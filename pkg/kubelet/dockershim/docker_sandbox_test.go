@@ -26,6 +26,7 @@ import (
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -37,10 +38,10 @@ func makeSandboxConfig(name, namespace, uid string, attempt uint32) *runtimeapi.
 func makeSandboxConfigWithLabelsAndAnnotations(name, namespace, uid string, attempt uint32, labels, annotations map[string]string) *runtimeapi.PodSandboxConfig {
 	return &runtimeapi.PodSandboxConfig{
 		Metadata: &runtimeapi.PodSandboxMetadata{
-			Name:      &name,
-			Namespace: &namespace,
-			Uid:       &uid,
-			Attempt:   &attempt,
+			Name:      name,
+			Namespace: namespace,
+			Uid:       uid,
+			Attempt:   attempt,
 		},
 		Labels:      labels,
 		Annotations: annotations,
@@ -72,9 +73,9 @@ func TestListSandboxes(t *testing.T) {
 		// the most recent sandbox first.
 		expected = append([]*runtimeapi.PodSandbox{{
 			Metadata:    configs[i].Metadata,
-			Id:          &id,
-			State:       &state,
-			CreatedAt:   &createdAt,
+			Id:          id,
+			State:       state,
+			CreatedAt:   createdAt,
 			Labels:      configs[i].Labels,
 			Annotations: configs[i].Annotations,
 		}}, expected...)
@@ -102,18 +103,18 @@ func TestSandboxStatus(t *testing.T) {
 	ct := int64(0)
 	hostNetwork := false
 	expected := &runtimeapi.PodSandboxStatus{
-		State:       &state,
-		CreatedAt:   &ct,
+		State:       state,
+		CreatedAt:   ct,
 		Metadata:    config.Metadata,
-		Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: &fakeIP},
-		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Network: &fakeNS, Options: &runtimeapi.NamespaceOption{HostNetwork: &hostNetwork}}},
+		Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
+		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Network: fakeNS, Options: &runtimeapi.NamespaceOption{HostNetwork: hostNetwork}}},
 		Labels:      labels,
 		Annotations: annotations,
 	}
 
 	// Create the sandbox.
 	fClock.SetTime(time.Now())
-	*expected.CreatedAt = fClock.Now().UnixNano()
+	expected.CreatedAt = fClock.Now().UnixNano()
 	id, err := ds.RunPodSandbox(config)
 
 	// Check internal labels
@@ -122,13 +123,13 @@ func TestSandboxStatus(t *testing.T) {
 	assert.Equal(t, c.Config.Labels[containerTypeLabelKey], containerTypeLabelSandbox)
 	assert.Equal(t, c.Config.Labels[types.KubernetesContainerNameLabel], sandboxContainerName)
 
-	expected.Id = &id // ID is only known after the creation.
+	expected.Id = id // ID is only known after the creation.
 	status, err := ds.PodSandboxStatus(id)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, status)
 
 	// Stop the sandbox.
-	*expected.State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+	expected.State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
 	err = ds.StopPodSandbox(id)
 	assert.NoError(t, err)
 	status, err = ds.PodSandboxStatus(id)
@@ -146,7 +147,7 @@ func TestSandboxStatus(t *testing.T) {
 func TestNetworkPluginInvocation(t *testing.T) {
 	ds, _, _ := newTestDockerService()
 	mockPlugin := newTestNetworkPlugin(t)
-	ds.networkPlugin = mockPlugin
+	ds.network = network.NewPluginManager(mockPlugin)
 	defer mockPlugin.Finish()
 
 	name := "foo0"
@@ -158,6 +159,7 @@ func TestNetworkPluginInvocation(t *testing.T) {
 	)
 	cID := kubecontainer.ContainerID{Type: runtimeName, ID: fmt.Sprintf("/%v", makeSandboxName(c))}
 
+	mockPlugin.EXPECT().Name().Return("mockNetworkPlugin").AnyTimes()
 	setup := mockPlugin.EXPECT().SetUpPod(ns, name, cID)
 	// StopPodSandbox performs a lookup on status to figure out if the sandbox
 	// is running with hostnetworking, as all its given is the ID.
@@ -175,7 +177,7 @@ func TestNetworkPluginInvocation(t *testing.T) {
 func TestHostNetworkPluginInvocation(t *testing.T) {
 	ds, _, _ := newTestDockerService()
 	mockPlugin := newTestNetworkPlugin(t)
-	ds.networkPlugin = mockPlugin
+	ds.network = network.NewPluginManager(mockPlugin)
 	defer mockPlugin.Finish()
 
 	name := "foo0"
@@ -189,7 +191,7 @@ func TestHostNetworkPluginInvocation(t *testing.T) {
 	c.Linux = &runtimeapi.LinuxPodSandboxConfig{
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
 			NamespaceOptions: &runtimeapi.NamespaceOption{
-				HostNetwork: &hostNetwork,
+				HostNetwork: hostNetwork,
 			},
 		},
 	}

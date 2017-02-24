@@ -18,15 +18,17 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -63,9 +65,9 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		if CurrentGinkgoTestDescription().Failed {
 			// Most of the reboot tests just make sure that addon/system pods are running, so dump
 			// events for the kube-system namespace on failures
-			namespaceName := api.NamespaceSystem
+			namespaceName := metav1.NamespaceSystem
 			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.ClientSet.Core().Events(namespaceName).List(v1.ListOptions{})
+			events, err := f.ClientSet.Core().Events(namespaceName).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {
@@ -116,9 +118,7 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
 		tmpLogPath := "/tmp/drop-inbound.log"
-		testReboot(f.ClientSet, fmt.Sprintf("nohup sh -c 'set -x && sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT"+
-			" && sudo iptables -I INPUT 2 -j DROP && sudo iptables -t filter -nL INPUT && date && sleep 120 && sudo iptables -t filter -nL INPUT"+
-			" && sudo iptables -D INPUT -j DROP && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT' >%v 2>&1 &", tmpLogPath), catLogHook(tmpLogPath))
+		testReboot(f.ClientSet, dropPacketsScript("INPUT", tmpLogPath), catLogHook(tmpLogPath))
 	})
 
 	It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
@@ -126,9 +126,7 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.
 		tmpLogPath := "/tmp/drop-outbound.log"
-		testReboot(f.ClientSet, fmt.Sprintf("nohup sh -c 'set -x && sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT"+
-			" && sudo iptables -I OUTPUT 2 -j DROP && sudo iptables -t filter -nL OUTPUT && date && sleep 120 && sudo iptables -t filter -nL OUTPUT"+
-			" && sudo iptables -D OUTPUT -j DROP && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT' >%v 2>&1 &", tmpLogPath), catLogHook(tmpLogPath))
+		testReboot(f.ClientSet, dropPacketsScript("OUTPUT", tmpLogPath), catLogHook(tmpLogPath))
 	})
 })
 
@@ -220,13 +218,13 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 // failed step, it will return false through result and not run the rest.
 func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	// Setup
-	ns := api.NamespaceSystem
+	ns := metav1.NamespaceSystem
 	ps := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
 	defer ps.Stop()
 
 	// Get the node initially.
 	framework.Logf("Getting %s", name)
-	node, err := c.Core().Nodes().Get(name)
+	node, err := c.Core().Nodes().Get(name, metav1.GetOptions{})
 	if err != nil {
 		framework.Logf("Couldn't get node %s", name)
 		return false
@@ -302,4 +300,19 @@ func catLogHook(logPath string) terminationHook {
 		}
 
 	}
+}
+
+func dropPacketsScript(chainName, logPath string) string {
+	return strings.Replace(fmt.Sprintf(`
+		nohup sh -c '
+			set -x
+			sleep 10
+			while true; do sudo iptables -I ${CHAIN} 1 -s 127.0.0.1 -j ACCEPT && break; done
+			while true; do sudo iptables -I ${CHAIN} 2 -j DROP && break; done
+			date
+			sleep 120
+			while true; do sudo iptables -D ${CHAIN} -j DROP && break; done
+			while true; do sudo iptables -D ${CHAIN} -s 127.0.0.1 -j ACCEPT && break; done
+		' >%v 2>&1 &
+		`, logPath), "${CHAIN}", chainName, -1)
 }

@@ -24,9 +24,9 @@ import (
 	"testing"
 
 	"golang.org/x/net/context"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/rand"
 )
 
 func configFromEnv() (cfg VSphereConfig, ok bool) {
@@ -71,6 +71,7 @@ user = user
 password = password
 insecure-flag = true
 datacenter = us-west
+vm-uuid = 1234
 `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -86,6 +87,10 @@ datacenter = us-west
 
 	if cfg.Global.Datacenter != "us-west" {
 		t.Errorf("incorrect datacenter: %s", cfg.Global.Datacenter)
+	}
+
+	if cfg.Global.VMUUID != "1234" {
+		t.Errorf("incorrect vm-uuid: %s", cfg.Global.VMUUID)
 	}
 }
 
@@ -118,7 +123,7 @@ func TestVSphereLogin(t *testing.T) {
 	defer cancel()
 
 	// Create vSphere client
-	err = vSphereLogin(vs, ctx)
+	err = vSphereLogin(ctx, vs)
 	if err != nil {
 		t.Errorf("Failed to create vSpere client: %s", err)
 	}
@@ -128,30 +133,15 @@ func TestVSphereLogin(t *testing.T) {
 func TestZones(t *testing.T) {
 	cfg := VSphereConfig{}
 	cfg.Global.Datacenter = "myDatacenter"
-	failureZone := "myCluster"
 
 	// Create vSphere configuration object
 	vs := VSphere{
-		cfg:         &cfg,
-		clusterName: failureZone,
+		cfg: &cfg,
 	}
 
-	z, ok := vs.Zones()
-	if !ok {
-		t.Fatalf("Zones() returned false")
-	}
-
-	zone, err := z.GetZone()
-	if err != nil {
-		t.Fatalf("GetZone() returned error: %s", err)
-	}
-
-	if zone.Region != vs.cfg.Global.Datacenter {
-		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
-	}
-
-	if zone.FailureDomain != failureZone {
-		t.Fatalf("GetZone() returned wrong Failure Zone (%s)", zone.FailureDomain)
+	_, ok := vs.Zones()
+	if ok {
+		t.Fatalf("Zones() returned true")
 	}
 }
 
@@ -171,13 +161,13 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances() returned false")
 	}
 
-	srvs, err := i.List("*")
+	srvs, err := vs.list("*")
 	if err != nil {
-		t.Fatalf("Instances.List() failed: %s", err)
+		t.Fatalf("list() failed: %s", err)
 	}
 
 	if len(srvs) == 0 {
-		t.Fatalf("Instances.List() returned zero servers")
+		t.Fatalf("list() returned zero servers")
 	}
 	t.Logf("Found servers (%d): %s\n", len(srvs), srvs)
 
@@ -230,17 +220,12 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
 
-	i, ok := vs.Instances()
-	if !ok {
-		t.Fatalf("Instances() returned false")
-	}
-
-	srvs, err := i.List("*")
+	srvs, err := vs.list("*")
 	if err != nil {
-		t.Fatalf("Instances.List() failed: %s", err)
+		t.Fatalf("list() failed: %s", err)
 	}
 	if len(srvs) == 0 {
-		t.Fatalf("Instances.List() returned zero servers")
+		t.Fatalf("list() returned zero servers")
 	}
 
 	volumeOptions := &VolumeOptions{

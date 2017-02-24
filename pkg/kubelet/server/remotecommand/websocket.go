@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/kubernetes/pkg/httplog"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wsstream"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/apiserver/pkg/util/wsstream"
 )
 
 const (

@@ -12,5 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/google_containers/mounttest:0.7
+FROM gcr.io/google_containers/mounttest:0.8
 USER 1001

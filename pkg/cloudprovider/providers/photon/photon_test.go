@@ -23,27 +23,27 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/rand"
 )
 
 func configFromEnv() (TestVM string, TestFlavor string, cfg PCConfig, ok bool) {
-	var IgnoreCertificate bool
+	var AuthEnabled bool
 	var OverrideIP bool
 	var err error
 	cfg.Global.CloudTarget = os.Getenv("PHOTON_TARGET")
-	cfg.Global.Tenant = os.Getenv("PHOTON_TENANT")
 	cfg.Global.Project = os.Getenv("PHOTON_PROJECT")
-	if os.Getenv("PHOTON_IGNORE_CERTIFICATE") != "" {
-		IgnoreCertificate, err = strconv.ParseBool(os.Getenv("PHOTON_IGNORE_CERTIFICATE"))
+	cfg.Global.VMID = os.Getenv("PHOTON_VMID")
+	if os.Getenv("PHOTON_AUTH_ENABLED") != "" {
+		AuthEnabled, err = strconv.ParseBool(os.Getenv("PHOTON_AUTH_ENABLED"))
 	} else {
-		IgnoreCertificate = false
+		AuthEnabled = false
 	}
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg.Global.IgnoreCertificate = IgnoreCertificate
+	cfg.Global.AuthEnabled = AuthEnabled
 	if os.Getenv("PHOTON_OVERRIDE_IP") != "" {
 		OverrideIP, err = strconv.ParseBool(os.Getenv("PHOTON_OVERRIDE_IP"))
 	} else {
@@ -65,8 +65,8 @@ func configFromEnv() (TestVM string, TestFlavor string, cfg PCConfig, ok bool) {
 	}
 
 	ok = (cfg.Global.CloudTarget != "" &&
-		cfg.Global.Tenant != "" &&
 		cfg.Global.Project != "" &&
+		cfg.Global.VMID != "" &&
 		TestVM != "")
 
 	return
@@ -81,10 +81,10 @@ func TestReadConfig(t *testing.T) {
 	cfg, err := readConfig(strings.NewReader(`
 [Global]
 target = 0.0.0.0
-ignoreCertificate = true
-tenant = tenant
 project = project
-overrideIP = false
+overrideIP = true
+vmID = vmid
+authentication = false
 `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -94,12 +94,12 @@ overrideIP = false
 		t.Errorf("incorrect photon target ip: %s", cfg.Global.CloudTarget)
 	}
 
-	if cfg.Global.Tenant != "tenant" {
-		t.Errorf("incorrect tenant: %s", cfg.Global.Tenant)
-	}
-
 	if cfg.Global.Project != "project" {
 		t.Errorf("incorrect project: %s", cfg.Global.Project)
+	}
+
+	if cfg.Global.VMID != "vmid" {
+		t.Errorf("incorrect vmid: %s", cfg.Global.VMID)
 	}
 }
 

@@ -20,5 +20,18 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-go get -u github.com/mikedanese/gazel
-"${GOPATH}/bin/gazel" -root="$(kube::realpath ${KUBE_ROOT})"
+git config http.https://gopkg.in.followRedirects true
+
+go get -u gopkg.in/mikedanese/gazel.v14/gazel
+
+for path in ${GOPATH//:/ }; do
+    if [[ -e "${path}/bin/gazel" ]]; then
+      gazel="${path}/bin/gazel"
+      break
+    fi
+done
+if [[ -z "${gazel:-}" ]]; then
+  echo "Couldn't find gazel on the GOPATH."
+  exit 1
+fi
+"${gazel}" -root="$(kube::realpath ${KUBE_ROOT})"

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,37 +22,18 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-
-	"github.com/golang/glog"
-	"github.com/renstrom/dedent"
 )
 
 const (
 	DefaultErrorExitCode = 1
-	PreFlight            = 2
+	PreFlightExitCode    = 2
 )
-
-var AlphaWarningOnExit = dedent.Dedent(`
-	kubeadm: I am an alpha version, my authors welcome your feedback and bug reports
-	kubeadm: please create an issue using https://github.com/kubernetes/kubernetes/issues/new
-	kubeadm: and make sure to mention @kubernetes/sig-cluster-lifecycle. Thank you!
-`)
 
 type debugError interface {
 	DebugError() (msg string, args []interface{})
 }
 
-var fatalErrHandler = fatal
-
-// BehaviorOnFatal allows you to override the default behavior when a fatal
-// error occurs, which is to call os.Exit(code). You can pass 'panic' as a function
-// here if you prefer the panic() over os.Exit(1).
-func BehaviorOnFatal(f func(string, int)) {
-	fatalErrHandler = f
-}
-
-// fatal prints the message if set and then exits. If V(2) or greater, glog.Fatal
-// is invoked for extended information.
+// fatal prints the message if set and then exits.
 func fatal(msg string, code int) {
 	if len(msg) > 0 {
 		// add newline if needed
@@ -60,9 +41,6 @@ func fatal(msg string, code int) {
 			msg += "\n"
 		}
 
-		if glog.V(2) {
-			glog.FatalDepth(2, msg)
-		}
 		fmt.Fprint(os.Stderr, msg)
 	}
 	os.Exit(code)
@@ -74,7 +52,7 @@ func fatal(msg string, code int) {
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
 func CheckErr(err error) {
-	checkErr("", err, fatalErrHandler)
+	checkErr("", err, fatal)
 }
 
 // checkErr formats a given error as a string and calls the passed handleErr
@@ -83,10 +61,9 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 	switch err.(type) {
 	case nil:
 		return
-	case *preflight.PreFlightError:
-		handleErr(err.Error(), PreFlight)
+	case *preflight.Error:
+		handleErr(err.Error(), PreFlightExitCode)
 	default:
-		fmt.Printf(AlphaWarningOnExit)
 		handleErr(err.Error(), DefaultErrorExitCode)
 	}
 }

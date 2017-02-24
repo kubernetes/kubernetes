@@ -30,13 +30,13 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"k8s.io/client-go/pkg/util/jsonpath"
-	"k8s.io/client-go/pkg/util/yaml"
-	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/jsonpath"
 )
 
 func init() {
-	if err := rest.RegisterAuthProviderPlugin("gcp", newGCPAuthProvider); err != nil {
+	if err := restclient.RegisterAuthProviderPlugin("gcp", newGCPAuthProvider); err != nil {
 		glog.Fatalf("Failed to register gcp auth plugin: %v", err)
 	}
 }
@@ -85,10 +85,10 @@ func init() {
 //
 type gcpAuthProvider struct {
 	tokenSource oauth2.TokenSource
-	persister   rest.AuthProviderConfigPersister
+	persister   restclient.AuthProviderConfigPersister
 }
 
-func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister rest.AuthProviderConfigPersister) (rest.AuthProvider, error) {
+func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	cmd, useCmd := gcpConfig["cmd-path"]
 	var ts oauth2.TokenSource
 	var err error
@@ -121,11 +121,11 @@ type cachedTokenSource struct {
 	source      oauth2.TokenSource
 	accessToken string
 	expiry      time.Time
-	persister   rest.AuthProviderConfigPersister
+	persister   restclient.AuthProviderConfigPersister
 	cache       map[string]string
 }
 
-func newCachedTokenSource(accessToken, expiry string, persister rest.AuthProviderConfigPersister, ts oauth2.TokenSource, cache map[string]string) (*cachedTokenSource, error) {
+func newCachedTokenSource(accessToken, expiry string, persister restclient.AuthProviderConfigPersister, ts oauth2.TokenSource, cache map[string]string) (*cachedTokenSource, error) {
 	var expiryTime time.Time
 	if parsedTime, err := time.Parse(time.RFC3339Nano, expiry); err == nil {
 		expiryTime = parsedTime

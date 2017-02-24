@@ -17,20 +17,23 @@ limitations under the License.
 package thirdpartyresourcedata
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store ThirdPartyResourceData objects.
 type Registry interface {
-	ListThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error)
-	WatchThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetThirdPartyResourceData(ctx api.Context, name string) (*extensions.ThirdPartyResourceData, error)
-	CreateThirdPartyResourceData(ctx api.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
-	UpdateThirdPartyResourceData(ctx api.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
-	DeleteThirdPartyResourceData(ctx api.Context, name string) error
+	ListThirdPartyResourceData(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.ThirdPartyResourceDataList, error)
+	WatchThirdPartyResourceData(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	GetThirdPartyResourceData(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*extensions.ThirdPartyResourceData, error)
+	CreateThirdPartyResourceData(ctx genericapirequest.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
+	UpdateThirdPartyResourceData(ctx genericapirequest.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
+	DeleteThirdPartyResourceData(ctx genericapirequest.Context, name string) error
 }
 
 // storage puts strong typing around storage calls
@@ -44,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error) {
+func (s *storage) ListThirdPartyResourceData(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.ThirdPartyResourceDataList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -52,29 +55,29 @@ func (s *storage) ListThirdPartyResourceData(ctx api.Context, options *api.ListO
 	return obj.(*extensions.ThirdPartyResourceDataList), nil
 }
 
-func (s *storage) WatchThirdPartyResourceData(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchThirdPartyResourceData(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetThirdPartyResourceData(ctx api.Context, name string) (*extensions.ThirdPartyResourceData, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetThirdPartyResourceData(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*extensions.ThirdPartyResourceData, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*extensions.ThirdPartyResourceData), nil
 }
 
-func (s *storage) CreateThirdPartyResourceData(ctx api.Context, ThirdPartyResourceData *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error) {
+func (s *storage) CreateThirdPartyResourceData(ctx genericapirequest.Context, ThirdPartyResourceData *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error) {
 	obj, err := s.Create(ctx, ThirdPartyResourceData)
 	return obj.(*extensions.ThirdPartyResourceData), err
 }
 
-func (s *storage) UpdateThirdPartyResourceData(ctx api.Context, ThirdPartyResourceData *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error) {
+func (s *storage) UpdateThirdPartyResourceData(ctx genericapirequest.Context, ThirdPartyResourceData *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error) {
 	obj, _, err := s.Update(ctx, ThirdPartyResourceData.Name, rest.DefaultUpdatedObjectInfo(ThirdPartyResourceData, api.Scheme))
 	return obj.(*extensions.ThirdPartyResourceData), err
 }
 
-func (s *storage) DeleteThirdPartyResourceData(ctx api.Context, name string) error {
+func (s *storage) DeleteThirdPartyResourceData(ctx genericapirequest.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }

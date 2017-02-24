@@ -25,8 +25,9 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type unsetOptions struct {
@@ -44,7 +45,7 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 
 	cmd := &cobra.Command{
 		Use:   "unset PROPERTY_NAME",
-		Short: "Unsets an individual value in a kubeconfig file",
+		Short: i18n.T("Unsets an individual value in a kubeconfig file"),
 		Long:  unset_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {

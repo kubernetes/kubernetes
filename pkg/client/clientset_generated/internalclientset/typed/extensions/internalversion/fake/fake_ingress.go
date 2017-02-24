@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,13 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeIngresses implements IngressInterface
@@ -35,7 +36,7 @@ var ingressesResource = schema.GroupVersionResource{Group: "extensions", Version
 
 func (c *FakeIngresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(ingressesResource, c.ns, ingress), &extensions.Ingress{})
+		Invokes(testing.NewCreateAction(ingressesResource, c.ns, ingress), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -45,7 +46,7 @@ func (c *FakeIngresses) Create(ingress *extensions.Ingress) (result *extensions.
 
 func (c *FakeIngresses) Update(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(ingressesResource, c.ns, ingress), &extensions.Ingress{})
+		Invokes(testing.NewUpdateAction(ingressesResource, c.ns, ingress), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -55,7 +56,7 @@ func (c *FakeIngresses) Update(ingress *extensions.Ingress) (result *extensions.
 
 func (c *FakeIngresses) UpdateStatus(ingress *extensions.Ingress) (*extensions.Ingress, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(ingressesResource, "status", c.ns, ingress), &extensions.Ingress{})
+		Invokes(testing.NewUpdateSubresourceAction(ingressesResource, "status", c.ns, ingress), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -63,23 +64,23 @@ func (c *FakeIngresses) UpdateStatus(ingress *extensions.Ingress) (*extensions.I
 	return obj.(*extensions.Ingress), err
 }
 
-func (c *FakeIngresses) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeIngresses) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(ingressesResource, c.ns, name), &extensions.Ingress{})
+		Invokes(testing.NewDeleteAction(ingressesResource, c.ns, name), &extensions.Ingress{})
 
 	return err
 }
 
-func (c *FakeIngresses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction(ingressesResource, c.ns, listOptions)
+func (c *FakeIngresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(ingressesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.IngressList{})
 	return err
 }
 
-func (c *FakeIngresses) Get(name string) (result *extensions.Ingress, err error) {
+func (c *FakeIngresses) Get(name string, options v1.GetOptions) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(ingressesResource, c.ns, name), &extensions.Ingress{})
+		Invokes(testing.NewGetAction(ingressesResource, c.ns, name), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err
@@ -87,15 +88,15 @@ func (c *FakeIngresses) Get(name string) (result *extensions.Ingress, err error)
 	return obj.(*extensions.Ingress), err
 }
 
-func (c *FakeIngresses) List(opts api.ListOptions) (result *extensions.IngressList, err error) {
+func (c *FakeIngresses) List(opts v1.ListOptions) (result *extensions.IngressList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(ingressesResource, c.ns, opts), &extensions.IngressList{})
+		Invokes(testing.NewListAction(ingressesResource, c.ns, opts), &extensions.IngressList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -109,16 +110,16 @@ func (c *FakeIngresses) List(opts api.ListOptions) (result *extensions.IngressLi
 }
 
 // Watch returns a watch.Interface that watches the requested ingresses.
-func (c *FakeIngresses) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeIngresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(ingressesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(ingressesResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched ingress.
-func (c *FakeIngresses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.Ingress, err error) {
+func (c *FakeIngresses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(ingressesResource, c.ns, name, data, subresources...), &extensions.Ingress{})
+		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, name, data, subresources...), &extensions.Ingress{})
 
 	if obj == nil {
 		return nil, err

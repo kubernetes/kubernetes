@@ -14,6 +14,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 )
 
+// ProviderName provides a name of EC2Role provider
+const ProviderName = "EC2RoleProvider"
+
 // A EC2RoleProvider retrieves credentials from the EC2 service, and keeps track if
 // those credentials are expired.
 //
@@ -85,17 +88,17 @@ func NewCredentialsWithClient(client *ec2metadata.EC2Metadata, options ...func(*
 func (m *EC2RoleProvider) Retrieve() (credentials.Value, error) {
 	credsList, err := requestCredList(m.Client)
 	if err != nil {
-		return credentials.Value{}, err
+		return credentials.Value{ProviderName: ProviderName}, err
 	}
 
 	if len(credsList) == 0 {
-		return credentials.Value{}, awserr.New("EmptyEC2RoleList", "empty EC2 Role list", nil)
+		return credentials.Value{ProviderName: ProviderName}, awserr.New("EmptyEC2RoleList", "empty EC2 Role list", nil)
 	}
 	credsName := credsList[0]
 
 	roleCreds, err := requestCred(m.Client, credsName)
 	if err != nil {
-		return credentials.Value{}, err
+		return credentials.Value{ProviderName: ProviderName}, err
 	}
 
 	m.SetExpiration(roleCreds.Expiration, m.ExpiryWindow)
@@ -104,10 +107,11 @@ func (m *EC2RoleProvider) Retrieve() (credentials.Value, error) {
 		AccessKeyID:     roleCreds.AccessKeyID,
 		SecretAccessKey: roleCreds.SecretAccessKey,
 		SessionToken:    roleCreds.Token,
+		ProviderName:    ProviderName,
 	}, nil
 }
 
-// A ec2RoleCredRespBody provides the shape for unmarshalling credential
+// A ec2RoleCredRespBody provides the shape for unmarshaling credential
 // request responses.
 type ec2RoleCredRespBody struct {
 	// Success State
@@ -128,7 +132,7 @@ const iamSecurityCredsPath = "/iam/security-credentials"
 func requestCredList(client *ec2metadata.EC2Metadata) ([]string, error) {
 	resp, err := client.GetMetadata(iamSecurityCredsPath)
 	if err != nil {
-		return nil, awserr.New("EC2RoleRequestError", "failed to list EC2 Roles", err)
+		return nil, awserr.New("EC2RoleRequestError", "no EC2 instance role found", err)
 	}
 
 	credsList := []string{}
@@ -138,7 +142,7 @@ func requestCredList(client *ec2metadata.EC2Metadata) ([]string, error) {
 	}
 
 	if err := s.Err(); err != nil {
-		return nil, awserr.New("SerializationError", "failed to read list of EC2 Roles", err)
+		return nil, awserr.New("SerializationError", "failed to read EC2 instance role from metadata service", err)
 	}
 
 	return credsList, nil
@@ -153,7 +157,7 @@ func requestCred(client *ec2metadata.EC2Metadata, credsName string) (ec2RoleCred
 	if err != nil {
 		return ec2RoleCredRespBody{},
 			awserr.New("EC2RoleRequestError",
-				fmt.Sprintf("failed to get %s EC2 Role credentials", credsName),
+				fmt.Sprintf("failed to get %s EC2 instance role credentials", credsName),
 				err)
 	}
 
@@ -161,7 +165,7 @@ func requestCred(client *ec2metadata.EC2Metadata, credsName string) (ec2RoleCred
 	if err := json.NewDecoder(strings.NewReader(resp)).Decode(&respCreds); err != nil {
 		return ec2RoleCredRespBody{},
 			awserr.New("SerializationError",
-				fmt.Sprintf("failed to decode %s EC2 Role credentials", credsName),
+				fmt.Sprintf("failed to decode %s EC2 instance role credentials", credsName),
 				err)
 	}
 

@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"net"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -37,10 +38,12 @@ import (
 // plugins - used to initialize volumePluginMgr
 func NewInitializedVolumePluginMgr(
 	kubelet *Kubelet,
+	secretManager secret.Manager,
 	plugins []volume.VolumePlugin) (*volume.VolumePluginMgr, error) {
 	kvh := &kubeletVolumeHost{
 		kubelet:         kubelet,
 		volumePluginMgr: volume.VolumePluginMgr{},
+		secretManager:   secretManager,
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, kvh); err != nil {
@@ -62,6 +65,7 @@ func (kvh *kubeletVolumeHost) GetPluginDir(pluginName string) string {
 type kubeletVolumeHost struct {
 	kubelet         *Kubelet
 	volumePluginMgr volume.VolumePluginMgr
+	secretManager   secret.Manager
 }
 
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
@@ -131,4 +135,8 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
 	return node.Status.Allocatable, nil
+}
+
+func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
+	return kvh.secretManager.GetSecret
 }

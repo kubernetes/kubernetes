@@ -19,12 +19,12 @@ package v1_test
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testing/compat"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func TestCompatibility_v1_PodSecurityContext(t *testing.T) {
@@ -152,68 +152,6 @@ func TestCompatibility_v1_PodSecurityContext(t *testing.T) {
 `,
 			absentKeys: []string{
 				"spec.hostPID",
-			},
-		},
-		{
-			name: "reseting defaults for pre-v1.1 mirror pods",
-			input: `
-{
-	"kind":"Pod",
-	"apiVersion":"v1",
-	"metadata":{
-		"name":"my-pod-name",
-		"namespace":"my-pod-namespace",
-		"annotations": {
-			"kubernetes.io/config.mirror": "mirror"
-		}
-	},
-	"spec": {
-		"containers":[{
-			"name":"a",
-			"image":"my-container-image",
-			"resources": {
-				"limits": {
-					"cpu": "100m"
-				}
-			}
-		}]
-	}
-}
-`,
-			absentKeys: []string{
-				"spec.terminationGracePeriodSeconds",
-				"spec.containers[0].resources.requests",
-			},
-		},
-		{
-			name: "preserving defaults for v1.1+ mirror pods",
-			input: `
-		{
-			"kind":"Pod",
-			"apiVersion":"v1",
-			"metadata":{
-				"name":"my-pod-name",
-				"namespace":"my-pod-namespace",
-				"annotations": {
-					"kubernetes.io/config.mirror": "cbe924f710c7e26f7693d6a341bcfad0"
-				}
-			},
-			"spec": {
-				"containers":[{
-					"name":"a",
-					"image":"my-container-image",
-					"resources": {
-						"limits": {
-							"cpu": "100m"
-						}
-					}
-				}]
-			}
-		}
-		`,
-			expectedKeys: map[string]string{
-				"spec.terminationGracePeriodSeconds":    "30",
-				"spec.containers[0].resources.requests": "map[cpu:100m]",
 			},
 		},
 	}

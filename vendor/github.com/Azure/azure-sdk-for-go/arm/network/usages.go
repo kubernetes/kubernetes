@@ -21,12 +21,13 @@ package network
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
 // UsagesClient is the the Microsoft Azure Network management API provides a
 // RESTful set of web services that interact with Microsoft Azure Networks
-// service to manage your network resrources. The API has entities that
+// service to manage your network resources. The API has entities that
 // capture the relationship between an end user and the Microsoft Azure
 // Networks service.
 type UsagesClient struct {
@@ -45,8 +46,14 @@ func NewUsagesClientWithBaseURI(baseURI string, subscriptionID string) UsagesCli
 
 // List lists compute usages for a subscription.
 //
-// location is the location upon which resource usage is queried.
+// location is the location where resource usage is queried.
 func (client UsagesClient) List(location string) (result UsagesListResult, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: location,
+			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "network.UsagesClient", "List")
+	}
+
 	req, err := client.ListPreparer(location)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.UsagesClient", "List", nil, "Failure preparing request")
@@ -108,7 +115,7 @@ func (client UsagesClient) ListResponder(resp *http.Response) (result UsagesList
 func (client UsagesClient) ListNextResults(lastResults UsagesListResult) (result UsagesListResult, err error) {
 	req, err := lastResults.UsagesListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "network.UsagesClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "network.UsagesClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -117,12 +124,12 @@ func (client UsagesClient) ListNextResults(lastResults UsagesListResult) (result
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "network.UsagesClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "network.UsagesClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.UsagesClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "network.UsagesClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return

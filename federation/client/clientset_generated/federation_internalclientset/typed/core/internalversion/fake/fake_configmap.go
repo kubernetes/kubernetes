@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/api"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeConfigMaps implements ConfigMapInterface
@@ -34,7 +36,7 @@ var configmapsResource = schema.GroupVersionResource{Group: "", Version: "", Res
 
 func (c *FakeConfigMaps) Create(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(configmapsResource, c.ns, configMap), &api.ConfigMap{})
+		Invokes(testing.NewCreateAction(configmapsResource, c.ns, configMap), &api.ConfigMap{})
 
 	if obj == nil {
 		return nil, err
@@ -44,7 +46,7 @@ func (c *FakeConfigMaps) Create(configMap *api.ConfigMap) (result *api.ConfigMap
 
 func (c *FakeConfigMaps) Update(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(configmapsResource, c.ns, configMap), &api.ConfigMap{})
+		Invokes(testing.NewUpdateAction(configmapsResource, c.ns, configMap), &api.ConfigMap{})
 
 	if obj == nil {
 		return nil, err
@@ -52,23 +54,23 @@ func (c *FakeConfigMaps) Update(configMap *api.ConfigMap) (result *api.ConfigMap
 	return obj.(*api.ConfigMap), err
 }
 
-func (c *FakeConfigMaps) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeConfigMaps) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(configmapsResource, c.ns, name), &api.ConfigMap{})
+		Invokes(testing.NewDeleteAction(configmapsResource, c.ns, name), &api.ConfigMap{})
 
 	return err
 }
 
-func (c *FakeConfigMaps) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction(configmapsResource, c.ns, listOptions)
+func (c *FakeConfigMaps) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(configmapsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ConfigMapList{})
 	return err
 }
 
-func (c *FakeConfigMaps) Get(name string) (result *api.ConfigMap, err error) {
+func (c *FakeConfigMaps) Get(name string, options v1.GetOptions) (result *api.ConfigMap, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(configmapsResource, c.ns, name), &api.ConfigMap{})
+		Invokes(testing.NewGetAction(configmapsResource, c.ns, name), &api.ConfigMap{})
 
 	if obj == nil {
 		return nil, err
@@ -76,15 +78,15 @@ func (c *FakeConfigMaps) Get(name string) (result *api.ConfigMap, err error) {
 	return obj.(*api.ConfigMap), err
 }
 
-func (c *FakeConfigMaps) List(opts api.ListOptions) (result *api.ConfigMapList, err error) {
+func (c *FakeConfigMaps) List(opts v1.ListOptions) (result *api.ConfigMapList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(configmapsResource, c.ns, opts), &api.ConfigMapList{})
+		Invokes(testing.NewListAction(configmapsResource, c.ns, opts), &api.ConfigMapList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -98,16 +100,16 @@ func (c *FakeConfigMaps) List(opts api.ListOptions) (result *api.ConfigMapList, 
 }
 
 // Watch returns a watch.Interface that watches the requested configMaps.
-func (c *FakeConfigMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeConfigMaps) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(configmapsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(configmapsResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched configMap.
-func (c *FakeConfigMaps) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error) {
+func (c *FakeConfigMaps) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(configmapsResource, c.ns, name, data, subresources...), &api.ConfigMap{})
+		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, name, data, subresources...), &api.ConfigMap{})
 
 	if obj == nil {
 		return nil, err

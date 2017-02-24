@@ -21,14 +21,24 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
+)
+
+var (
+	delete_cluster_example = templates.Examples(`
+		# Delete the minikube cluster
+		kubectl config delete-cluster minikube`)
 )
 
 func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "delete-cluster NAME",
-		Short: "Delete the specified cluster from the kubeconfig",
+		Use:     "delete-cluster NAME",
+		Short:   i18n.T("Delete the specified cluster from the kubeconfig"),
+		Long:    "Delete the specified cluster from the kubeconfig",
+		Example: delete_cluster_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := runDeleteCluster(out, configAccess, cmd)
 			cmdutil.CheckErr(err)

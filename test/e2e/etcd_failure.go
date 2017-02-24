@@ -19,9 +19,10 @@ package e2e
 import (
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -106,7 +107,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 
 	By("deleting pods from existing replication controller")
 	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
-		options := v1.ListOptions{LabelSelector: rcSelector.String()}
+		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(options)
 		if err != nil {
 			framework.Logf("apiserver returned error, as expected before recovery: %v", err)
@@ -116,7 +117,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 			return false, nil
 		}
 		for _, pod := range pods.Items {
-			err = podClient.Delete(pod.Name, v1.NewDeleteOptions(0))
+			err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
 			Expect(err).NotTo(HaveOccurred())
 		}
 		framework.Logf("apiserver has recovered")
@@ -125,7 +126,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 
 	By("waiting for replication controller to recover")
 	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
-		options := v1.ListOptions{LabelSelector: rcSelector.String()}
+		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(options)
 		Expect(err).NotTo(HaveOccurred())
 		for _, pod := range pods.Items {

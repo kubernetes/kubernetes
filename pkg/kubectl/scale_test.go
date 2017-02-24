@@ -20,15 +20,16 @@ import (
 	"errors"
 	"testing"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type ErrorReplicationControllers struct {
@@ -67,7 +68,7 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo-v1"
-	namespace := api.NamespaceDefault
+	namespace := metav1.NamespaceDefault
 
 	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
 	pass, err := scaleFunc()
@@ -126,7 +127,7 @@ func TestReplicationControllerScale(t *testing.T) {
 
 func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 	fake := fake.NewSimpleClientset(&api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 10,
 		},
@@ -161,7 +162,7 @@ func TestValidateReplicationController(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{-1, ""},
 			controller: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -174,7 +175,7 @@ func TestValidateReplicationController(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{0, ""},
 			controller: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -187,7 +188,7 @@ func TestValidateReplicationController(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{-1, "foo"},
 			controller: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -200,7 +201,7 @@ func TestValidateReplicationController(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			controller: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -213,7 +214,7 @@ func TestValidateReplicationController(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			controller: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -226,7 +227,7 @@ func TestValidateReplicationController(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			controller: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "bar",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -239,7 +240,7 @@ func TestValidateReplicationController(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			controller: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "bar",
 				},
 				Spec: api.ReplicationControllerSpec{
@@ -277,7 +278,7 @@ func (c *ErrorJobs) Update(job *batch.Job) (*batch.Job, error) {
 	return nil, errors.New("Job update failure")
 }
 
-func (c *ErrorJobs) Get(name string) (*batch.Job, error) {
+func (c *ErrorJobs) Get(name string, options metav1.GetOptions) (*batch.Job, error) {
 	zero := int32(0)
 	return &batch.Job{
 		Spec: batch.JobSpec{
@@ -326,8 +327,8 @@ func TestJobScaleRetry(t *testing.T) {
 
 func job() *batch.Job {
 	return &batch.Job{
-		ObjectMeta: api.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 		},
 	}
@@ -375,8 +376,8 @@ func TestJobScaleInvalid(t *testing.T) {
 func TestJobScaleFailsPreconditions(t *testing.T) {
 	ten := int32(10)
 	fake := fake.NewSimpleClientset(&batch.Job{
-		ObjectMeta: api.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 		},
 		Spec: batch.JobSpec{
@@ -414,7 +415,7 @@ func TestValidateJob(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{-1, ""},
 			job: batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: batch.JobSpec{
@@ -427,7 +428,7 @@ func TestValidateJob(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{0, ""},
 			job: batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: batch.JobSpec{
@@ -440,7 +441,7 @@ func TestValidateJob(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{-1, "foo"},
 			job: batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: batch.JobSpec{
@@ -453,7 +454,7 @@ func TestValidateJob(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			job: batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: batch.JobSpec{
@@ -466,7 +467,7 @@ func TestValidateJob(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			job: batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: batch.JobSpec{
@@ -479,7 +480,7 @@ func TestValidateJob(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			job: batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 			},
@@ -489,7 +490,7 @@ func TestValidateJob(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			job: batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "bar",
 				},
 				Spec: batch.JobSpec{
@@ -502,7 +503,7 @@ func TestValidateJob(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			job: batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "bar",
 				},
 				Spec: batch.JobSpec{
@@ -540,7 +541,7 @@ func (c *ErrorDeployments) Update(deployment *extensions.Deployment) (*extension
 	return nil, errors.New("deployment update failure")
 }
 
-func (c *ErrorDeployments) Get(name string) (*extensions.Deployment, error) {
+func (c *ErrorDeployments) Get(name string, options metav1.GetOptions) (*extensions.Deployment, error) {
 	return &extensions.Deployment{
 		Spec: extensions.DeploymentSpec{
 			Replicas: 0,
@@ -588,8 +589,8 @@ func TestDeploymentScaleRetry(t *testing.T) {
 
 func deployment() *extensions.Deployment {
 	return &extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 		},
 	}
@@ -636,8 +637,8 @@ func TestDeploymentScaleInvalid(t *testing.T) {
 
 func TestDeploymentScaleFailsPreconditions(t *testing.T) {
 	fake := fake.NewSimpleClientset(&extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
-			Namespace: api.NamespaceDefault,
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 		},
 		Spec: extensions.DeploymentSpec{
@@ -675,7 +676,7 @@ func TestValidateDeployment(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{-1, ""},
 			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: extensions.DeploymentSpec{
@@ -688,7 +689,7 @@ func TestValidateDeployment(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{0, ""},
 			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: extensions.DeploymentSpec{
@@ -701,7 +702,7 @@ func TestValidateDeployment(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{-1, "foo"},
 			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: extensions.DeploymentSpec{
@@ -714,7 +715,7 @@ func TestValidateDeployment(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: extensions.DeploymentSpec{
@@ -727,7 +728,7 @@ func TestValidateDeployment(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 				Spec: extensions.DeploymentSpec{
@@ -740,7 +741,7 @@ func TestValidateDeployment(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
 			},
@@ -750,7 +751,7 @@ func TestValidateDeployment(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "bar",
 				},
 				Spec: extensions.DeploymentSpec{
@@ -763,7 +764,7 @@ func TestValidateDeployment(t *testing.T) {
 		{
 			preconditions: ScalePrecondition{10, "foo"},
 			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "bar",
 				},
 				Spec: extensions.DeploymentSpec{

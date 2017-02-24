@@ -114,6 +114,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 	)
 
 	logSoakVerification := f.NewClusterVerification(
+		f.Namespace,
 		framework.PodStateVerification{
 			Selectors:   podlables,
 			ValidPhases: []v1.PodPhase{v1.PodRunning, v1.PodSucceeded},

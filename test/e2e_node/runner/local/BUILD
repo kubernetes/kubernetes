@@ -6,16 +6,33 @@ load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
     "go_library",
-    "go_test",
-    "cgo_library",
 )
 
 go_binary(
     name = "local",
+    library = ":go_default_library",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "go_default_library",
     srcs = ["run_local.go"],
     tags = ["automanaged"],
     deps = [
         "//test/e2e_node/builder:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

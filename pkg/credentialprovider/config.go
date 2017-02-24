@@ -122,29 +122,35 @@ func ReadDockerConfigJSONFile(searchPaths []string) (cfg DockerConfig, err error
 	if len(searchPaths) == 0 {
 		searchPaths = DefaultDockerConfigJSONPaths()
 	}
-
 	for _, configPath := range searchPaths {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJsonFileName))
 		if err != nil {
 			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
 			continue
 		}
-		glog.V(4).Infof("looking for .docker/config.json at %s", absDockerConfigFileLocation)
-		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
-		if os.IsNotExist(err) {
-			continue
-		}
+		glog.V(4).Infof("looking for %s at %s", configJsonFileName, absDockerConfigFileLocation)
+		cfg, err = ReadSpecificDockerConfigJsonFile(absDockerConfigFileLocation)
 		if err != nil {
-			glog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+			if !os.IsNotExist(err) {
+				glog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+			}
 			continue
 		}
-		cfg, err := readDockerConfigJsonFileFromBytes(contents)
-		if err == nil {
-			glog.V(4).Infof("found .docker/config.json at %s", absDockerConfigFileLocation)
-			return cfg, nil
-		}
+		glog.V(4).Infof("found valid %s at %s", configJsonFileName, absDockerConfigFileLocation)
+		return cfg, nil
 	}
-	return nil, fmt.Errorf("couldn't find valid .docker/config.json after checking in %v", searchPaths)
+	return nil, fmt.Errorf("couldn't find valid %s after checking in %v", configJsonFileName, searchPaths)
+
+}
+
+//ReadSpecificDockerConfigJsonFile attempts to read docker configJSON from a given file path.
+func ReadSpecificDockerConfigJsonFile(filePath string) (cfg DockerConfig, err error) {
+	var contents []byte
+
+	if contents, err = ioutil.ReadFile(filePath); err != nil {
+		return nil, err
+	}
+	return readDockerConfigJsonFileFromBytes(contents)
 }
 
 func ReadDockerConfigFile() (cfg DockerConfig, err error) {

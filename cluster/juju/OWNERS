@@ -1,8 +1,18 @@
-assignees:
-  - chuckbutler
-  - mbruzek
-  - marcoceppi
-  - castrojo
-owners:
-  - chuckbutler
-  - mbruzek
+approvers:
+- castrojo
+- chuckbutler
+- marcoceppi
+- mbruzek
+reviewers:
+- thockin
+- mikedanese
+- nikhiljindal
+- pmorie
+- eparis
+- jlowdermilk
+- jsafrane
+- krousey
+- david-mcmahon
+- Cynerva
+- wwwtyro
+- tvansteenburgh

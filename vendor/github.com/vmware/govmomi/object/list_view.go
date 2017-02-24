@@ -17,10 +17,11 @@ limitations under the License.
 package object
 
 import (
+	"context"
+
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type ListView struct {
@@ -37,7 +38,33 @@ func (v ListView) Destroy(ctx context.Context) error {
 	req := types.DestroyView{
 		This: v.Reference(),
 	}
-
 	_, err := methods.DestroyView(ctx, v.c, &req)
+	return err
+}
+
+func (v ListView) Add(ctx context.Context, refs []types.ManagedObjectReference) error {
+	req := types.ModifyListView{
+		This: v.Reference(),
+		Add:  refs,
+	}
+	_, err := methods.ModifyListView(ctx, v.c, &req)
+	return err
+}
+
+func (v ListView) Remove(ctx context.Context, refs []types.ManagedObjectReference) error {
+	req := types.ModifyListView{
+		This:   v.Reference(),
+		Remove: refs,
+	}
+	_, err := methods.ModifyListView(ctx, v.c, &req)
+	return err
+}
+
+func (v ListView) Reset(ctx context.Context, refs []types.ManagedObjectReference) error {
+	req := types.ResetListView{
+		This: v.Reference(),
+		Obj:  refs,
+	}
+	_, err := methods.ResetListView(ctx, v.c, &req)
 	return err
 }

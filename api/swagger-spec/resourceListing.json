@@ -30,12 +30,20 @@
     "description": "get information of a group"
    },
    {
+    "path": "/apis/authentication.k8s.io/v1",
+    "description": "API at /apis/authentication.k8s.io/v1"
+   },
+   {
     "path": "/apis/authentication.k8s.io/v1beta1",
     "description": "API at /apis/authentication.k8s.io/v1beta1"
    },
    {
     "path": "/apis/authentication.k8s.io",
     "description": "get information of a group"
+   },
+   {
+    "path": "/apis/authorization.k8s.io/v1",
+    "description": "API at /apis/authorization.k8s.io/v1"
    },
    {
     "path": "/apis/authorization.k8s.io/v1beta1",
@@ -48,6 +56,10 @@
    {
     "path": "/apis/autoscaling/v1",
     "description": "API at /apis/autoscaling/v1"
+   },
+   {
+    "path": "/apis/autoscaling/v2alpha1",
+    "description": "API at /apis/autoscaling/v2alpha1"
    },
    {
     "path": "/apis/autoscaling",
@@ -66,8 +78,8 @@
     "description": "get information of a group"
    },
    {
-    "path": "/apis/certificates.k8s.io/v1alpha1",
-    "description": "API at /apis/certificates.k8s.io/v1alpha1"
+    "path": "/apis/certificates.k8s.io/v1beta1",
+    "description": "API at /apis/certificates.k8s.io/v1beta1"
    },
    {
     "path": "/apis/certificates.k8s.io",
@@ -88,6 +100,10 @@
    {
     "path": "/apis/policy",
     "description": "get information of a group"
+   },
+   {
+    "path": "/apis/rbac.authorization.k8s.io/v1beta1",
+    "description": "API at /apis/rbac.authorization.k8s.io/v1beta1"
    },
    {
     "path": "/apis/rbac.authorization.k8s.io/v1alpha1",

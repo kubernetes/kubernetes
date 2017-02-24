@@ -18,7 +18,6 @@
 
 FROM java:openjdk-8-jre
 
-MAINTAINER Mik Vyatskov "vmik@google.com"
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV ELASTICSEARCH_VERSION 2.4.1

@@ -22,9 +22,12 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -79,6 +82,17 @@ X024wzbiw1q07jFCyfQmODzURAx1VNT7QVUMdz/N8vy47/H40AZJ
 -----END RSA PRIVATE KEY-----
 `
 
+// openssl ecparam -name prime256v1 -genkey -out ecdsa256params.pem
+const ecdsaPrivateKeyWithParams = `-----BEGIN EC PARAMETERS-----
+BggqhkjOPQMBBw==
+-----END EC PARAMETERS-----
+-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIJ9LWDj3ZWe9CksPV7mZjD2dYXG9icfzxadCRwd3vr1toAoGCCqGSM49
+AwEHoUQDQgAEaLNEpzbaaNTCkKjBVj7sxpfJ1ifJQGNvcck4nrzcwFRuujwVDDJh
+95iIGwKCQeSg+yhdN6Q/p2XaxNIZlYmUhg==
+-----END EC PRIVATE KEY-----
+`
+
 // openssl ecparam -name prime256v1 -genkey -noout -out ecdsa256.pem
 const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIEZmTmUhuanLjPA2CLquXivuwBDHTt5XYwgIr/kA1LtRoAoGCCqGSM49
@@ -93,7 +107,7 @@ X2i8uIp/C/ASqiIGUeeKQtX0/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 -----END PUBLIC KEY-----`
 
 func getPrivateKey(data string) interface{} {
-	key, _ := serviceaccount.ReadPrivateKeyFromPEM([]byte(data))
+	key, _ := cert.ParsePrivateKeyPEM([]byte(data))
 	return key
 }
 
@@ -108,6 +122,10 @@ func TestReadPrivateKey(t *testing.T) {
 	}
 	defer os.Remove(f.Name())
 
+	if _, err := serviceaccount.ReadPrivateKey(f.Name()); err == nil {
+		t.Fatalf("Expected error reading key from empty file, got none")
+	}
+
 	if err := ioutil.WriteFile(f.Name(), []byte(rsaPrivateKey), os.FileMode(0600)); err != nil {
 		t.Fatalf("error writing private key to tmpfile: %v", err)
 	}
@@ -121,6 +139,13 @@ func TestReadPrivateKey(t *testing.T) {
 	if _, err := serviceaccount.ReadPrivateKey(f.Name()); err != nil {
 		t.Fatalf("error reading private ECDSA key: %v", err)
 	}
+
+	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPrivateKeyWithParams), os.FileMode(0600)); err != nil {
+		t.Fatalf("error writing private key to tmpfile: %v", err)
+	}
+	if _, err := serviceaccount.ReadPrivateKey(f.Name()); err != nil {
+		t.Fatalf("error reading private ECDSA key with params: %v", err)
+	}
 }
 
 func TestReadPublicKeys(t *testing.T) {
@@ -129,6 +154,10 @@ func TestReadPublicKeys(t *testing.T) {
 		t.Fatalf("error creating tmpfile: %v", err)
 	}
 	defer os.Remove(f.Name())
+
+	if _, err := serviceaccount.ReadPublicKeys(f.Name()); err == nil {
+		t.Fatalf("Expected error reading keys from empty file, got none")
+	}
 
 	if err := ioutil.WriteFile(f.Name(), []byte(rsaPublicKey), os.FileMode(0600)); err != nil {
 		t.Fatalf("error writing public key to tmpfile: %v", err)
@@ -165,20 +194,20 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 
 	// Related API objects
 	serviceAccount := &v1.ServiceAccount{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-service-account",
 			UID:       "12345",
 			Namespace: "test",
 		},
 	}
 	rsaSecret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-rsa-secret",
 			Namespace: "test",
 		},
 	}
 	ecdsaSecret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-ecdsa-secret",
 			Namespace: "test",
 		},
@@ -349,8 +378,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 }
 
 func TestMakeSplitUsername(t *testing.T) {
-	username := serviceaccount.MakeUsername("ns", "name")
-	ns, name, err := serviceaccount.SplitUsername(username)
+	username := apiserverserviceaccount.MakeUsername("ns", "name")
+	ns, name, err := apiserverserviceaccount.SplitUsername(username)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -360,7 +389,7 @@ func TestMakeSplitUsername(t *testing.T) {
 
 	invalid := []string{"test", "system:serviceaccount", "system:serviceaccount:", "system:serviceaccount:ns", "system:serviceaccount:ns:name:extra"}
 	for _, n := range invalid {
-		_, _, err := serviceaccount.SplitUsername("test")
+		_, _, err := apiserverserviceaccount.SplitUsername("test")
 		if err == nil {
 			t.Errorf("Expected error for %s", n)
 		}

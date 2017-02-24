@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -83,7 +84,7 @@ func (c *PrivilegedPodTestConfig) createPodsSpec() *v1.Pod {
 	const image = "gcr.io/google_containers/busybox:1.24"
 
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.privilegedPod,
 			Namespace: c.f.Namespace.Name,
 		},

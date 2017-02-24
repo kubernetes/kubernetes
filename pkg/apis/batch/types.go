@@ -17,55 +17,55 @@ limitations under the License.
 package batch
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 // +genclient=true
 
 // Job represents the configuration of a single job.
 type Job struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	api.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta
 
 	// Spec is a structure defining the expected behavior of a job.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	// +optional
-	Spec JobSpec `json:"spec,omitempty"`
+	Spec JobSpec
 
 	// Status is a structure describing current status of a job.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	// +optional
-	Status JobStatus `json:"status,omitempty"`
+	Status JobStatus
 }
 
 // JobList is a collection of jobs.
 type JobList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta
 
 	// Items is the list of Job.
-	Items []Job `json:"items"`
+	Items []Job
 }
 
 // JobTemplate describes a template for creating copies of a predefined pod.
 type JobTemplate struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	api.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta
 
 	// Template defines jobs that will be created from this template
 	// http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	// +optional
-	Template JobTemplateSpec `json:"template,omitempty"`
+	Template JobTemplateSpec
 }
 
 // JobTemplateSpec describes the data a Job should have when created from a template
@@ -73,12 +73,12 @@ type JobTemplateSpec struct {
 	// Standard object's metadata of the jobs created from this template.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	api.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta
 
 	// Specification of the desired behavior of the job.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	// +optional
-	Spec JobSpec `json:"spec,omitempty"`
+	Spec JobSpec
 }
 
 // JobSpec describes how the job execution will look like.
@@ -89,7 +89,7 @@ type JobSpec struct {
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
 	// i.e. when the work left to do is less than max parallelism.
 	// +optional
-	Parallelism *int32 `json:"parallelism,omitempty"`
+	Parallelism *int32
 
 	// Completions specifies the desired number of successfully finished pods the
 	// job should be run with.  Setting to nil means that the success of any
@@ -97,17 +97,17 @@ type JobSpec struct {
 	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
 	// pod signals the success of the job.
 	// +optional
-	Completions *int32 `json:"completions,omitempty"`
+	Completions *int32
 
 	// Optional duration in seconds relative to the startTime that the job may be active
 	// before the system tries to terminate it; value must be positive integer
 	// +optional
-	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
+	ActiveDeadlineSeconds *int64
 
 	// Selector is a label query over pods that should match the pod count.
 	// Normally, the system sets this field for you.
 	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+	Selector *metav1.LabelSelector
 
 	// ManualSelector controls generation of pod labels and pod selectors.
 	// Leave `manualSelector` unset unless you are certain what you are doing.
@@ -119,11 +119,11 @@ type JobSpec struct {
 	// `manualSelector=true` in jobs that were created with the old `extensions/v1beta1`
 	// API.
 	// +optional
-	ManualSelector *bool `json:"manualSelector,omitempty"`
+	ManualSelector *bool
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
-	Template api.PodTemplateSpec `json:"template"`
+	Template api.PodTemplateSpec
 }
 
 // JobStatus represents the current state of a Job.
@@ -131,31 +131,31 @@ type JobStatus struct {
 
 	// Conditions represent the latest available observations of an object's current state.
 	// +optional
-	Conditions []JobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions []JobCondition
 
 	// StartTime represents time when the job was acknowledged by the Job Manager.
 	// It is not guaranteed to be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
 	// +optional
-	StartTime *metav1.Time `json:"startTime,omitempty"`
+	StartTime *metav1.Time
 
 	// CompletionTime represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
 	// +optional
-	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
+	CompletionTime *metav1.Time
 
 	// Active is the number of actively running pods.
 	// +optional
-	Active int32 `json:"active,omitempty"`
+	Active int32
 
 	// Succeeded is the number of pods which reached Phase Succeeded.
 	// +optional
-	Succeeded int32 `json:"succeeded,omitempty"`
+	Succeeded int32
 
 	// Failed is the number of pods which reached Phase Failed.
 	// +optional
-	Failed int32 `json:"failed,omitempty"`
+	Failed int32
 }
 
 type JobConditionType string
@@ -171,79 +171,79 @@ const (
 // JobCondition describes current state of a job.
 type JobCondition struct {
 	// Type of job condition, Complete or Failed.
-	Type JobConditionType `json:"type"`
+	Type JobConditionType
 	// Status of the condition, one of True, False, Unknown.
-	Status api.ConditionStatus `json:"status"`
+	Status api.ConditionStatus
 	// Last time the condition was checked.
 	// +optional
-	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	LastProbeTime metav1.Time
 	// Last time the condition transit from one status to another.
 	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	LastTransitionTime metav1.Time
 	// (brief) reason for the condition's last transition.
 	// +optional
-	Reason string `json:"reason,omitempty"`
+	Reason string
 	// Human readable message indicating details about last transition.
 	// +optional
-	Message string `json:"message,omitempty"`
+	Message string
 }
 
 // +genclient=true
 
 // CronJob represents the configuration of a single cron job.
 type CronJob struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	api.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta
 
 	// Spec is a structure defining the expected behavior of a job, including the schedule.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	// +optional
-	Spec CronJobSpec `json:"spec,omitempty"`
+	Spec CronJobSpec
 
 	// Status is a structure describing current status of a job.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	// +optional
-	Status CronJobStatus `json:"status,omitempty"`
+	Status CronJobStatus
 }
 
 // CronJobList is a collection of cron jobs.
 type CronJobList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta
 
 	// Items is the list of CronJob.
-	Items []CronJob `json:"items"`
+	Items []CronJob
 }
 
 // CronJobSpec describes how the job execution will look like and when it will actually run.
 type CronJobSpec struct {
 
 	// Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
-	Schedule string `json:"schedule"`
+	Schedule string
 
 	// Optional deadline in seconds for starting the job if it misses scheduled
 	// time for any reason.  Missed jobs executions will be counted as failed ones.
 	// +optional
-	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty"`
+	StartingDeadlineSeconds *int64
 
 	// ConcurrencyPolicy specifies how to treat concurrent executions of a Job.
 	// +optional
-	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty"`
+	ConcurrencyPolicy ConcurrencyPolicy
 
 	// Suspend flag tells the controller to suspend subsequent executions, it does
 	// not apply to already started executions.  Defaults to false.
 	// +optional
-	Suspend *bool `json:"suspend,omitempty"`
+	Suspend *bool
 
 	// JobTemplate is the object that describes the job that will be created when
 	// executing a CronJob.
-	JobTemplate JobTemplateSpec `json:"jobTemplate"`
+	JobTemplate JobTemplateSpec
 }
 
 // ConcurrencyPolicy describes how the job will be handled.
@@ -268,9 +268,9 @@ const (
 type CronJobStatus struct {
 	// Active holds pointers to currently running jobs.
 	// +optional
-	Active []api.ObjectReference `json:"active,omitempty"`
+	Active []api.ObjectReference
 
 	// LastScheduleTime keeps information of when was the last time the job was successfully scheduled.
 	// +optional
-	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
+	LastScheduleTime *metav1.Time
 }

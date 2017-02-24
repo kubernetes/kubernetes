@@ -30,10 +30,10 @@ import (
 // genFakeForGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
 type genFakeForGroup struct {
 	generator.DefaultGen
-	outputPackage  string
-	realClientPath string
-	group          string
-	version        string
+	outputPackage     string
+	realClientPackage string
+	group             string
+	version           string
 	// types in this group
 	types   []*types.Type
 	imports namer.ImportTracker
@@ -53,27 +53,27 @@ func (g *genFakeForGroup) Namers(c *generator.Context) namer.NameSystems {
 }
 
 func (g *genFakeForGroup) Imports(c *generator.Context) (imports []string) {
-	imports = append(g.imports.ImportLines(), strings.ToLower(fmt.Sprintf("%s \"%s\"", filepath.Base(g.realClientPath), g.realClientPath)))
+	imports = append(g.imports.ImportLines(), strings.ToLower(fmt.Sprintf("%s \"%s\"", filepath.Base(g.realClientPackage), g.realClientPackage)))
 	return imports
 }
 
 func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	const pkgTestingCore = "k8s.io/kubernetes/pkg/client/testing/core"
-	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
+
 	m := map[string]interface{}{
 		"group":               g.group,
 		"GroupVersion":        namer.IC(g.group) + namer.IC(g.version),
-		"Fake":                c.Universe.Type(types.Name{Package: pkgTestingCore, Name: "Fake"}),
-		"RESTClientInterface": c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Interface"}),
-		"RESTClient":          c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
+		"Fake":                c.Universe.Type(types.Name{Package: "k8s.io/client-go/testing", Name: "Fake"}),
+		"RESTClientInterface": c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
+		"RESTClient":          c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClient"}),
 	}
+
 	sw.Do(groupClientTemplate, m)
 	for _, t := range g.types {
 		wrapper := map[string]interface{}{
 			"type":              t,
 			"GroupVersion":      namer.IC(g.group) + namer.IC(g.version),
-			"realClientPackage": strings.ToLower(filepath.Base(g.realClientPath)),
+			"realClientPackage": strings.ToLower(filepath.Base(g.realClientPackage)),
 		}
 		namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 		if namespaced {

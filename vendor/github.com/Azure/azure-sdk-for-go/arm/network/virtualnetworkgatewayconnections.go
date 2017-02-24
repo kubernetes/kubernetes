@@ -21,13 +21,14 @@ package network
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
 // VirtualNetworkGatewayConnectionsClient is the the Microsoft Azure Network
 // management API provides a RESTful set of web services that interact with
-// Microsoft Azure Networks service to manage your network resrources. The
-// API has entities that capture the relationship between an end user and the
+// Microsoft Azure Networks service to manage your network resources. The API
+// has entities that capture the relationship between an end user and the
 // Microsoft Azure Networks service.
 type VirtualNetworkGatewayConnectionsClient struct {
 	ManagementClient
@@ -45,19 +46,46 @@ func NewVirtualNetworkGatewayConnectionsClientWithBaseURI(baseURI string, subscr
 	return VirtualNetworkGatewayConnectionsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// CreateOrUpdate the Put VirtualNetworkGatewayConnection operation
-// creates/updates a virtual network gateway connection in the specified
-// resource group through Network resource provider. This method may poll for
-// completion. Polling can be canceled by passing the cancel channel
-// argument. The channel will be used to cancel polling and any outstanding
-// HTTP requests.
+// CreateOrUpdate creates or updates a virtual network gateway connection in
+// the specified resource group. This method may poll for completion. Polling
+// can be canceled by passing the cancel channel argument. The channel will
+// be used to cancel polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group.
 // virtualNetworkGatewayConnectionName is the name of the virtual network
-// gateway conenction. parameters is parameters supplied to the Begin Create
-// or update Virtual Network Gateway connection operation through Network
-// resource provider.
+// gateway connection. parameters is parameters supplied to the create or
+// update virtual network gateway connection operation.
 func (client VirtualNetworkGatewayConnectionsClient) CreateOrUpdate(resourceGroupName string, virtualNetworkGatewayConnectionName string, parameters VirtualNetworkGatewayConnection, cancel <-chan struct{}) (result autorest.Response, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat", Name: validation.Null, Rule: true,
+				Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway1", Name: validation.Null, Rule: true,
+					Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway1.VirtualNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true,
+						Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway1.VirtualNetworkGatewayPropertiesFormat.IPConfigurations", Name: validation.Null, Rule: true, Chain: nil},
+							{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway1.VirtualNetworkGatewayPropertiesFormat.ProvisioningState", Name: validation.ReadOnly, Rule: true, Chain: nil},
+						}},
+					}},
+					{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway2", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway2.VirtualNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true,
+							Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway2.VirtualNetworkGatewayPropertiesFormat.IPConfigurations", Name: validation.Null, Rule: true, Chain: nil},
+								{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway2.VirtualNetworkGatewayPropertiesFormat.ProvisioningState", Name: validation.ReadOnly, Rule: true, Chain: nil},
+							}},
+						}},
+					{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.LocalNetworkGateway2", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.LocalNetworkGateway2.LocalNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true,
+							Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.LocalNetworkGateway2.LocalNetworkGatewayPropertiesFormat.LocalNetworkAddressSpace", Name: validation.Null, Rule: true, Chain: nil},
+								{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.LocalNetworkGateway2.LocalNetworkGatewayPropertiesFormat.ProvisioningState", Name: validation.ReadOnly, Rule: true, Chain: nil},
+							}},
+						}},
+					{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.ConnectionStatus", Name: validation.ReadOnly, Rule: true, Chain: nil},
+					{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.TunnelConnectionStatus", Name: validation.ReadOnly, Rule: true, Chain: nil},
+					{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.EgressBytesTransferred", Name: validation.ReadOnly, Rule: true, Chain: nil},
+					{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.IngressBytesTransferred", Name: validation.ReadOnly, Rule: true, Chain: nil},
+					{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.ProvisioningState", Name: validation.ReadOnly, Rule: true, Chain: nil},
+				}}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "network.VirtualNetworkGatewayConnectionsClient", "CreateOrUpdate")
+	}
+
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, virtualNetworkGatewayConnectionName, parameters, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewayConnectionsClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -119,11 +147,10 @@ func (client VirtualNetworkGatewayConnectionsClient) CreateOrUpdateResponder(res
 	return
 }
 
-// Delete the Delete VirtualNetworkGatewayConnection operation deletes the
-// specifed virtual network Gateway connection through Network resource
-// provider. This method may poll for completion. Polling can be canceled by
-// passing the cancel channel argument. The channel will be used to cancel
-// polling and any outstanding HTTP requests.
+// Delete deletes the specified virtual network Gateway connection. This
+// method may poll for completion. Polling can be canceled by passing the
+// cancel channel argument. The channel will be used to cancel polling and
+// any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group.
 // virtualNetworkGatewayConnectionName is the name of the virtual network
@@ -188,9 +215,7 @@ func (client VirtualNetworkGatewayConnectionsClient) DeleteResponder(resp *http.
 	return
 }
 
-// Get the Get VirtualNetworkGatewayConnection operation retrieves information
-// about the specified virtual network gateway connection through Network
-// resource provider.
+// Get gets the specified virtual network gateway connection by resource group.
 //
 // resourceGroupName is the name of the resource group.
 // virtualNetworkGatewayConnectionName is the name of the virtual network
@@ -259,10 +284,10 @@ func (client VirtualNetworkGatewayConnectionsClient) GetResponder(resp *http.Res
 // connection shared key through Network resource provider.
 //
 // resourceGroupName is the name of the resource group.
-// connectionSharedKeyName is the virtual network gateway connection shared
-// key name.
-func (client VirtualNetworkGatewayConnectionsClient) GetSharedKey(resourceGroupName string, connectionSharedKeyName string) (result ConnectionSharedKeyResult, err error) {
-	req, err := client.GetSharedKeyPreparer(resourceGroupName, connectionSharedKeyName)
+// virtualNetworkGatewayConnectionName is the virtual network gateway
+// connection shared key name.
+func (client VirtualNetworkGatewayConnectionsClient) GetSharedKey(resourceGroupName string, virtualNetworkGatewayConnectionName string) (result ConnectionSharedKey, err error) {
+	req, err := client.GetSharedKeyPreparer(resourceGroupName, virtualNetworkGatewayConnectionName)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewayConnectionsClient", "GetSharedKey", nil, "Failure preparing request")
 	}
@@ -282,11 +307,11 @@ func (client VirtualNetworkGatewayConnectionsClient) GetSharedKey(resourceGroupN
 }
 
 // GetSharedKeyPreparer prepares the GetSharedKey request.
-func (client VirtualNetworkGatewayConnectionsClient) GetSharedKeyPreparer(resourceGroupName string, connectionSharedKeyName string) (*http.Request, error) {
+func (client VirtualNetworkGatewayConnectionsClient) GetSharedKeyPreparer(resourceGroupName string, virtualNetworkGatewayConnectionName string) (*http.Request, error) {
 	pathParameters := map[string]interface{}{
-		"connectionSharedKeyName": autorest.Encode("path", connectionSharedKeyName),
-		"resourceGroupName":       autorest.Encode("path", resourceGroupName),
-		"subscriptionId":          autorest.Encode("path", client.SubscriptionID),
+		"resourceGroupName":                   autorest.Encode("path", resourceGroupName),
+		"subscriptionId":                      autorest.Encode("path", client.SubscriptionID),
+		"virtualNetworkGatewayConnectionName": autorest.Encode("path", virtualNetworkGatewayConnectionName),
 	}
 
 	queryParameters := map[string]interface{}{
@@ -296,7 +321,7 @@ func (client VirtualNetworkGatewayConnectionsClient) GetSharedKeyPreparer(resour
 	preparer := autorest.CreatePreparer(
 		autorest.AsGet(),
 		autorest.WithBaseURL(client.BaseURI),
-		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/connections/{connectionSharedKeyName}/sharedkey", pathParameters),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/connections/{virtualNetworkGatewayConnectionName}/sharedkey", pathParameters),
 		autorest.WithQueryParameters(queryParameters))
 	return preparer.Prepare(&http.Request{})
 }
@@ -309,7 +334,7 @@ func (client VirtualNetworkGatewayConnectionsClient) GetSharedKeySender(req *htt
 
 // GetSharedKeyResponder handles the response to the GetSharedKey request. The method always
 // closes the http.Response Body.
-func (client VirtualNetworkGatewayConnectionsClient) GetSharedKeyResponder(resp *http.Response) (result ConnectionSharedKeyResult, err error) {
+func (client VirtualNetworkGatewayConnectionsClient) GetSharedKeyResponder(resp *http.Response) (result ConnectionSharedKey, err error) {
 	err = autorest.Respond(
 		resp,
 		client.ByInspecting(),
@@ -386,7 +411,7 @@ func (client VirtualNetworkGatewayConnectionsClient) ListResponder(resp *http.Re
 func (client VirtualNetworkGatewayConnectionsClient) ListNextResults(lastResults VirtualNetworkGatewayConnectionListResult) (result VirtualNetworkGatewayConnectionListResult, err error) {
 	req, err := lastResults.VirtualNetworkGatewayConnectionListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewayConnectionsClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewayConnectionsClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -395,12 +420,12 @@ func (client VirtualNetworkGatewayConnectionsClient) ListNextResults(lastResults
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewayConnectionsClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewayConnectionsClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.VirtualNetworkGatewayConnectionsClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "network.VirtualNetworkGatewayConnectionsClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return
@@ -416,9 +441,18 @@ func (client VirtualNetworkGatewayConnectionsClient) ListNextResults(lastResults
 // resourceGroupName is the name of the resource group.
 // virtualNetworkGatewayConnectionName is the virtual network gateway
 // connection reset shared key Name. parameters is parameters supplied to the
-// Begin Reset Virtual Network Gateway connection shared key operation
-// through Network resource provider.
+// begin reset virtual network gateway connection shared key operation
+// through network resource provider.
 func (client VirtualNetworkGatewayConnectionsClient) ResetSharedKey(resourceGroupName string, virtualNetworkGatewayConnectionName string, parameters ConnectionResetSharedKey, cancel <-chan struct{}) (result autorest.Response, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.KeyLength", Name: validation.Null, Rule: true,
+				Chain: []validation.Constraint{{Target: "parameters.KeyLength", Name: validation.InclusiveMaximum, Rule: 128, Chain: nil},
+					{Target: "parameters.KeyLength", Name: validation.InclusiveMinimum, Rule: 1, Chain: nil},
+				}}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "network.VirtualNetworkGatewayConnectionsClient", "ResetSharedKey")
+	}
+
 	req, err := client.ResetSharedKeyPreparer(resourceGroupName, virtualNetworkGatewayConnectionName, parameters, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewayConnectionsClient", "ResetSharedKey", nil, "Failure preparing request")
@@ -490,9 +524,15 @@ func (client VirtualNetworkGatewayConnectionsClient) ResetSharedKeyResponder(res
 // resourceGroupName is the name of the resource group.
 // virtualNetworkGatewayConnectionName is the virtual network gateway
 // connection name. parameters is parameters supplied to the Begin Set
-// Virtual Network Gateway conection Shared key operation throughNetwork
+// Virtual Network Gateway connection Shared key operation throughNetwork
 // resource provider.
 func (client VirtualNetworkGatewayConnectionsClient) SetSharedKey(resourceGroupName string, virtualNetworkGatewayConnectionName string, parameters ConnectionSharedKey, cancel <-chan struct{}) (result autorest.Response, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.Value", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "network.VirtualNetworkGatewayConnectionsClient", "SetSharedKey")
+	}
+
 	req, err := client.SetSharedKeyPreparer(resourceGroupName, virtualNetworkGatewayConnectionName, parameters, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.VirtualNetworkGatewayConnectionsClient", "SetSharedKey", nil, "Failure preparing request")

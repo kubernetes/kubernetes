@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // SecretForDockerRegistryGeneratorV1 supports stable generation of a docker registry secret

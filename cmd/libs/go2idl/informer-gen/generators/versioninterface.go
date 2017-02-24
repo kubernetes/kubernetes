@@ -27,10 +27,11 @@ import (
 // versionInterfaceGenerator generates the per-version interface file.
 type versionInterfaceGenerator struct {
 	generator.DefaultGen
-	outputPackage string
-	imports       namer.ImportTracker
-	types         []*types.Type
-	filtered      bool
+	outputPackage             string
+	imports                   namer.ImportTracker
+	types                     []*types.Type
+	filtered                  bool
+	internalInterfacesPackage string
 }
 
 var _ generator.Generator = &versionInterfaceGenerator{}
@@ -58,7 +59,7 @@ func (g *versionInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
 	m := map[string]interface{}{
-		"interfacesSharedInformerFactory": c.Universe.Type(interfacesSharedInformerFactory),
+		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
 		"types": g.types,
 	}
 

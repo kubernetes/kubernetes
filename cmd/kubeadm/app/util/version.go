@@ -54,18 +54,18 @@ func KubernetesReleaseVersion(version string) (string, error) {
 		url := fmt.Sprintf("%s/%s.txt", kubeReleaseBucketURL, version)
 		resp, err := http.Get(url)
 		if err != nil {
-			return "", fmt.Errorf("Error: unable to get URL %q: %s", url, err.Error())
+			return "", fmt.Errorf("unable to get URL %q: %s", url, err.Error())
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("Error: unable to fetch release information. URL: %q Status: %v", url, resp.Status)
+			return "", fmt.Errorf("unable to fetch release information. URL: %q Status: %v", url, resp.Status)
 		}
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return "", fmt.Errorf("Error: unable to read content of URL %q: %s", url, err.Error())
+			return "", fmt.Errorf("unable to read content of URL %q: %s", url, err.Error())
 		}
 		// Re-validate received version and return.
 		return KubernetesReleaseVersion(strings.Trim(string(body), " \t\n"))
 	}
-	return "", fmt.Errorf("Error: version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
+	return "", fmt.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	federation "k8s.io/kubernetes/federation/apis/federation"
-	api "k8s.io/kubernetes/pkg/api"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeClusters implements ClusterInterface
@@ -34,7 +35,7 @@ var clustersResource = schema.GroupVersionResource{Group: "federation", Version:
 
 func (c *FakeClusters) Create(cluster *federation.Cluster) (result *federation.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction(clustersResource, cluster), &federation.Cluster{})
+		Invokes(testing.NewRootCreateAction(clustersResource, cluster), &federation.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
@@ -43,7 +44,7 @@ func (c *FakeClusters) Create(cluster *federation.Cluster) (result *federation.C
 
 func (c *FakeClusters) Update(cluster *federation.Cluster) (result *federation.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction(clustersResource, cluster), &federation.Cluster{})
+		Invokes(testing.NewRootUpdateAction(clustersResource, cluster), &federation.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
@@ -52,43 +53,43 @@ func (c *FakeClusters) Update(cluster *federation.Cluster) (result *federation.C
 
 func (c *FakeClusters) UpdateStatus(cluster *federation.Cluster) (*federation.Cluster, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateSubresourceAction(clustersResource, "status", cluster), &federation.Cluster{})
+		Invokes(testing.NewRootUpdateSubresourceAction(clustersResource, "status", cluster), &federation.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*federation.Cluster), err
 }
 
-func (c *FakeClusters) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeClusters) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction(clustersResource, name), &federation.Cluster{})
+		Invokes(testing.NewRootDeleteAction(clustersResource, name), &federation.Cluster{})
 	return err
 }
 
-func (c *FakeClusters) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction(clustersResource, listOptions)
+func (c *FakeClusters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(clustersResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &federation.ClusterList{})
 	return err
 }
 
-func (c *FakeClusters) Get(name string) (result *federation.Cluster, err error) {
+func (c *FakeClusters) Get(name string, options v1.GetOptions) (result *federation.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction(clustersResource, name), &federation.Cluster{})
+		Invokes(testing.NewRootGetAction(clustersResource, name), &federation.Cluster{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*federation.Cluster), err
 }
 
-func (c *FakeClusters) List(opts api.ListOptions) (result *federation.ClusterList, err error) {
+func (c *FakeClusters) List(opts v1.ListOptions) (result *federation.ClusterList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction(clustersResource, opts), &federation.ClusterList{})
+		Invokes(testing.NewRootListAction(clustersResource, opts), &federation.ClusterList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -102,15 +103,15 @@ func (c *FakeClusters) List(opts api.ListOptions) (result *federation.ClusterLis
 }
 
 // Watch returns a watch.Interface that watches the requested clusters.
-func (c *FakeClusters) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeClusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction(clustersResource, opts))
+		InvokesWatch(testing.NewRootWatchAction(clustersResource, opts))
 }
 
 // Patch applies the patch and returns the patched cluster.
-func (c *FakeClusters) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *federation.Cluster, err error) {
+func (c *FakeClusters) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *federation.Cluster, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchSubresourceAction(clustersResource, name, data, subresources...), &federation.Cluster{})
+		Invokes(testing.NewRootPatchSubresourceAction(clustersResource, name, data, subresources...), &federation.Cluster{})
 	if obj == nil {
 		return nil, err
 	}

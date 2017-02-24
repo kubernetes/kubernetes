@@ -19,11 +19,10 @@ package kubectl
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // PodDisruptionBudgetV1Generator supports stable generation of a pod disruption budget.
@@ -77,7 +76,7 @@ func (s *PodDisruptionBudgetV1Generator) StructuredGenerate() (runtime.Object, e
 	}
 
 	return &policy.PodDisruptionBudget{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 		},
 		Spec: policy.PodDisruptionBudgetSpec{

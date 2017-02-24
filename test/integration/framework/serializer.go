@@ -17,8 +17,8 @@ limitations under the License.
 package framework
 
 import (
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 )
 
 // NewSingleContentTypeSerializer wraps a serializer in a NegotiatedSerializer that handles one content type

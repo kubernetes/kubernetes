@@ -24,14 +24,14 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -493,12 +493,12 @@ func qosComparator(p1, p2 *v1.Pod) int {
 		return 0
 	}
 	// if p1 is best effort, we know p2 is burstable or guaranteed
-	if qosP1 == qos.BestEffort {
+	if qosP1 == v1.PodQOSBestEffort {
 		return -1
 	}
 	// we know p1 and p2 are not besteffort, so if p1 is burstable, p2 must be guaranteed
-	if qosP1 == qos.Burstable {
-		if qosP2 == qos.Guaranteed {
+	if qosP1 == v1.PodQOSBurstable {
+		if qosP2 == v1.PodQOSGuaranteed {
 			return -1
 		}
 		return 1
@@ -533,12 +533,18 @@ func memory(stats statsFunc) cmpFunc {
 
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Memory := p1Usage[v1.ResourceMemory]
-		p1Spec := core.PodUsageFunc(p1)
+		p1Spec, err := core.PodUsageFunc(p1)
+		if err != nil {
+			return -1
+		}
 		p1Request := p1Spec[api.ResourceRequestsMemory]
 		p1Memory.Sub(p1Request)
 
 		p2Memory := p2Usage[v1.ResourceMemory]
-		p2Spec := core.PodUsageFunc(p2)
+		p2Spec, err := core.PodUsageFunc(p2)
+		if err != nil {
+			return 1
+		}
 		p2Request := p2Spec[api.ResourceRequestsMemory]
 		p2Memory.Sub(p2Request)
 
@@ -686,6 +692,29 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations, enfo
 		}
 	}
 	return results
+}
+
+func debugLogObservations(logPrefix string, observations signalObservations) {
+	for k, v := range observations {
+		if !v.time.IsZero() {
+			glog.V(3).Infof("eviction manager: %v: signal=%v, available: %v, capacity: %v, time: %v", logPrefix, k, v.available, v.capacity, v.time)
+		} else {
+			glog.V(3).Infof("eviction manager: %v: signal=%v, available: %v, capacity: %v", logPrefix, k, v.available, v.capacity)
+		}
+	}
+}
+
+func debugLogThresholdsWithObservation(logPrefix string, thresholds []Threshold, observations signalObservations) {
+	for i := range thresholds {
+		threshold := thresholds[i]
+		observed, found := observations[threshold.Signal]
+		if found {
+			quantity := getThresholdQuantity(threshold.Value, observed.capacity)
+			glog.V(3).Infof("eviction manager: %v: threshold [signal=%v, quantity=%v] observed %v", logPrefix, threshold.Signal, quantity, observed.available)
+		} else {
+			glog.V(3).Infof("eviction manager: %v: threshold [signal=%v] had no observation", logPrefix, threshold.Signal)
+		}
+	}
 }
 
 func thresholdsUpdatedStats(thresholds []Threshold, observations, lastObservations signalObservations) []Threshold {

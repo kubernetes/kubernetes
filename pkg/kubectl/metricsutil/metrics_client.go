@@ -21,12 +21,12 @@ import (
 	"errors"
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 const (
@@ -68,7 +68,7 @@ func DefaultHeapsterMetricsClient(svcClient coreclient.ServicesGetter) *Heapster
 }
 
 func podMetricsUrl(namespace string, name string) (string, error) {
-	if namespace == api.NamespaceAll {
+	if namespace == metav1.NamespaceAll {
 		return fmt.Sprintf("%s/pods", metricsRoot), nil
 	}
 	errs := validation.ValidateNamespaceName(namespace, false)
@@ -128,7 +128,7 @@ func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector label
 
 func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string, allNamespaces bool, selector labels.Selector) ([]metricsapi.PodMetrics, error) {
 	if allNamespaces {
-		namespace = api.NamespaceAll
+		namespace = metav1.NamespaceAll
 	}
 	path, err := podMetricsUrl(namespace, podName)
 	if err != nil {

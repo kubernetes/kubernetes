@@ -5,7 +5,13 @@ import (
 	"sync"
 )
 
-// ReadSeekCloser wraps a io.Reader returning a ReaderSeekerCloser
+// ReadSeekCloser wraps a io.Reader returning a ReaderSeekerCloser. Should
+// only be used with an io.Reader that is also an io.Seeker. Doing so may
+// cause request signature errors, or request body's not sent for GET, HEAD
+// and DELETE HTTP methods.
+//
+// Deprecated: Should only be used with io.ReadSeeker. If using for
+// S3 PutObject to stream content use s3manager.Uploader instead.
 func ReadSeekCloser(r io.Reader) ReaderSeekerCloser {
 	return ReaderSeekerCloser{r}
 }
@@ -44,6 +50,12 @@ func (r ReaderSeekerCloser) Seek(offset int64, whence int) (int64, error) {
 	return int64(0), nil
 }
 
+// IsSeeker returns if the underlying reader is also a seeker.
+func (r ReaderSeekerCloser) IsSeeker() bool {
+	_, ok := r.r.(io.Seeker)
+	return ok
+}
+
 // Close closes the ReaderSeekerCloser.
 //
 // If the ReaderSeekerCloser is not an io.Closer nothing will be done.
@@ -61,23 +73,41 @@ func (r ReaderSeekerCloser) Close() error {
 type WriteAtBuffer struct {
 	buf []byte
 	m   sync.Mutex
+
+	// GrowthCoeff defines the growth rate of the internal buffer. By
+	// default, the growth rate is 1, where expanding the internal
+	// buffer will allocate only enough capacity to fit the new expected
+	// length.
+	GrowthCoeff float64
+}
+
+// NewWriteAtBuffer creates a WriteAtBuffer with an internal buffer
+// provided by buf.
+func NewWriteAtBuffer(buf []byte) *WriteAtBuffer {
+	return &WriteAtBuffer{buf: buf}
 }
 
 // WriteAt writes a slice of bytes to a buffer starting at the position provided
 // The number of bytes written will be returned, or error. Can overwrite previous
 // written slices if the write ats overlap.
 func (b *WriteAtBuffer) WriteAt(p []byte, pos int64) (n int, err error) {
+	pLen := len(p)
+	expLen := pos + int64(pLen)
 	b.m.Lock()
 	defer b.m.Unlock()
-
-	expLen := pos + int64(len(p))
 	if int64(len(b.buf)) < expLen {
-		newBuf := make([]byte, expLen)
-		copy(newBuf, b.buf)
-		b.buf = newBuf
+		if int64(cap(b.buf)) < expLen {
+			if b.GrowthCoeff < 1 {
+				b.GrowthCoeff = 1
+			}
+			newBuf := make([]byte, expLen, int64(b.GrowthCoeff*float64(expLen)))
+			copy(newBuf, b.buf)
+			b.buf = newBuf
+		}
+		b.buf = b.buf[:expLen]
 	}
 	copy(b.buf[pos:], p)
-	return len(p), nil
+	return pLen, nil
 }
 
 // Bytes returns a slice of bytes written to the buffer.

@@ -20,28 +20,27 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	"k8s.io/kubernetes/pkg/controller"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 )
 
 func Test_NewAttachDetachController_Positive(t *testing.T) {
 	// Arrange
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	resyncPeriod := 5 * time.Minute
-	podInformer := informers.NewPodInformer(fakeKubeClient, resyncPeriod)
-	nodeInformer := informers.NewNodeInformer(fakeKubeClient, resyncPeriod)
-	pvcInformer := informers.NewPVCInformer(fakeKubeClient, resyncPeriod)
-	pvInformer := informers.NewPVInformer(fakeKubeClient, resyncPeriod)
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 
 	// Act
 	_, err := NewAttachDetachController(
 		fakeKubeClient,
-		podInformer,
-		nodeInformer,
-		pvcInformer,
-		pvInformer,
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().PersistentVolumes(),
 		nil, /* cloud */
-		nil /* plugins */)
+		nil, /* plugins */
+		false,
+		time.Second*5)
 
 	// Assert
 	if err != nil {

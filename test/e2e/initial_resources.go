@@ -22,7 +22,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -38,13 +40,13 @@ var _ = framework.KubeDescribe("Initial Resources [Feature:InitialResources] [Fl
 		cpu := 100
 		mem := 200
 		for i := 0; i < 10; i++ {
-			rc := NewStaticResourceConsumer(fmt.Sprintf("ir-%d", i), 1, cpu, mem, 0, int64(2*cpu), int64(2*mem), f)
+			rc := common.NewStaticResourceConsumer(fmt.Sprintf("ir-%d", i), 1, cpu, mem, 0, int64(2*cpu), int64(2*mem), f)
 			defer rc.CleanUp()
 		}
 		// Wait some time to make sure usage data is gathered.
 		time.Sleep(10 * time.Minute)
 
-		pod := runPod(f, "ir-test", resourceConsumerImage)
+		pod := runPod(f, "ir-test", common.GetResourceConsumerImage())
 		r := pod.Spec.Containers[0].Resources.Requests
 		Expect(r.Cpu().MilliValue()).Should(BeNumerically("~", cpu, 10))
 		Expect(r.Memory().Value()).Should(BeNumerically("~", mem*1024*1024, 20*1024*1024))
@@ -53,7 +55,7 @@ var _ = framework.KubeDescribe("Initial Resources [Feature:InitialResources] [Fl
 
 func runPod(f *framework.Framework, name, image string) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PodSpec{

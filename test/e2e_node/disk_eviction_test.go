@@ -21,13 +21,14 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -73,7 +74,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 				verifyPodName = "verify" + string(uuid.NewUUID())
 				createIdlePod(idlePodName, podClient)
 				podClient.Create(&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: busyPodName,
 					},
 					Spec: v1.PodSpec{
@@ -96,9 +97,9 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 				if !isImageSupported() || !evictionOptionIsSet() { // Skip the after each
 					return
 				}
-				podClient.DeleteSync(busyPodName, &v1.DeleteOptions{}, podDisappearTimeout)
-				podClient.DeleteSync(idlePodName, &v1.DeleteOptions{}, podDisappearTimeout)
-				podClient.DeleteSync(verifyPodName, &v1.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(busyPodName, &metav1.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(idlePodName, &metav1.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(verifyPodName, &metav1.DeleteOptions{}, podDisappearTimeout)
 
 				// Wait for 2 container gc loop to ensure that the containers are deleted. The containers
 				// created in this test consume a lot of disk, we don't want them to trigger disk eviction
@@ -125,7 +126,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 
 					// The pod should be evicted.
 					if !evictionOccurred {
-						podData, err := podClient.Get(busyPodName)
+						podData, err := podClient.Get(busyPodName, metav1.GetOptions{})
 						if err != nil {
 							return err
 						}
@@ -135,7 +136,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 							return err
 						}
 
-						podData, err = podClient.Get(idlePodName)
+						podData, err = podClient.Get(idlePodName, metav1.GetOptions{})
 						if err != nil {
 							return err
 						}
@@ -170,7 +171,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 					}
 
 					// The new pod should be able to be scheduled and run after the disk pressure is relieved.
-					podData, err := podClient.Get(verifyPodName)
+					podData, err := podClient.Get(verifyPodName, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
@@ -187,7 +188,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 
 func createIdlePod(podName string, podClient *framework.PodClient) {
 	podClient.Create(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{

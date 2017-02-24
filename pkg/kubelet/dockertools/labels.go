@@ -21,14 +21,14 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/runtime"
+	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/custommetrics"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/runtime"
-	kubetypes "k8s.io/kubernetes/pkg/types"
 )
 
 // This file contains all docker label related constants and functions, including:
@@ -39,11 +39,12 @@ const (
 	kubernetesPodDeletionGracePeriodLabel    = "io.kubernetes.pod.deletionGracePeriod"
 	kubernetesPodTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 
-	kubernetesContainerHashLabel                   = "io.kubernetes.container.hash"
-	kubernetesContainerRestartCountLabel           = "io.kubernetes.container.restartCount"
-	kubernetesContainerTerminationMessagePathLabel = "io.kubernetes.container.terminationMessagePath"
-	kubernetesContainerPreStopHandlerLabel         = "io.kubernetes.container.preStopHandler"
-	kubernetesContainerPortsLabel                  = "io.kubernetes.container.ports" // Added in 1.4
+	kubernetesContainerHashLabel                     = "io.kubernetes.container.hash"
+	kubernetesContainerRestartCountLabel             = "io.kubernetes.container.restartCount"
+	kubernetesContainerTerminationMessagePathLabel   = "io.kubernetes.container.terminationMessagePath"
+	kubernetesContainerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
+	kubernetesContainerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
+	kubernetesContainerPortsLabel                    = "io.kubernetes.container.ports" // Added in 1.4
 
 	// TODO(random-liu): Keep this for old containers, remove this when we drop support for v1.1.
 	kubernetesPodLabel = "io.kubernetes.pod.data"
@@ -63,6 +64,7 @@ type labelledContainerInfo struct {
 	Hash                      string
 	RestartCount              int
 	TerminationMessagePath    string
+	TerminationMessagePolicy  v1.TerminationMessagePolicy
 	PreStopHandler            *v1.Handler
 	Ports                     []v1.ContainerPort
 }
@@ -80,9 +82,10 @@ func newLabels(container *v1.Container, pod *v1.Pod, restartCount int, enableCus
 	}
 
 	labels[types.KubernetesContainerNameLabel] = container.Name
-	labels[kubernetesContainerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+	labels[kubernetesContainerHashLabel] = strconv.FormatUint(kubecontainer.HashContainerLegacy(container), 16)
 	labels[kubernetesContainerRestartCountLabel] = strconv.Itoa(restartCount)
 	labels[kubernetesContainerTerminationMessagePathLabel] = container.TerminationMessagePath
+	labels[kubernetesContainerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
 		// Using json enconding so that the PreStop handler object is readable after writing as a label
 		rawPreStop, err := json.Marshal(container.Lifecycle.PreStop)
@@ -118,7 +121,8 @@ func getContainerInfoFromLabel(labels map[string]string) *labelledContainerInfo 
 		PodUID:       kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
 		Name:         getStringValueFromLabel(labels, types.KubernetesContainerNameLabel),
 		Hash:         getStringValueFromLabel(labels, kubernetesContainerHashLabel),
-		TerminationMessagePath: getStringValueFromLabel(labels, kubernetesContainerTerminationMessagePathLabel),
+		TerminationMessagePath:   getStringValueFromLabel(labels, kubernetesContainerTerminationMessagePathLabel),
+		TerminationMessagePolicy: v1.TerminationMessagePolicy(getStringValueFromLabel(labels, kubernetesContainerTerminationMessagePolicyLabel)),
 	}
 	if containerInfo.RestartCount, err = getIntValueFromLabel(labels, kubernetesContainerRestartCountLabel); err != nil {
 		logError(containerInfo, kubernetesContainerRestartCountLabel, err)

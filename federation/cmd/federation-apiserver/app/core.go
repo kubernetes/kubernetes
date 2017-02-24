@@ -26,27 +26,28 @@ import (
 	// TODO(nikhiljindal): Fix this by ensuring that pkg/api/install and federation/apis/core/install do not conflict with each other.
 	_ "k8s.io/kubernetes/pkg/api/install"
 
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/federation/apis/core"
 	_ "k8s.io/kubernetes/federation/apis/core/install"
 	"k8s.io/kubernetes/federation/apis/core/v1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	configmapetcd "k8s.io/kubernetes/pkg/registry/core/configmap/etcd"
-	eventetcd "k8s.io/kubernetes/pkg/registry/core/event/etcd"
-	namespaceetcd "k8s.io/kubernetes/pkg/registry/core/namespace/etcd"
-	secretetcd "k8s.io/kubernetes/pkg/registry/core/secret/etcd"
-	serviceetcd "k8s.io/kubernetes/pkg/registry/core/service/etcd"
+	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
+	eventstore "k8s.io/kubernetes/pkg/registry/core/event/storage"
+	namespacestore "k8s.io/kubernetes/pkg/registry/core/namespace/storage"
+	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
+	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
 )
 
-func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {
-	serviceStore, serviceStatusStore := serviceetcd.NewREST(restOptionsFactory.NewFor(api.Resource("service")))
-	namespaceStore, namespaceStatusStore, namespaceFinalizeStore := namespaceetcd.NewREST(restOptionsFactory.NewFor(api.Resource("namespaces")))
-	secretStore := secretetcd.NewREST(restOptionsFactory.NewFor(api.Resource("secrets")))
-	configMapStore := configmapetcd.NewREST(restOptionsFactory.NewFor(api.Resource("configmaps")))
-	eventStore := eventetcd.NewREST(restOptionsFactory.NewFor(api.Resource("events")), uint64(s.EventTTL.Seconds()))
+func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
+	serviceStore, serviceStatusStore := servicestore.NewREST(optsGetter)
+	namespaceStore, namespaceStatusStore, namespaceFinalizeStore := namespacestore.NewREST(optsGetter)
+	secretStore := secretstore.NewREST(optsGetter)
+	configMapStore := configmapstore.NewREST(optsGetter)
+	eventStore := eventstore.NewREST(optsGetter, uint64(s.EventTTL.Seconds()))
+
 	coreResources := map[string]rest.Storage{
 		"secrets":             secretStore,
 		"services":            serviceStore,
@@ -57,13 +58,13 @@ func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPI
 		"events":              eventStore,
 		"configmaps":          configMapStore,
 	}
-	coreGroupMeta := registered.GroupOrDie(core.GroupName)
+	coreGroupMeta := api.Registry.GroupOrDie(core.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *coreGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			v1.SchemeGroupVersion.Version: coreResources,
 		},
-		OptionsExternalVersion: &registered.GroupOrDie(core.GroupName).GroupVersion,
+		OptionsExternalVersion: &api.Registry.GroupOrDie(core.GroupName).GroupVersion,
 		Scheme:                 core.Scheme,
 		ParameterCodec:         core.ParameterCodec,
 		NegotiatedSerializer:   core.Codecs,

@@ -6,6 +6,11 @@
 		"./third_party",
 		"./plugin",
 		"./test",
-		"./federation"
-	]
+		"./federation",
+		"./examples"
+	],
+	"SkippedPaths": [
+		"^_.*"
+	],
+	"AddSourcesRules": true
 }

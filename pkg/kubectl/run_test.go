@@ -20,11 +20,11 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestGenerate(t *testing.T) {
@@ -42,7 +42,7 @@ func TestGenerate(t *testing.T) {
 				"port":              "",
 			},
 			expected: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
@@ -50,7 +50,7 @@ func TestGenerate(t *testing.T) {
 					Replicas: 1,
 					Selector: map[string]string{"run": "foo"},
 					Template: &api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
 						Spec: api.PodSpec{
@@ -76,7 +76,7 @@ func TestGenerate(t *testing.T) {
 				"env":      []string{"a=b", "c=d"},
 			},
 			expected: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
@@ -84,7 +84,7 @@ func TestGenerate(t *testing.T) {
 					Replicas: 1,
 					Selector: map[string]string{"run": "foo"},
 					Template: &api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
 						Spec: api.PodSpec{
@@ -120,7 +120,7 @@ func TestGenerate(t *testing.T) {
 				"args":              []string{"bar", "baz", "blah"},
 			},
 			expected: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
@@ -128,7 +128,7 @@ func TestGenerate(t *testing.T) {
 					Replicas: 1,
 					Selector: map[string]string{"run": "foo"},
 					Template: &api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
 						Spec: api.PodSpec{
@@ -155,7 +155,7 @@ func TestGenerate(t *testing.T) {
 				"command":  "true",
 			},
 			expected: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
@@ -163,7 +163,7 @@ func TestGenerate(t *testing.T) {
 					Replicas: 1,
 					Selector: map[string]string{"run": "foo"},
 					Template: &api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
 						Spec: api.PodSpec{
@@ -187,7 +187,7 @@ func TestGenerate(t *testing.T) {
 				"port":     "80",
 			},
 			expected: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
@@ -195,7 +195,7 @@ func TestGenerate(t *testing.T) {
 					Replicas: 1,
 					Selector: map[string]string{"run": "foo"},
 					Template: &api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
 						Spec: api.PodSpec{
@@ -225,7 +225,7 @@ func TestGenerate(t *testing.T) {
 				"hostport":          "80",
 			},
 			expected: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
@@ -233,7 +233,7 @@ func TestGenerate(t *testing.T) {
 					Replicas: 1,
 					Selector: map[string]string{"run": "foo"},
 					Template: &api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
 						Spec: api.PodSpec{
@@ -273,7 +273,7 @@ func TestGenerate(t *testing.T) {
 				"labels":   "foo=bar,baz=blah",
 			},
 			expected: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
@@ -281,7 +281,7 @@ func TestGenerate(t *testing.T) {
 					Replicas: 1,
 					Selector: map[string]string{"foo": "bar", "baz": "blah"},
 					Template: &api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
 						},
 						Spec: api.PodSpec{
@@ -349,7 +349,7 @@ func TestGenerate(t *testing.T) {
 				"limits":   "cpu=400m,memory=200Mi",
 			},
 			expected: &api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
@@ -357,7 +357,7 @@ func TestGenerate(t *testing.T) {
 					Replicas: 1,
 					Selector: map[string]string{"foo": "bar", "baz": "blah"},
 					Template: &api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
 						},
 						Spec: api.PodSpec{
@@ -413,7 +413,7 @@ func TestGeneratePod(t *testing.T) {
 				"port":  "",
 			},
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
@@ -447,7 +447,7 @@ func TestGeneratePod(t *testing.T) {
 				"env":               []string{"a=b", "c=d"},
 			},
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
@@ -480,7 +480,7 @@ func TestGeneratePod(t *testing.T) {
 				"port":  "80",
 			},
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
@@ -509,7 +509,7 @@ func TestGeneratePod(t *testing.T) {
 				"hostport": "80",
 			},
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
@@ -548,7 +548,7 @@ func TestGeneratePod(t *testing.T) {
 				"labels":   "foo=bar,baz=blah",
 			},
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
@@ -574,7 +574,7 @@ func TestGeneratePod(t *testing.T) {
 				"stdin":    "true",
 			},
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
@@ -603,7 +603,7 @@ func TestGeneratePod(t *testing.T) {
 				"leave-stdin-open": "true",
 			},
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
@@ -661,7 +661,7 @@ func TestGenerateDeployment(t *testing.T) {
 				"limits":            "cpu=400m,memory=200Mi",
 			},
 			expected: &extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
@@ -669,7 +669,7 @@ func TestGenerateDeployment(t *testing.T) {
 					Replicas: 3,
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar", "baz": "blah"}},
 					Template: api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
 						},
 						Spec: api.PodSpec{
@@ -753,17 +753,13 @@ func TestGenerateJob(t *testing.T) {
 				"restart":          "OnFailure",
 			},
 			expected: &batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: batch.JobSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"foo": "bar", "baz": "blah"},
-					},
-					ManualSelector: newBool(true),
 					Template: api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
 						},
 						Spec: api.PodSpec{
@@ -810,7 +806,7 @@ func TestGenerateJob(t *testing.T) {
 		},
 	}
 
-	generator := JobV1Beta1{}
+	generator := JobV1{}
 	for _, test := range tests {
 		obj, err := generator.Generate(test.params)
 		if !test.expectErr && err != nil {
@@ -821,6 +817,104 @@ func TestGenerateJob(t *testing.T) {
 		}
 		if !reflect.DeepEqual(obj.(*batch.Job), test.expected) {
 			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batch.Job))
+		}
+	}
+}
+
+func TestGenerateCronJob(t *testing.T) {
+	tests := []struct {
+		params    map[string]interface{}
+		expected  *batch.CronJob
+		expectErr bool
+	}{
+		{
+			params: map[string]interface{}{
+				"labels":           "foo=bar,baz=blah",
+				"name":             "foo",
+				"image":            "someimage",
+				"port":             "80",
+				"hostport":         "80",
+				"stdin":            "true",
+				"leave-stdin-open": "true",
+				"command":          "true",
+				"args":             []string{"bar", "baz", "blah"},
+				"env":              []string{"a=b", "c=d"},
+				"requests":         "cpu=100m,memory=100Mi",
+				"limits":           "cpu=400m,memory=200Mi",
+				"restart":          "OnFailure",
+				"schedule":         "0/5 * * * ?",
+			},
+			expected: &batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "0/5 * * * ?",
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: api.PodTemplateSpec{
+								ObjectMeta: metav1.ObjectMeta{
+									Labels: map[string]string{"foo": "bar", "baz": "blah"},
+								},
+								Spec: api.PodSpec{
+									RestartPolicy: api.RestartPolicyOnFailure,
+									Containers: []api.Container{
+										{
+											Name:      "foo",
+											Image:     "someimage",
+											Stdin:     true,
+											StdinOnce: false,
+											Ports: []api.ContainerPort{
+												{
+													ContainerPort: 80,
+													HostPort:      80,
+												},
+											},
+											Command: []string{"bar", "baz", "blah"},
+											Env: []api.EnvVar{
+												{
+													Name:  "a",
+													Value: "b",
+												},
+												{
+													Name:  "c",
+													Value: "d",
+												},
+											},
+											Resources: api.ResourceRequirements{
+												Requests: api.ResourceList{
+													api.ResourceCPU:    resource.MustParse("100m"),
+													api.ResourceMemory: resource.MustParse("100Mi"),
+												},
+												Limits: api.ResourceList{
+													api.ResourceCPU:    resource.MustParse("400m"),
+													api.ResourceMemory: resource.MustParse("200Mi"),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	generator := CronJobV2Alpha1{}
+	for _, test := range tests {
+		obj, err := generator.Generate(test.params)
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*batch.CronJob), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batch.CronJob))
 		}
 	}
 }

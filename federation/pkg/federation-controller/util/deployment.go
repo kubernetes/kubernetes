@@ -19,12 +19,12 @@ package util
 import (
 	"reflect"
 
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	extensions_v1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	deputils "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
-// Checks if cluster-independent, user provided data in two given Deployment are eqaul.
+// Checks if cluster-independent, user provided data in two given Deployment are equal.
 // This function assumes that revisions are not kept in sync across the clusters.
 func DeploymentEquivalent(a, b *extensions_v1.Deployment) bool {
 	if a.Name != b.Name {
@@ -60,7 +60,7 @@ func DeploymentEquivalent(a, b *extensions_v1.Deployment) bool {
 }
 
 // Copies object meta for Deployment, skipping revision information.
-func DeepCopyDeploymentObjectMeta(meta api_v1.ObjectMeta) api_v1.ObjectMeta {
+func DeepCopyDeploymentObjectMeta(meta metav1.ObjectMeta) metav1.ObjectMeta {
 	meta = DeepCopyRelevantObjectMeta(meta)
 	delete(meta.Annotations, deputils.RevisionAnnotation)
 	return meta
@@ -70,6 +70,6 @@ func DeepCopyDeploymentObjectMeta(meta api_v1.ObjectMeta) api_v1.ObjectMeta {
 func DeepCopyDeployment(a *extensions_v1.Deployment) *extensions_v1.Deployment {
 	return &extensions_v1.Deployment{
 		ObjectMeta: DeepCopyDeploymentObjectMeta(a.ObjectMeta),
-		Spec:       DeepCopyApiTypeOrPanic(a.Spec).(extensions_v1.DeploymentSpec),
+		Spec:       *(DeepCopyApiTypeOrPanic(&a.Spec).(*extensions_v1.DeploymentSpec)),
 	}
 }

@@ -12,6 +12,7 @@ write_files:
     content: |
       grains:
         node_ip: $MASTER_IP
+        cbr-cidr: $MASTER_IP_RANGE
         publicAddressOverride: $MASTER_IP
         network_mode: openvswitch
         networkInterfaceName: eth0
@@ -21,7 +22,7 @@ write_files:
         roles:
           - $role
         runtime_config: ""
-        docker_opts: ""
+        docker_opts: "--bridge=cbr0 --iptables=false --ip-masq=false"
         master_extra_sans: "DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local,DNS:kubernetes-master"
         keep_host_etcd: true
         kube_user: $KUBE_USER
@@ -32,13 +33,17 @@ write_files:
       username=$OS_USERNAME
       password=$OS_PASSWORD
       region=$OS_REGION_NAME
-      tenant-id=$OS_TENANT_ID
+      tenant-name=$OS_TENANT_NAME
+      domain-name=$OS_USER_DOMAIN_NAME
       [LoadBalancer]
       lb-version=$LBAAS_VERSION
       subnet-id=$SUBNET_ID
       floating-network-id=$FLOATING_NETWORK_ID
+      [Route]
+      router-id=$router_id
   - path: /srv/salt-overlay/pillar/cluster-params.sls
     content: |
+      allocate_node_cidrs: "true"
       service_cluster_ip_range: 10.246.0.0/16
       cert_ip: 10.246.0.1
       enable_cluster_monitoring: influxdb
@@ -56,6 +61,7 @@ write_files:
       admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DefaultStorageClass,ResourceQuota
       enable_cpu_cfs_quota: "true"
       network_provider: none
+      cluster_cidr: "$cluster_cidr"
       opencontrail_tag: R2.20
       opencontrail_kubernetes_tag: master
       opencontrail_public_subnet: 10.1.0.0/16

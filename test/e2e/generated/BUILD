@@ -4,10 +4,7 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
     "go_library",
-    "go_test",
-    "cgo_library",
 )
 
 go_library(
@@ -32,13 +29,26 @@ genrule(
     ],
     outs = ["bindata.go"],
     cmd = """
-$(location //vendor:github.com/jteeuwen/go-bindata/go-bindata) \
+$(location //vendor:github.com/jteeuwen/go-bindata/go-bindata_bin) \
   -nometadata -o "$(OUTS)" -pkg generated \
   -prefix $$(pwd) \
   -ignore .jpg -ignore .png -ignore .md \
   $(SRCS)
 """,
     tools = [
-        "//vendor:github.com/jteeuwen/go-bindata/go-bindata",
+        "//vendor:github.com/jteeuwen/go-bindata/go-bindata_bin",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

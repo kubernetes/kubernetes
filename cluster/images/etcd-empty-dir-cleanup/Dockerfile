@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gliderlabs/alpine
-MAINTAINER Mehdy Bohlool <mehdy@google.com>
+FROM busybox
 
-RUN apk-install bash
-ADD etcd-empty-dir-cleanup.sh etcd-empty-dir-cleanup.sh
-ADD etcdctl etcdctl
+COPY etcdctl etcd-empty-dir-cleanup.sh /
+RUN chmod a+rx /etcdctl /etcd-empty-dir-cleanup.sh
+
 ENV ETCDCTL /etcdctl
 ENV SLEEP_SECOND 3600
-RUN chmod +x etcd-empty-dir-cleanup.sh
-CMD bash /etcd-empty-dir-cleanup.sh
+
+USER nobody:nogroup
+
+ENTRYPOINT ["/etcd-empty-dir-cleanup.sh"]

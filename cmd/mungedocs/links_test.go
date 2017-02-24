@@ -45,10 +45,6 @@ func TestGoodLinks(t *testing.T) {
 		expected string
 	}{
 		{"", ""},
-		{"[README](https://github.com/kubernetes/kubernetes/tree/master/README.md)",
-			"[README](README.md)"},
-		{"[README](../README.md)",
-			"[README](README.md)"},
 		{"[README](https://lwn.net)",
 			"[README](https://lwn.net)"},
 		// _ to -

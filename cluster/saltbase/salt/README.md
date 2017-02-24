@@ -13,8 +13,6 @@ Config                                              | GCE   | Vagrant | AWS | Az
 [debian-auto-upgrades](debian-auto-upgrades/)       | M n   | M n     | M n | M n
 [docker](docker/)                                   | M n   | M n     | M n | M n
 [etcd](etcd/)                                       | M     | M       | M   | M
-[fluentd-es](fluentd-es/) (pillar conditional)      | M n   | M n     | M n | M n
-[fluentd-gcp](fluentd-gcp/) (pillar conditional)    | M n   | M n     | M n | M n
 [generate-cert](generate-cert/)                     | M     | M       | M   | M
 [kube-addons](kube-addons/)                         | M     | M       | M   | M
 [kube-apiserver](kube-apiserver/)                   | M     | M       | M   | M

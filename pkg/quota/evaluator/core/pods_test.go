@@ -19,9 +19,9 @@ package core
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
@@ -86,8 +86,10 @@ func TestPodConstraintsFunc(t *testing.T) {
 			err:      `must specify memory`,
 		},
 	}
+	kubeClient := fake.NewSimpleClientset()
+	evaluator := NewPodEvaluator(kubeClient, nil)
 	for testName, test := range testCases {
-		err := PodConstraintsFunc(test.required, test.pod)
+		err := evaluator.Constraints(test.required, test.pod)
 		switch {
 		case err != nil && len(test.err) == 0,
 			err == nil && len(test.err) != 0,
@@ -245,7 +247,10 @@ func TestPodEvaluatorUsage(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := evaluator.Usage(testCase.pod)
+		actual, err := evaluator.Usage(testCase.pod)
+		if err != nil {
+			t.Errorf("%s unexpected error: %v", testName, err)
+		}
 		if !quota.Equals(testCase.usage, actual) {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.usage, actual)
 		}

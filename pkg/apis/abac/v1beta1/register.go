@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	api "k8s.io/kubernetes/pkg/apis/abac"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 const GroupName = "abac.authorization.kubernetes.io"
@@ -33,10 +33,14 @@ func init() {
 		// Programmer error.
 		panic(err)
 	}
+	if err := addConversionFuncs(api.Scheme); err != nil {
+		// Programmer error.
+		panic(err)
+	}
 }
 
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addConversionFuncs)
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 

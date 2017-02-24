@@ -24,7 +24,7 @@ import (
 )
 
 func TestImageStatsNoImages(t *testing.T) {
-	fakeDockerClient := NewFakeDockerClientWithVersion("1.2.3", "1.2")
+	fakeDockerClient := NewFakeDockerClient().WithVersion("1.2.3", "1.2")
 	isp := newImageStatsProvider(fakeDockerClient)
 	st, err := isp.ImageStats()
 	as := assert.New(t)
@@ -34,7 +34,7 @@ func TestImageStatsNoImages(t *testing.T) {
 }
 
 func TestImageStatsWithImages(t *testing.T) {
-	fakeDockerClient := NewFakeDockerClientWithVersion("1.2.3", "1.2")
+	fakeDockerClient := NewFakeDockerClient().WithVersion("1.2.3", "1.2")
 	fakeHistoryData := map[string][]dockertypes.ImageHistory{
 		"busybox": {
 			{
@@ -317,7 +317,7 @@ func TestImageStatsWithCachedImages(t *testing.T) {
 			expectedTotalStorageSize: 600,
 		},
 	} {
-		fakeDockerClient := NewFakeDockerClientWithVersion("1.2.3", "1.2")
+		fakeDockerClient := NewFakeDockerClient().WithVersion("1.2.3", "1.2")
 		fakeDockerClient.InjectImages(test.images)
 		fakeDockerClient.InjectImageHistory(test.history)
 		isp := newImageStatsProvider(fakeDockerClient)

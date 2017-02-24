@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/validation"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
 func TestSubjectLocator(t *testing.T) {
@@ -58,29 +58,29 @@ func TestSubjectLocator(t *testing.T) {
 				{
 					&defaultAttributes{"", "", "get", "Pods", "", "ns1", ""},
 					[]rbac.Subject{
-						{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, Name: "super-admin"},
-						{Kind: rbac.GroupKind, Name: "super-admins"},
-						{Kind: rbac.UserKind, Name: "admin"},
-						{Kind: rbac.GroupKind, Name: "admins"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "admin"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "admins"},
 					},
 				},
 				{
 					// cluster role matches star in namespace
 					&defaultAttributes{"", "", "*", "Pods", "", "*", ""},
 					[]rbac.Subject{
-						{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, Name: "super-admin"},
-						{Kind: rbac.GroupKind, Name: "super-admins"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
 					},
 				},
 				{
 					// empty ns
 					&defaultAttributes{"", "", "*", "Pods", "", "", ""},
 					[]rbac.Subject{
-						{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, Name: "super-admin"},
-						{Kind: rbac.GroupKind, Name: "super-admins"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
 					},
 				},
 			},
@@ -104,39 +104,39 @@ func TestSubjectLocator(t *testing.T) {
 				{
 					&defaultAttributes{"", "", "get", "Pods", "", "ns1", ""},
 					[]rbac.Subject{
-						{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIVersion: "v1alpha1", Name: "foo"},
-						{Kind: rbac.UserKind, Name: "super-admin"},
-						{Kind: rbac.GroupKind, Name: "super-admins"},
-						{Kind: rbac.UserKind, Name: "admin"},
-						{Kind: rbac.GroupKind, Name: "admins"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "foo"},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "admin"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "admins"},
 					},
 				},
 				{
 					// verb matchies correctly
 					&defaultAttributes{"", "", "create", "Pods", "", "ns1", ""},
 					[]rbac.Subject{
-						{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIVersion: "v1alpha1", Name: "foo"},
-						{Kind: rbac.UserKind, Name: "super-admin"},
-						{Kind: rbac.GroupKind, Name: "super-admins"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "foo"},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
 					},
 				},
 				{
 					// binding only works in correct ns
 					&defaultAttributes{"", "", "get", "Pods", "", "ns2", ""},
 					[]rbac.Subject{
-						{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup},
-						{Kind: rbac.UserKind, APIVersion: "v1alpha1", Name: "foo"},
-						{Kind: rbac.UserKind, Name: "super-admin"},
-						{Kind: rbac.GroupKind, Name: "super-admins"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "foo"},
+						{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: "super-admin"},
+						{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: "super-admins"},
 					},
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
-		ruleResolver, lister := validation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
+		ruleResolver, lister := rbacregistryvalidation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
 		a := SubjectAccessEvaluator{tt.superUser, lister, lister, ruleResolver}
 		for i, action := range tt.actionsToSubjects {
 			actualSubjects, err := a.AllowedSubjects(action.action)
@@ -144,7 +144,7 @@ func TestSubjectLocator(t *testing.T) {
 				t.Errorf("case %q %d: error %v", tt.name, i, err)
 			}
 			if !reflect.DeepEqual(actualSubjects, action.subjects) {
-				t.Errorf("case %q %d: expected %v actual %v", tt.name, i, action.subjects, actualSubjects)
+				t.Errorf("case %q %d: expected\n%v\nactual\n%v", tt.name, i, action.subjects, actualSubjects)
 			}
 		}
 	}

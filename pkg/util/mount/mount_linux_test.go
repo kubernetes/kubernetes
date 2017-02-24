@@ -29,20 +29,21 @@ func TestReadProcMountsFrom(t *testing.T) {
 		/dev/1    /path/to/1   type1	flags 1 1
 		/dev/2 /path/to/2 type2 flags,1,2=3 2 2
 		`
+	// NOTE: readProcMountsFrom has been updated to using fnv.New32a()
 	hash, err := readProcMountsFrom(strings.NewReader(successCase), nil)
 	if err != nil {
 		t.Errorf("expected success")
 	}
-	if hash != 0xa3522051 {
-		t.Errorf("expected 0xa3522051, got %#x", hash)
+	if hash != 0xa290ff0b {
+		t.Errorf("expected 0xa290ff0b, got %#x", hash)
 	}
 	mounts := []MountPoint{}
 	hash, err = readProcMountsFrom(strings.NewReader(successCase), &mounts)
 	if err != nil {
 		t.Errorf("expected success")
 	}
-	if hash != 0xa3522051 {
-		t.Errorf("expected 0xa3522051, got %#x", hash)
+	if hash != 0xa290ff0b {
+		t.Errorf("expected 0xa290ff0b, got %#x", hash)
 	}
 	if len(mounts) != 3 {
 		t.Fatalf("expected 3 mounts, got %d", len(mounts))
@@ -98,7 +99,7 @@ func TestGetMountRefs(t *testing.T) {
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd"},
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd-in-pod"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2"},
-			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod"},
+			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod1"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod2"},
 		},
 	}
@@ -114,7 +115,7 @@ func TestGetMountRefs(t *testing.T) {
 			},
 		},
 		{
-			"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod",
+			"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod1",
 			[]string{
 				"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod2",
 				"/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2",

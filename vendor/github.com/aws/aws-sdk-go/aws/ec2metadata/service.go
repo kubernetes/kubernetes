@@ -3,8 +3,9 @@
 package ec2metadata
 
 import (
-	"io/ioutil"
-	"net"
+	"bytes"
+	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -26,6 +27,7 @@ type EC2Metadata struct {
 // New creates a new instance of the EC2Metadata client with a session.
 // This client is safe to use across multiple goroutines.
 //
+//
 // Example:
 //     // Create a EC2Metadata client from just a session.
 //     svc := ec2metadata.New(mySession)
@@ -40,22 +42,19 @@ func New(p client.ConfigProvider, cfgs ...*aws.Config) *EC2Metadata {
 // NewClient returns a new EC2Metadata client. Should be used to create
 // a client when not using a session. Generally using just New with a session
 // is preferred.
+//
+// If an unmodified HTTP client is provided from the stdlib default, or no client
+// the EC2RoleProvider's EC2Metadata HTTP client's timeout will be shortened.
+// To disable this set Config.EC2MetadataDisableTimeoutOverride to false. Enabled by default.
 func NewClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegion string, opts ...func(*client.Client)) *EC2Metadata {
-	// If the default http client is provided, replace it with a custom
-	// client using default timeouts.
-	if cfg.HTTPClient == http.DefaultClient {
+	if !aws.BoolValue(cfg.EC2MetadataDisableTimeoutOverride) && httpClientZero(cfg.HTTPClient) {
+		// If the http client is unmodified and this feature is not disabled
+		// set custom timeouts for EC2Metadata requests.
 		cfg.HTTPClient = &http.Client{
-			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				Dial: (&net.Dialer{
-					// use a shorter timeout than default because the metadata
-					// service is local if it is running, and to fail faster
-					// if not running on an ec2 instance.
-					Timeout:   5 * time.Second,
-					KeepAlive: 30 * time.Second,
-				}).Dial,
-				TLSHandshakeTimeout: 10 * time.Second,
-			},
+			// use a shorter timeout than default because the metadata
+			// service is local if it is running, and to fail faster
+			// if not running on an ec2 instance.
+			Timeout: 5 * time.Second,
 		}
 	}
 
@@ -84,29 +83,38 @@ func NewClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 	return svc
 }
 
+func httpClientZero(c *http.Client) bool {
+	return c == nil || (c.Transport == nil && c.CheckRedirect == nil && c.Jar == nil && c.Timeout == 0)
+}
+
 type metadataOutput struct {
 	Content string
 }
 
 func unmarshalHandler(r *request.Request) {
 	defer r.HTTPResponse.Body.Close()
-	b, err := ioutil.ReadAll(r.HTTPResponse.Body)
-	if err != nil {
+	b := &bytes.Buffer{}
+	if _, err := io.Copy(b, r.HTTPResponse.Body); err != nil {
 		r.Error = awserr.New("SerializationError", "unable to unmarshal EC2 metadata respose", err)
+		return
 	}
 
-	data := r.Data.(*metadataOutput)
-	data.Content = string(b)
+	if data, ok := r.Data.(*metadataOutput); ok {
+		data.Content = b.String()
+	}
 }
 
 func unmarshalError(r *request.Request) {
 	defer r.HTTPResponse.Body.Close()
-	_, err := ioutil.ReadAll(r.HTTPResponse.Body)
-	if err != nil {
+	b := &bytes.Buffer{}
+	if _, err := io.Copy(b, r.HTTPResponse.Body); err != nil {
 		r.Error = awserr.New("SerializationError", "unable to unmarshal EC2 metadata error respose", err)
+		return
 	}
 
-	// TODO extract the error...
+	// Response body format is not consistent between metadata endpoints.
+	// Grab the error message as a string and include that as the source error
+	r.Error = awserr.New("EC2MetadataError", "failed to make EC2Metadata request", errors.New(b.String()))
 }
 
 func validateEndpointHandler(r *request.Request) {

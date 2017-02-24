@@ -44,7 +44,7 @@ type Route53APIStub struct {
 	recordSets map[string]map[string][]*route53.ResourceRecordSet
 }
 
-// NewRoute53APIStub returns an initlialized Route53APIStub
+// NewRoute53APIStub returns an initialized Route53APIStub
 func NewRoute53APIStub() *Route53APIStub {
 	return &Route53APIStub{
 		zones:      make(map[string]*route53.HostedZone),

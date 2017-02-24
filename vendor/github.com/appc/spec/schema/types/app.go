@@ -22,16 +22,18 @@ import (
 )
 
 type App struct {
-	Exec              Exec           `json:"exec"`
-	EventHandlers     []EventHandler `json:"eventHandlers,omitempty"`
-	User              string         `json:"user"`
-	Group             string         `json:"group"`
-	SupplementaryGIDs []int          `json:"supplementaryGIDs,omitempty"`
-	WorkingDirectory  string         `json:"workingDirectory,omitempty"`
-	Environment       Environment    `json:"environment,omitempty"`
-	MountPoints       []MountPoint   `json:"mountPoints,omitempty"`
-	Ports             []Port         `json:"ports,omitempty"`
-	Isolators         Isolators      `json:"isolators,omitempty"`
+	Exec              Exec            `json:"exec"`
+	EventHandlers     []EventHandler  `json:"eventHandlers,omitempty"`
+	User              string          `json:"user"`
+	Group             string          `json:"group"`
+	SupplementaryGIDs []int           `json:"supplementaryGIDs,omitempty"`
+	WorkingDirectory  string          `json:"workingDirectory,omitempty"`
+	Environment       Environment     `json:"environment,omitempty"`
+	MountPoints       []MountPoint    `json:"mountPoints,omitempty"`
+	Ports             []Port          `json:"ports,omitempty"`
+	Isolators         Isolators       `json:"isolators,omitempty"`
+	UserAnnotations   UserAnnotations `json:"userAnnotations,omitempty"`
+	UserLabels        UserLabels      `json:"userLabels,omitempty"`
 }
 
 // app is a model to facilitate extra validation during the
@@ -84,6 +86,9 @@ func (a *App) assertValid() error {
 		eh[name] = true
 	}
 	if err := a.Environment.assertValid(); err != nil {
+		return err
+	}
+	if err := a.Isolators.assertValid(); err != nil {
 		return err
 	}
 	return nil

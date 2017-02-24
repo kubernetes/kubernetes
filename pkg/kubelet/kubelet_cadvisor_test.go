@@ -22,46 +22,186 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
 func TestGetContainerInfo(t *testing.T) {
-	containerID := "ab2cdf"
-	containerPath := fmt.Sprintf("/docker/%v", containerID)
-	containerInfo := cadvisorapi.ContainerInfo{
-		ContainerReference: cadvisorapi.ContainerReference{
-			Name: containerPath,
+	cadvisorApiFailure := fmt.Errorf("cAdvisor failure")
+	runtimeError := fmt.Errorf("List containers error")
+	tests := []struct {
+		name                      string
+		containerID               string
+		containerPath             string
+		cadvisorContainerInfo     cadvisorapi.ContainerInfo
+		runtimeError              error
+		podList                   []*kubecontainertest.FakePod
+		requestedPodFullName      string
+		requestedPodUid           types.UID
+		requestedContainerName    string
+		expectDockerContainerCall bool
+		mockError                 error
+		expectedError             error
+		expectStats               bool
+	}{
+		{
+			name:          "get container info",
+			containerID:   "ab2cdf",
+			containerPath: "/docker/ab2cdf",
+			cadvisorContainerInfo: cadvisorapi.ContainerInfo{
+				ContainerReference: cadvisorapi.ContainerReference{
+					Name: "/docker/ab2cdf",
+				},
+			},
+			runtimeError: nil,
+			podList: []*kubecontainertest.FakePod{
+				{
+					Pod: &kubecontainer.Pod{
+						ID:        "12345678",
+						Name:      "qux",
+						Namespace: "ns",
+						Containers: []*kubecontainer.Container{
+							{
+								Name: "foo",
+								ID:   kubecontainer.ContainerID{Type: "test", ID: "ab2cdf"},
+							},
+						},
+					},
+				},
+			},
+			requestedPodFullName:      "qux_ns",
+			requestedPodUid:           "",
+			requestedContainerName:    "foo",
+			expectDockerContainerCall: true,
+			mockError:                 nil,
+			expectedError:             nil,
+			expectStats:               true,
+		},
+		{
+			name:                  "get container info when cadvisor failed",
+			containerID:           "ab2cdf",
+			containerPath:         "/docker/ab2cdf",
+			cadvisorContainerInfo: cadvisorapi.ContainerInfo{},
+			runtimeError:          nil,
+			podList: []*kubecontainertest.FakePod{
+				{
+					Pod: &kubecontainer.Pod{
+						ID:        "uuid",
+						Name:      "qux",
+						Namespace: "ns",
+						Containers: []*kubecontainer.Container{
+							{
+								Name: "foo",
+								ID:   kubecontainer.ContainerID{Type: "test", ID: "ab2cdf"},
+							},
+						},
+					},
+				},
+			},
+			requestedPodFullName:      "qux_ns",
+			requestedPodUid:           "uuid",
+			requestedContainerName:    "foo",
+			expectDockerContainerCall: true,
+			mockError:                 cadvisorApiFailure,
+			expectedError:             cadvisorApiFailure,
+			expectStats:               false,
+		},
+		{
+			name:                      "get container info on non-existent container",
+			containerID:               "",
+			containerPath:             "",
+			cadvisorContainerInfo:     cadvisorapi.ContainerInfo{},
+			runtimeError:              nil,
+			podList:                   []*kubecontainertest.FakePod{},
+			requestedPodFullName:      "qux",
+			requestedPodUid:           "",
+			requestedContainerName:    "foo",
+			expectDockerContainerCall: false,
+			mockError:                 nil,
+			expectedError:             kubecontainer.ErrContainerNotFound,
+			expectStats:               false,
+		},
+		{
+			name:                   "get container info when container runtime failed",
+			containerID:            "",
+			containerPath:          "",
+			cadvisorContainerInfo:  cadvisorapi.ContainerInfo{},
+			runtimeError:           runtimeError,
+			podList:                []*kubecontainertest.FakePod{},
+			requestedPodFullName:   "qux",
+			requestedPodUid:        "",
+			requestedContainerName: "foo",
+			mockError:              nil,
+			expectedError:          runtimeError,
+			expectStats:            false,
+		},
+		{
+			name:                   "get container info with no containers",
+			containerID:            "",
+			containerPath:          "",
+			cadvisorContainerInfo:  cadvisorapi.ContainerInfo{},
+			runtimeError:           nil,
+			podList:                []*kubecontainertest.FakePod{},
+			requestedPodFullName:   "qux_ns",
+			requestedPodUid:        "",
+			requestedContainerName: "foo",
+			mockError:              nil,
+			expectedError:          kubecontainer.ErrContainerNotFound,
+			expectStats:            false,
+		},
+		{
+			name:                  "get container info with no matching containers",
+			containerID:           "",
+			containerPath:         "",
+			cadvisorContainerInfo: cadvisorapi.ContainerInfo{},
+			runtimeError:          nil,
+			podList: []*kubecontainertest.FakePod{
+				{
+					Pod: &kubecontainer.Pod{
+						ID:        "12345678",
+						Name:      "qux",
+						Namespace: "ns",
+						Containers: []*kubecontainer.Container{
+							{
+								Name: "bar",
+								ID:   kubecontainer.ContainerID{Type: "test", ID: "fakeID"},
+							},
+						},
+					},
+				},
+			},
+			requestedPodFullName:   "qux_ns",
+			requestedPodUid:        "",
+			requestedContainerName: "foo",
+			mockError:              nil,
+			expectedError:          kubecontainer.ErrContainerNotFound,
+			expectStats:            false,
 		},
 	}
 
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	fakeRuntime := testKubelet.fakeRuntime
-	kubelet := testKubelet.kubelet
-	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
-	fakeRuntime.PodList = []*kubecontainertest.FakePod{
-		{Pod: &kubecontainer.Pod{
-			ID:        "12345678",
-			Name:      "qux",
-			Namespace: "ns",
-			Containers: []*kubecontainer.Container{
-				{
-					Name: "foo",
-					ID:   kubecontainer.ContainerID{Type: "test", ID: containerID},
-				},
-			},
-		}},
+	for _, tc := range tests {
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnablec */)
+		defer testKubelet.Cleanup()
+		fakeRuntime := testKubelet.fakeRuntime
+		kubelet := testKubelet.kubelet
+		cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
+		mockCadvisor := testKubelet.fakeCadvisor
+		if tc.expectDockerContainerCall {
+			mockCadvisor.On("DockerContainer", tc.containerID, cadvisorReq).Return(tc.cadvisorContainerInfo, tc.mockError)
+		}
+		fakeRuntime.Err = tc.runtimeError
+		fakeRuntime.PodList = tc.podList
+
+		stats, err := kubelet.GetContainerInfo(tc.requestedPodFullName, tc.requestedPodUid, tc.requestedContainerName, cadvisorReq)
+		if err != tc.expectedError {
+			t.Errorf("test '%s' failed: expected error %#v, got %#v", tc.name, tc.expectedError, err)
+		}
+		if tc.expectStats && stats == nil {
+			t.Fatalf("test '%s' failed: stats should not be nil", tc.name)
+		}
+		mockCadvisor.AssertExpectations(t)
 	}
-	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", cadvisorReq)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if stats == nil {
-		t.Fatalf("stats should not be nil")
-	}
-	mockCadvisor.AssertExpectations(t)
 }
 
 func TestGetRawContainerInfoRoot(t *testing.T) {
@@ -72,6 +212,7 @@ func TestGetRawContainerInfoRoot(t *testing.T) {
 		},
 	}
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
@@ -99,6 +240,7 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 		},
 	}
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
@@ -110,126 +252,6 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 	}
 	if len(result) != 2 {
 		t.Errorf("Expected 2 elements, received: %#v", result)
-	}
-	mockCadvisor.AssertExpectations(t)
-}
-
-func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
-	containerID := "ab2cdf"
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	fakeRuntime := testKubelet.fakeRuntime
-	cadvisorApiFailure := fmt.Errorf("cAdvisor failure")
-	containerInfo := cadvisorapi.ContainerInfo{}
-	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
-	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, cadvisorApiFailure)
-	fakeRuntime.PodList = []*kubecontainertest.FakePod{
-		{Pod: &kubecontainer.Pod{
-			ID:        "uuid",
-			Name:      "qux",
-			Namespace: "ns",
-			Containers: []*kubecontainer.Container{
-				{Name: "foo",
-					ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
-				},
-			},
-		}},
-	}
-	stats, err := kubelet.GetContainerInfo("qux_ns", "uuid", "foo", cadvisorReq)
-	if stats != nil {
-		t.Errorf("non-nil stats on error")
-	}
-	if err == nil {
-		t.Errorf("expect error but received nil error")
-		return
-	}
-	if err.Error() != cadvisorApiFailure.Error() {
-		t.Errorf("wrong error message. expect %v, got %v", cadvisorApiFailure, err)
-	}
-	mockCadvisor.AssertExpectations(t)
-}
-
-func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.PodList = []*kubecontainertest.FakePod{}
-
-	stats, _ := kubelet.GetContainerInfo("qux", "", "foo", nil)
-	if stats != nil {
-		t.Errorf("non-nil stats on non exist container")
-	}
-	mockCadvisor.AssertExpectations(t)
-}
-
-func TestGetContainerInfoWhenContainerRuntimeFailed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	fakeRuntime := testKubelet.fakeRuntime
-	expectedErr := fmt.Errorf("List containers error")
-	fakeRuntime.Err = expectedErr
-
-	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
-	if err == nil {
-		t.Errorf("expected error from dockertools, got none")
-	}
-	if err.Error() != expectedErr.Error() {
-		t.Errorf("expected error %v got %v", expectedErr.Error(), err.Error())
-	}
-	if stats != nil {
-		t.Errorf("non-nil stats when dockertools failed")
-	}
-	mockCadvisor.AssertExpectations(t)
-}
-
-func TestGetContainerInfoWithNoContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-
-	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
-	if err == nil {
-		t.Errorf("expected error from cadvisor client, got none")
-	}
-	if err != kubecontainer.ErrContainerNotFound {
-		t.Errorf("expected error %v, got %v", kubecontainer.ErrContainerNotFound.Error(), err.Error())
-	}
-	if stats != nil {
-		t.Errorf("non-nil stats when dockertools returned no containers")
-	}
-	mockCadvisor.AssertExpectations(t)
-}
-
-func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	fakeRuntime := testKubelet.fakeRuntime
-	kubelet := testKubelet.kubelet
-	mockCadvisor := testKubelet.fakeCadvisor
-	fakeRuntime.PodList = []*kubecontainertest.FakePod{
-		{Pod: &kubecontainer.Pod{
-			ID:        "12345678",
-			Name:      "qux",
-			Namespace: "ns",
-			Containers: []*kubecontainer.Container{
-				{Name: "bar",
-					ID: kubecontainer.ContainerID{Type: "test", ID: "fakeID"},
-				},
-			}},
-		},
-	}
-
-	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
-	if err == nil {
-		t.Errorf("Expected error from cadvisor client, got none")
-	}
-	if err != kubecontainer.ErrContainerNotFound {
-		t.Errorf("Expected error %v, got %v", kubecontainer.ErrContainerNotFound.Error(), err.Error())
-	}
-	if stats != nil {
-		t.Errorf("non-nil stats when dockertools returned no containers")
 	}
 	mockCadvisor.AssertExpectations(t)
 }
@@ -253,6 +275,7 @@ func TestHasDedicatedImageFs(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		mockCadvisor := testKubelet.fakeCadvisor
 		mockCadvisor.On("Start").Return(nil)

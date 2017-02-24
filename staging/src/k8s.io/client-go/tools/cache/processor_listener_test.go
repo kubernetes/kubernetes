@@ -20,13 +20,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // TestPopReleaseLock tests that when processor listener blocks on chan,
 // it should release the lock for pendingNotifications.
 func TestPopReleaseLock(t *testing.T) {
-	pl := newProcessListener(nil)
+	pl := newProcessListener(nil, 0, 0, time.Now())
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	// make pop() block on nextCh: waiting for receiver to get notification.

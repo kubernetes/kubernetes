@@ -24,3 +24,12 @@ func (f *FilterChain) ProcessFilter(request *Request, response *Response) {
 
 // FilterFunction definitions must call ProcessFilter on the FilterChain to pass on the control and eventually call the RouteFunction
 type FilterFunction func(*Request, *Response, *FilterChain)
+
+// NoBrowserCacheFilter is a filter function to set HTTP headers that disable browser caching
+// See examples/restful-no-cache-filter.go for usage
+func NoBrowserCacheFilter(req *Request, resp *Response, chain *FilterChain) {
+	resp.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1.
+	resp.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0.
+	resp.Header().Set("Expires", "0")                                         // Proxies.
+	chain.ProcessFilter(req, resp)
+}

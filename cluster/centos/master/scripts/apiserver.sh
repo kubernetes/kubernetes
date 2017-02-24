@@ -27,12 +27,12 @@ KUBE_LOGTOSTDERR="--logtostderr=true"
 # --v=0: log level for V logs
 KUBE_LOG_LEVEL="--v=4"
 
-# --etcd-servers=[]: List of etcd servers to watch (http://ip:port), 
+# --etcd-servers=[]: List of etcd servers to watch (http://ip:port),
 # comma separated. Mutually exclusive with -etcd-config
 KUBE_ETCD_SERVERS="--etcd-servers=${ETCD_SERVERS}"
 
 # --insecure-bind-address=127.0.0.1: The IP address on which to serve the --insecure-port.
-KUBE_API_ADDRESS="--insecure-bind-address=${MASTER_ADDRESS}"
+KUBE_API_ADDRESS="--insecure-bind-address=0.0.0.0"
 
 # --insecure-port=8080: The port on which to serve unsecured, unauthenticated access.
 KUBE_API_PORT="--insecure-port=8080"
@@ -40,21 +40,21 @@ KUBE_API_PORT="--insecure-port=8080"
 # --kubelet-port=10250: Kubelet port
 NODE_PORT="--kubelet-port=10250"
 
-# --advertise-address=<nil>: The IP address on which to advertise 
+# --advertise-address=<nil>: The IP address on which to advertise
 # the apiserver to members of the cluster.
 KUBE_ADVERTISE_ADDR="--advertise-address=${MASTER_ADDRESS}"
 
 # --allow-privileged=false: If true, allow privileged containers.
 KUBE_ALLOW_PRIV="--allow-privileged=false"
 
-# --service-cluster-ip-range=<nil>: A CIDR notation IP range from which to assign service cluster IPs. 
+# --service-cluster-ip-range=<nil>: A CIDR notation IP range from which to assign service cluster IPs.
 # This must not overlap with any IP ranges assigned to nodes for pods.
 KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 
-# --admission-control="AlwaysAdmit": Ordered list of plug-ins 
-# to do admission control of resources into cluster. 
-# Comma-delimited list of: 
-#   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists, 
+# --admission-control="AlwaysAdmit": Ordered list of plug-ins
+# to do admission control of resources into cluster.
+# Comma-delimited list of:
+#   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists,
 #   NamespaceLifecycle, NamespaceAutoProvision,
 #   AlwaysAdmit, ServiceAccount, ResourceQuota, DefaultStorageClass
 KUBE_ADMISSION_CONTROL="--admission-control=${ADMISSION_CONTROL}"
@@ -105,4 +105,4 @@ EOF
 
 systemctl daemon-reload
 systemctl enable kube-apiserver
-systemctl start kube-apiserver
+systemctl restart kube-apiserver

@@ -65,8 +65,8 @@ function unpack-releases() {
   # flannel
   if [[ -f ${RELEASES_DIR}/flannel.tar.gz ]] ; then
     tar xzf ${RELEASES_DIR}/flannel.tar.gz -C ${RELEASES_DIR}
-    cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/master/bin
-    cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/node/bin
+    cp ${RELEASES_DIR}/flanneld ${BINARY_DIR}/master/bin
+    cp ${RELEASES_DIR}/flanneld ${BINARY_DIR}/node/bin
   fi
 
   # ectd

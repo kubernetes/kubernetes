@@ -19,8 +19,8 @@ package v1
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -38,8 +38,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		v1.Convert_api_ObjectMeta_To_v1_ObjectMeta,
 		v1.Convert_v1_ObjectReference_To_api_ObjectReference,
 		v1.Convert_api_ObjectReference_To_v1_ObjectReference,
-		v1.Convert_v1_OwnerReference_To_api_OwnerReference,
-		v1.Convert_api_OwnerReference_To_v1_OwnerReference,
 		v1.Convert_v1_Secret_To_api_Secret,
 		v1.Convert_api_Secret_To_v1_Secret,
 		v1.Convert_v1_SecretList_To_api_SecretList,

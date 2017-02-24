@@ -19,13 +19,13 @@ package v1
 import (
 	"errors"
 	"fmt"
-	"k8s.io/client-go/pkg/api"
 	"net/url"
 	"strings"
 
-	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 // object, or an error if the object doesn't follow the conventions
 // that would allow this.
 // TODO: should take a meta.Interface see http://issue.k8s.io/7127
-func GetReference(obj runtime.Object) (*ObjectReference, error) {
+func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*ObjectReference, error) {
 	if obj == nil {
 		return nil, ErrNilObject
 	}
@@ -54,7 +54,7 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	kind := gvk.Kind
 	if len(kind) == 0 {
 		// TODO: this is wrong
-		gvks, _, err := api.Scheme.ObjectKinds(obj)
+		gvks, _, err := scheme.ObjectKinds(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -112,8 +112,8 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 }
 
 // GetPartialReference is exactly like GetReference, but allows you to set the FieldPath.
-func GetPartialReference(obj runtime.Object, fieldPath string) (*ObjectReference, error) {
-	ref, err := GetReference(obj)
+func GetPartialReference(scheme *runtime.Scheme, obj runtime.Object, fieldPath string) (*ObjectReference, error) {
+	ref, err := GetReference(scheme, obj)
 	if err != nil {
 		return nil, err
 	}

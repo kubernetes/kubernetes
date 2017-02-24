@@ -50,7 +50,7 @@ func SetUpContainerPath(netnsPath string, containerInterfaceName string) error {
 	if netnsPath[0] != '/' {
 		return fmt.Errorf("netnsPath path '%s' was invalid", netnsPath)
 	}
-	nsenterArgs := []string{"-n", netnsPath}
+	nsenterArgs := []string{"--net=" + netnsPath}
 	return setUpContainerInternal(containerInterfaceName, netnsPath, nsenterArgs)
 }
 
@@ -58,8 +58,7 @@ func setUpContainerInternal(containerInterfaceName, containerDesc string, nsente
 	e := exec.New()
 	hostIfName, err := findPairInterfaceOfContainerInterface(e, containerInterfaceName, containerDesc, nsenterArgs)
 	if err != nil {
-		glog.Infof("Unable to find pair interface, setting up all interfaces: %v", err)
-		return setUpAllInterfaces()
+		return err
 	}
 	return setUpInterface(hostIfName)
 }
@@ -93,17 +92,6 @@ func findPairInterfaceOfContainerInterface(e exec.Interface, containerInterfaceN
 		return "", err
 	}
 	return iface.Name, nil
-}
-
-func setUpAllInterfaces() error {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return err
-	}
-	for _, netIf := range interfaces {
-		setUpInterface(netIf.Name) // ignore errors
-	}
-	return nil
 }
 
 func setUpInterface(ifName string) error {

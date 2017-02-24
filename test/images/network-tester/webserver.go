@@ -43,9 +43,10 @@ import (
 	"syscall"
 	"time"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	restclient "k8s.io/client-go/rest"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 var (
@@ -268,7 +269,7 @@ func contactOthers(state *State) {
 
 //getWebserverEndpoints returns the webserver endpoints as a set of String, each in the format like "http://{ip}:{port}"
 func getWebserverEndpoints(client clientset.Interface) sets.String {
-	endpoints, err := client.Core().Endpoints(*namespace).Get(*service)
+	endpoints, err := client.Core().Endpoints(*namespace).Get(*service, v1.GetOptions{})
 	eps := sets.String{}
 	if err != nil {
 		state.Logf("Unable to read the endpoints for %v/%v: %v.", *namespace, *service, err)

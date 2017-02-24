@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -39,7 +39,7 @@ var _ = framework.KubeDescribe("Cadvisor", func() {
 func CheckCadvisorHealthOnAllNodes(c clientset.Interface, timeout time.Duration) {
 	// It should be OK to list unschedulable Nodes here.
 	By("getting list of nodes")
-	nodeList, err := c.Core().Nodes().List(v1.ListOptions{})
+	nodeList, err := c.Core().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	var errors []error
 

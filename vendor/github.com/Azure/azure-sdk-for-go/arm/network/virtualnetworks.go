@@ -26,7 +26,7 @@ import (
 
 // VirtualNetworksClient is the the Microsoft Azure Network management API
 // provides a RESTful set of web services that interact with Microsoft Azure
-// Networks service to manage your network resrources. The API has entities
+// Networks service to manage your network resources. The API has entities
 // that capture the relationship between an end user and the Microsoft Azure
 // Networks service.
 type VirtualNetworksClient struct {
@@ -45,7 +45,7 @@ func NewVirtualNetworksClientWithBaseURI(baseURI string, subscriptionID string) 
 	return VirtualNetworksClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// CheckIPAddressAvailability checks whether a private Ip address is available
+// CheckIPAddressAvailability checks whether a private IP address is available
 // for use.
 //
 // resourceGroupName is the name of the resource group. virtualNetworkName is
@@ -113,15 +113,14 @@ func (client VirtualNetworksClient) CheckIPAddressAvailabilityResponder(resp *ht
 	return
 }
 
-// CreateOrUpdate the Put VirtualNetwork operation creates/updates a virtual
-// network in the specified resource group. This method may poll for
-// completion. Polling can be canceled by passing the cancel channel
-// argument. The channel will be used to cancel polling and any outstanding
-// HTTP requests.
+// CreateOrUpdate creates or updates a virtual network in the specified
+// resource group. This method may poll for completion. Polling can be
+// canceled by passing the cancel channel argument. The channel will be used
+// to cancel polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group. virtualNetworkName is
 // the name of the virtual network. parameters is parameters supplied to the
-// create/update Virtual Network operation
+// create or update virtual network operation
 func (client VirtualNetworksClient) CreateOrUpdate(resourceGroupName string, virtualNetworkName string, parameters VirtualNetwork, cancel <-chan struct{}) (result autorest.Response, err error) {
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, virtualNetworkName, parameters, cancel)
 	if err != nil {
@@ -184,10 +183,10 @@ func (client VirtualNetworksClient) CreateOrUpdateResponder(resp *http.Response)
 	return
 }
 
-// Delete the Delete VirtualNetwork operation deletes the specifed virtual
-// network This method may poll for completion. Polling can be canceled by
-// passing the cancel channel argument. The channel will be used to cancel
-// polling and any outstanding HTTP requests.
+// Delete deletes the specified virtual network. This method may poll for
+// completion. Polling can be canceled by passing the cancel channel
+// argument. The channel will be used to cancel polling and any outstanding
+// HTTP requests.
 //
 // resourceGroupName is the name of the resource group. virtualNetworkName is
 // the name of the virtual network.
@@ -251,11 +250,10 @@ func (client VirtualNetworksClient) DeleteResponder(resp *http.Response) (result
 	return
 }
 
-// Get the Get VirtualNetwork operation retrieves information about the
-// specified virtual network.
+// Get gets the specified virtual network by resource group.
 //
 // resourceGroupName is the name of the resource group. virtualNetworkName is
-// the name of the virtual network. expand is expand references resources.
+// the name of the virtual network. expand is expands referenced resources.
 func (client VirtualNetworksClient) Get(resourceGroupName string, virtualNetworkName string, expand string) (result VirtualNetwork, err error) {
 	req, err := client.GetPreparer(resourceGroupName, virtualNetworkName, expand)
 	if err != nil {
@@ -318,8 +316,7 @@ func (client VirtualNetworksClient) GetResponder(resp *http.Response) (result Vi
 	return
 }
 
-// List the list VirtualNetwork returns all Virtual Networks in a resource
-// group
+// List gets all virtual networks in a resource group.
 //
 // resourceGroupName is the name of the resource group.
 func (client VirtualNetworksClient) List(resourceGroupName string) (result VirtualNetworkListResult, err error) {
@@ -384,7 +381,7 @@ func (client VirtualNetworksClient) ListResponder(resp *http.Response) (result V
 func (client VirtualNetworksClient) ListNextResults(lastResults VirtualNetworkListResult) (result VirtualNetworkListResult, err error) {
 	req, err := lastResults.VirtualNetworkListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -393,19 +390,18 @@ func (client VirtualNetworksClient) ListNextResults(lastResults VirtualNetworkLi
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return
 }
 
-// ListAll the list VirtualNetwork returns all Virtual Networks in a
-// subscription
+// ListAll gets all virtual networks in a subscription.
 func (client VirtualNetworksClient) ListAll() (result VirtualNetworkListResult, err error) {
 	req, err := client.ListAllPreparer()
 	if err != nil {
@@ -467,7 +463,7 @@ func (client VirtualNetworksClient) ListAllResponder(resp *http.Response) (resul
 func (client VirtualNetworksClient) ListAllNextResults(lastResults VirtualNetworkListResult) (result VirtualNetworkListResult, err error) {
 	req, err := lastResults.VirtualNetworkListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "ListAll", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "ListAll", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -476,12 +472,12 @@ func (client VirtualNetworksClient) ListAllNextResults(lastResults VirtualNetwor
 	resp, err := client.ListAllSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "ListAll", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "ListAll", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListAllResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "ListAll", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "ListAll", resp, "Failure responding to next results request")
 	}
 
 	return

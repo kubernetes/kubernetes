@@ -1,3 +1,18 @@
-maintainers:
+approvers:
 - jsafrane
 - justinsb
+- chrislovecnm
+- jingxu97
+reviewers:
+- thockin
+- smarterclayton
+- deads2k
+- pmorie
+- saad-ali
+- justinsb
+- jsafrane
+- rootfs
+- jingxu97
+- chakri-nelluri
+- screeley44
+- gnufied

@@ -24,14 +24,14 @@ import (
 	"net/http"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
-	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
-	"k8s.io/kubernetes/pkg/util/wsstream"
 
 	"github.com/golang/glog"
 )
@@ -39,11 +39,10 @@ import (
 // Options contains details about which streams are required for
 // remote command execution.
 type Options struct {
-	Stdin           bool
-	Stdout          bool
-	Stderr          bool
-	TTY             bool
-	expectedStreams int
+	Stdin  bool
+	Stdout bool
+	Stderr bool
+	TTY    bool
 }
 
 // NewOptions creates a new Options from the Request.
@@ -58,28 +57,15 @@ func NewOptions(req *http.Request) (*Options, error) {
 		stderr = false
 	}
 
-	// count the streams client asked for, starting with 1
-	expectedStreams := 1
-	if stdin {
-		expectedStreams++
-	}
-	if stdout {
-		expectedStreams++
-	}
-	if stderr {
-		expectedStreams++
-	}
-
-	if expectedStreams == 1 {
+	if !stdin && !stdout && !stderr {
 		return nil, fmt.Errorf("you must specify at least 1 of stdin, stdout, stderr")
 	}
 
 	return &Options{
-		Stdin:           stdin,
-		Stdout:          stdout,
-		Stderr:          stderr,
-		TTY:             tty,
-		expectedStreams: expectedStreams,
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
+		TTY:    tty,
 	}, nil
 }
 
@@ -115,15 +101,7 @@ func waitStreamReply(replySent <-chan struct{}, notify chan<- struct{}, stop <-c
 	}
 }
 
-func createStreams(req *http.Request, w http.ResponseWriter, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*context, bool) {
-	opts, err := NewOptions(req)
-	if err != nil {
-		runtime.HandleError(err)
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, err.Error())
-		return nil, false
-	}
-
+func createStreams(req *http.Request, w http.ResponseWriter, opts *Options, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*context, bool) {
 	var ctx *context
 	var ok bool
 	if wsstream.IsWebSocketRequest(req) {
@@ -183,14 +161,25 @@ func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 		handler = &v1ProtocolHandler{}
 	}
 
+	// count the streams client asked for, starting with 1
+	expectedStreams := 1
+	if opts.Stdin {
+		expectedStreams++
+	}
+	if opts.Stdout {
+		expectedStreams++
+	}
+	if opts.Stderr {
+		expectedStreams++
+	}
 	if opts.TTY && handler.supportsTerminalResizing() {
-		opts.expectedStreams++
+		expectedStreams++
 	}
 
 	expired := time.NewTimer(streamCreationTimeout)
 	defer expired.Stop()
 
-	ctx, err := handler.waitForStreams(streamCh, opts.expectedStreams, expired.C)
+	ctx, err := handler.waitForStreams(streamCh, expectedStreams, expired.C)
 	if err != nil {
 		runtime.HandleError(err)
 		return nil, false

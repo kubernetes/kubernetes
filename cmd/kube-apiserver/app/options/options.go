@@ -18,16 +18,26 @@ limitations under the License.
 package options
 
 import (
+	"net"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 
+	// add the kubernetes feature gates
+	_ "k8s.io/kubernetes/pkg/features"
+
 	"github.com/spf13/pflag"
 )
+
+// DefaultServiceNodePortRange is the default port range for NodePort services.
+var DefaultServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
 // ServerRunOptions runs a kubernetes api server.
 type ServerRunOptions struct {
@@ -35,40 +45,67 @@ type ServerRunOptions struct {
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
-	Authentication          *genericoptions.BuiltInAuthenticationOptions
-	Authorization           *genericoptions.BuiltInAuthorizationOptions
+	Audit                   *genericoptions.AuditLogOptions
+	Features                *genericoptions.FeatureOptions
+	Authentication          *kubeoptions.BuiltInAuthenticationOptions
+	Authorization           *kubeoptions.BuiltInAuthorizationOptions
+	CloudProvider           *kubeoptions.CloudProviderOptions
+	StorageSerialization    *kubeoptions.StorageSerializationOptions
+	APIEnablement           *kubeoptions.APIEnablementOptions
 
-	AllowPrivileged          bool
-	EventTTL                 time.Duration
-	KubeletConfig            kubeletclient.KubeletClientConfig
-	MaxConnectionBytesPerSec int64
-	SSHKeyfile               string
-	SSHUser                  string
+	AllowPrivileged           bool
+	EventTTL                  time.Duration
+	KubeletConfig             kubeletclient.KubeletClientConfig
+	KubernetesServiceNodePort int
+	MasterCount               int
+	MaxConnectionBytesPerSec  int64
+	ServiceClusterIPRange     net.IPNet // TODO: make this a list
+	ServiceNodePortRange      utilnet.PortRange
+	SSHKeyfile                string
+	SSHUser                   string
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:            genericoptions.NewEtcdOptions(),
-		SecureServing:   genericoptions.NewSecureServingOptions(),
-		InsecureServing: genericoptions.NewInsecureServingOptions(),
-		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
-		Authorization:   genericoptions.NewBuiltInAuthorizationOptions(),
+		Etcd:                 genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, api.Scheme, nil)),
+		SecureServing:        genericoptions.NewSecureServingOptions(),
+		InsecureServing:      genericoptions.NewInsecureServingOptions(),
+		Audit:                genericoptions.NewAuditLogOptions(),
+		Features:             genericoptions.NewFeatureOptions(),
+		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
+		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
+		StorageSerialization: kubeoptions.NewStorageSerializationOptions(),
+		APIEnablement:        kubeoptions.NewAPIEnablementOptions(),
 
-		EventTTL: 1 * time.Hour,
+		EventTTL:    1 * time.Hour,
+		MasterCount: 1,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
-			Port: ports.KubeletPort,
+			Port:         ports.KubeletPort,
+			ReadOnlyPort: ports.KubeletReadOnlyPort,
 			PreferredAddressTypes: []string{
+				// --override-hostname
 				string(api.NodeHostName),
+
+				// internal, preferring DNS if reported
+				string(api.NodeInternalDNS),
 				string(api.NodeInternalIP),
+
+				// external, preferring DNS if reported
+				string(api.NodeExternalDNS),
 				string(api.NodeExternalIP),
+
 				string(api.NodeLegacyHostIP),
 			},
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
+		ServiceNodePortRange: DefaultServiceNodePortRange,
 	}
+	// Overwrite the default for storage data format.
+	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 	return &s
 }
 
@@ -76,14 +113,18 @@ func NewServerRunOptions() *ServerRunOptions {
 func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fs)
-
 	s.Etcd.AddFlags(fs)
 	s.SecureServing.AddFlags(fs)
 	s.SecureServing.AddDeprecatedFlags(fs)
 	s.InsecureServing.AddFlags(fs)
 	s.InsecureServing.AddDeprecatedFlags(fs)
+	s.Audit.AddFlags(fs)
+	s.Features.AddFlags(fs)
 	s.Authentication.AddFlags(fs)
 	s.Authorization.AddFlags(fs)
+	s.CloudProvider.AddFlags(fs)
+	s.StorageSerialization.AddFlags(fs)
+	s.APIEnablement.AddFlags(fs)
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
@@ -104,6 +145,30 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
 		"Currently only applies to long-running requests.")
 
+	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
+		"The number of apiservers running in the cluster, must be a positive number.")
+
+	// See #14282 for details on how to test/try this option out.
+	// TODO: remove this comment once this option is tested in CI.
+	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", s.KubernetesServiceNodePort, ""+
+		"If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be "+
+		"of type NodePort, using this as the value of the port. If zero, the Kubernetes master "+
+		"service will be of type ClusterIP.")
+
+	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, ""+
+		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
+		"overlap with any IP ranges assigned to nodes for pods.")
+
+	fs.IPNetVar(&s.ServiceClusterIPRange, "portal-net", s.ServiceClusterIPRange,
+		"DEPRECATED: see --service-cluster-ip-range instead.")
+	fs.MarkDeprecated("portal-net", "see --service-cluster-ip-range instead")
+
+	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", ""+
+		"A port range to reserve for services with NodePort visibility. "+
+		"Example: '30000-32767'. Inclusive at both ends of the range.")
+	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "DEPRECATED: see --service-node-port-range instead")
+	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead")
+
 	// Kubelet related flags:
 	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps,
 		"Use https for kubelet connections.")
@@ -114,6 +179,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port,
 		"DEPRECATED: kubelet port.")
 	fs.MarkDeprecated("kubelet-port", "kubelet-port is deprecated and will be removed.")
+
+	fs.UintVar(&s.KubeletConfig.ReadOnlyPort, "kubelet-read-only-port", s.KubeletConfig.ReadOnlyPort,
+		"DEPRECATED: kubelet port.")
 
 	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout,
 		"Timeout for kubelet operations.")

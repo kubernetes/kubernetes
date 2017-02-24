@@ -17,21 +17,22 @@ limitations under the License.
 package podgc
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -43,24 +44,14 @@ const (
 type PodGCController struct {
 	kubeClient clientset.Interface
 
-	// internalPodInformer is used to hold a personal informer.  If we're using
-	// a normal shared informer, then the informer will be started for us.  If
-	// we have a personal informer, we must start it ourselves.   If you start
-	// the controller using NewPodGC(..., passing SharedInformer, ...), this
-	// will be null
-	internalPodInformer cache.SharedIndexInformer
-
-	podStore  cache.StoreToPodLister
-	nodeStore cache.StoreToNodeLister
-
-	podController  cache.ControllerInterface
-	nodeController cache.ControllerInterface
+	podLister       corelisters.PodLister
+	podListerSynced cache.InformerSynced
 
 	deletePod              func(namespace, name string) error
 	terminatedPodThreshold int
 }
 
-func NewPodGC(kubeClient clientset.Interface, podInformer cache.SharedIndexInformer, terminatedPodThreshold int) *PodGCController {
+func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer, terminatedPodThreshold int) *PodGCController {
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
@@ -69,55 +60,28 @@ func NewPodGC(kubeClient clientset.Interface, podInformer cache.SharedIndexInfor
 		terminatedPodThreshold: terminatedPodThreshold,
 		deletePod: func(namespace, name string) error {
 			glog.Infof("PodGC is force deleting Pod: %v:%v", namespace, name)
-			return kubeClient.Core().Pods(namespace).Delete(name, v1.NewDeleteOptions(0))
+			return kubeClient.Core().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
 		},
 	}
 
-	gcc.podStore.Indexer = podInformer.GetIndexer()
-	gcc.podController = podInformer.GetController()
-
-	gcc.nodeStore.Store, gcc.nodeController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return gcc.kubeClient.Core().Nodes().List(options)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return gcc.kubeClient.Core().Nodes().Watch(options)
-			},
-		},
-		&v1.Node{},
-		controller.NoResyncPeriodFunc(),
-		cache.ResourceEventHandlerFuncs{},
-	)
+	gcc.podLister = podInformer.Lister()
+	gcc.podListerSynced = podInformer.Informer().HasSynced
 
 	return gcc
 }
 
-func NewFromClient(
-	kubeClient clientset.Interface,
-	terminatedPodThreshold int,
-) *PodGCController {
-	podInformer := informers.NewPodInformer(kubeClient, controller.NoResyncPeriodFunc())
-	controller := NewPodGC(kubeClient, podInformer, terminatedPodThreshold)
-	controller.internalPodInformer = podInformer
-	return controller
-}
-
 func (gcc *PodGCController) Run(stop <-chan struct{}) {
-	if gcc.internalPodInformer != nil {
-		go gcc.podController.Run(stop)
+	if !cache.WaitForCacheSync(stop, gcc.podListerSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		return
 	}
-	go gcc.nodeController.Run(stop)
+
 	go wait.Until(gcc.gc, gcCheckPeriod, stop)
 	<-stop
 }
 
 func (gcc *PodGCController) gc() {
-	if !gcc.podController.HasSynced() || !gcc.nodeController.HasSynced() {
-		glog.V(2).Infof("PodGCController is waiting for informer sync...")
-		return
-	}
-	pods, err := gcc.podStore.List(labels.Everything())
+	pods, err := gcc.podLister.List(labels.Everything())
 	if err != nil {
 		glog.Errorf("Error while listing all Pods: %v", err)
 		return
@@ -173,12 +137,21 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 // gcOrphaned deletes pods that are bound to nodes that don't exist.
 func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
 	glog.V(4).Infof("GC'ing orphaned")
+	// We want to get list of Nodes from the etcd, to make sure that it's as fresh as possible.
+	nodes, err := gcc.kubeClient.Core().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return
+	}
+	nodeNames := sets.NewString()
+	for i := range nodes.Items {
+		nodeNames.Insert(nodes.Items[i].Name)
+	}
 
 	for _, pod := range pods {
 		if pod.Spec.NodeName == "" {
 			continue
 		}
-		if _, exists, _ := gcc.nodeStore.GetByKey(pod.Spec.NodeName); exists {
+		if nodeNames.Has(pod.Spec.NodeName) {
 			continue
 		}
 		glog.V(2).Infof("Found orphaned Pod %v assigned to the Node %v. Deleting.", pod.Name, pod.Spec.NodeName)

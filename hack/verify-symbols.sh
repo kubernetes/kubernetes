@@ -25,7 +25,7 @@ kube::golang::setup_env
 
 make -C "${KUBE_ROOT}" WHAT=cmd/hyperkube
 
-# add other BADSYMBOLS here.
+# Add other BADSYMBOLS here.
 BADSYMBOLS=(
   "httptest"
   "testify"

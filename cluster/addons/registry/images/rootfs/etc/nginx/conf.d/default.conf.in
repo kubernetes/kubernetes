@@ -1,0 +1,28 @@
+# Docker registry proxy for api version 2
+
+upstream docker-registry {
+    server %HOST%:%PORT%;
+}
+
+# No client auth or TLS
+# TODO(bacongobbler): experiment with authenticating the registry if it's using TLS
+server {
+    listen %BIND_PORT%;
+    server_name localhost;
+
+    # disable any limits to avoid HTTP 413 for large image uploads
+    client_max_body_size 0;
+
+    # required to avoid HTTP 411: see Issue #1486 (https://github.com/docker/docker/issues/1486)
+    chunked_transfer_encoding on;
+
+    location / {
+        # Do not allow connections from docker 1.5 and earlier
+        # docker pre-1.6.0 did not properly set the user agent on ping, catch "Go *" user agents
+        if ($http_user_agent ~ "^(docker\/1\.(3|4|5(?!\.[0-9]-dev))|Go ).*$" ) {
+            return 404;
+        }
+
+        include docker-registry.conf;
+    }
+}

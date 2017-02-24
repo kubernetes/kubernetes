@@ -53,6 +53,10 @@ function replicate-master-instance() {
   kube_env="$(echo "${kube_env}" | grep -v "INITIAL_ETCD_CLUSTER")"
   kube_env="$(echo -e "${kube_env}\nINITIAL_ETCD_CLUSTER: '${existing_master_replicas},${REPLICA_NAME}'")"
 
+  # Substitute INITIAL_ETCD_CLUSTER_STATE
+  kube_env="$(echo "${kube_env}" | grep -v "INITIAL_ETCD_CLUSTER_STATE")"
+  kube_env="$(echo -e "${kube_env}\nINITIAL_ETCD_CLUSTER_STATE: 'existing'")"
+
   ETCD_CA_KEY="$(echo "${kube_env}" | grep "ETCD_CA_KEY" |  sed "s/^.*: '//" | sed "s/'$//")"
   ETCD_CA_CERT="$(echo "${kube_env}" | grep "ETCD_CA_CERT" |  sed "s/^.*: '//" | sed "s/'$//")"
 
@@ -66,6 +70,7 @@ function replicate-master-instance() {
   echo "${kube_env}" > ${KUBE_TEMP}/master-kube-env.yaml
   get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-name > ${KUBE_TEMP}/cluster-name.txt
   get-metadata "${existing_master_zone}" "${existing_master_name}" startup-script > ${KUBE_TEMP}/configure-vm.sh
+  get-metadata "${existing_master_zone}" "${existing_master_name}" kube-master-certs > "${KUBE_TEMP}/kube-master-certs.yaml"
 
   create-master-instance-internal "${REPLICA_NAME}"
 }
@@ -87,7 +92,7 @@ function create-master-instance-internal() {
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
-      "startup-script=${KUBE_TEMP}/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
+      "startup-script=${KUBE_TEMP}/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml,cluster-name=${KUBE_TEMP}/cluster-name.txt,kube-master-certs=${KUBE_TEMP}/kube-master-certs.yaml" \
     --disk "name=${master_name}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
     ${preemptible_master}

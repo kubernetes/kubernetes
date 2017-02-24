@@ -145,22 +145,11 @@ Performance options
 
 This package has several options that affect the performance of your service. It is important to understand them and how you can change it.
 
-	restful.DefaultContainer.Router(CurlyRouter{})
-
-The default router is the RouterJSR311 which is an implementation of its spec (http://jsr311.java.net/nonav/releases/1.1/spec/spec.html).
-However, it uses regular expressions for all its routes which, depending on your usecase, may consume a significant amount of time.
-The CurlyRouter implementation is more lightweight that also allows you to use wildcards and expressions, but only if needed.
-
-	restful.DefaultContainer.DoNotRecover(true)
+	restful.DefaultContainer.DoNotRecover(false)
 
 DoNotRecover controls whether panics will be caught to return HTTP 500.
-If set to true, Route functions are responsible for handling any error situation.
-Default value is false; it will recover from panics. This has performance implications.
-
-	restful.SetCacheReadEntity(false)
-
-SetCacheReadEntity controls whether the response data ([]byte) is cached such that ReadEntity is repeatable.
-If you expect to read large amounts of payload data, and you do not use this feature, you should set it to false.
+If set to false, the container will recover from panics.
+Default value is true
 
 	restful.SetCompressorProvider(NewBoundedCachedCompressors(20, 20))
 

@@ -21,6 +21,7 @@ import (
 	"sort"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -69,13 +70,13 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 	}
 	testNodes := []*v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "machine1", Annotations: annotations1},
+			ObjectMeta: metav1.ObjectMeta{Name: "machine1", Annotations: annotations1},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "machine2", Annotations: annotations2},
+			ObjectMeta: metav1.ObjectMeta{Name: "machine2", Annotations: annotations2},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "machine3"},
+			ObjectMeta: metav1.ObjectMeta{Name: "machine3"},
 		},
 	}
 	trueVar := true
@@ -87,9 +88,9 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 	}{
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "ReplicationController", Name: "foo", UID: "abcdef123456", Controller: &trueVar},
 					},
 				},
@@ -100,9 +101,9 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "RandomController", Name: "foo", UID: "abcdef123456", Controller: &trueVar},
 					},
 				},
@@ -113,9 +114,9 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "ReplicationController", Name: "foo", UID: "abcdef123456"},
 					},
 				},
@@ -126,9 +127,9 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
-					OwnerReferences: []v1.OwnerReference{
+					OwnerReferences: []metav1.OwnerReference{
 						{Kind: "ReplicaSet", Name: "foo", UID: "qwert12345", Controller: &trueVar},
 					},
 				},

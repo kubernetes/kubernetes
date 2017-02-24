@@ -54,6 +54,18 @@ spec:
   selector:
     app: cockroachdb
 ---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: cockroachdb-budget
+  labels:
+    app: cockroachdb
+spec:
+  selector:
+    matchLabels:
+      app: cockroachdb
+  minAvailable: 67%
+---
 apiVersion: apps/v1beta1
 kind: StatefulSet
 metadata:
@@ -66,6 +78,22 @@ spec:
       labels:
         app: cockroachdb
       annotations:
+        scheduler.alpha.kubernetes.io/affinity: >
+            {
+              "podAntiAffinity": {
+                "preferredDuringSchedulingIgnoredDuringExecution": [{
+                  "weight": 100,
+                  "labelSelector": {
+                    "matchExpressions": [{
+                      "key": "app",
+                      "operator": "In",
+                      "values": ["cockroachdb"]
+                    }]
+                  },
+                  "topologyKey": "kubernetes.io/hostname"
+                }]
+              }
+            }
         # Init containers are run only once in the lifetime of a pod, before
         # it's started up for the first time. It has to exit successfully
         # before the pod's main containers are allowed to start.
@@ -80,6 +108,7 @@ spec:
             {
                 "name": "bootstrap",
                 "image": "cockroachdb/cockroach-k8s-init:0.1",
+                "imagePullPolicy": "IfNotPresent",
                 "args": [
                   "-on-start=/on-start.sh",
                   "-service=cockroachdb"
@@ -118,16 +147,6 @@ spec:
           name: grpc
         - containerPort: 8080
           name: http
-        livenessProbe:
-          httpGet:
-            path: /_admin/v1/health
-            port: http
-          initialDelaySeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /_admin/v1/health
-            port: http
-          initialDelaySeconds: 10
         volumeMounts:
         - name: datadir
           mountPath: /cockroach/cockroach-data

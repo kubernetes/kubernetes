@@ -30,10 +30,11 @@ import (
 // groupInterfaceGenerator generates the per-group interface file.
 type groupInterfaceGenerator struct {
 	generator.DefaultGen
-	outputPackage string
-	imports       namer.ImportTracker
-	groupVersions clientgentypes.GroupVersions
-	filtered      bool
+	outputPackage             string
+	imports                   namer.ImportTracker
+	groupVersions             clientgentypes.GroupVersions
+	filtered                  bool
+	internalInterfacesPackage string
 }
 
 var _ generator.Generator = &groupInterfaceGenerator{}
@@ -78,7 +79,7 @@ func (g *groupInterfaceGenerator) GenerateType(c *generator.Context, t *types.Ty
 		})
 	}
 	m := map[string]interface{}{
-		"interfacesSharedInformerFactory": c.Universe.Type(interfacesSharedInformerFactory),
+		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
 		"versions":                        versions,
 	}
 

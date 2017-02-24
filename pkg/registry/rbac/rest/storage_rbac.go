@@ -19,83 +19,104 @@ package rest
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacapiv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
+	rbacapiv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/registry"
+	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
-	clusterroleetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/etcd"
 	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/policybased"
+	clusterrolestore "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/storage"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
-	clusterrolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/etcd"
 	clusterrolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/policybased"
+	clusterrolebindingstore "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/storage"
+	"k8s.io/kubernetes/pkg/registry/rbac/reconciliation"
 	"k8s.io/kubernetes/pkg/registry/rbac/role"
-	roleetcd "k8s.io/kubernetes/pkg/registry/rbac/role/etcd"
 	rolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/role/policybased"
+	rolestore "k8s.io/kubernetes/pkg/registry/rbac/role/storage"
 	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
-	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/etcd"
 	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/policybased"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	rolebindingstore "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/storage"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
 type RESTStorageProvider struct {
-	AuthorizerRBACSuperUser string
+	Authorizer authorizer.Authorizer
 }
 
 var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(rbac.GroupName)
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(rbac.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1alpha1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1alpha1.SchemeGroupVersion.Version] = p.storage(rbacapiv1alpha1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = rbacapiv1alpha1.SchemeGroupVersion
+	}
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1beta1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1beta1.SchemeGroupVersion.Version] = p.storage(rbacapiv1beta1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = rbacapiv1beta1.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true
 }
 
-func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter registry.RESTOptionsGetter) map[string]rest.Storage {
-	version := rbacapiv1alpha1.SchemeGroupVersion
-
+func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	once := new(sync.Once)
-	var authorizationRuleResolver rbacvalidation.AuthorizationRuleResolver
-	newRuleValidator := func() rbacvalidation.AuthorizationRuleResolver {
+	var (
+		authorizationRuleResolver  rbacregistryvalidation.AuthorizationRuleResolver
+		rolesStorage               rest.StandardStorage
+		roleBindingsStorage        rest.StandardStorage
+		clusterRolesStorage        rest.StandardStorage
+		clusterRoleBindingsStorage rest.StandardStorage
+	)
+
+	initializeStorage := func() {
 		once.Do(func() {
-			authorizationRuleResolver = rbacvalidation.NewDefaultRuleResolver(
-				role.AuthorizerAdapter{Registry: role.NewRegistry(roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles"))))},
-				rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings"))))},
-				clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles"))))},
-				clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings"))))},
+			rolesStorage = rolestore.NewREST(restOptionsGetter)
+			roleBindingsStorage = rolebindingstore.NewREST(restOptionsGetter)
+			clusterRolesStorage = clusterrolestore.NewREST(restOptionsGetter)
+			clusterRoleBindingsStorage = clusterrolebindingstore.NewREST(restOptionsGetter)
+
+			authorizationRuleResolver = rbacregistryvalidation.NewDefaultRuleResolver(
+				role.AuthorizerAdapter{Registry: role.NewRegistry(rolesStorage)},
+				rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(roleBindingsStorage)},
+				clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterRolesStorage)},
+				clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterRoleBindingsStorage)},
 			)
 		})
-		return authorizationRuleResolver
 	}
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("roles")) {
-		rolesStorage := roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles")))
-		storage["roles"] = rolepolicybased.NewStorage(rolesStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+		initializeStorage()
+		storage["roles"] = rolepolicybased.NewStorage(rolesStorage, authorizationRuleResolver)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("rolebindings")) {
-		roleBindingsStorage := rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings")))
-		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+		initializeStorage()
+		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, p.Authorizer, authorizationRuleResolver)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
-		clusterRolesStorage := clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))
-		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+		initializeStorage()
+		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, authorizationRuleResolver)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
-		clusterRoleBindingsStorage := clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings")))
-		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+		initializeStorage()
+		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, p.Authorizer, authorizationRuleResolver)
 	}
 	return storage
 }
@@ -105,50 +126,79 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 }
 
 func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
-	clientset, err := rbacclient.NewForConfig(hookContext.LoopbackClientConfig)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
-		return nil
-	}
-
-	existingClusterRoles, err := clientset.ClusterRoles().List(api.ListOptions{})
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
-		return nil
-	}
-	// if clusterroles already exist, then assume we don't have work to do because we've already
-	// initialized or another API server has started this task
-	if len(existingClusterRoles.Items) > 0 {
-		return nil
-	}
-
-	for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
-		if _, err := clientset.ClusterRoles().Create(&clusterRole); err != nil {
-			// don't fail on failures, try to create as many as you can
+	// intializing roles is really important.  On some e2e runs, we've seen cases where etcd is down when the server
+	// starts, the roles don't initialize, and nothing works.
+	err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
+		clientset, err := rbacclient.NewForConfig(hookContext.LoopbackClientConfig)
+		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
-			continue
+			return false, nil
 		}
-		glog.Infof("Created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
-	}
 
-	existingClusterRoleBindings, err := clientset.ClusterRoleBindings().List(api.ListOptions{})
+		// ensure bootstrap roles are created or reconciled
+		for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
+			opts := reconciliation.ReconcileClusterRoleOptions{
+				Role:    &clusterRole,
+				Client:  clientset.ClusterRoles(),
+				Confirm: true,
+			}
+			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				result, err := opts.Run()
+				if err != nil {
+					return err
+				}
+				switch {
+				case result.Protected && result.Operation != reconciliation.ReconcileNone:
+					glog.Warningf("skipped reconcile-protected clusterrole.%s/%s with missing permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
+				case result.Operation == reconciliation.ReconcileUpdate:
+					glog.Infof("updated clusterrole.%s/%s with additional permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
+				case result.Operation == reconciliation.ReconcileCreate:
+					glog.Infof("created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
+				}
+				return nil
+			})
+			if err != nil {
+				// don't fail on failures, try to create as many as you can
+				utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrole.%s/%s: %v", rbac.GroupName, clusterRole.Name, err))
+			}
+		}
+
+		// ensure bootstrap rolebindings are created or reconciled
+		for _, clusterRoleBinding := range append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...) {
+
+			opts := reconciliation.ReconcileClusterRoleBindingOptions{
+				RoleBinding: &clusterRoleBinding,
+				Client:      clientset.ClusterRoleBindings(),
+				Confirm:     true,
+			}
+			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				result, err := opts.Run()
+				if err != nil {
+					return err
+				}
+				switch {
+				case result.Protected && result.Operation != reconciliation.ReconcileNone:
+					glog.Warningf("skipped reconcile-protected clusterrolebinding.%s/%s with missing subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
+				case result.Operation == reconciliation.ReconcileUpdate:
+					glog.Infof("updated clusterrolebinding.%s/%s with additional subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
+				case result.Operation == reconciliation.ReconcileCreate:
+					glog.Infof("created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
+				case result.Operation == reconciliation.ReconcileRecreate:
+					glog.Infof("recreated clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
+				}
+				return nil
+			})
+			if err != nil {
+				// don't fail on failures, try to create as many as you can
+				utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrolebinding.%s/%s: %v", rbac.GroupName, clusterRoleBinding.Name, err))
+			}
+		}
+
+		return true, nil
+	})
+	// if we're never able to make it through intialization, kill the API server
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
-		return nil
-	}
-	// if clusterrolebindings already exist, then assume we don't have work to do because we've already
-	// initialized or another API server has started this task
-	if len(existingClusterRoleBindings.Items) > 0 {
-		return nil
-	}
-
-	for _, clusterRoleBinding := range append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...) {
-		if _, err := clientset.ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
-			// don't fail on failures, try to create as many as you can
-			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
-			continue
-		}
-		glog.Infof("Created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
+		return fmt.Errorf("unable to initialize roles: %v", err)
 	}
 
 	return nil

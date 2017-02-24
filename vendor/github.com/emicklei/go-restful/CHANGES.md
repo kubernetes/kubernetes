@@ -1,5 +1,13 @@
 Change history of go-restful
 =
+2016-11-26
+- Default change! now use CurlyRouter (was RouterJSR311)
+- Default change! no more caching of request content
+- Default change! do not recover from panics
+
+2016-09-22
+- fix the DefaultRequestContentType feature
+
 2016-02-14
 - take the qualify factor of the Accept header mediatype into account when deciding the contentype of the response
 - add constructors for custom entity accessors for xml and json 

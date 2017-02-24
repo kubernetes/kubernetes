@@ -61,7 +61,7 @@ func (r *FakeRuntimeService) SetFakeSandboxes(sandboxes []*FakePodSandbox) {
 
 	r.Sandboxes = make(map[string]*FakePodSandbox)
 	for _, sandbox := range sandboxes {
-		sandboxID := sandbox.GetId()
+		sandboxID := sandbox.Id
 		r.Sandboxes[sandboxID] = sandbox
 	}
 }
@@ -72,7 +72,7 @@ func (r *FakeRuntimeService) SetFakeContainers(containers []*FakeContainer) {
 
 	r.Containers = make(map[string]*FakeContainer)
 	for _, c := range containers {
-		containerID := c.GetId()
+		containerID := c.Id
 		r.Containers[containerID] = c
 	}
 
@@ -103,10 +103,10 @@ func (r *FakeRuntimeService) Version(apiVersion string) (*runtimeapi.VersionResp
 	r.Called = append(r.Called, "Version")
 
 	return &runtimeapi.VersionResponse{
-		Version:           &version,
-		RuntimeName:       &FakeRuntimeName,
-		RuntimeVersion:    &version,
-		RuntimeApiVersion: &version,
+		Version:           version,
+		RuntimeName:       FakeRuntimeName,
+		RuntimeVersion:    version,
+		RuntimeApiVersion: version,
 	}, nil
 }
 
@@ -128,16 +128,15 @@ func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) 
 	// PodSandboxID should be randomized for real container runtime, but here just use
 	// fixed name from BuildSandboxName() for easily making fake sandboxes.
 	podSandboxID := BuildSandboxName(config.Metadata)
-	createdAt := time.Now().Unix()
-	readyState := runtimeapi.PodSandboxState_SANDBOX_READY
+	createdAt := time.Now().UnixNano()
 	r.Sandboxes[podSandboxID] = &FakePodSandbox{
 		PodSandboxStatus: runtimeapi.PodSandboxStatus{
-			Id:        &podSandboxID,
+			Id:        podSandboxID,
 			Metadata:  config.Metadata,
-			State:     &readyState,
-			CreatedAt: &createdAt,
+			State:     runtimeapi.PodSandboxState_SANDBOX_READY,
+			CreatedAt: createdAt,
 			Network: &runtimeapi.PodSandboxNetworkStatus{
-				Ip: &FakePodSandboxIP,
+				Ip: FakePodSandboxIP,
 			},
 			Labels:      config.Labels,
 			Annotations: config.Annotations,
@@ -153,9 +152,8 @@ func (r *FakeRuntimeService) StopPodSandbox(podSandboxID string) error {
 
 	r.Called = append(r.Called, "StopPodSandbox")
 
-	notReadyState := runtimeapi.PodSandboxState_SANDBOX_NOTREADY
 	if s, ok := r.Sandboxes[podSandboxID]; ok {
-		s.State = &notReadyState
+		s.State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
 	} else {
 		return fmt.Errorf("pod sandbox %s not found", podSandboxID)
 	}
@@ -199,10 +197,10 @@ func (r *FakeRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter)
 	result := make([]*runtimeapi.PodSandbox, 0)
 	for id, s := range r.Sandboxes {
 		if filter != nil {
-			if filter.Id != nil && filter.GetId() != id {
+			if filter.Id != "" && filter.Id != id {
 				continue
 			}
-			if filter.State != nil && filter.GetState() != s.GetState() {
+			if filter.State != nil && filter.GetState().State != s.State {
 				continue
 			}
 			if filter.LabelSelector != nil && !filterInLabels(filter.LabelSelector, s.GetLabels()) {
@@ -240,17 +238,17 @@ func (r *FakeRuntimeService) CreateContainer(podSandboxID string, config *runtim
 	// ContainerID should be randomized for real container runtime, but here just use
 	// fixed BuildContainerName() for easily making fake containers.
 	containerID := BuildContainerName(config.Metadata, podSandboxID)
-	createdAt := time.Now().Unix()
+	createdAt := time.Now().UnixNano()
 	createdState := runtimeapi.ContainerState_CONTAINER_CREATED
-	imageRef := config.Image.GetImage()
+	imageRef := config.Image.Image
 	r.Containers[containerID] = &FakeContainer{
 		ContainerStatus: runtimeapi.ContainerStatus{
-			Id:          &containerID,
+			Id:          containerID,
 			Metadata:    config.Metadata,
 			Image:       config.Image,
-			ImageRef:    &imageRef,
-			CreatedAt:   &createdAt,
-			State:       &createdState,
+			ImageRef:    imageRef,
+			CreatedAt:   createdAt,
+			State:       createdState,
 			Labels:      config.Labels,
 			Annotations: config.Annotations,
 		},
@@ -272,10 +270,8 @@ func (r *FakeRuntimeService) StartContainer(containerID string) error {
 	}
 
 	// Set container to running.
-	startedAt := time.Now().Unix()
-	runningState := runtimeapi.ContainerState_CONTAINER_RUNNING
-	c.State = &runningState
-	c.StartedAt = &startedAt
+	c.State = runtimeapi.ContainerState_CONTAINER_RUNNING
+	c.StartedAt = time.Now().UnixNano()
 
 	return nil
 }
@@ -292,10 +288,10 @@ func (r *FakeRuntimeService) StopContainer(containerID string, timeout int64) er
 	}
 
 	// Set container to exited state.
-	finishedAt := time.Now().Unix()
+	finishedAt := time.Now().UnixNano()
 	exitedState := runtimeapi.ContainerState_CONTAINER_EXITED
-	c.State = &exitedState
-	c.FinishedAt = &finishedAt
+	c.State = exitedState
+	c.FinishedAt = finishedAt
 
 	return nil
 }
@@ -321,13 +317,13 @@ func (r *FakeRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) 
 	result := make([]*runtimeapi.Container, 0)
 	for _, s := range r.Containers {
 		if filter != nil {
-			if filter.Id != nil && filter.GetId() != s.GetId() {
+			if filter.Id != "" && filter.Id != s.Id {
 				continue
 			}
-			if filter.PodSandboxId != nil && filter.GetPodSandboxId() != s.SandboxID {
+			if filter.PodSandboxId != "" && filter.PodSandboxId != s.SandboxID {
 				continue
 			}
-			if filter.State != nil && filter.GetState() != s.GetState() {
+			if filter.State != nil && filter.GetState().State != s.State {
 				continue
 			}
 			if filter.LabelSelector != nil && !filterInLabels(filter.LabelSelector, s.GetLabels()) {
@@ -338,7 +334,7 @@ func (r *FakeRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) 
 		result = append(result, &runtimeapi.Container{
 			Id:           s.Id,
 			CreatedAt:    s.CreatedAt,
-			PodSandboxId: &s.SandboxID,
+			PodSandboxId: s.SandboxID,
 			Metadata:     s.Metadata,
 			State:        s.State,
 			Image:        s.Image,

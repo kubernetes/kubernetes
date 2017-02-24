@@ -19,7 +19,7 @@ package util
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestStringDiff(t *testing.T) {
@@ -27,31 +27,6 @@ func TestStringDiff(t *testing.T) {
 	expect := "aaa\n\nA: bb\n\nB: cc\n\n"
 	if diff != expect {
 		t.Errorf("diff returned %v", diff)
-	}
-}
-
-func TestCompileRegex(t *testing.T) {
-	uncompiledRegexes := []string{"endsWithMe$", "^startingWithMe"}
-	regexes, err := CompileRegexps(uncompiledRegexes)
-
-	if err != nil {
-		t.Errorf("Failed to compile legal regexes: '%v': %v", uncompiledRegexes, err)
-	}
-	if len(regexes) != len(uncompiledRegexes) {
-		t.Errorf("Wrong number of regexes returned: '%v': %v", uncompiledRegexes, regexes)
-	}
-
-	if !regexes[0].MatchString("Something that endsWithMe") {
-		t.Errorf("Wrong regex returned: '%v': %v", uncompiledRegexes[0], regexes[0])
-	}
-	if regexes[0].MatchString("Something that doesn't endsWithMe.") {
-		t.Errorf("Wrong regex returned: '%v': %v", uncompiledRegexes[0], regexes[0])
-	}
-	if !regexes[1].MatchString("startingWithMe is very important") {
-		t.Errorf("Wrong regex returned: '%v': %v", uncompiledRegexes[1], regexes[1])
-	}
-	if regexes[1].MatchString("not startingWithMe should fail") {
-		t.Errorf("Wrong regex returned: '%v': %v", uncompiledRegexes[1], regexes[1])
 	}
 }
 

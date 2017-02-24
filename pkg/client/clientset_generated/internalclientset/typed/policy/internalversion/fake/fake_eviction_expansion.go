@@ -17,9 +17,9 @@ limitations under the License.
 package fake
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	core "k8s.io/client-go/testing"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func (c *FakeEvictions) Evict(eviction *policy.Eviction) error {

@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -34,7 +35,7 @@ type fakeNodeInterface struct {
 	node api.Node
 }
 
-func (fake *fakeNodeInterface) Get(hostname string) (*api.Node, error) {
+func (fake *fakeNodeInterface) Get(hostname string, options metav1.GetOptions) (*api.Node, error) {
 	return &fake.node, nil
 }
 
@@ -115,140 +116,6 @@ func Test_getProxyMode(t *testing.T) {
 		},
 		{ // detect, version ok, kernel is compatible
 			flag:            "",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // annotation says userspace
-			flag:          "",
-			annotationKey: "net.experimental.kubernetes.io/proxy-mode",
-			annotationVal: "userspace",
-			expected:      proxyModeUserspace,
-		},
-		{ // annotation says iptables, error detecting
-			flag:          "",
-			annotationKey: "net.experimental.kubernetes.io/proxy-mode",
-			annotationVal: "iptables",
-			iptablesError: fmt.Errorf("oops!"),
-			expected:      proxyModeUserspace,
-		},
-		{ // annotation says iptables, version too low
-			flag:            "",
-			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
-			annotationVal:   "iptables",
-			iptablesVersion: "0.0.0",
-			expected:        proxyModeUserspace,
-		},
-		{ // annotation says iptables, version ok, kernel not compatible
-			flag:            "",
-			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
-			annotationVal:   "iptables",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    false,
-			expected:        proxyModeUserspace,
-		},
-		{ // annotation says iptables, version ok, kernel is compatible
-			flag:            "",
-			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
-			annotationVal:   "iptables",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // annotation says something else, version ok
-			flag:            "",
-			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
-			annotationVal:   "other",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // annotation says nothing, version ok
-			flag:            "",
-			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
-			annotationVal:   "",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // annotation says userspace
-			flag:          "",
-			annotationKey: "net.beta.kubernetes.io/proxy-mode",
-			annotationVal: "userspace",
-			expected:      proxyModeUserspace,
-		},
-		{ // annotation says iptables, error detecting
-			flag:          "",
-			annotationKey: "net.beta.kubernetes.io/proxy-mode",
-			annotationVal: "iptables",
-			iptablesError: fmt.Errorf("oops!"),
-			expected:      proxyModeUserspace,
-		},
-		{ // annotation says iptables, version too low
-			flag:            "",
-			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
-			annotationVal:   "iptables",
-			iptablesVersion: "0.0.0",
-			expected:        proxyModeUserspace,
-		},
-		{ // annotation says iptables, version ok, kernel not compatible
-			flag:            "",
-			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
-			annotationVal:   "iptables",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    false,
-			expected:        proxyModeUserspace,
-		},
-		{ // annotation says iptables, version ok, kernel is compatible
-			flag:            "",
-			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
-			annotationVal:   "iptables",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // annotation says something else, version ok
-			flag:            "",
-			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
-			annotationVal:   "other",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // annotation says nothing, version ok
-			flag:            "",
-			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
-			annotationVal:   "",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // flag says userspace, annotation disagrees
-			flag:            "userspace",
-			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
-			annotationVal:   "iptables",
-			iptablesVersion: iptables.MinCheckVersion,
-			expected:        proxyModeUserspace,
-		},
-		{ // flag says iptables, annotation disagrees
-			flag:            "iptables",
-			annotationKey:   "net.experimental.kubernetes.io/proxy-mode",
-			annotationVal:   "userspace",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // flag says userspace, annotation disagrees
-			flag:            "userspace",
-			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
-			annotationVal:   "iptables",
-			iptablesVersion: iptables.MinCheckVersion,
-			expected:        proxyModeUserspace,
-		},
-		{ // flag says iptables, annotation disagrees
-			flag:            "iptables",
-			annotationKey:   "net.beta.kubernetes.io/proxy-mode",
-			annotationVal:   "userspace",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
 			expected:        proxyModeIPTables,

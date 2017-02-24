@@ -17,10 +17,11 @@ limitations under the License.
 package e2e
 
 import (
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"fmt"
@@ -52,13 +53,13 @@ const (
 var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
 
-	It("should not conflict", func() {
+	It("should not conflict [Volume]", func() {
 		name := "emptydir-wrapper-test-" + string(uuid.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
 
 		secret := &v1.Secret{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: f.Namespace.Name,
 				Name:      name,
 			},
@@ -78,7 +79,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 		defer gitCleanup()
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
 			Spec: v1.PodSpec{
@@ -128,7 +129,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 				framework.Failf("unable to delete secret %v: %v", secret.Name, err)
 			}
 			By("Cleaning up the git vol pod")
-			if err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, v1.NewDeleteOptions(0)); err != nil {
+			if err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("unable to delete git vol pod %v: %v", pod.Name, err)
 			}
 		}()
@@ -151,7 +152,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 	// but these cases are harder because tmpfs-based emptyDir
 	// appears to be less prone to the race problem.
 
-	It("should not cause race condition when used for configmaps [Serial] [Slow]", func() {
+	It("should not cause race condition when used for configmaps [Serial] [Slow] [Volume]", func() {
 		configMapNames := createConfigmapsForRace(f)
 		defer deleteConfigMaps(f, configMapNames)
 		volumes, volumeMounts := makeConfigMapVolumes(configMapNames)
@@ -160,7 +161,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 		}
 	})
 
-	It("should not cause race condition when used for git_repo [Serial] [Slow]", func() {
+	It("should not cause race condition when used for git_repo [Serial] [Slow] [Volume]", func() {
 		gitURL, gitRepo, cleanup := createGitServer(f)
 		defer cleanup()
 		volumes, volumeMounts := makeGitRepoVolumes(gitURL, gitRepo)
@@ -178,7 +179,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 	labels := map[string]string{"name": gitServerPodName}
 
 	gitServerPod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   gitServerPodName,
 			Labels: labels,
 		},
@@ -201,7 +202,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 	httpPort := 2345
 
 	gitServerSvc := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "git-server-svc",
 		},
 		Spec: v1.ServiceSpec{
@@ -222,7 +223,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 
 	return "http://" + gitServerSvc.Spec.ClusterIP + ":" + strconv.Itoa(httpPort), "test", func() {
 		By("Cleaning up the git server pod")
-		if err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(gitServerPod.Name, v1.NewDeleteOptions(0)); err != nil {
+		if err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(gitServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 			framework.Failf("unable to delete git server pod %v: %v", gitServerPod.Name, err)
 		}
 		By("Cleaning up the git server svc")
@@ -258,7 +259,7 @@ func createConfigmapsForRace(f *framework.Framework) (configMapNames []string) {
 		configMapName := fmt.Sprintf("racey-configmap-%d", i)
 		configMapNames = append(configMapNames, configMapName)
 		configMap := &v1.ConfigMap{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: f.Namespace.Name,
 				Name:      configMapName,
 			},
@@ -314,21 +315,26 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 	targetNode := nodeList.Items[0]
 
 	By("Creating RC which spawns configmap-volume pods")
-	affinity := map[string]string{
-		v1.AffinityAnnotationKey: fmt.Sprintf(`
-				{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-					"nodeSelectorTerms": [{
-						"matchExpressions": [{
-							"key": "kubernetes.io/hostname",
-							"operator": "In",
-							"values": ["%s"]
-					}]
-				}]
-			}}}`, targetNode.Name),
+	affinity := &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/hostname",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{targetNode.Name},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	rc := &v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: rcName,
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -337,9 +343,8 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 				"name": rcName,
 			},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
-					Annotations: affinity,
-					Labels:      map[string]string{"name": rcName},
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"name": rcName},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -355,6 +360,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 							VolumeMounts: volumeMounts,
 						},
 					},
+					Affinity:  affinity,
 					DNSPolicy: v1.DNSDefault,
 					Volumes:   volumes,
 				},

@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 )
@@ -27,7 +28,7 @@ import (
 func TestFromServices(t *testing.T) {
 	sl := []*v1.Service{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "foo-bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo-bar"},
 			Spec: v1.ServiceSpec{
 				Selector:  map[string]string{"bar": "baz"},
 				ClusterIP: "1.2.3.4",
@@ -37,7 +38,7 @@ func TestFromServices(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "abc-123"},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
 			Spec: v1.ServiceSpec{
 				Selector:  map[string]string{"bar": "baz"},
 				ClusterIP: "5.6.7.8",
@@ -48,7 +49,7 @@ func TestFromServices(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "q-u-u-x"},
+			ObjectMeta: metav1.ObjectMeta{Name: "q-u-u-x"},
 			Spec: v1.ServiceSpec{
 				Selector:  map[string]string{"bar": "baz"},
 				ClusterIP: "9.8.7.6",
@@ -59,7 +60,7 @@ func TestFromServices(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "svrc-clusterip-none"},
+			ObjectMeta: metav1.ObjectMeta{Name: "svrc-clusterip-none"},
 			Spec: v1.ServiceSpec{
 				Selector:  map[string]string{"bar": "baz"},
 				ClusterIP: "None",
@@ -69,7 +70,7 @@ func TestFromServices(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "svrc-clusterip-empty"},
+			ObjectMeta: metav1.ObjectMeta{Name: "svrc-clusterip-empty"},
 			Spec: v1.ServiceSpec{
 				Selector:  map[string]string{"bar": "baz"},
 				ClusterIP: "",

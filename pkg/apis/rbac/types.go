@@ -17,9 +17,7 @@ limitations under the License.
 package rbac
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Authorization is calculated against
@@ -37,7 +35,8 @@ const (
 	ServiceAccountKind = "ServiceAccount"
 	UserKind           = "User"
 
-	UserAll = "*"
+	// AutoUpdateAnnotationKey is the name of an annotation which prevents reconciliation if set to "false"
+	AutoUpdateAnnotationKey = "rbac.authorization.kubernetes.io/autoupdate"
 )
 
 // PolicyRule holds information that describes a policy rule, but does not contain information
@@ -45,12 +44,9 @@ const (
 type PolicyRule struct {
 	// Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds.
 	Verbs []string
-	// AttributeRestrictions will vary depending on what the Authorizer/AuthorizationAttributeBuilder pair supports.
-	// If the Authorizer does not recognize how to handle the AttributeRestrictions, the Authorizer should report an error.
-	AttributeRestrictions runtime.Object
+
 	// APIGroups is the name of the APIGroup that contains the resources.
 	// If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.
-
 	APIGroups []string
 	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
 	Resources []string
@@ -70,9 +66,10 @@ type Subject struct {
 	// Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
 	Kind string
-	// APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-	// expected to be API version of this API group. For example, "rbac/v1alpha1".
-	APIVersion string
+	// APIGroup holds the API group of the referenced subject.
+	// Defaults to "" for ServiceAccount subjects.
+	// Defaults to "rbac.authorization.k8s.io" for User and Group subjects.
+	APIGroup string
 	// Name of the object being referenced.
 	Name string
 	// Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
@@ -96,7 +93,7 @@ type RoleRef struct {
 type Role struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Rules holds all the PolicyRules for this Role
 	Rules []PolicyRule
@@ -109,7 +106,7 @@ type Role struct {
 // namespace only have effect in that namespace.
 type RoleBinding struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Subjects holds references to the objects the role applies to.
 	Subjects []Subject
@@ -146,7 +143,7 @@ type RoleList struct {
 type ClusterRole struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Rules holds all the PolicyRules for this ClusterRole
 	Rules []PolicyRule
@@ -160,7 +157,7 @@ type ClusterRole struct {
 type ClusterRoleBinding struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Subjects holds references to the objects the role applies to.
 	Subjects []Subject

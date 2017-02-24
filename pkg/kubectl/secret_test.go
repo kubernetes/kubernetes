@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -34,7 +35,7 @@ func TestSecretGenerate(t *testing.T) {
 				"name": "foo",
 			},
 			expected: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: map[string][]byte{},
@@ -47,7 +48,7 @@ func TestSecretGenerate(t *testing.T) {
 				"type": "my-type",
 			},
 			expected: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: map[string][]byte{},
@@ -61,7 +62,7 @@ func TestSecretGenerate(t *testing.T) {
 				"from-literal": []string{"key1=value1", "key2=value2"},
 			},
 			expected: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: map[string][]byte{
@@ -98,7 +99,7 @@ func TestSecretGenerate(t *testing.T) {
 				"from-literal": []string{"key1==value1"},
 			},
 			expected: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: map[string][]byte{

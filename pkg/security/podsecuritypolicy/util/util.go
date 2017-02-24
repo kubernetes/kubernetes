@@ -19,9 +19,9 @@ package util
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -61,7 +61,9 @@ func GetAllFSTypesAsSet() sets.String {
 		string(extensions.VsphereVolume),
 		string(extensions.Quobyte),
 		string(extensions.AzureDisk),
-		string(extensions.PhotonPersistentDisk))
+		string(extensions.PhotonPersistentDisk),
+		string(extensions.Projected),
+	)
 	return fstypes
 }
 
@@ -114,6 +116,8 @@ func GetVolumeFSType(v api.Volume) (extensions.FSType, error) {
 		return extensions.AzureDisk, nil
 	case v.PhotonPersistentDisk != nil:
 		return extensions.PhotonPersistentDisk, nil
+	case v.Projected != nil:
+		return extensions.Projected, nil
 	}
 
 	return "", fmt.Errorf("unknown volume type for volume: %#v", v)

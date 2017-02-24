@@ -21,7 +21,8 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -107,7 +108,8 @@ var _ volume.Provisioner = &azureDiskProvisioner{}
 func (a *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 	var sku, location, account string
 
-	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 255)
+	// maxLength = 79 - (4 for ".vhd") = 75
+	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 75)
 	capacity := a.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
 	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
@@ -137,7 +139,7 @@ func (a *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   a.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{

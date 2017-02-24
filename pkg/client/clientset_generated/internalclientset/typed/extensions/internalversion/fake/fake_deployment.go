@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,13 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeDeployments implements DeploymentInterface
@@ -35,7 +36,7 @@ var deploymentsResource = schema.GroupVersionResource{Group: "extensions", Versi
 
 func (c *FakeDeployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(deploymentsResource, c.ns, deployment), &extensions.Deployment{})
+		Invokes(testing.NewCreateAction(deploymentsResource, c.ns, deployment), &extensions.Deployment{})
 
 	if obj == nil {
 		return nil, err
@@ -45,7 +46,7 @@ func (c *FakeDeployments) Create(deployment *extensions.Deployment) (result *ext
 
 func (c *FakeDeployments) Update(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(deploymentsResource, c.ns, deployment), &extensions.Deployment{})
+		Invokes(testing.NewUpdateAction(deploymentsResource, c.ns, deployment), &extensions.Deployment{})
 
 	if obj == nil {
 		return nil, err
@@ -55,7 +56,7 @@ func (c *FakeDeployments) Update(deployment *extensions.Deployment) (result *ext
 
 func (c *FakeDeployments) UpdateStatus(deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(deploymentsResource, "status", c.ns, deployment), &extensions.Deployment{})
+		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "status", c.ns, deployment), &extensions.Deployment{})
 
 	if obj == nil {
 		return nil, err
@@ -63,23 +64,23 @@ func (c *FakeDeployments) UpdateStatus(deployment *extensions.Deployment) (*exte
 	return obj.(*extensions.Deployment), err
 }
 
-func (c *FakeDeployments) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeDeployments) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(deploymentsResource, c.ns, name), &extensions.Deployment{})
+		Invokes(testing.NewDeleteAction(deploymentsResource, c.ns, name), &extensions.Deployment{})
 
 	return err
 }
 
-func (c *FakeDeployments) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction(deploymentsResource, c.ns, listOptions)
+func (c *FakeDeployments) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(deploymentsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.DeploymentList{})
 	return err
 }
 
-func (c *FakeDeployments) Get(name string) (result *extensions.Deployment, err error) {
+func (c *FakeDeployments) Get(name string, options v1.GetOptions) (result *extensions.Deployment, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(deploymentsResource, c.ns, name), &extensions.Deployment{})
+		Invokes(testing.NewGetAction(deploymentsResource, c.ns, name), &extensions.Deployment{})
 
 	if obj == nil {
 		return nil, err
@@ -87,15 +88,15 @@ func (c *FakeDeployments) Get(name string) (result *extensions.Deployment, err e
 	return obj.(*extensions.Deployment), err
 }
 
-func (c *FakeDeployments) List(opts api.ListOptions) (result *extensions.DeploymentList, err error) {
+func (c *FakeDeployments) List(opts v1.ListOptions) (result *extensions.DeploymentList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(deploymentsResource, c.ns, opts), &extensions.DeploymentList{})
+		Invokes(testing.NewListAction(deploymentsResource, c.ns, opts), &extensions.DeploymentList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -109,16 +110,16 @@ func (c *FakeDeployments) List(opts api.ListOptions) (result *extensions.Deploym
 }
 
 // Watch returns a watch.Interface that watches the requested deployments.
-func (c *FakeDeployments) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeDeployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(deploymentsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(deploymentsResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (c *FakeDeployments) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.Deployment, err error) {
+func (c *FakeDeployments) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.Deployment, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(deploymentsResource, c.ns, name, data, subresources...), &extensions.Deployment{})
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, name, data, subresources...), &extensions.Deployment{})
 
 	if obj == nil {
 		return nil, err

@@ -4,10 +4,7 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
     "go_library",
-    "go_test",
-    "cgo_library",
 )
 
 go_library(
@@ -15,20 +12,34 @@ go_library(
     srcs = [
         "doc.go",
         "register.go",
-        "types.generated.go",
         "types.go",
         "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/conversion:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/intstr:go_default_library",
-        "//vendor:github.com/ugorji/go/codec",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/apis/batch/install:all-srcs",
+        "//pkg/apis/batch/v1:all-srcs",
+        "//pkg/apis/batch/v2alpha1:all-srcs",
+        "//pkg/apis/batch/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

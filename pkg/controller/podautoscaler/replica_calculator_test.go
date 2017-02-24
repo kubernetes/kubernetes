@@ -25,16 +25,15 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	restclient "k8s.io/client-go/rest"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"k8s.io/kubernetes/pkg/runtime"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
 	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
@@ -47,17 +46,20 @@ type resourceInfo struct {
 	name     v1.ResourceName
 	requests []resource.Quantity
 	levels   []int64
+	// only applies to pod names returned from "heapster"
+	podNames []string
 
 	targetUtilization   int32
 	expectedUtilization int32
+	expectedValue       int64
 }
 
 type metricInfo struct {
 	name   string
 	levels []float64
 
-	targetUtilization   float64
-	expectedUtilization float64
+	targetUtilization   int64
+	expectedUtilization int64
 }
 
 type replicaCalcTestCase struct {
@@ -74,8 +76,9 @@ type replicaCalcTestCase struct {
 }
 
 const (
-	testNamespace = "test-namespace"
-	podNamePrefix = "test-pod"
+	testNamespace       = "test-namespace"
+	podNamePrefix       = "test-pod"
+	numContainersPerPod = 2
 )
 
 func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
@@ -99,7 +102,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						},
 					},
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
 					Namespace: testNamespace,
 					Labels: map[string]string{
@@ -134,30 +137,28 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		if tc.resource != nil {
 			metrics := metricsapi.PodMetricsList{}
 			for i, resValue := range tc.resource.levels {
+				podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+				if len(tc.resource.podNames) > i {
+					podName = tc.resource.podNames[i]
+				}
 				podMetric := metricsapi.PodMetrics{
 					ObjectMeta: v1.ObjectMeta{
-						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
+						Name:      podName,
 						Namespace: testNamespace,
 					},
-					Timestamp: unversioned.Time{Time: tc.timestamp},
-					Containers: []metricsapi.ContainerMetrics{
-						{
-							Name: "container1",
-							Usage: v1.ResourceList{
-								v1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
-									int64(resValue),
-									resource.DecimalSI),
-							},
+					Timestamp:  unversioned.Time{Time: tc.timestamp},
+					Containers: make([]metricsapi.ContainerMetrics, numContainersPerPod),
+				}
+
+				for i := 0; i < numContainersPerPod; i++ {
+					podMetric.Containers[i] = metricsapi.ContainerMetrics{
+						Name: fmt.Sprintf("container%v", i),
+						Usage: v1.ResourceList{
+							v1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
+								int64(resValue),
+								resource.DecimalSI),
 						},
-						{
-							Name: "container2",
-							Usage: v1.ResourceList{
-								v1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
-									int64(resValue),
-									resource.DecimalSI),
-							},
-						},
-					},
+					}
 				}
 				metrics.Items = append(metrics.Items, podMetric)
 			}
@@ -223,7 +224,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	}
 
 	if tc.resource != nil {
-		outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetResourceReplicas(tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector)
+		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -233,6 +234,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		require.NoError(t, err, "there should not have been an error calculating the replica count")
 		assert.Equal(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
 		assert.Equal(t, tc.resource.expectedUtilization, outUtilization, "utilization should be as expected")
+		assert.Equal(t, tc.resource.expectedValue, outRawValue, "raw value should be as expected")
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 
 	} else {
@@ -245,9 +247,25 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		}
 		require.NoError(t, err, "there should not have been an error calculating the replica count")
 		assert.Equal(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
-		assert.InDelta(t, tc.metric.expectedUtilization, 0.1, outUtilization, "utilization should be as expected")
+		assert.Equal(t, tc.metric.expectedUtilization, outUtilization, "utilization should be as expected")
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 	}
+}
+
+func TestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas: 1,
+		expectedError:   fmt.Errorf("no metrics returned matched known pods"),
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0")},
+			levels:   []int64{100},
+			podNames: []string{"an-older-pod-name"},
+
+			targetUtilization: 100,
+		},
+	}
+	tc.runTest(t)
 }
 
 func TestReplicaCalcScaleUp(t *testing.T) {
@@ -261,6 +279,7 @@ func TestReplicaCalcScaleUp(t *testing.T) {
 
 			targetUtilization:   30,
 			expectedUtilization: 50,
+			expectedValue:       numContainersPerPod * 500,
 		},
 	}
 	tc.runTest(t)
@@ -278,6 +297,7 @@ func TestReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
 
 			targetUtilization:   30,
 			expectedUtilization: 60,
+			expectedValue:       numContainersPerPod * 600,
 		},
 	}
 	tc.runTest(t)
@@ -295,6 +315,7 @@ func TestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
 
 			targetUtilization:   30,
 			expectedUtilization: 40,
+			expectedValue:       numContainersPerPod * 400,
 		},
 	}
 	tc.runTest(t)
@@ -307,8 +328,8 @@ func TestReplicaCalcScaleUpCM(t *testing.T) {
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []float64{20.0, 10.0, 30.0},
-			targetUtilization:   15.0,
-			expectedUtilization: 20.0,
+			targetUtilization:   15000,
+			expectedUtilization: 20000,
 		},
 	}
 	tc.runTest(t)
@@ -322,8 +343,8 @@ func TestReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []float64{50.0, 10.0, 30.0},
-			targetUtilization:   15.0,
-			expectedUtilization: 30.0,
+			targetUtilization:   15000,
+			expectedUtilization: 30000,
 		},
 	}
 	tc.runTest(t)
@@ -337,8 +358,8 @@ func TestReplicaCalcScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []float64{50.0, 15.0, 30.0},
-			targetUtilization:   15.0,
-			expectedUtilization: 15.0,
+			targetUtilization:   15000,
+			expectedUtilization: 15000,
 		},
 	}
 	tc.runTest(t)
@@ -355,6 +376,7 @@ func TestReplicaCalcScaleDown(t *testing.T) {
 
 			targetUtilization:   50,
 			expectedUtilization: 28,
+			expectedValue:       numContainersPerPod * 280,
 		},
 	}
 	tc.runTest(t)
@@ -367,8 +389,8 @@ func TestReplicaCalcScaleDownCM(t *testing.T) {
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []float64{12.0, 12.0, 12.0, 12.0, 12.0},
-			targetUtilization:   20.0,
-			expectedUtilization: 12.0,
+			targetUtilization:   20000,
+			expectedUtilization: 12000,
 		},
 	}
 	tc.runTest(t)
@@ -386,6 +408,7 @@ func TestReplicaCalcScaleDownIgnoresUnreadyPods(t *testing.T) {
 
 			targetUtilization:   50,
 			expectedUtilization: 30,
+			expectedValue:       numContainersPerPod * 300,
 		},
 	}
 	tc.runTest(t)
@@ -402,6 +425,7 @@ func TestReplicaCalcTolerance(t *testing.T) {
 
 			targetUtilization:   100,
 			expectedUtilization: 102,
+			expectedValue:       numContainersPerPod * 1020,
 		},
 	}
 	tc.runTest(t)
@@ -414,8 +438,8 @@ func TestReplicaCalcToleranceCM(t *testing.T) {
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []float64{20.0, 21.0, 21.0},
-			targetUtilization:   20.0,
-			expectedUtilization: 20.66666,
+			targetUtilization:   20000,
+			expectedUtilization: 20666,
 		},
 	}
 	tc.runTest(t)
@@ -431,6 +455,7 @@ func TestReplicaCalcSuperfluousMetrics(t *testing.T) {
 			levels:              []int64{4000, 9500, 3000, 7000, 3200, 2000},
 			targetUtilization:   100,
 			expectedUtilization: 587,
+			expectedValue:       numContainersPerPod * 5875,
 		},
 	}
 	tc.runTest(t)
@@ -447,6 +472,7 @@ func TestReplicaCalcMissingMetrics(t *testing.T) {
 
 			targetUtilization:   100,
 			expectedUtilization: 24,
+			expectedValue:       495, // numContainersPerPod * 247, for sufficiently large values of 247
 		},
 	}
 	tc.runTest(t)
@@ -493,6 +519,7 @@ func TestReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
 
 			targetUtilization:   100,
 			expectedUtilization: 100,
+			expectedValue:       numContainersPerPod * 1000,
 		},
 	}
 	tc.runTest(t)
@@ -509,6 +536,7 @@ func TestReplicaCalcMissingMetricsNoChangeGt(t *testing.T) {
 
 			targetUtilization:   100,
 			expectedUtilization: 190,
+			expectedValue:       numContainersPerPod * 1900,
 		},
 	}
 	tc.runTest(t)
@@ -525,6 +553,7 @@ func TestReplicaCalcMissingMetricsNoChangeLt(t *testing.T) {
 
 			targetUtilization:   100,
 			expectedUtilization: 60,
+			expectedValue:       numContainersPerPod * 600,
 		},
 	}
 	tc.runTest(t)
@@ -542,6 +571,7 @@ func TestReplicaCalcMissingMetricsUnreadyNoChange(t *testing.T) {
 
 			targetUtilization:   50,
 			expectedUtilization: 45,
+			expectedValue:       numContainersPerPod * 450,
 		},
 	}
 	tc.runTest(t)
@@ -559,6 +589,7 @@ func TestReplicaCalcMissingMetricsUnreadyScaleUp(t *testing.T) {
 
 			targetUtilization:   50,
 			expectedUtilization: 200,
+			expectedValue:       numContainersPerPod * 2000,
 		},
 	}
 	tc.runTest(t)
@@ -576,6 +607,7 @@ func TestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
 
 			targetUtilization:   50,
 			expectedUtilization: 10,
+			expectedValue:       numContainersPerPod * 100,
 		},
 	}
 	tc.runTest(t)
@@ -637,6 +669,7 @@ func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 
 			targetUtilization:   finalCpuPercentTarget,
 			expectedUtilization: int32(totalUsedCPUOfAllPods*100) / totalRequestedCPUOfAllPods,
+			expectedValue:       numContainersPerPod * totalUsedCPUOfAllPods / 10,
 		},
 	}
 

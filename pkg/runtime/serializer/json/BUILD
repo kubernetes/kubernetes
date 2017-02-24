@@ -4,46 +4,24 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
     "go_library",
-    "go_test",
-    "cgo_library",
 )
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "json.go",
-        "meta.go",
-    ],
+    srcs = ["doc.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/runtime/serializer/recognizer:go_default_library",
-        "//pkg/util/framer:go_default_library",
-        "//pkg/util/yaml:go_default_library",
-        "//vendor:github.com/ghodss/yaml",
-        "//vendor:github.com/ugorji/go/codec",
-    ],
 )
 
-go_test(
-    name = "go_default_test",
-    srcs = ["meta_test.go"],
-    library = "go_default_library",
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
     tags = ["automanaged"],
-    deps = [],
+    visibility = ["//visibility:private"],
 )
 
-go_test(
-    name = "go_default_xtest",
-    srcs = ["json_test.go"],
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/runtime/serializer/json:go_default_library",
-        "//pkg/util/diff:go_default_library",
-    ],
 )

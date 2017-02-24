@@ -19,18 +19,21 @@ package deployment
 import (
 	"fmt"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // Registry is an interface for things that know how to store Deployments.
 type Registry interface {
-	ListDeployments(ctx api.Context, options *api.ListOptions) (*extensions.DeploymentList, error)
-	GetDeployment(ctx api.Context, deploymentID string) (*extensions.Deployment, error)
-	CreateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
-	UpdateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
-	DeleteDeployment(ctx api.Context, deploymentID string) error
+	ListDeployments(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.DeploymentList, error)
+	GetDeployment(ctx genericapirequest.Context, deploymentID string, options *metav1.GetOptions) (*extensions.Deployment, error)
+	CreateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
+	UpdateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
+	DeleteDeployment(ctx genericapirequest.Context, deploymentID string) error
 }
 
 // storage puts strong typing around storage calls
@@ -43,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListDeployments(ctx api.Context, options *api.ListOptions) (*extensions.DeploymentList, error) {
+func (s *storage) ListDeployments(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.DeploymentList, error) {
 	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -54,15 +57,15 @@ func (s *storage) ListDeployments(ctx api.Context, options *api.ListOptions) (*e
 	return obj.(*extensions.DeploymentList), err
 }
 
-func (s *storage) GetDeployment(ctx api.Context, deploymentID string) (*extensions.Deployment, error) {
-	obj, err := s.Get(ctx, deploymentID)
+func (s *storage) GetDeployment(ctx genericapirequest.Context, deploymentID string, options *metav1.GetOptions) (*extensions.Deployment, error) {
+	obj, err := s.Get(ctx, deploymentID, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*extensions.Deployment), nil
 }
 
-func (s *storage) CreateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
+func (s *storage) CreateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	obj, err := s.Create(ctx, deployment)
 	if err != nil {
 		return nil, err
@@ -70,7 +73,7 @@ func (s *storage) CreateDeployment(ctx api.Context, deployment *extensions.Deplo
 	return obj.(*extensions.Deployment), nil
 }
 
-func (s *storage) UpdateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
+func (s *storage) UpdateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	obj, _, err := s.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment, api.Scheme))
 	if err != nil {
 		return nil, err
@@ -78,7 +81,7 @@ func (s *storage) UpdateDeployment(ctx api.Context, deployment *extensions.Deplo
 	return obj.(*extensions.Deployment), nil
 }
 
-func (s *storage) DeleteDeployment(ctx api.Context, deploymentID string) error {
+func (s *storage) DeleteDeployment(ctx genericapirequest.Context, deploymentID string) error {
 	_, err := s.Delete(ctx, deploymentID, nil)
 	return err
 }

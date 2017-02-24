@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -86,4 +87,147 @@ func HasRunAsUser(container *v1.Container) bool {
 // HasRootRunAsUser returns true if the run as user is set and it is set to 0.
 func HasRootRunAsUser(container *v1.Container) bool {
 	return HasRunAsUser(container) && HasRootUID(container)
+}
+
+func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {
+	effectiveSc := securityContextFromPodSecurityContext(pod)
+	containerSc := container.SecurityContext
+
+	if effectiveSc == nil && containerSc == nil {
+		return nil
+	}
+	if effectiveSc != nil && containerSc == nil {
+		return effectiveSc
+	}
+	if effectiveSc == nil && containerSc != nil {
+		return containerSc
+	}
+
+	if containerSc.SELinuxOptions != nil {
+		effectiveSc.SELinuxOptions = new(v1.SELinuxOptions)
+		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
+	}
+
+	if containerSc.Capabilities != nil {
+		effectiveSc.Capabilities = new(v1.Capabilities)
+		*effectiveSc.Capabilities = *containerSc.Capabilities
+	}
+
+	if containerSc.Privileged != nil {
+		effectiveSc.Privileged = new(bool)
+		*effectiveSc.Privileged = *containerSc.Privileged
+	}
+
+	if containerSc.RunAsUser != nil {
+		effectiveSc.RunAsUser = new(int64)
+		*effectiveSc.RunAsUser = *containerSc.RunAsUser
+	}
+
+	if containerSc.RunAsNonRoot != nil {
+		effectiveSc.RunAsNonRoot = new(bool)
+		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
+	}
+
+	if containerSc.ReadOnlyRootFilesystem != nil {
+		effectiveSc.ReadOnlyRootFilesystem = new(bool)
+		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
+	}
+
+	return effectiveSc
+}
+
+func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
+	if pod.Spec.SecurityContext == nil {
+		return nil
+	}
+
+	synthesized := &v1.SecurityContext{}
+
+	if pod.Spec.SecurityContext.SELinuxOptions != nil {
+		synthesized.SELinuxOptions = &v1.SELinuxOptions{}
+		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
+	}
+	if pod.Spec.SecurityContext.RunAsUser != nil {
+		synthesized.RunAsUser = new(int64)
+		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
+	}
+
+	if pod.Spec.SecurityContext.RunAsNonRoot != nil {
+		synthesized.RunAsNonRoot = new(bool)
+		*synthesized.RunAsNonRoot = *pod.Spec.SecurityContext.RunAsNonRoot
+	}
+
+	return synthesized
+}
+
+// TODO: remove the duplicate code
+func InternalDetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *api.SecurityContext {
+	effectiveSc := internalSecurityContextFromPodSecurityContext(pod)
+	containerSc := container.SecurityContext
+
+	if effectiveSc == nil && containerSc == nil {
+		return nil
+	}
+	if effectiveSc != nil && containerSc == nil {
+		return effectiveSc
+	}
+	if effectiveSc == nil && containerSc != nil {
+		return containerSc
+	}
+
+	if containerSc.SELinuxOptions != nil {
+		effectiveSc.SELinuxOptions = new(api.SELinuxOptions)
+		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
+	}
+
+	if containerSc.Capabilities != nil {
+		effectiveSc.Capabilities = new(api.Capabilities)
+		*effectiveSc.Capabilities = *containerSc.Capabilities
+	}
+
+	if containerSc.Privileged != nil {
+		effectiveSc.Privileged = new(bool)
+		*effectiveSc.Privileged = *containerSc.Privileged
+	}
+
+	if containerSc.RunAsUser != nil {
+		effectiveSc.RunAsUser = new(int64)
+		*effectiveSc.RunAsUser = *containerSc.RunAsUser
+	}
+
+	if containerSc.RunAsNonRoot != nil {
+		effectiveSc.RunAsNonRoot = new(bool)
+		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
+	}
+
+	if containerSc.ReadOnlyRootFilesystem != nil {
+		effectiveSc.ReadOnlyRootFilesystem = new(bool)
+		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
+	}
+
+	return effectiveSc
+}
+
+func internalSecurityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityContext {
+	if pod.Spec.SecurityContext == nil {
+		return nil
+	}
+
+	synthesized := &api.SecurityContext{}
+
+	if pod.Spec.SecurityContext.SELinuxOptions != nil {
+		synthesized.SELinuxOptions = &api.SELinuxOptions{}
+		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
+	}
+	if pod.Spec.SecurityContext.RunAsUser != nil {
+		synthesized.RunAsUser = new(int64)
+		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
+	}
+
+	if pod.Spec.SecurityContext.RunAsNonRoot != nil {
+		synthesized.RunAsNonRoot = new(bool)
+		*synthesized.RunAsNonRoot = *pod.Spec.SecurityContext.RunAsNonRoot
+	}
+
+	return synthesized
 }

@@ -21,21 +21,22 @@ import (
 	"sync"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
 	"github.com/golang/glog"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // A wrapper around v1.PodStatus that includes a version to enforce that stale pod statuses are
@@ -66,6 +67,7 @@ type manager struct {
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[types.UID]uint64
+	podDeletionSafety PodDeletionSafetyProvider
 }
 
 // PodStatusProvider knows how to provide status for a pod.  It's intended to be used by other components
@@ -74,6 +76,12 @@ type PodStatusProvider interface {
 	// GetPodStatus returns the cached status for the provided pod UID, as well as whether it
 	// was a cache hit.
 	GetPodStatus(uid types.UID) (v1.PodStatus, bool)
+}
+
+// An object which provides guarantees that a pod can be saftely deleted.
+type PodDeletionSafetyProvider interface {
+	// A function which returns true if the pod can safely be deleted
+	OkToDeletePod(pod *v1.Pod) bool
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
@@ -102,13 +110,14 @@ type Manager interface {
 
 const syncPeriod = 10 * time.Second
 
-func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager) Manager {
+func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider) Manager {
 	return &manager{
 		kubeClient:        kubeClient,
 		podManager:        podManager,
 		podStatuses:       make(map[types.UID]versionedPodStatus),
 		podStatusChannel:  make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
 		apiStatusVersions: make(map[types.UID]uint64),
+		podDeletionSafety: podDeletionSafety,
 	}
 }
 
@@ -116,7 +125,7 @@ func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager) Mana
 // This method normalizes the status before comparing so as to make sure that meaningless
 // changes will be ignored.
 func isStatusEqual(oldStatus, status *v1.PodStatus) bool {
-	return api.Semantic.DeepEqual(status, oldStatus)
+	return apiequality.Semantic.DeepEqual(status, oldStatus)
 }
 
 func (m *manager) Start() {
@@ -134,6 +143,8 @@ func (m *manager) Start() {
 	go wait.Forever(func() {
 		select {
 		case syncRequest := <-m.podStatusChannel:
+			glog.V(5).Infof("Status Manager: syncing pod: %q, with status: (%d, %v) from podStatusChannel",
+				syncRequest.podUID, syncRequest.status.version, syncRequest.status.status)
 			m.syncPod(syncRequest.podUID, syncRequest.status)
 		case <-syncTicker:
 			m.syncBatch()
@@ -259,7 +270,7 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 			Terminated: &v1.ContainerStateTerminated{},
 		}
 	}
-	m.updateStatusInternal(pod, pod.Status, true)
+	m.updateStatusInternal(pod, status, true)
 }
 
 // updateStatusInternal updates the internal status cache, and queues an update to the api server if
@@ -325,6 +336,8 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 	select {
 	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus}:
+		glog.V(5).Infof("Status Manager: adding pod: %q, with status: (%q, %v) to podStatusChannel",
+			pod.UID, newStatus.version, newStatus.status)
 		return true
 	default:
 		// Let the periodic syncBatch handle the update if the channel is full.
@@ -380,7 +393,7 @@ func (m *manager) syncBatch() {
 				}
 				syncedUID = mirrorUID
 			}
-			if m.needsUpdate(syncedUID, status) {
+			if m.needsUpdate(syncedUID, status) || m.couldBeDeleted(uid, status.status) {
 				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
 			} else if m.needsReconcile(uid, status.status) {
 				// Delete the apiStatusVersions here to force an update on the pod status
@@ -394,6 +407,7 @@ func (m *manager) syncBatch() {
 	}()
 
 	for _, update := range updatedStatuses {
+		glog.V(5).Infof("Status Manager: syncPod in syncbatch. pod UID: %q", update.podUID)
 		m.syncPod(update.podUID, update.status)
 	}
 }
@@ -406,7 +420,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 
 	// TODO: make me easier to express from client code
-	pod, err := m.kubeClient.Core().Pods(status.podNamespace).Get(status.podName)
+	pod, err := m.kubeClient.Core().Pods(status.podNamespace).Get(status.podName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		glog.V(3).Infof("Pod %q (%s) does not exist on the server", status.podName, uid)
 		// If the Pod is deleted the status will be cleared in
@@ -433,16 +447,12 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 				// We don't handle graceful deletion of mirror pods.
 				return
 			}
-			if pod.DeletionTimestamp == nil {
+			if !m.podDeletionSafety.OkToDeletePod(pod) {
 				return
 			}
-			if !notRunning(pod.Status.ContainerStatuses) {
-				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
-				return
-			}
-			deleteOptions := v1.NewDeleteOptions(0)
+			deleteOptions := metav1.NewDeleteOptions(0)
 			// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
-			deleteOptions.Preconditions = v1.NewUIDPreconditions(string(pod.UID))
+			deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
 			if err = m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
 				m.deletePodStatus(uid)
@@ -460,6 +470,15 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 	latest, ok := m.apiStatusVersions[uid]
 	return !ok || latest < status.version
+}
+
+func (m *manager) couldBeDeleted(uid types.UID, status v1.PodStatus) bool {
+	// The pod could be a static pod, so we should translate first.
+	pod, ok := m.podManager.GetPodByUID(uid)
+	if !ok {
+		return false
+	}
+	return !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.OkToDeletePod(pod)
 }
 
 // needsReconcile compares the given status with the status in the pod manager (which
@@ -513,6 +532,10 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 // kubelet temporarily.
 // TODO(random-liu): Remove timestamp related logic after apiserver supports nanosecond or makes it consistent.
 func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
+	bytesPerStatus := kubecontainer.MaxPodTerminationMessageLogLength
+	if containers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers); containers > 0 {
+		bytesPerStatus = bytesPerStatus / containers
+	}
 	normalizeTimeStamp := func(t *metav1.Time) {
 		*t = t.Rfc3339Copy()
 	}
@@ -523,6 +546,9 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 		if c.Terminated != nil {
 			normalizeTimeStamp(&c.Terminated.StartedAt)
 			normalizeTimeStamp(&c.Terminated.FinishedAt)
+			if len(c.Terminated.Message) > bytesPerStatus {
+				c.Terminated.Message = c.Terminated.Message[:bytesPerStatus]
+			}
 		}
 	}
 
@@ -553,17 +579,6 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	// Sort the container statuses, so that the order won't affect the result of comparison
 	kubetypes.SortInitContainerStatuses(pod, status.InitContainerStatuses)
 	return status
-}
-
-// notRunning returns true if every status is terminated or waiting, or the status list
-// is empty.
-func notRunning(statuses []v1.ContainerStatus) bool {
-	for _, status := range statuses {
-		if status.State.Terminated == nil && status.State.Waiting == nil {
-			return false
-		}
-	}
-	return true
 }
 
 func copyStatus(source *v1.PodStatus) (v1.PodStatus, error) {

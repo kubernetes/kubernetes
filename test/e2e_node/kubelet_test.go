@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	apiunversioned "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -40,7 +40,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
 		It("it should print the output to logs [Conformance]", func() {
 			podClient.CreateSync(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
 				Spec: v1.PodSpec{
@@ -56,7 +56,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				},
 			})
 			Eventually(func() string {
-				sinceTime := apiunversioned.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
+				sinceTime := metav1.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
 				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream()
 				if err != nil {
 					return ""
@@ -74,7 +74,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		BeforeEach(func() {
 			podName = "bin-false" + string(uuid.NewUUID())
 			podClient.Create(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
 				Spec: v1.PodSpec{
@@ -93,7 +93,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 
 		It("should have an error terminated reason", func() {
 			Eventually(func() error {
-				podData, err := podClient.Get(podName)
+				podData, err := podClient.Get(podName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 
 		It("should be possible to delete", func() {
-			err := podClient.Delete(podName, &v1.DeleteOptions{})
+			err := podClient.Delete(podName, &metav1.DeleteOptions{})
 			Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})
@@ -121,7 +121,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		It("it should not write to root filesystem [Conformance]", func() {
 			isReadOnly := true
 			podClient.CreateSync(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
 				Spec: v1.PodSpec{
@@ -131,7 +131,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 						{
 							Image:   "gcr.io/google_containers/busybox:1.24",
 							Name:    podName,
-							Command: []string{"sh", "-c", "echo test > /file; sleep 240"},
+							Command: []string{"/bin/sh", "-c", "echo test > /file; sleep 240"},
 							SecurityContext: &v1.SecurityContext{
 								ReadOnlyRootFilesystem: &isReadOnly,
 							},
@@ -148,7 +148,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				buf := new(bytes.Buffer)
 				buf.ReadFrom(rc)
 				return buf.String()
-			}, time.Minute, time.Second*4).Should(Equal("sh: can't create /file: Read-only file system\n"))
+			}, time.Minute, time.Second*4).Should(Equal("/bin/sh: can't create /file: Read-only file system\n"))
 		})
 	})
 })

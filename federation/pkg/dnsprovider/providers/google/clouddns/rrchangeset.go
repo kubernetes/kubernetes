@@ -31,6 +31,7 @@ type ResourceRecordChangeset struct {
 
 	additions []dnsprovider.ResourceRecordSet
 	removals  []dnsprovider.ResourceRecordSet
+	upserts   []dnsprovider.ResourceRecordSet
 }
 
 func (c *ResourceRecordChangeset) Add(rrset dnsprovider.ResourceRecordSet) dnsprovider.ResourceRecordChangeset {
@@ -43,10 +44,16 @@ func (c *ResourceRecordChangeset) Remove(rrset dnsprovider.ResourceRecordSet) dn
 	return c
 }
 
+func (c *ResourceRecordChangeset) Upsert(rrset dnsprovider.ResourceRecordSet) dnsprovider.ResourceRecordChangeset {
+	c.upserts = append(c.upserts, rrset)
+	return c
+}
+
 func (c *ResourceRecordChangeset) Apply() error {
 	rrsets := c.rrsets
 
 	service := rrsets.zone.zones.interface_.service.Changes()
+
 	var additions []interfaces.ResourceRecordSet
 	for _, r := range c.additions {
 		additions = append(additions, r.(ResourceRecordSet).impl)
@@ -54,6 +61,40 @@ func (c *ResourceRecordChangeset) Apply() error {
 	var deletions []interfaces.ResourceRecordSet
 	for _, r := range c.removals {
 		deletions = append(deletions, r.(ResourceRecordSet).impl)
+	}
+
+	if len(c.upserts) != 0 {
+		// TODO: We could maybe tweak this to fetch just the records we care about
+		// although not clear when this would be a win.  N=1 obviously so though...
+		before, err := c.rrsets.List()
+		if err != nil {
+			return fmt.Errorf("error fetching recordset images for upsert operation: %v", err)
+		}
+
+		upsertMap := make(map[string]dnsprovider.ResourceRecordSet)
+		for _, upsert := range c.upserts {
+			key := string(upsert.Type()) + "::" + upsert.Name()
+			upsertMap[key] = upsert
+		}
+
+		for _, b := range before {
+			key := string(b.Type()) + "::" + b.Name()
+			upsert := upsertMap[key]
+			if upsert == nil {
+				continue
+			}
+
+			deletions = append(deletions, b.(ResourceRecordSet).impl)
+			additions = append(additions, upsert.(ResourceRecordSet).impl)
+
+			// Mark as seen
+			delete(upsertMap, key)
+		}
+
+		// Anything left in the map must be an addition
+		for _, upsert := range upsertMap {
+			additions = append(additions, upsert.(ResourceRecordSet).impl)
+		}
 	}
 
 	change := service.NewChange(additions, deletions)
@@ -71,4 +112,13 @@ func (c *ResourceRecordChangeset) Apply() error {
 	}
 
 	return nil
+}
+
+func (c *ResourceRecordChangeset) IsEmpty() bool {
+	return len(c.additions) == 0 && len(c.removals) == 0
+}
+
+// ResourceRecordSets returns the parent ResourceRecordSets
+func (c *ResourceRecordChangeset) ResourceRecordSets() dnsprovider.ResourceRecordSets {
+	return c.rrsets
 }

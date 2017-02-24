@@ -37,9 +37,9 @@ type informerGenerator struct {
 	groupVersion              clientgentypes.GroupVersion
 	typeToGenerate            *types.Type
 	imports                   namer.ImportTracker
-	versionedClientSetPackage string
-	internalClientSetPackage  string
+	clientSetPackage          string
 	listersPackage            string
+	internalInterfacesPackage string
 }
 
 var _ generator.Generator = &informerGenerator{}
@@ -66,20 +66,8 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 
 	//listerPackage := "k8s.io/kubernetes/pkg/client/listers/" + g.groupVersion.Group.NonEmpty() + "/" + strings.ToLower(g.groupVersion.Version.NonEmpty())
 	listerPackage := fmt.Sprintf("%s/%s/%s", g.listersPackage, g.groupVersion.Group.NonEmpty(), strings.ToLower(g.groupVersion.Version.NonEmpty()))
-
-	var (
-		clientSetInterface, namespaceAll *types.Type
-		informerFor                      string
-	)
-	if len(g.groupVersion.Version) == 0 {
-		clientSetInterface = c.Universe.Type(types.Name{Package: g.internalClientSetPackage, Name: "Interface"})
-		namespaceAll = c.Universe.Type(apiNamespaceAll)
-		informerFor = "InternalInformerFor"
-	} else {
-		clientSetInterface = c.Universe.Type(types.Name{Package: g.versionedClientSetPackage, Name: "Interface"})
-		namespaceAll = c.Universe.Type(v1NamespaceAll)
-		informerFor = "VersionedInformerFor"
-	}
+	clientSetInterface := c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"})
+	informerFor := "InformerFor"
 
 	m := map[string]interface{}{
 		"apiScheme":                       c.Universe.Type(apiScheme),
@@ -92,10 +80,10 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"clientSetInterface":              clientSetInterface,
 		"group":                           namer.IC(g.groupVersion.Group.NonEmpty()),
 		"informerFor":                     informerFor,
-		"interfacesSharedInformerFactory": c.Universe.Type(interfacesSharedInformerFactory),
+		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
 		"listOptions":                     c.Universe.Type(listOptions),
 		"lister":                          c.Universe.Type(types.Name{Package: listerPackage, Name: t.Name.Name + "Lister"}),
-		"namespaceAll":                    namespaceAll,
+		"namespaceAll":                    c.Universe.Type(metav1NamespaceAll),
 		"namespaced":                      !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines),
 		"newLister":                       c.Universe.Function(types.Name{Package: listerPackage, Name: "New" + t.Name.Name + "Lister"}),
 		"runtimeObject":                   c.Universe.Type(runtimeObject),
@@ -139,18 +127,10 @@ func new$.type|public$Informer(client $.clientSetInterface|raw$, resyncPeriod $.
 	sharedIndexInformer := $.cacheNewSharedIndexInformer|raw$(
 		&$.cacheListWatch|raw${
 			ListFunc: func(options $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
-				var internalOptions $.listOptions|raw$
-				if err := $.apiScheme|raw$.Convert(&options, &internalOptions, nil); err != nil {
-					return nil, err
-				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$$.namespaceAll|raw$$end$).List(internalOptions)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$$.namespaceAll|raw$$end$).List(options)
 			},
 			WatchFunc: func(options $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
-				var internalOptions $.listOptions|raw$
-				if err := $.apiScheme|raw$.Convert(&options, &internalOptions, nil); err != nil {
-					return nil, err
-				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$$.namespaceAll|raw$$end$).Watch(internalOptions)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$$.namespaceAll|raw$$end$).Watch(options)
 			},
 		},
 		&$.type|raw${},

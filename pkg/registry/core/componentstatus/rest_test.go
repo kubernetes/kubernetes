@@ -26,10 +26,11 @@ import (
 	"net/url"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 type fakeHttpProber struct {
@@ -50,8 +51,8 @@ type testResponse struct {
 
 func NewTestREST(resp testResponse) *REST {
 	return &REST{
-		GetServersToValidate: func() map[string]apiserver.Server {
-			return map[string]apiserver.Server{
+		GetServersToValidate: func() map[string]Server {
+			return map[string]Server{
 				"test1": {Addr: "testserver1", Port: 8000, Path: "/healthz"},
 			}
 		},
@@ -75,7 +76,7 @@ func createTestStatus(name string, status api.ConditionStatus, msg string, err s
 
 func TestList_NoError(t *testing.T) {
 	r := NewTestREST(testResponse{result: probe.Success, data: "ok"})
-	got, err := r.List(api.NewContext(), nil)
+	got, err := r.List(genericapirequest.NewContext(), nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -89,7 +90,7 @@ func TestList_NoError(t *testing.T) {
 
 func TestList_FailedCheck(t *testing.T) {
 	r := NewTestREST(testResponse{result: probe.Failure, data: ""})
-	got, err := r.List(api.NewContext(), nil)
+	got, err := r.List(genericapirequest.NewContext(), nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -104,7 +105,7 @@ func TestList_FailedCheck(t *testing.T) {
 
 func TestList_UnknownError(t *testing.T) {
 	r := NewTestREST(testResponse{result: probe.Unknown, data: "", err: fmt.Errorf("fizzbuzz error")})
-	got, err := r.List(api.NewContext(), nil)
+	got, err := r.List(genericapirequest.NewContext(), nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -119,7 +120,7 @@ func TestList_UnknownError(t *testing.T) {
 
 func TestGet_NoError(t *testing.T) {
 	r := NewTestREST(testResponse{result: probe.Success, data: "ok"})
-	got, err := r.Get(api.NewContext(), "test1")
+	got, err := r.Get(genericapirequest.NewContext(), "test1", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -131,7 +132,7 @@ func TestGet_NoError(t *testing.T) {
 
 func TestGet_BadName(t *testing.T) {
 	r := NewTestREST(testResponse{result: probe.Success, data: "ok"})
-	_, err := r.Get(api.NewContext(), "invalidname")
+	_, err := r.Get(genericapirequest.NewContext(), "invalidname", &metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("Expected error, but did not get one")
 	}

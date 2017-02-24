@@ -39,9 +39,9 @@ GROUP_VERSIONS=("federation/v1beta1" "v1" "extensions/v1beta1")
 GV_DIRS=()
 for gv in "${GROUP_VERSIONS[@]}"; do
   if [[ ${gv} == "federation/v1beta1" ]]; then
-    GV_DIRS+=("${REPO_DIR}/federation/$(kube::util::group-version-to-pkg-path "${gv}")")
+    GV_DIRS+=("${REPO_DIR}/$(kube::util::group-version-to-pkg-path "${gv}")")
   else
-    GV_DIRS+=("${REPO_DIR}/pkg/$(kube::util::group-version-to-pkg-path "${gv}")")
+    GV_DIRS+=("${REPO_DIR}/$(kube::util::group-version-to-pkg-path "${gv}")")
   fi
 done
 

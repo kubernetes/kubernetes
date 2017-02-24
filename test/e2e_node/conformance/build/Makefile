@@ -26,7 +26,7 @@ BIN_DIR?=../../../../_output/dockerized/bin/linux/${ARCH}
 TEMP_DIR:=$(shell mktemp -d)
 
 BASEIMAGE_amd64=debian:jessie
-BASEIMAGE_arm=armel/debian:jessie
+BASEIMAGE_arm=armhf/debian:jessie
 BASEIMAGE_arm64=aarch64/debian:jessie
 BASEIMAGE_ppc64le=ppc64le/debian:jessie
 
@@ -52,7 +52,7 @@ endif
 		e2e_node.test \
 		ginkgo
 
-	docker build -t ${REGISTRY}/node-test-${ARCH}:${VERSION} ${TEMP_DIR}
+	docker build --pull -t ${REGISTRY}/node-test-${ARCH}:${VERSION} ${TEMP_DIR}
 
 push: build
 	gcloud docker push ${REGISTRY}/node-test-${ARCH}:${VERSION}

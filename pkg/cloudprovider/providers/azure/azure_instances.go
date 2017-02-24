@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // NodeAddresses returns the addresses of the specified instance.
@@ -68,27 +68,7 @@ func (az *Cloud) InstanceType(name types.NodeName) (string, error) {
 	} else if !exists {
 		return "", cloudprovider.InstanceNotFound
 	}
-	return string(machine.Properties.HardwareProfile.VMSize), nil
-}
-
-// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
-func (az *Cloud) List(filter string) ([]types.NodeName, error) {
-	allNodes, err := az.listAllNodesInResourceGroup()
-	if err != nil {
-		return nil, err
-	}
-
-	filteredNodes, err := filterNodes(allNodes, filter)
-	if err != nil {
-		return nil, err
-	}
-
-	nodeNames := make([]types.NodeName, len(filteredNodes))
-	for i, v := range filteredNodes {
-		nodeNames[i] = types.NodeName(*v.Name)
-	}
-
-	return nodeNames, nil
+	return string(machine.HardwareProfile.VMSize), nil
 }
 
 // AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances

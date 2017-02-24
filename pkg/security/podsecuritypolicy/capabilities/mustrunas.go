@@ -19,9 +19,9 @@ package capabilities
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // defaultCapabilities implements the Strategy interface
@@ -87,7 +87,7 @@ func (s *defaultCapabilities) Validate(pod *api.Pod, container *api.Container) f
 	}
 
 	if container.SecurityContext.Capabilities == nil {
-		// if container.SC.Caps is nil then nothing was defaulted by the strat or requested by the pod author
+		// if container.SC.Caps is nil then nothing was defaulted by the strategy or requested by the pod author
 		// if there are no required caps on the strategy and nothing is requested on the pod
 		// then we can safely return here without further validation.
 		if len(s.defaultAddCapabilities) == 0 && len(s.requiredDropCapabilities) == 0 {
@@ -138,8 +138,7 @@ func capabilityFromStringSlice(slice []string) []api.Capability {
 	return caps
 }
 
-// makeCapSet makes a string set from capabilities and normalizes them to be all lower case to help
-// with comparisons.
+// makeCapSet makes a string set from capabilities.
 func makeCapSet(caps []api.Capability) sets.String {
 	s := sets.NewString()
 	for _, c := range caps {

@@ -17,9 +17,9 @@ limitations under the License.
 package abac
 
 import (
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
 // Group is the API group for abac
@@ -27,7 +27,7 @@ const GroupName = "abac.authorization.kubernetes.io"
 
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
-// Scheme is the default instance of runtime.Scheme to which types in the abac API group are registered.
+// Scheme is the default instance of runtime.Scheme to which types in the abac API group are api.Registry.
 // TODO: remove this, abac should not have its own scheme.
 var Scheme = runtime.NewScheme()
 

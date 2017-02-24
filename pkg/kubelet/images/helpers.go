@@ -19,9 +19,9 @@ package images
 import (
 	"fmt"
 
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
 // throttleImagePulling wraps kubecontainer.ImageService to throttle image
@@ -42,9 +42,9 @@ type throttledImageService struct {
 	limiter flowcontrol.RateLimiter
 }
 
-func (ts throttledImageService) PullImage(image kubecontainer.ImageSpec, secrets []v1.Secret) error {
+func (ts throttledImageService) PullImage(image kubecontainer.ImageSpec, secrets []v1.Secret) (string, error) {
 	if ts.limiter.TryAccept() {
 		return ts.ImageService.PullImage(image, secrets)
 	}
-	return fmt.Errorf("pull QPS exceeded.")
+	return "", fmt.Errorf("pull QPS exceeded.")
 }

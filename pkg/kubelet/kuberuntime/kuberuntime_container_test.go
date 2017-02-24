@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -30,7 +31,7 @@ import (
 func TestRemoveContainer(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "bar",
 			Namespace: "new",
@@ -50,7 +51,7 @@ func TestRemoveContainer(t *testing.T) {
 	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
 	assert.Equal(t, len(fakeContainers), 1)
 
-	containerId := fakeContainers[0].GetId()
+	containerId := fakeContainers[0].Id
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	err = m.removeContainer(containerId)
 	assert.NoError(t, err)
@@ -60,7 +61,7 @@ func TestRemoveContainer(t *testing.T) {
 	assert.Equal(t, fakeOS.Removes, []string{expectedContainerLogPath, expectedContainerLogSymlink})
 	// Verify container is removed
 	fakeRuntime.AssertCalls([]string{"RemoveContainer"})
-	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: &containerId})
+	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerId})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
 }

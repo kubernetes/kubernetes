@@ -29,18 +29,18 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	k8sRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
-	k8sRuntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
-	// emptyUniquePodName is a UniquePodName for empty string.
-	emptyUniquePodName types.UniquePodName = types.UniquePodName("")
+	// EmptyUniquePodName is a UniquePodName for empty string.
+	EmptyUniquePodName types.UniquePodName = types.UniquePodName("")
 
-	// emptyUniqueVolumeName is a UniqueVolumeName for empty string
-	emptyUniqueVolumeName v1.UniqueVolumeName = v1.UniqueVolumeName("")
+	// EmptyUniqueVolumeName is a UniqueVolumeName for empty string
+	EmptyUniqueVolumeName v1.UniqueVolumeName = v1.UniqueVolumeName("")
 )
 
 // NestedPendingOperations defines the supported set of operations.
@@ -160,7 +160,7 @@ func (grm *nestedPendingOperations) isOperationExists(
 	podName types.UniquePodName) (bool, int) {
 
 	// If volumeName is empty, operation can be executed concurrently
-	if volumeName == emptyUniqueVolumeName {
+	if volumeName == EmptyUniqueVolumeName {
 		return false, -1
 	}
 
@@ -170,8 +170,8 @@ func (grm *nestedPendingOperations) isOperationExists(
 			continue
 		}
 
-		if previousOp.podName != emptyUniquePodName &&
-			podName != emptyUniquePodName &&
+		if previousOp.podName != EmptyUniquePodName &&
+			podName != EmptyUniquePodName &&
 			previousOp.podName != podName {
 			// No match, keep searching
 			continue
@@ -196,7 +196,7 @@ func (grm *nestedPendingOperations) getOperation(
 	}
 
 	logOperationName := getOperationName(volumeName, podName)
-	return 0, fmt.Errorf("Operation %q not found.", logOperationName)
+	return 0, fmt.Errorf("Operation %q not found", logOperationName)
 }
 
 func (grm *nestedPendingOperations) deleteOperation(
@@ -274,7 +274,7 @@ func (grm *nestedPendingOperations) Wait() {
 func getOperationName(
 	volumeName v1.UniqueVolumeName, podName types.UniquePodName) string {
 	podNameStr := ""
-	if podName != emptyUniquePodName {
+	if podName != EmptyUniquePodName {
 		podNameStr = fmt.Sprintf(" (%q)", podName)
 	}
 

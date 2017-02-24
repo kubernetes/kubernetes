@@ -56,14 +56,16 @@ func main() {
 		ExtraPeerDirs: []string{
 			"k8s.io/kubernetes/pkg/api",
 			"k8s.io/kubernetes/pkg/api/v1",
-			"k8s.io/kubernetes/pkg/apis/meta/v1",
-			"k8s.io/kubernetes/pkg/conversion",
-			"k8s.io/kubernetes/pkg/runtime",
+			"k8s.io/apimachinery/pkg/apis/meta/v1",
+			"k8s.io/apimachinery/pkg/conversion",
+			"k8s.io/apimachinery/pkg/runtime",
 		},
 		SkipUnsafe: false,
 	}
 	pflag.CommandLine.StringSliceVar(&customArgs.ExtraPeerDirs, "extra-peer-dirs", customArgs.ExtraPeerDirs,
 		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
+	pflag.CommandLine.BoolVar(&customArgs.SkipUnsafe, "skip-unsafe", customArgs.SkipUnsafe,
+		"If true, will not generate code using unsafe pointer conversions; resulting code may be slower.")
 	arguments.CustomArgs = customArgs
 
 	// Run it.

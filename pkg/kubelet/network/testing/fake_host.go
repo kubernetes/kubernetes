@@ -21,13 +21,15 @@ package testing
 
 import (
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 )
 
 type fakeNetworkHost struct {
 	fakeNamespaceGetter
+	FakePortMappingGetter
 	kubeClient clientset.Interface
 	Legacy     bool
 	Runtime    *containertest.FakeRuntime
@@ -60,4 +62,12 @@ type fakeNamespaceGetter struct {
 
 func (nh *fakeNamespaceGetter) GetNetNS(containerID string) (string, error) {
 	return nh.ns, nil
+}
+
+type FakePortMappingGetter struct {
+	mem map[string][]*hostport.PortMapping
+}
+
+func (pm *FakePortMappingGetter) GetPodPortMappings(containerID string) ([]*hostport.PortMapping, error) {
+	return pm.mem[containerID], nil
 }

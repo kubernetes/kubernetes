@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	cache "k8s.io/client-go/tools/cache"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	cache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"reflect"
@@ -136,7 +137,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 	if isDeletion {
 		// cachedService is not reliable here as
 		// deleting cache is the last step of federation service deletion
-		_, err := fedClient.Core().Services(cachedService.lastState.Namespace).Get(cachedService.lastState.Name)
+		_, err := fedClient.Core().Services(cachedService.lastState.Namespace).Get(cachedService.lastState.Name, metav1.GetOptions{})
 		// rebuild service if federation service still exists
 		if err == nil || !errors.IsNotFound(err) {
 			return sc.ensureClusterService(cachedService, clusterName, cachedService.appliedState, clusterCache.clientset)
@@ -263,7 +264,7 @@ func (cc *clusterClientCache) persistFedServiceUpdate(cachedService *cachedServi
 	glog.V(5).Infof("Persist federation service status %s/%s", service.Namespace, service.Name)
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		_, err := fedClient.Core().Services(service.Namespace).Get(service.Name)
+		_, err := fedClient.Core().Services(service.Namespace).Get(service.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			glog.Infof("Not persisting update to service '%s/%s' that no longer exists: %v",
 				service.Namespace, service.Name, err)

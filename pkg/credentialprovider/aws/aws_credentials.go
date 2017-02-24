@@ -30,25 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-// AWSRegions is the complete list of regions known to the AWS cloudprovider
-// and credentialprovider.
-var AWSRegions = [...]string{
-	"us-east-1",
-	"us-east-2",
-	"us-west-1",
-	"us-west-2",
-	"eu-west-1",
-	"eu-central-1",
-	"ap-south-1",
-	"ap-southeast-1",
-	"ap-southeast-2",
-	"ap-northeast-1",
-	"ap-northeast-2",
-	"cn-north-1",
-	"us-gov-west-1",
-	"sa-east-1",
-}
-
 const registryURLTemplate = "*.dkr.ecr.%s.amazonaws.com"
 
 // awsHandlerLogger is a handler that logs all AWS SDK requests
@@ -99,21 +80,20 @@ type ecrProvider struct {
 
 var _ credentialprovider.DockerConfigProvider = &ecrProvider{}
 
-// Init creates a lazy provider for each AWS region, in order to support
+// RegisterCredentialsProvider registers a credential provider for the specified region.
+// It creates a lazy provider for each AWS region, in order to support
 // cross-region ECR access. They have to be lazy because it's unlikely, but not
 // impossible, that we'll use more than one.
-// Not using the package init() function: this module should be initialized only
-// if using the AWS cloud provider. This way, we avoid timeouts waiting for a
-// non-existent provider.
-func Init() {
-	for _, region := range AWSRegions {
-		credentialprovider.RegisterCredentialProvider("aws-ecr-"+region,
-			&lazyEcrProvider{
-				region:    region,
-				regionURL: fmt.Sprintf(registryURLTemplate, region),
-			})
-	}
+// This should be called only if using the AWS cloud provider.
+// This way, we avoid timeouts waiting for a non-existent provider.
+func RegisterCredentialsProvider(region string) {
+	glog.V(4).Infof("registering credentials provider for AWS region %q", region)
 
+	credentialprovider.RegisterCredentialProvider("aws-ecr-"+region,
+		&lazyEcrProvider{
+			region:    region,
+			regionURL: fmt.Sprintf(registryURLTemplate, region),
+		})
 }
 
 // Enabled implements DockerConfigProvider.Enabled for the lazy provider.

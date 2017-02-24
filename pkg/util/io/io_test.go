@@ -22,11 +22,11 @@ import (
 	"testing"
 
 	"github.com/pborman/uuid"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/runtime"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/io"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -34,7 +34,7 @@ func TestSavePodToFile(t *testing.T) {
 	pod := volume.NewPersistentVolumeRecyclerPodTemplate()
 
 	// sets all default values on a pod for equality comparison after decoding from file
-	codec := api.Codecs.LegacyCodec(registered.GroupOrDie(api.GroupName).GroupVersion)
+	codec := api.Codecs.LegacyCodec(api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 	encoded, err := runtime.Encode(codec, pod)
 	runtime.DecodeInto(codec, encoded, pod)
 
@@ -50,7 +50,7 @@ func TestSavePodToFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load pod from file: %v", err)
 	}
-	if !api.Semantic.DeepEqual(pod, podFromFile) {
+	if !apiequality.Semantic.DeepEqual(pod, podFromFile) {
 		t.Errorf("\nexpected %#v\ngot	%#v\n", pod, podFromFile)
 	}
 }

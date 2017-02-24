@@ -18,7 +18,7 @@ package common
 
 import (
 	. "github.com/onsi/ginkgo"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

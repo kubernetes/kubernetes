@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// DeploymentGeneratorV1 supports stable generation of a deployment
+// DeploymentBasicGeneratorV1 supports stable generation of a deployment
 type DeploymentBasicGeneratorV1 struct {
 	Name   string
 	Images []string
@@ -67,8 +67,15 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 
 	podSpec := api.PodSpec{Containers: []api.Container{}}
 	for _, imageString := range s.Images {
+		// Retain just the image name
 		imageSplit := strings.Split(imageString, "/")
 		name := imageSplit[len(imageSplit)-1]
+		// Remove any tag or hash
+		if strings.Contains(name, ":") {
+			name = strings.Split(name, ":")[0]
+		} else if strings.Contains(name, "@") {
+			name = strings.Split(name, "@")[0]
+		}
 		podSpec.Containers = append(podSpec.Containers, api.Container{Name: name, Image: imageString})
 	}
 
@@ -77,7 +84,7 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 	labels["app"] = s.Name
 	selector := metav1.LabelSelector{MatchLabels: labels}
 	deployment := extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
 		},
@@ -85,7 +92,7 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 			Replicas: 1,
 			Selector: &selector,
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: podSpec,

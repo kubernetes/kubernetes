@@ -107,18 +107,17 @@ echo "${ETCD_VERSION}/${STORAGE_BACKEND_ETCD2}" > "${ETCD_DIR}/version.txt"
 
 ### BEGIN TEST DEFINITION CUSTOMIZATION ###
 
+# After removing HPA in v1beta1 there is basically no resource which has
+# two versions. In the future we may want to extend it.
 # source_file,resource,namespace,name,old_version,new_version
 tests=(
-test/fixtures/doc-yaml/user-guide/job.yaml,jobs,default,pi,extensions/v1beta1,batch/v1
-test/fixtures/doc-yaml/user-guide/horizontal-pod-autoscaling/hpa-php-apache.yaml,horizontalpodautoscalers,default,php-apache,extensions/v1beta1,autoscaling/v1
+test/fixtures/doc-yaml/user-guide/pod.yaml,pods,default,nginx,v1,v1
 )
 
-# need to include extensions/v1beta1 in new api version because its internal types are used by jobs
-# and hpas
 KUBE_OLD_API_VERSION="v1,extensions/v1beta1"
-KUBE_NEW_API_VERSION="v1,extensions/v1beta1,batch/v1,autoscaling/v1"
-KUBE_OLD_STORAGE_VERSIONS="batch=extensions/v1beta1,autoscaling=extensions/v1beta1"
-KUBE_NEW_STORAGE_VERSIONS="batch/v1,autoscaling/v1"
+KUBE_NEW_API_VERSION="v1,extensions/v1beta1"
+KUBE_OLD_STORAGE_VERSIONS="v1"
+KUBE_NEW_STORAGE_VERSIONS="v1"
 
 ### END TEST DEFINITION CUSTOMIZATION ###
 
@@ -160,7 +159,7 @@ killApiServer
 
 kube::etcd::stop
 TARGET_STORAGE="etcd3" \
-  TARGET_VERSION="3.0.14" \
+  TARGET_VERSION="3.0.17" \
   DATA_DIRECTORY="${ETCD_DIR}" \
   ETCD=$(which etcd) \
   ETCDCTL=$(which etcdctl) \

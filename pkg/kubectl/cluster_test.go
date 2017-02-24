@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -38,7 +39,7 @@ func TestClusterGenerate(t *testing.T) {
 				"secret":         "foo-credentials",
 			},
 			expected: &federationapi.Cluster{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: federationapi.ClusterSpec{
@@ -63,7 +64,7 @@ func TestClusterGenerate(t *testing.T) {
 				"secret":         "foo-credentials",
 			},
 			expected: &federationapi.Cluster{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: federationapi.ClusterSpec{
@@ -88,7 +89,7 @@ func TestClusterGenerate(t *testing.T) {
 				"secret":         "credentials",
 			},
 			expected: &federationapi.Cluster{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar-cluster",
 				},
 				Spec: federationapi.ClusterSpec{

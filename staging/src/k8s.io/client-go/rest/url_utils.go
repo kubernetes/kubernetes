@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"path"
 
-	"k8s.io/client-go/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
@@ -33,10 +33,7 @@ func DefaultServerURL(host, apiPath string, groupVersion schema.GroupVersion, de
 	}
 	base := host
 	hostURL, err := url.Parse(base)
-	if err != nil {
-		return nil, "", err
-	}
-	if hostURL.Scheme == "" || hostURL.Host == "" {
+	if err != nil || hostURL.Scheme == "" || hostURL.Host == "" {
 		scheme := "http://"
 		if defaultTLS {
 			scheme = "https://"

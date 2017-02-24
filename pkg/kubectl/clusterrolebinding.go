@@ -19,8 +19,10 @@ package kubectl
 import (
 	"fmt"
 
+	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // ClusterRoleBindingGeneratorV1 supports stable generation of a clusterRoleBinding.
@@ -33,6 +35,8 @@ type ClusterRoleBindingGeneratorV1 struct {
 	Users []string
 	// Groups to derive the clusterRoleBinding from (optional)
 	Groups []string
+	// ServiceAccounts to derive the clusterRoleBinding from in namespace:name format(optional)
+	ServiceAccounts []string
 }
 
 // Ensure it supports the generator pattern that uses parameter injection.
@@ -66,6 +70,15 @@ func (s ClusterRoleBindingGeneratorV1) Generate(genericParams map[string]interfa
 		delegate.Groups = fromLiteralArray
 		delete(genericParams, "group")
 	}
+	fromSAStrings, found := genericParams["serviceaccount"]
+	if found {
+		fromLiteralArray, isArray := fromSAStrings.([]string)
+		if !isArray {
+			return nil, fmt.Errorf("expected []string, found :%v", fromFileStrings)
+		}
+		delegate.ServiceAccounts = fromLiteralArray
+		delete(genericParams, "serviceaccount")
+	}
 	params := map[string]string{}
 	for key, value := range genericParams {
 		strVal, isString := value.(string)
@@ -86,7 +99,7 @@ func (s ClusterRoleBindingGeneratorV1) ParamNames() []GeneratorParam {
 		{"clusterrole", false},
 		{"user", false},
 		{"group", false},
-		{"force", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -104,16 +117,28 @@ func (s ClusterRoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, err
 	}
 	for _, user := range s.Users {
 		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{
-			Kind:       rbac.UserKind,
-			APIVersion: "rbac/v1alpha1",
-			Name:       user,
+			Kind:     rbac.UserKind,
+			APIGroup: rbac.GroupName,
+			Name:     user,
 		})
 	}
 	for _, group := range s.Groups {
 		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{
-			Kind:       rbac.GroupKind,
-			APIVersion: "rbac/v1alpha1",
-			Name:       group,
+			Kind:     rbac.GroupKind,
+			APIGroup: rbac.GroupName,
+			Name:     group,
+		})
+	}
+	for _, sa := range s.ServiceAccounts {
+		tokens := strings.Split(sa, ":")
+		if len(tokens) != 2 {
+			return nil, fmt.Errorf("serviceaccount must be <namespace>:<name>")
+		}
+		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{
+			Kind:      rbac.ServiceAccountKind,
+			APIGroup:  "",
+			Namespace: tokens[0],
+			Name:      tokens[1],
 		})
 	}
 

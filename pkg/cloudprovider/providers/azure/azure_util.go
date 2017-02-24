@@ -25,7 +25,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -133,12 +133,12 @@ func getProtocolsFromKubernetesProtocol(protocol v1.Protocol) (network.Transport
 
 // This returns the full identifier of the primary NIC for the given VM.
 func getPrimaryInterfaceID(machine compute.VirtualMachine) (string, error) {
-	if len(*machine.Properties.NetworkProfile.NetworkInterfaces) == 1 {
-		return *(*machine.Properties.NetworkProfile.NetworkInterfaces)[0].ID, nil
+	if len(*machine.NetworkProfile.NetworkInterfaces) == 1 {
+		return *(*machine.NetworkProfile.NetworkInterfaces)[0].ID, nil
 	}
 
-	for _, ref := range *machine.Properties.NetworkProfile.NetworkInterfaces {
-		if *ref.Properties.Primary {
+	for _, ref := range *machine.NetworkProfile.NetworkInterfaces {
+		if *ref.Primary {
 			return *ref.ID, nil
 		}
 	}
@@ -147,12 +147,12 @@ func getPrimaryInterfaceID(machine compute.VirtualMachine) (string, error) {
 }
 
 func getPrimaryIPConfig(nic network.Interface) (*network.InterfaceIPConfiguration, error) {
-	if len(*nic.Properties.IPConfigurations) == 1 {
-		return &((*nic.Properties.IPConfigurations)[0]), nil
+	if len(*nic.IPConfigurations) == 1 {
+		return &((*nic.IPConfigurations)[0]), nil
 	}
 
-	for _, ref := range *nic.Properties.IPConfigurations {
-		if *ref.Properties.Primary {
+	for _, ref := range *nic.IPConfigurations {
+		if *ref.Primary {
 			return &ref, nil
 		}
 	}
@@ -204,7 +204,7 @@ func getNextAvailablePriority(rules []network.SecurityRule) (int32, error) {
 outer:
 	for smallest < loadBalancerMaximumPriority {
 		for _, rule := range rules {
-			if *rule.Properties.Priority == smallest {
+			if *rule.Priority == smallest {
 				smallest += spread
 				continue outer
 			}
@@ -245,6 +245,6 @@ func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
 		return "", err
 	}
 
-	targetIP := *ipConfig.Properties.PrivateIPAddress
+	targetIP := *ipConfig.PrivateIPAddress
 	return targetIP, nil
 }

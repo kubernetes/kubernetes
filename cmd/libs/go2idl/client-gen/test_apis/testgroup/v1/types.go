@@ -16,10 +16,7 @@ limitations under the License.
 
 package v1
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // +genclient=true
 
@@ -30,7 +27,7 @@ type TestType struct {
 	// unversioned objects in the generate file that is not used anywhere other than this test type.
 	// +k8s:openapi-gen=false
 	// +optional
-	api.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +optional
 	Status TestTypeStatus `json:"status,omitempty"`
 }

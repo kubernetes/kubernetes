@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,12 +28,11 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -221,7 +221,7 @@ func readLatencyMetrics(c clientset.Interface) (APIResponsiveness, error) {
 
 	ignoredResources := sets.NewString("events")
 	// TODO: figure out why we're getting non-capitalized proxy and fix this.
-	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY", "proxy", "CONNECT")
+	ignoredVerbs := sets.NewString("WATCH", "WATCHLIST", "PROXY", "proxy", "CONNECT")
 
 	for _, sample := range samples {
 		// Example line:
@@ -324,8 +324,13 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 	result := SchedulingLatency{}
 
 	// Check if master Node is registered
-	nodes, err := c.Core().Nodes().List(v1.ListOptions{})
+	nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 	ExpectNoError(err)
+
+	subResourceProxyAvailable, err := ServerVersionGTE(SubResourcePodProxyVersion, c.Discovery())
+	if err != nil {
+		return result, err
+	}
 
 	var data string
 	var masterRegistered = false
@@ -335,13 +340,29 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 		}
 	}
 	if masterRegistered {
-		rawData, err := c.Core().RESTClient().Get().
-			Prefix("proxy").
-			Namespace(api.NamespaceSystem).
-			Resource("pods").
-			Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
-			Suffix("metrics").
-			Do().Raw()
+		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
+		defer cancel()
+
+		var rawData []byte
+		if subResourceProxyAvailable {
+			rawData, err = c.Core().RESTClient().Get().
+				Context(ctx).
+				Namespace(metav1.NamespaceSystem).
+				Resource("pods").
+				Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
+				SubResource("proxy").
+				Suffix("metrics").
+				Do().Raw()
+		} else {
+			rawData, err = c.Core().RESTClient().Get().
+				Context(ctx).
+				Prefix("proxy").
+				Namespace(metav1.NamespaceSystem).
+				SubResource("pods").
+				Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
+				Suffix("metrics").
+				Do().Raw()
+		}
 
 		ExpectNoError(err)
 		data = string(rawData)

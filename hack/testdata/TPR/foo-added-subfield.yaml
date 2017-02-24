@@ -1,0 +1,11 @@
+kind: Foo
+apiVersion: company.com/v1
+metadata:
+  name: test
+  labels:
+    pruneGroup: "true"
+someField: field1
+otherField: field2
+nestedField:
+  someSubfield: modifiedSubfield
+  newSubfield: subfield3

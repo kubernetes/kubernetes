@@ -26,28 +26,30 @@ import (
 	"net/url"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/conversion/queryparams"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/conversion/queryparams"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/runtime/serializer"
-	"k8s.io/client-go/pkg/util/flowcontrol"
-	"k8s.io/client-go/pkg/watch"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 // Client is a Kubernetes client that allows you to access metadata
 // and manipulate metadata of a Kubernetes API group.
 type Client struct {
-	cl             *rest.RESTClient
+	cl             *restclient.RESTClient
 	parameterCodec runtime.ParameterCodec
 }
 
 // NewClient returns a new client based on the passed in config. The
 // codec is ignored, as the dynamic client uses it's own codec.
-func NewClient(conf *rest.Config) (*Client, error) {
+func NewClient(conf *restclient.Config) (*Client, error) {
 	// avoid changing the original config
 	confCopy := *conf
 	conf = &confCopy
@@ -64,10 +66,10 @@ func NewClient(conf *rest.Config) (*Client, error) {
 	}
 
 	if len(conf.UserAgent) == 0 {
-		conf.UserAgent = rest.DefaultKubernetesUserAgent()
+		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
 
-	cl, err := rest.RESTClientFor(conf)
+	cl, err := restclient.RESTClientFor(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -103,14 +105,14 @@ func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *Client {
 // ResourceClient is an API interface to a specific resource under a
 // dynamic client.
 type ResourceClient struct {
-	cl             *rest.RESTClient
+	cl             *restclient.RESTClient
 	resource       *metav1.APIResource
 	ns             string
 	parameterCodec runtime.ParameterCodec
 }
 
 // List returns a list of objects for this resource.
-func (rc *ResourceClient) List(opts runtime.Object) (runtime.Object, error) {
+func (rc *ResourceClient) List(opts metav1.ListOptions) (runtime.Object, error) {
 	parameterEncoder := rc.parameterCodec
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder
@@ -118,14 +120,14 @@ func (rc *ResourceClient) List(opts runtime.Object) (runtime.Object, error) {
 	return rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
-		VersionedParams(opts, parameterEncoder).
+		VersionedParams(&opts, parameterEncoder).
 		Do().
 		Get()
 }
 
 // Get gets the resource with the specified name.
-func (rc *ResourceClient) Get(name string) (*runtime.Unstructured, error) {
-	result := new(runtime.Unstructured)
+func (rc *ResourceClient) Get(name string) (*unstructured.Unstructured, error) {
+	result := new(unstructured.Unstructured)
 	err := rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -136,7 +138,7 @@ func (rc *ResourceClient) Get(name string) (*runtime.Unstructured, error) {
 }
 
 // Delete deletes the resource with the specified name.
-func (rc *ResourceClient) Delete(name string, opts *v1.DeleteOptions) error {
+func (rc *ResourceClient) Delete(name string, opts *metav1.DeleteOptions) error {
 	return rc.cl.Delete().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -147,7 +149,7 @@ func (rc *ResourceClient) Delete(name string, opts *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (rc *ResourceClient) DeleteCollection(deleteOptions *v1.DeleteOptions, listOptions runtime.Object) error {
+func (rc *ResourceClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	parameterEncoder := rc.parameterCodec
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder
@@ -155,15 +157,15 @@ func (rc *ResourceClient) DeleteCollection(deleteOptions *v1.DeleteOptions, list
 	return rc.cl.Delete().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
-		VersionedParams(listOptions, parameterEncoder).
+		VersionedParams(&listOptions, parameterEncoder).
 		Body(deleteOptions).
 		Do().
 		Error()
 }
 
 // Create creates the provided resource.
-func (rc *ResourceClient) Create(obj *runtime.Unstructured) (*runtime.Unstructured, error) {
-	result := new(runtime.Unstructured)
+func (rc *ResourceClient) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	result := new(unstructured.Unstructured)
 	err := rc.cl.Post().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -174,8 +176,8 @@ func (rc *ResourceClient) Create(obj *runtime.Unstructured) (*runtime.Unstructur
 }
 
 // Update updates the provided resource.
-func (rc *ResourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructured, error) {
-	result := new(runtime.Unstructured)
+func (rc *ResourceClient) Update(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	result := new(unstructured.Unstructured)
 	if len(obj.GetName()) == 0 {
 		return result, errors.New("object missing name")
 	}
@@ -190,21 +192,21 @@ func (rc *ResourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructur
 }
 
 // Watch returns a watch.Interface that watches the resource.
-func (rc *ResourceClient) Watch(opts runtime.Object) (watch.Interface, error) {
+func (rc *ResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	parameterEncoder := rc.parameterCodec
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder
 	}
+	opts.Watch = true
 	return rc.cl.Get().
-		Prefix("watch").
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
-		VersionedParams(opts, parameterEncoder).
+		VersionedParams(&opts, parameterEncoder).
 		Watch()
 }
 
-func (rc *ResourceClient) Patch(name string, pt api.PatchType, data []byte) (*runtime.Unstructured, error) {
-	result := new(runtime.Unstructured)
+func (rc *ResourceClient) Patch(name string, pt types.PatchType, data []byte) (*unstructured.Unstructured, error) {
+	result := new(unstructured.Unstructured)
 	err := rc.cl.Patch(pt).
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -220,7 +222,7 @@ func (rc *ResourceClient) Patch(name string, pt api.PatchType, data []byte) (*ru
 type dynamicCodec struct{}
 
 func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	obj, gvk, err := runtime.UnstructuredJSONScheme.Decode(data, gvk, obj)
+	obj, gvk, err := unstructured.UnstructuredJSONScheme.Decode(data, gvk, obj)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -237,11 +239,11 @@ func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtim
 }
 
 func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
-	return runtime.UnstructuredJSONScheme.Encode(obj, w)
+	return unstructured.UnstructuredJSONScheme.Encode(obj, w)
 }
 
-// ContentConfig returns a rest.ContentConfig for dynamic types.
-func ContentConfig() rest.ContentConfig {
+// ContentConfig returns a restclient.ContentConfig for dynamic types.
+func ContentConfig() restclient.ContentConfig {
 	var jsonInfo runtime.SerializerInfo
 	// TODO: api.Codecs here should become "pkg/apis/server/scheme" which is the minimal core you need
 	// to talk to a kubernetes server
@@ -254,7 +256,7 @@ func ContentConfig() rest.ContentConfig {
 
 	jsonInfo.Serializer = dynamicCodec{}
 	jsonInfo.PrettySerializer = nil
-	return rest.ContentConfig{
+	return restclient.ContentConfig{
 		AcceptContentTypes:   runtime.ContentTypeJSON,
 		ContentType:          runtime.ContentTypeJSON,
 		NegotiatedSerializer: serializer.NegotiatedSerializerWrapper(jsonInfo),

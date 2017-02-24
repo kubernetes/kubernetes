@@ -17,10 +17,13 @@ limitations under the License.
 package remote
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
+
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
@@ -71,28 +74,42 @@ func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimea
 		Image: image,
 	})
 	if err != nil {
-		glog.Errorf("ImageStatus %q from image service failed: %v", image.GetImage(), err)
+		glog.Errorf("ImageStatus %q from image service failed: %v", image.Image, err)
 		return nil, err
+	}
+
+	if resp.Image != nil {
+		if resp.Image.Id == "" || resp.Image.Size_ == 0 {
+			errorMessage := fmt.Sprintf("Id or size of image %q is not set", image.Image)
+			glog.Errorf("ImageStatus failed: %s", errorMessage)
+			return nil, errors.New(errorMessage)
+		}
 	}
 
 	return resp.Image, nil
 }
 
 // PullImage pulls an image with authentication config.
-func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) (string, error) {
+	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	_, err := r.imageClient.PullImage(ctx, &runtimeapi.PullImageRequest{
+	resp, err := r.imageClient.PullImage(ctx, &runtimeapi.PullImageRequest{
 		Image: image,
 		Auth:  auth,
 	})
 	if err != nil {
-		glog.Errorf("PullImage %q from image service failed: %v", image.GetImage(), err)
-		return err
+		glog.Errorf("PullImage %q from image service failed: %v", image.Image, err)
+		return "", err
 	}
 
-	return nil
+	if resp.ImageRef == "" {
+		errorMessage := fmt.Sprintf("imageRef of image %q is not set", image.Image)
+		glog.Errorf("PullImage failed: %s", errorMessage)
+		return "", errors.New(errorMessage)
+	}
+
+	return resp.ImageRef, nil
 }
 
 // RemoveImage removes the image.
@@ -104,7 +121,7 @@ func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 		Image: image,
 	})
 	if err != nil {
-		glog.Errorf("RemoveImage %q from image service failed: %v", image.GetImage(), err)
+		glog.Errorf("RemoveImage %q from image service failed: %v", image.Image, err)
 		return err
 	}
 

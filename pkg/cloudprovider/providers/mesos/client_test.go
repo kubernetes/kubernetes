@@ -30,7 +30,7 @@ import (
 	"github.com/mesos/mesos-go/mesosutil"
 	"golang.org/x/net/context"
 
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 
 // Test data
@@ -56,9 +56,9 @@ const (
 				"cpus": 8
 			},
 			"registered_time": 1429456502.46999,
-			"pid": "slave(1)@mesos1.internal.company.com:5050",
+			"pid": "slave(1)@mesos1.internal.example.org.fail:5050",
 			"id": "20150419-081501-16777343-5050-16383-S2",
-			"hostname": "mesos1.internal.company.com",
+			"hostname": "mesos1.internal.example.org.fail",
 			"attributes": {},
 			"active": true
 		},
@@ -70,9 +70,9 @@ const (
 				"cpus": 8
 			},
 			"registered_time": 1429456502.4144,
-			"pid": "slave(1)@mesos2.internal.company.com:5050",
+			"pid": "slave(1)@mesos2.internal.example.org.fail:5050",
 			"id": "20150419-081501-16777343-5050-16383-S1",
-			"hostname": "mesos2.internal.company.com",
+			"hostname": "mesos2.internal.example.org.fail",
 			"attributes": {},
 			"active": true
 		},
@@ -84,17 +84,17 @@ const (
 				"cpus": 8
 			},
 			"registered_time": 1429456502.02879,
-			"pid": "slave(1)@mesos3.internal.company.com:5050",
+			"pid": "slave(1)@mesos3.internal.example.org.fail:5050",
 			"id": "20150419-081501-16777343-5050-16383-S0",
-			"hostname": "mesos3.internal.company.com",
+			"hostname": "mesos3.internal.example.org.fail",
 			"attributes": {},
 			"active": true
 		}
 		],
-		"pid": "master@mesos-master0.internal.company.com:5050",
+		"pid": "master@mesos-master0.internal.example.org.fail:5050",
 		"orphan_tasks": [],
 		"lost_tasks": 0,
-		"leader": "master@mesos-master0.internal.company.com:5050",
+		"leader": "master@mesos-master0.internal.example.org.fail:5050",
 		"killed_tasks": 0,
 		"failed_tasks": 0,
 		"elected_time": 1429456501.61638,
@@ -234,9 +234,9 @@ func Test_listSlaves(t *testing.T) {
 	}
 
 	expectedHostnames := map[string]struct{}{
-		"mesos1.internal.company.com": {},
-		"mesos2.internal.company.com": {},
-		"mesos3.internal.company.com": {},
+		"mesos1.internal.example.org.fail": {},
+		"mesos2.internal.example.org.fail": {},
+		"mesos3.internal.example.org.fail": {},
 	}
 
 	actualHostnames := make(map[string]struct{})

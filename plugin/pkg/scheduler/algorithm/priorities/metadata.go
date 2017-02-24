@@ -38,13 +38,9 @@ func PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.Nod
 	if err != nil {
 		return nil
 	}
-	affinity, err := v1.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		return nil
-	}
 	return &priorityMetadata{
 		nonZeroRequest: getNonZeroRequests(pod),
 		podTolerations: tolerations,
-		affinity:       affinity,
+		affinity:       schedulercache.ReconcileAffinity(pod),
 	}
 }

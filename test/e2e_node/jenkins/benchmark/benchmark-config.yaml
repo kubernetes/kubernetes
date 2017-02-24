@@ -1,72 +1,72 @@
 ---
 images:
   containervm-density1:
-    image: e2e-node-containervm-v20160604-image
+    image: e2e-node-containervm-v20161208-image
     project: kubernetes-node-e2e-images
     machine: n1-standard-1
     tests:
       - 'create 35 pods with 0s? interval \[Benchmark\]'
   containervm-density2:
-    image: e2e-node-containervm-v20160604-image
+    image: e2e-node-containervm-v20161208-image
     project: kubernetes-node-e2e-images
     machine: n1-standard-1
     tests:
       - 'create 105 pods with 0s? interval \[Benchmark\]'
   containervm-density2-qps60:
-    image: e2e-node-containervm-v20160604-image
+    image: e2e-node-containervm-v20161208-image
     project: kubernetes-node-e2e-images
     machine: n1-standard-1
     tests:
       - 'create 105 pods with 0s? interval \(QPS 60\) \[Benchmark\]'
   containervm-density3:
-    image: e2e-node-containervm-v20160604-image
+    image: e2e-node-containervm-v20161208-image
     project: kubernetes-node-e2e-images
     machine: n1-standard-2
     tests:
       - 'create 105 pods with 0s? interval \[Benchmark\]'
   containervm-density4:
-    image: e2e-node-containervm-v20160604-image
+    image: e2e-node-containervm-v20161208-image
     project: kubernetes-node-e2e-images
     machine: n1-standard-1
     tests:
       - 'create 105 pods with 100ms interval \[Benchmark\]'
   containervm-resource1:
-    image: e2e-node-containervm-v20160604-image
+    image: e2e-node-containervm-v20161208-image
     project: kubernetes-node-e2e-images
     machine: n1-standard-1
     tests:
       - 'resource tracking for 0 pods per node \[Benchmark\]'
   containervm-resource2:
-    image: e2e-node-containervm-v20160604-image
+    image: e2e-node-containervm-v20161208-image
     project: kubernetes-node-e2e-images
     machine: n1-standard-1
     tests:
       - 'resource tracking for 35 pods per node \[Benchmark\]'
   containervm-resource3:
-    image: e2e-node-containervm-v20160604-image
+    image: e2e-node-containervm-v20161208-image
     project: kubernetes-node-e2e-images
     machine: n1-standard-1
     tests:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
   gci-resource1:
-    image: gci-dev-56-8977-0-0
+    image: gci-stable-56-9000-84-2
     project: google-containers
     machine: n1-standard-1
-    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml"
+    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 0 pods per node \[Benchmark\]'
   gci-resource2:
-    image: gci-dev-56-8977-0-0
+    image: gci-stable-56-9000-84-2
     project: google-containers
     machine: n1-standard-1
-    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml"
+    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 35 pods per node \[Benchmark\]'
   gci-resource3:
-    image: gci-dev-56-8977-0-0
+    image: gci-stable-56-9000-84-2
     project: google-containers
     machine: n1-standard-1
-    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml"
+    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
   coreos-resource1:

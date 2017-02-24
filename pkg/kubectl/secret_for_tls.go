@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // SecretForTLSGeneratorV1 supports stable generation of a TLS secret.

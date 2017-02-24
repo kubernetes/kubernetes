@@ -21,6 +21,7 @@ package compute
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
@@ -46,6 +47,12 @@ func NewVirtualMachineSizesClientWithBaseURI(baseURI string, subscriptionID stri
 //
 // location is the location upon which virtual-machine-sizes is queried.
 func (client VirtualMachineSizesClient) List(location string) (result VirtualMachineSizeListResult, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: location,
+			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "compute.VirtualMachineSizesClient", "List")
+	}
+
 	req, err := client.ListPreparer(location)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "compute.VirtualMachineSizesClient", "List", nil, "Failure preparing request")

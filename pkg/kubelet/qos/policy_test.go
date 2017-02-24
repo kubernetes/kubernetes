@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 

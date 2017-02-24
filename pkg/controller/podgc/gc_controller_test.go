@@ -21,12 +21,16 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/node/testutil"
 )
 
 type FakeController struct{}
@@ -35,6 +39,20 @@ func (*FakeController) Run(<-chan struct{}) {}
 
 func (*FakeController) HasSynced() bool {
 	return true
+}
+
+func (*FakeController) LastSyncResourceVersion() string {
+	return ""
+}
+
+func alwaysReady() bool { return true }
+
+func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer) {
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	podInformer := informerFactory.Core().V1().Pods()
+	controller := NewPodGC(kubeClient, podInformer, terminatedPodThreshold)
+	controller.podListerSynced = alwaysReady
+	return controller, podInformer
 }
 
 func TestGCTerminated(t *testing.T) {
@@ -94,8 +112,8 @@ func TestGCTerminated(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		client := fake.NewSimpleClientset()
-		gcc := NewFromClient(client, test.threshold)
+		client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
+		gcc, podInformer := NewFromClient(client, test.threshold)
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex
 		gcc.deletePod = func(_, name string) error {
@@ -108,20 +126,12 @@ func TestGCTerminated(t *testing.T) {
 		creationTime := time.Unix(0, 0)
 		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
-			gcc.podStore.Indexer.Add(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
+			podInformer.Informer().GetStore().Add(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
 				Status:     v1.PodStatus{Phase: pod.phase},
 				Spec:       v1.PodSpec{NodeName: "node"},
 			})
 		}
-
-		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-		store.Add(&v1.Node{
-			ObjectMeta: v1.ObjectMeta{Name: "node"},
-		})
-		gcc.nodeStore = cache.StoreToNodeLister{Store: store}
-		gcc.podController = &FakeController{}
-		gcc.nodeController = &FakeController{}
 
 		gcc.gc()
 
@@ -170,7 +180,7 @@ func TestGCOrphaned(t *testing.T) {
 
 	for i, test := range testCases {
 		client := fake.NewSimpleClientset()
-		gcc := NewFromClient(client, test.threshold)
+		gcc, podInformer := NewFromClient(client, test.threshold)
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex
 		gcc.deletePod = func(_, name string) error {
@@ -183,19 +193,14 @@ func TestGCOrphaned(t *testing.T) {
 		creationTime := time.Unix(0, 0)
 		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
-			gcc.podStore.Indexer.Add(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
+			podInformer.Informer().GetStore().Add(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
 				Status:     v1.PodStatus{Phase: pod.phase},
 				Spec:       v1.PodSpec{NodeName: "node"},
 			})
 		}
 
-		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-		gcc.nodeStore = cache.StoreToNodeLister{Store: store}
-		gcc.podController = &FakeController{}
-		gcc.nodeController = &FakeController{}
-
-		pods, err := gcc.podStore.List(labels.Everything())
+		pods, err := podInformer.Lister().List(labels.Everything())
 		if err != nil {
 			t.Errorf("Error while listing all Pods: %v", err)
 			return
@@ -252,7 +257,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 
 	for i, test := range testCases {
 		client := fake.NewSimpleClientset()
-		gcc := NewFromClient(client, -1)
+		gcc, podInformer := NewFromClient(client, -1)
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex
 		gcc.deletePod = func(_, name string) error {
@@ -265,20 +270,15 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		creationTime := time.Unix(0, 0)
 		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
-			gcc.podStore.Indexer.Add(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
+			podInformer.Informer().GetStore().Add(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
 					DeletionTimestamp: pod.deletionTimeStamp},
 				Status: v1.PodStatus{Phase: pod.phase},
 				Spec:   v1.PodSpec{NodeName: pod.nodeName},
 			})
 		}
 
-		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-		gcc.nodeStore = cache.StoreToNodeLister{Store: store}
-		gcc.podController = &FakeController{}
-		gcc.nodeController = &FakeController{}
-
-		pods, err := gcc.podStore.List(labels.Everything())
+		pods, err := podInformer.Lister().List(labels.Everything())
 		if err != nil {
 			t.Errorf("Error while listing all Pods: %v", err)
 			return

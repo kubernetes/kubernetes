@@ -1,0 +1,16 @@
+{
+	"spec": {
+		"ports": [
+			{
+				"$patch": "delete",
+				"port": 81
+			},
+			{
+				"name": "80",
+				"port": 82,
+				"protocol": "TCP",
+				"targetPort": 80
+			}
+		]
+	}
+}

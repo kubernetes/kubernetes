@@ -16,12 +16,17 @@ limitations under the License.
 
 package metrics
 
+import (
+	"fmt"
+)
+
 // GetResourceUtilizationRatio takes in a set of metrics, a set of matching requests,
 // and a target utilization percentage, and calcuates the the ratio of
-// desired to actual utilization (returning that and the actual utilization)
-func GetResourceUtilizationRatio(metrics PodResourceInfo, requests map[string]int64, targetUtilization int32) (float64, int32, error) {
+// desired to actual utilization (returning that, the actual utilization, and the raw average value)
+func GetResourceUtilizationRatio(metrics PodMetricsInfo, requests map[string]int64, targetUtilization int32) (utilizationRatio float64, currentUtilization int32, rawAverageValue int64, err error) {
 	metricsTotal := int64(0)
 	requestsTotal := int64(0)
+	numEntries := 0
 
 	for podName, metricValue := range metrics {
 		request, hasRequest := requests[podName]
@@ -32,23 +37,30 @@ func GetResourceUtilizationRatio(metrics PodResourceInfo, requests map[string]in
 
 		metricsTotal += metricValue
 		requestsTotal += request
+		numEntries++
 	}
 
-	currentUtilization := int32((metricsTotal * 100) / requestsTotal)
+	// if the set of requests is completely disjoint from the set of metrics,
+	// then we could have an issue where the requests total is zero
+	if requestsTotal == 0 {
+		return 0, 0, 0, fmt.Errorf("no metrics returned matched known pods")
+	}
 
-	return float64(currentUtilization) / float64(targetUtilization), currentUtilization, nil
+	currentUtilization = int32((metricsTotal * 100) / requestsTotal)
+
+	return float64(currentUtilization) / float64(targetUtilization), currentUtilization, metricsTotal / int64(numEntries), nil
 }
 
 // GetMetricUtilizationRatio takes in a set of metrics and a target utilization value,
 // and calcuates the ratio of desired to actual utilization
 // (returning that and the actual utilization)
-func GetMetricUtilizationRatio(metrics PodMetricsInfo, targetUtilization float64) (float64, float64) {
-	metricsTotal := float64(0)
+func GetMetricUtilizationRatio(metrics PodMetricsInfo, targetUtilization int64) (utilizationRatio float64, currentUtilization int64) {
+	metricsTotal := int64(0)
 	for _, metricValue := range metrics {
 		metricsTotal += metricValue
 	}
 
-	currentUtilization := metricsTotal / float64(len(metrics))
+	currentUtilization = metricsTotal / int64(len(metrics))
 
-	return currentUtilization / targetUtilization, currentUtilization
+	return float64(currentUtilization) / float64(targetUtilization), currentUtilization
 }

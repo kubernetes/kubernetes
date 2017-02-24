@@ -19,7 +19,7 @@ package validation
 import (
 	"fmt"
 
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 

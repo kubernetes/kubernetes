@@ -24,11 +24,11 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 )
@@ -222,6 +222,27 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			skipUnsafe = customArgs.SkipUnsafe
 		}
 
+		// if the source path is within a /vendor/ directory (for example,
+		// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
+		// generation to output to the proper relative path (under vendor).
+		// Otherwise, the generator will create the file in the wrong location
+		// in the output directory.
+		// TODO: build a more fundamental concept in gengo for dealing with modifications
+		// to vendored packages.
+		vendorless := func(pkg string) string {
+			if pos := strings.LastIndex(pkg, "/vendor/"); pos != -1 {
+				return pkg[pos+len("/vendor/"):]
+			}
+			return pkg
+		}
+		fqPkgPath := pkg.Path
+		if strings.Contains(pkg.SourcePath, "/vendor/") {
+			fqPkgPath = filepath.Join("k8s.io", "kubernetes", "vendor", pkg.Path)
+		}
+		for i := range peerPkgs {
+			peerPkgs[i] = vendorless(peerPkgs[i])
+		}
+
 		// Make sure our peer-packages are added and fully parsed.
 		for _, pp := range peerPkgs {
 			context.AddDir(pp)
@@ -236,7 +257,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		packages = append(packages,
 			&generator.DefaultPackage{
 				PackageName: filepath.Base(pkg.Path),
-				PackagePath: pkg.Path,
+				PackagePath: fqPkgPath,
 				HeaderText:  header,
 				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
@@ -342,8 +363,8 @@ func unwrapAlias(in *types.Type) *types.Type {
 }
 
 const (
-	runtimePackagePath    = "k8s.io/kubernetes/pkg/runtime"
-	conversionPackagePath = "k8s.io/kubernetes/pkg/conversion"
+	runtimePackagePath    = "k8s.io/apimachinery/pkg/runtime"
+	conversionPackagePath = "k8s.io/apimachinery/pkg/conversion"
 )
 
 type noEquality struct{}
@@ -657,7 +678,7 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				sw.Do("if err := "+nameTmpl+"(&(*in)[i], &(*out)[i], s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 			} else {
-				// TODO: This triggers on v1.ObjectMeta <-> api.ObjectMeta and
+				// TODO: This triggers on metav1.ObjectMeta <-> metav1.ObjectMeta and
 				// similar because neither package is the target package, and
 				// we really don't know which package will have the conversion
 				// function defined.  This fires on basically every object

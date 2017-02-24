@@ -61,8 +61,7 @@ kube::log::status "Starting federation-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --token-auth-file=$TMP_DIR/tokenauth.csv \
-  --service-cluster-ip-range="10.0.0.0/24" >/tmp/openapi-federation-api-server.log 2>&1 &
+  --token-auth-file=$TMP_DIR/tokenauth.csv >/tmp/openapi-federation-api-server.log 2>&1 &
 APISERVER_PID=$!
 kube::util::wait_for_url "${API_HOST}:${API_PORT}/" "apiserver: "
 

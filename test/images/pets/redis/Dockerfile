@@ -15,7 +15,6 @@
 # TODO: get rid of bash dependency and switch to plain busybox.
 # The tar in busybox also doesn't seem to understand compression.
 FROM debian:jessie
-MAINTAINER Prashanth.B <beeps@google.com>
 
 # TODO: just use standard redis when there is one for 3.2.0.
 RUN apt-get update && apt-get install -y wget make gcc

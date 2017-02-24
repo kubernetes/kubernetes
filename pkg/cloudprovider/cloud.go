@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 // Interface is an abstract, pluggable interface for cloud providers.
@@ -85,13 +85,15 @@ type LoadBalancer interface {
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 	GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
+	// Implementations must treat the *v1.Service and *v1.Node
+	// parameters as read-only and not modify them.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	EnsureLoadBalancer(clusterName string, service *v1.Service, nodeNames []string) (*v1.LoadBalancerStatus, error)
+	EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
-	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
+	// Implementations must treat the *v1.Service and *v1.Node
+	// parameters as read-only and not modify them.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	UpdateLoadBalancer(clusterName string, service *v1.Service, nodeNames []string) error
+	UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
 	// exists, returning nil if the load balancer specified either didn't exist or
 	// was successfully deleted.
@@ -117,8 +119,6 @@ type Instances interface {
 	InstanceID(nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
 	InstanceType(name types.NodeName) (string, error)
-	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
-	List(filter string) ([]types.NodeName, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
 	AddSSHKeyToAllInstances(user string, keyData []byte) error

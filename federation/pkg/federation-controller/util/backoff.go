@@ -19,7 +19,7 @@ package util
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 func StartBackoffGC(backoff *flowcontrol.Backoff, stopCh <-chan struct{}) {

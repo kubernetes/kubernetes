@@ -21,12 +21,13 @@ import (
 	"strconv"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestLabels(t *testing.T) {
@@ -71,7 +72,7 @@ func TestLabels(t *testing.T) {
 		Lifecycle:              lifecycle,
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pod",
 			Namespace: "test_pod_namespace",
 			UID:       "test_pod_uid",
@@ -89,7 +90,7 @@ func TestLabels(t *testing.T) {
 		PodDeletionGracePeriod:    pod.DeletionGracePeriodSeconds,
 		PodTerminationGracePeriod: pod.Spec.TerminationGracePeriodSeconds,
 		Name:                   container.Name,
-		Hash:                   strconv.FormatUint(kubecontainer.HashContainer(container), 16),
+		Hash:                   strconv.FormatUint(kubecontainer.HashContainerLegacy(container), 16),
 		RestartCount:           restartCount,
 		TerminationMessagePath: container.TerminationMessagePath,
 		PreStopHandler:         container.Lifecycle.PreStop,
@@ -112,7 +113,7 @@ func TestLabels(t *testing.T) {
 	expected.PodTerminationGracePeriod = nil
 	expected.PreStopHandler = nil
 	// Because container is changed, the Hash should be updated
-	expected.Hash = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+	expected.Hash = strconv.FormatUint(kubecontainer.HashContainerLegacy(container), 16)
 	labels = newLabels(container, pod, restartCount, false)
 	containerInfo = getContainerInfoFromLabel(labels)
 	if !reflect.DeepEqual(containerInfo, expected) {

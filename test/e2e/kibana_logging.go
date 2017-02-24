@@ -17,11 +17,11 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -51,16 +51,16 @@ const (
 // ClusterLevelLoggingWithKibana is an end to end test that checks to see if Kibana is alive.
 func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	// graceTime is how long to keep retrying requests for status information.
-	const graceTime = 10 * time.Minute
+	const graceTime = 20 * time.Minute
 
 	// Check for the existence of the Kibana service.
 	By("Checking the Kibana service exists.")
-	s := f.ClientSet.Core().Services(api.NamespaceSystem)
+	s := f.ClientSet.Core().Services(metav1.NamespaceSystem)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
-		if _, err = s.Get("kibana-logging"); err == nil {
+		if _, err = s.Get("kibana-logging", metav1.GetOptions{}); err == nil {
 			break
 		}
 		framework.Logf("Attempt to check for the existence of the Kibana service failed after %v", time.Since(start))
@@ -70,8 +70,8 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	// Wait for the Kibana pod(s) to enter the running state.
 	By("Checking to make sure the Kibana pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{kibanaKey: kibanaValue}))
-	options := v1.ListOptions{LabelSelector: label.String()}
-	pods, err := f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
+	options := metav1.ListOptions{LabelSelector: label.String()}
+	pods, err := f.ClientSet.Core().Pods(metav1.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
 		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)
@@ -87,11 +87,20 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 			err = errProxy
 			continue
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		// Query against the root URL for Kibana.
-		_, err = proxyRequest.Namespace(api.NamespaceSystem).
+		_, err = proxyRequest.Namespace(metav1.NamespaceSystem).
+			Context(ctx).
 			Name("kibana-logging").
 			DoRaw()
 		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("After %v proxy call to kibana-logging failed: %v", time.Since(start), err)
+				break
+			}
 			framework.Logf("After %v proxy call to kibana-logging failed: %v", time.Since(start), err)
 			continue
 		}

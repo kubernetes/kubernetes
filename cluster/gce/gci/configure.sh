@@ -54,6 +54,22 @@ for k,v in yaml.load(sys.stdin).iteritems():
   rm -f "${tmp_kube_env}"
 }
 
+function download-kube-master-certs {
+  # Fetch kube-env from GCE metadata server.
+  local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
+  curl --fail --retry 5 --retry-delay 3 --silent --show-error \
+    -H "X-Google-Metadata-Request: True" \
+    -o "${tmp_kube_master_certs}" \
+    http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
+  # Convert the yaml format file into a shell-style file.
+  eval $(python -c '''
+import pipes,sys,yaml
+for k,v in yaml.load(sys.stdin).iteritems():
+  print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
+''' < "${tmp_kube_master_certs}" > "${KUBE_HOME}/kube-master-certs")
+  rm -f "${tmp_kube_master_certs}"
+}
+
 function validate-hash {
   local -r file="$1"
   local -r expected="$2"
@@ -114,6 +130,22 @@ function install-gci-mounter-tools {
     chmod a+x "${rkt_dst}/rkt"
 }
 
+# Install node problem detector binary.
+function install-node-problem-detector {
+  local -r npd_version="v0.3.0-alpha.1"
+  local -r npd_sha1="46f963fac14d92021c8b2a648a6cb0337c1bc833"
+  local -r npd_release_path="https://storage.googleapis.com/kubernetes-release"
+  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
+  download-or-bust "${npd_sha1}" "${npd_release_path}/node-problem-detector/${npd_tar}"
+  local -r npd_dir="${KUBE_HOME}/node-problem-detector"
+  mkdir -p "${npd_dir}"
+  tar xzf "${KUBE_HOME}/${npd_tar}" -C "${npd_dir}" --overwrite
+  mv "${npd_dir}/bin"/* "${KUBE_HOME}/bin"
+  chmod a+x "${KUBE_HOME}/bin/node-problem-detector"
+  rmdir "${npd_dir}/bin"
+  rm -f "${KUBE_HOME}/${npd_tar}"
+}
+
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
 # and places them into suitable directories. Files are placed in /home/kubernetes.
 function install-kube-binary-config {
@@ -137,6 +169,9 @@ function install-kube-binary-config {
   cp "${src_dir}/"*.docker_tag "${dst_dir}"
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
     cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
+    if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+      install-node-problem-detector
+    fi
   else
     cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
     cp "${src_dir}/kube-controller-manager.tar" "${dst_dir}"
@@ -202,12 +237,15 @@ function install-kube-binary-config {
   rm -f "${KUBE_HOME}/${manifests_tar}.sha1"
 }
 
-
 ######### Main Function ##########
 echo "Start to install kubernetes files"
 set-broken-motd
 KUBE_HOME="/home/kubernetes"
 download-kube-env
 source "${KUBE_HOME}/kube-env"
+if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+  download-kube-master-certs
+fi
 install-kube-binary-config
 echo "Done for installing kubernetes files"
+

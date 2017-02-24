@@ -17,29 +17,45 @@ limitations under the License.
 package v1alpha1
 
 import (
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	Secrets           Secrets    `json:"secrets"`
 	API               API        `json:"api"`
-	Etcd              Etcd       `json:"etcd"`
 	Discovery         Discovery  `json:"discovery"`
+	Etcd              Etcd       `json:"etcd"`
 	Networking        Networking `json:"networking"`
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
+	AuthorizationMode string     `json:"authorizationMode"`
 }
 
 type API struct {
 	AdvertiseAddresses []string `json:"advertiseAddresses"`
 	ExternalDNSNames   []string `json:"externalDNSNames"`
-	BindPort           int32    `json:"bindPort"`
+	Port               int32    `json:"port"`
 }
 
 type Discovery struct {
-	BindPort int32 `json:"bindPort"`
+	HTTPS *HTTPSDiscovery `json:"https"`
+	File  *FileDiscovery  `json:"file"`
+	Token *TokenDiscovery `json:"token"`
+}
+
+type HTTPSDiscovery struct {
+	URL string `json:"url"`
+}
+
+type FileDiscovery struct {
+	Path string `json:"path"`
+}
+
+type TokenDiscovery struct {
+	ID        string   `json:"id"`
+	Secret    string   `json:"secret"`
+	Addresses []string `json:"addresses"`
 }
 
 type Networking struct {
@@ -55,20 +71,10 @@ type Etcd struct {
 	KeyFile   string   `json:"keyFile"`
 }
 
-type Secrets struct {
-	GivenToken  string `json:"givenToken"`  // dot-separated `<TokenID>.<Token>` set by the user
-	TokenID     string `json:"tokenID"`     // optional on master side, will be generated if not specified
-	Token       []byte `json:"token"`       // optional on master side, will be generated if not specified
-	BearerToken string `json:"bearerToken"` // set based on Token
-}
-
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	MasterAddresses []string `json:"masterAddresses"`
-	Secrets         Secrets  `json:"secrets"`
-	APIPort         int32    `json:"apiPort"`
-	DiscoveryPort   int32    `json:"discoveryPort"`
+	Discovery Discovery `json:"discovery"`
 }
 
 // ClusterInfo TODO add description

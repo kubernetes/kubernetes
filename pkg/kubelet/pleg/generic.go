@@ -22,12 +22,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/clock"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/clock"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // GenericPLEG is an extremely simple generic PLEG that relies solely on
@@ -75,6 +75,11 @@ const (
 	plegContainerExited      plegContainerState = "exited"
 	plegContainerUnknown     plegContainerState = "unknown"
 	plegContainerNonExistent plegContainerState = "non-existent"
+
+	// The threshold needs to be greater than the relisting period + the
+	// relisting time, which can vary significantly. Set a conservative
+	// threshold to avoid flipping between healthy and unhealthy.
+	relistThreshold = 3 * time.Minute
 )
 
 func convertState(state kubecontainer.ContainerState) plegContainerState {
@@ -126,13 +131,9 @@ func (g *GenericPLEG) Start() {
 
 func (g *GenericPLEG) Healthy() (bool, error) {
 	relistTime := g.getRelistTime()
-	// TODO: Evaluate if we can reduce this threshold.
-	// The threshold needs to be greater than the relisting period + the
-	// relisting time, which can vary significantly. Set a conservative
-	// threshold so that we don't cause kubelet to be restarted unnecessarily.
-	threshold := 2 * time.Minute
-	if g.clock.Since(relistTime) > threshold {
-		return false, fmt.Errorf("pleg was last seen active at %v", relistTime)
+	elapsed := g.clock.Since(relistTime)
+	if elapsed > relistThreshold {
+		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)
 	}
 	return true, nil
 }

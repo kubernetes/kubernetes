@@ -24,29 +24,30 @@ limitations under the License.
 package photon
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
+	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/golang/glog"
 	"github.com/vmware/photon-controller-go-sdk/photon"
 	"gopkg.in/gcfg.v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	k8stypes "k8s.io/kubernetes/pkg/types"
 )
 
 const (
 	ProviderName = "photon"
 	DiskSpecKind = "persistent-disk"
+	MAC_OUI_VC   = "00:50:56"
+	MAC_OUI_ESX  = "00:0c:29"
 )
-
-// Global variable pointing to photon client
-var photonClient *photon.Client
-var logger *log.Logger = nil
 
 // overrideIP indicates if the hostname is overriden by IP address, such as when
 // running multi-node kubernetes using docker. In this case the user should set
@@ -66,22 +67,23 @@ type PCCloud struct {
 	// in the environment per current Photon Controller deployment methodology.
 	projID string
 	cloudprovider.Zone
+	photonClient *photon.Client
+	logger       *log.Logger
 }
 
 type PCConfig struct {
 	Global struct {
 		// the Photon Controller endpoint IP address
 		CloudTarget string `gcfg:"target"`
-		// when the Photon Controller authentication is enabled, set to true;
-		// otherwise, set to false.
-		IgnoreCertificate bool `gcfg:"ignoreCertificate"`
-		// Photon Controller tenant name
-		Tenant string `gcfg:"tenant"`
 		// Photon Controller project name
 		Project string `gcfg:"project"`
 		// when kubelet is started with '--hostname-override=${IP_ADDRESS}', set to true;
 		// otherwise, set to false.
 		OverrideIP bool `gcfg:"overrideIP"`
+		// VM ID for this node
+		VMID string `gcfg:"vmID"`
+		// Authentication enabled or not
+		AuthEnabled bool `gcfg:"authentication"`
 	}
 }
 
@@ -140,10 +142,16 @@ func init() {
 }
 
 // Retrieve the Photon VM ID from the Photon Controller endpoint based on the node name
-func getVMIDbyNodename(project string, nodeName string) (string, error) {
-	vmList, err := photonClient.Projects.GetVMs(project, nil)
+func getVMIDbyNodename(pc *PCCloud, nodeName string) (string, error) {
+	photonClient, err := getPhotonClient(pc)
 	if err != nil {
-		glog.Errorf("Photon Cloud Provider: Failed to GetVMs from project %s with nodeName %s, error: [%v]", project, nodeName, err)
+		glog.Errorf("Photon Cloud Provider: Failed to get photon client for getVMIDbyNodename, error: [%v]", err)
+		return "", err
+	}
+
+	vmList, err := photonClient.Projects.GetVMs(pc.projID, nil)
+	if err != nil {
+		glog.Errorf("Photon Cloud Provider: Failed to GetVMs from project %s with nodeName %s, error: [%v]", pc.projID, nodeName, err)
 		return "", err
 	}
 
@@ -157,10 +165,16 @@ func getVMIDbyNodename(project string, nodeName string) (string, error) {
 }
 
 // Retrieve the Photon VM ID from the Photon Controller endpoint based on the IP address
-func getVMIDbyIP(project string, IPAddress string) (string, error) {
-	vmList, err := photonClient.Projects.GetVMs(project, nil)
+func getVMIDbyIP(pc *PCCloud, IPAddress string) (string, error) {
+	photonClient, err := getPhotonClient(pc)
 	if err != nil {
-		glog.Errorf("Photon Cloud Provider: Failed to GetVMs for project %s. error: [%v]", project, err)
+		glog.Errorf("Photon Cloud Provider: Failed to get photon client for getVMIDbyNodename, error: [%v]", err)
+		return "", err
+	}
+
+	vmList, err := photonClient.Projects.GetVMs(pc.projID, nil)
+	if err != nil {
+		glog.Errorf("Photon Cloud Provider: Failed to GetVMs for project %s. error: [%v]", pc.projID, err)
 		return "", err
 	}
 
@@ -191,59 +205,67 @@ func getVMIDbyIP(project string, IPAddress string) (string, error) {
 	return "", fmt.Errorf("No matching VM is found with IP %s", IPAddress)
 }
 
-// Retrieve the the Photon project ID from the Photon Controller endpoint based on the project name
-func getProjIDbyName(tenantName, projName string) (string, error) {
-	tenants, err := photonClient.Tenants.GetAll()
-	if err != nil {
-		glog.Errorf("Photon Cloud Provider: GetAll tenants failed with error [%v].", err)
-		return "", err
-	}
-
-	for _, tenant := range tenants.Items {
-		if tenant.Name == tenantName {
-			projects, err := photonClient.Tenants.GetProjects(tenant.ID, nil)
-			if err != nil {
-				glog.Errorf("Photon Cloud Provider: Failed to GetProjects for tenant %s. error [%v]", tenantName, err)
-				return "", err
-			}
-
-			for _, project := range projects.Items {
-				if project.Name == projName {
-					return project.ID, nil
-				}
-			}
-		}
-	}
-
-	return "", fmt.Errorf("No matching tenant/project name is found with %s/%s", tenantName, projName)
-}
-
-func newPCCloud(cfg PCConfig) (*PCCloud, error) {
-	if len(cfg.Global.CloudTarget) == 0 {
+func getPhotonClient(pc *PCCloud) (*photon.Client, error) {
+	var err error
+	if len(pc.cfg.Global.CloudTarget) == 0 {
 		return nil, fmt.Errorf("Photon Controller endpoint was not specified.")
 	}
 
-	// Currently we support Photon Controller endpoint with authentication disabled.
 	options := &photon.ClientOptions{
-		IgnoreCertificate: cfg.Global.IgnoreCertificate,
+		IgnoreCertificate: true,
 	}
 
-	photonClient = photon.NewClient(cfg.Global.CloudTarget, options, logger)
-	status, err := photonClient.Status.Get()
+	pc.photonClient = photon.NewClient(pc.cfg.Global.CloudTarget, options, pc.logger)
+	if pc.cfg.Global.AuthEnabled == true {
+		// work around before metadata is available
+		file, err := os.Open("/etc/kubernetes/pc_login_info")
+		if err != nil {
+			glog.Errorf("Photon Cloud Provider: Authentication is enabled but found no username/password at /etc/kubernetes/pc_login_info. Error[%v]", err)
+			return nil, err
+		}
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		if !scanner.Scan() {
+			glog.Errorf("Photon Cloud Provider: Empty username inside /etc/kubernetes/pc_login_info.")
+			return nil, fmt.Errorf("Failed to create authentication enabled client with invalid username")
+		}
+		username := scanner.Text()
+		if !scanner.Scan() {
+			glog.Errorf("Photon Cloud Provider: Empty password set inside /etc/kubernetes/pc_login_info.")
+			return nil, fmt.Errorf("Failed to create authentication enabled client with invalid password")
+		}
+		password := scanner.Text()
+
+		token_options, err := pc.photonClient.Auth.GetTokensByPassword(username, password)
+		if err != nil {
+			glog.Errorf("Photon Cloud Provider: failed to get tokens by password")
+			return nil, err
+		}
+
+		options = &photon.ClientOptions{
+			IgnoreCertificate: true,
+			TokenOptions: &photon.TokenOptions{
+				AccessToken: token_options.AccessToken,
+			},
+		}
+		pc.photonClient = photon.NewClient(pc.cfg.Global.CloudTarget, options, pc.logger)
+	}
+
+	status, err := pc.photonClient.Status.Get()
 	if err != nil {
 		glog.Errorf("Photon Cloud Provider: new client creation failed. Error[%v]", err)
 		return nil, err
 	}
 	glog.V(2).Info("Photon Cloud Provider: Status of the new photon controller client: %v", status)
 
-	// Get Photon Controller project ID for future use
-	projID, err := getProjIDbyName(cfg.Global.Tenant, cfg.Global.Project)
-	if err != nil {
-		glog.Errorf("Photon Cloud Provider: getProjIDbyName failed when creating new Photon Controller client. Error[%v]", err)
-		return nil, err
-	}
+	return pc.photonClient, nil
+}
 
-	// Get local hostname for localInstanceID
+func newPCCloud(cfg PCConfig) (*PCCloud, error) {
+	projID := cfg.Global.Project
+	vmID := cfg.Global.VMID
+
+	// Get local hostname
 	cmd := exec.Command("bash", "-c", `echo $HOSTNAME`)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -255,11 +277,6 @@ func newPCCloud(cfg PCConfig) (*PCCloud, error) {
 		return nil, fmt.Errorf("unable to retrieve hostname for Instance ID")
 	}
 	hostname := strings.TrimRight(string(out), "\n")
-	vmID, err := getVMIDbyNodename(projID, hostname)
-	if err != nil {
-		glog.Errorf("Photon Cloud Provider: getVMIDbyNodename failed when creating new Photon Controller client. Error[%v]", err)
-		return nil, err
-	}
 
 	pc := PCCloud{
 		cfg:              &cfg,
@@ -286,26 +303,68 @@ func (pc *PCCloud) List(filter string) ([]k8stypes.NodeName, error) {
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, error) {
-	addrs := []v1.NodeAddress{}
+	nodeAddrs := []v1.NodeAddress{}
 	name := string(nodeName)
 
-	var vmID string
-	var err error
 	if name == pc.localK8sHostname {
-		vmID = pc.localInstanceID
-	} else {
-		vmID, err = getInstanceID(name, pc.projID)
+		ifaces, err := net.Interfaces()
 		if err != nil {
-			glog.Errorf("Photon Cloud Provider: getInstanceID failed for NodeAddresses. Error[%v]", err)
-			return addrs, err
+			glog.Errorf("Photon Cloud Provider: net.Interfaces() failed for NodeAddresses. Error[%v]", err)
+			return nodeAddrs, err
 		}
+
+		for _, i := range ifaces {
+			addrs, err := i.Addrs()
+			if err != nil {
+				glog.Warningf("Photon Cloud Provider: Failed to extract addresses for NodeAddresses. Error[%v]", err)
+			} else {
+				for _, addr := range addrs {
+					if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+						if ipnet.IP.To4() != nil {
+							// Filter external IP by MAC address OUIs from vCenter and from ESX
+							if strings.HasPrefix(i.HardwareAddr.String(), MAC_OUI_VC) ||
+								strings.HasPrefix(i.HardwareAddr.String(), MAC_OUI_ESX) {
+								v1.AddToNodeAddresses(&nodeAddrs,
+									v1.NodeAddress{
+										Type:    v1.NodeExternalIP,
+										Address: ipnet.IP.String(),
+									},
+								)
+							} else {
+								v1.AddToNodeAddresses(&nodeAddrs,
+									v1.NodeAddress{
+										Type:    v1.NodeInternalIP,
+										Address: ipnet.IP.String(),
+									},
+								)
+							}
+						}
+					}
+				}
+			}
+		}
+		return nodeAddrs, nil
+	}
+
+	// Inquiring IP addresses from photon controller endpoint only for a node other than this node.
+	// This is assumed to be done by master only.
+	vmID, err := getInstanceID(pc, name)
+	if err != nil {
+		glog.Errorf("Photon Cloud Provider: getInstanceID failed for NodeAddresses. Error[%v]", err)
+		return nodeAddrs, err
+	}
+
+	photonClient, err := getPhotonClient(pc)
+	if err != nil {
+		glog.Errorf("Photon Cloud Provider: Failed to get photon client for NodeAddresses, error: [%v]", err)
+		return nodeAddrs, err
 	}
 
 	// Retrieve the Photon VM's IP addresses from the Photon Controller endpoint based on the VM ID
 	vmList, err := photonClient.Projects.GetVMs(pc.projID, nil)
 	if err != nil {
 		glog.Errorf("Photon Cloud Provider: Failed to GetVMs for project %s. Error[%v]", pc.projID, err)
-		return addrs, err
+		return nodeAddrs, err
 	}
 
 	for _, vm := range vmList.Items {
@@ -313,23 +372,37 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 			task, err := photonClient.VMs.GetNetworks(vm.ID)
 			if err != nil {
 				glog.Errorf("Photon Cloud Provider: GetNetworks failed for node %s with vm.ID %s. Error[%v]", name, vm.ID, err)
-				return addrs, err
+				return nodeAddrs, err
 			} else {
 				task, err = photonClient.Tasks.Wait(task.ID)
 				if err != nil {
 					glog.Errorf("Photon Cloud Provider: Wait task for GetNetworks failed for node %s with vm.ID %s. Error[%v]", name, vm.ID, err)
-					return addrs, err
+					return nodeAddrs, err
 				} else {
 					networkConnections := task.ResourceProperties.(map[string]interface{})
 					networks := networkConnections["networkConnections"].([]interface{})
 					for _, nt := range networks {
+						ipAddr := "-"
+						macAddr := "-"
 						network := nt.(map[string]interface{})
 						if val, ok := network["ipAddress"]; ok && val != nil {
-							ipAddr := val.(string)
-							if ipAddr != "-" {
-								v1.AddToNodeAddresses(&addrs,
+							ipAddr = val.(string)
+						}
+						if val, ok := network["macAddress"]; ok && val != nil {
+							macAddr = val.(string)
+						}
+						if ipAddr != "-" {
+							if strings.HasPrefix(macAddr, MAC_OUI_VC) ||
+								strings.HasPrefix(macAddr, MAC_OUI_ESX) {
+								v1.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
-										// TODO: figure out the type of the IP
+										Type:    v1.NodeExternalIP,
+										Address: ipAddr,
+									},
+								)
+							} else {
+								v1.AddToNodeAddresses(&nodeAddrs,
+									v1.NodeAddress{
 										Type:    v1.NodeInternalIP,
 										Address: ipAddr,
 									},
@@ -337,14 +410,14 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 							}
 						}
 					}
-					return addrs, nil
+					return nodeAddrs, nil
 				}
 			}
 		}
 	}
 
 	glog.Errorf("Failed to find the node %s from Photon Controller endpoint", name)
-	return addrs, fmt.Errorf("Failed to find the node %s from Photon Controller endpoint", name)
+	return nodeAddrs, fmt.Errorf("Failed to find the node %s from Photon Controller endpoint", name)
 }
 
 func (pc *PCCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
@@ -356,14 +429,14 @@ func (pc *PCCloud) CurrentNodeName(hostname string) (k8stypes.NodeName, error) {
 	return k8stypes.NodeName(hostname), nil
 }
 
-func getInstanceID(name string, projID string) (string, error) {
+func getInstanceID(pc *PCCloud, name string) (string, error) {
 	var vmID string
 	var err error
 
 	if overrideIP == true {
-		vmID, err = getVMIDbyIP(projID, name)
+		vmID, err = getVMIDbyIP(pc, name)
 	} else {
-		vmID, err = getVMIDbyNodename(projID, name)
+		vmID, err = getVMIDbyNodename(pc, name)
 	}
 	if err != nil {
 		return "", err
@@ -382,7 +455,8 @@ func (pc *PCCloud) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 	if name == pc.localK8sHostname {
 		return pc.localInstanceID, nil
 	} else {
-		ID, err := getInstanceID(name, pc.projID)
+		// We assume only master need to get InstanceID of a node other than itself
+		ID, err := getInstanceID(pc, name)
 		if err != nil {
 			glog.Errorf("Photon Cloud Provider: getInstanceID failed for ExternalID. Error[%v]", err)
 			return ID, err
@@ -398,7 +472,8 @@ func (pc *PCCloud) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	if name == pc.localK8sHostname {
 		return pc.localInstanceID, nil
 	} else {
-		ID, err := getInstanceID(name, pc.projID)
+		// We assume only master need to get InstanceID of a node other than itself
+		ID, err := getInstanceID(pc, name)
 		if err != nil {
 			glog.Errorf("Photon Cloud Provider: getInstanceID failed for InstanceID. Error[%v]", err)
 			return ID, err
@@ -447,6 +522,12 @@ func (pc *PCCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []st
 
 // Attaches given virtual disk volume to the compute running kubelet.
 func (pc *PCCloud) AttachDisk(pdID string, nodeName k8stypes.NodeName) error {
+	photonClient, err := getPhotonClient(pc)
+	if err != nil {
+		glog.Errorf("Photon Cloud Provider: Failed to get photon client for AttachDisk, error: [%v]", err)
+		return err
+	}
+
 	operation := &photon.VmDiskOperation{
 		DiskID: pdID,
 	}
@@ -474,6 +555,12 @@ func (pc *PCCloud) AttachDisk(pdID string, nodeName k8stypes.NodeName) error {
 
 // Detaches given virtual disk volume from the compute running kubelet.
 func (pc *PCCloud) DetachDisk(pdID string, nodeName k8stypes.NodeName) error {
+	photonClient, err := getPhotonClient(pc)
+	if err != nil {
+		glog.Errorf("Photon Cloud Provider: Failed to get photon client for DetachDisk, error: [%v]", err)
+		return err
+	}
+
 	operation := &photon.VmDiskOperation{
 		DiskID: pdID,
 	}
@@ -501,6 +588,12 @@ func (pc *PCCloud) DetachDisk(pdID string, nodeName k8stypes.NodeName) error {
 
 // DiskIsAttached returns if disk is attached to the VM using controllers supported by the plugin.
 func (pc *PCCloud) DiskIsAttached(pdID string, nodeName k8stypes.NodeName) (bool, error) {
+	photonClient, err := getPhotonClient(pc)
+	if err != nil {
+		glog.Errorf("Photon Cloud Provider: Failed to get photon client for DiskIsAttached, error: [%v]", err)
+		return false, err
+	}
+
 	disk, err := photonClient.Disks.Get(pdID)
 	if err != nil {
 		glog.Errorf("Photon Cloud Provider: Failed to Get disk with pdID %s. Error[%v]", pdID, err)
@@ -525,6 +618,12 @@ func (pc *PCCloud) DiskIsAttached(pdID string, nodeName k8stypes.NodeName) (bool
 // DisksAreAttached returns if disks are attached to the VM using controllers supported by the plugin.
 func (pc *PCCloud) DisksAreAttached(pdIDs []string, nodeName k8stypes.NodeName) (map[string]bool, error) {
 	attached := make(map[string]bool)
+	photonClient, err := getPhotonClient(pc)
+	if err != nil {
+		glog.Errorf("Photon Cloud Provider: Failed to get photon client for DisksAreAttached, error: [%v]", err)
+		return attached, err
+	}
+
 	for _, pdID := range pdIDs {
 		attached[pdID] = false
 	}
@@ -553,6 +652,12 @@ func (pc *PCCloud) DisksAreAttached(pdIDs []string, nodeName k8stypes.NodeName) 
 
 // Create a volume of given size (in GB).
 func (pc *PCCloud) CreateDisk(volumeOptions *VolumeOptions) (pdID string, err error) {
+	photonClient, err := getPhotonClient(pc)
+	if err != nil {
+		glog.Errorf("Photon Cloud Provider: Failed to get photon client for CreateDisk, error: [%v]", err)
+		return "", err
+	}
+
 	diskSpec := photon.DiskCreateSpec{}
 	diskSpec.Name = volumeOptions.Name
 	diskSpec.Flavor = volumeOptions.Flavor
@@ -576,6 +681,12 @@ func (pc *PCCloud) CreateDisk(volumeOptions *VolumeOptions) (pdID string, err er
 
 // Deletes a volume given volume name.
 func (pc *PCCloud) DeleteDisk(pdID string) error {
+	photonClient, err := getPhotonClient(pc)
+	if err != nil {
+		glog.Errorf("Photon Cloud Provider: Failed to get photon client for DeleteDisk, error: [%v]", err)
+		return err
+	}
+
 	task, err := photonClient.Disks.Delete(pdID)
 	if err != nil {
 		glog.Errorf("Photon Cloud Provider: Failed to DeleteDisk. Error[%v]", err)

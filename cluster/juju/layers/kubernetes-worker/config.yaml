@@ -1,0 +1,13 @@
+options:
+  ingress:
+    type: boolean
+    default: true
+    description: |
+      Deploy the default http backend and ingress controller to handle
+      ingress requests.
+  labels:
+    type: string
+    default: ""
+    description: |
+      Labels can be used to organize and to select subsets of nodes in the
+      cluster. Declare node labels in key=value format, separated by spaces.

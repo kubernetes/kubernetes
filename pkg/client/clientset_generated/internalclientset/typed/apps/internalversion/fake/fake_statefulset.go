@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,13 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeStatefulSets implements StatefulSetInterface
@@ -35,7 +36,7 @@ var statefulsetsResource = schema.GroupVersionResource{Group: "apps", Version: "
 
 func (c *FakeStatefulSets) Create(statefulSet *apps.StatefulSet) (result *apps.StatefulSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(statefulsetsResource, c.ns, statefulSet), &apps.StatefulSet{})
+		Invokes(testing.NewCreateAction(statefulsetsResource, c.ns, statefulSet), &apps.StatefulSet{})
 
 	if obj == nil {
 		return nil, err
@@ -45,7 +46,7 @@ func (c *FakeStatefulSets) Create(statefulSet *apps.StatefulSet) (result *apps.S
 
 func (c *FakeStatefulSets) Update(statefulSet *apps.StatefulSet) (result *apps.StatefulSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(statefulsetsResource, c.ns, statefulSet), &apps.StatefulSet{})
+		Invokes(testing.NewUpdateAction(statefulsetsResource, c.ns, statefulSet), &apps.StatefulSet{})
 
 	if obj == nil {
 		return nil, err
@@ -55,7 +56,7 @@ func (c *FakeStatefulSets) Update(statefulSet *apps.StatefulSet) (result *apps.S
 
 func (c *FakeStatefulSets) UpdateStatus(statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(statefulsetsResource, "status", c.ns, statefulSet), &apps.StatefulSet{})
+		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "status", c.ns, statefulSet), &apps.StatefulSet{})
 
 	if obj == nil {
 		return nil, err
@@ -63,23 +64,23 @@ func (c *FakeStatefulSets) UpdateStatus(statefulSet *apps.StatefulSet) (*apps.St
 	return obj.(*apps.StatefulSet), err
 }
 
-func (c *FakeStatefulSets) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeStatefulSets) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(statefulsetsResource, c.ns, name), &apps.StatefulSet{})
+		Invokes(testing.NewDeleteAction(statefulsetsResource, c.ns, name), &apps.StatefulSet{})
 
 	return err
 }
 
-func (c *FakeStatefulSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction(statefulsetsResource, c.ns, listOptions)
+func (c *FakeStatefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(statefulsetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &apps.StatefulSetList{})
 	return err
 }
 
-func (c *FakeStatefulSets) Get(name string) (result *apps.StatefulSet, err error) {
+func (c *FakeStatefulSets) Get(name string, options v1.GetOptions) (result *apps.StatefulSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(statefulsetsResource, c.ns, name), &apps.StatefulSet{})
+		Invokes(testing.NewGetAction(statefulsetsResource, c.ns, name), &apps.StatefulSet{})
 
 	if obj == nil {
 		return nil, err
@@ -87,15 +88,15 @@ func (c *FakeStatefulSets) Get(name string) (result *apps.StatefulSet, err error
 	return obj.(*apps.StatefulSet), err
 }
 
-func (c *FakeStatefulSets) List(opts api.ListOptions) (result *apps.StatefulSetList, err error) {
+func (c *FakeStatefulSets) List(opts v1.ListOptions) (result *apps.StatefulSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(statefulsetsResource, c.ns, opts), &apps.StatefulSetList{})
+		Invokes(testing.NewListAction(statefulsetsResource, c.ns, opts), &apps.StatefulSetList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -109,16 +110,16 @@ func (c *FakeStatefulSets) List(opts api.ListOptions) (result *apps.StatefulSetL
 }
 
 // Watch returns a watch.Interface that watches the requested statefulSets.
-func (c *FakeStatefulSets) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeStatefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(statefulsetsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(statefulsetsResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched statefulSet.
-func (c *FakeStatefulSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *apps.StatefulSet, err error) {
+func (c *FakeStatefulSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.StatefulSet, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, data, subresources...), &apps.StatefulSet{})
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, data, subresources...), &apps.StatefulSet{})
 
 	if obj == nil {
 		return nil, err

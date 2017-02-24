@@ -4,10 +4,8 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
     "go_library",
     "go_test",
-    "cgo_library",
 )
 
 go_library(
@@ -20,12 +18,12 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//pkg/util/net:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
         "//vendor:golang.org/x/oauth2",
         "//vendor:golang.org/x/oauth2/google",
         "//vendor:golang.org/x/oauth2/jwt",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
     ],
 )
 
@@ -35,10 +33,23 @@ go_test(
         "jwt_test.go",
         "metadata_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//pkg/util/net:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
-
 // Package api contains the latest (or "internal") version of the
 // Kubernetes API objects. This is the API objects as represented in memory.
 // The contract presented to clients is located in the versioned packages,

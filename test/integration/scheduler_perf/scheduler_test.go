@@ -22,17 +22,18 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/golang/glog"
-	"github.com/renstrom/dedent"
+	"k8s.io/kubernetes/plugin/pkg/scheduler"
 )
 
 const (
-	threshold3K  = 100
+	warning3K    = 100
+	threshold3K  = 30
 	threshold30K = 30
 	threshold60K = 30
 )
@@ -44,14 +45,17 @@ func TestSchedule100Node3KPods(t *testing.T) {
 	}
 
 	config := defaultSchedulerBenchmarkConfig(100, 3000)
-	if min := schedulePods(config); min < threshold3K {
-		t.Errorf("To small pod scheduling throughput for 3k pods. Expected %v got %v", threshold3K, min)
+	min := schedulePods(config)
+	if min < threshold3K {
+		t.Errorf("Failing: Scheduling rate was too low for an interval, we saw rate of %v, which is the allowed minimum of %v ! ", min, threshold3K)
+	} else if min < warning3K {
+		fmt.Printf("Warning: pod scheduling throughput for 3k pods was slow for an interval... Saw a interval with very low (%v) scheduling rate!", min)
 	} else {
 		fmt.Printf("Minimal observed throughput for 3k pod test: %v\n", min)
 	}
 }
 
-// TestSchedule100Node3KPods schedules 3k pods using Node affinity on 100 nodes.
+// TestSchedule100Node3KNodeAffinityPods schedules 3k pods using Node affinity on 100 nodes.
 func TestSchedule100Node3KNodeAffinityPods(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping because we want to run short tests")
@@ -73,42 +77,45 @@ func TestSchedule100Node3KNodeAffinityPods(t *testing.T) {
 		})
 	}
 	config.nodePreparer = framework.NewIntegrationTestNodePreparer(
-		config.schedulerConfigFactory.Client,
+		config.schedulerSupportFunctions.GetClient(),
 		nodeStrategies,
 		"scheduler-perf-",
 	)
 
-	affinityTemplate := dedent.Dedent(`
-		{
-			"nodeAffinity": {
-				"requiredDuringSchedulingIgnoredDuringExecution": {
-					"nodeSelectorTerms": [{
-						"matchExpressions": [{
-							"key": "` + nodeAffinityKey + `",
-							"operator": "In",
-							"values": ["%v"]
-						}]
-					}]
-				}
-			}
-		}`)
-
 	podCreatorConfig := testutils.NewTestPodCreatorConfig()
 	for i := 0; i < numGroups; i++ {
-		podCreatorConfig.AddStrategy("sched-perf-node-affinity", config.numPods/numGroups,
-			testutils.NewCustomCreatePodStrategy(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					GenerateName: "sched-perf-node-affinity-pod-",
-					Annotations:  map[string]string{v1.AffinityAnnotationKey: fmt.Sprintf(affinityTemplate, i)},
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "sched-perf-node-affinity-pod-",
+			},
+			Spec: testutils.MakePodSpec(),
+		}
+		pod.Spec.Affinity = &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      nodeAffinityKey,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{fmt.Sprintf("%v", i)},
+								},
+							},
+						},
+					},
 				},
-				Spec: testutils.MakePodSpec(),
-			}),
+			},
+		}
+
+		podCreatorConfig.AddStrategy("sched-perf-node-affinity", config.numPods/numGroups,
+			testutils.NewCustomCreatePodStrategy(pod),
 		)
 	}
-	config.podCreator = testutils.NewTestPodCreator(config.schedulerConfigFactory.Client, podCreatorConfig)
+	config.podCreator = testutils.NewTestPodCreator(config.schedulerSupportFunctions.GetClient(), podCreatorConfig)
 
 	if min := schedulePods(config); min < threshold30K {
-		t.Errorf("To small pod scheduling throughput for 30k pods. Expected %v got %v", threshold30K, min)
+		t.Errorf("Too small pod scheduling throughput for 30k pods. Expected %v got %v", threshold30K, min)
 	} else {
 		fmt.Printf("Minimal observed throughput for 30k pod test: %v\n", min)
 	}
@@ -143,19 +150,19 @@ func TestSchedule1000Node30KPods(t *testing.T) {
 // }
 
 type testConfig struct {
-	numPods                int
-	numNodes               int
-	nodePreparer           testutils.TestNodePreparer
-	podCreator             *testutils.TestPodCreator
-	schedulerConfigFactory *factory.ConfigFactory
-	destroyFunc            func()
+	numPods                   int
+	numNodes                  int
+	nodePreparer              testutils.TestNodePreparer
+	podCreator                *testutils.TestPodCreator
+	schedulerSupportFunctions scheduler.Configurator
+	destroyFunc               func()
 }
 
 func baseConfig() *testConfig {
 	schedulerConfigFactory, destroyFunc := mustSetupScheduler()
 	return &testConfig{
-		schedulerConfigFactory: schedulerConfigFactory,
-		destroyFunc:            destroyFunc,
+		schedulerSupportFunctions: schedulerConfigFactory,
+		destroyFunc:               destroyFunc,
 	}
 }
 
@@ -163,14 +170,14 @@ func defaultSchedulerBenchmarkConfig(numNodes, numPods int) *testConfig {
 	baseConfig := baseConfig()
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
-		baseConfig.schedulerConfigFactory.Client,
+		baseConfig.schedulerSupportFunctions.GetClient(),
 		[]testutils.CountToStrategy{{Count: numNodes, Strategy: &testutils.TrivialNodePrepareStrategy{}}},
 		"scheduler-perf-",
 	)
 
 	config := testutils.NewTestPodCreatorConfig()
 	config.AddStrategy("sched-test", numPods, testutils.NewSimpleWithControllerCreatePodStrategy("rc1"))
-	podCreator := testutils.NewTestPodCreator(baseConfig.schedulerConfigFactory.Client, config)
+	podCreator := testutils.NewTestPodCreator(baseConfig.schedulerSupportFunctions.GetClient(), config)
 
 	baseConfig.nodePreparer = nodePreparer
 	baseConfig.podCreator = podCreator
@@ -184,7 +191,7 @@ func defaultSchedulerBenchmarkConfig(numNodes, numPods int) *testConfig {
 // This is used to learn the scheduling throughput on various
 // sizes of cluster and changes as more and more pods are scheduled.
 // It won't stop until all pods are scheduled.
-// It retruns the minimum of throughput over whole run.
+// It returns the minimum of throughput over whole run.
 func schedulePods(config *testConfig) int32 {
 	defer config.destroyFunc()
 	if err := config.nodePreparer.PrepareNodes(); err != nil {
@@ -194,25 +201,47 @@ func schedulePods(config *testConfig) int32 {
 	config.podCreator.CreatePods()
 
 	prev := 0
+	// On startup there may be a latent period where NO scheduling occurs (qps = 0).
+	// We are interested in low scheduling rates (i.e. qps=2),
 	minQps := int32(math.MaxInt32)
 	start := time.Now()
+
+	// Bake in time for the first pod scheduling event.
+	for {
+		time.Sleep(50 * time.Millisecond)
+		scheduled := config.schedulerSupportFunctions.GetScheduledPodListerIndexer().List()
+		// 30,000 pods -> wait till @ least 300 are scheduled to start measuring.
+		// TODO Find out why sometimes there may be scheduling blips in the beggining.
+		if len(scheduled) > config.numPods/100 {
+			break
+		}
+	}
+	// map minimum QPS entries in a counter, useful for debugging tests.
+	qpsStats := map[int]int{}
+
+	// Now that scheduling has started, lets start taking the pulse on how many pods are happening per second.
 	for {
 		// This can potentially affect performance of scheduler, since List() is done under mutex.
 		// Listing 10000 pods is an expensive operation, so running it frequently may impact scheduler.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled := config.schedulerConfigFactory.ScheduledPodLister.Indexer.List()
+		scheduled := config.schedulerSupportFunctions.GetScheduledPodListerIndexer().List()
+
+		// We will be completed when all pods are done being scheduled.
+		// return the worst-case-scenario interval that was seen during this time.
+		// Note this should never be low due to cold-start, so allow bake in sched time if necessary.
 		if len(scheduled) >= config.numPods {
-			fmt.Printf("Scheduled %v Pods in %v seconds (%v per second on average).\n",
-				config.numPods, int(time.Since(start)/time.Second), config.numPods/int(time.Since(start)/time.Second))
+			fmt.Printf("Scheduled %v Pods in %v seconds (%v per second on average). min QPS was %v\n",
+				config.numPods, int(time.Since(start)/time.Second), config.numPods/int(time.Since(start)/time.Second), minQps)
 			return minQps
 		}
+
 		// There's no point in printing it for the last iteration, as the value is random
 		qps := len(scheduled) - prev
+		qpsStats[qps] += 1
 		if int32(qps) < minQps {
 			minQps = int32(qps)
 		}
-
-		fmt.Printf("%ds\trate: %d\ttotal: %d\n", time.Since(start)/time.Second, qps, len(scheduled))
+		fmt.Printf("%ds\trate: %d\ttotal: %d (qps frequency: %v)\n", time.Since(start)/time.Second, qps, len(scheduled), qpsStats)
 		prev = len(scheduled)
 		time.Sleep(1 * time.Second)
 	}

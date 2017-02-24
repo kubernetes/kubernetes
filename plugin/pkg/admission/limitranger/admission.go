@@ -25,17 +25,18 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	coreinternallisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
-	"k8s.io/kubernetes/pkg/controller/informers"
-
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 const (
@@ -43,17 +44,17 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin("LimitRanger", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		return NewLimitRanger(client, &DefaultLimitRangerActions{})
+	admission.RegisterPlugin("LimitRanger", func(config io.Reader) (admission.Interface, error) {
+		return NewLimitRanger(&DefaultLimitRangerActions{})
 	})
 }
 
 // limitRanger enforces usage limits on a per resource basis in the namespace
 type limitRanger struct {
 	*admission.Handler
-	client  clientset.Interface
+	client  internalclientset.Interface
 	actions LimitRangerActions
-	lister  coreinternallisters.LimitRangeLister
+	lister  corelisters.LimitRangeLister
 
 	// liveLookups holds the last few live lookups we've done to help ammortize cost on repeated lookup failures.
 	// This let's us handle the case of latent caches, by looking up actual results for a namespace on cache miss/no results.
@@ -68,14 +69,17 @@ type liveLookupEntry struct {
 }
 
 func (l *limitRanger) SetInformerFactory(f informers.SharedInformerFactory) {
-	limitRangeInformer := f.InternalLimitRanges().Informer()
-	l.SetReadyFunc(limitRangeInformer.HasSynced)
-	l.lister = f.InternalLimitRanges().Lister()
+	limitRangeInformer := f.Core().InternalVersion().LimitRanges()
+	l.SetReadyFunc(limitRangeInformer.Informer().HasSynced)
+	l.lister = limitRangeInformer.Lister()
 }
 
 func (l *limitRanger) Validate() error {
 	if l.lister == nil {
 		return fmt.Errorf("missing limitRange lister")
+	}
+	if l.client == nil {
+		return fmt.Errorf("missing client")
 	}
 	return nil
 }
@@ -109,7 +113,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 			// If there is already in-flight List() for a given namespace, we should wait until
 			// it is finished and cache is updated instead of doing the same, also to avoid
 			// throttling - see #22422 for details.
-			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(api.ListOptions{})
+			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(metav1.ListOptions{})
 			if err != nil {
 				return admission.NewForbidden(a, err)
 			}
@@ -145,7 +149,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 }
 
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function
-func NewLimitRanger(client clientset.Interface, actions LimitRangerActions) (admission.Interface, error) {
+func NewLimitRanger(actions LimitRangerActions) (admission.Interface, error) {
 	liveLookupCache, err := lru.New(10000)
 	if err != nil {
 		return nil, err
@@ -157,11 +161,17 @@ func NewLimitRanger(client clientset.Interface, actions LimitRangerActions) (adm
 
 	return &limitRanger{
 		Handler:         admission.NewHandler(admission.Create, admission.Update),
-		client:          client,
 		actions:         actions,
 		liveLookupCache: liveLookupCache,
 		liveTTL:         time.Duration(30 * time.Second),
 	}, nil
+}
+
+var _ = kubeapiserveradmission.WantsInformerFactory(&limitRanger{})
+var _ = kubeapiserveradmission.WantsInternalClientSet(&limitRanger{})
+
+func (a *limitRanger) SetInternalClientSet(client internalclientset.Interface) {
+	a.client = client
 }
 
 // defaultContainerResourceRequirements returns the default requirements for a container
@@ -275,6 +285,21 @@ func minConstraint(limitType api.LimitType, resourceName api.ResourceName, enfor
 	}
 	if limExists && (observedLimValue < enforcedValue) {
 		return fmt.Errorf("minimum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
+	}
+	return nil
+}
+
+// maxRequestConstraint enforces the max constraint over the specified resource
+// use when specify LimitType resource doesn't recognize limit values
+func maxRequestConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList) error {
+	req, reqExists := request[resourceName]
+	observedReqValue, _, enforcedValue := requestLimitEnforcedValues(req, resource.Quantity{}, enforced)
+
+	if !reqExists {
+		return fmt.Errorf("maximum %s usage per %s is %s.  No request is specified.", resourceName, limitType, enforced.String())
+	}
+	if observedReqValue > enforcedValue {
+		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
 	}
 	return nil
 }
@@ -415,9 +440,9 @@ func PersistentVolumeClaimLimitFunc(limitRange *api.LimitRange, pvc *api.Persist
 				}
 			}
 			for k, v := range limit.Max {
-				// reverse usage of maxConstraint. We want to enforce the max of the LimitRange against what
+				// We want to enforce the max of the LimitRange against what
 				// the user requested.
-				if err := maxConstraint(limitType, k, v, api.ResourceList{}, pvc.Spec.Resources.Requests); err != nil {
+				if err := maxRequestConstraint(limitType, k, v, pvc.Spec.Resources.Requests); err != nil {
 					errs = append(errs, err)
 				}
 			}

@@ -166,6 +166,13 @@ func (d *simpleDecDriver) readNextBd() {
 	d.bdRead = true
 }
 
+func (d *simpleDecDriver) uncacheRead() {
+	if d.bdRead {
+		d.r.unreadn1()
+		d.bdRead = false
+	}
+}
+
 func (d *simpleDecDriver) ContainerType() (vt valueType) {
 	if d.bd == simpleVdNil {
 		return valueTypeNil
@@ -340,7 +347,7 @@ func (d *simpleDecDriver) decLen() int {
 		}
 		return int(ui)
 	}
-	d.d.errorf("decLen: Cannot read length: bd%8 must be in range 0..4. Got: %d", d.bd%8)
+	d.d.errorf("decLen: Cannot read length: bd%%8 must be in range 0..4. Got: %d", d.bd%8)
 	return -1
 }
 
@@ -474,7 +481,7 @@ func (d *simpleDecDriver) DecodeNaked() {
 // SimpleHandle is a Handle for a very simple encoding format.
 //
 // simple is a simplistic codec similar to binc, but not as compact.
-//   - Encoding of a value is always preceeded by the descriptor byte (bd)
+//   - Encoding of a value is always preceded by the descriptor byte (bd)
 //   - True, false, nil are encoded fully in 1 byte (the descriptor)
 //   - Integers (intXXX, uintXXX) are encoded in 1, 2, 4 or 8 bytes (plus a descriptor byte).
 //     There are positive (uintXXX and intXXX >= 0) and negative (intXXX < 0) integers.
@@ -512,6 +519,7 @@ func (e *simpleEncDriver) reset() {
 
 func (d *simpleDecDriver) reset() {
 	d.r = d.d.r
+	d.bd, d.bdRead = 0, false
 }
 
 var _ decDriver = (*simpleDecDriver)(nil)

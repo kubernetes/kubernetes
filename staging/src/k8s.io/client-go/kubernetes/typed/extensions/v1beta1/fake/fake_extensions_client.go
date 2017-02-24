@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,10 +36,6 @@ func (c *FakeExtensionsV1beta1) Deployments(namespace string) v1beta1.Deployment
 
 func (c *FakeExtensionsV1beta1) Ingresses(namespace string) v1beta1.IngressInterface {
 	return &FakeIngresses{c, namespace}
-}
-
-func (c *FakeExtensionsV1beta1) Jobs(namespace string) v1beta1.JobInterface {
-	return &FakeJobs{c, namespace}
 }
 
 func (c *FakeExtensionsV1beta1) PodSecurityPolicies() v1beta1.PodSecurityPolicyInterface {

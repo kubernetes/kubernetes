@@ -43,12 +43,8 @@ kube::util::gen-docs "${KUBE_TEMP}"
 # remove all of the old docs
 kube::util::remove-gen-docs
 
-# Copy fresh docs into the repo.
-# the shopt is so that we get .generated_docs from the glob.
+# copy fresh docs into the repo.
+# the shopt is so that we get docs/.generated_docs from the glob.
 shopt -s dotglob
 cp -af "${KUBE_TEMP}"/* "${KUBE_ROOT}"
 shopt -u dotglob
-
-echo "Generated docs have been placed in the repository tree. Running hack/update-munge-docs.sh."
-
-"${KUBE_ROOT}/hack/update-munge-docs.sh"

@@ -22,7 +22,7 @@ import (
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
-// Checks if cluster-independent, user provided data in two given ConfigMapss are eqaul. If in
+// Checks if cluster-independent, user provided data in two given ConfigMaps are equal. If in
 // the future the ConfigMap structure is expanded then any field that is not populated.
 // by the api server should be included here.
 func ConfigMapEquivalent(s1, s2 *api_v1.ConfigMap) bool {

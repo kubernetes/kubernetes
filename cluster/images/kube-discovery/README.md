@@ -23,7 +23,7 @@ $ cat token-map.json
 ## Build And Run From Source
 
 ```
-$ build-tools/run.sh /bin/bash -c "KUBE_BUILD_PLATFORMS=linux/amd64 make WHAT=cmd/kube-discovery"
+$ build/run.sh /bin/bash -c "KUBE_BUILD_PLATFORMS=linux/amd64 make WHAT=cmd/kube-discovery"
 $ _output/dockerized/bin/linux/amd64/kube-discovery
 2016/08/23 19:17:28 Listening for requests on port 9898.
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,12 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	federation "k8s.io/kubernetes/federation/apis/federation"
-	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
+	scheme "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/scheme"
 )
 
 // ClustersGetter has a method to return a ClusterInterface.
@@ -34,18 +36,18 @@ type ClusterInterface interface {
 	Create(*federation.Cluster) (*federation.Cluster, error)
 	Update(*federation.Cluster) (*federation.Cluster, error)
 	UpdateStatus(*federation.Cluster) (*federation.Cluster, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*federation.Cluster, error)
-	List(opts api.ListOptions) (*federation.ClusterList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *federation.Cluster, err error)
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(name string, options v1.GetOptions) (*federation.Cluster, error)
+	List(opts v1.ListOptions) (*federation.ClusterList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *federation.Cluster, err error)
 	ClusterExpansion
 }
 
 // clusters implements ClusterInterface
 type clusters struct {
-	client restclient.Interface
+	client rest.Interface
 }
 
 // newClusters returns a Clusters
@@ -78,6 +80,9 @@ func (c *clusters) Update(cluster *federation.Cluster) (result *federation.Clust
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *clusters) UpdateStatus(cluster *federation.Cluster) (result *federation.Cluster, err error) {
 	result = &federation.Cluster{}
 	err = c.client.Put().
@@ -91,7 +96,7 @@ func (c *clusters) UpdateStatus(cluster *federation.Cluster) (result *federation
 }
 
 // Delete takes name of the cluster and deletes it. Returns an error if one occurs.
-func (c *clusters) Delete(name string, options *api.DeleteOptions) error {
+func (c *clusters) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clusters").
 		Name(name).
@@ -101,48 +106,49 @@ func (c *clusters) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusters) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *clusters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusters").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
 }
 
 // Get takes name of the cluster, and returns the corresponding cluster object, and an error if there is any.
-func (c *clusters) Get(name string) (result *federation.Cluster, err error) {
+func (c *clusters) Get(name string, options v1.GetOptions) (result *federation.Cluster, err error) {
 	result = &federation.Cluster{}
 	err = c.client.Get().
 		Resource("clusters").
 		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Clusters that match those selectors.
-func (c *clusters) List(opts api.ListOptions) (result *federation.ClusterList, err error) {
+func (c *clusters) List(opts v1.ListOptions) (result *federation.ClusterList, err error) {
 	result = &federation.ClusterList{}
 	err = c.client.Get().
 		Resource("clusters").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested clusters.
-func (c *clusters) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *clusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("clusters").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 
 // Patch applies the patch and returns the patched cluster.
-func (c *clusters) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *federation.Cluster, err error) {
+func (c *clusters) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *federation.Cluster, err error) {
 	result = &federation.Cluster{}
 	err = c.client.Patch(pt).
 		Resource("clusters").

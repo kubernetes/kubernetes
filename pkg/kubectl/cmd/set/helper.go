@@ -21,12 +21,12 @@ import (
 	"io"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 // selectContainers allows one or more containers to be matched against a string or wildcard
@@ -117,46 +117,44 @@ type Patch struct {
 	Patch  []byte
 }
 
-// CalculatePatches calls the mutation function on each provided info object, and generates a strategic merge patch for
-// the changes in the object. Encoder must be able to encode the info into the appropriate destination type. If mutateFn
-// returns false, the object is not included in the final list of patches.
-func CalculatePatches(infos []*resource.Info, encoder runtime.Encoder, mutateFn func(*resource.Info) (bool, error)) []*Patch {
+// patchFn is a function type that accepts an info object and returns a byte slice.
+// Implementations of patchFn should update the object and return it encoded.
+type patchFn func(*resource.Info) ([]byte, error)
+
+// CalculatePatch calls the mutation function on the provided info object, and generates a strategic merge patch for
+// the changes in the object. Encoder must be able to encode the info into the appropriate destination type.
+// This function returns whether the mutation function made any change in the original object.
+func CalculatePatch(patch *Patch, encoder runtime.Encoder, mutateFn patchFn) bool {
+	patch.Before, patch.Err = runtime.Encode(encoder, patch.Info.Object)
+
+	patch.After, patch.Err = mutateFn(patch.Info)
+	if patch.Err != nil {
+		return true
+	}
+	if patch.After == nil {
+		return false
+	}
+
+	// TODO: should be via New
+	versioned, err := patch.Info.Mapping.ConvertToVersion(patch.Info.Object, patch.Info.Mapping.GroupVersionKind.GroupVersion())
+	if err != nil {
+		patch.Err = err
+		return true
+	}
+
+	patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, versioned)
+	return true
+}
+
+// CalculatePatches calculates patches on each provided info object. If the provided mutateFn
+// makes no change in an object, the object is not included in the final list of patches.
+func CalculatePatches(infos []*resource.Info, encoder runtime.Encoder, mutateFn patchFn) []*Patch {
 	var patches []*Patch
 	for _, info := range infos {
 		patch := &Patch{Info: info}
-		patch.Before, patch.Err = runtime.Encode(encoder, info.Object)
-		if patch.Err != nil {
+		if CalculatePatch(patch, encoder, mutateFn) {
 			patches = append(patches, patch)
-			continue
 		}
-
-		ok, err := mutateFn(info)
-		if err != nil {
-			patch.Err = err
-			patches = append(patches, patch)
-			continue
-		}
-		if !ok {
-			continue
-		}
-		patches = append(patches, patch)
-		if patch.Err != nil {
-			continue
-		}
-
-		patch.After, patch.Err = runtime.Encode(encoder, info.Object)
-		if patch.Err != nil {
-			continue
-		}
-
-		// TODO: should be via New
-		versioned, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
-		if err != nil {
-			patch.Err = err
-			continue
-		}
-
-		patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, versioned)
 	}
 	return patches
 }

@@ -41,16 +41,16 @@ func NewVirtualMachineScaleSetVMsClientWithBaseURI(baseURI string, subscriptionI
 	return VirtualMachineScaleSetVMsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// Deallocate allows you to deallocate a virtual machine scale set virtual
-// machine. Shuts down the virtual machine and releases the compute
-// resources. You are not billed for the compute resources that this virtual
-// machine uses. This method may poll for completion. Polling can be canceled
-// by passing the cancel channel argument. The channel will be used to cancel
-// polling and any outstanding HTTP requests.
+// Deallocate deallocates a specific virtual machine in a VM scale set. Shuts
+// down the virtual machine and releases the compute resources it uses. You
+// are not billed for the compute resources of this virtual machine once it
+// is deallocated. This method may poll for completion. Polling can be
+// canceled by passing the cancel channel argument. The channel will be used
+// to cancel polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group. vmScaleSetName is the
-// name of the virtual machine scale set. instanceID is the instance id of
-// the virtual machine.
+// name of the VM scale set. instanceID is the instance ID of the virtual
+// machine.
 func (client VirtualMachineScaleSetVMsClient) Deallocate(resourceGroupName string, vmScaleSetName string, instanceID string, cancel <-chan struct{}) (result autorest.Response, err error) {
 	req, err := client.DeallocatePreparer(resourceGroupName, vmScaleSetName, instanceID, cancel)
 	if err != nil {
@@ -112,14 +112,14 @@ func (client VirtualMachineScaleSetVMsClient) DeallocateResponder(resp *http.Res
 	return
 }
 
-// Delete allows you to delete a virtual machine scale set. This method may
-// poll for completion. Polling can be canceled by passing the cancel channel
+// Delete deletes a virtual machine from a VM scale set. This method may poll
+// for completion. Polling can be canceled by passing the cancel channel
 // argument. The channel will be used to cancel polling and any outstanding
 // HTTP requests.
 //
 // resourceGroupName is the name of the resource group. vmScaleSetName is the
-// name of the virtual machine scale set. instanceID is the instance id of
-// the virtual machine.
+// name of the VM scale set. instanceID is the instance ID of the virtual
+// machine.
 func (client VirtualMachineScaleSetVMsClient) Delete(resourceGroupName string, vmScaleSetName string, instanceID string, cancel <-chan struct{}) (result autorest.Response, err error) {
 	req, err := client.DeletePreparer(resourceGroupName, vmScaleSetName, instanceID, cancel)
 	if err != nil {
@@ -181,11 +181,11 @@ func (client VirtualMachineScaleSetVMsClient) DeleteResponder(resp *http.Respons
 	return
 }
 
-// Get displays information about a virtual machine scale set virtual machine.
+// Get gets a virtual machine from a VM scale set.
 //
 // resourceGroupName is the name of the resource group. vmScaleSetName is the
-// name of the virtual machine scale set. instanceID is the instance id of
-// the virtual machine.
+// name of the VM scale set. instanceID is the instance ID of the virtual
+// machine.
 func (client VirtualMachineScaleSetVMsClient) Get(resourceGroupName string, vmScaleSetName string, instanceID string) (result VirtualMachineScaleSetVM, err error) {
 	req, err := client.GetPreparer(resourceGroupName, vmScaleSetName, instanceID)
 	if err != nil {
@@ -246,12 +246,11 @@ func (client VirtualMachineScaleSetVMsClient) GetResponder(resp *http.Response) 
 	return
 }
 
-// GetInstanceView displays the status of a virtual machine scale set virtual
-// machine.
+// GetInstanceView gets the status of a virtual machine from a VM scale set.
 //
 // resourceGroupName is the name of the resource group. vmScaleSetName is the
-// name of the virtual machine scale set. instanceID is the instance id of
-// the virtual machine.
+// name of the VM scale set. instanceID is the instance ID of the virtual
+// machine.
 func (client VirtualMachineScaleSetVMsClient) GetInstanceView(resourceGroupName string, vmScaleSetName string, instanceID string) (result VirtualMachineScaleSetVMInstanceView, err error) {
 	req, err := client.GetInstanceViewPreparer(resourceGroupName, vmScaleSetName, instanceID)
 	if err != nil {
@@ -312,13 +311,12 @@ func (client VirtualMachineScaleSetVMsClient) GetInstanceViewResponder(resp *htt
 	return
 }
 
-// List lists all virtual machines in a VM scale sets.
+// List gets a list of all virtual machines in a VM scale sets.
 //
 // resourceGroupName is the name of the resource group.
-// virtualMachineScaleSetName is the name of the virtual machine scale set.
-// filter is the filter to apply on the operation. selectParameter is the
-// list parameters. expand is the expand expression to apply on the
-// operation.
+// virtualMachineScaleSetName is the name of the VM scale set. filter is the
+// filter to apply to the operation. selectParameter is the list parameters.
+// expand is the expand expression to apply to the operation.
 func (client VirtualMachineScaleSetVMsClient) List(resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result VirtualMachineScaleSetVMListResult, err error) {
 	req, err := client.ListPreparer(resourceGroupName, virtualMachineScaleSetName, filter, selectParameter, expand)
 	if err != nil {
@@ -391,7 +389,7 @@ func (client VirtualMachineScaleSetVMsClient) ListResponder(resp *http.Response)
 func (client VirtualMachineScaleSetVMsClient) ListNextResults(lastResults VirtualMachineScaleSetVMListResult) (result VirtualMachineScaleSetVMListResult, err error) {
 	req, err := lastResults.VirtualMachineScaleSetVMListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMsClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMsClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -400,25 +398,27 @@ func (client VirtualMachineScaleSetVMsClient) ListNextResults(lastResults Virtua
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMsClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMsClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMsClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMsClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return
 }
 
-// PowerOff allows you to power off (stop) a virtual machine in a VM scale
-// set. This method may poll for completion. Polling can be canceled by
-// passing the cancel channel argument. The channel will be used to cancel
-// polling and any outstanding HTTP requests.
+// PowerOff power off (stop) a virtual machine in a VM scale set. Note that
+// resources are still attached and you are getting charged for the
+// resources. Instead, use deallocate to release resources and avoid charges.
+// This method may poll for completion. Polling can be canceled by passing
+// the cancel channel argument. The channel will be used to cancel polling
+// and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group. vmScaleSetName is the
-// name of the virtual machine scale set. instanceID is the instance id of
-// the virtual machine.
+// name of the VM scale set. instanceID is the instance ID of the virtual
+// machine.
 func (client VirtualMachineScaleSetVMsClient) PowerOff(resourceGroupName string, vmScaleSetName string, instanceID string, cancel <-chan struct{}) (result autorest.Response, err error) {
 	req, err := client.PowerOffPreparer(resourceGroupName, vmScaleSetName, instanceID, cancel)
 	if err != nil {
@@ -480,15 +480,14 @@ func (client VirtualMachineScaleSetVMsClient) PowerOffResponder(resp *http.Respo
 	return
 }
 
-// Reimage allows you to re-image(update the version of the installed
-// operating system) a virtual machine scale set instance. This method may
-// poll for completion. Polling can be canceled by passing the cancel channel
-// argument. The channel will be used to cancel polling and any outstanding
-// HTTP requests.
+// Reimage reimages (upgrade the operating system) a specific virtual machine
+// in a VM scale set. This method may poll for completion. Polling can be
+// canceled by passing the cancel channel argument. The channel will be used
+// to cancel polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group. vmScaleSetName is the
-// name of the virtual machine scale set. instanceID is the instance id of
-// the virtual machine.
+// name of the VM scale set. instanceID is the instance ID of the virtual
+// machine.
 func (client VirtualMachineScaleSetVMsClient) Reimage(resourceGroupName string, vmScaleSetName string, instanceID string, cancel <-chan struct{}) (result autorest.Response, err error) {
 	req, err := client.ReimagePreparer(resourceGroupName, vmScaleSetName, instanceID, cancel)
 	if err != nil {
@@ -550,14 +549,14 @@ func (client VirtualMachineScaleSetVMsClient) ReimageResponder(resp *http.Respon
 	return
 }
 
-// Restart allows you to restart a virtual machine in a VM scale set. This
-// method may poll for completion. Polling can be canceled by passing the
-// cancel channel argument. The channel will be used to cancel polling and
-// any outstanding HTTP requests.
+// Restart restarts a virtual machine in a VM scale set. This method may poll
+// for completion. Polling can be canceled by passing the cancel channel
+// argument. The channel will be used to cancel polling and any outstanding
+// HTTP requests.
 //
 // resourceGroupName is the name of the resource group. vmScaleSetName is the
-// name of the virtual machine scale set. instanceID is the instance id of
-// the virtual machine.
+// name of the VM scale set. instanceID is the instance ID of the virtual
+// machine.
 func (client VirtualMachineScaleSetVMsClient) Restart(resourceGroupName string, vmScaleSetName string, instanceID string, cancel <-chan struct{}) (result autorest.Response, err error) {
 	req, err := client.RestartPreparer(resourceGroupName, vmScaleSetName, instanceID, cancel)
 	if err != nil {
@@ -619,14 +618,14 @@ func (client VirtualMachineScaleSetVMsClient) RestartResponder(resp *http.Respon
 	return
 }
 
-// Start allows you to start a virtual machine in a VM scale set. This method
-// may poll for completion. Polling can be canceled by passing the cancel
-// channel argument. The channel will be used to cancel polling and any
-// outstanding HTTP requests.
+// Start starts a virtual machine in a VM scale set. This method may poll for
+// completion. Polling can be canceled by passing the cancel channel
+// argument. The channel will be used to cancel polling and any outstanding
+// HTTP requests.
 //
 // resourceGroupName is the name of the resource group. vmScaleSetName is the
-// name of the virtual machine scale set. instanceID is the instance id of
-// the virtual machine.
+// name of the VM scale set. instanceID is the instance ID of the virtual
+// machine.
 func (client VirtualMachineScaleSetVMsClient) Start(resourceGroupName string, vmScaleSetName string, instanceID string, cancel <-chan struct{}) (result autorest.Response, err error) {
 	req, err := client.StartPreparer(resourceGroupName, vmScaleSetName, instanceID, cancel)
 	if err != nil {

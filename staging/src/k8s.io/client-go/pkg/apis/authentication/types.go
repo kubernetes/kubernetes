@@ -17,8 +17,7 @@ limitations under the License.
 package authentication
 
 import (
-	"k8s.io/client-go/pkg/api"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -43,9 +42,9 @@ const (
 // TokenReview attempts to authenticate a token to a known user.
 type TokenReview struct {
 	metav1.TypeMeta
-	// ObjectMeta fulfills the meta.ObjectMetaAccessor interface so that the stock
+	// ObjectMeta fulfills the metav1.ObjectMetaAccessor interface so that the stock
 	// REST handler paths work
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec holds information about the request being evaluated
 	Spec TokenReviewSpec

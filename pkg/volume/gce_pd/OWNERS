@@ -1,3 +1,15 @@
-maintainers:
+approvers:
 - saad-ali
 - thockin
+reviewers:
+- thockin
+- smarterclayton
+- bprashanth
+- pmorie
+- saad-ali
+- justinsb
+- jsafrane
+- markturansky
+- jingxu97
+- matchstick
+- gnufied

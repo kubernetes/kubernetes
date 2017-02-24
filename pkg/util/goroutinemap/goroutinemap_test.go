@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -448,10 +448,45 @@ func Test_NewGoRoutineMap_Positive_WaitWithExpBackoff(t *testing.T) {
 	}
 }
 
+func Test_NewGoRoutineMap_WaitForCompletionWithExpBackoff(t *testing.T) {
+	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)
+	operationName := "operation-err"
+
+	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1 := generateErrorFunc(operation1DoneCh)
+	err := grm.Run(operationName, operation1)
+	if err != nil {
+		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	waitDoneCh := make(chan interface{}, 1)
+	go func() {
+		grm.WaitForCompletion()
+		waitDoneCh <- true
+	}()
+
+	// Finish the operation
+	operation1DoneCh <- true
+
+	// Assert that WaitForCompletion returns even if scheduled op had error
+	err = waitChannelWithTimeout(waitDoneCh, testTimeout)
+	if err != nil {
+		t.Fatalf("Error waiting for GoRoutineMap.Wait: %v", err)
+	}
+}
+
 func generateCallbackFunc(done chan<- interface{}) func() error {
 	return func() error {
 		done <- true
 		return nil
+	}
+}
+
+func generateErrorFunc(done <-chan interface{}) func() error {
+	return func() error {
+		<-done
+		return fmt.Errorf("Generic error")
 	}
 }
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,12 +21,12 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.policy.v1beta1;
 
-import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
+import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
+import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
-import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -36,15 +36,15 @@ option go_package = "v1beta1";
 // created by POSTing to .../pods/<pod name>/evictions.
 message Eviction {
   // ObjectMeta describes the pod that is being evicted.
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // DeleteOptions may be provided
-  optional k8s.io.kubernetes.pkg.api.v1.DeleteOptions deleteOptions = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.DeleteOptions deleteOptions = 2;
 }
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 message PodDisruptionBudget {
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the PodDisruptionBudget.
   optional PodDisruptionBudgetSpec spec = 2;
@@ -55,7 +55,7 @@ message PodDisruptionBudget {
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 message PodDisruptionBudgetList {
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   repeated PodDisruptionBudget items = 2;
 }
@@ -66,11 +66,11 @@ message PodDisruptionBudgetSpec {
   // "selector" will still be available after the eviction, i.e. even in the
   // absence of the evicted pod.  So for example you can prevent all voluntary
   // evictions by specifying "100%".
-  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString minAvailable = 1;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString minAvailable = 1;
 
   // Label query over pods whose evictions are managed by the disruption
   // budget.
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector selector = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 }
 
 // PodDisruptionBudgetStatus represents information about the status of a
@@ -92,7 +92,7 @@ message PodDisruptionBudgetStatus {
   // the list automatically by PodDisruptionBudget controller after some time.
   // If everything goes smooth this map should be empty for the most of the time.
   // Large number of entries in the map may indicate problems with pod deletions.
-  map<string, k8s.io.kubernetes.pkg.apis.meta.v1.Time> disruptedPods = 2;
+  map<string, k8s.io.apimachinery.pkg.apis.meta.v1.Time> disruptedPods = 2;
 
   // Number of pod disruptions that are currently allowed.
   optional int32 disruptionsAllowed = 3;

@@ -188,14 +188,8 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 	tr := newTransport(s.sshConn.conn, config.Rand, false /* not client */)
 	s.transport = newServerTransport(tr, s.clientVersion, s.serverVersion, config)
 
-	if err := s.transport.requestKeyChange(); err != nil {
+	if err := s.transport.requestInitialKeyChange(); err != nil {
 		return nil, err
-	}
-
-	if packet, err := s.transport.readPacket(); err != nil {
-		return nil, err
-	} else if packet[0] != msgNewKeys {
-		return nil, unexpectedMessageError(msgNewKeys, packet[0])
 	}
 
 	// We just did the key change, so the session ID is established.
@@ -230,7 +224,7 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 
 func isAcceptableAlgo(algo string) bool {
 	switch algo {
-	case KeyAlgoRSA, KeyAlgoDSA, KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521,
+	case KeyAlgoRSA, KeyAlgoDSA, KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521, KeyAlgoED25519,
 		CertAlgoRSAv01, CertAlgoDSAv01, CertAlgoECDSA256v01, CertAlgoECDSA384v01, CertAlgoECDSA521v01:
 		return true
 	}
@@ -290,7 +284,6 @@ userAuthLoop:
 		switch userAuthReq.Method {
 		case "none":
 			if config.NoClientAuth {
-				s.user = ""
 				authErr = nil
 			}
 		case "password":

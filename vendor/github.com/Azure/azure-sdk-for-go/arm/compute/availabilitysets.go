@@ -21,6 +21,7 @@ package compute
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
@@ -41,12 +42,19 @@ func NewAvailabilitySetsClientWithBaseURI(baseURI string, subscriptionID string)
 	return AvailabilitySetsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// CreateOrUpdate the operation to create or update the availability set.
+// CreateOrUpdate create or update an availability set.
 //
-// resourceGroupName is the name of the resource group. name is parameters
-// supplied to the Create Availability Set operation. parameters is
-// parameters supplied to the Create Availability Set operation.
+// resourceGroupName is the name of the resource group. name is the name of
+// the availability set. parameters is parameters supplied to the Create
+// Availability Set operation.
 func (client AvailabilitySetsClient) CreateOrUpdate(resourceGroupName string, name string, parameters AvailabilitySet) (result AvailabilitySet, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.AvailabilitySetProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{{Target: "parameters.AvailabilitySetProperties.Statuses", Name: validation.ReadOnly, Rule: true, Chain: nil}}}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "compute.AvailabilitySetsClient", "CreateOrUpdate")
+	}
+
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, name, parameters)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "compute.AvailabilitySetsClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -107,7 +115,7 @@ func (client AvailabilitySetsClient) CreateOrUpdateResponder(resp *http.Response
 	return
 }
 
-// Delete the operation to delete the availability set.
+// Delete delete an availability set.
 //
 // resourceGroupName is the name of the resource group. availabilitySetName is
 // the name of the availability set.
@@ -169,7 +177,7 @@ func (client AvailabilitySetsClient) DeleteResponder(resp *http.Response) (resul
 	return
 }
 
-// Get the operation to get the availability set.
+// Get retrieves information about an availability set.
 //
 // resourceGroupName is the name of the resource group. availabilitySetName is
 // the name of the availability set.
@@ -232,7 +240,7 @@ func (client AvailabilitySetsClient) GetResponder(resp *http.Response) (result A
 	return
 }
 
-// List the operation to list the availability sets.
+// List lists all availability sets in a resource group.
 //
 // resourceGroupName is the name of the resource group.
 func (client AvailabilitySetsClient) List(resourceGroupName string) (result AvailabilitySetListResult, err error) {

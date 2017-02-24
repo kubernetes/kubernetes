@@ -19,11 +19,10 @@ package v1
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/batch"
-	"k8s.io/client-go/pkg/conversion"
-	"k8s.io/client-go/pkg/runtime"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -36,13 +35,13 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	return api.Scheme.AddFieldLabelConversionFunc("batch/v1", "Job",
+	return scheme.AddFieldLabelConversionFunc("batch/v1", "Job",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":
 				return label, value, nil
 			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
+				return "", "", fmt.Errorf("field label %q not supported for Job", label)
 			}
 		},
 	)

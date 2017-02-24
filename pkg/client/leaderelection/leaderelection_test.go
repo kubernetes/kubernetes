@@ -26,14 +26,14 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestTryAcquireOrRenew(t *testing.T) {
@@ -84,7 +84,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &v1.Endpoints{
-							ObjectMeta: v1.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 							},
@@ -113,7 +113,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &v1.Endpoints{
-							ObjectMeta: v1.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
@@ -147,7 +147,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &v1.Endpoints{
-							ObjectMeta: v1.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
@@ -173,7 +173,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &v1.Endpoints{
-							ObjectMeta: v1.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
@@ -205,7 +205,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		var reportedLeader string
 
 		lock := rl.EndpointsLock{
-			EndpointsMeta: v1.ObjectMeta{Namespace: "foo", Name: "bar"},
+			EndpointsMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
 			LockConfig: rl.ResourceLockConfig{
 				Identity:      "baz",
 				EventRecorder: &record.FakeRecorder{},

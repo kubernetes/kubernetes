@@ -21,31 +21,43 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/client-go/pkg/runtime"
-	utilruntime "k8s.io/client-go/pkg/util/runtime"
-	"k8s.io/client-go/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/clock"
 
 	"github.com/golang/glog"
 )
 
-// if you use this, there is one behavior change compared to a standard Informer.
-// When you receive a notification, the cache will be AT LEAST as fresh as the
-// notification, but it MAY be more fresh.  You should NOT depend on the contents
-// of the cache exactly matching the notification you've received in handler
-// functions.  If there was a create, followed by a delete, the cache may NOT
-// have your item.  This has advantages over the broadcaster since it allows us
-// to share a common cache across many controllers. Extending the broadcaster
-// would have required us keep duplicate caches for each watch.
+// SharedInformer has a shared data cache and is capable of distributing notifications for changes
+// to the cache to multiple listeners who registered via AddEventHandler. If you use this, there is
+// one behavior change compared to a standard Informer.  When you receive a notification, the cache
+// will be AT LEAST as fresh as the notification, but it MAY be more fresh.  You should NOT depend
+// on the contents of the cache exactly matching the notification you've received in handler
+// functions.  If there was a create, followed by a delete, the cache may NOT have your item.  This
+// has advantages over the broadcaster since it allows us to share a common cache across many
+// controllers. Extending the broadcaster would have required us keep duplicate caches for each
+// watch.
 type SharedInformer interface {
-	// events to a single handler are delivered sequentially, but there is no coordination between different handlers
-	// You may NOT add a handler *after* the SharedInformer is running.  That will result in an error being returned.
-	// TODO we should try to remove this restriction eventually.
-	AddEventHandler(handler ResourceEventHandler) error
+	// AddEventHandler adds an event handler to the shared informer using the shared informer's resync
+	// period.  Events to a single handler are delivered sequentially, but there is no coordination
+	// between different handlers.
+	AddEventHandler(handler ResourceEventHandler)
+	// AddEventHandlerWithResyncPeriod adds an event handler to the shared informer using the
+	// specified resync period.  Events to a single handler are delivered sequentially, but there is
+	// no coordination between different handlers.
+	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration)
+	// GetStore returns the Store.
 	GetStore() Store
 	// GetController gives back a synthetic interface that "votes" to start the informer
-	GetController() ControllerInterface
+	GetController() Controller
+	// Run starts the shared informer, which will be stopped when stopCh is closed.
 	Run(stopCh <-chan struct{})
+	// HasSynced returns true if the shared informer's store has synced.
 	HasSynced() bool
+	// LastSyncResourceVersion is the resource version observed when last synced with the underlying
+	// store. The value returned is not synchronized with access to the underlying store and is not
+	// thread-safe.
 	LastSyncResourceVersion() string
 }
 
@@ -57,23 +69,22 @@ type SharedIndexInformer interface {
 }
 
 // NewSharedInformer creates a new instance for the listwatcher.
-// TODO: create a cache/factory of these at a higher level for the list all, watch all of a given resource that can
-// be shared amongst all consumers.
 func NewSharedInformer(lw ListerWatcher, objType runtime.Object, resyncPeriod time.Duration) SharedInformer {
 	return NewSharedIndexInformer(lw, objType, resyncPeriod, Indexers{})
 }
 
 // NewSharedIndexInformer creates a new instance for the listwatcher.
-// TODO: create a cache/factory of these at a higher level for the list all, watch all of a given resource that can
-// be shared amongst all consumers.
-func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, resyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
+func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
+	realClock := &clock.RealClock{}
 	sharedIndexInformer := &sharedIndexInformer{
-		processor:             &sharedProcessor{},
-		indexer:               NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
-		listerWatcher:         lw,
-		objectType:            objType,
-		fullResyncPeriod:      resyncPeriod,
-		cacheMutationDetector: NewCacheMutationDetector(fmt.Sprintf("%T", objType)),
+		processor:                       &sharedProcessor{clock: realClock},
+		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
+		listerWatcher:                   lw,
+		objectType:                      objType,
+		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
+		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
+		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", objType)),
+		clock: realClock,
 	}
 	return sharedIndexInformer
 }
@@ -108,15 +119,24 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 
 type sharedIndexInformer struct {
 	indexer    Indexer
-	controller *Controller
+	controller Controller
 
 	processor             *sharedProcessor
 	cacheMutationDetector CacheMutationDetector
 
 	// This block is tracked to handle late initialization of the controller
-	listerWatcher    ListerWatcher
-	objectType       runtime.Object
-	fullResyncPeriod time.Duration
+	listerWatcher ListerWatcher
+	objectType    runtime.Object
+
+	// resyncCheckPeriod is how often we want the reflector's resync timer to fire so it can call
+	// shouldResync to check if any of our listeners need a resync.
+	resyncCheckPeriod time.Duration
+	// defaultEventHandlerResyncPeriod is the default resync period for any handlers added via
+	// AddEventHandler (i.e. they don't specify one and just want to use the shared informer's default
+	// value).
+	defaultEventHandlerResyncPeriod time.Duration
+	// clock allows for testability
+	clock clock.Clock
 
 	started     bool
 	startedLock sync.Mutex
@@ -145,6 +165,10 @@ func (v *dummyController) HasSynced() bool {
 	return v.informer.HasSynced()
 }
 
+func (c *dummyController) LastSyncResourceVersion() string {
+	return ""
+}
+
 type updateNotification struct {
 	oldObj interface{}
 	newObj interface{}
@@ -167,8 +191,9 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		Queue:            fifo,
 		ListerWatcher:    s.listerWatcher,
 		ObjectType:       s.objectType,
-		FullResyncPeriod: s.fullResyncPeriod,
+		FullResyncPeriod: s.resyncCheckPeriod,
 		RetryOnError:     false,
+		ShouldResync:     s.processor.shouldResync,
 
 		Process: s.HandleDeltas,
 	}
@@ -178,6 +203,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		defer s.startedLock.Unlock()
 
 		s.controller = New(cfg)
+		s.controller.(*controller).clock = s.clock
 		s.started = true
 	}()
 
@@ -207,10 +233,10 @@ func (s *sharedIndexInformer) LastSyncResourceVersion() string {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
-	if s.controller == nil || s.controller.reflector == nil {
+	if s.controller == nil {
 		return ""
 	}
-	return s.controller.reflector.LastSyncResourceVersion()
+	return s.controller.LastSyncResourceVersion()
 }
 
 func (s *sharedIndexInformer) GetStore() Store {
@@ -232,18 +258,60 @@ func (s *sharedIndexInformer) AddIndexers(indexers Indexers) error {
 	return s.indexer.AddIndexers(indexers)
 }
 
-func (s *sharedIndexInformer) GetController() ControllerInterface {
+func (s *sharedIndexInformer) GetController() Controller {
 	return &dummyController{informer: s}
 }
 
-func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) error {
+func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) {
+	s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
+}
+
+func determineResyncPeriod(desired, check time.Duration) time.Duration {
+	if desired == 0 {
+		return desired
+	}
+	if check == 0 {
+		glog.Warningf("The specified resyncPeriod %v is invalid because this shared informer doesn't support resyncing", desired)
+		return 0
+	}
+	if desired < check {
+		glog.Warningf("The specified resyncPeriod %v is being increased to the minimum resyncCheckPeriod %v", desired, check)
+		return check
+	}
+	return desired
+}
+
+const minimumResyncPeriod = 1 * time.Second
+
+func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
+	if resyncPeriod > 0 {
+		if resyncPeriod < minimumResyncPeriod {
+			glog.Warningf("resyncPeriod %d is too small. Changing it to the minimum allowed value of %d", resyncPeriod, minimumResyncPeriod)
+			resyncPeriod = minimumResyncPeriod
+		}
+
+		if resyncPeriod < s.resyncCheckPeriod {
+			if s.started {
+				glog.Warningf("resyncPeriod %d is smaller than resyncCheckPeriod %d and the informer has already started. Changing it to %d", resyncPeriod, s.resyncCheckPeriod, s.resyncCheckPeriod)
+				resyncPeriod = s.resyncCheckPeriod
+			} else {
+				// if the event handler's resyncPeriod is smaller than the current resyncCheckPeriod, update
+				// resyncCheckPeriod to match resyncPeriod and adjust the resync periods of all the listeners
+				// accordingly
+				s.resyncCheckPeriod = resyncPeriod
+				s.processor.resyncCheckPeriodChanged(resyncPeriod)
+			}
+		}
+	}
+
+	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now())
+
 	if !s.started {
-		listener := newProcessListener(handler)
-		s.processor.listeners = append(s.processor.listeners, listener)
-		return nil
+		s.processor.addListener(listener)
+		return
 	}
 
 	// in order to safely join, we have to
@@ -254,8 +322,7 @@ func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) erro
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 
-	listener := newProcessListener(handler)
-	s.processor.listeners = append(s.processor.listeners, listener)
+	s.processor.addListener(listener)
 
 	go listener.run(s.stopCh)
 	go listener.pop(s.stopCh)
@@ -264,8 +331,6 @@ func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) erro
 	for i := range items {
 		listener.add(addNotification{newObj: items[i]})
 	}
-
-	return nil
 }
 
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
@@ -276,42 +341,98 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	for _, d := range obj.(Deltas) {
 		switch d.Type {
 		case Sync, Added, Updated:
+			isSync := d.Type == Sync
 			s.cacheMutationDetector.AddObject(d.Object)
 			if old, exists, err := s.indexer.Get(d.Object); err == nil && exists {
 				if err := s.indexer.Update(d.Object); err != nil {
 					return err
 				}
-				s.processor.distribute(updateNotification{oldObj: old, newObj: d.Object})
+				s.processor.distribute(updateNotification{oldObj: old, newObj: d.Object}, isSync)
 			} else {
 				if err := s.indexer.Add(d.Object); err != nil {
 					return err
 				}
-				s.processor.distribute(addNotification{newObj: d.Object})
+				s.processor.distribute(addNotification{newObj: d.Object}, isSync)
 			}
 		case Deleted:
 			if err := s.indexer.Delete(d.Object); err != nil {
 				return err
 			}
-			s.processor.distribute(deleteNotification{oldObj: d.Object})
+			s.processor.distribute(deleteNotification{oldObj: d.Object}, false)
 		}
 	}
 	return nil
 }
 
 type sharedProcessor struct {
-	listeners []*processorListener
+	listenersLock    sync.RWMutex
+	listeners        []*processorListener
+	syncingListeners []*processorListener
+	clock            clock.Clock
 }
 
-func (p *sharedProcessor) distribute(obj interface{}) {
-	for _, listener := range p.listeners {
-		listener.add(obj)
+func (p *sharedProcessor) addListener(listener *processorListener) {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+
+	p.listeners = append(p.listeners, listener)
+	p.syncingListeners = append(p.syncingListeners, listener)
+}
+
+func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
+	p.listenersLock.RLock()
+	defer p.listenersLock.RUnlock()
+
+	if sync {
+		for _, listener := range p.syncingListeners {
+			listener.add(obj)
+		}
+	} else {
+		for _, listener := range p.listeners {
+			listener.add(obj)
+		}
 	}
 }
 
 func (p *sharedProcessor) run(stopCh <-chan struct{}) {
+	p.listenersLock.RLock()
+	defer p.listenersLock.RUnlock()
+
 	for _, listener := range p.listeners {
 		go listener.run(stopCh)
 		go listener.pop(stopCh)
+	}
+}
+
+// shouldResync queries every listener to determine if any of them need a resync, based on each
+// listener's resyncPeriod.
+func (p *sharedProcessor) shouldResync() bool {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+
+	p.syncingListeners = []*processorListener{}
+
+	resyncNeeded := false
+	now := p.clock.Now()
+	for _, listener := range p.listeners {
+		// need to loop through all the listeners to see if they need to resync so we can prepare any
+		// listeners that are going to be resyncing.
+		if listener.shouldResync(now) {
+			resyncNeeded = true
+			p.syncingListeners = append(p.syncingListeners, listener)
+			listener.determineNextResync(now)
+		}
+	}
+	return resyncNeeded
+}
+
+func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Duration) {
+	p.listenersLock.RLock()
+	defer p.listenersLock.RUnlock()
+
+	for _, listener := range p.listeners {
+		resyncPeriod := determineResyncPeriod(listener.requestedResyncPeriod, resyncCheckPeriod)
+		listener.setResyncPeriod(resyncPeriod)
 	}
 }
 
@@ -330,16 +451,32 @@ type processorListener struct {
 	nextCh chan interface{}
 
 	handler ResourceEventHandler
+
+	// requestedResyncPeriod is how frequently the listener wants a full resync from the shared informer
+	requestedResyncPeriod time.Duration
+	// resyncPeriod is how frequently the listener wants a full resync from the shared informer. This
+	// value may differ from requestedResyncPeriod if the shared informer adjusts it to align with the
+	// informer's overall resync check period.
+	resyncPeriod time.Duration
+	// nextResync is the earliest time the listener should get a full resync
+	nextResync time.Time
+	// resyncLock guards access to resyncPeriod and nextResync
+	resyncLock sync.Mutex
 }
 
-func newProcessListener(handler ResourceEventHandler) *processorListener {
+func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time) *processorListener {
 	ret := &processorListener{
-		pendingNotifications: []interface{}{},
-		nextCh:               make(chan interface{}),
-		handler:              handler,
+		pendingNotifications:  []interface{}{},
+		nextCh:                make(chan interface{}),
+		handler:               handler,
+		requestedResyncPeriod: requestedResyncPeriod,
+		resyncPeriod:          resyncPeriod,
 	}
 
 	ret.cond.L = &ret.lock
+
+	ret.determineNextResync(now)
+
 	return ret
 }
 
@@ -414,4 +551,31 @@ func (p *processorListener) run(stopCh <-chan struct{}) {
 			utilruntime.HandleError(fmt.Errorf("unrecognized notification: %#v", next))
 		}
 	}
+}
+
+// shouldResync deterimines if the listener needs a resync. If the listener's resyncPeriod is 0,
+// this always returns false.
+func (p *processorListener) shouldResync(now time.Time) bool {
+	p.resyncLock.Lock()
+	defer p.resyncLock.Unlock()
+
+	if p.resyncPeriod == 0 {
+		return false
+	}
+
+	return now.After(p.nextResync) || now.Equal(p.nextResync)
+}
+
+func (p *processorListener) determineNextResync(now time.Time) {
+	p.resyncLock.Lock()
+	defer p.resyncLock.Unlock()
+
+	p.nextResync = now.Add(p.resyncPeriod)
+}
+
+func (p *processorListener) setResyncPeriod(resyncPeriod time.Duration) {
+	p.resyncLock.Lock()
+	defer p.resyncLock.Unlock()
+
+	p.resyncPeriod = resyncPeriod
 }

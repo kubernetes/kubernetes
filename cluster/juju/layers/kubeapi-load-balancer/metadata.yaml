@@ -1,0 +1,17 @@
+name: kubeapi-load-balancer
+summary: Nginx Load Balancer
+maintainers:
+  - Charles Butler <charles.butler@canonical.com>
+description: |
+  A round robin Nginx load balancer to distribute traffic for kubernetes apiservers.
+tags:
+  - misc
+subordinate: false
+series:
+  - xenial
+requires:
+  apiserver:
+    interface: http
+provides:
+  loadbalancer:
+      interface: public-address

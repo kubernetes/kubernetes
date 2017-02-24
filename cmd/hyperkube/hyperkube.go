@@ -25,9 +25,9 @@ import (
 	"os"
 	"path"
 
+	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/util"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -55,7 +55,7 @@ func (hk *HyperKube) AddServer(s *Server) {
 // FindServer will find a specific server named name.
 func (hk *HyperKube) FindServer(name string) (*Server, error) {
 	for _, s := range hk.servers {
-		if s.Name() == name {
+		if s.Name() == name || s.AlternativeName == name {
 			return &s, nil
 		}
 	}
@@ -188,7 +188,7 @@ func (hk *HyperKube) Run(args []string) error {
 func (hk *HyperKube) RunToExit(args []string) {
 	err := hk.Run(args)
 	if err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
 		os.Exit(1)
 	}
 	os.Exit(0)

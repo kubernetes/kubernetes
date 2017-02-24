@@ -17,10 +17,10 @@ limitations under the License.
 package validation
 
 import (
+	"k8s.io/apimachinery/pkg/api/validation/path"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // Minimal validation of names for roles and bindings. Identical to the validation for Openshift. See:
@@ -201,6 +201,9 @@ func validateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, msg))
 			}
 		}
+		if len(subject.APIGroup) > 0 {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), subject.APIGroup, []string{""}))
+		}
 		if !isNamespaced && len(subject.Namespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
 		}
@@ -210,11 +213,17 @@ func validateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 		if len(subject.Name) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, "user name cannot be empty"))
 		}
+		if subject.APIGroup != rbac.GroupName {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), subject.APIGroup, []string{rbac.GroupName}))
+		}
 
 	case rbac.GroupKind:
 		// TODO(ericchiang): What other restrictions on group name are there?
 		if len(subject.Name) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, "group name cannot be empty"))
+		}
+		if subject.APIGroup != rbac.GroupName {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), subject.APIGroup, []string{rbac.GroupName}))
 		}
 
 	default:

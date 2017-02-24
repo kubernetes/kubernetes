@@ -21,13 +21,14 @@ import (
 	"os"
 	"strconv"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/core"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
@@ -35,9 +36,11 @@ import (
 
 const (
 	// GCE instances can have up to 16 PD volumes attached.
-	DefaultMaxGCEPDVolumes    = 16
-	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
-	StatefulSetKind           = "StatefulSet"
+	DefaultMaxGCEPDVolumes = 16
+	// Larger Azure VMs can actually have much more disks attached. TODO We should determine the max based on VM size
+	DefaultMaxAzureDiskVolumes = 16
+	ClusterAutoscalerProvider  = "ClusterAutoscalerProvider"
+	StatefulSetKind            = "StatefulSet"
 )
 
 func init() {
@@ -51,7 +54,7 @@ func init() {
 			return priorities.PriorityMetadata
 		})
 
-	// Retisters algorithm providers. By default we use 'DefaultProvider', but user can specify one to be used
+	// Registers algorithm providers. By default we use 'DefaultProvider', but user can specify one to be used
 	// by specifying flag.
 	factory.RegisterAlgorithmProvider(factory.DefaultProvider, defaultPredicates(), defaultPriorities())
 	// Cluster autoscaler friendly scheduling algorithm.
@@ -99,7 +102,7 @@ func init() {
 	// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
-	factory.RegisterPriorityFunction2("EqualPriority", scheduler.EqualPriorityMap, nil, 1)
+	factory.RegisterPriorityFunction2("EqualPriority", core.EqualPriorityMap, nil, 1)
 	// ImageLocalityPriority prioritizes nodes based on locality of images requested by a pod. Nodes with larger size
 	// of already-installed packages required by the pod will be preferred over nodes with no already-installed
 	// packages required by the pod or a small total size of already-installed packages required by the pod.
@@ -135,11 +138,20 @@ func defaultPredicates() sets.String {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilter, maxVols, args.PVInfo, args.PVCInfo)
 			},
 		),
+		// Fit is determined by whether or not there would be too many Azure Disk volumes attached to the node
+		factory.RegisterFitPredicateFactory(
+			"MaxAzureDiskVolumeCount",
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				// TODO: allow for generically parameterized scheduler predicates, because this is a bit ugly
+				maxVols := getMaxVols(DefaultMaxAzureDiskVolumes)
+				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilter, maxVols, args.PVInfo, args.PVCInfo)
+			},
+		),
 		// Fit is determined by inter-pod affinity.
 		factory.RegisterFitPredicateFactory(
 			"MatchInterPodAffinity",
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister, args.FailureDomains)
+				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
 			},
 		),
 
@@ -179,7 +191,7 @@ func defaultPriorities() sets.String {
 			"InterPodAffinityPriority",
 			factory.PriorityConfigFactory{
 				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-					return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.HardPodAffinitySymmetricWeight, args.FailureDomains)
+					return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.HardPodAffinitySymmetricWeight)
 				},
 				Weight: 1,
 			},
@@ -237,7 +249,7 @@ func GetEquivalencePod(pod *v1.Pod) interface{} {
 	// to be equivalent
 	if len(pod.OwnerReferences) != 0 {
 		for _, ref := range pod.OwnerReferences {
-			if *ref.Controller && isValidControllerKind(ref.Kind) {
+			if *ref.Controller {
 				equivalencePod.ControllerRef = ref
 				// a pod can only belongs to one controller
 				break
@@ -247,18 +259,7 @@ func GetEquivalencePod(pod *v1.Pod) interface{} {
 	return &equivalencePod
 }
 
-// isValidControllerKind checks if a given controller's kind can be applied to equivalence pod algorithm.
-func isValidControllerKind(kind string) bool {
-	switch kind {
-	// list of kinds that we cannot handle
-	case StatefulSetKind:
-		return false
-	default:
-		return true
-	}
-}
-
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
 type EquivalencePod struct {
-	ControllerRef v1.OwnerReference
+	ControllerRef metav1.OwnerReference
 }

@@ -19,11 +19,12 @@ package services
 import (
 	"time"
 
+	"k8s.io/client-go/dynamic"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -55,9 +56,17 @@ func (n *NamespaceController) Start() error {
 	if err != nil {
 		return err
 	}
-	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	gvrFn := client.Discovery().ServerPreferredNamespacedResources
-	nc := namespacecontroller.NewNamespaceController(client, clientPool, gvrFn, ncResyncPeriod, v1.FinalizerKubernetes)
+	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	discoverResourcesFn := client.Discovery().ServerPreferredNamespacedResources
+	informerFactory := informers.NewSharedInformerFactory(client, ncResyncPeriod)
+	nc := namespacecontroller.NewNamespaceController(
+		client,
+		clientPool,
+		discoverResourcesFn,
+		informerFactory.Core().V1().Namespaces(),
+		ncResyncPeriod, v1.FinalizerKubernetes,
+	)
+	informerFactory.Start(n.stopCh)
 	go nc.Run(ncConcurrency, n.stopCh)
 	return nil
 }

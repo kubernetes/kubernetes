@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
+	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 // ReplicationControllersGetter has a method to return a ReplicationControllerInterface.
@@ -33,18 +36,18 @@ type ReplicationControllerInterface interface {
 	Create(*api.ReplicationController) (*api.ReplicationController, error)
 	Update(*api.ReplicationController) (*api.ReplicationController, error)
 	UpdateStatus(*api.ReplicationController) (*api.ReplicationController, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*api.ReplicationController, error)
-	List(opts api.ListOptions) (*api.ReplicationControllerList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ReplicationController, err error)
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(name string, options v1.GetOptions) (*api.ReplicationController, error)
+	List(opts v1.ListOptions) (*api.ReplicationControllerList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ReplicationController, err error)
 	ReplicationControllerExpansion
 }
 
 // replicationControllers implements ReplicationControllerInterface
 type replicationControllers struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 
@@ -81,6 +84,9 @@ func (c *replicationControllers) Update(replicationController *api.ReplicationCo
 	return
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+
 func (c *replicationControllers) UpdateStatus(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.client.Put().
@@ -95,7 +101,7 @@ func (c *replicationControllers) UpdateStatus(replicationController *api.Replica
 }
 
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
-func (c *replicationControllers) Delete(name string, options *api.DeleteOptions) error {
+func (c *replicationControllers) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
@@ -106,52 +112,53 @@ func (c *replicationControllers) Delete(name string, options *api.DeleteOptions)
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicationControllers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *replicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
 }
 
 // Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
-func (c *replicationControllers) Get(name string) (result *api.ReplicationController, err error) {
+func (c *replicationControllers) Get(name string, options v1.GetOptions) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
-func (c *replicationControllers) List(opts api.ListOptions) (result *api.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(opts v1.ListOptions) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested replicationControllers.
-func (c *replicationControllers) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *replicationControllers) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 
 // Patch applies the patch and returns the patched replicationController.
-func (c *replicationControllers) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ReplicationController, err error) {
+func (c *replicationControllers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

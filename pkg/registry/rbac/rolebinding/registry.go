@@ -17,20 +17,23 @@ limitations under the License.
 package rolebinding
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store RoleBindings.
 type Registry interface {
-	ListRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.RoleBindingList, error)
-	CreateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) error
-	UpdateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) error
-	GetRoleBinding(ctx api.Context, name string) (*rbac.RoleBinding, error)
-	DeleteRoleBinding(ctx api.Context, name string) error
-	WatchRoleBindings(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
+	ListRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleBindingList, error)
+	CreateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding) error
+	UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding) error
+	GetRoleBinding(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.RoleBinding, error)
+	DeleteRoleBinding(ctx genericapirequest.Context, name string) error
+	WatchRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -44,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.RoleBindingList, error) {
+func (s *storage) ListRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleBindingList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -53,30 +56,30 @@ func (s *storage) ListRoleBindings(ctx api.Context, options *api.ListOptions) (*
 	return obj.(*rbac.RoleBindingList), nil
 }
 
-func (s *storage) CreateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) error {
+func (s *storage) CreateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding) error {
 	// TODO(ericchiang): add additional validation
 	_, err := s.Create(ctx, roleBinding)
 	return err
 }
 
-func (s *storage) UpdateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) error {
+func (s *storage) UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding) error {
 	_, _, err := s.Update(ctx, roleBinding.Name, rest.DefaultUpdatedObjectInfo(roleBinding, api.Scheme))
 	return err
 }
 
-func (s *storage) WatchRoleBindings(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetRoleBinding(ctx api.Context, name string) (*rbac.RoleBinding, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetRoleBinding(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.RoleBinding, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*rbac.RoleBinding), nil
 }
 
-func (s *storage) DeleteRoleBinding(ctx api.Context, name string) error {
+func (s *storage) DeleteRoleBinding(ctx genericapirequest.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }
@@ -87,7 +90,7 @@ type AuthorizerAdapter struct {
 }
 
 func (a AuthorizerAdapter) ListRoleBindings(namespace string) ([]*rbac.RoleBinding, error) {
-	list, err := a.Registry.ListRoleBindings(api.WithNamespace(api.NewContext(), namespace), &api.ListOptions{})
+	list, err := a.Registry.ListRoleBindings(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &metainternalversion.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

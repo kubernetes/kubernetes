@@ -22,8 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # We need an absolute path to KUBE_ROOT
 ABSOLUTE_ROOT=$(readlink -f ${KUBE_ROOT})
 
-source ${KUBE_ROOT}/cluster/kubemark/util.sh
-source ${KUBE_ROOT}/cluster/kubemark/config-default.sh
+source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
 echo "Kubemark master name: ${MASTER_NAME}"
 
@@ -34,11 +33,15 @@ export KUBECONFIG="${ABSOLUTE_ROOT}/test/kubemark/resources/kubeconfig.kubemark"
 export E2E_MIN_STARTUP_PODS=0
 
 if [[ -z "$@" ]]; then
-	ARGS='--ginkgo.focus=should\sallow\sstarting\s30\spods\sper\snode'
+	ARGS='--ginkgo.focus=\[Feature:Performance\]'
 else
 	ARGS=$@
 fi
 
-go run ./hack/e2e.go -v --check_version_skew=false --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS}"
-# Just make local testing easier...
-# ${KUBE_ROOT}/hack/ginkgo-e2e.sh "--e2e-verify-service-account=false" "--dump-logs-on-failure=false" $ARGS
+if [[ -f /.dockerenv ]]; then
+	# Running inside a dockerized runner.
+	go run ./hack/e2e.go -v --check_version_skew=false --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS}"
+else
+	# Running locally.
+	${KUBE_ROOT}/hack/ginkgo-e2e.sh "--e2e-verify-service-account=false" "--dump-logs-on-failure=false" $ARGS
+fi

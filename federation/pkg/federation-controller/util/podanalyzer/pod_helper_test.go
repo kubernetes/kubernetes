@@ -20,10 +20,10 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -95,7 +95,7 @@ func TestAnalyze(t *testing.T) {
 func newReplicaSet(selectorMap map[string]string) *v1beta1.ReplicaSet {
 	replicas := int32(3)
 	rs := &v1beta1.ReplicaSet{
-		ObjectMeta: api_v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
 			Namespace: "default",
 		},
@@ -109,7 +109,7 @@ func newReplicaSet(selectorMap map[string]string) *v1beta1.ReplicaSet {
 
 func newPod(name string, rs *v1beta1.ReplicaSet, status api_v1.PodStatus) *api_v1.Pod {
 	return &api_v1.Pod{
-		ObjectMeta: api_v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: rs.Namespace,
 			Labels:    rs.Spec.Selector.MatchLabels,

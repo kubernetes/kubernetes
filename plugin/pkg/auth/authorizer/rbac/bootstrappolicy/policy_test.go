@@ -17,11 +17,25 @@ limitations under the License.
 package bootstrappolicy_test
 
 import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"reflect"
 	"testing"
 
-	rbac "k8s.io/kubernetes/pkg/apis/rbac"
-	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"github.com/ghodss/yaml"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/rbac"
+	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
@@ -53,13 +67,13 @@ func getSemanticRoles(roles []rbac.ClusterRole) semanticRoles {
 func TestCovers(t *testing.T) {
 	semanticRoles := getSemanticRoles(bootstrappolicy.ClusterRoles())
 
-	if covers, miss := rbacvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.edit.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.edit.Rules); !covers {
 		t.Errorf("failed to cover: %#v", miss)
 	}
-	if covers, miss := rbacvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.view.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.view.Rules); !covers {
 		t.Errorf("failed to cover: %#v", miss)
 	}
-	if covers, miss := rbacvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.view.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.view.Rules); !covers {
 		t.Errorf("failed to cover: %#v", miss)
 	}
 }
@@ -77,17 +91,17 @@ func TestAdminEditRelationship(t *testing.T) {
 
 	// confirm that the edit role doesn't already have extra powers
 	for _, rule := range additionalAdminPowers {
-		if covers, _ := rbacvalidation.Covers(semanticRoles.edit.Rules, []rbac.PolicyRule{rule}); covers {
+		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, []rbac.PolicyRule{rule}); covers {
 			t.Errorf("edit has extra powers: %#v", rule)
 		}
 	}
 	semanticRoles.edit.Rules = append(semanticRoles.edit.Rules, additionalAdminPowers...)
 
 	// at this point, we should have a two way covers relationship
-	if covers, miss := rbacvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.edit.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.admin.Rules, semanticRoles.edit.Rules); !covers {
 		t.Errorf("admin has lost rules for: %#v", miss)
 	}
-	if covers, miss := rbacvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.admin.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.admin.Rules); !covers {
 		t.Errorf("edit is missing rules for: %#v\nIf these should only be admin powers, add them to the list.  Otherwise, add them to the edit role.", miss)
 	}
 }
@@ -122,17 +136,144 @@ func TestEditViewRelationship(t *testing.T) {
 
 	// confirm that the view role doesn't already have extra powers
 	for _, rule := range viewEscalatingNamespaceResources {
-		if covers, _ := rbacvalidation.Covers(semanticRoles.view.Rules, []rbac.PolicyRule{rule}); covers {
+		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbac.PolicyRule{rule}); covers {
 			t.Errorf("view has extra powers: %#v", rule)
 		}
 	}
 	semanticRoles.view.Rules = append(semanticRoles.view.Rules, viewEscalatingNamespaceResources...)
 
 	// at this point, we should have a two way covers relationship
-	if covers, miss := rbacvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.view.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.view.Rules); !covers {
 		t.Errorf("edit has lost rules for: %#v", miss)
 	}
-	if covers, miss := rbacvalidation.Covers(semanticRoles.view.Rules, semanticRoles.edit.Rules); !covers {
+	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.view.Rules, semanticRoles.edit.Rules); !covers {
 		t.Errorf("view is missing rules for: %#v\nIf these are escalating powers, add them to the list.  Otherwise, add them to the view role.", miss)
+	}
+}
+
+func TestBootstrapClusterRoles(t *testing.T) {
+	list := &api.List{}
+	names := sets.NewString()
+	roles := map[string]runtime.Object{}
+	bootstrapRoles := bootstrappolicy.ClusterRoles()
+	for i := range bootstrapRoles {
+		role := bootstrapRoles[i]
+		names.Insert(role.Name)
+		roles[role.Name] = &role
+	}
+	for _, name := range names.List() {
+		list.Items = append(list.Items, roles[name])
+	}
+	testObjects(t, list, "cluster-roles.yaml")
+}
+
+func TestBootstrapClusterRoleBindings(t *testing.T) {
+	list := &api.List{}
+	names := sets.NewString()
+	roleBindings := map[string]runtime.Object{}
+	bootstrapRoleBindings := bootstrappolicy.ClusterRoleBindings()
+	for i := range bootstrapRoleBindings {
+		role := bootstrapRoleBindings[i]
+		names.Insert(role.Name)
+		roleBindings[role.Name] = &role
+	}
+	for _, name := range names.List() {
+		list.Items = append(list.Items, roleBindings[name])
+	}
+	testObjects(t, list, "cluster-role-bindings.yaml")
+}
+
+func TestBootstrapControllerRoles(t *testing.T) {
+	list := &api.List{}
+	names := sets.NewString()
+	roles := map[string]runtime.Object{}
+	bootstrapRoles := bootstrappolicy.ControllerRoles()
+	for i := range bootstrapRoles {
+		role := bootstrapRoles[i]
+		names.Insert(role.Name)
+		roles[role.Name] = &role
+	}
+	for _, name := range names.List() {
+		list.Items = append(list.Items, roles[name])
+	}
+	testObjects(t, list, "controller-roles.yaml")
+}
+
+func TestBootstrapControllerRoleBindings(t *testing.T) {
+	list := &api.List{}
+	names := sets.NewString()
+	roleBindings := map[string]runtime.Object{}
+	bootstrapRoleBindings := bootstrappolicy.ControllerRoleBindings()
+	for i := range bootstrapRoleBindings {
+		roleBinding := bootstrapRoleBindings[i]
+		names.Insert(roleBinding.Name)
+		roleBindings[roleBinding.Name] = &roleBinding
+	}
+	for _, name := range names.List() {
+		list.Items = append(list.Items, roleBindings[name])
+	}
+	testObjects(t, list, "controller-role-bindings.yaml")
+}
+
+func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
+	filename := filepath.Join("testdata", fixtureFilename)
+	expectedYAML, err := ioutil.ReadFile(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runtime.EncodeList(api.Codecs.LegacyCodec(v1.SchemeGroupVersion, rbacv1beta1.SchemeGroupVersion), list.Items); err != nil {
+		t.Fatal(err)
+	}
+
+	jsonData, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion, rbacv1beta1.SchemeGroupVersion), list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	yamlData, err := yaml.JSONToYAML(jsonData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(yamlData) != string(expectedYAML) {
+		t.Errorf("Bootstrap policy data does not match the test fixture in %s", filename)
+
+		const updateEnvVar = "UPDATE_BOOTSTRAP_POLICY_FIXTURE_DATA"
+		if os.Getenv(updateEnvVar) == "true" {
+			if err := ioutil.WriteFile(filename, []byte(yamlData), os.FileMode(0755)); err == nil {
+				t.Logf("Updated data in %s", filename)
+				t.Logf("Verify the diff, commit changes, and rerun the tests")
+			} else {
+				t.Logf("Could not update data in %s: %v", filename, err)
+			}
+		} else {
+			t.Logf("Diff between bootstrap data and fixture data in %s:\n-------------\n%s", filename, diff.StringDiff(string(yamlData), string(expectedYAML)))
+			t.Logf("If the change is expected, re-run with %s=true to update the fixtures", updateEnvVar)
+		}
+	}
+}
+
+func TestClusterRoleLabel(t *testing.T) {
+	roles := bootstrappolicy.ClusterRoles()
+	for i := range roles {
+		role := roles[i]
+		accessor, err := meta.Accessor(&role)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("ClusterRole: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+		}
+	}
+
+	rolebindings := bootstrappolicy.ClusterRoleBindings()
+	for i := range rolebindings {
+		rolebinding := rolebindings[i]
+		accessor, err := meta.Accessor(&rolebinding)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("ClusterRoleBinding: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+		}
 	}
 }

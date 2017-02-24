@@ -20,17 +20,23 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/pkg/api"
+	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
 var (
@@ -60,14 +66,10 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			j, err := NewJoin(cfgPath, args, &cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
+			kubeadmutil.CheckErr(j.Validate())
 			kubeadmutil.CheckErr(j.Run(out))
 		},
 	}
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.Secrets.GivenToken, "token", cfg.Secrets.GivenToken,
-		"(required) Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'",
-	)
 
 	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
 
@@ -76,14 +78,9 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		"skip preflight checks normally run before modifying the system",
 	)
 
-	cmd.PersistentFlags().Int32Var(
-		&cfg.APIPort, "api-port", cfg.APIPort,
-		"(optional) API server port on the master",
-	)
-
-	cmd.PersistentFlags().Int32Var(
-		&cfg.DiscoveryPort, "discovery-port", cfg.DiscoveryPort,
-		"(optional) Discovery port on the master",
+	cmd.PersistentFlags().Var(
+		discovery.NewDiscoveryValue(&cfg.Discovery), "discovery",
+		"The discovery method kubeadm will use for connecting nodes to the master",
 	)
 
 	return cmd
@@ -94,6 +91,8 @@ type Join struct {
 }
 
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
+	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
+
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
@@ -104,55 +103,53 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		}
 	}
 
-	if len(args) == 0 && len(cfg.MasterAddresses) == 0 {
-		return nil, fmt.Errorf("must specify master address (see --help)")
-	}
-	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
-	if len(cfg.MasterAddresses) > 1 {
-		return nil, fmt.Errorf("Must not specify more than one master address  (see --help)")
-	}
-
 	if !skipPreFlight {
-		fmt.Println("Running pre-flight checks")
-		err := preflight.RunJoinNodeChecks(cfg)
-		if err != nil {
-			return nil, &preflight.PreFlightError{Msg: err.Error()}
+		fmt.Println("[preflight] Running pre-flight checks")
+
+		// First, check if we're root separately from the other preflight checks and fail fast
+		if err := preflight.RunRootCheckOnly(); err != nil {
+			return nil, err
+		}
+
+		// Then continue with the others...
+		if err := preflight.RunJoinNodeChecks(cfg); err != nil {
+			return nil, err
 		}
 	} else {
-		fmt.Println("Skipping pre-flight checks")
+		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
 
-	ok, err := kubeadmutil.UseGivenTokenIfValid(&cfg.Secrets)
-	if !ok {
-		if err != nil {
-			return nil, fmt.Errorf("%v (see --help)\n", err)
-		}
-		return nil, fmt.Errorf("Must specify --token (see --help)\n")
-	}
+	// Try to start the kubelet service in case it's inactive
+	preflight.TryStartKubelet()
 
 	return &Join{cfg: cfg}, nil
 }
 
-// Run executes worked node provisioning and tries to join an existing cluster.
+func (j *Join) Validate() error {
+	return validation.ValidateNodeConfiguration(j.cfg).ToAggregate()
+}
+
+// Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(j.cfg)
+	cfg, err := discovery.For(j.cfg.Discovery)
 	if err != nil {
 		return err
 	}
-
-	connectionDetails, err := kubenode.EstablishMasterConnection(j.cfg, clusterInfo)
-	if err != nil {
+	if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
 		return err
 	}
 
-	kubeconfig, err := kubenode.PerformTLSBootstrap(connectionDetails)
-	if err != nil {
+	kubeconfigFile := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
+	if err := kubeconfigutil.WriteToDisk(kubeconfigFile, cfg); err != nil {
 		return err
 	}
 
-	err = kubeadmutil.WriteKubeconfigIfNotExists("kubelet", kubeconfig)
+	// Write the ca certificate to disk so kubelet can use it for authentication
+	cluster := cfg.Contexts[cfg.CurrentContext].Cluster
+	caCertFile := filepath.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)
+	err = certutil.WriteCert(caCertFile, cfg.Clusters[cluster].CertificateAuthorityData)
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}
 
 	fmt.Fprintf(out, joinDoneMsgf)

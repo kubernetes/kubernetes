@@ -17,7 +17,7 @@ limitations under the License.
 package stats
 
 import (
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Summary is a top-level container for holding NodeStats and PodStats.

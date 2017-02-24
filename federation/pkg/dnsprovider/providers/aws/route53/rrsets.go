@@ -48,6 +48,21 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 	return list, nil
 }
 
+func (rrsets ResourceRecordSets) Get(name string) (dnsprovider.ResourceRecordSet, error) {
+	var newRrset dnsprovider.ResourceRecordSet
+	rrsetList, err := rrsets.List()
+	if err != nil {
+		return nil, err
+	}
+	for _, rrset := range rrsetList {
+		if rrset.Name() == name {
+			newRrset = rrset
+			break
+		}
+	}
+	return newRrset, nil
+}
+
 func (r ResourceRecordSets) StartChangeset() dnsprovider.ResourceRecordChangeset {
 	return &ResourceRecordChangeset{
 		zone:   r.zone,
@@ -72,4 +87,9 @@ func (r ResourceRecordSets) New(name string, rrdatas []string, ttl int64, rrstyp
 		rrs,
 		&r,
 	}
+}
+
+// Zone returns the parent zone
+func (rrset ResourceRecordSets) Zone() dnsprovider.Zone {
+	return rrset.zone
 }

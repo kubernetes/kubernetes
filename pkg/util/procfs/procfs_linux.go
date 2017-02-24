@@ -32,7 +32,7 @@ import (
 	"unicode"
 
 	"github.com/golang/glog"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 type ProcFS struct{}
@@ -90,7 +90,7 @@ func PKill(name string, sig syscall.Signal) error {
 	return utilerrors.NewAggregate(errList)
 }
 
-// Find process(es) with a specified name (exact match)
+// Find process(es) with a specified name (regexp match)
 // and return their pid(s)
 func PidOf(name string) ([]int, error) {
 	if len(name) == 0 {

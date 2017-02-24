@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/flag"
 )
 
 func stringFlagFor(s string) flag.StringFlag {

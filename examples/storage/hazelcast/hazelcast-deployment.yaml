@@ -1,0 +1,22 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata: 
+  name: hazelcast
+  labels: 
+    name: hazelcast
+spec: 
+  template: 
+    metadata: 
+      labels: 
+        name: hazelcast
+    spec: 
+      containers: 
+      - name: hazelcast
+        image: quay.io/pires/hazelcast-kubernetes:0.8.0
+        imagePullPolicy: Always
+        env:
+        - name: "DNS_DOMAIN"
+          value: "cluster.local"
+        ports: 
+        - name: hazelcast
+          containerPort: 5701

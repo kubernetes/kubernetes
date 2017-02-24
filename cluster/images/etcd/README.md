@@ -21,6 +21,9 @@ $ make push ARCH=arm64
 
 $ make push ARCH=ppc64le
 # ---> gcr.io/google_containers/etcd-ppc64le:TAG
+
+$ make push ARCH=s390x
+# ---> gcr.io/google_containers/etcd-s390x:TAG
 ```
 
 If you don't want to push the images, run `make` or `make build` instead

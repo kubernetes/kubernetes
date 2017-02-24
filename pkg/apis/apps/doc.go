@@ -15,7 +15,5 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package,register
-// +k8s:openapi-gen=true
-// +groupName=apps.k8s.io
 
 package apps // import "k8s.io/kubernetes/pkg/apis/apps"

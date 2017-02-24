@@ -25,8 +25,6 @@ package glusterfs
 import (
 	"errors"
 	"sync"
-
-	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 )
 
 var (
@@ -51,7 +49,11 @@ var _ Rangeable = &MinMaxAllocator{}
 // Rangeable is an Interface that can adjust its min/max range.
 // Rangeable should be threadsafe
 type Rangeable interface {
-	allocator.Interface
+	Allocate(int) (bool, error)
+	AllocateNext() (int, bool, error)
+	Release(int) error
+	Has(int) bool
+	Free() int
 	SetRange(min, max int) error
 }
 

@@ -22,12 +22,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/clock"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/record"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/util/clock"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
 type pullerTestCase struct {
@@ -44,7 +45,7 @@ func pullerTestCases() []pullerTestCase {
 		{ // pull missing image
 			containerImage:  "missing_image",
 			policy:          v1.PullIfNotPresent,
-			calledFunctions: []string{"IsImagePresent", "PullImage"},
+			calledFunctions: []string{"GetImageRef", "PullImage"},
 			inspectErr:      nil,
 			pullerErr:       nil,
 			expectedErr:     []error{nil}},
@@ -52,35 +53,35 @@ func pullerTestCases() []pullerTestCase {
 		{ // image present, don't pull
 			containerImage:  "present_image",
 			policy:          v1.PullIfNotPresent,
-			calledFunctions: []string{"IsImagePresent"},
+			calledFunctions: []string{"GetImageRef"},
 			inspectErr:      nil,
 			pullerErr:       nil,
 			expectedErr:     []error{nil, nil, nil}},
 		// image present, pull it
 		{containerImage: "present_image",
 			policy:          v1.PullAlways,
-			calledFunctions: []string{"IsImagePresent", "PullImage"},
+			calledFunctions: []string{"GetImageRef", "PullImage"},
 			inspectErr:      nil,
 			pullerErr:       nil,
 			expectedErr:     []error{nil, nil, nil}},
 		// missing image, error PullNever
 		{containerImage: "missing_image",
 			policy:          v1.PullNever,
-			calledFunctions: []string{"IsImagePresent"},
+			calledFunctions: []string{"GetImageRef"},
 			inspectErr:      nil,
 			pullerErr:       nil,
 			expectedErr:     []error{ErrImageNeverPull, ErrImageNeverPull, ErrImageNeverPull}},
 		// missing image, unable to inspect
 		{containerImage: "missing_image",
 			policy:          v1.PullIfNotPresent,
-			calledFunctions: []string{"IsImagePresent"},
+			calledFunctions: []string{"GetImageRef"},
 			inspectErr:      errors.New("unknown inspectError"),
 			pullerErr:       nil,
 			expectedErr:     []error{ErrImageInspect, ErrImageInspect, ErrImageInspect}},
 		// missing image, unable to fetch
 		{containerImage: "typo_image",
 			policy:          v1.PullIfNotPresent,
-			calledFunctions: []string{"IsImagePresent", "PullImage"},
+			calledFunctions: []string{"GetImageRef", "PullImage"},
 			inspectErr:      nil,
 			pullerErr:       errors.New("404"),
 			expectedErr:     []error{ErrImagePull, ErrImagePull, ErrImagePullBackOff, ErrImagePull, ErrImagePullBackOff, ErrImagePullBackOff}},
@@ -111,7 +112,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 
 func TestParallelPuller(t *testing.T) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
 			Namespace:       "test-ns",
 			UID:             "bar",
@@ -126,7 +127,7 @@ func TestParallelPuller(t *testing.T) {
 
 		for tick, expected := range c.expectedErr {
 			fakeClock.Step(time.Second)
-			err, _ := puller.EnsureImageExists(pod, container, nil)
+			_, _, err := puller.EnsureImageExists(pod, container, nil)
 			fakeRuntime.AssertCalls(c.calledFunctions)
 			assert.Equal(t, expected, err, "in test %d tick=%d", i, tick)
 		}
@@ -135,7 +136,7 @@ func TestParallelPuller(t *testing.T) {
 
 func TestSerializedPuller(t *testing.T) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
 			Namespace:       "test-ns",
 			UID:             "bar",
@@ -150,7 +151,7 @@ func TestSerializedPuller(t *testing.T) {
 
 		for tick, expected := range c.expectedErr {
 			fakeClock.Step(time.Second)
-			err, _ := puller.EnsureImageExists(pod, container, nil)
+			_, _, err := puller.EnsureImageExists(pod, container, nil)
 			fakeRuntime.AssertCalls(c.calledFunctions)
 			assert.Equal(t, expected, err, "in test %d tick=%d", i, tick)
 		}

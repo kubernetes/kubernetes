@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/apimachinery/registered"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/watch"
-	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
 )
 
 // ObjectTracker keeps track of objects. It is intended to be used to
@@ -41,8 +41,11 @@ type ObjectTracker interface {
 	// Get retrieves the object by its kind, namespace and name.
 	Get(gvk schema.GroupVersionKind, ns, name string) (runtime.Object, error)
 
-	// Update updates an existing object in the tracker.
-	Update(obj runtime.Object) error
+	// Create adds an object to the tracker in the specified namespace.
+	Create(obj runtime.Object, ns string) error
+
+	// Update updates an existing object in the tracker in the specified namespace.
+	Update(obj runtime.Object, ns string) error
 
 	// List retrieves all objects of a given kind in the given
 	// namespace. Only non-List kinds are accepted.
@@ -102,12 +105,12 @@ func ObjectReaction(tracker ObjectTracker, mapper meta.RESTMapper) ReactionFunc 
 				return true, nil, err
 			}
 			if action.GetSubresource() == "" {
-				err = tracker.Add(action.GetObject())
+				err = tracker.Create(action.GetObject(), ns)
 			} else {
 				// TODO: Currently we're handling subresource creation as an update
 				// on the enclosing resource. This works for some subresources but
 				// might not be generic enough.
-				err = tracker.Update(action.GetObject())
+				err = tracker.Update(action.GetObject(), ns)
 			}
 			if err != nil {
 				return true, nil, err
@@ -120,7 +123,7 @@ func ObjectReaction(tracker ObjectTracker, mapper meta.RESTMapper) ReactionFunc 
 			if err != nil {
 				return true, nil, err
 			}
-			err = tracker.Update(action.GetObject())
+			err = tracker.Update(action.GetObject(), ns)
 			if err != nil {
 				return true, nil, err
 			}
@@ -141,21 +144,23 @@ func ObjectReaction(tracker ObjectTracker, mapper meta.RESTMapper) ReactionFunc 
 }
 
 type tracker struct {
-	scheme  ObjectScheme
-	decoder runtime.Decoder
-	lock    sync.RWMutex
-	objects map[schema.GroupVersionKind][]runtime.Object
+	registry *registered.APIRegistrationManager
+	scheme   ObjectScheme
+	decoder  runtime.Decoder
+	lock     sync.RWMutex
+	objects  map[schema.GroupVersionKind][]runtime.Object
 }
 
 var _ ObjectTracker = &tracker{}
 
 // NewObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects for the fake clientset. Mostly useful for unit tests.
-func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
+func NewObjectTracker(registry *registered.APIRegistrationManager, scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
 	return &tracker{
-		scheme:  scheme,
-		decoder: decoder,
-		objects: make(map[schema.GroupVersionKind][]runtime.Object),
+		registry: registry,
+		scheme:   scheme,
+		decoder:  decoder,
+		objects:  make(map[schema.GroupVersionKind][]runtime.Object),
 	}
 }
 
@@ -197,7 +202,7 @@ func (t *tracker) List(gvk schema.GroupVersionKind, ns string) (runtime.Object, 
 }
 
 func (t *tracker) Get(gvk schema.GroupVersionKind, ns, name string) (runtime.Object, error) {
-	if err := checkNamespace(gvk, ns); err != nil {
+	if err := checkNamespace(t.registry, gvk, ns); err != nil {
 		return nil, err
 	}
 
@@ -243,18 +248,26 @@ func (t *tracker) Get(gvk schema.GroupVersionKind, ns, name string) (runtime.Obj
 }
 
 func (t *tracker) Add(obj runtime.Object) error {
-	return t.add(obj, false)
-}
-
-func (t *tracker) Update(obj runtime.Object) error {
-	return t.add(obj, true)
-}
-
-func (t *tracker) add(obj runtime.Object, replaceExisting bool) error {
 	if meta.IsListType(obj) {
-		return t.addList(obj, replaceExisting)
+		return t.addList(obj, false)
 	}
 
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	return t.add(obj, objMeta.GetNamespace(), false)
+}
+
+func (t *tracker) Create(obj runtime.Object, ns string) error {
+	return t.add(obj, ns, false)
+}
+
+func (t *tracker) Update(obj runtime.Object, ns string) error {
+	return t.add(obj, ns, true)
+}
+
+func (t *tracker) add(obj runtime.Object, ns string, replaceExisting bool) error {
 	gvks, _, err := t.scheme.ObjectKinds(obj)
 	if err != nil {
 		return err
@@ -286,7 +299,17 @@ func (t *tracker) add(obj runtime.Object, replaceExisting bool) error {
 			return err
 		}
 
-		if err := checkNamespace(gvk, newMeta.GetNamespace()); err != nil {
+		// Propagate namespace to the new object if hasn't already been set.
+		if len(newMeta.GetNamespace()) == 0 {
+			newMeta.SetNamespace(ns)
+		}
+
+		if ns != newMeta.GetNamespace() {
+			msg := fmt.Sprintf("request namespace does not match object namespace, request: %q object: %q", ns, newMeta.GetNamespace())
+			return errors.NewBadRequest(msg)
+		}
+
+		if err := checkNamespace(t.registry, gvk, newMeta.GetNamespace()); err != nil {
 			return err
 		}
 
@@ -325,7 +348,11 @@ func (t *tracker) addList(obj runtime.Object, replaceExisting bool) error {
 		return errs[0]
 	}
 	for _, obj := range list {
-		err := t.add(obj, replaceExisting)
+		objMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return err
+		}
+		err = t.add(obj, objMeta.GetNamespace(), replaceExisting)
 		if err != nil {
 			return err
 		}
@@ -334,7 +361,7 @@ func (t *tracker) addList(obj runtime.Object, replaceExisting bool) error {
 }
 
 func (t *tracker) Delete(gvk schema.GroupVersionKind, ns, name string) error {
-	if err := checkNamespace(gvk, ns); err != nil {
+	if err := checkNamespace(t.registry, gvk, ns); err != nil {
 		return err
 	}
 
@@ -388,8 +415,8 @@ func filterByNamespaceAndName(objs []runtime.Object, ns, name string) ([]runtime
 // checkNamespace makes sure that the scope of gvk matches ns. It
 // returns an error if namespace is empty but gvk is a namespaced
 // kind, or if ns is non-empty and gvk is a namespaced kind.
-func checkNamespace(gvk schema.GroupVersionKind, ns string) error {
-	group, err := registered.Group(gvk.Group)
+func checkNamespace(registry *registered.APIRegistrationManager, gvk schema.GroupVersionKind, ns string) error {
+	group, err := registry.Group(gvk.Group)
 	if err != nil {
 		return err
 	}
@@ -486,6 +513,6 @@ func (r *SimpleProxyReactor) Handles(action Action) bool {
 	return true
 }
 
-func (r *SimpleProxyReactor) React(action Action) (bool, rest.ResponseWrapper, error) {
+func (r *SimpleProxyReactor) React(action Action) (bool, restclient.ResponseWrapper, error) {
 	return r.Reaction(action)
 }

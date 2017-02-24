@@ -59,7 +59,8 @@ BASH_TARGETS="
 	swagger-spec
 	openapi-spec
 	api-reference-docs
-	bazel"
+	bazel
+	federation-openapi-spec"
 # TODO: (caesarxuchao) uncomment after 1.5 code freeze.
 #	staging-client-go"
 

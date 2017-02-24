@@ -18,284 +18,225 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"net/url"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/client-go/rest/fake"
 	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
-func TestTopPodAllNamespacesMetrics(t *testing.T) {
-	initTestErrorHandler(t)
-	metrics := testPodMetricsData()
-	firstTestNamespace := "testnamespace"
-	secondTestNamespace := "secondtestns"
-	thirdTestNamespace := "thirdtestns"
-	metrics.Items[0].Namespace = firstTestNamespace
-	metrics.Items[1].Namespace = secondTestNamespace
-	metrics.Items[2].Namespace = thirdTestNamespace
+const (
+	topPathPrefix = baseMetricsAddress + "/" + metricsApiVersion
+)
 
-	expectedPath := fmt.Sprintf("%s/%s/pods", baseMetricsAddress, metricsApiVersion)
-
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == expectedPath && m == "GET":
-				body, err := marshallBody(metrics)
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
-				return nil, nil
-			}
-		}),
+func TestTopPod(t *testing.T) {
+	testNS := "testns"
+	testCases := []struct {
+		name            string
+		namespace       string
+		flags           map[string]string
+		args            []string
+		expectedPath    string
+		expectedQuery   string
+		namespaces      []string
+		containers      bool
+		listsNamespaces bool
+	}{
+		{
+			name:            "all namespaces",
+			flags:           map[string]string{"all-namespaces": "true"},
+			expectedPath:    topPathPrefix + "/pods",
+			namespaces:      []string{testNS, "secondtestns", "thirdtestns"},
+			listsNamespaces: true,
+		},
+		{
+			name:         "all in namespace",
+			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods",
+			namespaces:   []string{testNS, testNS},
+		},
+		{
+			name:         "pod with name",
+			args:         []string{"pod1"},
+			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods/pod1",
+			namespaces:   []string{testNS},
+		},
+		{
+			name:          "pod with label selector",
+			flags:         map[string]string{"selector": "key=value"},
+			expectedPath:  topPathPrefix + "/namespaces/" + testNS + "/pods",
+			expectedQuery: "labelSelector=" + url.QueryEscape("key=value"),
+			namespaces:    []string{testNS, testNS},
+		},
+		{
+			name:         "pod with container metrics",
+			flags:        map[string]string{"containers": "true"},
+			args:         []string{"pod1"},
+			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods/pod1",
+			namespaces:   []string{testNS},
+			containers:   true,
+		},
 	}
-	tf.Namespace = firstTestNamespace
-	tf.ClientConfig = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-
-	cmd := NewCmdTopPod(f, buf)
-	cmd.Flags().Set("all-namespaces", "true")
-	cmd.Run(cmd, []string{})
-
-	// Check the presence of pod names and namespaces in the output.
-	result := buf.String()
-	for _, m := range metrics.Items {
-		if !strings.Contains(result, m.Name) {
-			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
+	initTestErrorHandler(t)
+	for _, testCase := range testCases {
+		t.Logf("Running test case: %s", testCase.name)
+		metricsList := testPodMetricsData()
+		var expectedMetrics []metricsapi.PodMetrics
+		var expectedContainerNames, nonExpectedMetricsNames []string
+		for n, m := range metricsList {
+			if n < len(testCase.namespaces) {
+				m.Namespace = testCase.namespaces[n]
+				expectedMetrics = append(expectedMetrics, m)
+				for _, c := range m.Containers {
+					expectedContainerNames = append(expectedContainerNames, c.Name)
+				}
+			} else {
+				nonExpectedMetricsNames = append(nonExpectedMetricsNames, m.Name)
+			}
 		}
-		if !strings.Contains(result, m.Namespace) {
-			t.Errorf("missing metrics for %s/%s: \n%s", m.Namespace, m.Name, result)
+
+		var response interface{}
+		if len(expectedMetrics) == 1 {
+			response = expectedMetrics[0]
+		} else {
+			response = metricsapi.PodMetricsList{
+				ListMeta: unversioned.ListMeta{
+					ResourceVersion: "2",
+				},
+				Items: expectedMetrics,
+			}
+		}
+
+		f, tf, _, ns := cmdtesting.NewAPIFactory()
+		tf.Printer = &testPrinter{}
+		tf.Client = &fake.RESTClient{
+			APIRegistry:          api.Registry,
+			NegotiatedSerializer: ns,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
+				case p == testCase.expectedPath && m == "GET" && (testCase.expectedQuery == "" || q == testCase.expectedQuery):
+					body, err := marshallBody(response)
+					if err != nil {
+						t.Errorf("%s: unexpected error: %v", testCase.name, err)
+					}
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				default:
+					t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v\nExpected path: %#v\nExpected query: %#v",
+						testCase.name, req, req.URL, testCase.expectedPath, testCase.expectedQuery)
+					return nil, nil
+				}
+			}),
+		}
+		tf.Namespace = testNS
+		tf.ClientConfig = defaultClientConfig()
+		buf := bytes.NewBuffer([]byte{})
+
+		cmd := NewCmdTopPod(f, buf)
+		for name, value := range testCase.flags {
+			cmd.Flags().Set(name, value)
+		}
+		cmd.Run(cmd, testCase.args)
+
+		// Check the presence of pod names&namespaces/container names in the output.
+		result := buf.String()
+		if testCase.containers {
+			for _, containerName := range expectedContainerNames {
+				if !strings.Contains(result, containerName) {
+					t.Errorf("%s: missing metrics for container %s: \n%s", testCase.name, containerName, result)
+				}
+			}
+		}
+		for _, m := range expectedMetrics {
+			if !strings.Contains(result, m.Name) {
+				t.Errorf("%s: missing metrics for %s: \n%s", testCase.name, m.Name, result)
+			}
+			if testCase.listsNamespaces && !strings.Contains(result, m.Namespace) {
+				t.Errorf("%s: missing metrics for %s/%s: \n%s", testCase.name, m.Namespace, m.Name, result)
+			}
+		}
+		for _, name := range nonExpectedMetricsNames {
+			if strings.Contains(result, name) {
+				t.Errorf("%s: unexpected metrics for %s: \n%s", testCase.name, name, result)
+			}
 		}
 	}
 }
 
-func TestTopPodAllInNamespaceMetrics(t *testing.T) {
-	initTestErrorHandler(t)
-	metrics := testPodMetricsData()
-	testNamespace := "testnamespace"
-	nonTestNamespace := "anothernamespace"
-	expectedMetrics := metricsapi.PodMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[0:2],
-	}
-	for _, m := range expectedMetrics.Items {
-		m.Namespace = testNamespace
-	}
-	nonExpectedMetrics := metricsapi.PodMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[2:],
-	}
-	for _, m := range nonExpectedMetrics.Items {
-		m.Namespace = nonTestNamespace
-	}
-	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods", baseMetricsAddress, metricsApiVersion, testNamespace)
-
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == expectedPath && m == "GET":
-				body, err := marshallBody(expectedMetrics)
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
-				return nil, nil
-			}
-		}),
-	}
-	tf.Namespace = testNamespace
-	tf.ClientConfig = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-
-	cmd := NewCmdTopPod(f, buf)
-	cmd.Run(cmd, []string{})
-
-	// Check the presence of pod names in the output.
-	result := buf.String()
-	for _, m := range expectedMetrics.Items {
-		if !strings.Contains(result, m.Name) {
-			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-		}
-	}
-	for _, m := range nonExpectedMetrics.Items {
-		if strings.Contains(result, m.Name) {
-			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
-		}
-	}
-}
-
-func TestTopPodWithNameMetrics(t *testing.T) {
-	initTestErrorHandler(t)
-	metrics := testPodMetricsData()
-	expectedMetrics := metrics.Items[0]
-	nonExpectedMetrics := metricsapi.PodMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[1:],
-	}
-	testNamespace := "testnamespace"
-	expectedMetrics.Namespace = testNamespace
-	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods/%s", baseMetricsAddress, metricsApiVersion, testNamespace, expectedMetrics.Name)
-
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == expectedPath && m == "GET":
-				body, err := marshallBody(expectedMetrics)
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
-				return nil, nil
-			}
-		}),
-	}
-	tf.Namespace = testNamespace
-	tf.ClientConfig = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-
-	cmd := NewCmdTopPod(f, buf)
-	cmd.Run(cmd, []string{expectedMetrics.Name})
-
-	// Check the presence of pod names in the output.
-	result := buf.String()
-	if !strings.Contains(result, expectedMetrics.Name) {
-		t.Errorf("missing metrics for %s: \n%s", expectedMetrics.Name, result)
-	}
-	for _, m := range nonExpectedMetrics.Items {
-		if strings.Contains(result, m.Name) {
-			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
-		}
-	}
-}
-
-func TestTopPodWithLabelSelectorMetrics(t *testing.T) {
-	initTestErrorHandler(t)
-	metrics := testPodMetricsData()
-	expectedMetrics := metricsapi.PodMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[0:2],
-	}
-	nonExpectedMetrics := metricsapi.PodMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[2:],
-	}
-	label := "key=value"
-	testNamespace := "testnamespace"
-	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods", baseMetricsAddress, metricsApiVersion, testNamespace)
-	expectedQuery := fmt.Sprintf("labelSelector=%s", url.QueryEscape(label))
-
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
-			case p == expectedPath && m == "GET" && q == expectedQuery:
-				body, err := marshallBody(expectedMetrics)
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
-				return nil, nil
-			}
-		}),
-	}
-	tf.Namespace = testNamespace
-	tf.ClientConfig = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-
-	cmd := NewCmdTopPod(f, buf)
-	cmd.Flags().Set("selector", label)
-	cmd.Run(cmd, []string{})
-
-	// Check the presence of pod names in the output.
-	result := buf.String()
-	for _, m := range expectedMetrics.Items {
-		if !strings.Contains(result, m.Name) {
-			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-		}
-	}
-	for _, m := range nonExpectedMetrics.Items {
-		if strings.Contains(result, m.Name) {
-			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
-		}
-	}
-}
-
-func TestTopPodWithContainersMetrics(t *testing.T) {
-	initTestErrorHandler(t)
-	metrics := testPodMetricsData()
-	expectedMetrics := metrics.Items[0]
-	nonExpectedMetrics := metricsapi.PodMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[1:],
-	}
-	testNamespace := "testnamespace"
-	expectedMetrics.Namespace = testNamespace
-	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods/%s", baseMetricsAddress, metricsApiVersion, testNamespace, expectedMetrics.Name)
-
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == expectedPath && m == "GET":
-				body, err := marshallBody(expectedMetrics)
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
-				return nil, nil
-			}
-		}),
-	}
-	tf.Namespace = testNamespace
-	tf.ClientConfig = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-
-	cmd := NewCmdTopPod(f, buf)
-	cmd.Flags().Set("containers", "true")
-	cmd.Run(cmd, []string{expectedMetrics.Name})
-
-	// Check the presence of pod names in the output.
-	result := buf.String()
-	if !strings.Contains(result, expectedMetrics.Name) {
-		t.Errorf("missing metrics for %s: \n%s", expectedMetrics.Name, result)
-	}
-	for _, m := range expectedMetrics.Containers {
-		if !strings.Contains(result, m.Name) {
-			t.Errorf("missing metrics for container %s: \n%s", m.Name, result)
-		}
-	}
-	for _, m := range nonExpectedMetrics.Items {
-		if strings.Contains(result, m.Name) {
-			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
-		}
+func testPodMetricsData() []metricsapi.PodMetrics {
+	return []metricsapi.PodMetrics{
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "pod1", Namespace: "test", ResourceVersion: "10"},
+			Window:     unversioned.Duration{Duration: time.Minute},
+			Containers: []metricsapi.ContainerMetrics{
+				{
+					Name: "container1-1",
+					Usage: v1.ResourceList{
+						v1.ResourceCPU:     *resource.NewMilliQuantity(1, resource.DecimalSI),
+						v1.ResourceMemory:  *resource.NewQuantity(2*(1024*1024), resource.DecimalSI),
+						v1.ResourceStorage: *resource.NewQuantity(3*(1024*1024), resource.DecimalSI),
+					},
+				},
+				{
+					Name: "container1-2",
+					Usage: v1.ResourceList{
+						v1.ResourceCPU:     *resource.NewMilliQuantity(4, resource.DecimalSI),
+						v1.ResourceMemory:  *resource.NewQuantity(5*(1024*1024), resource.DecimalSI),
+						v1.ResourceStorage: *resource.NewQuantity(6*(1024*1024), resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "pod2", Namespace: "test", ResourceVersion: "11"},
+			Window:     unversioned.Duration{Duration: time.Minute},
+			Containers: []metricsapi.ContainerMetrics{
+				{
+					Name: "container2-1",
+					Usage: v1.ResourceList{
+						v1.ResourceCPU:     *resource.NewMilliQuantity(7, resource.DecimalSI),
+						v1.ResourceMemory:  *resource.NewQuantity(8*(1024*1024), resource.DecimalSI),
+						v1.ResourceStorage: *resource.NewQuantity(9*(1024*1024), resource.DecimalSI),
+					},
+				},
+				{
+					Name: "container2-2",
+					Usage: v1.ResourceList{
+						v1.ResourceCPU:     *resource.NewMilliQuantity(10, resource.DecimalSI),
+						v1.ResourceMemory:  *resource.NewQuantity(11*(1024*1024), resource.DecimalSI),
+						v1.ResourceStorage: *resource.NewQuantity(12*(1024*1024), resource.DecimalSI),
+					},
+				},
+				{
+					Name: "container2-3",
+					Usage: v1.ResourceList{
+						v1.ResourceCPU:     *resource.NewMilliQuantity(13, resource.DecimalSI),
+						v1.ResourceMemory:  *resource.NewQuantity(14*(1024*1024), resource.DecimalSI),
+						v1.ResourceStorage: *resource.NewQuantity(15*(1024*1024), resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "pod3", Namespace: "test", ResourceVersion: "12"},
+			Window:     unversioned.Duration{Duration: time.Minute},
+			Containers: []metricsapi.ContainerMetrics{
+				{
+					Name: "container3-1",
+					Usage: v1.ResourceList{
+						v1.ResourceCPU:     *resource.NewMilliQuantity(7, resource.DecimalSI),
+						v1.ResourceMemory:  *resource.NewQuantity(8*(1024*1024), resource.DecimalSI),
+						v1.ResourceStorage: *resource.NewQuantity(9*(1024*1024), resource.DecimalSI),
+					},
+				},
+			},
+		},
 	}
 }

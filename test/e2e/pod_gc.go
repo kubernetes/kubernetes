@@ -22,9 +22,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -61,7 +62,7 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 
 		By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
-			pods, err = f.ClientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{})
+			pods, err = f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				framework.Logf("Failed to list pod %v", err)
 				return false, nil
@@ -81,11 +82,8 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 	uuid := uuid.NewUUID()
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: string(uuid),
-			Annotations: map[string]string{
-				"scheduler.alpha.kubernetes.io/name": "please don't schedule my pods",
-			},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -94,6 +92,7 @@ func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 					Image: "gcr.io/google_containers/busybox:1.24",
 				},
 			},
+			SchedulerName: "please don't schedule my pods",
 		},
 	}
 	return f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)

@@ -21,12 +21,12 @@ import (
 	"runtime"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
-	kruntime "k8s.io/kubernetes/pkg/runtime"
 )
 
 const (
@@ -204,14 +204,14 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CertDirectory == "" {
 		obj.CertDirectory = "/var/run/kubernetes"
 	}
-	if obj.ExperimentalCgroupsPerQOS == nil {
-		obj.ExperimentalCgroupsPerQOS = boolVar(false)
-	}
 	if obj.ContainerRuntime == "" {
 		obj.ContainerRuntime = "docker"
 	}
 	if obj.RuntimeRequestTimeout == zeroDuration {
 		obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
+	}
+	if obj.ImagePullProgressDeadline == zeroDuration {
+		obj.ImagePullProgressDeadline = metav1.Duration{Duration: 1 * time.Minute}
 	}
 	if obj.CPUCFSQuota == nil {
 		obj.CPUCFSQuota = boolVar(true)
@@ -274,7 +274,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.LowDiskSpaceThresholdMB = 256
 	}
 	if obj.MasterServiceNamespace == "" {
-		obj.MasterServiceNamespace = api.NamespaceDefault
+		obj.MasterServiceNamespace = metav1.NamespaceDefault
 	}
 	if obj.MaxContainerCount == nil {
 		temp := int32(-1)
@@ -348,9 +348,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.SyncFrequency == zeroDuration {
 		obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}
 	}
-	if obj.ReconcileCIDR == nil {
-		obj.ReconcileCIDR = boolVar(true)
-	}
 	if obj.ContentType == "" {
 		obj.ContentType = "application/vnd.kubernetes.protobuf"
 	}
@@ -374,6 +371,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 	}
+	if obj.ExperimentalKernelMemcgNotification == nil {
+		obj.ExperimentalKernelMemcgNotification = boolVar(false)
+	}
 	if obj.SystemReserved == nil {
 		obj.SystemReserved = make(map[string]string)
 	}
@@ -391,22 +391,15 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := int32(defaultIPTablesDropBit)
 		obj.IPTablesDropBit = &temp
 	}
-	if obj.ExperimentalCgroupsPerQOS == nil {
-		temp := false
-		obj.ExperimentalCgroupsPerQOS = &temp
+	if obj.CgroupsPerQOS == nil {
+		temp := true
+		obj.CgroupsPerQOS = &temp
 	}
 	if obj.CgroupDriver == "" {
 		obj.CgroupDriver = "cgroupfs"
 	}
-	// NOTE: this is for backwards compatibility with earlier releases where cgroup-root was optional.
-	// if cgroups per qos is not enabled, and cgroup-root is not specified, we need to default to the
-	// container runtime default and not default to the root cgroup.
-	if obj.ExperimentalCgroupsPerQOS != nil {
-		if *obj.ExperimentalCgroupsPerQOS {
-			if obj.CgroupRoot == "" {
-				obj.CgroupRoot = "/"
-			}
-		}
+	if obj.EnableCRI == nil {
+		obj.EnableCRI = boolVar(true)
 	}
 }
 

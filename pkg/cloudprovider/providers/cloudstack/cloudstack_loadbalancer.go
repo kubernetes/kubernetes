@@ -63,8 +63,8 @@ func (cs *CSCloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1
 }
 
 // EnsureLoadBalancer creates a new load balancer, or updates the existing one. Returns the status of the balancer.
-func (cs *CSCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, hosts []string) (status *v1.LoadBalancerStatus, err error) {
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", clusterName, service.Namespace, service.Name, service.Spec.LoadBalancerIP, service.Spec.Ports, hosts)
+func (cs *CSCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (status *v1.LoadBalancerStatus, err error) {
+	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", clusterName, service.Namespace, service.Name, service.Spec.LoadBalancerIP, service.Spec.Ports, nodes)
 
 	if len(service.Spec.Ports) == 0 {
 		return nil, fmt.Errorf("requested load balancer with no ports")
@@ -87,7 +87,7 @@ func (cs *CSCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, h
 	}
 
 	// Verify that all the hosts belong to the same network, and retrieve their ID's.
-	lb.hostIDs, lb.networkID, err = cs.verifyHosts(hosts)
+	lb.hostIDs, lb.networkID, err = cs.verifyHosts(nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +165,8 @@ func (cs *CSCloud) EnsureLoadBalancer(clusterName string, service *v1.Service, h
 }
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
-func (cs *CSCloud) UpdateLoadBalancer(clusterName string, service *v1.Service, hosts []string) error {
-	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v, %v)", clusterName, service.Namespace, service.Name, hosts)
+func (cs *CSCloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v, %v)", clusterName, service.Namespace, service.Name, nodes)
 
 	// Get the load balancer details and existing rules.
 	lb, err := cs.getLoadBalancer(service)
@@ -175,7 +175,7 @@ func (cs *CSCloud) UpdateLoadBalancer(clusterName string, service *v1.Service, h
 	}
 
 	// Verify that all the hosts belong to the same network, and retrieve their ID's.
-	lb.hostIDs, _, err = cs.verifyHosts(hosts)
+	lb.hostIDs, _, err = cs.verifyHosts(nodes)
 	if err != nil {
 		return err
 	}
@@ -276,10 +276,10 @@ func (cs *CSCloud) getLoadBalancer(service *v1.Service) (*loadBalancer, error) {
 }
 
 // verifyHosts verifies if all hosts belong to the same network, and returns the host ID's and network ID.
-func (cs *CSCloud) verifyHosts(hosts []string) ([]string, string, error) {
+func (cs *CSCloud) verifyHosts(nodes []*v1.Node) ([]string, string, error) {
 	hostNames := map[string]bool{}
-	for _, host := range hosts {
-		hostNames[host] = true
+	for _, node := range nodes {
+		hostNames[node.Name] = true
 	}
 
 	p := cs.client.VirtualMachine.NewListVirtualMachinesParams()

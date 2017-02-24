@@ -20,9 +20,6 @@ const (
 
 	// DefaultRetryAttempts is number of attempts for retry status codes (5xx).
 	DefaultRetryAttempts = 3
-
-	// DefaultRetryDuration is a resonable delay for retry.
-	defaultRetryInterval = 30 * time.Second
 )
 
 var statusCodesForRetry = []int{
@@ -130,6 +127,9 @@ type Client struct {
 	// RetryAttempts sets the default number of retry attempts for client.
 	RetryAttempts int
 
+	// RetryDuration sets the delay duration for retries.
+	RetryDuration time.Duration
+
 	// UserAgent, if not empty, will be set as the HTTP User-Agent header on all requests sent
 	// through the Do method.
 	UserAgent string
@@ -144,6 +144,7 @@ func NewClientWithUserAgent(ua string) Client {
 		PollingDelay:    DefaultPollingDelay,
 		PollingDuration: DefaultPollingDuration,
 		RetryAttempts:   DefaultRetryAttempts,
+		RetryDuration:   30 * time.Second,
 		UserAgent:       ua,
 	}
 }
@@ -163,7 +164,7 @@ func (c Client) Do(r *http.Request) (*http.Response, error) {
 		return nil, NewErrorWithError(err, "autorest/Client", "Do", nil, "Preparing request failed")
 	}
 	resp, err := SendWithSender(c.sender(), r,
-		DoRetryForStatusCodes(c.RetryAttempts, defaultRetryInterval, statusCodesForRetry...))
+		DoRetryForStatusCodes(c.RetryAttempts, c.RetryDuration, statusCodesForRetry...))
 	Respond(resp,
 		c.ByInspecting())
 	return resp, err

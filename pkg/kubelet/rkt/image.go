@@ -45,18 +45,18 @@ import (
 //
 // http://issue.k8s.io/7203
 //
-func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret) error {
+func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret) (string, error) {
 	img := image.Image
 	// TODO(yifan): The credential operation is a copy from dockertools package,
 	// Need to resolve the code duplication.
 	repoToPull, _, _, err := parsers.ParseImageName(img)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	keyring, err := credentialprovider.MakeDockerKeyring(pullSecrets, r.dockerKeyring)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	creds, ok := keyring.Lookup(repoToPull)
@@ -66,7 +66,7 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secr
 
 	userConfigDir, err := ioutil.TempDir("", "rktnetes-user-config-dir-")
 	if err != nil {
-		return fmt.Errorf("rkt: Cannot create a temporary user-config directory: %v", err)
+		return "", fmt.Errorf("rkt: Cannot create a temporary user-config directory: %v", err)
 	}
 	defer os.RemoveAll(userConfigDir)
 
@@ -74,7 +74,7 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secr
 	config.UserConfigDir = userConfigDir
 
 	if err := r.writeDockerAuthConfig(img, creds, userConfigDir); err != nil {
-		return err
+		return "", err
 	}
 
 	// Today, `--no-store` will fetch the remote image regardless of whether the content of the image
@@ -82,14 +82,20 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secr
 	// the image pull policy is 'always'. The issue is tracked in https://github.com/coreos/rkt/issues/2937.
 	if _, err := r.cli.RunCommand(&config, "fetch", "--no-store", dockerPrefix+img); err != nil {
 		glog.Errorf("Failed to fetch: %v", err)
-		return err
+		return "", err
 	}
-	return nil
+	return r.getImageID(img)
 }
 
-func (r *Runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
+func (r *Runtime) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
 	images, err := r.listImages(image.Image, false)
-	return len(images) > 0, err
+	if err != nil {
+		return "", err
+	}
+	if len(images) == 0 {
+		return "", nil
+	}
+	return images[0].Id, nil
 }
 
 // ListImages lists all the available appc images on the machine by invoking 'rkt image list'.

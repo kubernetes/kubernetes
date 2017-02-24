@@ -32,8 +32,8 @@ KUBE_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 DEPLOY_ROOT="${KUBE_ROOT}/federation/deploy"
 CUR_ROOT="$(pwd)"
 
-source "${KUBE_ROOT}/build-tools/common.sh"
-source "${KUBE_ROOT}/build-tools/util.sh"
+source "${KUBE_ROOT}/build/common.sh"
+source "${KUBE_ROOT}/build/util.sh"
 # Provides the detect-project function
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 # Provides logging facilities
@@ -43,10 +43,15 @@ readonly TMP_DIR="$(mktemp -d)"
 readonly FEDERATION_OUTPUT_ROOT="${LOCAL_OUTPUT_ROOT}/federation"
 readonly VERSIONS_FILE="${FEDERATION_OUTPUT_ROOT}/versions"
 
-detect-project
-readonly KUBE_PROJECT="${KUBE_PROJECT:-${PROJECT:-}}"
+if [[ "${KUBERNETES_PROVIDER}" == "gke" || "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+  detect-project
+  readonly KUBE_PROJECT="${KUBE_PROJECT:-${PROJECT:-}}"
+  readonly KUBE_REGISTRY="${KUBE_REGISTRY:-gcr.io/${KUBE_PROJECT}}"
+else
+  readonly KUBE_PROJECT="${KUBE_PROJECT:-${PROJECT:-federation}}"
+  readonly KUBE_REGISTRY="${KUBE_REGISTRY:-localhost:5000/${KUBE_PROJECT}}"
+fi
 
-readonly KUBE_REGISTRY="${KUBE_REGISTRY:-gcr.io/${KUBE_PROJECT}}"
 # In dev environments this value must be recomputed after build. See
 # the build_image() function. So not making it readonly
 KUBE_VERSION="${KUBE_VERSION:-}"
@@ -74,20 +79,12 @@ function dirty_sha() {
   GIT_ALTERNATE_OBJECT_DIRECTORIES="${objects_dir}" GIT_OBJECT_DIRECTORY="${tmp_objects_dir}" GIT_INDEX_FILE="${tmp_index}" git write-tree
 }
 
-function update_config() {
-  local -r q="${1:-}"
-  local -r cfile="${2:-}"
-  local -r bname="$(basename ${cfile})"
-
-  jq "${q}" "${cfile}" > "${TMP_DIR}/${bname}"
-  mv "${TMP_DIR}/${bname}" "${cfile}"
-}
-
 function build_binaries() {
   cd "${KUBE_ROOT}"
   kube::build::verify_prereqs
   kube::build::build_image
   kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube"
+  kube::build::copy_output
 }
 
 function build_image() {
@@ -107,8 +104,9 @@ function build_image() {
   # Write the generated version to the output versions file so that we can
   # reuse it.
   mkdir -p "${FEDERATION_OUTPUT_ROOT}"
-  jq -n --arg ver "${kube_version}" \
-    '{"KUBE_VERSION": $ver}' > "${VERSIONS_FILE}"
+  echo "{
+  \"KUBE_VERSION\": \"${kube_version}\"
+}" > "${VERSIONS_FILE}"
   kube::log::status "Wrote to version file ${VERSIONS_FILE}: ${kube_version}"
 
   BASEIMAGE="ubuntu:16.04" \
@@ -117,44 +115,24 @@ function build_image() {
     make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
 }
 
-function push() {
+function get_version() {
   local kube_version=""
   if [[ -n "${KUBE_VERSION:-}" ]]; then
     kube_version="${KUBE_VERSION}"
   else
     # Read the version back from the versions file if no version is given.
-    kube_version="$(jq -r '.KUBE_VERSION' ${VERSIONS_FILE})"
+    kube_version="$(cat ${VERSIONS_FILE} | python -c '\
+import json, sys;\
+print json.load(sys.stdin)["KUBE_VERSION"]')"
   fi
+  echo "${kube_version}"
+}
+
+function push() {
+  local -r kube_version="$(get_version)"
 
   kube::log::status "Pushing hyperkube image to the registry"
   gcloud docker -- push "${KUBE_REGISTRY}/hyperkube-amd64:${kube_version}"
-
-  # Update config after build and push, but before turning up the clusters
-  # to ensure the config has the right image version tags.
-  gen_or_update_config "${kube_version}"
-}
-
-function gen_or_update_config() {
-  local -r kube_version="${1:-}"
-
-  mkdir -p "${FEDERATION_OUTPUT_ROOT}"
-  cp "${DEPLOY_ROOT}/config.json.sample" "${FEDERATION_OUTPUT_ROOT}/config.json"
-
-  update_config \
-    '[.[] | .phase1.gce.project |= "'"${KUBE_PROJECT}"'"]' \
-        "${FEDERATION_OUTPUT_ROOT}/config.json"
-
-  # Not chaining for readability
-  update_config \
-    '[.[] | .phase2 = { docker_registry: "'"${KUBE_REGISTRY}"'", kubernetes_version: "'"${kube_version}"'" } ]' \
-    "${FEDERATION_OUTPUT_ROOT}/config.json"
-
-  cat <<EOF> "${FEDERATION_OUTPUT_ROOT}/values.yaml"
-apiserverRegistry: "${KUBE_REGISTRY}"
-apiserverVersion: "${kube_version}"
-controllerManagerRegistry: "${KUBE_REGISTRY}"
-controllerManagerVersion: "${kube_version}"
-EOF
 }
 
 readonly ACTION="${1:-}"

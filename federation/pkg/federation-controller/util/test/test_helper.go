@@ -24,14 +24,15 @@ import (
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	core "k8s.io/client-go/testing"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -40,7 +41,7 @@ const (
 	pushTimeout = 5 * time.Second
 )
 
-// A structure that distributes eventes to multiple watchers.
+// A structure that distributes events to multiple watchers.
 type WatcherDispatcher struct {
 	sync.Mutex
 	watchers       []*watch.RaceFreeFakeWatcher
@@ -225,6 +226,18 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *Watch
 	return objChan
 }
 
+// Adds an update reactor to the given fake client.
+// The reactor just returns the object passed to update action.
+// This is used as a hack to workaround https://github.com/kubernetes/kubernetes/issues/40939.
+// Without this, all update actions using fake client return empty objects.
+func AddFakeUpdateReactor(resource string, client *core.Fake) {
+	client.AddReactor("update", resource, func(action core.Action) (bool, runtime.Object, error) {
+		updateAction := action.(core.UpdateAction)
+		originalObj := updateAction.GetObject()
+		return true, originalObj, nil
+	})
+}
+
 // GetObjectFromChan tries to get an api object from the given channel
 // within a reasonable time.
 func GetObjectFromChan(c chan runtime.Object) runtime.Object {
@@ -264,7 +277,7 @@ func CheckObjectFromChan(c chan runtime.Object, checkFunction CheckingFunction) 
 }
 
 // CompareObjectMeta returns an error when the given objects are not equivalent.
-func CompareObjectMeta(a, b apiv1.ObjectMeta) error {
+func CompareObjectMeta(a, b metav1.ObjectMeta) error {
 	if a.Namespace != b.Namespace {
 		return fmt.Errorf("Different namespace expected:%s observed:%s", a.Namespace, b.Namespace)
 	}
@@ -272,10 +285,10 @@ func CompareObjectMeta(a, b apiv1.ObjectMeta) error {
 		return fmt.Errorf("Different name expected:%s observed:%s", a.Namespace, b.Namespace)
 	}
 	if !reflect.DeepEqual(a.Labels, b.Labels) && (len(a.Labels) != 0 || len(b.Labels) != 0) {
-		return fmt.Errorf("Labels are different expected:%v observerd:%v", a.Labels, b.Labels)
+		return fmt.Errorf("Labels are different expected:%v observed:%v", a.Labels, b.Labels)
 	}
 	if !reflect.DeepEqual(a.Annotations, b.Annotations) && (len(a.Annotations) != 0 || len(b.Annotations) != 0) {
-		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Annotations, b.Annotations)
+		return fmt.Errorf("Annotations are different expected:%v observed:%v", a.Annotations, b.Annotations)
 	}
 	return nil
 }
@@ -288,7 +301,7 @@ func ToFederatedInformerForTestOnly(informer util.FederatedInformer) util.Federa
 // NewCluster builds a new cluster object.
 func NewCluster(name string, readyStatus apiv1.ConditionStatus) *federationapi.Cluster {
 	return &federationapi.Cluster{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: map[string]string{},
 		},
@@ -333,6 +346,6 @@ func MetaAndSpecCheckingFunction(expected runtime.Object) CheckingFunction {
 		if util.ObjectMetaAndSpecEquivalent(obj, expected) {
 			return nil
 		}
-		return fmt.Errorf("Object different expected=%#v  received=%#v", expected, obj)
+		return fmt.Errorf("Object different expected=%#v received=%#v", expected, obj)
 	}
 }

@@ -18,13 +18,17 @@ package openstack
 
 import (
 	"os"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/rand"
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 
-	"github.com/rackspace/gophercloud"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -118,6 +122,115 @@ func TestToAuthOptions(t *testing.T) {
 	}
 }
 
+func TestCaller(t *testing.T) {
+	called := false
+	myFunc := func() { called = true }
+
+	c := NewCaller()
+	c.Call(myFunc)
+
+	if !called {
+		t.Errorf("Caller failed to call function in default case")
+	}
+
+	c.Disarm()
+	called = false
+	c.Call(myFunc)
+
+	if called {
+		t.Error("Caller still called function when disarmed")
+	}
+
+	// Confirm the "usual" deferred Caller pattern works as expected
+
+	called = false
+	success_case := func() {
+		c := NewCaller()
+		defer c.Call(func() { called = true })
+		c.Disarm()
+	}
+	if success_case(); called {
+		t.Error("Deferred success case still invoked unwind")
+	}
+
+	called = false
+	failure_case := func() {
+		c := NewCaller()
+		defer c.Call(func() { called = true })
+	}
+	if failure_case(); !called {
+		t.Error("Deferred failure case failed to invoke unwind")
+	}
+}
+
+// An arbitrary sort.Interface, just for easier comparison
+type AddressSlice []v1.NodeAddress
+
+func (a AddressSlice) Len() int           { return len(a) }
+func (a AddressSlice) Less(i, j int) bool { return a[i].Address < a[j].Address }
+func (a AddressSlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
+func TestNodeAddresses(t *testing.T) {
+	srv := servers.Server{
+		Status:     "ACTIVE",
+		HostID:     "29d3c8c896a45aa4c34e52247875d7fefc3d94bbcc9f622b5d204362",
+		AccessIPv4: "50.56.176.99",
+		AccessIPv6: "2001:4800:790e:510:be76:4eff:fe04:82a8",
+		Addresses: map[string]interface{}{
+			"private": []interface{}{
+				map[string]interface{}{
+					"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:7c:1b:2b",
+					"version":                 float64(4),
+					"addr":                    "10.0.0.32",
+					"OS-EXT-IPS:type":         "fixed",
+				},
+				map[string]interface{}{
+					"version":         float64(4),
+					"addr":            "50.56.176.36",
+					"OS-EXT-IPS:type": "floating",
+				},
+				map[string]interface{}{
+					"version": float64(4),
+					"addr":    "10.0.0.31",
+					// No OS-EXT-IPS:type
+				},
+			},
+			"public": []interface{}{
+				map[string]interface{}{
+					"version": float64(4),
+					"addr":    "50.56.176.35",
+				},
+				map[string]interface{}{
+					"version": float64(6),
+					"addr":    "2001:4800:780e:510:be76:4eff:fe04:84a8",
+				},
+			},
+		},
+	}
+
+	addrs, err := nodeAddresses(&srv)
+	if err != nil {
+		t.Fatalf("nodeAddresses returned error: %v", err)
+	}
+
+	sort.Sort(AddressSlice(addrs))
+	t.Logf("addresses is %v", addrs)
+
+	want := []v1.NodeAddress{
+		{Type: v1.NodeInternalIP, Address: "10.0.0.31"},
+		{Type: v1.NodeInternalIP, Address: "10.0.0.32"},
+		{Type: v1.NodeExternalIP, Address: "2001:4800:780e:510:be76:4eff:fe04:84a8"},
+		{Type: v1.NodeExternalIP, Address: "2001:4800:790e:510:be76:4eff:fe04:82a8"},
+		{Type: v1.NodeExternalIP, Address: "50.56.176.35"},
+		{Type: v1.NodeExternalIP, Address: "50.56.176.36"},
+		{Type: v1.NodeExternalIP, Address: "50.56.176.99"},
+	}
+
+	if !reflect.DeepEqual(want, addrs) {
+		t.Errorf("nodeAddresses returned incorrect value %v", addrs)
+	}
+}
+
 // This allows acceptance testing against an existing OpenStack
 // install, using the standard OS_* OpenStack client environment
 // variables.
@@ -134,14 +247,13 @@ func configFromEnv() (cfg Config, ok bool) {
 
 	cfg.Global.Username = os.Getenv("OS_USERNAME")
 	cfg.Global.Password = os.Getenv("OS_PASSWORD")
-	cfg.Global.ApiKey = os.Getenv("OS_API_KEY")
 	cfg.Global.Region = os.Getenv("OS_REGION_NAME")
 	cfg.Global.DomainId = os.Getenv("OS_DOMAIN_ID")
 	cfg.Global.DomainName = os.Getenv("OS_DOMAIN_NAME")
 
 	ok = (cfg.Global.AuthUrl != "" &&
 		cfg.Global.Username != "" &&
-		(cfg.Global.Password != "" || cfg.Global.ApiKey != "") &&
+		cfg.Global.Password != "" &&
 		(cfg.Global.TenantId != "" || cfg.Global.TenantName != "" ||
 			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
 
@@ -158,50 +270,6 @@ func TestNewOpenStack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
-}
-
-func TestInstances(t *testing.T) {
-	cfg, ok := configFromEnv()
-	if !ok {
-		t.Skipf("No config found in environment")
-	}
-
-	os, err := newOpenStack(cfg)
-	if err != nil {
-		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
-	}
-
-	i, ok := os.Instances()
-	if !ok {
-		t.Fatalf("Instances() returned false")
-	}
-
-	srvs, err := i.List(".")
-	if err != nil {
-		t.Fatalf("Instances.List() failed: %s", err)
-	}
-	if len(srvs) == 0 {
-		t.Fatalf("Instances.List() returned zero servers")
-	}
-	t.Logf("Found servers (%d): %s\n", len(srvs), srvs)
-
-	srvExternalId, err := i.ExternalID(srvs[0])
-	if err != nil {
-		t.Fatalf("Instances.ExternalId(%s) failed: %s", srvs[0], err)
-	}
-	t.Logf("Found server (%s), with external id: %s\n", srvs[0], srvExternalId)
-
-	srvInstanceId, err := i.InstanceID(srvs[0])
-	if err != nil {
-		t.Fatalf("Instance.InstanceId(%s) failed: %s", srvs[0], err)
-	}
-	t.Logf("Found server (%s), with instance id: %s\n", srvs[0], srvInstanceId)
-
-	addrs, err := i.NodeAddresses(srvs[0])
-	if err != nil {
-		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", srvs[0], err)
-	}
-	t.Logf("Found NodeAddresses(%s) = %s\n", srvs[0], addrs)
 }
 
 func TestLoadBalancer(t *testing.T) {
@@ -226,7 +294,7 @@ func TestLoadBalancer(t *testing.T) {
 			t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 		}
 
-		_, exists, err := lb.GetLoadBalancer(testClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "noexist"}})
+		_, exists, err := lb.GetLoadBalancer(testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
 		if err != nil {
 			t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 		}

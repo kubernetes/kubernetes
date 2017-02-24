@@ -26,16 +26,19 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -81,9 +84,9 @@ type Info struct {
 	// Optional, this is the provided object in a versioned type before defaulting
 	// and conversions into its corresponding internal type. This is useful for
 	// reflecting on user intent which may be lost after defaulting and conversions.
-	VersionedObject interface{}
+	VersionedObject runtime.Object
 	// Optional, this is the most recent value returned by the server if available
-	runtime.Object
+	Object runtime.Object
 	// Optional, this is the most recent resource version the server knows about for
 	// this type of resource. It may not match the resource version of the object,
 	// but if set it should be equal to or newer than the resource version of the
@@ -113,7 +116,7 @@ func (i *Info) Visit(fn VisitorFunc) error {
 func (i *Info) Get() (err error) {
 	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name, i.Export)
 	if err != nil {
-		if errors.IsNotFound(err) && len(i.Namespace) > 0 && i.Namespace != api.NamespaceDefault && i.Namespace != api.NamespaceAll {
+		if errors.IsNotFound(err) && len(i.Namespace) > 0 && i.Namespace != metav1.NamespaceDefault && i.Namespace != metav1.NamespaceAll {
 			err2 := i.Client.Get().AbsPath("api", "v1", "namespaces", i.Namespace).Do().Error()
 			if err2 != nil && errors.IsNotFound(err2) {
 				return err2
@@ -263,7 +266,7 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 		}
 
 		// Error - Set the error condition from the StatusCode
-		if statusCode != 200 {
+		if statusCode != http.StatusOK {
 			err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
 		}
 
@@ -489,7 +492,11 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 		}
 	}
 	defer f.Close()
-	v.StreamVisitor.Reader = f
+
+	// TODO: Consider adding a flag to force to UTF16, apparently some
+	// Windows tools don't write the BOM
+	utf16bom := unicode.BOMOverride(unicode.UTF8.NewDecoder())
+	v.StreamVisitor.Reader = transform.NewReader(f, utf16bom)
 
 	return v.StreamVisitor.Visit(fn)
 }
@@ -687,4 +694,14 @@ func FilterBySelector(s labels.Selector) FilterFunc {
 		}
 		return true, nil
 	}
+}
+
+type InfoListVisitor []*Info
+
+func (infos InfoListVisitor) Visit(fn VisitorFunc) error {
+	var err error
+	for _, i := range infos {
+		err = fn(i, err)
+	}
+	return err
 }

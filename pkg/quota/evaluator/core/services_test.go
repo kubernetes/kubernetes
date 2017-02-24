@@ -19,21 +19,30 @@ package core
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
 func TestServiceEvaluatorMatchesResources(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	evaluator := NewServiceEvaluator(kubeClient)
+	// we give a lot of resources
+	input := []api.ResourceName{
+		api.ResourceConfigMaps,
+		api.ResourceCPU,
+		api.ResourceServices,
+		api.ResourceServicesNodePorts,
+		api.ResourceServicesLoadBalancers,
+	}
+	// but we only match these...
 	expected := quota.ToSet([]api.ResourceName{
 		api.ResourceServices,
 		api.ResourceServicesNodePorts,
 		api.ResourceServicesLoadBalancers,
 	})
-	actual := quota.ToSet(evaluator.MatchesResources())
+	actual := quota.ToSet(evaluator.MatchingResources(input))
 	if !expected.Equal(actual) {
 		t.Errorf("expected: %v, actual: %v", expected, actual)
 	}
@@ -109,7 +118,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := evaluator.Usage(testCase.service)
+		actual, err := evaluator.Usage(testCase.service)
+		if err != nil {
+			t.Errorf("%s unexpected error: %v", testName, err)
+		}
 		if !quota.Equals(testCase.usage, actual) {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.usage, actual)
 		}
@@ -168,8 +180,11 @@ func TestServiceConstraintsFunc(t *testing.T) {
 			required: []api.ResourceName{api.ResourceServicesNodePorts},
 		},
 	}
+
+	kubeClient := fake.NewSimpleClientset()
+	evaluator := NewServiceEvaluator(kubeClient)
 	for testName, test := range testCases {
-		err := ServiceConstraintsFunc(test.required, test.service)
+		err := evaluator.Constraints(test.required, test.service)
 		switch {
 		case err != nil && len(test.err) == 0,
 			err == nil && len(test.err) != 0,

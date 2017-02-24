@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,13 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeClusterRoles implements ClusterRoleInterface
@@ -34,7 +35,7 @@ var clusterrolesResource = schema.GroupVersionResource{Group: "rbac.authorizatio
 
 func (c *FakeClusterRoles) Create(clusterRole *rbac.ClusterRole) (result *rbac.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootCreateAction(clusterrolesResource, clusterRole), &rbac.ClusterRole{})
+		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &rbac.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
@@ -43,43 +44,43 @@ func (c *FakeClusterRoles) Create(clusterRole *rbac.ClusterRole) (result *rbac.C
 
 func (c *FakeClusterRoles) Update(clusterRole *rbac.ClusterRole) (result *rbac.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateAction(clusterrolesResource, clusterRole), &rbac.ClusterRole{})
+		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &rbac.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*rbac.ClusterRole), err
 }
 
-func (c *FakeClusterRoles) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeClusterRoles) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewRootDeleteAction(clusterrolesResource, name), &rbac.ClusterRole{})
+		Invokes(testing.NewRootDeleteAction(clusterrolesResource, name), &rbac.ClusterRole{})
 	return err
 }
 
-func (c *FakeClusterRoles) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewRootDeleteCollectionAction(clusterrolesResource, listOptions)
+func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(clusterrolesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &rbac.ClusterRoleList{})
 	return err
 }
 
-func (c *FakeClusterRoles) Get(name string) (result *rbac.ClusterRole, err error) {
+func (c *FakeClusterRoles) Get(name string, options v1.GetOptions) (result *rbac.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootGetAction(clusterrolesResource, name), &rbac.ClusterRole{})
+		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &rbac.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*rbac.ClusterRole), err
 }
 
-func (c *FakeClusterRoles) List(opts api.ListOptions) (result *rbac.ClusterRoleList, err error) {
+func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *rbac.ClusterRoleList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootListAction(clusterrolesResource, opts), &rbac.ClusterRoleList{})
+		Invokes(testing.NewRootListAction(clusterrolesResource, opts), &rbac.ClusterRoleList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -93,15 +94,15 @@ func (c *FakeClusterRoles) List(opts api.ListOptions) (result *rbac.ClusterRoleL
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
-func (c *FakeClusterRoles) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewRootWatchAction(clusterrolesResource, opts))
+		InvokesWatch(testing.NewRootWatchAction(clusterrolesResource, opts))
 }
 
 // Patch applies the patch and returns the patched clusterRole.
-func (c *FakeClusterRoles) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRole, err error) {
+func (c *FakeClusterRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootPatchSubresourceAction(clusterrolesResource, name, data, subresources...), &rbac.ClusterRole{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, data, subresources...), &rbac.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}

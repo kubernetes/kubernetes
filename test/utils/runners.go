@@ -23,19 +23,26 @@ import (
 	"sync"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
+	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
+	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -44,6 +51,64 @@ const (
 	// String used to mark pod deletion
 	nonExist = "NonExist"
 )
+
+func removePtr(replicas *int32) int32 {
+	if replicas == nil {
+		return 0
+	}
+	return *replicas
+}
+
+func WaitUntilPodIsScheduled(c clientset.Interface, name, namespace string, timeout time.Duration) (*v1.Pod, error) {
+	// Wait until it's scheduled
+	p, err := c.Core().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
+	if err == nil && p.Spec.NodeName != "" {
+		return p, nil
+	}
+	pollingPeriod := 200 * time.Millisecond
+	startTime := time.Now()
+	for startTime.Add(timeout).After(time.Now()) {
+		time.Sleep(pollingPeriod)
+		p, err := c.Core().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
+		if err == nil && p.Spec.NodeName != "" {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("Timed out after %v when waiting for pod %v/%v to start.", timeout, namespace, name)
+}
+
+func RunPodAndGetNodeName(c clientset.Interface, pod *v1.Pod, timeout time.Duration) (string, error) {
+	name := pod.Name
+	namespace := pod.Namespace
+	var err error
+	// Create a Pod
+	for i := 0; i < retries; i++ {
+		_, err = c.Core().Pods(namespace).Create(pod)
+		if err == nil || apierrs.IsAlreadyExists(err) {
+			break
+		}
+	}
+	if err != nil && !apierrs.IsAlreadyExists(err) {
+		return "", err
+	}
+	p, err := WaitUntilPodIsScheduled(c, name, namespace, timeout)
+	if err != nil {
+		return "", err
+	}
+	return p.Spec.NodeName, nil
+}
+
+type RunObjectConfig interface {
+	Run() error
+	GetName() string
+	GetNamespace() string
+	GetKind() schema.GroupKind
+	GetClient() clientset.Interface
+	GetInternalClient() internalclientset.Interface
+	SetClient(clientset.Interface)
+	SetInternalClient(internalclientset.Interface)
+	GetReplicas() int
+}
 
 type RCConfig struct {
 	Client         clientset.Interface
@@ -97,6 +162,9 @@ type RCConfig struct {
 	// kubelets are running those variables should be nil.
 	NodeDumpFunc      func(c clientset.Interface, nodeNames []string, logFunc func(fmt string, args ...interface{}))
 	ContainerDumpFunc func(c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{}))
+
+	// Names of the secrets to mount
+	SecretNames []string
 }
 
 func (rc *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
@@ -111,6 +179,10 @@ type DeploymentConfig struct {
 }
 
 type ReplicaSetConfig struct {
+	RCConfig
+}
+
+type JobConfig struct {
 	RCConfig
 }
 
@@ -193,9 +265,17 @@ func RunDeployment(config DeploymentConfig) error {
 	return config.start()
 }
 
+func (config *DeploymentConfig) Run() error {
+	return RunDeployment(*config)
+}
+
+func (config *DeploymentConfig) GetKind() schema.GroupKind {
+	return extensionsinternal.Kind("Deployment")
+}
+
 func (config *DeploymentConfig) create() error {
 	deployment := &extensions.Deployment{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: extensions.DeploymentSpec{
@@ -206,7 +286,7 @@ func (config *DeploymentConfig) create() error {
 				},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -223,13 +303,17 @@ func (config *DeploymentConfig) create() error {
 		},
 	}
 
+	if len(config.SecretNames) > 0 {
+		attachSecrets(&deployment.Spec.Template, config.SecretNames)
+	}
+
 	config.applyTo(&deployment.Spec.Template)
 
 	_, err := config.Client.Extensions().Deployments(config.Namespace).Create(deployment)
 	if err != nil {
 		return fmt.Errorf("Error creating deployment: %v", err)
 	}
-	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, deployment.Spec.Replicas)
+	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, removePtr(deployment.Spec.Replicas))
 	return nil
 }
 
@@ -245,9 +329,17 @@ func RunReplicaSet(config ReplicaSetConfig) error {
 	return config.start()
 }
 
+func (config *ReplicaSetConfig) Run() error {
+	return RunReplicaSet(*config)
+}
+
+func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
+	return extensionsinternal.Kind("ReplicaSet")
+}
+
 func (config *ReplicaSetConfig) create() error {
 	rs := &extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: extensions.ReplicaSetSpec{
@@ -258,7 +350,7 @@ func (config *ReplicaSetConfig) create() error {
 				},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -275,13 +367,77 @@ func (config *ReplicaSetConfig) create() error {
 		},
 	}
 
+	if len(config.SecretNames) > 0 {
+		attachSecrets(&rs.Spec.Template, config.SecretNames)
+	}
+
 	config.applyTo(&rs.Spec.Template)
 
 	_, err := config.Client.Extensions().ReplicaSets(config.Namespace).Create(rs)
 	if err != nil {
 		return fmt.Errorf("Error creating replica set: %v", err)
 	}
-	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, rs.Spec.Replicas)
+	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, removePtr(rs.Spec.Replicas))
+	return nil
+}
+
+// RunJob baunches (and verifies correctness) of a Job
+// and will wait for all pods it spawns to become "Running".
+// It's the caller's responsibility to clean up externally (i.e. use the
+// namespace lifecycle for handling Cleanup).
+func RunJob(config JobConfig) error {
+	err := config.create()
+	if err != nil {
+		return err
+	}
+	return config.start()
+}
+
+func (config *JobConfig) Run() error {
+	return RunJob(*config)
+}
+
+func (config *JobConfig) GetKind() schema.GroupKind {
+	return batchinternal.Kind("Job")
+}
+
+func (config *JobConfig) create() error {
+	job := &batch.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Name,
+		},
+		Spec: batch.JobSpec{
+			Parallelism: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
+			Completions: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"name": config.Name},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    config.Name,
+							Image:   config.Image,
+							Command: config.Command,
+						},
+					},
+					RestartPolicy: v1.RestartPolicyOnFailure,
+				},
+			},
+		},
+	}
+
+	if len(config.SecretNames) > 0 {
+		attachSecrets(&job.Spec.Template, config.SecretNames)
+	}
+
+	config.applyTo(&job.Spec.Template)
+
+	_, err := config.Client.Batch().Jobs(config.Namespace).Create(job)
+	if err != nil {
+		return fmt.Errorf("Error creating job: %v", err)
+	}
+	config.RCConfigLog("Created job with name: %v, namespace: %v, parallelism/completions: %v", job.Name, config.Namespace, job.Spec.Parallelism)
 	return nil
 }
 
@@ -297,13 +453,49 @@ func RunRC(config RCConfig) error {
 	return config.start()
 }
 
+func (config *RCConfig) Run() error {
+	return RunRC(*config)
+}
+
+func (config *RCConfig) GetName() string {
+	return config.Name
+}
+
+func (config *RCConfig) GetNamespace() string {
+	return config.Namespace
+}
+
+func (config *RCConfig) GetKind() schema.GroupKind {
+	return api.Kind("ReplicationController")
+}
+
+func (config *RCConfig) GetClient() clientset.Interface {
+	return config.Client
+}
+
+func (config *RCConfig) GetInternalClient() internalclientset.Interface {
+	return config.InternalClient
+}
+
+func (config *RCConfig) SetClient(c clientset.Interface) {
+	config.Client = c
+}
+
+func (config *RCConfig) SetInternalClient(c internalclientset.Interface) {
+	config.InternalClient = c
+}
+
+func (config *RCConfig) GetReplicas() int {
+	return config.Replicas
+}
+
 func (config *RCConfig) create() error {
 	dnsDefault := v1.DNSDefault
 	if config.DNSPolicy == nil {
 		config.DNSPolicy = &dnsDefault
 	}
 	rc := &v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -312,7 +504,7 @@ func (config *RCConfig) create() error {
 				"name": config.Name,
 			},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -332,13 +524,17 @@ func (config *RCConfig) create() error {
 		},
 	}
 
+	if len(config.SecretNames) > 0 {
+		attachSecrets(rc.Spec.Template, config.SecretNames)
+	}
+
 	config.applyTo(rc.Spec.Template)
 
 	_, err := config.Client.Core().ReplicationControllers(config.Namespace).Create(rc)
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
-	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, rc.Spec.Replicas)
+	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, removePtr(rc.Spec.Replicas))
 	return nil
 }
 
@@ -540,8 +736,8 @@ func (config *RCConfig) start() error {
 
 	if oldRunning != config.Replicas {
 		// List only pods from a given replication controller.
-		options := v1.ListOptions{LabelSelector: label.String()}
-		if pods, err := config.Client.Core().Pods(v1.NamespaceAll).List(options); err == nil {
+		options := metav1.ListOptions{LabelSelector: label.String()}
+		if pods, err := config.Client.Core().Pods(metav1.NamespaceAll).List(options); err == nil {
 
 			for _, pod := range pods.Items {
 				config.RCConfigLog("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
@@ -657,7 +853,7 @@ func (s *LabelNodePrepareStrategy) PreparePatch(*v1.Node) []byte {
 }
 
 func (s *LabelNodePrepareStrategy) CleanupNode(node *v1.Node) *v1.Node {
-	objCopy, err := api.Scheme.DeepCopy(*node)
+	objCopy, err := api.Scheme.Copy(node)
 	if err != nil {
 		return &v1.Node{}
 	}
@@ -678,7 +874,7 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 		return nil
 	}
 	for attempt := 0; attempt < retries; attempt++ {
-		if _, err = client.Core().Nodes().Patch(node.Name, api.MergePatchType, []byte(patch)); err == nil {
+		if _, err = client.Core().Nodes().Patch(node.Name, types.MergePatchType, []byte(patch)); err == nil {
 			return nil
 		}
 		if !apierrs.IsConflict(err) {
@@ -691,12 +887,12 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 
 func DoCleanupNode(client clientset.Interface, nodeName string, strategy PrepareNodeStrategy) error {
 	for attempt := 0; attempt < retries; attempt++ {
-		node, err := client.Core().Nodes().Get(nodeName)
+		node, err := client.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("Skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
 		}
 		updatedNode := strategy.CleanupNode(node)
-		if api.Semantic.DeepEqual(node, updatedNode) {
+		if apiequality.Semantic.DeepEqual(node, updatedNode) {
 			return nil
 		}
 		if _, err = client.Core().Nodes().Update(updatedNode); err == nil {
@@ -805,14 +1001,14 @@ func createPod(client clientset.Interface, namespace string, podCount int, podTe
 
 func createController(client clientset.Interface, controllerName, namespace string, podCount int, podTemplate *v1.Pod) error {
 	rc := &v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: controllerName,
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: func(i int) *int32 { x := int32(i); return &x }(podCount),
 			Selector: map[string]string{"name": controllerName},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": controllerName},
 				},
 				Spec: podTemplate.Spec,
@@ -837,7 +1033,7 @@ func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
 
 func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 	basePod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "simple-pod-",
 		},
 		Spec: MakePodSpec(),
@@ -848,7 +1044,7 @@ func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
 		basePod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: controllerName + "-pod-",
 				Labels:       map[string]string{"name": controllerName},
 			},
@@ -859,4 +1055,150 @@ func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCrea
 		}
 		return createPod(client, namespace, podCount, basePod)
 	}
+}
+
+type SecretConfig struct {
+	Content   map[string]string
+	Client    clientset.Interface
+	Name      string
+	Namespace string
+	// If set this function will be used to print log lines instead of glog.
+	LogFunc func(fmt string, args ...interface{})
+}
+
+func (config *SecretConfig) Run() error {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Name,
+		},
+		StringData: map[string]string{},
+	}
+	for k, v := range config.Content {
+		secret.StringData[k] = v
+	}
+
+	_, err := config.Client.Core().Secrets(config.Namespace).Create(secret)
+	if err != nil {
+		return fmt.Errorf("Error creating secret: %v", err)
+	}
+	config.LogFunc("Created secret %v/%v", config.Namespace, config.Name)
+	return nil
+}
+
+func (config *SecretConfig) Stop() error {
+	if err := config.Client.Core().Secrets(config.Namespace).Delete(config.Name, &metav1.DeleteOptions{}); err != nil {
+		return fmt.Errorf("Error deleting secret: %v", err)
+	}
+	config.LogFunc("Deleted secret %v/%v", config.Namespace, config.Name)
+	return nil
+}
+
+// TODO: attach secrets using different possibilities: env vars, image pull secrets.
+func attachSecrets(template *v1.PodTemplateSpec, secretNames []string) {
+	volumes := make([]v1.Volume, 0, len(secretNames))
+	mounts := make([]v1.VolumeMount, 0, len(secretNames))
+	for _, name := range secretNames {
+		volumes = append(volumes, v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: name,
+				},
+			},
+		})
+		mounts = append(mounts, v1.VolumeMount{
+			Name:      name,
+			MountPath: fmt.Sprintf("/%v", name),
+		})
+	}
+
+	template.Spec.Volumes = volumes
+	template.Spec.Containers[0].VolumeMounts = mounts
+}
+
+type DaemonConfig struct {
+	Client    clientset.Interface
+	Name      string
+	Namespace string
+	Image     string
+	// If set this function will be used to print log lines instead of glog.
+	LogFunc func(fmt string, args ...interface{})
+	// How long we wait for DaemonSet to become running.
+	Timeout time.Duration
+}
+
+func (config *DaemonConfig) Run() error {
+	if config.Image == "" {
+		config.Image = "kubernetes/pause"
+	}
+	nameLabel := map[string]string{
+		"name": config.Name + "-daemon",
+	}
+	daemon := &extensions.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Name,
+		},
+		Spec: extensions.DaemonSetSpec{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: nameLabel,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  config.Name,
+							Image: config.Image,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := config.Client.Extensions().DaemonSets(config.Namespace).Create(daemon)
+	if err != nil {
+		return fmt.Errorf("Error creating DaemonSet %v: %v", config.Name, err)
+	}
+
+	var nodes *v1.NodeList
+	for i := 0; i < retries; i++ {
+		// Wait for all daemons to be running
+		nodes, err = config.Client.Core().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
+		if err == nil {
+			break
+		} else if i+1 == retries {
+			return fmt.Errorf("Error listing Nodes while waiting for DaemonSet %v: %v", config.Name, err)
+		}
+	}
+
+	timeout := config.Timeout
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
+
+	podStore := NewPodStore(config.Client, config.Namespace, labels.SelectorFromSet(nameLabel), fields.Everything())
+	defer podStore.Stop()
+
+	err = wait.Poll(time.Second, timeout, func() (bool, error) {
+		pods := podStore.List()
+
+		nodeHasDaemon := sets.NewString()
+		for _, pod := range pods {
+			podReady, _ := PodRunningReady(pod)
+			if pod.Spec.NodeName != "" && podReady {
+				nodeHasDaemon.Insert(pod.Spec.NodeName)
+			}
+		}
+
+		running := len(nodeHasDaemon)
+		config.LogFunc("Found %v/%v Daemons %v running", running, config.Name, len(nodes.Items))
+		return running == len(nodes.Items), nil
+	})
+	if err != nil {
+		config.LogFunc("Timed out while waiting for DaemonsSet %v/%v to be running.", config.Namespace, config.Name)
+	} else {
+		config.LogFunc("Created Daemon %v/%v", config.Namespace, config.Name)
+	}
+
+	return err
 }

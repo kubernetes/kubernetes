@@ -22,9 +22,10 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 )
 
@@ -123,6 +124,13 @@ type testExpirePodStruct struct {
 	assumedTime time.Time
 }
 
+func assumeAndFinishBinding(cache *schedulerCache, pod *v1.Pod, assumedTime time.Time) error {
+	if err := cache.AssumePod(pod); err != nil {
+		return err
+	}
+	return cache.finishBinding(pod, assumedTime)
+}
+
 // TestExpirePod tests that assumed pods will be removed if expired.
 // The removal will be reflected in node info.
 func TestExpirePod(t *testing.T) {
@@ -168,7 +176,7 @@ func TestExpirePod(t *testing.T) {
 		cache := newSchedulerCache(ttl, time.Second, nil)
 
 		for _, pod := range tt.pods {
-			if err := cache.assumePod(pod.pod, pod.assumedTime); err != nil {
+			if err := assumeAndFinishBinding(cache, pod.pod, pod.assumedTime); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
 		}
@@ -215,7 +223,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 	for i, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
 		for _, podToAssume := range tt.podsToAssume {
-			if err := cache.assumePod(podToAssume, now); err != nil {
+			if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
 		}
@@ -259,7 +267,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 	now := time.Now()
 	for i, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
-		if err := cache.assumePod(tt.pod, now); err != nil {
+		if err := assumeAndFinishBinding(cache, tt.pod, now); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
 		}
 		cache.cleanupAssumedPods(now.Add(2 * ttl))
@@ -388,7 +396,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 	for _, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
 		for _, podToAssume := range tt.podsToAssume {
-			if err := cache.assumePod(podToAssume, now); err != nil {
+			if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
 		}
@@ -471,7 +479,7 @@ func TestForgetPod(t *testing.T) {
 	for i, tt := range tests {
 		cache := newSchedulerCache(ttl, time.Second, nil)
 		for _, pod := range tt.pods {
-			if err := cache.assumePod(pod, now); err != nil {
+			if err := assumeAndFinishBinding(cache, pod, now); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
 		}
@@ -526,7 +534,7 @@ func makeBasePod(nodeName, objName, cpu, mem string, ports []v1.ContainerPort) *
 		}
 	}
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "node_info_cache_test",
 			Name:      objName,
 		},
@@ -565,7 +573,7 @@ func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) 
 		objName := fmt.Sprintf("%s-pod-%d", nodeName, i%10)
 		pod := makeBasePod(nodeName, objName, "0", "0", nil)
 
-		err := cache.assumePod(pod, assumedTime)
+		err := assumeAndFinishBinding(cache, pod, assumedTime)
 		if err != nil {
 			b.Fatalf("assumePod failed: %v", err)
 		}

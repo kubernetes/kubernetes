@@ -12,13 +12,13 @@ import (
 )
 
 // MarshalJSON returns a JSON encoding of schema containing only selected fields.
-// A field is selected if:
-//   * it has a non-empty value, or
-//     * its field name is present in forceSendFields, and
-//     * it is not a nil pointer or nil interface.
+// A field is selected if any of the following is true:
+//   * it has a non-empty value
+//   * its field name is present in forceSendFields and it is not a nil pointer or nil interface
+//   * its field name is present in nullFields.
 // The JSON key for each selected field is taken from the field's json: struct tag.
-func MarshalJSON(schema interface{}, forceSendFields []string) ([]byte, error) {
-	if len(forceSendFields) == 0 {
+func MarshalJSON(schema interface{}, forceSendFields, nullFields []string) ([]byte, error) {
+	if len(forceSendFields) == 0 && len(nullFields) == 0 {
 		return json.Marshal(schema)
 	}
 
@@ -26,15 +26,19 @@ func MarshalJSON(schema interface{}, forceSendFields []string) ([]byte, error) {
 	for _, f := range forceSendFields {
 		mustInclude[f] = struct{}{}
 	}
+	useNull := make(map[string]struct{})
+	for _, f := range nullFields {
+		useNull[f] = struct{}{}
+	}
 
-	dataMap, err := schemaToMap(schema, mustInclude)
+	dataMap, err := schemaToMap(schema, mustInclude, useNull)
 	if err != nil {
 		return nil, err
 	}
 	return json.Marshal(dataMap)
 }
 
-func schemaToMap(schema interface{}, mustInclude map[string]struct{}) (map[string]interface{}, error) {
+func schemaToMap(schema interface{}, mustInclude, useNull map[string]struct{}) (map[string]interface{}, error) {
 	m := make(map[string]interface{})
 	s := reflect.ValueOf(schema)
 	st := s.Type()
@@ -54,6 +58,14 @@ func schemaToMap(schema interface{}, mustInclude map[string]struct{}) (map[strin
 
 		v := s.Field(i)
 		f := st.Field(i)
+
+		if _, ok := useNull[f.Name]; ok {
+			if !isEmptyValue(v) {
+				return nil, fmt.Errorf("field %q in NullFields has non-empty value", f.Name)
+			}
+			m[tag.apiName] = nil
+			continue
+		}
 		if !includeField(v, f, mustInclude) {
 			continue
 		}

@@ -21,10 +21,11 @@ import (
 
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/admission"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 type mockVolumes struct {
@@ -79,7 +80,7 @@ func TestAdmission(t *testing.T) {
 	pvHandler := NewPersistentVolumeLabel()
 	handler := admission.NewChainHandler(pvHandler)
 	ignoredPV := api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{Name: "noncloud", Namespace: "myns"},
+		ObjectMeta: metav1.ObjectMeta{Name: "noncloud", Namespace: "myns"},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{
@@ -89,7 +90,7 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 	awsPV := api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{Name: "noncloud", Namespace: "myns"},
+		ObjectMeta: metav1.ObjectMeta{Name: "noncloud", Namespace: "myns"},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{

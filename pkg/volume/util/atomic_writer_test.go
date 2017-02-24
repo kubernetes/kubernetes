@@ -28,8 +28,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/sets"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 func TestNewAtomicWriter(t *testing.T) {
@@ -37,6 +37,7 @@ func TestNewAtomicWriter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error creating tmp dir: %v", err)
 	}
+	defer os.RemoveAll(targetDir)
 
 	_, err = NewAtomicWriter(targetDir, "-test-")
 	if err != nil {
@@ -225,6 +226,7 @@ func TestPathsToRemove(t *testing.T) {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
 		}
+		defer os.RemoveAll(targetDir)
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 		err = writer.Write(tc.payload1)
@@ -382,6 +384,7 @@ IAAAAAAAsDyZDwU=`
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
 		}
+		defer os.RemoveAll(targetDir)
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 		err = writer.Write(tc.payload)
@@ -557,6 +560,7 @@ func TestUpdate(t *testing.T) {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
 		}
+		defer os.RemoveAll(targetDir)
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 
@@ -724,6 +728,7 @@ func TestMultipleUpdates(t *testing.T) {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
 		}
+		defer os.RemoveAll(targetDir)
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 

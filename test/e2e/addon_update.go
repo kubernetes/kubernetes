@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
-	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -205,7 +205,7 @@ spec:
 const (
 	addonTestPollInterval = 3 * time.Second
 	addonTestPollTimeout  = 5 * time.Minute
-	defaultNsName         = v1.NamespaceDefault
+	defaultNsName         = metav1.NamespaceDefault
 	addonNsName           = "kube-system"
 )
 
@@ -329,11 +329,11 @@ var _ = framework.KubeDescribe("Addon update", func() {
 		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-test-v2", false)
 
 		By("verify invalid API addons weren't created")
-		_, err = f.ClientSet.Core().ReplicationControllers(addonNsName).Get("invalid-addon-test-v1")
+		_, err = f.ClientSet.Core().ReplicationControllers(addonNsName).Get("invalid-addon-test-v1", metav1.GetOptions{})
 		Expect(err).To(HaveOccurred())
-		_, err = f.ClientSet.Core().Services(addonNsName).Get("ivalid-addon-test")
+		_, err = f.ClientSet.Core().Services(addonNsName).Get("ivalid-addon-test", metav1.GetOptions{})
 		Expect(err).To(HaveOccurred())
-		_, err = f.ClientSet.Core().Services(defaultNsName).Get("ivalid-addon-test-v2")
+		_, err = f.ClientSet.Core().Services(defaultNsName).Get("ivalid-addon-test-v2", metav1.GetOptions{})
 		Expect(err).To(HaveOccurred())
 
 		// invalid addons will be deleted by the deferred function

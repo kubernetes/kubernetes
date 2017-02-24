@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestConversionError(t *testing.T) {
@@ -240,62 +240,6 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 	}
 }
 
-func TestGetAffinityFromPod(t *testing.T) {
-	testCases := []struct {
-		pod       *Pod
-		expectErr bool
-	}{
-		{
-			pod:       &Pod{},
-			expectErr: false,
-		},
-		{
-			pod: &Pod{
-				ObjectMeta: ObjectMeta{
-					Annotations: map[string]string{
-						AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			pod: &Pod{
-				ObjectMeta: ObjectMeta{
-					Annotations: map[string]string{
-						AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-						`,
-					},
-				},
-			},
-			expectErr: true,
-		},
-	}
-
-	for i, tc := range testCases {
-		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		}
-	}
-}
-
 func TestTaintToString(t *testing.T) {
 	testCases := []struct {
 		taint          *Taint
@@ -393,102 +337,6 @@ func TestMatchTaint(t *testing.T) {
 	for _, tc := range testCases {
 		if tc.expectMatch != tc.taint.MatchTaint(tc.taintToMatch) {
 			t.Errorf("[%s] expect taint %s match taint %s", tc.description, tc.taint.ToString(), tc.taintToMatch.ToString())
-		}
-	}
-}
-
-func TestGetAvoidPodsFromNode(t *testing.T) {
-	controllerFlag := true
-	testCases := []struct {
-		node        *Node
-		expectValue AvoidPods
-		expectErr   bool
-	}{
-		{
-			node:        &Node{},
-			expectValue: AvoidPods{},
-			expectErr:   false,
-		},
-		{
-			node: &Node{
-				ObjectMeta: ObjectMeta{
-					Annotations: map[string]string{
-						PreferAvoidPodsAnnotationKey: `
-							{
-							    "preferAvoidPods": [
-							        {
-							            "podSignature": {
-							                "podController": {
-						                            "apiVersion": "v1",
-						                            "kind": "ReplicationController",
-						                            "name": "foo",
-						                            "uid": "abcdef123456",
-						                            "controller": true
-							                }
-							            },
-							            "reason": "some reason",
-							            "message": "some message"
-							        }
-							    ]
-							}`,
-					},
-				},
-			},
-			expectValue: AvoidPods{
-				PreferAvoidPods: []PreferAvoidPodsEntry{
-					{
-						PodSignature: PodSignature{
-							PodController: &OwnerReference{
-								APIVersion: "v1",
-								Kind:       "ReplicationController",
-								Name:       "foo",
-								UID:        "abcdef123456",
-								Controller: &controllerFlag,
-							},
-						},
-						Reason:  "some reason",
-						Message: "some message",
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			node: &Node{
-				// Missing end symbol of "podController" and "podSignature"
-				ObjectMeta: ObjectMeta{
-					Annotations: map[string]string{
-						PreferAvoidPodsAnnotationKey: `
-							{
-							    "preferAvoidPods": [
-							        {
-							            "podSignature": {
-							                "podController": {
-							                    "kind": "ReplicationController",
-							                    "apiVersion": "v1"
-							            "reason": "some reason",
-							            "message": "some message"
-							        }
-							    ]
-							}`,
-					},
-				},
-			},
-			expectValue: AvoidPods{},
-			expectErr:   true,
-		},
-	}
-
-	for i, tc := range testCases {
-		v, err := GetAvoidPodsFromNodeAnnotations(tc.node.Annotations)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		}
-		if !reflect.DeepEqual(tc.expectValue, v) {
-			t.Errorf("[%v]expect value %v but got %v with %v", i, tc.expectValue, v, v.PreferAvoidPods[0].PodSignature.PodController.Controller)
 		}
 	}
 }

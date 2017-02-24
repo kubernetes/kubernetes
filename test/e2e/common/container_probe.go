@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -50,7 +51,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		p := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
 		f.WaitForPodReady(p.Name)
 
-		p, err := podClient.Get(p.Name)
+		p, err := podClient.Get(p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
@@ -76,14 +77,14 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	It("with readiness probe that fails should never be ready and never restart [Conformance]", func() {
 		p := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
 		Consistently(func() (bool, error) {
-			p, err := podClient.Get(p.Name)
+			p, err := podClient.Get(p.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
 			return v1.IsPodReady(p), nil
 		}, 1*time.Minute, 1*time.Second).ShouldNot(BeTrue(), "pod should not be ready")
 
-		p, err := podClient.Get(p.Name)
+		p, err := podClient.Get(p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		isReady, err := testutils.PodRunningReady(p)
@@ -95,7 +96,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 	It("should be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-exec",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -122,7 +123,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 	It("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-exec",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -149,7 +150,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 	It("should be restarted with a /healthz http liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -178,7 +179,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	// Slow by design (5 min)
 	It("should have monotonically increasing restart count [Conformance] [Slow]", func() {
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -206,7 +207,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 	It("should *not* be restarted with a /healthz http liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-http",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -237,7 +238,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		// TODO: enable this test once the default exec handler supports timeout.
 		Skip("The default exec handler, dockertools.NativeExecHandler, does not support timeouts due to a limitation in the Docker Remote API")
 		runLivenessTest(f, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-exec",
 				Labels: map[string]string{"test": "liveness"},
 			},
@@ -296,7 +297,7 @@ func getRestartCount(p *v1.Pod) int {
 
 func makePodSpec(readinessProbe, livenessProbe *v1.Probe) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "test-webserver-" + string(uuid.NewUUID())},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-webserver-" + string(uuid.NewUUID())},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
@@ -352,7 +353,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		By("deleting the pod")
-		podClient.Delete(pod.Name, v1.NewDeleteOptions(0))
+		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}()
 	By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
 	podClient.Create(pod)
@@ -360,13 +361,13 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(framework.WaitForPodNotPending(f.ClientSet, ns, pod.Name, pod.ResourceVersion),
+	framework.ExpectNoError(framework.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
 	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
 	// Check the pod's current state and verify that restartCount is present.
 	By("checking the pod's current state and verifying that restartCount is present")
-	pod, err := podClient.Get(pod.Name)
+	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
 	initialRestartCount := v1.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
@@ -376,7 +377,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	lastRestartCount := initialRestartCount
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
-		pod, err = podClient.Get(pod.Name)
+		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := v1.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {

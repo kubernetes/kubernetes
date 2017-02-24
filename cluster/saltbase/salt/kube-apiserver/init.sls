@@ -1,4 +1,4 @@
-{% if grains['cloud'] is defined and grains.cloud in ['aws', 'gce', 'vagrant', 'vsphere', 'photon-controller', 'openstack'] %}
+{% if grains['cloud'] is defined and grains.cloud in ['aws', 'gce', 'vagrant', 'photon-controller', 'openstack'] %}
 # TODO: generate and distribute tokens on other cloud providers.
 /srv/kubernetes/known_tokens.csv:
   file.managed:
@@ -26,6 +26,12 @@
 {% endif %}
 
 /var/log/kube-apiserver.log:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: 644
+
+/var/log/kube-apiserver-audit.log:
   file.managed:
     - user: root
     - group: root

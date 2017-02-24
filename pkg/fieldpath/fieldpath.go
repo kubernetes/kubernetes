@@ -22,13 +22,13 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// formatMap formats map[string]string to a string.
+// FormatMap formats map[string]string to a string.
 func FormatMap(m map[string]string) (fmtStr string) {
 	for key, value := range m {
 		fmtStr += fmt.Sprintf("%v=%q\n", key, value)
@@ -63,7 +63,7 @@ func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error)
 		return accessor.GetNamespace(), nil
 	}
 
-	return "", fmt.Errorf("Unsupported fieldPath: %v", fieldPath)
+	return "", fmt.Errorf("unsupported fieldPath: %v", fieldPath)
 }
 
 // TODO: move the functions below to pkg/api/util/resources
@@ -146,7 +146,7 @@ func InternalExtractContainerResourceValue(fs *api.ResourceFieldSelector, contai
 		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
 	}
 
-	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
+	return "", fmt.Errorf("unsupported container resource : %v", fs.Resource)
 }
 
 // findContainerInPod finds a container by its name in the provided pod
@@ -159,7 +159,7 @@ func findContainerInPod(pod *v1.Pod, containerName string) (*v1.Container, error
 	return nil, fmt.Errorf("container %s not found", containerName)
 }
 
-// convertResourceCPUTOString converts cpu value to the format of divisor and returns
+// convertResourceCPUToString converts cpu value to the format of divisor and returns
 // ceiling of the value.
 func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantity) (string, error) {
 	c := int64(math.Ceil(float64(cpu.MilliValue()) / float64(divisor.MilliValue())))

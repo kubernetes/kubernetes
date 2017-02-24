@@ -22,7 +22,7 @@ coreos:
         --tls-private-key-file=/opt/kubernetes/certs/${NODE_NAMES[$i]}-node-key.pem \
         $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster-dns=${DNS_SERVER_IP}" ) \
         $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster-domain=${DNS_DOMAIN}" ) \
-        --config=/opt/kubernetes/manifests
+        --pod-manifest-path=/opt/kubernetes/manifests
         Restart=always
         RestartSec=2
 

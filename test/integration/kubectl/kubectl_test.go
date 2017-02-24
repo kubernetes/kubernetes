@@ -21,8 +21,8 @@ package kubectl
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -40,8 +40,8 @@ func TestKubectlValidation(t *testing.T) {
 		// The following test the experimental api.
 		// TODO: Replace with something more robust. These may move.
 		{`{"apiVersion": "extensions/v1beta1", "kind": "Ingress"}`, false},
-		{`{"apiVersion": "extensions/v1beta1", "kind": "Job"}`, false},
-		{`{"apiVersion": "vNotAVersion", "kind": "Job"}`, false},
+		{`{"apiVersion": "extensions/v1beta1", "kind": "DaemonSet"}`, false},
+		{`{"apiVersion": "vNotAVersion", "kind": "DaemonSet"}`, false},
 	}
 	components := framework.NewMasterComponents(&framework.Config{})
 	defer components.Stop(true, true)

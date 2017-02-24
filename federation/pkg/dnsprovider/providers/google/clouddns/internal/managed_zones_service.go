@@ -20,11 +20,11 @@ import (
 	"strings"
 
 	dns "google.golang.org/api/dns/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ interfaces.ManagedZonesService = &ManagedZonesService{}
 
 type ManagedZonesService struct{ impl *dns.ManagedZonesService }

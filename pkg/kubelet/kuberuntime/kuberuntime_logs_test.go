@@ -18,14 +18,13 @@ package kuberuntime
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestLogOptions(t *testing.T) {
@@ -240,30 +239,5 @@ func TestWriteLogsWithBytesLimit(t *testing.T) {
 		}
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
 		assert.Equal(t, test.expectStderr, stderrBuf.String())
-	}
-}
-
-func TestTail(t *testing.T) {
-	line := strings.Repeat("a", blockSize)
-	testBytes := []byte(line + "\n" +
-		line + "\n" +
-		line + "\n" +
-		line + "\n" +
-		line[blockSize/2:]) // incomplete line
-
-	for c, test := range []struct {
-		n     int64
-		start int64
-	}{
-		{n: -1, start: 0},
-		{n: 0, start: int64(len(line)+1) * 4},
-		{n: 1, start: int64(len(line)+1) * 3},
-		{n: 9999, start: 0},
-	} {
-		t.Logf("TestCase #%d: %+v", c, test)
-		r := bytes.NewReader(testBytes)
-		s, err := tail(r, test.n)
-		assert.NoError(t, err)
-		assert.Equal(t, s, test.start)
 	}
 }

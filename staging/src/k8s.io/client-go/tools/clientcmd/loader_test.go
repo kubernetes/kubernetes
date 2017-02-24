@@ -28,7 +28,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 )
@@ -129,7 +129,7 @@ func TestErrorReadingNonFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
-	defer os.Remove(tmpdir)
+	defer os.RemoveAll(tmpdir)
 
 	loadingRules := ClientConfigLoadingRules{
 		ExplicitPath: tmpdir,
@@ -224,14 +224,15 @@ func TestResolveRelativePaths(t *testing.T) {
 	}
 
 	configDir1, _ := ioutil.TempDir("", "")
+	defer os.RemoveAll(configDir1)
 	configFile1 := path.Join(configDir1, ".kubeconfig")
 	configDir1, _ = filepath.Abs(configDir1)
-	defer os.Remove(configFile1)
+
 	configDir2, _ := ioutil.TempDir("", "")
+	defer os.RemoveAll(configDir2)
 	configDir2, _ = ioutil.TempDir(configDir2, "")
 	configFile2 := path.Join(configDir2, ".kubeconfig")
 	configDir2, _ = filepath.Abs(configDir2)
-	defer os.Remove(configFile2)
 
 	WriteToFile(pathResolutionConfig1, configFile1)
 	WriteToFile(pathResolutionConfig2, configFile2)

@@ -17,9 +17,9 @@ limitations under the License.
 package fake
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -52,16 +52,25 @@ func (g *genFakeForType) Imports(c *generator.Context) (imports []string) {
 	return g.imports.ImportLines()
 }
 
-// Ideally, we'd like hasStatus to return true if there is a subresource path
+// Ideally, we'd like genStatus to return true if there is a subresource path
 // registered for "status" in the API server, but we do not have that
-// information, so hasStatus returns true if the type has a status field.
-func hasStatus(t *types.Type) bool {
+// information, so genStatus returns true if the type has a status field.
+func genStatus(t *types.Type) bool {
+	// Default to true if we have a Status member
+	hasStatus := false
 	for _, m := range t.Members {
-		if m.Name == "Status" && strings.Contains(m.Tags, `json:"status`) {
-			return true
+		if m.Name == "Status" {
+			hasStatus = true
+			break
 		}
 	}
-	return false
+
+	// Allow overriding via a comment on the type
+	genStatus, err := types.ExtractSingleBoolCommentTag("+", "genclientstatus", hasStatus, t.SecondClosestCommentLines)
+	if err != nil {
+		fmt.Printf("error looking up +genclientstatus: %v\n", err)
+	}
+	return genStatus
 }
 
 // hasObjectMeta returns true if the type has a ObjectMeta field.
@@ -78,7 +87,6 @@ func hasObjectMeta(t *types.Type) bool {
 func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
-	const pkgTestingCore = "k8s.io/kubernetes/pkg/client/testing/core"
 	namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 	canonicalGroup := g.group
 	if canonicalGroup == "core" {
@@ -96,6 +104,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		groupName = override[0]
 	}
 
+	const pkgClientGoTesting = "k8s.io/client-go/testing"
 	m := map[string]interface{}{
 		"type":                 t,
 		"package":              pkg,
@@ -106,40 +115,35 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"group":                canonicalGroup,
 		"groupName":            groupName,
 		"version":              g.version,
-		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
-		"GroupVersionResource": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/runtime/schema", Name: "GroupVersionResource"}),
-		"PatchType":            c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "PatchType"}),
-		"Everything":           c.Universe.Function(types.Name{Package: "k8s.io/kubernetes/pkg/labels", Name: "Everything"}),
+		"DeleteOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
+		"ListOptions":          c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
+		"GetOptions":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
+		"Everything":           c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/labels", Name: "Everything"}),
+		"GroupVersionResource": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionResource"}),
+		"PatchType":            c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
+		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 
-		"NewRootListAction":              c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootListAction"}),
-		"NewListAction":                  c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewListAction"}),
-		"NewRootGetAction":               c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootGetAction"}),
-		"NewGetAction":                   c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewGetAction"}),
-		"NewRootDeleteAction":            c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootDeleteAction"}),
-		"NewDeleteAction":                c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewDeleteAction"}),
-		"NewRootDeleteCollectionAction":  c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootDeleteCollectionAction"}),
-		"NewDeleteCollectionAction":      c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewDeleteCollectionAction"}),
-		"NewRootUpdateAction":            c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootUpdateAction"}),
-		"NewUpdateAction":                c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewUpdateAction"}),
-		"NewRootCreateAction":            c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootCreateAction"}),
-		"NewCreateAction":                c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewCreateAction"}),
-		"NewRootWatchAction":             c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootWatchAction"}),
-		"NewWatchAction":                 c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewWatchAction"}),
-		"NewUpdateSubresourceAction":     c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewUpdateSubresourceAction"}),
-		"NewRootUpdateSubresourceAction": c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootUpdateSubresourceAction"}),
-		"NewRootPatchAction":             c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootPatchAction"}),
-		"NewPatchAction":                 c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewPatchAction"}),
-		"NewRootPatchSubresourceAction":  c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootPatchSubresourceAction"}),
-		"NewPatchSubresourceAction":      c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewPatchSubresourceAction"}),
-		"ExtractFromListOptions":         c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "ExtractFromListOptions"}),
-	}
-
-	if g.version == "" {
-		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"})
-		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"})
-	} else {
-		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "DeleteOptions"})
-		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "ListOptions"})
+		"NewRootListAction":              c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootListAction"}),
+		"NewListAction":                  c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewListAction"}),
+		"NewRootGetAction":               c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootGetAction"}),
+		"NewGetAction":                   c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewGetAction"}),
+		"NewRootDeleteAction":            c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootDeleteAction"}),
+		"NewDeleteAction":                c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewDeleteAction"}),
+		"NewRootDeleteCollectionAction":  c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootDeleteCollectionAction"}),
+		"NewDeleteCollectionAction":      c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewDeleteCollectionAction"}),
+		"NewRootUpdateAction":            c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootUpdateAction"}),
+		"NewUpdateAction":                c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewUpdateAction"}),
+		"NewRootCreateAction":            c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootCreateAction"}),
+		"NewCreateAction":                c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewCreateAction"}),
+		"NewRootWatchAction":             c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootWatchAction"}),
+		"NewWatchAction":                 c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewWatchAction"}),
+		"NewUpdateSubresourceAction":     c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewUpdateSubresourceAction"}),
+		"NewRootUpdateSubresourceAction": c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootUpdateSubresourceAction"}),
+		"NewRootPatchAction":             c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootPatchAction"}),
+		"NewPatchAction":                 c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewPatchAction"}),
+		"NewRootPatchSubresourceAction":  c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootPatchSubresourceAction"}),
+		"NewPatchSubresourceAction":      c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewPatchSubresourceAction"}),
+		"ExtractFromListOptions":         c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "ExtractFromListOptions"}),
 	}
 
 	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
@@ -155,7 +159,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		sw.Do(createTemplate, m)
 		sw.Do(updateTemplate, m)
 		// Generate the UpdateStatus method if the type has a status
-		if hasStatus(t) {
+		if genStatus(t) {
 			sw.Do(updateStatusTemplate, m)
 		}
 		sw.Do(deleteTemplate, m)
@@ -230,7 +234,7 @@ func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type
 `
 
 var getTemplate = `
-func (c *Fake$.type|publicPlural$) Get(name string) (result *$.type|raw$, err error) {
+func (c *Fake$.type|publicPlural$) Get(name string, options $.GetOptions|raw$) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewGetAction|raw$($.type|allLowercasePlural$Resource, c.ns, name), &$.type|raw${})
 		$else$Invokes($.NewRootGetAction|raw$($.type|allLowercasePlural$Resource, name), &$.type|raw${})$end$

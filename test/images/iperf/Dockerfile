@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.2
-MAINTAINER jay@apache.org
+FROM gcr.io/google_containers/ubuntu-slim:0.6
 RUN apt-get update && apt-get install -y --no-install-recommends iperf bash \
   && apt-get clean -y \
   && rm -rf /var/lib/apt/lists/* \

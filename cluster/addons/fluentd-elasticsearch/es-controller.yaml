@@ -20,7 +20,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/elasticsearch:v2.4.1
+      - image: gcr.io/google_containers/elasticsearch:v2.4.1-1
         name: elasticsearch-logging
         resources:
           # need more cpu upon initialization, therefore burstable class
@@ -38,6 +38,11 @@ spec:
         volumeMounts:
         - name: es-persistent-storage
           mountPath: /data
+        env:
+        - name: "NAMESPACE"
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
       volumes:
       - name: es-persistent-storage
         emptyDir: {}

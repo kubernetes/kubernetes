@@ -31,8 +31,9 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -51,6 +52,7 @@ var e2es *services.E2EServices
 
 // TODO(random-liu): Change the following modes to sub-command.
 var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
+var runKubeletMode = flag.Bool("run-kubelet-mode", false, "If true, only start kubelet, and not run test.")
 var systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only run system validation in current process, and not run test.")
 
 func init() {
@@ -63,7 +65,6 @@ func init() {
 	// It seems that someone is using flag.Parse() after init() and TestMain().
 	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic
 	// into TestContext.
-	pflag.CommandLine.MarkHidden("enable-cri")
 }
 
 func TestMain(m *testing.M) {
@@ -81,6 +82,11 @@ func TestE2eNode(t *testing.T) {
 		services.RunE2EServices()
 		return
 	}
+	if *runKubeletMode {
+		// If run-kubelet-mode is specified, only start kubelet.
+		services.RunKubelet()
+		return
+	}
 	if *systemValidateMode {
 		// If system-validate-mode is specified, only run system validation in current process.
 		if framework.TestContext.NodeConformance {
@@ -92,7 +98,7 @@ func TestE2eNode(t *testing.T) {
 				glog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if err := system.ValidateDefault(); err != nil {
+		if err := system.ValidateDefault(framework.TestContext.ContainerRuntime); err != nil {
 			glog.Exitf("system validation failed: %v", err)
 		}
 		return
@@ -246,7 +252,7 @@ func updateTestContext() error {
 
 // getNode gets node object from the apiserver.
 func getNode(c *clientset.Clientset) (*v1.Node, error) {
-	nodes, err := c.Nodes().List(v1.ListOptions{})
+	nodes, err := c.Nodes().List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil.")

@@ -17,20 +17,23 @@ limitations under the License.
 package certificates
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store CSRs.
 type Registry interface {
-	ListCSRs(ctx api.Context, options *api.ListOptions) (*certificates.CertificateSigningRequestList, error)
-	CreateCSR(ctx api.Context, csr *certificates.CertificateSigningRequest) error
-	UpdateCSR(ctx api.Context, csr *certificates.CertificateSigningRequest) error
-	GetCSR(ctx api.Context, csrID string) (*certificates.CertificateSigningRequest, error)
-	DeleteCSR(ctx api.Context, csrID string) error
-	WatchCSRs(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
+	ListCSRs(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*certificates.CertificateSigningRequestList, error)
+	CreateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error
+	UpdateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error
+	GetCSR(ctx genericapirequest.Context, csrID string, options *metav1.GetOptions) (*certificates.CertificateSigningRequest, error)
+	DeleteCSR(ctx genericapirequest.Context, csrID string) error
+	WatchCSRs(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -44,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListCSRs(ctx api.Context, options *api.ListOptions) (*certificates.CertificateSigningRequestList, error) {
+func (s *storage) ListCSRs(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*certificates.CertificateSigningRequestList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -53,29 +56,29 @@ func (s *storage) ListCSRs(ctx api.Context, options *api.ListOptions) (*certific
 	return obj.(*certificates.CertificateSigningRequestList), nil
 }
 
-func (s *storage) CreateCSR(ctx api.Context, csr *certificates.CertificateSigningRequest) error {
+func (s *storage) CreateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error {
 	_, err := s.Create(ctx, csr)
 	return err
 }
 
-func (s *storage) UpdateCSR(ctx api.Context, csr *certificates.CertificateSigningRequest) error {
+func (s *storage) UpdateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error {
 	_, _, err := s.Update(ctx, csr.Name, rest.DefaultUpdatedObjectInfo(csr, api.Scheme))
 	return err
 }
 
-func (s *storage) WatchCSRs(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchCSRs(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetCSR(ctx api.Context, name string) (*certificates.CertificateSigningRequest, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetCSR(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*certificates.CertificateSigningRequest, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*certificates.CertificateSigningRequest), nil
 }
 
-func (s *storage) DeleteCSR(ctx api.Context, name string) error {
+func (s *storage) DeleteCSR(ctx genericapirequest.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }

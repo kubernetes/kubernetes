@@ -27,21 +27,22 @@ import (
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/clock"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/runtime"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util/clock"
-	"k8s.io/kubernetes/pkg/util/sets"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
@@ -56,18 +57,18 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 
 func newReplicationController(replicas int) *v1.ReplicationController {
 	rc := &v1.ReplicationController{
-		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
-		ObjectMeta: v1.ObjectMeta{
+		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"name": "foo",
 						"type": "production",
@@ -99,7 +100,7 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, rc *v1.Replica
 	pods := []v1.Pod{}
 	for i := 0; i < count; i++ {
 		newPod := v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod%d", i),
 				Labels:    rc.Spec.Selector,
 				Namespace: rc.Namespace,
@@ -113,6 +114,45 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, rc *v1.Replica
 	}
 	return &v1.PodList{
 		Items: pods,
+	}
+}
+
+func newReplicaSet(name string, replicas int) *extensions.ReplicaSet {
+	return &extensions.ReplicaSet{
+		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             uuid.NewUUID(),
+			Name:            name,
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "18",
+		},
+		Spec: extensions.ReplicaSetSpec{
+			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+						"type": "production",
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Image: "foo/bar",
+							TerminationMessagePath: v1.TerminationMessagePathDefault,
+							ImagePullPolicy:        v1.PullIfNotPresent,
+							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+					DNSPolicy:     v1.DNSDefault,
+					NodeSelector: map[string]string{
+						"baz": "blah",
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -239,15 +279,15 @@ func TestUIDExpectations(t *testing.T) {
 }
 
 func TestCreatePods(t *testing.T) {
-	ns := v1.NamespaceDefault
-	body := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "empty_pod"}})
+	ns := metav1.NamespaceDefault
+	body := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	podControl := RealPodControl{
 		KubeClient: clientset,
@@ -262,19 +302,19 @@ func TestCreatePods(t *testing.T) {
 	}
 
 	expectedPod := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels:       controllerSpec.Spec.Template.Labels,
 			GenerateName: fmt.Sprintf("%s-", controllerSpec.Name),
 		},
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
-	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", v1.NamespaceDefault, ""), "POST", nil)
+	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", metav1.NamespaceDefault, ""), "POST", nil)
 	var actualPod = &v1.Pod{}
 	err := json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !api.Semantic.DeepDerivative(&expectedPod, actualPod) {
+	if !apiequality.Semantic.DeepDerivative(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
 		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", &expectedPod, actualPod)
 	}
@@ -379,5 +419,27 @@ func TestSortingActivePods(t *testing.T) {
 		if !reflect.DeepEqual(actual, expected) {
 			t.Errorf("expected %v, got %v", expected, actual)
 		}
+	}
+}
+
+func TestActiveReplicaSetsFiltering(t *testing.T) {
+	var replicaSets []*extensions.ReplicaSet
+	replicaSets = append(replicaSets, newReplicaSet("zero", 0))
+	replicaSets = append(replicaSets, nil)
+	replicaSets = append(replicaSets, newReplicaSet("foo", 1))
+	replicaSets = append(replicaSets, newReplicaSet("bar", 2))
+	expectedNames := sets.NewString()
+	for _, rs := range replicaSets[2:] {
+		expectedNames.Insert(rs.Name)
+	}
+
+	got := FilterActiveReplicaSets(replicaSets)
+	gotNames := sets.NewString()
+	for _, rs := range got {
+		gotNames.Insert(rs.Name)
+	}
+
+	if expectedNames.Difference(gotNames).Len() != 0 || gotNames.Difference(expectedNames).Len() != 0 {
+		t.Errorf("expected %v, got %v", expectedNames.List(), gotNames.List())
 	}
 }

@@ -20,26 +20,28 @@ import (
 	"fmt"
 	"strconv"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
 type jobStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
-var Strategy = jobStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = jobStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all jobs need to be within a namespace.
 func (jobStrategy) NamespaceScoped() bool {
@@ -47,20 +49,20 @@ func (jobStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a job before creation.
-func (jobStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+func (jobStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	job := obj.(*batch.Job)
 	job.Status = batch.JobStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (jobStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (jobStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
 }
 
 // Validate validates a new job.
-func (jobStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+func (jobStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	job := obj.(*batch.Job)
 	// TODO: move UID generation earlier and do this in defaulting logic?
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
@@ -133,7 +135,7 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (jobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (jobStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateJob(obj.(*batch.Job))
 	updateErrorList := validation.ValidateJobUpdate(obj.(*batch.Job), old.(*batch.Job))
 	return append(validationErrorList, updateErrorList...)
@@ -145,13 +147,13 @@ type jobStatusStrategy struct {
 
 var StatusStrategy = jobStatusStrategy{Strategy}
 
-func (jobStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (jobStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Spec = oldJob.Spec
 }
 
-func (jobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (jobStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateJobUpdateStatus(obj.(*batch.Job), old.(*batch.Job))
 }
 

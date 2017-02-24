@@ -1,3 +1,23 @@
-maintainers:
+approvers:
 - pmorie
-- sdminonne
+- saad-ali
+- thockin
+- matchstick
+reviewers:
+- ivan4th
+- rata
+- sjenning
+- thockin
+- smarterclayton
+- deads2k
+- brendandburns
+- derekwaynecarr
+- bprashanth
+- pmorie
+- saad-ali
+- justinsb
+- jsafrane
+- rootfs
+- jingxu97
+- rkouj
+- msau42

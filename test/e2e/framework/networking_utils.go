@@ -17,23 +17,29 @@ limitations under the License.
 package framework
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/rand"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/util/wait"
+	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )
 
 const (
@@ -315,9 +321,9 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node s
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: config.Namespace,
 		},
@@ -359,9 +365,9 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testPodName,
 			Namespace: config.Namespace,
 		},
@@ -391,7 +397,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 
 func (config *NetworkingTestConfig) createNodePortService(selector map[string]string) {
 	serviceSpec := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: nodePortServiceName,
 		},
 		Spec: v1.ServiceSpec{
@@ -423,12 +429,12 @@ func (config *NetworkingTestConfig) createTestPods() {
 	ExpectNoError(config.f.WaitForPodRunning(hostTestContainerPod.Name))
 
 	var err error
-	config.TestContainerPod, err = config.getPodClient().Get(testContainerPod.Name)
+	config.TestContainerPod, err = config.getPodClient().Get(testContainerPod.Name, metav1.GetOptions{})
 	if err != nil {
 		Failf("Failed to retrieve %s pod: %v", testContainerPod.Name, err)
 	}
 
-	config.HostTestContainerPod, err = config.getPodClient().Get(hostTestContainerPod.Name)
+	config.HostTestContainerPod, err = config.getPodClient().Get(hostTestContainerPod.Name, metav1.GetOptions{})
 	if err != nil {
 		Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
 	}
@@ -441,7 +447,7 @@ func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.S
 	err = WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
-	createdService, err := config.getServiceClient().Get(serviceSpec.Name)
+	createdService, err := config.getServiceClient().Get(serviceSpec.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	return createdService
@@ -495,7 +501,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 func (config *NetworkingTestConfig) cleanup() {
 	nsClient := config.getNamespacesClient()
-	nsList, err := nsClient.List(v1.ListOptions{})
+	nsList, err := nsClient.List(metav1.ListOptions{})
 	if err == nil {
 		for _, ns := range nsList.Items {
 			if strings.Contains(ns.Name, config.f.BaseName) && ns.Name != config.Namespace {
@@ -542,7 +548,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	runningPods := make([]*v1.Pod, 0, len(nodes))
 	for _, p := range createdPods {
 		ExpectNoError(config.f.WaitForPodReady(p.Name))
-		rp, err := config.getPodClient().Get(p.Name)
+		rp, err := config.getPodClient().Get(p.Name, metav1.GetOptions{})
 		ExpectNoError(err)
 		runningPods = append(runningPods, rp)
 	}
@@ -552,7 +558,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 
 func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	pod := config.EndpointPods[0]
-	config.getPodClient().Delete(pod.Name, v1.NewDeleteOptions(0))
+	config.getPodClient().Delete(pod.Name, metav1.NewDeleteOptions(0))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
 	err := WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
@@ -585,4 +591,238 @@ func (config *NetworkingTestConfig) getServiceClient() coreclientset.ServiceInte
 
 func (config *NetworkingTestConfig) getNamespacesClient() coreclientset.NamespaceInterface {
 	return config.f.ClientSet.Core().Namespaces()
+}
+
+func CheckReachabilityFromPod(expectToBeReachable bool, namespace, pod, target string) {
+	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
+	err := wait.PollImmediate(Poll, 2*time.Minute, func() (bool, error) {
+		_, err := RunHostCmd(namespace, pod, cmd)
+		if expectToBeReachable && err != nil {
+			Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
+			return false, nil
+		}
+
+		if !expectToBeReachable && err == nil {
+			Logf("Expect target NOT to be reachable. But it is reachable. Retry until timeout")
+			return false, nil
+		}
+		return true, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+}
+
+// Does an HTTP GET, but does not reuse TCP connections
+// This masks problems where the iptables rule has changed, but we don't see it
+// This is intended for relatively quick requests (status checks), so we set a short (5 seconds) timeout
+func httpGetNoConnectionPool(url string) (*http.Response, error) {
+	return httpGetNoConnectionPoolTimeout(url, 5*time.Second)
+}
+
+func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Response, error) {
+	tr := utilnet.SetTransportDefaults(&http.Transport{
+		DisableKeepAlives: true,
+	})
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   timeout,
+	}
+
+	return client.Get(url)
+}
+
+func TestReachableHTTP(ip string, port int, request string, expect string) (bool, error) {
+	return TestReachableHTTPWithContent(ip, port, request, expect, nil)
+}
+
+func TestReachableHTTPWithContent(ip string, port int, request string, expect string, content *bytes.Buffer) (bool, error) {
+	return TestReachableHTTPWithContentTimeout(ip, port, request, expect, content, 5*time.Second)
+}
+
+func TestReachableHTTPWithContentTimeout(ip string, port int, request string, expect string, content *bytes.Buffer, timeout time.Duration) (bool, error) {
+	url := fmt.Sprintf("http://%s:%d%s", ip, port, request)
+	if ip == "" {
+		Failf("Got empty IP for reachability check (%s)", url)
+		return false, nil
+	}
+	if port == 0 {
+		Failf("Got port==0 for reachability check (%s)", url)
+		return false, nil
+	}
+
+	Logf("Testing HTTP reachability of %v", url)
+
+	resp, err := httpGetNoConnectionPoolTimeout(url, timeout)
+	if err != nil {
+		Logf("Got error testing for reachability of %s: %v", url, err)
+		return false, nil
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		Logf("Got error reading response from %s: %v", url, err)
+		return false, nil
+	}
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s",
+			resp.Status, url, string(body))
+	}
+	if !strings.Contains(string(body), expect) {
+		return false, fmt.Errorf("received response body without expected substring %q: %s", expect, string(body))
+	}
+	if content != nil {
+		content.Write(body)
+	}
+	return true, nil
+}
+
+func TestNotReachableHTTP(ip string, port int) (bool, error) {
+	return TestNotReachableHTTPTimeout(ip, port, 5*time.Second)
+}
+
+func TestNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) (bool, error) {
+	url := fmt.Sprintf("http://%s:%d", ip, port)
+	if ip == "" {
+		Failf("Got empty IP for non-reachability check (%s)", url)
+		return false, nil
+	}
+	if port == 0 {
+		Failf("Got port==0 for non-reachability check (%s)", url)
+		return false, nil
+	}
+
+	Logf("Testing HTTP non-reachability of %v", url)
+
+	resp, err := httpGetNoConnectionPoolTimeout(url, timeout)
+	if err != nil {
+		Logf("Confirmed that %s is not reachable", url)
+		return true, nil
+	}
+	resp.Body.Close()
+	return false, nil
+}
+
+func TestReachableUDP(ip string, port int, request string, expect string) (bool, error) {
+	uri := fmt.Sprintf("udp://%s:%d", ip, port)
+	if ip == "" {
+		Failf("Got empty IP for reachability check (%s)", uri)
+		return false, nil
+	}
+	if port == 0 {
+		Failf("Got port==0 for reachability check (%s)", uri)
+		return false, nil
+	}
+
+	Logf("Testing UDP reachability of %v", uri)
+
+	con, err := net.Dial("udp", ip+":"+strconv.Itoa(port))
+	if err != nil {
+		return false, fmt.Errorf("Failed to dial %s:%d: %v", ip, port, err)
+	}
+
+	_, err = con.Write([]byte(fmt.Sprintf("%s\n", request)))
+	if err != nil {
+		return false, fmt.Errorf("Failed to send request: %v", err)
+	}
+
+	var buf []byte = make([]byte, len(expect)+1)
+
+	err = con.SetDeadline(time.Now().Add(3 * time.Second))
+	if err != nil {
+		return false, fmt.Errorf("Failed to set deadline: %v", err)
+	}
+
+	_, err = con.Read(buf)
+	if err != nil {
+		return false, nil
+	}
+
+	if !strings.Contains(string(buf), expect) {
+		return false, fmt.Errorf("Failed to retrieve %q, got %q", expect, string(buf))
+	}
+
+	Logf("Successfully reached %v", uri)
+	return true, nil
+}
+
+func TestNotReachableUDP(ip string, port int, request string) (bool, error) {
+	uri := fmt.Sprintf("udp://%s:%d", ip, port)
+	if ip == "" {
+		Failf("Got empty IP for reachability check (%s)", uri)
+		return false, nil
+	}
+	if port == 0 {
+		Failf("Got port==0 for reachability check (%s)", uri)
+		return false, nil
+	}
+
+	Logf("Testing UDP non-reachability of %v", uri)
+
+	con, err := net.Dial("udp", ip+":"+strconv.Itoa(port))
+	if err != nil {
+		Logf("Confirmed that %s is not reachable", uri)
+		return true, nil
+	}
+
+	_, err = con.Write([]byte(fmt.Sprintf("%s\n", request)))
+	if err != nil {
+		Logf("Confirmed that %s is not reachable", uri)
+		return true, nil
+	}
+
+	var buf []byte = make([]byte, 1)
+
+	err = con.SetDeadline(time.Now().Add(3 * time.Second))
+	if err != nil {
+		return false, fmt.Errorf("Failed to set deadline: %v", err)
+	}
+
+	_, err = con.Read(buf)
+	if err != nil {
+		Logf("Confirmed that %s is not reachable", uri)
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func TestHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String) error {
+	return TestHitNodesFromOutsideWithCount(externalIP, httpPort, timeout, expectedHosts, 1)
+}
+
+func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String,
+	countToSucceed int) error {
+	Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
+	hittedHosts := sets.NewString()
+	count := 0
+	condition := func() (bool, error) {
+		var respBody bytes.Buffer
+		reached, err := TestReachableHTTPWithContentTimeout(externalIP, int(httpPort), "/hostname", "", &respBody,
+			1*time.Second)
+		if err != nil || !reached {
+			return false, nil
+		}
+		hittedHost := strings.TrimSpace(respBody.String())
+		if !expectedHosts.Has(hittedHost) {
+			Logf("Error hitting unexpected host: %v, reset counter: %v", hittedHost, count)
+			count = 0
+			return false, nil
+		}
+		if !hittedHosts.Has(hittedHost) {
+			hittedHosts.Insert(hittedHost)
+			Logf("Missing %+v, got %+v", expectedHosts.Difference(hittedHosts), hittedHosts)
+		}
+		if hittedHosts.Equal(expectedHosts) {
+			count++
+			if count >= countToSucceed {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	if err := wait.Poll(time.Second, timeout, condition); err != nil {
+		return fmt.Errorf("error waiting for expectedHosts: %v, hittedHosts: %v, count: %v, expected count: %v",
+			expectedHosts, hittedHosts, count, countToSucceed)
+	}
+	return nil
 }

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM fedora
-MAINTAINER Jan Safranek, jsafrane@redhat.com
 RUN yum install -y iscsi-initiator-utils targetcli net-tools strace && yum clean all
 ADD run_iscsid.sh /usr/local/bin/
 ADD initiatorname.iscsi /etc/iscsi/

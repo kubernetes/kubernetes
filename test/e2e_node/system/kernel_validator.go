@@ -30,7 +30,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/errors"
 )
 
 var _ Validator = &KernelValidator{}

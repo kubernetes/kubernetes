@@ -21,12 +21,11 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func NewRootGetAction(resource schema.GroupVersionResource, name string) GetActionImpl {
@@ -224,22 +223,18 @@ func NewRootWatchAction(resource schema.GroupVersionResource, opts interface{}) 
 func ExtractFromListOptions(opts interface{}) (labelSelector labels.Selector, fieldSelector fields.Selector, resourceVersion string) {
 	var err error
 	switch t := opts.(type) {
-	case api.ListOptions:
-		labelSelector = t.LabelSelector
-		fieldSelector = t.FieldSelector
-		resourceVersion = t.ResourceVersion
-	case v1.ListOptions:
+	case metav1.ListOptions:
 		labelSelector, err = labels.Parse(t.LabelSelector)
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("invalid selector %q: %v", t.LabelSelector, err))
 		}
 		fieldSelector, err = fields.ParseSelector(t.FieldSelector)
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("invalid selector %q: %v", t.FieldSelector, err))
 		}
 		resourceVersion = t.ResourceVersion
 	default:
-		panic(fmt.Errorf("expect a ListOptions"))
+		panic(fmt.Errorf("expect a ListOptions %T", opts))
 	}
 	if labelSelector == nil {
 		labelSelector = labels.Everything()

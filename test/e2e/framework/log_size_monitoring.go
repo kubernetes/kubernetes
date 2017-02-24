@@ -25,7 +25,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (

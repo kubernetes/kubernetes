@@ -23,20 +23,20 @@ import (
 	"strconv"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // DefaultServiceAccountName is the name of the default service account to set on pods which do not specify a service account
@@ -54,9 +54,8 @@ const DefaultAPITokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 const PluginName = "ServiceAccount"
 
 func init() {
-	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		serviceAccountAdmission := NewServiceAccount(client)
-		serviceAccountAdmission.Run()
+	admission.RegisterPlugin(PluginName, func(config io.Reader) (admission.Interface, error) {
+		serviceAccountAdmission := NewServiceAccount()
 		return serviceAccountAdmission, nil
 	})
 }
@@ -73,15 +72,14 @@ type serviceAccount struct {
 	// MountServiceAccountToken creates Volume and VolumeMounts for the first referenced ServiceAccountToken for the pod's service account
 	MountServiceAccountToken bool
 
-	client clientset.Interface
+	client internalclientset.Interface
 
-	serviceAccounts cache.Indexer
-	secrets         cache.Indexer
-
-	stopChan                 chan struct{}
-	serviceAccountsReflector *cache.Reflector
-	secretsReflector         *cache.Reflector
+	serviceAccountLister corelisters.ServiceAccountLister
+	secretLister         corelisters.SecretLister
 }
+
+var _ = kubeapiserveradmission.WantsInternalClientSet(&serviceAccount{})
+var _ = kubeapiserveradmission.WantsInformerFactory(&serviceAccount{})
 
 // NewServiceAccount returns an admission.Interface implementation which limits admission of Pod CREATE requests based on the pod's ServiceAccount:
 // 1. If the pod does not specify a ServiceAccount, it sets the pod's ServiceAccount to "default"
@@ -89,44 +87,7 @@ type serviceAccount struct {
 // 3. If LimitSecretReferences is true, it rejects the pod if the pod references Secret objects which the pod's ServiceAccount does not reference
 // 4. If the pod does not contain any ImagePullSecrets, the ImagePullSecrets of the service account are added.
 // 5. If MountServiceAccountToken is true, it adds a VolumeMount with the pod's ServiceAccount's api token secret to containers
-func NewServiceAccount(cl clientset.Interface) *serviceAccount {
-	serviceAccountsIndexer, serviceAccountsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return cl.Core().ServiceAccounts(api.NamespaceAll).List(internalOptions)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return cl.Core().ServiceAccounts(api.NamespaceAll).Watch(internalOptions)
-			},
-		},
-		&api.ServiceAccount{},
-		0,
-	)
-
-	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
-	secretsIndexer, secretsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				internalOptions.FieldSelector = tokenSelector
-				return cl.Core().Secrets(api.NamespaceAll).List(internalOptions)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				internalOptions.FieldSelector = tokenSelector
-				return cl.Core().Secrets(api.NamespaceAll).Watch(internalOptions)
-			},
-		},
-		&api.Secret{},
-		0,
-	)
-
+func NewServiceAccount() *serviceAccount {
 	return &serviceAccount{
 		Handler: admission.NewHandler(admission.Create),
 		// TODO: enable this once we've swept secret usage to account for adding secret references to service accounts
@@ -135,27 +96,37 @@ func NewServiceAccount(cl clientset.Interface) *serviceAccount {
 		MountServiceAccountToken: true,
 		// Reject pod creation until a service account token is available
 		RequireAPIToken: true,
-
-		client:                   cl,
-		serviceAccounts:          serviceAccountsIndexer,
-		serviceAccountsReflector: serviceAccountsReflector,
-		secrets:                  secretsIndexer,
-		secretsReflector:         secretsReflector,
 	}
 }
 
-func (s *serviceAccount) Run() {
-	if s.stopChan == nil {
-		s.stopChan = make(chan struct{})
-		s.serviceAccountsReflector.RunUntil(s.stopChan)
-		s.secretsReflector.RunUntil(s.stopChan)
-	}
+func (a *serviceAccount) SetInternalClientSet(cl internalclientset.Interface) {
+	a.client = cl
 }
-func (s *serviceAccount) Stop() {
-	if s.stopChan != nil {
-		close(s.stopChan)
-		s.stopChan = nil
+
+func (a *serviceAccount) SetInformerFactory(f informers.SharedInformerFactory) {
+	serviceAccountInformer := f.Core().InternalVersion().ServiceAccounts()
+	a.serviceAccountLister = serviceAccountInformer.Lister()
+
+	secretInformer := f.Core().InternalVersion().Secrets()
+	a.secretLister = secretInformer.Lister()
+
+	a.SetReadyFunc(func() bool {
+		return serviceAccountInformer.Informer().HasSynced() && secretInformer.Informer().HasSynced()
+	})
+}
+
+// Validate ensures an authorizer is set.
+func (a *serviceAccount) Validate() error {
+	if a.client == nil {
+		return fmt.Errorf("missing client")
 	}
+	if a.secretLister == nil {
+		return fmt.Errorf("missing secretLister")
+	}
+	if a.serviceAccountLister == nil {
+		return fmt.Errorf("missing serviceAccountLister")
+	}
+	return nil
 }
 
 func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
@@ -207,7 +178,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		}
 	}
 
-	if s.MountServiceAccountToken {
+	if s.MountServiceAccountToken && shouldAutomount(serviceAccount, pod) {
 		if err := s.mountServiceAccountToken(serviceAccount, pod); err != nil {
 			if _, ok := err.(errors.APIStatus); ok {
 				return err
@@ -222,6 +193,19 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	}
 
 	return nil
+}
+
+func shouldAutomount(sa *api.ServiceAccount, pod *api.Pod) bool {
+	// Pod's preference wins
+	if pod.Spec.AutomountServiceAccountToken != nil {
+		return *pod.Spec.AutomountServiceAccountToken
+	}
+	// Then service account's
+	if sa.AutomountServiceAccountToken != nil {
+		return *sa.AutomountServiceAccountToken
+	}
+	// Default to true for backwards compatibility
+	return true
 }
 
 // enforceMountableSecrets indicates whether mountable secrets should be enforced for a particular service account
@@ -241,17 +225,12 @@ func (s *serviceAccount) enforceMountableSecrets(serviceAccount *api.ServiceAcco
 
 // getServiceAccount returns the ServiceAccount for the given namespace and name if it exists
 func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.ServiceAccount, error) {
-	key := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Namespace: namespace}}
-	index, err := s.serviceAccounts.Index("namespace", key)
-	if err != nil {
-		return nil, err
+	serviceAccount, err := s.serviceAccountLister.ServiceAccounts(namespace).Get(name)
+	if err == nil {
+		return serviceAccount, nil
 	}
-
-	for _, obj := range index {
-		serviceAccount := obj.(*api.ServiceAccount)
-		if serviceAccount.Name == name {
-			return serviceAccount, nil
-		}
+	if !errors.IsNotFound(err) {
+		return nil, err
 	}
 
 	// Could not find in cache, attempt to look up directly
@@ -265,7 +244,7 @@ func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.
 		if i != 0 {
 			time.Sleep(retryInterval)
 		}
-		serviceAccount, err := s.client.Core().ServiceAccounts(namespace).Get(name)
+		serviceAccount, err := s.client.Core().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
 		if err == nil {
 			return serviceAccount, nil
 		}
@@ -288,13 +267,14 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 		return "", err
 	}
 
-	references := sets.NewString()
-	for _, secret := range serviceAccount.Secrets {
-		references.Insert(secret.Name)
-	}
+	accountTokens := sets.NewString()
 	for _, token := range tokens {
-		if references.Has(token.Name) {
-			return token.Name, nil
+		accountTokens.Insert(token.Name)
+	}
+	// Prefer secrets in the order they're referenced.
+	for _, secret := range serviceAccount.Secrets {
+		if accountTokens.Has(secret.Name) {
+			return secret.Name, nil
 		}
 	}
 
@@ -303,15 +283,15 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 
 // getServiceAccountTokens returns all ServiceAccountToken secrets for the given ServiceAccount
 func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAccount) ([]*api.Secret, error) {
-	key := &api.Secret{ObjectMeta: api.ObjectMeta{Namespace: serviceAccount.Namespace}}
-	index, err := s.secrets.Index("namespace", key)
+	tokens, err := s.secretLister.Secrets(serviceAccount.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	tokens := []*api.Secret{}
-	for _, obj := range index {
-		token := obj.(*api.Secret)
+	for _, token := range tokens {
+		if token.Type != api.SecretTypeServiceAccountToken {
+			continue
+		}
 
 		if serviceaccount.InternalIsServiceAccountToken(token, serviceAccount) {
 			tokens = append(tokens, token)
@@ -405,7 +385,7 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAcc
 		// Try naming the volume the same as the serviceAccountToken, and uniquify if needed
 		tokenVolumeName = serviceAccountToken
 		if allVolumeNames.Has(tokenVolumeName) {
-			tokenVolumeName = api.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", serviceAccountToken))
+			tokenVolumeName = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", serviceAccountToken))
 		}
 	}
 

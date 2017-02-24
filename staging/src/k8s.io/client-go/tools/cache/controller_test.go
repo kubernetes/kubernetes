@@ -23,11 +23,12 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/util/sets"
-	"k8s.io/client-go/pkg/util/wait"
-	"k8s.io/client-go/pkg/watch"
 	fcache "k8s.io/client-go/tools/cache/testing"
 
 	"github.com/google/gofuzz"
@@ -101,7 +102,7 @@ func Example() {
 	for _, name := range testIDs {
 		// Note that these pods are not valid-- the fake source doesn't
 		// call validation or anything.
-		source.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: name}})
+		source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	}
 
 	// Let's wait for the controller to process the things we just added.
@@ -158,7 +159,7 @@ func ExampleNewInformer() {
 	for _, name := range testIDs {
 		// Note that these pods are not valid-- the fake source doesn't
 		// call validation or anything.
-		source.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: name}})
+		source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	}
 
 	// Let's wait for the controller to process the things we just added.
@@ -317,7 +318,7 @@ func TestUpdate(t *testing.T) {
 
 	pod := func(name, check string, final bool) *v1.Pod {
 		p := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
 				Labels: map[string]string{"check": check},
 			},
@@ -350,12 +351,12 @@ func TestUpdate(t *testing.T) {
 	watchCh := make(chan struct{})
 	_, controller := NewInformer(
 		&testLW{
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				watch, err := source.Watch(options)
 				close(watchCh)
 				return watch, err
 			},
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return source.List(options)
 			},
 		},

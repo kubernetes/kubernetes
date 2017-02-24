@@ -20,16 +20,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"path"
+	"path/filepath"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -43,7 +44,7 @@ func (kl *Kubelet) getRootDir() string {
 // getPodsDir returns the full path to the directory under which pod
 // directories are created.
 func (kl *Kubelet) getPodsDir() string {
-	return path.Join(kl.getRootDir(), options.DefaultKubeletPodsDirName)
+	return filepath.Join(kl.getRootDir(), options.DefaultKubeletPodsDirName)
 }
 
 // getPluginsDir returns the full path to the directory under which plugin
@@ -51,14 +52,14 @@ func (kl *Kubelet) getPodsDir() string {
 // they need to persist.  Plugins should create subdirectories under this named
 // after their own names.
 func (kl *Kubelet) getPluginsDir() string {
-	return path.Join(kl.getRootDir(), options.DefaultKubeletPluginsDirName)
+	return filepath.Join(kl.getRootDir(), options.DefaultKubeletPluginsDirName)
 }
 
 // getPluginDir returns a data directory name for a given plugin name.
 // Plugins can use these directories to store data that they need to persist.
 // For per-pod plugin data, see getPodPluginDir.
 func (kl *Kubelet) getPluginDir(pluginName string) string {
-	return path.Join(kl.getPluginsDir(), pluginName)
+	return filepath.Join(kl.getPluginsDir(), pluginName)
 }
 
 // GetPodDir returns the full path to the per-pod data directory for the
@@ -76,9 +77,9 @@ func (kl *Kubelet) getPodDir(podUID types.UID) string {
 	//     !old && new  = use new
 	//     old && !new  = use old
 	//     old && new   = use new (but warn)
-	oldPath := path.Join(kl.getRootDir(), string(podUID))
+	oldPath := filepath.Join(kl.getRootDir(), string(podUID))
 	oldExists := dirExists(oldPath)
-	newPath := path.Join(kl.getPodsDir(), string(podUID))
+	newPath := filepath.Join(kl.getPodsDir(), string(podUID))
 	newExists := dirExists(newPath)
 	if oldExists && !newExists {
 		return oldPath
@@ -93,28 +94,28 @@ func (kl *Kubelet) getPodDir(podUID types.UID) string {
 // which volumes are created for the specified pod.  This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodVolumesDir(podUID types.UID) string {
-	return path.Join(kl.getPodDir(podUID), options.DefaultKubeletVolumesDirName)
+	return filepath.Join(kl.getPodDir(podUID), options.DefaultKubeletVolumesDirName)
 }
 
 // getPodVolumeDir returns the full path to the directory which represents the
 // named volume under the named plugin for specified pod.  This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
-	return path.Join(kl.getPodVolumesDir(podUID), pluginName, volumeName)
+	return filepath.Join(kl.getPodVolumesDir(podUID), pluginName, volumeName)
 }
 
 // getPodPluginsDir returns the full path to the per-pod data directory under
 // which plugins may store data for the specified pod.  This directory may not
 // exist if the pod does not exist.
 func (kl *Kubelet) getPodPluginsDir(podUID types.UID) string {
-	return path.Join(kl.getPodDir(podUID), options.DefaultKubeletPluginsDirName)
+	return filepath.Join(kl.getPodDir(podUID), options.DefaultKubeletPluginsDirName)
 }
 
 // getPodPluginDir returns a data directory name for a given plugin name for a
 // given pod UID.  Plugins can use these directories to store data that they
 // need to persist.  For non-per-pod plugin data, see getPluginDir.
 func (kl *Kubelet) getPodPluginDir(podUID types.UID, pluginName string) string {
-	return path.Join(kl.getPodPluginsDir(podUID), pluginName)
+	return filepath.Join(kl.getPodPluginsDir(podUID), pluginName)
 }
 
 // getPodContainerDir returns the full path to the per-pod data directory under
@@ -127,9 +128,9 @@ func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 	//     !old && new  = use new
 	//     old && !new  = use old
 	//     old && new   = use new (but warn)
-	oldPath := path.Join(kl.getPodDir(podUID), ctrName)
+	oldPath := filepath.Join(kl.getPodDir(podUID), ctrName)
 	oldExists := dirExists(oldPath)
-	newPath := path.Join(kl.getPodDir(podUID), options.DefaultKubeletContainersDirName, ctrName)
+	newPath := filepath.Join(kl.getPodDir(podUID), options.DefaultKubeletContainersDirName, ctrName)
 	newExists := dirExists(newPath)
 	if oldExists && !newExists {
 		return oldPath
@@ -244,6 +245,14 @@ func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, error) {
 	volumes := []string{}
 	podVolDir := kl.getPodVolumesDir(podUID)
+
+	if pathExists, pathErr := volumeutil.PathExists(podVolDir); pathErr != nil {
+		return volumes, fmt.Errorf("Error checking if path %q exists: %v", podVolDir, pathErr)
+	} else if !pathExists {
+		glog.Warningf("Warning: path %q does not exist: %q", podVolDir)
+		return volumes, nil
+	}
+
 	volumePluginDirs, err := ioutil.ReadDir(podVolDir)
 	if err != nil {
 		glog.Errorf("Could not read directory %s: %v", podVolDir, err)
@@ -251,13 +260,13 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	}
 	for _, volumePluginDir := range volumePluginDirs {
 		volumePluginName := volumePluginDir.Name()
-		volumePluginPath := path.Join(podVolDir, volumePluginName)
+		volumePluginPath := filepath.Join(podVolDir, volumePluginName)
 		volumeDirs, err := util.ReadDirNoStat(volumePluginPath)
 		if err != nil {
 			return volumes, fmt.Errorf("Could not read directory %s: %v", volumePluginPath, err)
 		}
 		for _, volumeDir := range volumeDirs {
-			volumes = append(volumes, path.Join(volumePluginPath, volumeDir))
+			volumes = append(volumes, filepath.Join(volumePluginPath, volumeDir))
 		}
 	}
 	return volumes, nil

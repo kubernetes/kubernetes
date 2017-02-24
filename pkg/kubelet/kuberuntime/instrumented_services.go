@@ -31,7 +31,7 @@ type instrumentedRuntimeService struct {
 }
 
 // Creates an instrumented RuntimeInterface from an existing RuntimeService.
-func NewInstrumentedRuntimeService(service internalapi.RuntimeService) internalapi.RuntimeService {
+func newInstrumentedRuntimeService(service internalapi.RuntimeService) internalapi.RuntimeService {
 	return &instrumentedRuntimeService{service: service}
 }
 
@@ -42,7 +42,7 @@ type instrumentedImageManagerService struct {
 }
 
 // Creates an instrumented ImageManagerService from an existing ImageManagerService.
-func NewInstrumentedImageManagerService(service internalapi.ImageManagerService) internalapi.ImageManagerService {
+func newInstrumentedImageManagerService(service internalapi.ImageManagerService) internalapi.ImageManagerService {
 	return &instrumentedImageManagerService{service: service}
 }
 
@@ -239,13 +239,13 @@ func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpe
 	return out, err
 }
 
-func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error {
+func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) (string, error) {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.PullImage(image, auth)
+	imageRef, err := in.service.PullImage(image, auth)
 	recordError(operation, err)
-	return err
+	return imageRef, err
 }
 
 func (in instrumentedImageManagerService) RemoveImage(image *runtimeapi.ImageSpec) error {

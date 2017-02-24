@@ -17,12 +17,10 @@ limitations under the License.
 package kubectl
 
 import (
-	"encoding/json"
-
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/annotations"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // GetOriginalConfiguration retrieves the original configuration of the object
@@ -96,7 +94,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		accessor.SetAnnotations(annots)
 		// TODO: this needs to be abstracted - there should be no assumption that versioned object
 		// can be marshalled to JSON.
-		modified, err = json.Marshal(info.VersionedObject)
+		modified, err = runtime.Encode(codec, info.VersionedObject)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +104,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 			accessor.SetAnnotations(annots)
 			// TODO: this needs to be abstracted - there should be no assumption that versioned object
 			// can be marshalled to JSON.
-			modified, err = json.Marshal(info.VersionedObject)
+			modified, err = runtime.Encode(codec, info.VersionedObject)
 			if err != nil {
 				return nil, err
 			}

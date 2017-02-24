@@ -17,22 +17,22 @@ limitations under the License.
 package autoprovision
 
 import (
+	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
-	"fmt"
-
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 func init() {
-	admission.RegisterPlugin("NamespaceAutoProvision", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		return NewProvision(client), nil
+	admission.RegisterPlugin("NamespaceAutoProvision", func(config io.Reader) (admission.Interface, error) {
+		return NewProvision(), nil
 	})
 }
 
@@ -41,13 +41,14 @@ func init() {
 // It is useful in deployments that do not want to restrict creation of a namespace prior to its usage.
 type provision struct {
 	*admission.Handler
-	client            clientset.Interface
-	namespaceInformer cache.SharedIndexInformer
+	client          internalclientset.Interface
+	namespaceLister corelisters.NamespaceLister
 }
 
-var _ = admission.WantsInformerFactory(&provision{})
+var _ = kubeapiserveradmission.WantsInformerFactory(&provision{})
+var _ = kubeapiserveradmission.WantsInternalClientSet(&provision{})
 
-func (p *provision) Admit(a admission.Attributes) (err error) {
+func (p *provision) Admit(a admission.Attributes) error {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
@@ -58,43 +59,55 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 	if !p.WaitForReady() {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
+
+	_, err := p.namespaceLister.Get(a.GetNamespace())
+	if err == nil {
+		return nil
+	}
+
+	if !errors.IsNotFound(err) {
+		return admission.NewForbidden(a, err)
+	}
+
 	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      a.GetNamespace(),
 			Namespace: "",
 		},
 		Status: api.NamespaceStatus{},
 	}
-	_, exists, err := p.namespaceInformer.GetStore().Get(namespace)
-	if err != nil {
-		return admission.NewForbidden(a, err)
-	}
-	if exists {
-		return nil
-	}
+
 	_, err = p.client.Core().Namespaces().Create(namespace)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return admission.NewForbidden(a, err)
 	}
+
 	return nil
 }
 
 // NewProvision creates a new namespace provision admission control handler
-func NewProvision(c clientset.Interface) admission.Interface {
+func NewProvision() admission.Interface {
 	return &provision{
 		Handler: admission.NewHandler(admission.Create),
-		client:  c,
 	}
 }
 
+func (p *provision) SetInternalClientSet(client internalclientset.Interface) {
+	p.client = client
+}
+
 func (p *provision) SetInformerFactory(f informers.SharedInformerFactory) {
-	p.namespaceInformer = f.InternalNamespaces().Informer()
-	p.SetReadyFunc(p.namespaceInformer.HasSynced)
+	namespaceInformer := f.Core().InternalVersion().Namespaces()
+	p.namespaceLister = namespaceInformer.Lister()
+	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
 func (p *provision) Validate() error {
-	if p.namespaceInformer == nil {
-		return fmt.Errorf("missing namespaceInformer")
+	if p.namespaceLister == nil {
+		return fmt.Errorf("missing namespaceLister")
+	}
+	if p.client == nil {
+		return fmt.Errorf("missing client")
 	}
 	return nil
 }

@@ -20,15 +20,15 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestSetDefaultDaemonSet(t *testing.T) {
@@ -40,8 +40,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
+			SchedulerName:                 api.DefaultSchedulerName,
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: defaultLabels,
 		},
 	}
@@ -51,6 +52,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
+			SchedulerName:                 api.DefaultSchedulerName,
 		},
 	}
 	tests := []struct {
@@ -64,7 +66,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 				},
 			},
 			expected: &DaemonSet{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: defaultLabels,
 				},
 				Spec: DaemonSetSpec{
@@ -77,7 +79,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 		},
 		{ // Labels change/defaulting test.
 			original: &DaemonSet{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
@@ -87,7 +89,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 				},
 			},
 			expected: &DaemonSet{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
@@ -155,6 +157,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
+			SchedulerName:                 api.DefaultSchedulerName,
 		},
 	}
 	tests := []struct {
@@ -283,278 +286,6 @@ func TestSetDefaultDeployment(t *testing.T) {
 	}
 }
 
-func TestSetDefaultJob(t *testing.T) {
-	defaultLabels := map[string]string{"default": "default"}
-	tests := map[string]struct {
-		original     *Job
-		expected     *Job
-		expectLabels bool
-	}{
-		"both unspecified -> sets both to 1": {
-			original: &Job{
-				Spec: JobSpec{
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(1),
-					Parallelism: newInt32(1),
-				},
-			},
-			expectLabels: true,
-		},
-		"both unspecified -> sets both to 1 and no default labels": {
-			original: &Job{
-				ObjectMeta: v1.ObjectMeta{
-					Labels: map[string]string{"mylabel": "myvalue"},
-				},
-				Spec: JobSpec{
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(1),
-					Parallelism: newInt32(1),
-				},
-			},
-		},
-		"WQ: Parallelism explicitly 0 and completions unset -> no change": {
-			original: &Job{
-				Spec: JobSpec{
-					Parallelism: newInt32(0),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Parallelism: newInt32(0),
-				},
-			},
-			expectLabels: true,
-		},
-		"WQ: Parallelism explicitly 2 and completions unset -> no change": {
-			original: &Job{
-				Spec: JobSpec{
-					Parallelism: newInt32(2),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Parallelism: newInt32(2),
-				},
-			},
-			expectLabels: true,
-		},
-		"Completions explicitly 2 and parallelism unset -> parallelism is defaulted": {
-			original: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(2),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(2),
-					Parallelism: newInt32(1),
-				},
-			},
-			expectLabels: true,
-		},
-		"Both set -> no change": {
-			original: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(10),
-					Parallelism: newInt32(11),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(10),
-					Parallelism: newInt32(11),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expectLabels: true,
-		},
-		"Both set, flipped -> no change": {
-			original: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(11),
-					Parallelism: newInt32(10),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(11),
-					Parallelism: newInt32(10),
-				},
-			},
-			expectLabels: true,
-		},
-	}
-
-	for name, test := range tests {
-		original := test.original
-		expected := test.expected
-		obj2 := roundTrip(t, runtime.Object(original))
-		actual, ok := obj2.(*Job)
-		if !ok {
-			t.Errorf("%s: unexpected object: %v", name, actual)
-			t.FailNow()
-		}
-		if (actual.Spec.Completions == nil) != (expected.Spec.Completions == nil) {
-			t.Errorf("%s: got different *completions than expected: %v %v", name, actual.Spec.Completions, expected.Spec.Completions)
-		}
-		if actual.Spec.Completions != nil && expected.Spec.Completions != nil {
-			if *actual.Spec.Completions != *expected.Spec.Completions {
-				t.Errorf("%s: got different completions than expected: %d %d", name, *actual.Spec.Completions, *expected.Spec.Completions)
-			}
-		}
-		if (actual.Spec.Parallelism == nil) != (expected.Spec.Parallelism == nil) {
-			t.Errorf("%s: got different *Parallelism than expected: %v %v", name, actual.Spec.Parallelism, expected.Spec.Parallelism)
-		}
-		if actual.Spec.Parallelism != nil && expected.Spec.Parallelism != nil {
-			if *actual.Spec.Parallelism != *expected.Spec.Parallelism {
-				t.Errorf("%s: got different parallelism than expected: %d %d", name, *actual.Spec.Parallelism, *expected.Spec.Parallelism)
-			}
-		}
-		if test.expectLabels != reflect.DeepEqual(actual.Labels, actual.Spec.Template.Labels) {
-			if test.expectLabels {
-				t.Errorf("%s: expected: %v, got: %v", name, actual.Spec.Template.Labels, actual.Labels)
-			} else {
-				t.Errorf("%s: unexpected equality: %v", name, actual.Labels)
-			}
-		}
-	}
-}
-
-func TestSetDefaultJobSelector(t *testing.T) {
-	tests := []struct {
-		original         *Job
-		expectedSelector *metav1.LabelSelector
-	}{
-		// selector set explicitly, nil autoSelector
-		{
-			original: &Job{
-				Spec: JobSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"job": "selector"},
-					},
-				},
-			},
-			expectedSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"job": "selector"},
-			},
-		},
-		// selector set explicitly, autoSelector=true
-		{
-			original: &Job{
-				Spec: JobSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"job": "selector"},
-					},
-					AutoSelector: newBool(true),
-				},
-			},
-			expectedSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"job": "selector"},
-			},
-		},
-		// selector set explicitly, autoSelector=false
-		{
-			original: &Job{
-				Spec: JobSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"job": "selector"},
-					},
-					AutoSelector: newBool(false),
-				},
-			},
-			expectedSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"job": "selector"},
-			},
-		},
-		// selector from template labels
-		{
-			original: &Job{
-				Spec: JobSpec{
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
-							Labels: map[string]string{"job": "selector"},
-						},
-					},
-				},
-			},
-			expectedSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"job": "selector"},
-			},
-		},
-		// selector from template labels, autoSelector=false
-		{
-			original: &Job{
-				Spec: JobSpec{
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
-							Labels: map[string]string{"job": "selector"},
-						},
-					},
-					AutoSelector: newBool(false),
-				},
-			},
-			expectedSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"job": "selector"},
-			},
-		},
-		// selector not copied from template labels, autoSelector=true
-		{
-			original: &Job{
-				Spec: JobSpec{
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
-							Labels: map[string]string{"job": "selector"},
-						},
-					},
-					AutoSelector: newBool(true),
-				},
-			},
-			expectedSelector: nil,
-		},
-	}
-
-	for i, testcase := range tests {
-		obj2 := roundTrip(t, runtime.Object(testcase.original))
-		got, ok := obj2.(*Job)
-		if !ok {
-			t.Errorf("%d: unexpected object: %v", i, got)
-			t.FailNow()
-		}
-		if !reflect.DeepEqual(got.Spec.Selector, testcase.expectedSelector) {
-			t.Errorf("%d: got different selectors %#v %#v", i, got.Spec.Selector, testcase.expectedSelector)
-		}
-	}
-}
-
 func TestSetDefaultReplicaSet(t *testing.T) {
 	tests := []struct {
 		rs             *ReplicaSet
@@ -565,7 +296,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 			rs: &ReplicaSet{
 				Spec: ReplicaSetSpec{
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -578,14 +309,14 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 		},
 		{
 			rs: &ReplicaSet{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
 				Spec: ReplicaSetSpec{
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -598,7 +329,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 		},
 		{
 			rs: &ReplicaSet{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
@@ -610,7 +341,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 						},
 					},
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -630,7 +361,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 						},
 					},
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -677,7 +408,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 			rs: ReplicaSet{
 				Spec: ReplicaSetSpec{
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -692,7 +423,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 				Spec: ReplicaSetSpec{
 					Replicas: newInt32(0),
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -707,7 +438,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 				Spec: ReplicaSetSpec{
 					Replicas: newInt32(3),
 					Template: v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -750,7 +481,7 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 		Spec: ReplicaSetSpec{
 			Replicas: newInt32(3),
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -765,78 +496,6 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	requestValue := defaultRequest[v1.ResourceCPU]
 	if requestValue.String() != "0" {
 		t.Errorf("Expected 0 request value, got: %s", requestValue.String())
-	}
-}
-
-func TestSetDefaultHorizontalPodAutoscalerMinReplicas(t *testing.T) {
-	tests := []struct {
-		hpa            HorizontalPodAutoscaler
-		expectReplicas int32
-	}{
-		{
-			hpa:            HorizontalPodAutoscaler{},
-			expectReplicas: 1,
-		},
-		{
-			hpa: HorizontalPodAutoscaler{
-				Spec: HorizontalPodAutoscalerSpec{
-					MinReplicas: newInt32(3),
-				},
-			},
-			expectReplicas: 3,
-		},
-	}
-
-	for _, test := range tests {
-		hpa := &test.hpa
-		obj2 := roundTrip(t, runtime.Object(hpa))
-		hpa2, ok := obj2.(*HorizontalPodAutoscaler)
-		if !ok {
-			t.Errorf("unexpected object: %v", hpa2)
-			t.FailNow()
-		}
-		if hpa2.Spec.MinReplicas == nil {
-			t.Errorf("unexpected nil MinReplicas")
-		} else if test.expectReplicas != *hpa2.Spec.MinReplicas {
-			t.Errorf("expected: %d MinReplicas, got: %d", test.expectReplicas, *hpa2.Spec.MinReplicas)
-		}
-	}
-}
-
-func TestSetDefaultHorizontalPodAutoscalerCpuUtilization(t *testing.T) {
-	tests := []struct {
-		hpa               HorizontalPodAutoscaler
-		expectUtilization int32
-	}{
-		{
-			hpa:               HorizontalPodAutoscaler{},
-			expectUtilization: 80,
-		},
-		{
-			hpa: HorizontalPodAutoscaler{
-				Spec: HorizontalPodAutoscalerSpec{
-					CPUUtilization: &CPUTargetUtilization{
-						TargetPercentage: int32(50),
-					},
-				},
-			},
-			expectUtilization: 50,
-		},
-	}
-
-	for _, test := range tests {
-		hpa := &test.hpa
-		obj2 := roundTrip(t, runtime.Object(hpa))
-		hpa2, ok := obj2.(*HorizontalPodAutoscaler)
-		if !ok {
-			t.Errorf("unexpected object: %v", hpa2)
-			t.FailNow()
-		}
-		if hpa2.Spec.CPUUtilization == nil {
-			t.Errorf("unexpected nil CPUUtilization")
-		} else if test.expectUtilization != hpa2.Spec.CPUUtilization.TargetPercentage {
-			t.Errorf("expected: %d CPUUtilization, got: %d", test.expectUtilization, hpa2.Spec.CPUUtilization.TargetPercentage)
-		}
 	}
 }
 

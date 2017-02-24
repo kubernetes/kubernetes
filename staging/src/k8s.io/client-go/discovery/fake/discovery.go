@@ -17,12 +17,16 @@ limitations under the License.
 package fake
 
 import (
+	"fmt"
+
 	"github.com/emicklei/go-restful/swagger"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/version"
-	"k8s.io/client-go/rest"
+	kubeversion "k8s.io/client-go/pkg/version"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/testing"
 )
 
@@ -36,10 +40,15 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 		Resource: schema.GroupVersionResource{Resource: "resource"},
 	}
 	c.Invokes(action, nil)
-	return c.Resources[groupVersion], nil
+	for _, resourceList := range c.Resources {
+		if resourceList.GroupVersion == groupVersion {
+			return resourceList, nil
+		}
+	}
+	return nil, fmt.Errorf("GroupVersion %q not found", groupVersion)
 }
 
-func (c *FakeDiscovery) ServerResources() (map[string]*metav1.APIResourceList, error) {
+func (c *FakeDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
 	action := testing.ActionImpl{
 		Verb:     "get",
 		Resource: schema.GroupVersionResource{Resource: "resource"},
@@ -48,11 +57,11 @@ func (c *FakeDiscovery) ServerResources() (map[string]*metav1.APIResourceList, e
 	return c.Resources, nil
 }
 
-func (c *FakeDiscovery) ServerPreferredResources() ([]schema.GroupVersionResource, error) {
+func (c *FakeDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]schema.GroupVersionResource, error) {
+func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
@@ -66,7 +75,7 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
 
 	c.Invokes(action, nil)
-	versionInfo := version.Get()
+	versionInfo := kubeversion.Get()
 	return &versionInfo, nil
 }
 
@@ -83,6 +92,6 @@ func (c *FakeDiscovery) SwaggerSchema(version schema.GroupVersion) (*swagger.Api
 	return &swagger.ApiDeclaration{}, nil
 }
 
-func (c *FakeDiscovery) RESTClient() rest.Interface {
+func (c *FakeDiscovery) RESTClient() restclient.Interface {
 	return nil
 }

@@ -33,16 +33,15 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	clienttypedv1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	clienttypedv1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -74,6 +73,34 @@ func TestAppsPrefix(t *testing.T) {
 
 func TestExtensionsPrefix(t *testing.T) {
 	testPrefix(t, "/apis/extensions/")
+}
+
+func TestEmptyList(t *testing.T) {
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
+
+	u := s.URL + "/api/v1/namespaces/default/pods"
+	resp, err := http.Get(u)
+	if err != nil {
+		t.Fatalf("unexpected error getting %s: %v", u, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+	data, _ := ioutil.ReadAll(resp.Body)
+	decodedData := map[string]interface{}{}
+	if err := json.Unmarshal(data, &decodedData); err != nil {
+		t.Logf("body: %s", string(data))
+		t.Fatalf("got error decoding data: %v", err)
+	}
+	if items, ok := decodedData["items"]; !ok {
+		t.Logf("body: %s", string(data))
+		t.Fatalf("missing items field in empty list (all lists should return an items field)")
+	} else if items == nil {
+		t.Logf("body: %s", string(data))
+		t.Fatalf("nil items field from empty list (all lists should return non-nil empty items lists)")
+	}
 }
 
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
@@ -135,149 +162,8 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 		expectedStatusCodes map[int]bool
 		expectedVersion     string
 	}{
-		{"POST", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), hpaV1, integration.Code201, ""},
-		{"GET", autoscalingPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", integration.Code200, testapi.Autoscaling.GroupVersion().String()},
-		{"GET", extensionsPath("horizontalpodautoscalers", api.NamespaceDefault, ""), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
-	}
-
-	for _, r := range requests {
-		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
-		if err != nil {
-			t.Logf("case %v", r)
-			t.Fatalf("unexpected error: %v", err)
-		}
-		func() {
-			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
-			if err != nil {
-				t.Logf("case %v", r)
-				t.Fatalf("unexpected error: %v", err)
-			}
-			b, _ := ioutil.ReadAll(resp.Body)
-			body := string(b)
-			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
-				t.Logf("case %v", r)
-				t.Errorf("Expected status one of %v, but got %v", r.expectedStatusCodes, resp.StatusCode)
-				t.Errorf("Body: %v", body)
-			}
-			if !strings.Contains(body, "\"apiVersion\":\""+r.expectedVersion) {
-				t.Logf("case %v", r)
-				t.Errorf("Expected version %v, got body %v", r.expectedVersion, body)
-			}
-		}()
-	}
-}
-
-var jobV1beta1 string = `
-{
-    "kind": "Job",
-    "apiVersion": "extensions/v1beta1",
-    "metadata": {
-        "name": "pi",
-        "labels": {
-            "app": "pi"
-        }
-    },
-    "spec": {
-        "parallelism": 1,
-        "completions": 1,
-        "selector": {
-            "matchLabels": {
-                "app": "pi"
-            }
-        },
-        "template": {
-            "metadata": {
-                "name": "pi",
-                "creationTimestamp": null,
-                "labels": {
-                    "app": "pi"
-                }
-            },
-            "spec": {
-                "containers": [
-                    {
-                        "name": "pi",
-                        "image": "perl",
-                        "command": [
-                            "perl",
-                            "-Mbignum=bpi",
-                            "-wle",
-                            "print bpi(2000)"
-                        ]
-                    }
-                ],
-                "restartPolicy": "Never"
-            }
-        }
-    }
-}
-`
-
-var jobV1 string = `
-{
-    "kind": "Job",
-    "apiVersion": "batch/v1",
-    "metadata": {
-        "name": "pi"
-    },
-    "spec": {
-        "parallelism": 1,
-        "completions": 1,
-        "template": {
-            "metadata": {
-                "name": "pi",
-                "creationTimestamp": null
-            },
-            "spec": {
-                "containers": [
-                    {
-                        "name": "pi",
-                        "image": "perl",
-                        "command": [
-                            "perl",
-                            "-Mbignum=bpi",
-                            "-wle",
-                            "print bpi(2000)"
-                        ]
-                    }
-                ],
-                "restartPolicy": "Never"
-            }
-        }
-    }
-}
-`
-
-// TestBatchGroupBackwardCompatibility is testing that batch/v1 and ext/v1beta1
-// Job share storage.  This test can be deleted when Jobs is removed from ext/v1beta1,
-// (expected to happen in 1.4).
-func TestBatchGroupBackwardCompatibility(t *testing.T) {
-	if *testapi.Batch.GroupVersion() == v2alpha1.SchemeGroupVersion {
-		t.Skip("Shared job storage is not required for batch/v2alpha1.")
-	}
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
-	transport := http.DefaultTransport
-
-	requests := []struct {
-		verb                string
-		URL                 string
-		body                string
-		expectedStatusCodes map[int]bool
-		expectedVersion     string
-	}{
-		// Post a v1 and get back both as v1beta1 and as v1.
-		{"POST", batchPath("jobs", api.NamespaceDefault, ""), jobV1, integration.Code201, ""},
-		{"GET", batchPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Batch.GroupVersion().String()},
-		{"GET", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
-		{"DELETE", batchPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, registered.GroupOrDie(api.GroupName).GroupVersion.String()}, // status response
-		// Post a v1beta1 and get back both as v1beta1 and as v1.
-		{"POST", extensionsPath("jobs", api.NamespaceDefault, ""), jobV1beta1, integration.Code201, ""},
-		{"GET", batchPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Batch.GroupVersion().String()},
-		{"GET", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
-		{"DELETE", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, registered.GroupOrDie(api.GroupName).GroupVersion.String()}, //status response
+		{"POST", autoscalingPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), hpaV1, integration.Code201, ""},
+		{"GET", autoscalingPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), "", integration.Code200, testapi.Autoscaling.GroupVersion().String()},
 	}
 
 	for _, r := range requests {
@@ -391,10 +277,10 @@ func TestMasterService(t *testing.T) {
 	_, s := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer s.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 
 	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
-		svcList, err := client.Core().Services(api.NamespaceDefault).List(api.ListOptions{})
+		svcList, err := client.Core().Services(metav1.NamespaceDefault).List(metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			return false, nil
@@ -407,7 +293,7 @@ func TestMasterService(t *testing.T) {
 			}
 		}
 		if found {
-			ep, err := client.Core().Endpoints(api.NamespaceDefault).Get("kubernetes")
+			ep, err := client.Core().Endpoints(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -433,11 +319,11 @@ func TestServiceAlloc(t *testing.T) {
 	_, s := framework.RunAMaster(cfg)
 	defer s.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 
 	svc := func(i int) *api.Service {
 		return &api.Service{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("svc-%v", i),
 			},
 			Spec: api.ServiceSpec{
@@ -451,7 +337,7 @@ func TestServiceAlloc(t *testing.T) {
 
 	// Wait until the default "kubernetes" service is created.
 	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-		_, err := client.Core().Services(api.NamespaceDefault).Get("kubernetes")
+		_, err := client.Core().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return false, err
 		}
@@ -462,18 +348,18 @@ func TestServiceAlloc(t *testing.T) {
 
 	// make 5 more services to take up all IPs
 	for i := 0; i < 5; i++ {
-		if _, err := client.Core().Services(api.NamespaceDefault).Create(svc(i)); err != nil {
+		if _, err := client.Core().Services(metav1.NamespaceDefault).Create(svc(i)); err != nil {
 			t.Error(err)
 		}
 	}
 
 	// Make another service. It will fail because we're out of cluster IPs
-	if _, err := client.Core().Services(api.NamespaceDefault).Create(svc(8)); err != nil {
+	if _, err := client.Core().Services(metav1.NamespaceDefault).Create(svc(8)); err != nil {
 		if !strings.Contains(err.Error(), "range is full") {
 			t.Errorf("unexpected error text: %v", err)
 		}
 	} else {
-		svcs, err := client.Core().Services(api.NamespaceAll).List(api.ListOptions{})
+		svcs, err := client.Core().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
 		if err != nil {
 			t.Fatalf("unexpected success, and error getting the services: %v", err)
 		}
@@ -485,12 +371,12 @@ func TestServiceAlloc(t *testing.T) {
 	}
 
 	// Delete the first service.
-	if err := client.Core().Services(api.NamespaceDefault).Delete(svc(1).ObjectMeta.Name, nil); err != nil {
+	if err := client.Core().Services(metav1.NamespaceDefault).Delete(svc(1).ObjectMeta.Name, nil); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 
 	// This time creating the second service should work.
-	if _, err := client.Core().Services(api.NamespaceDefault).Create(svc(8)); err != nil {
+	if _, err := client.Core().Services(metav1.NamespaceDefault).Create(svc(8)); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 }
@@ -521,7 +407,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 	for i := 0; i < nodes*6; i++ {
 		c.Nodes().Delete(fmt.Sprintf("node-%d", i), nil)
 		_, err := c.Nodes().Create(&v1.Node{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("node-%d", i),
 			},
 		})
@@ -533,7 +419,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 	for k := 0; k < listers; k++ {
 		go func(lister int) {
 			for i := 0; i < iterations; i++ {
-				_, err := c.Nodes().List(v1.ListOptions{})
+				_, err := c.Nodes().List(metav1.ListOptions{})
 				if err != nil {
 					fmt.Printf("[list:%d] error after %d: %v\n", lister, i, err)
 					break
@@ -545,7 +431,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 
 	for k := 0; k < watchers; k++ {
 		go func(lister int) {
-			w, err := c.Nodes().Watch(v1.ListOptions{})
+			w, err := c.Nodes().Watch(metav1.ListOptions{})
 			if err != nil {
 				fmt.Printf("[watch:%d] error: %v", k, err)
 				return
@@ -575,14 +461,14 @@ func TestUpdateNodeObjects(t *testing.T) {
 					fmt.Printf("[%d] iteration %d ...\n", node, i)
 				}
 				if i%20 == 0 {
-					_, err := c.Nodes().List(v1.ListOptions{})
+					_, err := c.Nodes().List(metav1.ListOptions{})
 					if err != nil {
 						fmt.Printf("[%d] error after %d: %v\n", node, i, err)
 						break
 					}
 				}
 
-				r, err := c.Nodes().List(v1.ListOptions{
+				r, err := c.Nodes().List(metav1.ListOptions{
 					FieldSelector:   fmt.Sprintf("metadata.name=node-%d", node),
 					ResourceVersion: "0",
 				})
@@ -595,7 +481,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 					break
 				}
 
-				n, err := c.Nodes().Get(fmt.Sprintf("node-%d", node))
+				n, err := c.Nodes().Get(fmt.Sprintf("node-%d", node), metav1.GetOptions{})
 				if err != nil {
 					fmt.Printf("[%d] error after %d: %v\n", node, i, err)
 					break

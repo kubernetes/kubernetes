@@ -67,7 +67,7 @@ this example.
 * Kubernetes version 1.2 is required due to using newer features, such
   at PV Claims and Deployments. Run `kubectl version` to see your
   cluster version.
-* [Cluster DNS](../../build-tools/kube-dns/) will be used for service discovery.
+* [Cluster DNS](https://github.com/kubernetes/dns) will be used for service discovery.
 * An [external load balancer](http://kubernetes.io/docs/user-guide/services/#type-loadbalancer)
   will be used to access WordPress.
 * [Persistent Volume Claims](http://kubernetes.io/docs/user-guide/persistent-volumes/)

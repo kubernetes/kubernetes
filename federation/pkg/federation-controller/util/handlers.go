@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"reflect"
 
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 )
 
 // Returns cache.ResourceEventHandlerFuncs that trigger the given function
@@ -68,8 +68,8 @@ func NewTriggerOnMetaAndSpecChanges(triggerFunc func(pkgruntime.Object)) *cache.
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			curObj := cur.(pkgruntime.Object)
-			oldMeta := getFieldOrPanic(old, "ObjectMeta").(apiv1.ObjectMeta)
-			curMeta := getFieldOrPanic(cur, "ObjectMeta").(apiv1.ObjectMeta)
+			oldMeta := getFieldOrPanic(old, "ObjectMeta").(metav1.ObjectMeta)
+			curMeta := getFieldOrPanic(cur, "ObjectMeta").(metav1.ObjectMeta)
 			if !ObjectMetaEquivalent(oldMeta, curMeta) ||
 				!reflect.DeepEqual(getFieldOrPanic(old, "Spec"), getFieldOrPanic(cur, "Spec")) {
 				triggerFunc(curObj)

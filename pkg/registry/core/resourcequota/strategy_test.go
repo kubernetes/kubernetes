@@ -19,10 +19,11 @@ package resourcequota
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
 
 func TestResourceQuotaStrategy(t *testing.T) {
@@ -33,7 +34,7 @@ func TestResourceQuotaStrategy(t *testing.T) {
 		t.Errorf("ResourceQuota should not allow create on update")
 	}
 	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Status: api.ResourceQuotaStatus{
 			Used: api.ResourceList{
 				api.ResourceCPU:                    resource.MustParse("1"),
@@ -53,7 +54,7 @@ func TestResourceQuotaStrategy(t *testing.T) {
 			},
 		},
 	}
-	Strategy.PrepareForCreate(api.NewContext(), resourceQuota)
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), resourceQuota)
 	if resourceQuota.Status.Used != nil {
 		t.Errorf("ResourceQuota does not allow setting status on create")
 	}
@@ -61,7 +62,7 @@ func TestResourceQuotaStrategy(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"ResourceQuota",
 		ResourceQuotaToSelectableFields(&api.ResourceQuota{}),
 		nil,

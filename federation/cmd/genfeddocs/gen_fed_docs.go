@@ -26,7 +26,7 @@ import (
 	fedcmapp "k8s.io/kubernetes/federation/cmd/federation-controller-manager/app"
 )
 
-// Note: We have a separate binary for generating federation docs and kube docs because of the way api groups are registered.
+// Note: We have a separate binary for generating federation docs and kube docs because of the way api groups are api.Registry.
 // If we import both kube-apiserver and federation-apiserver in the same binary then api groups from both kube and federation will get registered in both the apiservers
 // and hence will produce incorrect flag values.
 // We can potentially merge cmd/kubegendocs and this when we have fixed that problem.

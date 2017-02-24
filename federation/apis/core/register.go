@@ -17,11 +17,11 @@ limitations under the License.
 package core
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
@@ -54,7 +54,7 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
@@ -67,8 +67,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&api.Service{},
 		&api.Namespace{},
 		&api.NamespaceList{},
-		&api.ListOptions{},
-		&api.DeleteOptions{},
 		&api.Secret{},
 		&api.SecretList{},
 		&api.Event{},
@@ -79,7 +77,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 	// Register Unversioned types under their own special group
 	scheme.AddUnversionedTypes(Unversioned,
-		&metav1.ExportOptions{},
 		&metav1.Status{},
 		&metav1.APIVersions{},
 		&metav1.APIGroupList{},

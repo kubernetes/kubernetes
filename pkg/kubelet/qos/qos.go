@@ -17,10 +17,10 @@ limitations under the License.
 package qos
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // isResourceGuaranteed returns true if the container's resource requirements are Guaranteed.
@@ -47,7 +47,7 @@ func isResourceBestEffort(container *v1.Container, resource v1.ResourceName) boo
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-func GetPodQOS(pod *v1.Pod) QOSClass {
+func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 	requests := v1.ResourceList{}
 	limits := v1.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
@@ -91,7 +91,7 @@ func GetPodQOS(pod *v1.Pod) QOSClass {
 		}
 	}
 	if len(requests) == 0 && len(limits) == 0 {
-		return BestEffort
+		return v1.PodQOSBestEffort
 	}
 	// Check is requests match limits for all resources.
 	if isGuaranteed {
@@ -104,21 +104,20 @@ func GetPodQOS(pod *v1.Pod) QOSClass {
 	}
 	if isGuaranteed &&
 		len(requests) == len(limits) {
-		return Guaranteed
+		return v1.PodQOSGuaranteed
 	}
-	return Burstable
+	return v1.PodQOSBurstable
 }
 
 // InternalGetPodQOS returns the QoS class of a pod.
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-func InternalGetPodQOS(pod *api.Pod) QOSClass {
+func InternalGetPodQOS(pod *api.Pod) api.PodQOSClass {
 	requests := api.ResourceList{}
 	limits := api.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
-	var supportedQoSComputeResources = sets.NewString(string(api.ResourceCPU), string(api.ResourceMemory))
 	for _, container := range pod.Spec.Containers {
 		// process requests
 		for name, quantity := range container.Resources.Requests {
@@ -158,7 +157,7 @@ func InternalGetPodQOS(pod *api.Pod) QOSClass {
 		}
 	}
 	if len(requests) == 0 && len(limits) == 0 {
-		return BestEffort
+		return api.PodQOSBestEffort
 	}
 	// Check is requests match limits for all resources.
 	if isGuaranteed {
@@ -171,13 +170,13 @@ func InternalGetPodQOS(pod *api.Pod) QOSClass {
 	}
 	if isGuaranteed &&
 		len(requests) == len(limits) {
-		return Guaranteed
+		return api.PodQOSGuaranteed
 	}
-	return Burstable
+	return api.PodQOSBurstable
 }
 
 // QOSList is a set of (resource name, QoS class) pairs.
-type QOSList map[v1.ResourceName]QOSClass
+type QOSList map[v1.ResourceName]v1.PodQOSClass
 
 // GetQOS returns a mapping of resource name to QoS class of a container
 func GetQOS(container *v1.Container) QOSList {
@@ -185,11 +184,11 @@ func GetQOS(container *v1.Container) QOSList {
 	for resource := range allResources(container) {
 		switch {
 		case isResourceGuaranteed(container, resource):
-			resourceToQOS[resource] = Guaranteed
+			resourceToQOS[resource] = v1.PodQOSGuaranteed
 		case isResourceBestEffort(container, resource):
-			resourceToQOS[resource] = BestEffort
+			resourceToQOS[resource] = v1.PodQOSBestEffort
 		default:
-			resourceToQOS[resource] = Burstable
+			resourceToQOS[resource] = v1.PodQOSBurstable
 		}
 	}
 	return resourceToQOS

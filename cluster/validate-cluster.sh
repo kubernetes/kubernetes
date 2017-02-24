@@ -51,6 +51,17 @@ ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-0}"
 CLUSTER_READY_ADDITIONAL_TIME_SECONDS="${CLUSTER_READY_ADDITIONAL_TIME_SECONDS:-30}"
 
 EXPECTED_NUM_NODES="${NUM_NODES}"
+
+if [[ "${KUBERNETES_PROVIDER:-}" == "gce" ]]; then
+  echo "Validating gce cluster, MULTIZONE=${MULTIZONE:-}"
+  # In multizone mode we need to add instances for all nodes in the region.
+  if [[ "${MULTIZONE:-}" == "true" ]]; then
+    EXPECTED_NUM_NODES=$(gcloud -q compute instances list --project="${PROJECT}" --format=[no-heading] --regexp="${NODE_INSTANCE_PREFIX}.*" \
+      --zones=$(gcloud -q compute zones list --project="${PROJECT}" --filter=region=${REGION} --format=[no-heading]\(name\) | tr "\n" "," | sed  "s/,$//") | wc -l)
+    echo "Computing number of nodes, NODE_INSTANCE_PREFIX=${NODE_INSTANCE_PREFIX}, REGION=${REGION}, EXPECTED_NUM_NODES=${EXPECTED_NUM_NODES}"
+  fi
+fi
+
 if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
   if [[ "${KUBERNETES_PROVIDER:-}" == "gce" ]]; then
     NUM_MASTERS=$(get-master-replicas-count)
@@ -59,11 +70,14 @@ if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
   fi
   EXPECTED_NUM_NODES=$((EXPECTED_NUM_NODES+NUM_MASTERS))
 fi
+
 REQUIRED_NUM_NODES=$((EXPECTED_NUM_NODES - ALLOWED_NOTREADY_NODES))
 # Make several attempts to deal with slow cluster birth.
 return_value=0
 attempt=0
+# Set the timeout to ~25minutes (100 x 15 second) to avoid timeouts for 1000-node clusters.
 PAUSE_BETWEEN_ITERATIONS_SECONDS=15
+MAX_ATTEMPTS=100
 ADDITIONAL_ITERATIONS=$(((CLUSTER_READY_ADDITIONAL_TIME_SECONDS + PAUSE_BETWEEN_ITERATIONS_SECONDS - 1)/PAUSE_BETWEEN_ITERATIONS_SECONDS))
 while true; do
   # Pause between iterations of this large outer loop.
@@ -81,7 +95,18 @@ while true; do
   # Suppress errors from kubectl output because during cluster bootstrapping
   # for clusters where the master node is registered, the apiserver will become
   # available and then get restarted as the kubelet configures the docker bridge.
-  node=$(kubectl_retry get nodes) || continue
+  #
+  # We are assigning the result of kubectl_retry get nodes operation to the res
+  # varaible in that way, to prevent stopping the whole script on an error.
+  node=$(kubectl_retry get nodes) && res="$?" || res="$?"
+  if [ "${res}" -ne "0" ]; then
+    if [[ "${attempt}" -gt "${last_run:-$MAX_ATTEMPTS}" ]]; then
+      echo -e "${color_red} Failed to get nodes.${color_norm}"
+      exit 1
+    else
+      continue
+    fi
+  fi
   found=$(($(echo "${node}" | wc -l) - 1))
   ready=$(($(echo "${node}" | grep -v "NotReady" | wc -l ) - 1))
 
@@ -100,8 +125,7 @@ while true; do
       echo -e "${color_green}Found ${REQUIRED_NUM_NODES} Nodes, allowing additional ${ADDITIONAL_ITERATIONS} iterations for other Nodes to join.${color_norm}"
       last_run="${last_run:-$((attempt + ADDITIONAL_ITERATIONS - 1))}"
     fi
-    # Set the timeout to ~25minutes (100 x 15 second) to avoid timeouts for 1000-node clusters.
-    if [[ "${attempt}" -gt "${last_run:-100}" ]]; then
+    if [[ "${attempt}" -gt "${last_run:-$MAX_ATTEMPTS}" ]]; then
       echo -e "${color_yellow}Detected ${ready} ready nodes, found ${found} nodes out of expected ${EXPECTED_NUM_NODES}. Your cluster may not be fully functional.${color_norm}"
       kubectl_retry get nodes
       if [[ "${REQUIRED_NUM_NODES}" -gt "${ready}" ]]; then

@@ -20,8 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/labels"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestAddToNodeAddresses(t *testing.T) {
@@ -75,7 +76,7 @@ func TestAddToNodeAddresses(t *testing.T) {
 
 	for i, tc := range testCases {
 		AddToNodeAddresses(&tc.existing, tc.toAdd...)
-		if !api.Semantic.DeepEqual(tc.expected, tc.existing) {
+		if !apiequality.Semantic.DeepEqual(tc.expected, tc.existing) {
 			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
 		}
 	}
@@ -178,62 +179,6 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 	}
 }
 
-func TestGetAffinityFromPod(t *testing.T) {
-	testCases := []struct {
-		pod       *Pod
-		expectErr bool
-	}{
-		{
-			pod:       &Pod{},
-			expectErr: false,
-		},
-		{
-			pod: &Pod{
-				ObjectMeta: ObjectMeta{
-					Annotations: map[string]string{
-						AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			pod: &Pod{
-				ObjectMeta: ObjectMeta{
-					Annotations: map[string]string{
-						AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-						`,
-					},
-				},
-			},
-			expectErr: true,
-		},
-	}
-
-	for i, tc := range testCases {
-		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		}
-	}
-}
-
 func TestTaintToString(t *testing.T) {
 	testCases := []struct {
 		taint          *Taint
@@ -329,8 +274,230 @@ func TestMatchTaint(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if tc.expectMatch != tc.taint.MatchTaint(tc.taintToMatch) {
+		if tc.expectMatch != tc.taint.MatchTaint(&tc.taintToMatch) {
 			t.Errorf("[%s] expect taint %s match taint %s", tc.description, tc.taint.ToString(), tc.taintToMatch.ToString())
+		}
+	}
+}
+
+func TestTolerationToleratesTaint(t *testing.T) {
+
+	testCases := []struct {
+		description     string
+		toleration      Toleration
+		taint           Taint
+		expectTolerated bool
+	}{
+		{
+			description: "toleration and taint have the same key and effect, and operator is Exists, and taint has no value, expect tolerated",
+			toleration: Toleration{
+				Key:      "foo",
+				Operator: TolerationOpExists,
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "foo",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: true,
+		},
+		{
+			description: "toleration and taint have the same key and effect, and operator is Exists, and taint has some value, expect tolerated",
+			toleration: Toleration{
+				Key:      "foo",
+				Operator: TolerationOpExists,
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: true,
+		},
+		{
+			description: "toleration and taint have the same effect, toleration has empty key and operator is Exists, means match all taints, expect tolerated",
+			toleration: Toleration{
+				Key:      "",
+				Operator: TolerationOpExists,
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: true,
+		},
+		{
+			description: "toleration and taint have the same key, effect and value, and operator is Equal, expect tolerated",
+			toleration: Toleration{
+				Key:      "foo",
+				Operator: TolerationOpEqual,
+				Value:    "bar",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: true,
+		},
+		{
+			description: "toleration and taint have the same key and effect, but different values, and operator is Equal, expect not tolerated",
+			toleration: Toleration{
+				Key:      "foo",
+				Operator: TolerationOpEqual,
+				Value:    "value1",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "foo",
+				Value:  "value2",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: false,
+		},
+		{
+			description: "toleration and taint have the same key and value, but different effects, and operator is Equal, expect not tolerated",
+			toleration: Toleration{
+				Key:      "foo",
+				Operator: TolerationOpEqual,
+				Value:    "bar",
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoExecute,
+			},
+			expectTolerated: false,
+		},
+	}
+	for _, tc := range testCases {
+		if tolerated := tc.toleration.ToleratesTaint(&tc.taint); tc.expectTolerated != tolerated {
+			t.Errorf("[%s] expect %v, got %v: toleration %+v, taint %s", tc.description, tc.expectTolerated, tolerated, tc.toleration, tc.taint.ToString())
+		}
+	}
+}
+
+func TestTolerationsTolerateTaintsWithFilter(t *testing.T) {
+	testCases := []struct {
+		description     string
+		tolerations     []Toleration
+		taints          []Taint
+		applyFilter     taintsFilterFunc
+		expectTolerated bool
+	}{
+		{
+			description:     "empty tolerations tolerate empty taints",
+			tolerations:     []Toleration{},
+			taints:          []Taint{},
+			applyFilter:     func(t *Taint) bool { return true },
+			expectTolerated: true,
+		},
+		{
+			description: "non-empty tolerations tolerate empty taints",
+			tolerations: []Toleration{
+				{
+					Key:      "foo",
+					Operator: "Exists",
+					Effect:   TaintEffectNoSchedule,
+				},
+			},
+			taints:          []Taint{},
+			applyFilter:     func(t *Taint) bool { return true },
+			expectTolerated: true,
+		},
+		{
+			description: "tolerations match all taints, expect tolerated",
+			tolerations: []Toleration{
+				{
+					Key:      "foo",
+					Operator: "Exists",
+					Effect:   TaintEffectNoSchedule,
+				},
+			},
+			taints: []Taint{
+				{
+					Key:    "foo",
+					Effect: TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *Taint) bool { return true },
+			expectTolerated: true,
+		},
+		{
+			description: "tolerations don't match taints, but no taints apply to the filter, expect tolerated",
+			tolerations: []Toleration{
+				{
+					Key:      "foo",
+					Operator: "Exists",
+					Effect:   TaintEffectNoSchedule,
+				},
+			},
+			taints: []Taint{
+				{
+					Key:    "bar",
+					Effect: TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *Taint) bool { return false },
+			expectTolerated: true,
+		},
+		{
+			description: "no filterFunc indicated, means all taints apply to the filter, tolerations don't match taints, expect untolerated",
+			tolerations: []Toleration{
+				{
+					Key:      "foo",
+					Operator: "Exists",
+					Effect:   TaintEffectNoSchedule,
+				},
+			},
+			taints: []Taint{
+				{
+					Key:    "bar",
+					Effect: TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     nil,
+			expectTolerated: false,
+		},
+		{
+			description: "tolerations match taints, expect tolerated",
+			tolerations: []Toleration{
+				{
+					Key:      "foo",
+					Operator: "Exists",
+					Effect:   TaintEffectNoExecute,
+				},
+			},
+			taints: []Taint{
+				{
+					Key:    "foo",
+					Effect: TaintEffectNoExecute,
+				},
+				{
+					Key:    "bar",
+					Effect: TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *Taint) bool { return t.Effect == TaintEffectNoExecute },
+			expectTolerated: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		if tc.expectTolerated != TolerationsTolerateTaintsWithFilter(tc.tolerations, tc.taints, tc.applyFilter) {
+			filteredTaints := []Taint{}
+			for _, taint := range tc.taints {
+				if tc.applyFilter != nil && !tc.applyFilter(&taint) {
+					continue
+				}
+				filteredTaints = append(filteredTaints, taint)
+			}
+			t.Errorf("[%s] expect tolerations %+v tolerate filtered taints %+v in taints %+v", tc.description, tc.tolerations, filteredTaints, tc.taints)
 		}
 	}
 }
@@ -349,7 +516,7 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 		},
 		{
 			node: &Node{
-				ObjectMeta: ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						PreferAvoidPodsAnnotationKey: `
 							{
@@ -376,7 +543,7 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 				PreferAvoidPods: []PreferAvoidPodsEntry{
 					{
 						PodSignature: PodSignature{
-							PodController: &OwnerReference{
+							PodController: &metav1.OwnerReference{
 								APIVersion: "v1",
 								Kind:       "ReplicationController",
 								Name:       "foo",
@@ -394,7 +561,7 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 		{
 			node: &Node{
 				// Missing end symbol of "podController" and "podSignature"
-				ObjectMeta: ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						PreferAvoidPodsAnnotationKey: `
 							{
@@ -474,6 +641,63 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 			t.Errorf("[%v]did not expect error but got: %v", i, err)
 		} else if !reflect.DeepEqual(sysctls, test.expectValue) {
 			t.Errorf("[%v]expect value %v but got %v", i, test.expectValue, sysctls)
+		}
+	}
+}
+
+// TODO: remove when alpha support for affinity is removed
+func TestGetAffinityFromPodAnnotations(t *testing.T) {
+	testCases := []struct {
+		pod       *Pod
+		expectErr bool
+	}{
+		{
+			pod:       &Pod{},
+			expectErr: false,
+		},
+		{
+			pod: &Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+									"operator": "In",
+									"values": ["value1", "value2"]
+								}]
+							}]
+						}}}`,
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			pod: &Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AffinityAnnotationKey: `
+						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+							"nodeSelectorTerms": [{
+								"matchExpressions": [{
+									"key": "foo",
+						`,
+					},
+				},
+			},
+			expectErr: true,
+		},
+	}
+
+	for i, tc := range testCases {
+		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
 		}
 	}
 }

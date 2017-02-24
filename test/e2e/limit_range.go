@@ -19,7 +19,8 @@ package e2e
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -46,7 +47,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Fetching the LimitRange to ensure it has proper values")
-		limitRange, err = f.ClientSet.Core().LimitRanges(f.Namespace.Name).Get(limitRange.Name)
+		limitRange, err = f.ClientSet.Core().LimitRanges(f.Namespace.Name).Get(limitRange.Name, metav1.GetOptions{})
 		expected := v1.ResourceRequirements{Requests: defaultRequest, Limits: defaultLimit}
 		actual := v1.ResourceRequirements{Requests: limitRange.Spec.Limits[0].DefaultRequest, Limits: limitRange.Spec.Limits[0].Default}
 		err = equalResourceRequirement(expected, actual)
@@ -58,7 +59,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring Pod has resource requirements applied from LimitRange")
-		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name)
+		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		for i := range pod.Spec.Containers {
 			err = equalResourceRequirement(expected, pod.Spec.Containers[i].Resources)
@@ -75,7 +76,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring Pod has merged resource requirements applied from LimitRange")
-		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name)
+		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		// This is an interesting case, so it's worth a comment
 		// If you specify a Limit, and no Request, the Limit will default to the Request
@@ -148,7 +149,7 @@ func newLimitRange(name string, limitType v1.LimitType,
 	defaultLimit, defaultRequest,
 	maxLimitRequestRatio v1.ResourceList) *v1.LimitRange {
 	return &v1.LimitRange{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.LimitRangeSpec{
@@ -169,7 +170,7 @@ func newLimitRange(name string, limitType v1.LimitType,
 // newTestPod returns a pod that has the specified requests and limits
 func newTestPod(f *framework.Framework, name string, requests v1.ResourceList, limits v1.ResourceList) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PodSpec{

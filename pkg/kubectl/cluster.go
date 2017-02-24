@@ -19,9 +19,10 @@ package kubectl
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // ClusterGeneratorV1Beta1 supports stable generation of a
@@ -94,7 +95,7 @@ func (s ClusterGeneratorV1Beta1) StructuredGenerate() (runtime.Object, error) {
 		s.SecretName = s.Name
 	}
 	cluster := &federationapi.Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 		},
 		Spec: federationapi.ClusterSpec{

@@ -172,6 +172,7 @@ function get-node-os() {
 # Vars set:
 #   KUBELET_TOKEN
 #   KUBE_PROXY_TOKEN
+#   NODE_PROBLEM_DETECTOR_TOKEN
 #   CA_CERT_BASE64
 #   EXTRA_DOCKER_OPTS
 #   KUBELET_CERT_BASE64
@@ -206,6 +207,7 @@ fi
 #   INSTANCE_GROUPS
 #   KUBELET_TOKEN
 #   KUBE_PROXY_TOKEN
+#   NODE_PROBLEM_DETECTOR_TOKEN
 #   CA_CERT_BASE64
 #   EXTRA_DOCKER_OPTS
 #   KUBELET_CERT_BASE64
@@ -228,6 +230,7 @@ function prepare-node-upgrade() {
   local node_env=$(get-node-env)
   KUBELET_TOKEN=$(get-env-val "${node_env}" "KUBELET_TOKEN")
   KUBE_PROXY_TOKEN=$(get-env-val "${node_env}" "KUBE_PROXY_TOKEN")
+  NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${node_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
   CA_CERT_BASE64=$(get-env-val "${node_env}" "CA_CERT")
   EXTRA_DOCKER_OPTS=$(get-env-val "${node_env}" "EXTRA_DOCKER_OPTS")
   KUBELET_CERT_BASE64=$(get-env-val "${node_env}" "KUBELET_CERT")

@@ -24,14 +24,17 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -45,7 +48,11 @@ var (
 
 		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
 		# and sends stdout/stderr from 'bash' back to the client
-		kubectl attach 123456-7890 -c ruby-container -i -t`)
+		kubectl attach 123456-7890 -c ruby-container -i -t
+
+		# Get output from the first pod of a ReplicaSet named nginx
+		kubectl attach rs/nginx
+		`)
 )
 
 func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -59,8 +66,8 @@ func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) 
 		Attach: &DefaultRemoteAttach{},
 	}
 	cmd := &cobra.Command{
-		Use:     "attach POD -c CONTAINER",
-		Short:   "Attach to a running container",
+		Use:     "attach (POD | TYPE/NAME) -c CONTAINER",
+		Short:   i18n.T("Attach to a running container"),
 		Long:    "Attach to a process that is already running inside an existing container.",
 		Example: attach_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -115,17 +122,39 @@ type AttachOptions struct {
 // Complete verifies command line arguments and loads data from the command environment
 func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
 	if len(argsIn) == 0 {
-		return cmdutil.UsageError(cmd, "POD is required for attach")
+		return cmdutil.UsageError(cmd, "at least one argument is required for attach")
 	}
-	if len(argsIn) > 1 {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("expected a single argument: POD, saw %d: %s", len(argsIn), argsIn))
+	if len(argsIn) > 2 {
+		return cmdutil.UsageError(cmd, fmt.Sprintf("expected fewer than three arguments: POD or TYPE/NAME or TYPE NAME, saw %d: %s", len(argsIn), argsIn))
 	}
-	p.PodName = argsIn[0]
 
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
+
+	mapper, typer := f.Object()
+	builder := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+		NamespaceParam(namespace).DefaultNamespace()
+
+	switch len(argsIn) {
+	case 1:
+		builder.ResourceNames("pods", argsIn[0])
+	case 2:
+		builder.ResourceNames(argsIn[0], argsIn[1])
+	}
+
+	obj, err := builder.Do().Object()
+	if err != nil {
+		return err
+	}
+
+	attachablePod, err := f.AttachablePodForObject(obj)
+	if err != nil {
+		return err
+	}
+
+	p.PodName = attachablePod.Name
 	p.Namespace = namespace
 
 	config, err := f.ClientConfig()
@@ -165,7 +194,7 @@ func (p *AttachOptions) Validate() error {
 // Run executes a validated remote execution against a pod.
 func (p *AttachOptions) Run() error {
 	if p.Pod == nil {
-		pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName)
+		pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

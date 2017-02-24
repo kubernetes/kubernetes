@@ -22,12 +22,13 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -45,6 +46,16 @@ func (f *Framework) PodClient() *PodClient {
 	return &PodClient{
 		f:            f,
 		PodInterface: f.ClientSet.Core().Pods(f.Namespace.Name),
+	}
+}
+
+// Convenience method for getting a pod client interface in an alternative namespace,
+// possibly applying test-suite specific transformations to the pod spec, e.g. for
+// node e2e pod scheduling.
+func (f *Framework) PodClientNS(namespace string) *PodClient {
+	return &PodClient{
+		f:            f,
+		PodInterface: f.ClientSet.Core().Pods(namespace),
 	}
 }
 
@@ -66,7 +77,7 @@ func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
 	p := c.Create(pod)
 	ExpectNoError(c.f.WaitForPodRunning(p.Name))
 	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
-	p, err := c.Get(p.Name)
+	p, err := c.Get(p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
 	return p
 }
@@ -92,7 +103,7 @@ func (c *PodClient) CreateBatch(pods []*v1.Pod) []*v1.Pod {
 // pod object.
 func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
-		pod, err := c.PodInterface.Get(name)
+		pod, err := c.PodInterface.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
 		}
@@ -112,7 +123,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
-func (c *PodClient) DeleteSync(name string, options *v1.DeleteOptions, timeout time.Duration) {
+func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeout time.Duration) {
 	err := c.Delete(name, options)
 	if err != nil && !errors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)

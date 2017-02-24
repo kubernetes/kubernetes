@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = v0.1.0
+TAG = v0.1.1
 PREFIX = gcr.io/google_containers
 
 all: build
@@ -23,7 +23,7 @@ binary:
 	go build -a --ldflags '-w' -o logs-generator .
 
 container:
-	docker build -t $(PREFIX)/logs-generator:$(TAG) .
+	docker build --pull -t $(PREFIX)/logs-generator:$(TAG) .
 
 push:
 	gcloud docker -- push $(PREFIX)/logs-generator:$(TAG)

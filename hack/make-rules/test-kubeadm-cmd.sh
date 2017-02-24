@@ -28,5 +28,5 @@ KUBEADM_PATH="${KUBEADM_PATH:=$(kube::realpath "${KUBE_ROOT}")/cluster/kubeadm.s
 make -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
 
 make -C "${KUBE_ROOT}" test \
-  WHAT=cmd/kubeadm/test \
+  WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd \
   KUBE_TEST_ARGS="--kubeadm-path '${KUBEADM_PATH}'"

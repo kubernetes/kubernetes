@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -55,16 +55,16 @@ var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
 
 		By("creating a new instance of Dashboard and waiting for Dashboard to be scheduled")
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kubernetes-dashboard"}))
-		listOpts := v1.ListOptions{LabelSelector: label.String()}
-		deployments, err := f.ClientSet.Extensions().Deployments(api.NamespaceSystem).List(listOpts)
+		listOpts := metav1.ListOptions{LabelSelector: label.String()}
+		deployments, err := f.ClientSet.Extensions().Deployments(metav1.NamespaceSystem).List(listOpts)
 		framework.ExpectNoError(err)
 		Expect(len(deployments.Items)).Should(Equal(1))
 
 		deployment := deployments.Items[0]
 		replicas := uint(*(deployment.Spec.Replicas))
 
-		err = framework.ScaleDeployment(f.ClientSet, f.InternalClientset, api.NamespaceSystem, deployment.Name, replicas+1, true)
-		defer framework.ExpectNoError(framework.ScaleDeployment(f.ClientSet, f.InternalClientset, api.NamespaceSystem, deployment.Name, replicas, true))
+		err = framework.ScaleDeployment(f.ClientSet, f.InternalClientset, metav1.NamespaceSystem, deployment.Name, replicas+1, true)
+		defer framework.ExpectNoError(framework.ScaleDeployment(f.ClientSet, f.InternalClientset, metav1.NamespaceSystem, deployment.Name, replicas, true))
 		framework.ExpectNoError(err)
 
 	})

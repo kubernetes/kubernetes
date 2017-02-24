@@ -22,9 +22,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type CurrentContextOptions struct {
@@ -45,7 +46,7 @@ func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAcce
 
 	cmd := &cobra.Command{
 		Use:     "current-context",
-		Short:   "Displays the current-context",
+		Short:   i18n.T("Displays the current-context"),
 		Long:    current_context_long,
 		Example: current_context_example,
 		Run: func(cmd *cobra.Command, args []string) {

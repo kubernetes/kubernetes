@@ -1,7 +1,5 @@
-maintainers:
-- dagnello
-- abithap
-- imkin
+approvers:
 - abrarshivani
+- imkin
 - kerneltime
 - luomiao

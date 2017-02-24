@@ -65,8 +65,8 @@ echo "${reset}"
 echo -ne "Checking for package aliases... "
 if ! hack/verify-pkg-names.sh > /dev/null; then
   echo "${red}ERROR!"
-  echo "Some package aliase break go conventions. To fix these errors, "
-  echo "do not use capitalizaed or underlined characters in pkg aliases. "
+  echo "Some package aliases break go conventions. To fix these errors, "
+  echo "do not use capitalized or underlined characters in pkg aliases. "
   echo "Refer to https://blog.golang.org/package-names for more info."
   exit_code=1
 else
@@ -128,18 +128,6 @@ if [[ "${#files_need_description[@]}" -ne 0 ]]; then
   for file in "${files_need_description[@]}"; do
     echo "  ${file}"
   done
-  exit_code=1
-else
-  echo "${green}OK"
-fi
-echo "${reset}"
-
-echo -ne "Checking for docs that need updating... "
-if ! hack/verify-munge-docs.sh > /dev/null; then
-  echo "${red}ERROR!"
-  echo "Some docs are out of sync between CLI and markdown."
-  echo "To regenerate docs, run:"
-  echo "  hack/update-munge-docs.sh"
   exit_code=1
 else
   echo "${green}OK"

@@ -16,10 +16,19 @@ package types
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 )
 
 var (
 	isolatorMap map[ACIdentifier]IsolatorValueConstructor
+
+	// ErrIncompatibleIsolator is returned whenever an Isolators set contains
+	// conflicting IsolatorValue instances
+	ErrIncompatibleIsolator = errors.New("isolators set contains incompatible types")
+	// ErrInvalidIsolator is returned upon validation failures due to improper
+	// or partially constructed Isolator instances (eg. from incomplete direct construction)
+	ErrInvalidIsolator = errors.New("invalid isolator")
 )
 
 func init() {
@@ -40,6 +49,33 @@ func AddIsolatorName(n ACIdentifier, ns map[ACIdentifier]struct{}) {
 // and PodManifest schemas.
 type Isolators []Isolator
 
+// assertValid checks that every single isolator is valid and that
+// the whole set is well built
+func (isolators Isolators) assertValid() error {
+	typesMap := make(map[ACIdentifier]bool)
+	for _, i := range isolators {
+		v := i.Value()
+		if v == nil {
+			return ErrInvalidIsolator
+		}
+		if err := v.AssertValid(); err != nil {
+			return err
+		}
+		if _, ok := typesMap[i.Name]; ok {
+			if !v.multipleAllowed() {
+				return fmt.Errorf(`isolators set contains too many instances of type %s"`, i.Name)
+			}
+		}
+		for _, c := range v.Conflicts() {
+			if _, found := typesMap[c]; found {
+				return ErrIncompatibleIsolator
+			}
+		}
+		typesMap[i.Name] = true
+	}
+	return nil
+}
+
 // GetByName returns the last isolator in the list by the given name.
 func (is *Isolators) GetByName(name ACIdentifier) *Isolator {
 	var i Isolator
@@ -50,6 +86,22 @@ func (is *Isolators) GetByName(name ACIdentifier) *Isolator {
 		}
 	}
 	return nil
+}
+
+// ReplaceIsolatorsByName overrides matching isolator types with a new
+// isolator, deleting them all and appending the new one instead
+func (is *Isolators) ReplaceIsolatorsByName(newIs Isolator, oldNames []ACIdentifier) {
+	var i Isolator
+	for j := len(*is) - 1; j >= 0; j-- {
+		i = []Isolator(*is)[j]
+		for _, name := range oldNames {
+			if i.Name == name {
+				*is = append((*is)[:j], (*is)[j+1:]...)
+			}
+		}
+	}
+	*is = append((*is)[:], newIs)
+	return
 }
 
 // Unrecognized returns a set of isolators that are not recognized.
@@ -69,8 +121,17 @@ func (is *Isolators) Unrecognized() Isolators {
 // serialized as any arbitrary JSON blob. Specific Isolator types should
 // implement this interface to facilitate unmarshalling and validation.
 type IsolatorValue interface {
+	// UnmarshalJSON unserialize a JSON-encoded isolator
 	UnmarshalJSON(b []byte) error
+	// AssertValid returns a non-nil error value if an IsolatorValue is not valid
+	// according to appc spec
 	AssertValid() error
+	// Conflicts returns a list of conflicting isolators types, which cannot co-exist
+	// together with this IsolatorValue
+	Conflicts() []ACIdentifier
+	// multipleAllowed specifies whether multiple isolator instances are allowed
+	// for this isolator type
+	multipleAllowed() bool
 }
 
 // Isolator is a model for unmarshalling isolator types from their JSON-encoded

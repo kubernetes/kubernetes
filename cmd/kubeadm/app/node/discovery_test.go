@@ -67,26 +67,26 @@ func TestRetrieveTrustedClusterInfo(t *testing.T) {
 	}
 	tests := []struct {
 		h       string
-		p       int32
+		p       int
 		payload string
 		expect  bool
 	}{
 		{
 			h:       host,
-			p:       int32(iPort),
+			p:       iPort,
 			payload: "",
 			expect:  false,
 		},
 		{
 			h:       host,
-			p:       int32(iPort),
+			p:       iPort,
 			payload: "foo",
 			expect:  false,
 		},
 	}
 	for _, rt := range tests {
 		j.Payload = rt.payload
-		nc := &kubeadmapi.NodeConfiguration{MasterAddresses: []string{host}, DiscoveryPort: int32(iPort)}
+		nc := &kubeadmapi.TokenDiscovery{Addresses: []string{rt.h + ":" + strconv.Itoa(rt.p)}}
 		_, actual := RetrieveTrustedClusterInfo(nc)
 		if (actual == nil) != rt.expect {
 			t.Errorf(

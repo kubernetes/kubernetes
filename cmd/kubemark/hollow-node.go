@@ -19,21 +19,23 @@ package main
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/flag"
+	clientgoclientset "k8s.io/client-go/kubernetes"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
-	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubemark"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
-	"k8s.io/kubernetes/pkg/util/flag"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
-	"k8s.io/kubernetes/pkg/util/sets"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 
 	"github.com/golang/glog"
@@ -110,7 +112,7 @@ func main() {
 		cadvisorInterface := new(cadvisortest.Fake)
 		containerManager := cm.NewStubContainerManager()
 
-		fakeDockerClient := dockertools.NewFakeDockerClient()
+		fakeDockerClient := dockertools.NewFakeDockerClient().WithTraceDisabled()
 		fakeDockerClient.EnableSleep = true
 
 		hollowKubelet := kubemark.NewHollowKubelet(
@@ -129,7 +131,7 @@ func main() {
 
 	if config.Morph == "proxy" {
 		eventBroadcaster := record.NewBroadcaster()
-		recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "kube-proxy", Host: config.NodeName})
+		recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: config.NodeName})
 
 		iptInterface := fakeiptables.NewFake()
 
@@ -139,7 +141,21 @@ func main() {
 		endpointsConfig := proxyconfig.NewEndpointsConfig()
 		endpointsConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
-		hollowProxy := kubemark.NewHollowProxyOrDie(config.NodeName, internalClientset, endpointsConfig, serviceConfig, iptInterface, eventBroadcaster, recorder)
+		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
+		if err != nil {
+			glog.Fatalf("Failed to create API Server client: %v", err)
+		}
+
+		hollowProxy := kubemark.NewHollowProxyOrDie(
+			config.NodeName,
+			internalClientset,
+			eventClient,
+			endpointsConfig,
+			serviceConfig,
+			iptInterface,
+			eventBroadcaster,
+			recorder,
+		)
 		hollowProxy.Run()
 	}
 }

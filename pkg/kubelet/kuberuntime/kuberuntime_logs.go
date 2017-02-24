@@ -32,6 +32,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util/tail"
 )
 
 // Notice that the current kuberuntime logs implementation doesn't handle
@@ -120,7 +121,7 @@ func ReadLogs(path string, apiOpts *v1.PodLogOptions, stdout, stderr io.Writer) 
 	opts := newLogOptions(apiOpts, time.Now())
 
 	// Search start point based on tail line.
-	start, err := tail(f, opts.tail)
+	start, err := tail.FindTailLineStartIndex(f, opts.tail)
 	if err != nil {
 		return fmt.Errorf("failed to tail %d lines of log file %q: %v", opts.tail, path, err)
 	}
@@ -190,6 +191,7 @@ func ReadLogs(path string, apiOpts *v1.PodLogOptions, stdout, stderr io.Writer) 
 				return nil
 			}
 			glog.Errorf("Failed with err %v when writing log for log file %q: %+v", err, path, msg)
+			return err
 		}
 	}
 }
@@ -298,6 +300,9 @@ type logWriter struct {
 // errMaximumWrite is returned when all bytes have been written.
 var errMaximumWrite = errors.New("maximum write")
 
+// errShortWrite is returned when the message is not fully written.
+var errShortWrite = errors.New("short write")
+
 func newLogWriter(stdout io.Writer, stderr io.Writer, opts *logOptions) *logWriter {
 	w := &logWriter{
 		stdout: stdout,
@@ -341,46 +346,13 @@ func (w *logWriter) write(msg *logMessage) error {
 	if err != nil {
 		return err
 	}
+	// If the line has not been fully written, return errShortWrite
+	if n < len(line) {
+		return errShortWrite
+	}
 	// If there are no more bytes left, return errMaximumWrite
 	if w.remain <= 0 {
 		return errMaximumWrite
 	}
 	return nil
-}
-
-// tail returns the start of last nth line.
-// * If n < 0, return the beginning of the file.
-// * If n >= 0, return the beginning of last nth line.
-// Notice that if the last line is incomplete (no end-of-line), it will not be counted
-// as one line.
-func tail(f io.ReadSeeker, n int64) (int64, error) {
-	if n < 0 {
-		return 0, nil
-	}
-	size, err := f.Seek(0, os.SEEK_END)
-	if err != nil {
-		return 0, err
-	}
-	var left, cnt int64
-	buf := make([]byte, blockSize)
-	for right := size; right > 0 && cnt <= n; right -= blockSize {
-		left = right - blockSize
-		if left < 0 {
-			left = 0
-			buf = make([]byte, right)
-		}
-		if _, err := f.Seek(left, os.SEEK_SET); err != nil {
-			return 0, err
-		}
-		if _, err := f.Read(buf); err != nil {
-			return 0, err
-		}
-		cnt += int64(bytes.Count(buf, eol))
-	}
-	for ; cnt > n; cnt-- {
-		idx := bytes.Index(buf, eol) + 1
-		buf = buf[idx:]
-		left += int64(idx)
-	}
-	return left, nil
 }

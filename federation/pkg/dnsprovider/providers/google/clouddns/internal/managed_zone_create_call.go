@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ interfaces.ManagedZonesCreateCall = ManagedZonesCreateCall{}
 
 type ManagedZonesCreateCall struct{ impl *dns.ManagedZonesCreateCall }

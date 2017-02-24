@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
@@ -60,11 +61,11 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki",
 			},
 			setupFiles: []string{
-				"manifests/etcd.json",
-				"manifests/kube-apiserver.json",
+				"manifests/etcd.yaml",
+				"manifests/kube-apiserver.yaml",
 				"pki/ca.pem",
-				"admin.conf",
-				"kubelet.conf",
+				kubeadmconstants.AdminKubeConfigFileName,
+				kubeadmconstants.KubeletKubeConfigFileName,
 			},
 			verifyExists: []string{
 				"manifests",
@@ -77,7 +78,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			},
 			setupFiles: []string{
 				"pki/ca.pem",
-				"kubelet.conf",
+				kubeadmconstants.KubeletKubeConfigFileName,
 			},
 			verifyExists: []string{
 				"pki",
@@ -86,23 +87,23 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests",
 			},
 		},
-		"preserve cloud-config.json": {
+		"preserve cloud-config": {
 			setupDirs: []string{
 				"manifests",
 				"pki",
 			},
 			setupFiles: []string{
-				"manifests/etcd.json",
-				"manifests/kube-apiserver.json",
+				"manifests/etcd.yaml",
+				"manifests/kube-apiserver.yaml",
 				"pki/ca.pem",
-				"admin.conf",
-				"kubelet.conf",
-				"cloud-config.json",
+				kubeadmconstants.AdminKubeConfigFileName,
+				kubeadmconstants.KubeletKubeConfigFileName,
+				"cloud-config",
 			},
 			verifyExists: []string{
 				"manifests",
 				"pki",
-				"cloud-config.json",
+				"cloud-config",
 			},
 		},
 		"preserve hidden files and directories": {
@@ -112,18 +113,18 @@ func TestConfigDirCleaner(t *testing.T) {
 				".mydir",
 			},
 			setupFiles: []string{
-				"manifests/etcd.json",
-				"manifests/kube-apiserver.json",
+				"manifests/etcd.yaml",
+				"manifests/kube-apiserver.yaml",
 				"pki/ca.pem",
-				"admin.conf",
-				"kubelet.conf",
-				".cloud-config.json",
+				kubeadmconstants.AdminKubeConfigFileName,
+				kubeadmconstants.KubeletKubeConfigFileName,
+				".cloud-config",
 				".mydir/.myfile",
 			},
 			verifyExists: []string{
 				"manifests",
 				"pki",
-				".cloud-config.json",
+				".cloud-config",
 				".mydir",
 				".mydir/.myfile",
 			},
@@ -156,18 +157,18 @@ func TestConfigDirCleaner(t *testing.T) {
 		for _, createFile := range test.setupFiles {
 			fullPath := filepath.Join(tmpDir, createFile)
 			f, err := os.Create(fullPath)
-			defer f.Close()
 			if err != nil {
 				t.Errorf("Unable to create test file: %s", err)
 			}
+			defer f.Close()
 		}
 
-		resetConfigDir(tmpDir)
+		resetConfigDir(tmpDir, filepath.Join(tmpDir, "pki"))
 
 		// Verify the files we cleanup implicitly in every test:
 		assertExists(t, tmpDir)
-		assertNotExists(t, filepath.Join(tmpDir, "admin.conf"))
-		assertNotExists(t, filepath.Join(tmpDir, "kubelet.conf"))
+		assertNotExists(t, filepath.Join(tmpDir, kubeadmconstants.AdminKubeConfigFileName))
+		assertNotExists(t, filepath.Join(tmpDir, kubeadmconstants.KubeletKubeConfigFileName))
 		assertDirEmpty(t, filepath.Join(tmpDir, "manifests"))
 		assertDirEmpty(t, filepath.Join(tmpDir, "pki"))
 

@@ -45,18 +45,22 @@ type Zone interface {
 	Name() string
 	// ID returns the unique provider identifier for the zone
 	ID() string
-	// ResourceRecordsets returns the provider's ResourceRecordSets interface, or false if not supported.
+	// ResourceRecordSets returns the provider's ResourceRecordSets interface, or false if not supported.
 	ResourceRecordSets() (ResourceRecordSets, bool)
 }
 
 type ResourceRecordSets interface {
 	// List returns the ResourceRecordSets of the Zone, or an error if the list operation failed.
 	List() ([]ResourceRecordSet, error)
+	// Get returns the ResourceRecordSet with the name in the Zone. if the named resource record set does not exist, but no error occurred, the returned set, and error, are both nil.
+	Get(name string) (ResourceRecordSet, error)
 	// New allocates a new ResourceRecordSet, which can then be passed to ResourceRecordChangeset Add() or Remove()
 	// Arguments are as per the ResourceRecordSet interface below.
 	New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) ResourceRecordSet
 	// StartChangeset begins a new batch operation of changes against the Zone
 	StartChangeset() ResourceRecordChangeset
+	// Zone returns the parent zone
+	Zone() Zone
 }
 
 // ResourceRecordChangeset accumulates a set of changes, that can then be applied with Apply
@@ -66,8 +70,16 @@ type ResourceRecordChangeset interface {
 	// Remove adds the removal of a ResourceRecordSet in the Zone to the changeset
 	// The supplied ResourceRecordSet must match one of the existing recordsets (obtained via List()) exactly.
 	Remove(ResourceRecordSet) ResourceRecordChangeset
+	// Upsert adds an "create or update" operation for the ResourceRecordSet in the Zone to the changeset
+	// Note: the implementation may translate this into a Remove followed by an Add operation.
+	// If you have the pre-image, it will likely be more efficient to call Remove and Add.
+	Upsert(ResourceRecordSet) ResourceRecordChangeset
 	// Apply applies the accumulated operations to the Zone.
 	Apply() error
+	// IsEmpty returns true if there are no accumulated operations.
+	IsEmpty() bool
+	// ResourceRecordSets returns the parent ResourceRecordSets
+	ResourceRecordSets() ResourceRecordSets
 }
 
 type ResourceRecordSet interface {

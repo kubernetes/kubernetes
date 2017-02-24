@@ -21,7 +21,7 @@ container: image
 
 image:
 	# Build new image and automatically tag it as latest
-	docker build -t $(PREFIX)/volume-rbd .
+	docker build --pull -t $(PREFIX)/volume-rbd .
 	# Add the version tag to the latest image
 	docker tag $(PREFIX)/volume-rbd $(PREFIX)/volume-rbd:$(TAG)
 

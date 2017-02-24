@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type FakeAPIObject struct{}
@@ -31,7 +31,7 @@ func (obj *FakeAPIObject) GetObjectKind() schema.ObjectKind { return schema.Empt
 
 type ExtensionAPIObject struct {
 	metav1.TypeMeta
-	ObjectMeta
+	metav1.ObjectMeta
 }
 
 func (obj *ExtensionAPIObject) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
@@ -53,7 +53,7 @@ func TestGetReference(t *testing.T) {
 	}{
 		"pod": {
 			obj: &Pod{
-				ObjectMeta: ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "foo",
 					UID:             "bar",
 					ResourceVersion: "42",
@@ -88,7 +88,7 @@ func TestGetReference(t *testing.T) {
 				TypeMeta: metav1.TypeMeta{
 					Kind: "ExtensionAPIObject",
 				},
-				ObjectMeta: ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "foo",
 					UID:             "bar",
 					ResourceVersion: "42",
@@ -125,7 +125,7 @@ func TestGetReference(t *testing.T) {
 	}
 
 	for name, item := range table {
-		ref, err := GetPartialReference(item.obj, item.fieldPath)
+		ref, err := GetPartialReference(Scheme, item.obj, item.fieldPath)
 		if e, a := item.shouldErr, (err != nil); e != a {
 			t.Errorf("%v: expected %v, got %v, err %v", name, e, a, err)
 			continue

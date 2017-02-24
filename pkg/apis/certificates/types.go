@@ -16,54 +16,68 @@ limitations under the License.
 
 package certificates
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // +genclient=true
 // +nonNamespaced=true
 
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta
 
 	// The certificate request itself and any additional information.
 	// +optional
-	Spec CertificateSigningRequestSpec `json:"spec,omitempty"`
+	Spec CertificateSigningRequestSpec
 
 	// Derived information about the request.
 	// +optional
-	Status CertificateSigningRequestStatus `json:"status,omitempty"`
+	Status CertificateSigningRequestStatus
 }
 
 // This information is immutable after the request is created. Only the Request
-// and ExtraInfo fields can be set on creation, other fields are derived by
+// and Usages fields can be set on creation, other fields are derived by
 // Kubernetes and cannot be modified by users.
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
-	Request []byte `json:"request"`
+	Request []byte
 
-	// Information about the requesting user (if relevant)
-	// See user.Info interface for details
+	// usages specifies a set of usage contexts the key will be
+	// valid for.
+	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	Usages []KeyUsage
+
+	// Information about the requesting user.
+	// See user.Info interface for details.
 	// +optional
-	Username string `json:"username,omitempty"`
+	Username string
+	// UID information about the requesting user.
+	// See user.Info interface for details.
 	// +optional
-	UID string `json:"uid,omitempty"`
+	UID string
+	// Group information about the requesting user.
+	// See user.Info interface for details.
 	// +optional
-	Groups []string `json:"groups,omitempty"`
+	Groups []string
+	// Extra information about the requesting user.
+	// See user.Info interface for details.
+	// +optional
+	Extra map[string]ExtraValue
 }
+
+// ExtraValue masks the value so protobuf can generate
+type ExtraValue []string
 
 type CertificateSigningRequestStatus struct {
 	// Conditions applied to the request, such as approval or denial.
 	// +optional
-	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty"`
+	Conditions []CertificateSigningRequestCondition
 
 	// If request was approved, the controller will place the issued certificate here.
 	// +optional
-	Certificate []byte `json:"certificate,omitempty"`
+	Certificate []byte
 }
 
 type RequestConditionType string
@@ -76,23 +90,54 @@ const (
 
 type CertificateSigningRequestCondition struct {
 	// request approval state, currently Approved or Denied.
-	Type RequestConditionType `json:"type"`
+	Type RequestConditionType
 	// brief reason for the request state
 	// +optional
-	Reason string `json:"reason,omitempty"`
+	Reason string
 	// human readable message with details about the request state
 	// +optional
-	Message string `json:"message,omitempty"`
+	Message string
 	// timestamp for the last update to this condition
 	// +optional
-	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+	LastUpdateTime metav1.Time
 }
 
 type CertificateSigningRequestList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// +optional
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta
 
 	// +optional
-	Items []CertificateSigningRequest `json:"items,omitempty"`
+	Items []CertificateSigningRequest
 }
+
+// KeyUsages specifies valid usage contexts for keys.
+// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+type KeyUsage string
+
+const (
+	UsageSigning            KeyUsage = "signing"
+	UsageDigitalSignature   KeyUsage = "digital signature"
+	UsageContentCommittment KeyUsage = "content committment"
+	UsageKeyEncipherment    KeyUsage = "key encipherment"
+	UsageKeyAgreement       KeyUsage = "key agreement"
+	UsageDataEncipherment   KeyUsage = "data encipherment"
+	UsageCertSign           KeyUsage = "cert sign"
+	UsageCRLSign            KeyUsage = "crl sign"
+	UsageEncipherOnly       KeyUsage = "encipher only"
+	UsageDecipherOnly       KeyUsage = "decipher only"
+	UsageAny                KeyUsage = "any"
+	UsageServerAuth         KeyUsage = "server auth"
+	UsageClientAuth         KeyUsage = "client auth"
+	UsageCodeSigning        KeyUsage = "code signing"
+	UsageEmailProtection    KeyUsage = "email protection"
+	UsageSMIME              KeyUsage = "s/mime"
+	UsageIPsecEndSystem     KeyUsage = "ipsec end system"
+	UsageIPsecTunnel        KeyUsage = "ipsec tunnel"
+	UsageIPsecUser          KeyUsage = "ipsec user"
+	UsageTimestamping       KeyUsage = "timestamping"
+	UsageOCSPSigning        KeyUsage = "ocsp signing"
+	UsageMicrosoftSGC       KeyUsage = "microsoft sgc"
+	UsageNetscapSGC         KeyUsage = "netscape sgc"
+)

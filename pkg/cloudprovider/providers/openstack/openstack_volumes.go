@@ -25,11 +25,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/volume"
 
-	"github.com/rackspace/gophercloud"
-	"github.com/rackspace/gophercloud/openstack"
-	"github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/extensions/volumeattach"
-	"github.com/rackspace/gophercloud/pagination"
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
+	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/golang/glog"
 )
@@ -52,18 +52,21 @@ func (os *OpenStack) AttachDisk(instanceID string, diskName string) (string, err
 		if instanceID == disk.Attachments[0]["server_id"] {
 			glog.V(4).Infof("Disk: %q is already attached to compute: %q", diskName, instanceID)
 			return disk.ID, nil
-		} else {
-			errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, should be detached before proceeding", diskName, disk.Attachments[0]["server_id"])
-			glog.Errorf(errMsg)
-			return "", errors.New(errMsg)
+		}
+
+		glog.V(2).Infof("Disk %q is attached to a different compute (%q), detaching", diskName, disk.Attachments[0]["server_id"])
+		err = os.DetachDisk(fmt.Sprintf("%s", disk.Attachments[0]["server_id"]), diskName)
+		if err != nil {
+			return "", err
 		}
 	}
+
 	// add read only flag here if possible spothanis
 	_, err = volumeattach.Create(cClient, instanceID, &volumeattach.CreateOpts{
 		VolumeID: disk.ID,
 	}).Extract()
 	if err != nil {
-		glog.Errorf("Failed to attach %s volume to %s compute", diskName, instanceID)
+		glog.Errorf("Failed to attach %s volume to %s compute: %v", diskName, instanceID, err)
 		return "", err
 	}
 	glog.V(2).Infof("Successfully attached %s volume to %s compute", diskName, instanceID)

@@ -20,17 +20,45 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 const region = "us-central"
 
 func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Service {
-	return &v1.Service{ObjectMeta: v1.ObjectMeta{Name: name, Namespace: "namespace", UID: uid, SelfLink: testapi.Default.SelfLink("services", name)}, Spec: v1.ServiceSpec{Type: serviceType}}
+	return &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "namespace", UID: uid, SelfLink: testapi.Default.SelfLink("services", name)}, Spec: v1.ServiceSpec{Type: serviceType}}
+}
+
+func alwaysReady() bool { return true }
+
+func newController() (*ServiceController, *fakecloud.FakeCloud, *fake.Clientset) {
+	cloud := &fakecloud.FakeCloud{}
+	cloud.Region = region
+
+	client := fake.NewSimpleClientset()
+
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	serviceInformer := informerFactory.Core().V1().Services()
+	nodeInformer := informerFactory.Core().V1().Nodes()
+
+	controller, _ := New(cloud, client, serviceInformer, nodeInformer, "test-cluster")
+	controller.nodeListerSynced = alwaysReady
+	controller.serviceListerSynced = alwaysReady
+	controller.eventRecorder = record.NewFakeRecorder(100)
+
+	controller.init()
+	cloud.Calls = nil     // ignore any cloud calls made in init()
+	client.ClearActions() // ignore any client calls made in init()
+
+	return controller, cloud, client
 }
 
 func TestCreateExternalLoadBalancer(t *testing.T) {
@@ -41,7 +69,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 	}{
 		{
 			service: &v1.Service{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "no-external-balancer",
 					Namespace: "default",
 				},
@@ -54,7 +82,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		},
 		{
 			service: &v1.Service{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "udp-service",
 					Namespace: "default",
 					SelfLink:  testapi.Default.SelfLink("services", "udp-service"),
@@ -72,7 +100,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		},
 		{
 			service: &v1.Service{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
 					SelfLink:  testapi.Default.SelfLink("services", "basic-service1"),
@@ -91,13 +119,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 	}
 
 	for _, item := range table {
-		cloud := &fakecloud.FakeCloud{}
-		cloud.Region = region
-		client := &fake.Clientset{}
-		controller, _ := New(cloud, client, "test-cluster")
-		controller.init()
-		cloud.Calls = nil     // ignore any cloud calls made in init()
-		client.ClearActions() // ignore any client calls made in init()
+		controller, cloud, client := newController()
 		err, _ := controller.createLoadBalancerIfNeeded("foo/bar", item.service)
 		if !item.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -145,7 +167,11 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 
 // TODO: Finish converting and update comments
 func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
-	hosts := []string{"node0", "node1", "node73"}
+	nodes := []*v1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: "node0"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node73"}},
+	}
 	table := []struct {
 		services            []*v1.Service
 		expectedUpdateCalls []fakecloud.FakeUpdateBalancerCall
@@ -169,7 +195,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s0", "333", v1.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "333", v1.ServiceTypeLoadBalancer), hosts},
+				{newService("s0", "333", v1.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 		{
@@ -180,9 +206,9 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s2", "666", v1.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "444", v1.ServiceTypeLoadBalancer), hosts},
-				{newService("s1", "555", v1.ServiceTypeLoadBalancer), hosts},
-				{newService("s2", "666", v1.ServiceTypeLoadBalancer), hosts},
+				{newService("s0", "444", v1.ServiceTypeLoadBalancer), nodes},
+				{newService("s1", "555", v1.ServiceTypeLoadBalancer), nodes},
+				{newService("s2", "666", v1.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 		{
@@ -194,8 +220,8 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s4", "123", v1.ServiceTypeClusterIP),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s1", "888", v1.ServiceTypeLoadBalancer), hosts},
-				{newService("s3", "999", v1.ServiceTypeLoadBalancer), hosts},
+				{newService("s1", "888", v1.ServiceTypeLoadBalancer), nodes},
+				{newService("s3", "999", v1.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 		{
@@ -205,82 +231,22 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				nil,
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "234", v1.ServiceTypeLoadBalancer), hosts},
+				{newService("s0", "234", v1.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 	}
 	for _, item := range table {
-		cloud := &fakecloud.FakeCloud{}
-
-		cloud.Region = region
-		client := &fake.Clientset{}
-		controller, _ := New(cloud, client, "test-cluster2")
-		controller.init()
-		cloud.Calls = nil // ignore any cloud calls made in init()
+		controller, cloud, _ := newController()
 
 		var services []*v1.Service
 		for _, service := range item.services {
 			services = append(services, service)
 		}
-		if err := controller.updateLoadBalancerHosts(services, hosts); err != nil {
+		if err := controller.updateLoadBalancerHosts(services, nodes); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
 			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)
-		}
-	}
-}
-
-func TestHostsFromNodeList(t *testing.T) {
-	tests := []struct {
-		nodes         *v1.NodeList
-		expectedHosts []string
-	}{
-		{
-			nodes:         &v1.NodeList{},
-			expectedHosts: []string{},
-		},
-		{
-			nodes: &v1.NodeList{
-				Items: []v1.Node{
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "foo"},
-						Status:     v1.NodeStatus{Phase: v1.NodeRunning},
-					},
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "bar"},
-						Status:     v1.NodeStatus{Phase: v1.NodeRunning},
-					},
-				},
-			},
-			expectedHosts: []string{"foo", "bar"},
-		},
-		{
-			nodes: &v1.NodeList{
-				Items: []v1.Node{
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "foo"},
-						Status:     v1.NodeStatus{Phase: v1.NodeRunning},
-					},
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "bar"},
-						Status:     v1.NodeStatus{Phase: v1.NodeRunning},
-					},
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "unschedulable"},
-						Spec:       v1.NodeSpec{Unschedulable: true},
-						Status:     v1.NodeStatus{Phase: v1.NodeRunning},
-					},
-				},
-			},
-			expectedHosts: []string{"foo", "bar"},
-		},
-	}
-
-	for _, test := range tests {
-		hosts := hostsFromNodeList(test.nodes)
-		if !reflect.DeepEqual(hosts, test.expectedHosts) {
-			t.Errorf("expected: %v, saw: %v", test.expectedHosts, hosts)
 		}
 	}
 }

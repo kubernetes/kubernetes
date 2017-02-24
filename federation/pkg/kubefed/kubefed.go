@@ -19,13 +19,13 @@ package kubefed
 import (
 	"io"
 
+	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/tools/clientcmd"
 	kubefedinit "k8s.io/kubernetes/federation/pkg/kubefed/init"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kubectl "k8s.io/kubernetes/pkg/kubectl/cmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/spf13/cobra"
 )

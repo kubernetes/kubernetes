@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.7
+TAG = 0.8
 PREFIX = gcr.io/google_containers
 
 all: push
 
 mt: mt.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./mt.go
+	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./mt.go && \
+	chmod a+rx mt
 
 image: mt
-	sudo docker build -t $(PREFIX)/mounttest:$(TAG) .
+	sudo docker build --pull -t $(PREFIX)/mounttest:$(TAG) .
 
 push: image
 	gcloud docker -- push $(PREFIX)/mounttest:$(TAG)

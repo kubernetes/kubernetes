@@ -509,7 +509,7 @@ func (self *version2_1) HandleRequest(requestType string, request []string, m ma
 			}
 			contStats[name] = v2.ContainerInfo{
 				Spec:  v2.ContainerSpecFromV1(&cont.Spec, cont.Aliases, cont.Namespace),
-				Stats: v2.ContainerStatsFromV1(&cont.Spec, cont.Stats),
+				Stats: v2.ContainerStatsFromV1(name, &cont.Spec, cont.Stats),
 			}
 		}
 		return writeResult(contStats, w)

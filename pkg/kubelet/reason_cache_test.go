@@ -19,8 +19,8 @@ package kubelet
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestReasonCache(t *testing.T) {

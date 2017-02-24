@@ -16,24 +16,21 @@ limitations under the License.
 
 package testgroup
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // +genclient=true
 
 type TestType struct {
-	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta  `json:"metadata,omitempty"`
-	Status          TestTypeStatus `json:"status,omitempty"`
+	metav1.TypeMeta
+	metav1.ObjectMeta
+	Status TestTypeStatus
 }
 
 type TestTypeList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta
+	metav1.ListMeta
 
-	Items []TestType `json:"items"`
+	Items []TestType
 }
 
 type TestTypeStatus struct {

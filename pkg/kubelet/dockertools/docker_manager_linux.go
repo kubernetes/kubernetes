@@ -20,8 +20,20 @@ package dockertools
 
 import (
 	dockertypes "github.com/docker/engine-api/types"
+	dockercontainer "github.com/docker/engine-api/types/container"
+
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
+
+// These two functions are OS specific (for now at least)
+func updateHostConfig(hc *dockercontainer.HostConfig, opts *kubecontainer.RunContainerOptions) {
+	// no-op, there is a windows implementation that is different.
+}
+
+func DefaultMemorySwap() int64 {
+	return 0
+}
 
 func getContainerIP(container *dockertypes.ContainerJSON) string {
 	result := ""
@@ -40,8 +52,13 @@ func getContainerIP(container *dockertypes.ContainerJSON) string {
 func getNetworkingMode() string { return "" }
 
 // Returns true if the container name matches the infrastructure's container name
-func containerProvidesPodIP(name *KubeletContainerName) bool {
-	return name.ContainerName == PodInfraContainerName
+func containerProvidesPodIP(containerName string) bool {
+	return containerName == PodInfraContainerName
+}
+
+// Only the infrastructure container needs network setup/teardown
+func containerIsNetworked(containerName string) bool {
+	return containerName == PodInfraContainerName
 }
 
 // Returns Seccomp and AppArmor Security options

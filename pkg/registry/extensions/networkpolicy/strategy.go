@@ -20,25 +20,27 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // networkPolicyStrategy implements verification logic for NetworkPolicys.
 type networkPolicyStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating NetworkPolicy objects.
-var Strategy = networkPolicyStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = networkPolicyStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all NetworkPolicys need to be within a namespace.
 func (networkPolicyStrategy) NamespaceScoped() bool {
@@ -46,26 +48,26 @@ func (networkPolicyStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an NetworkPolicy before creation.
-func (networkPolicyStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+func (networkPolicyStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	networkPolicy := obj.(*extensions.NetworkPolicy)
 	networkPolicy.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (networkPolicyStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (networkPolicyStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newNetworkPolicy := obj.(*extensions.NetworkPolicy)
 	oldNetworkPolicy := old.(*extensions.NetworkPolicy)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
-	// See api.ObjectMeta description for more information on Generation.
+	// See metav1.ObjectMeta description for more information on Generation.
 	if !reflect.DeepEqual(oldNetworkPolicy.Spec, newNetworkPolicy.Spec) {
 		newNetworkPolicy.Generation = oldNetworkPolicy.Generation + 1
 	}
 }
 
 // Validate validates a new NetworkPolicy.
-func (networkPolicyStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+func (networkPolicyStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	networkPolicy := obj.(*extensions.NetworkPolicy)
 	return validation.ValidateNetworkPolicy(networkPolicy)
 }
@@ -80,7 +82,7 @@ func (networkPolicyStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (networkPolicyStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (networkPolicyStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateNetworkPolicy(obj.(*extensions.NetworkPolicy))
 	updateErrorList := validation.ValidateNetworkPolicyUpdate(obj.(*extensions.NetworkPolicy), old.(*extensions.NetworkPolicy))
 	return append(validationErrorList, updateErrorList...)

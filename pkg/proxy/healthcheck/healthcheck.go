@@ -22,9 +22,9 @@ import (
 	"net/http"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/cache"
 )
 
 // proxyMutationRequest: Message to request addition/deletion of endpoints for a service

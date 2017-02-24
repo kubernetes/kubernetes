@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
@@ -329,38 +329,28 @@ func TestSSHUser(t *testing.T) {
 
 }
 
-type slowDialer struct {
-	delay time.Duration
-	err   error
-}
-
-func (s *slowDialer) Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
-	time.Sleep(s.delay)
-	if s.err != nil {
-		return nil, s.err
-	}
-	return &ssh.Client{}, nil
-}
-
 func TestTimeoutDialer(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		t.FailNow()
+	}
+
 	testCases := []struct {
-		delay             time.Duration
 		timeout           time.Duration
-		err               error
 		expectedErrString string
 	}{
 		// delay > timeout should cause ssh.Dial to timeout.
-		{1 * time.Second, 0, nil, "timed out dialing"},
-		// delay < timeout should return the result of the call to the dialer.
-		{0, 1 * time.Second, nil, ""},
-		{0, 1 * time.Second, fmt.Errorf("test dial error"), "test dial error"},
+		{1, "i/o timeout"},
 	}
 	for _, tc := range testCases {
-		dialer := &timeoutDialer{&slowDialer{tc.delay, tc.err}, tc.timeout}
-		_, err := dialer.Dial("tcp", "addr:port", &ssh.ClientConfig{})
+		dialer := &timeoutDialer{&realSSHDialer{}, tc.timeout}
+		_, err := dialer.Dial("tcp", listener.Addr().String(), &ssh.ClientConfig{})
 		if len(tc.expectedErrString) == 0 && err != nil ||
 			!strings.Contains(fmt.Sprint(err), tc.expectedErrString) {
 			t.Errorf("Expected error to contain %q; got %v", tc.expectedErrString, err)
 		}
 	}
+
+	listener.Close()
 }

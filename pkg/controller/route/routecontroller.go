@@ -23,19 +23,20 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -49,45 +50,39 @@ const (
 )
 
 type RouteController struct {
-	routes      cloudprovider.Routes
-	kubeClient  clientset.Interface
-	clusterName string
-	clusterCIDR *net.IPNet
-	// Node framework and store
-	nodeController *cache.Controller
-	nodeStore      cache.StoreToNodeLister
+	routes           cloudprovider.Routes
+	kubeClient       clientset.Interface
+	clusterName      string
+	clusterCIDR      *net.IPNet
+	nodeLister       corelisters.NodeLister
+	nodeListerSynced cache.InformerSynced
 }
 
-func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterName string, clusterCIDR *net.IPNet) *RouteController {
+func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDR *net.IPNet) *RouteController {
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
 	rc := &RouteController{
-		routes:      routes,
-		kubeClient:  kubeClient,
-		clusterName: clusterName,
-		clusterCIDR: clusterCIDR,
+		routes:           routes,
+		kubeClient:       kubeClient,
+		clusterName:      clusterName,
+		clusterCIDR:      clusterCIDR,
+		nodeLister:       nodeInformer.Lister(),
+		nodeListerSynced: nodeInformer.Informer().HasSynced,
 	}
-
-	rc.nodeStore.Store, rc.nodeController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return rc.kubeClient.Core().Nodes().List(options)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return rc.kubeClient.Core().Nodes().Watch(options)
-			},
-		},
-		&v1.Node{},
-		controller.NoResyncPeriodFunc(),
-		cache.ResourceEventHandlerFuncs{},
-	)
 
 	return rc
 }
 
-func (rc *RouteController) Run(syncPeriod time.Duration) {
-	go rc.nodeController.Run(wait.NeverStop)
+func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
+	defer utilruntime.HandleCrash()
+
+	glog.Info("Starting the route controller")
+
+	if !cache.WaitForCacheSync(stopCh, rc.nodeListerSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		return
+	}
 
 	// TODO: If we do just the full Resync every 5 minutes (default value)
 	// that means that we may wait up to 5 minutes before even starting
@@ -106,17 +101,14 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
 	}
-	if !rc.nodeController.HasSynced() {
-		return fmt.Errorf("nodeController is not yet synced")
-	}
-	nodeList, err := rc.nodeStore.List()
+	nodes, err := rc.nodeLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}
-	return rc.reconcile(nodeList.Items, routeList)
+	return rc.reconcile(nodes, routeList)
 }
 
-func (rc *RouteController) reconcile(nodes []v1.Node, routes []*cloudprovider.Route) error {
+func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.Route) error {
 	// nodeCIDRs maps nodeName->nodeCIDR
 	nodeCIDRs := make(map[types.NodeName]string)
 	// routeMap maps routeTargetNode->route

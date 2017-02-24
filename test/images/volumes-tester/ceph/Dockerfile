@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM centos:6
-MAINTAINER Huamin Chen, hchen@redhat.com 
 
 ADD install.sh /usr/local/bin/
 RUN /usr/local/bin/install.sh 

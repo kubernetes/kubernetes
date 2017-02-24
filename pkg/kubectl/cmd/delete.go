@@ -23,15 +23,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -82,15 +83,37 @@ var (
 		# Force delete a pod on a dead node
 		kubectl delete pod foo --grace-period=0 --force
 
-		# Delete a pod with UID 1234-56-7890-234234-456456.
-		kubectl delete pod 1234-56-7890-234234-456456
-
 		# Delete all pods
 		kubectl delete pods --all`)
 )
 
+type DeleteOptions struct {
+	resource.FilenameOptions
+
+	Selector        string
+	DeleteAll       bool
+	IgnoreNotFound  bool
+	Cascade         bool
+	DeleteNow       bool
+	ForceDeletion   bool
+	WaitForDeletion bool
+
+	GracePeriod int
+	Timeout     time.Duration
+
+	Include3rdParty bool
+	Output          string
+
+	Mapper meta.RESTMapper
+	Result *resource.Result
+
+	f      cmdutil.Factory
+	Out    io.Writer
+	ErrOut io.Writer
+}
+
 func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+	options := &DeleteOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
@@ -105,49 +128,58 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
-		Short:   "Delete resources by filenames, stdin, resources and names, or by resources and label selector",
+		Short:   i18n.T("Delete resources by filenames, stdin, resources and names, or by resources and label selector"),
 		Long:    delete_long,
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			err := RunDelete(f, out, errOut, cmd, args, options)
-			cmdutil.CheckErr(err)
+			if err := options.Complete(f, out, errOut, args); err != nil {
+				cmdutil.CheckErr(err)
+			}
+			if err := options.Validate(f, cmd); err != nil {
+				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+			}
+			if err := options.RunDelete(); err != nil {
+				cmdutil.CheckErr(err)
+			}
 		},
 		SuggestFor: []string{"rm"},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
 	usage := "containing the resource to delete."
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
-	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
-	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
-	cmd.Flags().Bool("cascade", true, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
-	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
-	cmd.Flags().Bool("now", false, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
-	cmd.Flags().Bool("force", false, "Immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
-	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
-	cmdutil.AddOutputFlagsForMutation(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on.")
+	cmd.Flags().BoolVar(&options.DeleteAll, "all", false, "[-all] to select all the specified resources.")
+	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
+	cmd.Flags().BoolVar(&options.Cascade, "cascade", true, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
+	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
+	cmd.Flags().BoolVar(&options.DeleteNow, "now", false, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
+	cmd.Flags().BoolVar(&options.ForceDeletion, "force", false, "Immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
+	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
+	cmdutil.AddOutputVarFlagsForMutation(cmd, &options.Output)
+	cmdutil.AddInclude3rdPartyVarFlags(cmd, &options.Include3rdParty)
 	return cmd
 }
 
-func RunDelete(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
-	deleteAll := cmdutil.GetFlagBool(cmd, "all")
+
+	// Set up client based support.
 	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
+	o.Mapper = mapper
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
-		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
-		SelectAllParam(deleteAll).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		SelectorParam(o.Selector).
+		SelectAllParam(o.DeleteAll).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
 		Do()
@@ -155,9 +187,18 @@ func RunDelete(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
+	o.Result = r
 
-	ignoreNotFound := cmdutil.GetFlagBool(cmd, "ignore-not-found")
-	if deleteAll {
+	o.f = f
+	// Set up writer
+	o.Out = out
+	o.ErrOut = errOut
+
+	return nil
+}
+
+func (o *DeleteOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) error {
+	if o.DeleteAll {
 		f := cmd.Flags().Lookup("ignore-not-found")
 		// The flag should never be missing
 		if f == nil {
@@ -165,37 +206,36 @@ func RunDelete(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, arg
 		}
 		// If the user didn't explicitly set the option, default to ignoring NotFound errors when used with --all
 		if !f.Changed {
-			ignoreNotFound = true
+			o.IgnoreNotFound = true
 		}
 	}
-
-	gracePeriod := cmdutil.GetFlagInt(cmd, "grace-period")
-	force := cmdutil.GetFlagBool(cmd, "force")
-	if cmdutil.GetFlagBool(cmd, "now") {
-		if gracePeriod != -1 {
+	if o.DeleteNow {
+		if o.GracePeriod != -1 {
 			return fmt.Errorf("--now and --grace-period cannot be specified together")
 		}
-		gracePeriod = 1
+		o.GracePeriod = 1
 	}
-	wait := false
-	if gracePeriod == 0 {
-		if force {
-			fmt.Fprintf(errOut, "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n")
+	if o.GracePeriod == 0 {
+		if o.ForceDeletion {
+			fmt.Fprintf(o.ErrOut, "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n")
 		} else {
 			// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
 			// into --grace-period=1 and wait until the object is successfully deleted. Users may provide --force
 			// to bypass this wait.
-			wait = true
-			gracePeriod = 1
+			o.WaitForDeletion = true
+			o.GracePeriod = 1
 		}
 	}
+	return nil
+}
 
-	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+func (o *DeleteOptions) RunDelete() error {
+	shortOutput := o.Output == "name"
 	// By default use a reaper to delete all related resources.
-	if cmdutil.GetFlagBool(cmd, "cascade") {
-		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), gracePeriod, wait, shortOutput, mapper, false)
+	if o.Cascade {
+		return ReapResult(o.Result, o.f, o.Out, true, o.IgnoreNotFound, o.Timeout, o.GracePeriod, o.WaitForDeletion, shortOutput, o.Mapper, false)
 	}
-	return DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
+	return DeleteResult(o.Result, o.Out, o.IgnoreNotFound, shortOutput, o.Mapper)
 }
 
 func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, waitForDeletion, shortOutput bool, mapper meta.RESTMapper, quiet bool) error {
@@ -216,9 +256,9 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 			}
 			return cmdutil.AddSourceToErr("reaping", info.Source, err)
 		}
-		var options *api.DeleteOptions
+		var options *metav1.DeleteOptions
 		if gracePeriod >= 0 {
-			options = api.NewDeleteOptions(int64(gracePeriod))
+			options = metav1.NewDeleteOptions(int64(gracePeriod))
 		}
 		if err := reaper.Stop(info.Namespace, info.Name, timeout, options); err != nil {
 			return cmdutil.AddSourceToErr("stopping", info.Source, err)

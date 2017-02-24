@@ -20,40 +20,42 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"path"
+	"runtime"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kuberuntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
-	"k8s.io/kubernetes/pkg/util/wait"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
-
-type kubeDiscovery struct {
-	Deployment *extensions.Deployment
-	Secret     *v1.Secret
-}
 
 const (
-	kubeDiscoveryName       = "kube-discovery"
 	kubeDiscoverySecretName = "clusterinfo"
+	kubeDiscoveryName       = "kube-discovery"
 )
 
-func encodeKubeDiscoverySecretData(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate) map[string][]byte {
+// TODO: Remove this file as soon as jbeda's token discovery refactoring PR has merged
+
+func encodeKubeDiscoverySecretData(dcfg *kubeadmapi.TokenDiscovery, apicfg kubeadmapi.API, caCert *x509.Certificate) map[string][]byte {
 	var (
 		data         = map[string][]byte{}
 		endpointList = []string{}
 		tokenMap     = map[string]string{}
 	)
 
-	for _, addr := range cfg.API.AdvertiseAddresses {
-		endpointList = append(endpointList, fmt.Sprintf("https://%s:%d", addr, cfg.API.BindPort))
+	for _, addr := range apicfg.AdvertiseAddresses {
+		endpointList = append(endpointList, fmt.Sprintf("https://%s:%d", addr, apicfg.Port))
 	}
 
-	tokenMap[cfg.Secrets.TokenID] = cfg.Secrets.BearerToken
+	tokenMap[dcfg.ID] = dcfg.Secret
 
 	data["endpoint-list.json"], _ = json.Marshal(endpointList)
 	data["token-map.json"], _ = json.Marshal(tokenMap)
@@ -62,78 +64,35 @@ func encodeKubeDiscoverySecretData(cfg *kubeadmapi.MasterConfiguration, caCert *
 	return data
 }
 
-func newKubeDiscoveryPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
-	return v1.PodSpec{
-		// We have to use host network namespace, as `HostPort`/`HostIP` are Docker's
-		// buisness and CNI support isn't quite there yet (except for kubenet)
-		// (see https://github.com/kubernetes/kubernetes/issues/31307)
-		// TODO update this when #31307 is resolved
-		HostNetwork:     true,
-		SecurityContext: &v1.PodSecurityContext{},
-		Containers: []v1.Container{{
-			Name:    kubeDiscoveryName,
-			Image:   kubeadmapi.GlobalEnvParams.DiscoveryImage,
-			Command: []string{"/usr/local/bin/kube-discovery"},
-			VolumeMounts: []v1.VolumeMount{{
-				Name:      kubeDiscoverySecretName,
-				MountPath: "/tmp/secret", // TODO use a shared constant
-				ReadOnly:  true,
-			}},
-			Ports: []v1.ContainerPort{
-				// TODO when CNI issue (#31307) is resolved, we should consider adding
-				// `HostIP: s.API.AdvertiseAddrs[0]`, if there is only one address`
-				{Name: "http", ContainerPort: kubeadmapiext.DefaultDiscoveryBindPort, HostPort: cfg.Discovery.BindPort},
-			},
-			SecurityContext: &v1.SecurityContext{
-				SELinuxOptions: &v1.SELinuxOptions{
-					// TODO: This implies our discovery container is not being restricted by
-					// SELinux. This is not optimal and would be nice to adjust in future
-					// so it can read /tmp/secret, but for now this avoids recommending
-					// setenforce 0 system-wide.
-					Type: "spc_t",
-				},
-			},
-		}},
-		Volumes: []v1.Volume{{
-			Name: kubeDiscoverySecretName,
-			VolumeSource: v1.VolumeSource{
-				Secret: &v1.SecretVolumeSource{SecretName: kubeDiscoverySecretName},
-			}},
-		},
-	}
-}
-
-func newKubeDiscovery(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate) kubeDiscovery {
-	kd := kubeDiscovery{
-		Deployment: NewDeployment(kubeDiscoveryName, 1, newKubeDiscoveryPodSpec(cfg)),
-		Secret: &v1.Secret{
-			ObjectMeta: v1.ObjectMeta{Name: kubeDiscoverySecretName},
-			Type:       v1.SecretTypeOpaque,
-			Data:       encodeKubeDiscoverySecretData(cfg, caCert),
-		},
+func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+	caCertificatePath := path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)
+	caCerts, err := certutil.CertsFromFile(caCertificatePath)
+	if err != nil {
+		return fmt.Errorf("couldn't load the CA certificate file %s: %v", caCertificatePath, err)
 	}
 
-	SetMasterTaintTolerations(&kd.Deployment.Spec.Template.ObjectMeta)
-	SetNodeAffinity(&kd.Deployment.Spec.Template.ObjectMeta, MasterNodeAffinity(), NativeArchitectureNodeAffinity())
+	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
+	// TODO: Support multiple certs here in order to be able to rotate certs
+	caCert := caCerts[0]
 
-	return kd
-}
-
-func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, caCert *x509.Certificate) error {
-	kd := newKubeDiscovery(cfg, caCert)
-
-	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q deployment [%v]", kubeDiscoveryName, err)
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: kubeDiscoverySecretName},
+		Type:       v1.SecretTypeOpaque,
+		Data:       encodeKubeDiscoverySecretData(cfg.Discovery.Token, cfg.API, caCert),
 	}
-	if _, err := client.Secrets(api.NamespaceSystem).Create(kd.Secret); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q secret [%v]", kubeDiscoverySecretName, err)
+	if _, err := client.Secrets(metav1.NamespaceSystem).Create(secret); err != nil {
+		return fmt.Errorf("failed to create %q secret [%v]", kubeDiscoverySecretName, err)
 	}
 
-	fmt.Println("<master/discovery> created essential addon: kube-discovery, waiting for it to become ready")
+	if err := createDiscoveryDeployment(client); err != nil {
+		return err
+	}
+
+	fmt.Println("[token-discovery] Created the kube-discovery deployment, waiting for it to become ready")
 
 	start := time.Now()
-	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		d, err := client.Extensions().Deployments(api.NamespaceSystem).Get(kubeDiscoveryName)
+	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
+		d, err := client.Extensions().Deployments(metav1.NamespaceSystem).Get(kubeDiscoveryName, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -142,7 +101,26 @@ func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, cli
 		}
 		return true, nil
 	})
-	fmt.Printf("<master/discovery> kube-discovery is ready after %f seconds\n", time.Since(start).Seconds())
+	fmt.Printf("[token-discovery] kube-discovery is ready after %f seconds\n", time.Since(start).Seconds())
 
+	return nil
+}
+
+func createDiscoveryDeployment(client *clientset.Clientset) error {
+	discoveryBytes, err := kubeadmutil.ParseTemplate(KubeDiscoveryDeployment, struct{ ImageRepository, Arch string }{
+		ImageRepository: kubeadmapi.GlobalEnvParams.RepositoryPrefix,
+		Arch:            runtime.GOARCH,
+	})
+	if err != nil {
+		return fmt.Errorf("error when parsing kube-discovery template: %v", err)
+	}
+
+	discoveryDeployment := &extensions.Deployment{}
+	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), discoveryBytes, discoveryDeployment); err != nil {
+		return fmt.Errorf("unable to decode kube-discovery deployment %v", err)
+	}
+	if _, err := client.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).Create(discoveryDeployment); err != nil {
+		return fmt.Errorf("unable to create a new discovery deployment: %v", err)
+	}
 	return nil
 }

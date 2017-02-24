@@ -14,11 +14,11 @@
 
 .PHONY:	build push
 
-TAG = v4.6.1
+TAG = v4.6.1-1
 PREFIX = gcr.io/google_containers
 
 build:
-	docker build -t $(PREFIX)/kibana:$(TAG) .
+	docker build --pull -t $(PREFIX)/kibana:$(TAG) .
 
 push:
 	gcloud docker -- push $(PREFIX)/kibana:$(TAG)

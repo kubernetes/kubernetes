@@ -1,3 +1,6 @@
-assignees:
-  - cjcullen
-  - jlowdermilk
+approvers:
+- cjcullen
+- jlowdermilk
+reviewers:
+- cjcullen
+- jlowdermilk

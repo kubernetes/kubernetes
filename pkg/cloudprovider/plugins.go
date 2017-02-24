@@ -71,7 +71,7 @@ func CloudProviders() []string {
 }
 
 // GetCloudProvider creates an instance of the named cloud provider, or nil if
-// the name is not known.  The error return is only used if the named provider
+// the name is unknown.  The error return is only used if the named provider
 // was known but failed to initialize. The config parameter specifies the
 // io.Reader handler of the configuration file for the cloud provider, or nil
 // for no configuation.

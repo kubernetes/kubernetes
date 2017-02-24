@@ -22,12 +22,16 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
-	maxLUN = 64 // max number of LUNs per VM
+	maxLUN               = 64 // max number of LUNs per VM
+	errLeaseFailed       = "AcquireDiskLeaseFailed"
+	errLeaseIDMissing    = "LeaseIdMissing"
+	errContainerNotFound = "ContainerNotFound"
 )
 
 // AttachDisk attaches a vhd to vm
@@ -39,7 +43,7 @@ func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, l
 	} else if !exists {
 		return cloudprovider.InstanceNotFound
 	}
-	disks := *vm.Properties.StorageProfile.DataDisks
+	disks := *vm.StorageProfile.DataDisks
 	disks = append(disks,
 		compute.DataDisk{
 			Name: &diskName,
@@ -53,7 +57,7 @@ func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, l
 
 	newVM := compute.VirtualMachine{
 		Location: vm.Location,
-		Properties: &compute.VirtualMachineProperties{
+		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			StorageProfile: &compute.StorageProfile{
 				DataDisks: &disks,
 			},
@@ -64,7 +68,7 @@ func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, l
 	if err != nil {
 		glog.Errorf("azure attach failed, err: %v", err)
 		detail := err.Error()
-		if strings.Contains(detail, "Code=\"AcquireDiskLeaseFailed\"") {
+		if strings.Contains(detail, errLeaseFailed) {
 			// if lease cannot be acquired, immediately detach the disk and return the original error
 			glog.Infof("failed to acquire disk lease, try detach")
 			az.DetachDiskByName(diskName, diskURI, nodeName)
@@ -91,7 +95,7 @@ func (az *Cloud) DisksAreAttached(diskNames []string, nodeName types.NodeName) (
 		return attached, err
 	}
 
-	disks := *vm.Properties.StorageProfile.DataDisks
+	disks := *vm.StorageProfile.DataDisks
 	for _, disk := range disks {
 		for _, diskName := range diskNames {
 			if disk.Name != nil && diskName != "" && *disk.Name == diskName {
@@ -113,7 +117,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskURI string, nodeName types.NodeN
 		return nil
 	}
 
-	disks := *vm.Properties.StorageProfile.DataDisks
+	disks := *vm.StorageProfile.DataDisks
 	for i, disk := range disks {
 		if (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskURI != "" && *disk.Vhd.URI == diskURI) {
 			// found the disk
@@ -124,7 +128,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskURI string, nodeName types.NodeN
 	}
 	newVM := compute.VirtualMachine{
 		Location: vm.Location,
-		Properties: &compute.VirtualMachineProperties{
+		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			StorageProfile: &compute.StorageProfile{
 				DataDisks: &disks,
 			},
@@ -148,7 +152,7 @@ func (az *Cloud) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (
 	} else if !exists {
 		return -1, cloudprovider.InstanceNotFound
 	}
-	disks := *vm.Properties.StorageProfile.DataDisks
+	disks := *vm.StorageProfile.DataDisks
 	for _, disk := range disks {
 		if disk.Lun != nil && (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskURI != "" && *disk.Vhd.URI == diskURI) {
 			// found the disk
@@ -169,7 +173,7 @@ func (az *Cloud) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
 		return -1, cloudprovider.InstanceNotFound
 	}
 	used := make([]bool, maxLUN)
-	disks := *vm.Properties.StorageProfile.DataDisks
+	disks := *vm.StorageProfile.DataDisks
 	for _, disk := range disks {
 		if disk.Lun != nil {
 			used[*disk.Lun] = true
@@ -235,6 +239,12 @@ func (az *Cloud) DeleteVolume(name, uri string) error {
 	err = az.deleteVhdBlob(accountName, key, blob)
 	if err != nil {
 		glog.Warningf("failed to delete blob %s err: %v", uri, err)
+		detail := err.Error()
+		if strings.Contains(detail, errLeaseIDMissing) {
+			// disk is still being used
+			// see https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.blob.protocol.bloberrorcodestrings.leaseidmissing.aspx
+			return volume.NewDeletedVolumeInUseError(fmt.Sprintf("disk %q is still in use while being deleted", name))
+		}
 		return fmt.Errorf("failed to delete vhd %v, account %s, blob %s, err: %v", uri, accountName, blob, err)
 	}
 	glog.V(4).Infof("blob %s deleted", uri)

@@ -19,10 +19,11 @@ package rest
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -43,7 +44,7 @@ func TestPodLogValidates(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, err := logRest.Get(api.NewDefaultContext(), "test", tc)
+		_, err := logRest.Get(genericapirequest.NewDefaultContext(), "test", tc)
 		if !errors.IsInvalid(err) {
 			t.Fatalf("unexpected error: %v", err)
 		}

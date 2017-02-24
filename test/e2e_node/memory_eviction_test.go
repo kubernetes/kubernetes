@@ -22,7 +22,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -50,7 +51,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				// Wait for the memory pressure condition to disappear from the node status before continuing.
 				By("waiting for the memory pressure condition on the node to disappear before ending the test.")
 				Eventually(func() error {
-					nodeList, err := f.ClientSet.Core().Nodes().List(v1.ListOptions{})
+					nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
 					if err != nil {
 						return fmt.Errorf("tried to get node list but got error: %v", err)
 					}
@@ -105,7 +106,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				// This is the final check to try to prevent interference with subsequent tests.
 				podName := "admit-best-effort-pod"
 				f.PodClient().CreateSync(&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 					},
 					Spec: v1.PodSpec{
@@ -150,15 +151,15 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				By("polling the Status.Phase of each pod and checking for violations of the eviction order.")
 				Eventually(func() error {
 
-					gteed, gtErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(guaranteed.Name)
+					gteed, gtErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(guaranteed.Name, metav1.GetOptions{})
 					framework.ExpectNoError(gtErr, fmt.Sprintf("getting pod %s", guaranteed.Name))
 					gteedPh := gteed.Status.Phase
 
-					burst, buErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(burstable.Name)
+					burst, buErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(burstable.Name, metav1.GetOptions{})
 					framework.ExpectNoError(buErr, fmt.Sprintf("getting pod %s", burstable.Name))
 					burstPh := burst.Status.Phase
 
-					best, beErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(besteffort.Name)
+					best, beErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(besteffort.Name, metav1.GetOptions{})
 					framework.ExpectNoError(beErr, fmt.Sprintf("getting pod %s", besteffort.Name))
 					bestPh := best.Status.Phase
 
@@ -174,7 +175,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 					//                     see the eviction manager reporting a pressure condition for a while without the besteffort failing,
 					//                     and we see that the manager did in fact evict the besteffort (this should be in the Kubelet log), we
 					//                     will have more reason to believe the phase is out of date.
-					nodeList, err := f.ClientSet.Core().Nodes().List(v1.ListOptions{})
+					nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
 					if err != nil {
 						glog.Errorf("tried to get node list but got error: %v", err)
 					}
@@ -244,7 +245,7 @@ func createMemhogPod(f *framework.Framework, genName string, ctnName string, res
 	}
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: genName,
 		},
 		Spec: v1.PodSpec{

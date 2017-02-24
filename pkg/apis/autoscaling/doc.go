@@ -15,6 +15,5 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package,register
-// +k8s:openapi-gen=true
 
 package autoscaling // import "k8s.io/kubernetes/pkg/apis/autoscaling"

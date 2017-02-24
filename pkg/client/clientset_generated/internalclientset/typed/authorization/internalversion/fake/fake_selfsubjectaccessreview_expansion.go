@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
+	core "k8s.io/client-go/testing"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 func (c *FakeSelfSubjectAccessReviews) Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {

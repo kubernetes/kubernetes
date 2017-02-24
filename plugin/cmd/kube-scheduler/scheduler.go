@@ -17,19 +17,15 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/util/logs"
+	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )
-
-func init() {
-	healthz.DefaultHealthz()
-}
 
 func main() {
 	s := options.NewSchedulerServer()
@@ -41,5 +37,7 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	app.Run(s)
+	if err := app.Run(s); err != nil {
+		glog.Fatalf("scheduler app failed to run: %v", err)
+	}
 }

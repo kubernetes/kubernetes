@@ -10,6 +10,6 @@ spec:
     - name: test-volume
       mountPath: /test-vmdk
   volumes:
-  - name: vmdk-storage
+  - name: test-volume
     persistentVolumeClaim:
-      claimName: pvcsc0001
+      claimName: pvcsc001

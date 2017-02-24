@@ -43,6 +43,12 @@ func (b modelBuilder) addModelFrom(sample interface{}) {
 }
 
 func (b modelBuilder) addModel(st reflect.Type, nameOverride string) *Model {
+	// Turn pointers into simpler types so further checks are
+	// correct.
+	if st.Kind() == reflect.Ptr {
+		st = st.Elem()
+	}
+
 	modelName := b.keyFrom(st)
 	if nameOverride != "" {
 		modelName = nameOverride
@@ -137,6 +143,11 @@ func (b modelBuilder) buildProperty(field reflect.StructField, model *Model, mod
 		return "", "", prop
 	}
 
+	if field.Name == "XMLName" && field.Type.String() == "xml.Name" {
+		// property is metadata for the xml.Name attribute, can be skipped
+		return "", "", prop
+	}
+
 	if tag := field.Tag.Get("modelDescription"); tag != "" {
 		modelDescription = tag
 	}
@@ -155,7 +166,7 @@ func (b modelBuilder) buildProperty(field reflect.StructField, model *Model, mod
 			prop.Type = &pType
 		}
 		if prop.Format == "" {
-			prop.Format = b.jsonSchemaFormat(fieldType.String())
+			prop.Format = b.jsonSchemaFormat(b.keyFrom(fieldType))
 		}
 		return jsonName, modelDescription, prop
 	}
@@ -192,13 +203,14 @@ func (b modelBuilder) buildProperty(field reflect.StructField, model *Model, mod
 		return jsonName, modelDescription, prop
 	}
 
-	if b.isPrimitiveType(fieldType.String()) {
-		mapped := b.jsonSchemaType(fieldType.String())
+	fieldTypeName := b.keyFrom(fieldType)
+	if b.isPrimitiveType(fieldTypeName) {
+		mapped := b.jsonSchemaType(fieldTypeName)
 		prop.Type = &mapped
-		prop.Format = b.jsonSchemaFormat(fieldType.String())
+		prop.Format = b.jsonSchemaFormat(fieldTypeName)
 		return jsonName, modelDescription, prop
 	}
-	modelType := fieldType.String()
+	modelType := b.keyFrom(fieldType)
 	prop.Ref = &modelType
 
 	if fieldType.Name() == "" { // override type of anonymous structs
@@ -272,7 +284,7 @@ func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonNam
 	}
 	// simple struct
 	b.addModel(fieldType, "")
-	var pType = fieldType.String()
+	var pType = b.keyFrom(fieldType)
 	prop.Ref = &pType
 	return jsonName, prop
 }
@@ -336,10 +348,11 @@ func (b modelBuilder) buildPointerTypeProperty(field reflect.StructField, jsonNa
 		}
 	} else {
 		// non-array, pointer type
-		var pType = b.jsonSchemaType(fieldType.String()[1:]) // no star, include pkg path
-		if b.isPrimitiveType(fieldType.String()[1:]) {
+		fieldTypeName := b.keyFrom(fieldType.Elem())
+		var pType = b.jsonSchemaType(fieldTypeName) // no star, include pkg path
+		if b.isPrimitiveType(fieldTypeName) {
 			prop.Type = &pType
-			prop.Format = b.jsonSchemaFormat(fieldType.String()[1:])
+			prop.Format = b.jsonSchemaFormat(fieldTypeName)
 			return jsonName, prop
 		}
 		prop.Ref = &pType
@@ -355,7 +368,7 @@ func (b modelBuilder) buildPointerTypeProperty(field reflect.StructField, jsonNa
 
 func (b modelBuilder) getElementTypeName(modelName, jsonName string, t reflect.Type) string {
 	if t.Kind() == reflect.Ptr {
-		return t.String()[1:]
+		t = t.Elem()
 	}
 	if t.Name() == "" {
 		return modelName + "." + jsonName
@@ -365,6 +378,11 @@ func (b modelBuilder) getElementTypeName(modelName, jsonName string, t reflect.T
 
 func (b modelBuilder) keyFrom(st reflect.Type) string {
 	key := st.String()
+	if b.Config != nil && b.Config.ModelTypeNameHandler != nil {
+		if name, ok := b.Config.ModelTypeNameHandler(st); ok {
+			key = name
+		}
+	}
 	if len(st.Name()) == 0 { // unnamed type
 		// Swagger UI has special meaning for [
 		key = strings.Replace(key, "[]", "||", -1)

@@ -36,6 +36,15 @@ source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
+if [[ -z "${KUBE_AWS_DEPRECATION_WARNED:-}" ]]; then
+  echo -e "${color_red}WARNING${color_norm}: The bash deployment for AWS is deprecated and will be removed in v1.7." >&2
+  echo "For a list of viable alternatives, see:" >&2
+  echo >&2
+  echo "  http://kubernetes.io/docs/getting-started-guides/aws/" >&2
+  echo >&2
+  export KUBE_AWS_DEPRECATION_WARNED=yes
+fi
+
 ALLOCATE_NODE_CIDRS=true
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
@@ -567,18 +576,6 @@ function verify-prereqs {
   if [[ "$(which aws)" == "" ]]; then
     echo "Can't find aws in PATH, please fix and retry."
     exit 1
-  fi
-}
-
-
-# Create a temp dir that'll be deleted at the end of this bash session.
-#
-# Vars set:
-#   KUBE_TEMP
-function ensure-temp-dir {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap 'rm -rf "${KUBE_TEMP}"' EXIT
   fi
 }
 
@@ -1489,6 +1486,21 @@ function kube-down {
     echo "has a name other than '${CLUSTER_ID}'." >&2
   fi
 
+  if [[ -z "${DHCP_OPTION_SET_ID:-}" ]]; then
+    dhcp_option_ids=$($AWS_CMD describe-dhcp-options \
+                               --output text \
+                               --filters Name=tag:Name,Values=kubernetes-dhcp-option-set \
+                                         Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                               --query DhcpOptions[].DhcpOptionsId \
+                      | tr "\t" "\n")
+    for dhcp_option_id in ${dhcp_option_ids}; do
+      echo "Deleting DHCP option set: ${dhcp_option_id}"
+      $AWS_CMD delete-dhcp-options --dhcp-options-id $dhcp_option_id > $LOG
+    done
+  else
+    echo "Skipping deletion of pre-existing DHCP option set: ${DHCP_OPTION_SET_ID}"
+  fi
+
   echo "Deleting IAM Instance profiles"
   delete-iam-profiles
 }
@@ -1534,7 +1546,7 @@ function kube-push {
 #   KUBE_ROOT
 function test-build-release {
   # Make a release
-  "${KUBE_ROOT}/build-tools/release.sh"
+  "${KUBE_ROOT}/build/release.sh"
 }
 
 # Execute prior to running tests to initialize required structure. This is

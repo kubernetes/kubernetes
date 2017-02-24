@@ -20,16 +20,18 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func getResourceList(cpu, memory string) v1.ResourceList {
@@ -54,7 +56,7 @@ func TestSyncResourceQuota(t *testing.T) {
 	podList := v1.PodList{
 		Items: []v1.Pod{
 			{
-				ObjectMeta: v1.ObjectMeta{Name: "pod-running", Namespace: "testing"},
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-running", Namespace: "testing"},
 				Status:     v1.PodStatus{Phase: v1.PodRunning},
 				Spec: v1.PodSpec{
 					Volumes:    []v1.Volume{{Name: "vol"}},
@@ -62,7 +64,7 @@ func TestSyncResourceQuota(t *testing.T) {
 				},
 			},
 			{
-				ObjectMeta: v1.ObjectMeta{Name: "pod-running-2", Namespace: "testing"},
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-running-2", Namespace: "testing"},
 				Status:     v1.PodStatus{Phase: v1.PodRunning},
 				Spec: v1.PodSpec{
 					Volumes:    []v1.Volume{{Name: "vol"}},
@@ -70,7 +72,7 @@ func TestSyncResourceQuota(t *testing.T) {
 				},
 			},
 			{
-				ObjectMeta: v1.ObjectMeta{Name: "pod-failed", Namespace: "testing"},
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-failed", Namespace: "testing"},
 				Status:     v1.PodStatus{Phase: v1.PodFailed},
 				Spec: v1.PodSpec{
 					Volumes:    []v1.Volume{{Name: "vol"}},
@@ -80,7 +82,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		},
 	}
 	resourceQuota := v1.ResourceQuota{
-		ObjectMeta: v1.ObjectMeta{Name: "quota", Namespace: "testing"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
 		Spec: v1.ResourceQuotaSpec{
 			Hard: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("3"),
@@ -105,21 +107,23 @@ func TestSyncResourceQuota(t *testing.T) {
 	}
 
 	kubeClient := fake.NewSimpleClientset(&podList, &resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:   kubeClient,
-		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient, nil),
+		KubeClient:            kubeClient,
+		ResourceQuotaInformer: informerFactory.Core().V1().ResourceQuotas(),
+		ResyncPeriod:          controller.NoResyncPeriodFunc,
+		Registry:              install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ControllerFactory:         NewReplenishmentControllerFactory(informerFactory),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
-	err := quotaController.syncResourceQuota(resourceQuota)
+	err := quotaController.syncResourceQuota(&resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -159,7 +163,7 @@ func TestSyncResourceQuota(t *testing.T) {
 
 func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	resourceQuota := v1.ResourceQuota{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "rq",
 		},
@@ -190,21 +194,23 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	}
 
 	kubeClient := fake.NewSimpleClientset(&resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:   kubeClient,
-		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient, nil),
+		KubeClient:            kubeClient,
+		ResourceQuotaInformer: informerFactory.Core().V1().ResourceQuotas(),
+		ResyncPeriod:          controller.NoResyncPeriodFunc,
+		Registry:              install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ControllerFactory:         NewReplenishmentControllerFactory(informerFactory),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
-	err := quotaController.syncResourceQuota(resourceQuota)
+	err := quotaController.syncResourceQuota(&resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -245,7 +251,7 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 }
 func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
 	resourceQuota := v1.ResourceQuota{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "rq",
 		},
@@ -278,21 +284,23 @@ func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
 	}
 
 	kubeClient := fake.NewSimpleClientset(&resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:   kubeClient,
-		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient, nil),
+		KubeClient:            kubeClient,
+		ResourceQuotaInformer: informerFactory.Core().V1().ResourceQuotas(),
+		ResyncPeriod:          controller.NoResyncPeriodFunc,
+		Registry:              install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ControllerFactory:         NewReplenishmentControllerFactory(informerFactory),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
-	err := quotaController.syncResourceQuota(resourceQuota)
+	err := quotaController.syncResourceQuota(&resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -346,7 +354,7 @@ func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
 
 func TestSyncResourceQuotaNoChange(t *testing.T) {
 	resourceQuota := v1.ResourceQuota{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "rq",
 		},
@@ -366,21 +374,23 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 	}
 
 	kubeClient := fake.NewSimpleClientset(&v1.PodList{}, &resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:   kubeClient,
-		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient, nil),
+		KubeClient:            kubeClient,
+		ResourceQuotaInformer: informerFactory.Core().V1().ResourceQuotas(),
+		ResyncPeriod:          controller.NoResyncPeriodFunc,
+		Registry:              install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ControllerFactory:         NewReplenishmentControllerFactory(informerFactory),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
-	err := quotaController.syncResourceQuota(resourceQuota)
+	err := quotaController.syncResourceQuota(&resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -398,16 +408,18 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 
 func TestAddQuota(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:   kubeClient,
-		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient, nil),
+		KubeClient:            kubeClient,
+		ResourceQuotaInformer: informerFactory.Core().V1().ResourceQuotas(),
+		ResyncPeriod:          controller.NoResyncPeriodFunc,
+		Registry:              install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []schema.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("ReplicationController"),
 			api.Kind("PersistentVolumeClaim"),
 		},
-		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ControllerFactory:         NewReplenishmentControllerFactory(informerFactory),
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
@@ -424,7 +436,7 @@ func TestAddQuota(t *testing.T) {
 			name:             "no status",
 			expectedPriority: true,
 			quota: &v1.ResourceQuota{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "rq",
 				},
@@ -439,7 +451,7 @@ func TestAddQuota(t *testing.T) {
 			name:             "status, no usage",
 			expectedPriority: true,
 			quota: &v1.ResourceQuota{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "rq",
 				},
@@ -459,7 +471,7 @@ func TestAddQuota(t *testing.T) {
 			name:             "status, mismatch",
 			expectedPriority: true,
 			quota: &v1.ResourceQuota{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "rq",
 				},
@@ -482,7 +494,7 @@ func TestAddQuota(t *testing.T) {
 			name:             "status, missing usage, but don't care",
 			expectedPriority: false,
 			quota: &v1.ResourceQuota{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "rq",
 				},
@@ -502,7 +514,7 @@ func TestAddQuota(t *testing.T) {
 			name:             "ready",
 			expectedPriority: false,
 			quota: &v1.ResourceQuota{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "rq",
 				},

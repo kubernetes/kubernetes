@@ -23,8 +23,8 @@ import (
 	"net/http"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // streamProtocolV2 implements version 2 of the streaming protocol for attach

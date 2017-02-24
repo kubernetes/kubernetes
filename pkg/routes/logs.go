@@ -22,7 +22,7 @@ import (
 
 	"github.com/emicklei/go-restful"
 
-	"k8s.io/kubernetes/pkg/genericapiserver/mux"
+	"k8s.io/apiserver/pkg/server/mux"
 )
 
 // Logs adds handlers for the /logs path serving log files from /var/log.

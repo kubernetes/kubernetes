@@ -17,9 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/examples/apiserver"
-	"k8s.io/kubernetes/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
@@ -29,7 +29,7 @@ func main() {
 	serverRunOptions := apiserver.NewServerRunOptions()
 
 	// Parse command line flags.
-	serverRunOptions.AddUniversalFlags(pflag.CommandLine)
+	serverRunOptions.GenericServerRunOptions.AddUniversalFlags(pflag.CommandLine)
 	serverRunOptions.Etcd.AddFlags(pflag.CommandLine)
 	serverRunOptions.SecureServing.AddFlags(pflag.CommandLine)
 	serverRunOptions.SecureServing.AddDeprecatedFlags(pflag.CommandLine)

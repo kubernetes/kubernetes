@@ -21,13 +21,18 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/controller"
 )
+
+func alwaysReady() bool { return true }
 
 func TestIsResponsibleForRoute(t *testing.T) {
 	myClusterName := "my-awesome-cluster"
@@ -56,7 +61,10 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d. Error in test case: unparsable cidr %q", i, testCase.clusterCIDR)
 		}
-		rc := New(nil, nil, myClusterName, cidr)
+		client := fake.NewSimpleClientset()
+		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, cidr)
+		rc.nodeListerSynced = alwaysReady
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
 			TargetNode:      types.NodeName("doesnt-matter-for-this-test"),
@@ -70,12 +78,12 @@ func TestIsResponsibleForRoute(t *testing.T) {
 
 func TestReconcile(t *testing.T) {
 	cluster := "my-k8s"
-	node1 := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24"}}
-	node2 := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24"}}
-	nodeNoCidr := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: ""}}
+	node1 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24"}}
+	node2 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24"}}
+	nodeNoCidr := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: ""}}
 
 	testCases := []struct {
-		nodes                      []v1.Node
+		nodes                      []*v1.Node
 		initialRoutes              []*cloudprovider.Route
 		expectedRoutes             []*cloudprovider.Route
 		expectedNetworkUnavailable []bool
@@ -83,9 +91,9 @@ func TestReconcile(t *testing.T) {
 	}{
 		// 2 nodes, routes already there
 		{
-			nodes: []v1.Node{
-				node1,
-				node2,
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
@@ -100,9 +108,9 @@ func TestReconcile(t *testing.T) {
 		},
 		// 2 nodes, one route already there
 		{
-			nodes: []v1.Node{
-				node1,
-				node2,
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
@@ -116,9 +124,9 @@ func TestReconcile(t *testing.T) {
 		},
 		// 2 nodes, no routes yet
 		{
-			nodes: []v1.Node{
-				node1,
-				node2,
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{},
 			expectedRoutes: []*cloudprovider.Route{
@@ -130,9 +138,9 @@ func TestReconcile(t *testing.T) {
 		},
 		// 2 nodes, a few too many routes
 		{
-			nodes: []v1.Node{
-				node1,
-				node2,
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
@@ -149,9 +157,9 @@ func TestReconcile(t *testing.T) {
 		},
 		// 2 nodes, 2 routes, but only 1 is right
 		{
-			nodes: []v1.Node{
-				node1,
-				node2,
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
@@ -166,9 +174,9 @@ func TestReconcile(t *testing.T) {
 		},
 		// 2 nodes, one node without CIDR assigned.
 		{
-			nodes: []v1.Node{
-				node1,
-				nodeNoCidr,
+			nodes: []*v1.Node{
+				&node1,
+				&nodeNoCidr,
 			},
 			initialRoutes: []*cloudprovider.Route{},
 			expectedRoutes: []*cloudprovider.Route{
@@ -191,7 +199,9 @@ func TestReconcile(t *testing.T) {
 			t.Error("Error in test: fakecloud doesn't support Routes()")
 		}
 		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
-		rc := New(routes, testCase.clientset, cluster, cidr)
+		informerFactory := informers.NewSharedInformerFactory(testCase.clientset, controller.NoResyncPeriodFunc())
+		rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidr)
+		rc.nodeListerSynced = alwaysReady
 		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
 			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
 		}

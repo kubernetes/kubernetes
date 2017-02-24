@@ -16,28 +16,43 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.0.14}
+ETCD_VERSION=${ETCD_VERSION:-3.0.17}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 
-kube::etcd::start() {
+kube::etcd::validate() {
+  # validate if in path
   which etcd >/dev/null || {
     kube::log::usage "etcd must be in your PATH"
     exit 1
   }
 
-  if pgrep etcd >/dev/null 2>&1; then
-    kube::log::usage "etcd appears to already be running on this machine (`pgrep -l etcd`) (or its a zombie and you need to kill its parent)."
+  # validate it is not running
+  if pgrep -x etcd >/dev/null 2>&1; then
+    kube::log::usage "etcd appears to already be running on this machine (`pgrep -xl etcd`) (or its a zombie and you need to kill its parent)."
     kube::log::usage "retry after you resolve this etcd error."
     exit 1
   fi
 
-  version=$(etcd --version | head -n 1 | cut -d " " -f 3)
+  # validate installed version is at least equal to minimum
+  version=$(etcd --version | tail -n +1 | head -n 1 | cut -d " " -f 3)
   if [[ "${version}" < "${ETCD_VERSION}" ]]; then
-   kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
-   kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
-   exit 1
+   export PATH=$KUBE_ROOT/third_party/etcd:$PATH
+   hash etcd
+   echo $PATH
+   ls $KUBE_ROOT/third_party/etcd
+   version=$(etcd --version | head -n 1 | cut -d " " -f 3)
+   if [[ "${version}" < "${ETCD_VERSION}" ]]; then
+    kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
+    kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
+    exit 1
+   fi
   fi
+}
+
+kube::etcd::start() {
+  # validate before running
+  kube::etcd::validate
 
   # Start etcd
   ETCD_DIR=${ETCD_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)}

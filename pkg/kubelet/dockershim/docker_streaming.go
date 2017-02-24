@@ -64,7 +64,7 @@ func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream i
 	if port < 0 || port > math.MaxUint16 {
 		return fmt.Errorf("invalid port %d", port)
 	}
-	return dockertools.PortForward(r.client, podSandboxID, uint16(port), stream)
+	return dockertools.PortForward(r.client, podSandboxID, port, stream)
 }
 
 // ExecSync executes a command in the container, and returns the stdout output.
@@ -86,7 +86,7 @@ func (ds *dockerService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResp
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("exec")
 	}
-	_, err := checkContainerStatus(ds.client, req.GetContainerId())
+	_, err := checkContainerStatus(ds.client, req.ContainerId)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (ds *dockerService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.Atta
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("attach")
 	}
-	_, err := checkContainerStatus(ds.client, req.GetContainerId())
+	_, err := checkContainerStatus(ds.client, req.ContainerId)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (ds *dockerService) PortForward(req *runtimeapi.PortForwardRequest) (*runti
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("port forward")
 	}
-	_, err := checkContainerStatus(ds.client, req.GetPodSandboxId())
+	_, err := checkContainerStatus(ds.client, req.PodSandboxId)
 	if err != nil {
 		return nil, err
 	}

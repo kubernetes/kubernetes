@@ -35,12 +35,16 @@ KUBECTL_PATH=${KUBE_ROOT}/cluster/centos/binaries/kubectl
 KUBE_TEMP="~/kube_temp"
 
 
-# Must ensure that the following ENV vars are set
-function detect-master() {
-  KUBE_MASTER=$MASTER
-  KUBE_MASTER_IP=${MASTER#*@}
-  echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}" 1>&2
-  echo "KUBE_MASTER: ${MASTER}" 1>&2
+# Get master IP addresses and store in KUBE_MASTER_IP_ADDRESSES[]
+# Must ensure that the following ENV vars are set:
+#   MASTERS
+function detect-masters() {
+  KUBE_MASTER_IP_ADDRESSES=()
+  for master in ${MASTERS}; do
+    KUBE_MASTER_IP_ADDRESSES+=("${master#*@}")
+  done
+  echo "KUBE_MASTERS: ${MASTERS}" 1>&2
+  echo "KUBE_MASTER_IP_ADDRESSES: [${KUBE_MASTER_IP_ADDRESSES[*]}]" 1>&2
 }
 
 # Get node IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
@@ -99,7 +103,9 @@ function validate-cluster() {
   set +e
   "${KUBE_ROOT}/cluster/validate-cluster.sh"
   if [[ "$?" -ne "0" ]]; then
-    troubleshoot-master
+    for master in ${MASTERS}; do
+      troubleshoot-master ${master}
+    done
     for node in ${NODES}; do
       troubleshoot-node ${node}
     done
@@ -110,17 +116,27 @@ function validate-cluster() {
 
 # Instantiate a kubernetes cluster
 function kube-up() {
-  provision-master
+  make-ca-cert
 
-  for node in ${NODES}; do
-    provision-node ${node}
+  local num_infra=0
+  for master in ${MASTERS}; do
+    provision-master "${master}" "infra${num_infra}"
+    let ++num_infra
   done
 
-  detect-master
+  for master in ${MASTERS}; do
+    post-provision-master "${master}"
+  done
+
+  for node in ${NODES}; do
+    provision-node "${node}"
+  done
+
+  detect-masters
 
   # set CONTEXT and KUBE_SERVER values for create-kubeconfig() and get-password()
   export CONTEXT="centos"
-  export KUBE_SERVER="http://${KUBE_MASTER_IP}:8080"
+  export KUBE_SERVER="http://${MASTER_ADVERTISE_ADDRESS}:8080"
   source "${KUBE_ROOT}/cluster/common.sh"
 
   # set kubernetes user and password
@@ -130,7 +146,10 @@ function kube-up() {
 
 # Delete a kubernetes cluster
 function kube-down() {
-  tear-down-master
+  for master in ${MASTERS}; do
+    tear-down-master ${master}
+  done
+
   for node in ${NODES}; do
     tear-down-node ${node}
   done
@@ -138,14 +157,14 @@ function kube-down() {
 
 function troubleshoot-master() {
   # Troubleshooting on master if all required daemons are active.
-  echo "[INFO] Troubleshooting on master ${MASTER}"
+  echo "[INFO] Troubleshooting on master $1"
   local -a required_daemon=("kube-apiserver" "kube-controller-manager" "kube-scheduler")
   local daemon
   local daemon_status
   printf "%-24s %-10s \n" "PROCESS" "STATUS"
   for daemon in "${required_daemon[@]}"; do
     local rc=0
-    kube-ssh "${MASTER}" "sudo systemctl is-active ${daemon}" >/dev/null 2>&1 || rc="$?"
+    kube-ssh "${1}" "sudo systemctl is-active ${daemon}" >/dev/null 2>&1 || rc="$?"
     if [[ "${rc}" -ne "0" ]]; then
       daemon_status="inactive"
     else
@@ -178,19 +197,19 @@ function troubleshoot-node() {
 
 # Clean up on master
 function tear-down-master() {
-echo "[INFO] tear-down-master on ${MASTER}"
+echo "[INFO] tear-down-master on $1"
   for service_name in etcd kube-apiserver kube-controller-manager kube-scheduler ; do
       service_file="/usr/lib/systemd/system/${service_name}.service"
-      kube-ssh "$MASTER" " \
+      kube-ssh "$1" " \
         if [[ -f $service_file ]]; then \
           sudo systemctl stop $service_name; \
           sudo systemctl disable $service_name; \
           sudo rm -f $service_file; \
         fi"
   done
-  kube-ssh "${MASTER}" "sudo rm -rf /opt/kubernetes"
-  kube-ssh "${MASTER}" "sudo rm -rf ${KUBE_TEMP}"
-  kube-ssh "${MASTER}" "sudo rm -rf /var/lib/etcd"
+  kube-ssh "${1}" "sudo rm -rf /opt/kubernetes"
+  kube-ssh "${1}" "sudo rm -rf ${KUBE_TEMP}"
+  kube-ssh "${1}" "sudo rm -rf /var/lib/etcd"
 }
 
 # Clean up on node
@@ -210,55 +229,85 @@ echo "[INFO] tear-down-node on $1"
   kube-ssh "$1" "sudo rm -rf ${KUBE_TEMP}"
 }
 
+# Generate the CA certificates for k8s components
+function make-ca-cert() {
+  echo "[INFO] make-ca-cert"
+  bash "${ROOT}/../saltbase/salt/generate-cert/make-ca-cert.sh" "${MASTER_ADVERTISE_IP}" "IP:${MASTER_ADVERTISE_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local"
+}
+
 # Provision master
 #
 # Assumed vars:
-#   MASTER
+#   $1 (master)
 #   KUBE_TEMP
 #   ETCD_SERVERS
+#   ETCD_INITIAL_CLUSTER
 #   SERVICE_CLUSTER_IP_RANGE
+#   MASTER_ADVERTISE_ADDRESS
 function provision-master() {
-  echo "[INFO] Provision master on ${MASTER}"
-  local master_ip=${MASTER#*@}
-  ensure-setup-dir ${MASTER}
+  echo "[INFO] Provision master on $1"
+  local master="$1"
+  local master_ip="${master#*@}"
+  local etcd_name="$2"
+  ensure-setup-dir "${master}"
 
-  # scp -r ${SSH_OPTS} master config-default.sh copy-files.sh util.sh "${MASTER}:${KUBE_TEMP}"
-  kube-scp ${MASTER} "${ROOT}/../saltbase/salt/generate-cert/make-ca-cert.sh ${ROOT}/binaries/master ${ROOT}/master ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}"
-  kube-ssh "${MASTER}" " \
+  kube-scp "${master}" "${ROOT}/ca-cert ${ROOT}/binaries/master ${ROOT}/master ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}"
+  kube-ssh "${master}" " \
+    sudo rm -rf /opt/kubernetes/bin; \
     sudo cp -r ${KUBE_TEMP}/master/bin /opt/kubernetes; \
+    sudo mkdir -p /srv/kubernetes; sudo cp -f ${KUBE_TEMP}/ca-cert/* /srv/kubernetes; \
     sudo chmod -R +x /opt/kubernetes/bin; \
-    sudo bash ${KUBE_TEMP}/make-ca-cert.sh ${master_ip} IP:${master_ip},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local; \
-    sudo bash ${KUBE_TEMP}/master/scripts/etcd.sh; \
+    sudo ln -sf /opt/kubernetes/bin/* /usr/local/bin/; \
+    sudo bash ${KUBE_TEMP}/master/scripts/etcd.sh ${etcd_name} ${master_ip} ${ETCD_INITIAL_CLUSTER}; \
     sudo bash ${KUBE_TEMP}/master/scripts/apiserver.sh ${master_ip} ${ETCD_SERVERS} ${SERVICE_CLUSTER_IP_RANGE} ${ADMISSION_CONTROL}; \
-    sudo bash ${KUBE_TEMP}/master/scripts/controller-manager.sh ${master_ip}; \
-    sudo bash ${KUBE_TEMP}/master/scripts/scheduler.sh ${master_ip}"
+    sudo bash ${KUBE_TEMP}/master/scripts/controller-manager.sh ${MASTER_ADVERTISE_ADDRESS}; \
+    sudo bash ${KUBE_TEMP}/master/scripts/scheduler.sh ${MASTER_ADVERTISE_ADDRESS}"
 }
 
+# Post-provision master, run after all masters were provisioned
+#
+# Assumed vars:
+#   $1 (master)
+#   KUBE_TEMP
+#   ETCD_SERVERS
+#   FLANNEL_NET
+function post-provision-master() {
+  echo "[INFO] Post provision master on $1"
+  local master=$1
+  kube-ssh "${master}" " \
+    sudo bash ${KUBE_TEMP}/master/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
+    sudo bash ${KUBE_TEMP}/master/scripts/post-etcd.sh"
+}
 
 # Provision node
 #
 # Assumed vars:
 #   $1 (node)
-#   MASTER
 #   KUBE_TEMP
 #   ETCD_SERVERS
 #   FLANNEL_NET
+#   MASTER_ADVERTISE_ADDRESS
 #   DOCKER_OPTS
+#   DNS_SERVER_IP
+#   DNS_DOMAIN
 function provision-node() {
   echo "[INFO] Provision node on $1"
-  local master_ip=${MASTER#*@}
   local node=$1
   local node_ip=${node#*@}
+  local dns_ip=${DNS_SERVER_IP#*@}
+  local dns_domain=${DNS_DOMAIN#*@}
   ensure-setup-dir ${node}
 
   kube-scp ${node} "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
   kube-ssh "${node}" " \
+    rm -rf /opt/kubernetes/bin; \
     sudo cp -r ${KUBE_TEMP}/node/bin /opt/kubernetes; \
     sudo chmod -R +x /opt/kubernetes/bin; \
+    sudo ln -s /opt/kubernetes/bin/* /usr/local/bin/; \
     sudo bash ${KUBE_TEMP}/node/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
     sudo bash ${KUBE_TEMP}/node/scripts/docker.sh \"${DOCKER_OPTS}\"; \
-    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${node_ip}; \
-    sudo bash ${KUBE_TEMP}/node/scripts/proxy.sh ${master_ip}"
+    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${MASTER_ADVERTISE_ADDRESS} ${node_ip} ${dns_ip} ${dns_domain}; \
+    sudo bash ${KUBE_TEMP}/node/scripts/proxy.sh ${MASTER_ADVERTISE_ADDRESS}"
 }
 
 # Create dirs that'll be used during setup on target machine.

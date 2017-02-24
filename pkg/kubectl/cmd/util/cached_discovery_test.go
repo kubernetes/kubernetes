@@ -25,13 +25,13 @@ import (
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/kubernetes/pkg/api/errors"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
 )
 
 func TestCachedDiscoveryClient_Fresh(t *testing.T) {
@@ -101,6 +101,8 @@ type fakeDiscoveryClient struct {
 	resourceCalls int
 	versionCalls  int
 	swaggerCalls  int
+
+	serverResourcesHandler func() ([]*metav1.APIResourceList, error)
 }
 
 var _ discovery.DiscoveryInterface = &fakeDiscoveryClient{}
@@ -139,19 +141,22 @@ func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
-func (c *fakeDiscoveryClient) ServerResources() (map[string]*metav1.APIResourceList, error) {
+func (c *fakeDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
 	c.resourceCalls = c.resourceCalls + 1
-	return map[string]*metav1.APIResourceList{}, nil
+	if c.serverResourcesHandler != nil {
+		return c.serverResourcesHandler()
+	}
+	return []*metav1.APIResourceList{}, nil
 }
 
-func (c *fakeDiscoveryClient) ServerPreferredResources() ([]schema.GroupVersionResource, error) {
+func (c *fakeDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	c.resourceCalls = c.resourceCalls + 1
-	return []schema.GroupVersionResource{}, nil
+	return nil, nil
 }
 
-func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]schema.GroupVersionResource, error) {
+func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	c.resourceCalls = c.resourceCalls + 1
-	return []schema.GroupVersionResource{}, nil
+	return nil, nil
 }
 
 func (c *fakeDiscoveryClient) ServerVersion() (*version.Info, error) {

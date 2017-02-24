@@ -1,0 +1,61 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
+load("@io_kubernetes_build//defs:build.bzl", "gcs_upload")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
+
+go_prefix("k8s.io/kubernetes")
+
+gcs_upload(
+    name = "ci-artifacts",
+    data = [
+        "//build/debs",
+        "//build/release-tars",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(
+        ["**"],
+        exclude = [
+            "bazel-*/**",
+            "_*/**",
+            ".config/**",
+            ".git/**",
+            ".gsutil/**",
+            ".make/**",
+        ],
+    ),
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//api:all-srcs",
+        "//build:all-srcs",
+        "//cluster:all-srcs",
+        "//cmd:all-srcs",
+        "//docs:all-srcs",
+        "//examples:all-srcs",
+        "//federation:all-srcs",
+        "//hack:all-srcs",
+        "//pkg:all-srcs",
+        "//plugin:all-srcs",
+        "//test:all-srcs",
+        "//third_party:all-srcs",
+        "//vendor:all-srcs",
+    ],
+    tags = ["automanaged"],
+)
+
+genrule(
+    name = "save_git_version",
+    outs = ["version"],
+    cmd = "grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt | cut -d' ' -f2 >$@",
+    stamp = 1,
+)

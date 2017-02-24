@@ -28,13 +28,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/client/restclient"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
 	DefaultHostAcceptRE   = "^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$"
-	DefaultPathAcceptRE   = "^/.*"
+	DefaultPathAcceptRE   = "^.*"
 	DefaultPathRejectRE   = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach"
 	DefaultMethodRejectRE = "POST,PUT,PATCH"
 )

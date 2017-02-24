@@ -21,7 +21,7 @@ portforwardtester: portforwardtester.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./portforwardtester.go
 
 image: portforwardtester
-	docker build -t $(PREFIX)/portforwardtester:$(TAG) .
+	docker build --pull -t $(PREFIX)/portforwardtester:$(TAG) .
 
 push: image
 	gcloud docker -- push $(PREFIX)/portforwardtester:$(TAG)

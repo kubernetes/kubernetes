@@ -129,7 +129,7 @@ func newWalkFunc(invalidLink *bool, client *http.Client) filepath.WalkFunc {
 				if err != nil {
 					break
 				}
-				if resp.StatusCode == 429 {
+				if resp.StatusCode == http.StatusTooManyRequests {
 					retryAfter := resp.Header.Get("Retry-After")
 					if seconds, err := strconv.Atoi(retryAfter); err != nil {
 						backoff = seconds + 10
@@ -138,7 +138,7 @@ func newWalkFunc(invalidLink *bool, client *http.Client) filepath.WalkFunc {
 					time.Sleep(time.Duration(backoff) * time.Second)
 					backoff *= 2
 					retry++
-				} else if resp.StatusCode == 404 {
+				} else if resp.StatusCode == http.StatusNotFound {
 					// We only check for 404 error for now. 401, 403 errors are hard to handle.
 
 					// We need to try a GET to avoid false alert.
@@ -146,7 +146,7 @@ func newWalkFunc(invalidLink *bool, client *http.Client) filepath.WalkFunc {
 					if err != nil {
 						break
 					}
-					if resp.StatusCode != 404 {
+					if resp.StatusCode != http.StatusNotFound {
 						continue URL
 					}
 

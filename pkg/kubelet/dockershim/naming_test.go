@@ -55,8 +55,8 @@ func TestContainerNameRoundTrip(t *testing.T) {
 	name, attempt := "pause", uint32(5)
 	config := &runtimeapi.ContainerConfig{
 		Metadata: &runtimeapi.ContainerMetadata{
-			Name:    &name,
-			Attempt: &attempt,
+			Name:    name,
+			Attempt: attempt,
 		},
 	}
 	actualName := makeContainerName(sConfig, config)
@@ -81,4 +81,26 @@ func TestNonParsableContainerNames(t *testing.T) {
 	// Should be able to parse attempt number.
 	_, err = parseContainerName("k8s_frontend_foo_bar_iamuid_notanumber")
 	assert.Error(t, err)
+}
+
+func TestParseRandomizedNames(t *testing.T) {
+	// Test randomized sandbox name.
+	sConfig := makeSandboxConfig("foo", "bar", "iamuid", 3)
+	sActualName := randomizeName(makeSandboxName(sConfig))
+	sActualMetadata, err := parseSandboxName(sActualName)
+	assert.NoError(t, err)
+	assert.Equal(t, sConfig.Metadata, sActualMetadata)
+
+	// Test randomized container name.
+	name, attempt := "pause", uint32(5)
+	config := &runtimeapi.ContainerConfig{
+		Metadata: &runtimeapi.ContainerMetadata{
+			Name:    name,
+			Attempt: attempt,
+		},
+	}
+	actualName := randomizeName(makeContainerName(sConfig, config))
+	actualMetadata, err := parseContainerName(actualName)
+	assert.NoError(t, err)
+	assert.Equal(t, config.Metadata, actualMetadata)
 }

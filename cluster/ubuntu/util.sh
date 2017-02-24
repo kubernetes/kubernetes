@@ -19,6 +19,7 @@
 set -e
 
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
+source "${KUBE_ROOT}/cluster/common.sh"
 
 MASTER=""
 MASTER_IP=""
@@ -28,7 +29,7 @@ NODE_IPS=""
 #   KUBE_ROOT
 function test-build-release() {
   # Make a release
-  "${KUBE_ROOT}/build-tools/release.sh"
+  "${KUBE_ROOT}/build/release.sh"
 }
 
 # From user input set the necessary k8s and etcd configuration information
@@ -70,7 +71,7 @@ function setClusterInfo() {
 # Sanity check on $CNI_PLUGIN_CONF and $CNI_PLUGIN_EXES
 function check-CNI-config() {
   if [ -z "$CNI_PLUGIN_CONF" ] && [ -n "$CNI_PLUGIN_EXES" ]; then
-    echo "Warning: CNI_PLUGIN_CONF is emtpy but CNI_PLUGIN_EXES is not (it is $CNI_PLUGIN_EXES); Flannel will be used" >& 2
+    echo "Warning: CNI_PLUGIN_CONF is empty but CNI_PLUGIN_EXES is not (it is $CNI_PLUGIN_EXES); Flannel will be used" >& 2
   elif [ -n "$CNI_PLUGIN_CONF" ] && [ -z "$CNI_PLUGIN_EXES" ]; then
     echo "Warning: CNI_PLUGIN_EXES is empty but CNI_PLUGIN_CONF is not (it is $CNI_PLUGIN_CONF); Flannel will be used" & 2
   elif [ -n "$CNI_PLUGIN_CONF" ] && [ -n "$CNI_PLUGIN_EXES" ]; then
@@ -296,7 +297,7 @@ KUBELET_OPTS="\
  --logtostderr=true \
  --cluster-dns=${3} \
  --cluster-domain=${4} \
- --config=${5} \
+ --pod-manifest-path=${5} \
  --allow-privileged=${6}
  $cni_opts"
 EOF
@@ -412,8 +413,6 @@ function kube-up() {
   detect-master
   export CONTEXT="ubuntu"
   export KUBE_SERVER="http://${KUBE_MASTER_IP}:8080"
-
-  source "${KUBE_ROOT}/cluster/common.sh"
 
   # set kubernetes user and password
   load-or-gen-kube-basicauth
@@ -546,7 +545,7 @@ function provision-node() {
     BASH_DEBUG_FLAGS="set -x"
   fi
 
-  # remote login to node and configue k8s node
+  # remote login to node and configure k8s node
   ssh $SSH_OPTS -t "$1" "
     set +e
     ${BASH_DEBUG_FLAGS}
@@ -558,7 +557,7 @@ function provision-node() {
       '${MASTER_IP}' \
       '${DNS_SERVER_IP}' \
       '${DNS_DOMAIN}' \
-      '${KUBELET_CONFIG}' \
+      '${KUBELET_POD_MANIFEST_PATH}' \
       '${ALLOW_PRIVILEGED}' \
       '${CNI_PLUGIN_CONF}'
     create-kube-proxy-opts \
@@ -639,7 +638,7 @@ function provision-masterandnode() {
     BASH_DEBUG_FLAGS="set -x"
   fi
 
-  # remote login to the master/node and configue k8s
+  # remote login to the master/node and configure k8s
   ssh $SSH_OPTS -t "$MASTER" "
     set +e
     ${BASH_DEBUG_FLAGS}
@@ -660,7 +659,7 @@ function provision-masterandnode() {
       '${MASTER_IP}' \
       '${DNS_SERVER_IP}' \
       '${DNS_DOMAIN}' \
-      '${KUBELET_CONFIG}' \
+      '${KUBELET_POD_MANIFEST_PATH}' \
       '${ALLOW_PRIVILEGED}' \
       '${CNI_PLUGIN_CONF}'
     create-kube-proxy-opts \
@@ -709,8 +708,6 @@ function kube-down() {
 
   export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
   source "${KUBE_CONFIG_FILE}"
-
-  source "${KUBE_ROOT}/cluster/common.sh"
 
   tear_down_alive_resources
   check-pods-torn-down

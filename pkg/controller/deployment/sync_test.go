@@ -20,15 +20,15 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	testclient "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
-	"k8s.io/kubernetes/pkg/client/record"
-	testclient "k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func maxSurge(val int) *intstr.IntOrString {
@@ -323,6 +323,9 @@ func TestScale(t *testing.T) {
 
 func TestDeploymentController_cleanupDeployment(t *testing.T) {
 	selector := map[string]string{"foo": "bar"}
+	alreadyDeleted := newRSWithStatus("foo-1", 0, 0, selector)
+	now := metav1.Now()
+	alreadyDeleted.DeletionTimestamp = &now
 
 	tests := []struct {
 		oldRSs               []*extensions.ReplicaSet
@@ -366,20 +369,29 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 			revisionHistoryLimit: 0,
 			expectedDeletions:    0,
 		},
+		{
+			oldRSs: []*extensions.ReplicaSet{
+				alreadyDeleted,
+			},
+			revisionHistoryLimit: 0,
+			expectedDeletions:    0,
+		},
 	}
 
 	for i := range tests {
 		test := tests[i]
+		t.Logf("scenario %d", i)
+
 		fake := &fake.Clientset{}
-		informers := informers.NewSharedInformerFactory(fake, nil, controller.NoResyncPeriodFunc())
-		controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
+		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+		controller := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 
 		controller.eventRecorder = &record.FakeRecorder{}
 		controller.dListerSynced = alwaysReady
 		controller.rsListerSynced = alwaysReady
 		controller.podListerSynced = alwaysReady
 		for _, rs := range test.oldRSs {
-			controller.rsLister.Indexer.Add(rs)
+			informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 		}
 
 		stopCh := make(chan struct{})

@@ -21,11 +21,12 @@ import (
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -43,7 +44,7 @@ var _ = framework.KubeDescribe("Events", func() {
 		name := "send-events-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				Labels: map[string]string{
 					"name": "foo",
@@ -74,12 +75,12 @@ var _ = framework.KubeDescribe("Events", func() {
 
 		By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options := v1.ListOptions{LabelSelector: selector.String()}
+		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("retrieving the pod")
-		podWithUid, err := podClient.Get(pod.Name)
+		podWithUid, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}
@@ -94,7 +95,7 @@ var _ = framework.KubeDescribe("Events", func() {
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   v1.DefaultSchedulerName,
 			}.AsSelector().String()
-			options := v1.ListOptions{FieldSelector: selector}
+			options := metav1.ListOptions{FieldSelector: selector}
 			events, err := f.ClientSet.Core().Events(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
@@ -114,7 +115,7 @@ var _ = framework.KubeDescribe("Events", func() {
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   "kubelet",
 			}.AsSelector().String()
-			options := v1.ListOptions{FieldSelector: selector}
+			options := metav1.ListOptions{FieldSelector: selector}
 			events, err = f.ClientSet.Core().Events(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err

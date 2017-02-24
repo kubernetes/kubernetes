@@ -1,7 +1,7 @@
-// Package ec2query provides serialisation of AWS EC2 requests and responses.
+// Package ec2query provides serialization of AWS EC2 requests and responses.
 package ec2query
 
-//go:generate go run ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/input/ec2.json build_test.go
+//go:generate go run -tags codegen ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/input/ec2.json build_test.go
 
 import (
 	"net/url"
@@ -10,6 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/private/protocol/query/queryutil"
 )
+
+// BuildHandler is a named request handler for building ec2query protocol requests
+var BuildHandler = request.NamedHandler{Name: "awssdk.ec2query.Build", Fn: Build}
 
 // Build builds a request for the EC2 protocol.
 func Build(r *request.Request) {

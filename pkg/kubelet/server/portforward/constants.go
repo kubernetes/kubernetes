@@ -18,4 +18,6 @@ limitations under the License.
 package portforward
 
 // The subprotocol "portforward.k8s.io" is used for port forwarding.
-const PortForwardProtocolV1Name = "portforward.k8s.io"
+const ProtocolV1Name = "portforward.k8s.io"
+
+var SupportedProtocols = []string{ProtocolV1Name}

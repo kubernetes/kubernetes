@@ -31,9 +31,9 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 const ProviderName = "ovirt"
@@ -285,19 +285,6 @@ func (m *OVirtInstanceMap) ListSortedNames() []string {
 	sort.Strings(names)
 
 	return names
-}
-
-// List enumerates the set of nodes instances known by the cloud provider
-func (v *OVirtCloud) List(filter string) ([]types.NodeName, error) {
-	instances, err := v.fetchAllInstances()
-	if err != nil {
-		return nil, err
-	}
-	var nodeNames []types.NodeName
-	for _, s := range instances.ListSortedNames() {
-		nodeNames = append(nodeNames, types.NodeName(s))
-	}
-	return nodeNames, nil
 }
 
 // Implementation of Instances.CurrentNodeName

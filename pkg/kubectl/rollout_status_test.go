@@ -19,7 +19,7 @@ package kubectl
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
@@ -106,7 +106,7 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 
 	for _, test := range tests {
 		d := &extensions.Deployment{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace:  "bar",
 				Name:       "foo",
 				UID:        "8764ae47-9092-11e4-8393-42010af018ff",

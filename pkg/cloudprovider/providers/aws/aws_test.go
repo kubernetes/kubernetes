@@ -28,13 +28,13 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const TestClusterId = "clusterid.test"
@@ -211,11 +211,6 @@ func TestNewAWSCloud(t *testing.T) {
 			true, "",
 		},
 		{
-			"Config specified invalid zone",
-			strings.NewReader("[global]\nzone = blahonga"), NewFakeAWSServices(),
-			true, "",
-		},
-		{
 			"Config specifies valid zone",
 			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
 			false, "eu-west-1",
@@ -350,6 +345,8 @@ func (self *FakeMetadata) GetMetadata(key string) (string, error) {
 		return aws.StringValue(i.InstanceId), nil
 	} else if key == "local-hostname" {
 		return aws.StringValue(i.PrivateDnsName), nil
+	} else if key == "public-hostname" {
+		return aws.StringValue(i.PublicDnsName), nil
 	} else if key == "local-ipv4" {
 		return aws.StringValue(i.PrivateIpAddress), nil
 	} else if key == "public-ipv4" {
@@ -538,92 +535,6 @@ func mockAvailabilityZone(availabilityZone string) *Cloud {
 	return awsCloud
 }
 
-func TestList(t *testing.T) {
-	// TODO this setup is not very clean and could probably be improved
-	var instance0 ec2.Instance
-	var instance1 ec2.Instance
-	var instance2 ec2.Instance
-	var instance3 ec2.Instance
-
-	//0
-	tag0 := ec2.Tag{
-		Key:   aws.String("Name"),
-		Value: aws.String("foo"),
-	}
-	instance0.Tags = []*ec2.Tag{&tag0}
-	instance0.InstanceId = aws.String("instance0")
-	instance0.PrivateDnsName = aws.String("instance0.ec2.internal")
-	instance0.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
-	state0 := ec2.InstanceState{
-		Name: aws.String("running"),
-	}
-	instance0.State = &state0
-
-	//1
-	tag1 := ec2.Tag{
-		Key:   aws.String("Name"),
-		Value: aws.String("bar"),
-	}
-	instance1.Tags = []*ec2.Tag{&tag1}
-	instance1.InstanceId = aws.String("instance1")
-	instance1.PrivateDnsName = aws.String("instance1.ec2.internal")
-	instance1.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
-	state1 := ec2.InstanceState{
-		Name: aws.String("running"),
-	}
-	instance1.State = &state1
-
-	//2
-	tag2 := ec2.Tag{
-		Key:   aws.String("Name"),
-		Value: aws.String("baz"),
-	}
-	instance2.Tags = []*ec2.Tag{&tag2}
-	instance2.InstanceId = aws.String("instance2")
-	instance2.PrivateDnsName = aws.String("instance2.ec2.internal")
-	instance2.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
-	state2 := ec2.InstanceState{
-		Name: aws.String("running"),
-	}
-	instance2.State = &state2
-
-	//3
-	tag3 := ec2.Tag{
-		Key:   aws.String("Name"),
-		Value: aws.String("quux"),
-	}
-	instance3.Tags = []*ec2.Tag{&tag3}
-	instance3.InstanceId = aws.String("instance3")
-	instance3.PrivateDnsName = aws.String("instance3.ec2.internal")
-	instance3.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
-	state3 := ec2.InstanceState{
-		Name: aws.String("running"),
-	}
-	instance3.State = &state3
-
-	instances := []*ec2.Instance{&instance0, &instance1, &instance2, &instance3}
-	aws, _ := mockInstancesResp(&instance0, instances)
-
-	table := []struct {
-		input  string
-		expect []types.NodeName
-	}{
-		{"blahonga", []types.NodeName{}},
-		{"quux", []types.NodeName{"instance3.ec2.internal"}},
-		{"a", []types.NodeName{"instance1.ec2.internal", "instance2.ec2.internal"}},
-	}
-
-	for _, item := range table {
-		result, err := aws.List(item.input)
-		if err != nil {
-			t.Errorf("Expected call with %v to succeed, failed with %v", item.input, err)
-		}
-		if e, a := item.expect, result; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-	}
-}
-
 func testHasNodeAddress(t *testing.T, addrs []v1.NodeAddress, addressType v1.NodeAddressType, address string) {
 	for _, addr := range addrs {
 		if addr.Type == addressType && addr.Address == address {
@@ -644,6 +555,7 @@ func TestNodeAddresses(t *testing.T) {
 	instance0.InstanceId = aws.String("i-0")
 	instance0.PrivateDnsName = aws.String("instance-same.ec2.internal")
 	instance0.PrivateIpAddress = aws.String("192.168.0.1")
+	instance0.PublicDnsName = aws.String("instance-same.ec2.external")
 	instance0.PublicIpAddress = aws.String("1.2.3.4")
 	instance0.InstanceType = aws.String("c3.large")
 	instance0.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
@@ -694,12 +606,14 @@ func TestNodeAddresses(t *testing.T) {
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
 	}
-	if len(addrs3) != 3 {
-		t.Errorf("Should return exactly 3 NodeAddresses")
+	if len(addrs3) != 5 {
+		t.Errorf("Should return exactly 5 NodeAddresses")
 	}
 	testHasNodeAddress(t, addrs3, v1.NodeInternalIP, "192.168.0.1")
 	testHasNodeAddress(t, addrs3, v1.NodeLegacyHostIP, "192.168.0.1")
 	testHasNodeAddress(t, addrs3, v1.NodeExternalIP, "1.2.3.4")
+	testHasNodeAddress(t, addrs3, v1.NodeExternalDNS, "instance-same.ec2.external")
+	testHasNodeAddress(t, addrs3, v1.NodeInternalDNS, "instance-same.ec2.internal")
 
 	// Fetch from metadata
 	aws4, fakeServices := mockInstancesResp(&instance0, []*ec2.Instance{&instance0})
@@ -1192,7 +1106,7 @@ func TestDescribeLoadBalancerOnDelete(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.EnsureLoadBalancerDeleted(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}})
+	c.EnsureLoadBalancerDeleted(TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}})
 }
 
 func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
@@ -1200,7 +1114,7 @@ func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.UpdateLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
+	c.UpdateLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
 }
 
 func TestDescribeLoadBalancerOnGet(t *testing.T) {
@@ -1208,7 +1122,7 @@ func TestDescribeLoadBalancerOnGet(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.GetLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}})
+	c.GetLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}})
 }
 
 func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
@@ -1216,7 +1130,7 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.EnsureLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
+	c.EnsureLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
 }
 
 func TestBuildListener(t *testing.T) {

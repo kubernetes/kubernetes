@@ -20,13 +20,13 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type serverResponse struct {
@@ -35,39 +35,39 @@ type serverResponse struct {
 }
 
 func TestServiceAccountCreation(t *testing.T) {
-	ns := v1.NamespaceDefault
+	ns := metav1.NamespaceDefault
 
 	defaultName := "default"
 	managedName := "managed"
 
 	activeNS := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{Name: ns},
+		ObjectMeta: metav1.ObjectMeta{Name: ns},
 		Status: v1.NamespaceStatus{
 			Phase: v1.NamespaceActive,
 		},
 	}
 	terminatingNS := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{Name: ns},
+		ObjectMeta: metav1.ObjectMeta{Name: ns},
 		Status: v1.NamespaceStatus{
 			Phase: v1.NamespaceTerminating,
 		},
 	}
 	defaultServiceAccount := &v1.ServiceAccount{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            defaultName,
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
 	}
 	managedServiceAccount := &v1.ServiceAccount{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            managedName,
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
 	}
 	unmanagedServiceAccount := &v1.ServiceAccount{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "other-unmanaged",
 			Namespace:       ns,
 			ResourceVersion: "1",
@@ -157,17 +157,25 @@ func TestServiceAccountCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		client := fake.NewSimpleClientset(defaultServiceAccount, managedServiceAccount)
-		informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), nil, controller.NoResyncPeriodFunc())
+		informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 		options := DefaultServiceAccountsControllerOptions()
 		options.ServiceAccounts = []v1.ServiceAccount{
-			{ObjectMeta: v1.ObjectMeta{Name: defaultName}},
-			{ObjectMeta: v1.ObjectMeta{Name: managedName}},
+			{ObjectMeta: metav1.ObjectMeta{Name: defaultName}},
+			{ObjectMeta: metav1.ObjectMeta{Name: managedName}},
 		}
-		controller := NewServiceAccountsController(informers.ServiceAccounts(), informers.Namespaces(), client, options)
-		controller.saLister = &cache.StoreToServiceAccountLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-		controller.nsLister = &cache.IndexerToNamespaceLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-		controller.saSynced = alwaysReady
-		controller.nsSynced = alwaysReady
+		saInformer := informers.Core().V1().ServiceAccounts()
+		nsInformer := informers.Core().V1().Namespaces()
+		controller := NewServiceAccountsController(
+			saInformer,
+			nsInformer,
+			client,
+			options,
+		)
+		controller.saListerSynced = alwaysReady
+		controller.nsListerSynced = alwaysReady
+
+		saStore := saInformer.Informer().GetStore()
+		nsStore := nsInformer.Informer().GetStore()
 
 		syncCalls := make(chan struct{})
 		controller.syncHandler = func(key string) error {
@@ -184,18 +192,18 @@ func TestServiceAccountCreation(t *testing.T) {
 		go controller.Run(1, stopCh)
 
 		if tc.ExistingNamespace != nil {
-			controller.nsLister.Add(tc.ExistingNamespace)
+			nsStore.Add(tc.ExistingNamespace)
 		}
 		for _, s := range tc.ExistingServiceAccounts {
-			controller.saLister.Indexer.Add(s)
+			saStore.Add(s)
 		}
 
 		if tc.AddedNamespace != nil {
-			controller.nsLister.Add(tc.AddedNamespace)
+			nsStore.Add(tc.AddedNamespace)
 			controller.namespaceAdded(tc.AddedNamespace)
 		}
 		if tc.UpdatedNamespace != nil {
-			controller.nsLister.Add(tc.UpdatedNamespace)
+			nsStore.Add(tc.UpdatedNamespace)
 			controller.namespaceUpdated(nil, tc.UpdatedNamespace)
 		}
 		if tc.DeletedServiceAccount != nil {

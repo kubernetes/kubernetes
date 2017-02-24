@@ -19,6 +19,7 @@ package dockershim
 import (
 	"testing"
 
+	"github.com/blang/semver"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -95,7 +96,7 @@ func TestGetContainerSecurityOpts(t *testing.T) {
 	}}
 
 	for i, test := range tests {
-		opts, err := getContainerSecurityOpts(containerName, test.config, "test/seccomp/profile/root")
+		opts, err := getContainerSecurityOpts(containerName, test.config, "test/seccomp/profile/root", '=')
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
@@ -140,7 +141,7 @@ func TestGetSandboxSecurityOpts(t *testing.T) {
 	}}
 
 	for i, test := range tests {
-		opts, err := getSandboxSecurityOpts(test.config, "test/seccomp/profile/root")
+		opts, err := getSandboxSecurityOpts(test.config, "test/seccomp/profile/root", '=')
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
@@ -192,11 +193,10 @@ func TestGetSystclsFromAnnotations(t *testing.T) {
 // TestGetUserFromImageUser tests the logic of getting image uid or user name of image user.
 func TestGetUserFromImageUser(t *testing.T) {
 	newI64 := func(i int64) *int64 { return &i }
-	newStr := func(s string) *string { return &s }
 	for c, test := range map[string]struct {
 		user string
 		uid  *int64
-		name *string
+		name string
 	}{
 		"no gid": {
 			user: "0",
@@ -215,11 +215,11 @@ func TestGetUserFromImageUser(t *testing.T) {
 		},
 		"root username": {
 			user: "root:root",
-			name: newStr("root"),
+			name: "root",
 		},
 		"username": {
 			user: "test:test",
-			name: newStr("test"),
+			name: "test",
 		},
 	} {
 		t.Logf("TestCase - %q", c)
@@ -236,4 +236,28 @@ func TestParsingCreationConflictError(t *testing.T) {
 	matches := conflictRE.FindStringSubmatch(msg)
 	require.Len(t, matches, 2)
 	require.Equal(t, matches[1], "24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e")
+}
+
+func TestGetSecurityOptSeparator(t *testing.T) {
+	for c, test := range map[string]struct {
+		desc     string
+		version  *semver.Version
+		expected rune
+	}{
+		"older docker version": {
+			version:  &semver.Version{Major: 1, Minor: 22, Patch: 0},
+			expected: ':',
+		},
+		"changed docker version": {
+			version:  &semver.Version{Major: 1, Minor: 23, Patch: 0},
+			expected: '=',
+		},
+		"newer docker version": {
+			version:  &semver.Version{Major: 1, Minor: 24, Patch: 0},
+			expected: '=',
+		},
+	} {
+		actual := getSecurityOptSeparator(test.version)
+		assert.Equal(t, test.expected, actual, c)
+	}
 }

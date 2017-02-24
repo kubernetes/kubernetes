@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
-	"k8s.io/kubernetes/pkg/types"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
 
@@ -1110,6 +1110,58 @@ func Test_SetNodeStatusUpdateNeededError(t *testing.T) {
 	nodesToUpdateStatusFor := asw.GetNodesToUpdateStatusFor()
 	if len(nodesToUpdateStatusFor) != 0 {
 		t.Fatalf("nodesToUpdateStatusFor should be empty as nodeName does not exist")
+	}
+}
+
+// Test_updateNodeStatusUpdateNeeded expects statusUpdateNeeded to be properly updated if
+// updateNodeStatusUpdateNeeded is called on a node that exists in the actual state of the world
+func Test_updateNodeStatusUpdateNeeded(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := &actualStateOfWorld{
+		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
+		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
+		volumePluginMgr:        volumePluginMgr,
+	}
+	nodeName := types.NodeName("node-1")
+	nodeToUpdate := nodeToUpdateStatusFor{
+		nodeName:                  nodeName,
+		statusUpdateNeeded:        true,
+		volumesToReportAsAttached: make(map[v1.UniqueVolumeName]v1.UniqueVolumeName),
+	}
+	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
+
+	// Act
+	err := asw.updateNodeStatusUpdateNeeded(nodeName, false)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("updateNodeStatusUpdateNeeded should not return error, but got: %v", err)
+	}
+	nodesToUpdateStatusFor := asw.GetNodesToUpdateStatusFor()
+	if nodesToUpdateStatusFor[nodeName].statusUpdateNeeded {
+		t.Fatalf("nodesToUpdateStatusFor should be updated to: false, but got: true")
+	}
+}
+
+// Test_updateNodeStatusUpdateNeededError expects statusUpdateNeeded to report error if
+// updateNodeStatusUpdateNeeded is called on a node that does not exist in the actual state of the world
+func Test_updateNodeStatusUpdateNeededError(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := &actualStateOfWorld{
+		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
+		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
+		volumePluginMgr:        volumePluginMgr,
+	}
+	nodeName := types.NodeName("node-1")
+
+	// Act
+	err := asw.updateNodeStatusUpdateNeeded(nodeName, false)
+
+	// Assert
+	if err == nil {
+		t.Fatalf("updateNodeStatusUpdateNeeded should return error, but got nothing")
 	}
 }
 

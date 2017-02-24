@@ -23,7 +23,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // monitorResizeEvents spawns a goroutine that waits for SIGWINCH signals (these indicate the

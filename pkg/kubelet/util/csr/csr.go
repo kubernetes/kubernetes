@@ -20,21 +20,23 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/types"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
-	"k8s.io/kubernetes/pkg/watch"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	certificates "k8s.io/client-go/pkg/apis/certificates/v1beta1"
+	certutil "k8s.io/client-go/util/cert"
 )
 
-// RequestNodeCertificate will create a certificate signing request and send it to API server,
-// then it will watch the object's status, once approved by API server, it will return the API
-// server's issued certificate (pem-encoded). If there is any errors, or the watch timeouts,
-// it will return an error. This is intended for use on nodes (kubelet and kubeadm).
-func RequestNodeCertificate(client unversionedcertificates.CertificateSigningRequestInterface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
+// RequestNodeCertificate will create a certificate signing request for a node
+// (Organization and CommonName for the CSR will be set as expected for node
+// certificates) and send it to API server, then it will watch the object's
+// status, once approved by API server, it will return the API server's issued
+// certificate (pem-encoded). If there is any errors, or the watch timeouts, it
+// will return an error. This is intended for use on nodes (kubelet and
+// kubeadm).
+func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestInterface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
 	subject := &pkix.Name{
 		Organization: []string{"system:nodes"},
 		CommonName:   fmt.Sprintf("system:node:%s", nodeName),
@@ -44,28 +46,40 @@ func RequestNodeCertificate(client unversionedcertificates.CertificateSigningReq
 	if err != nil {
 		return nil, fmt.Errorf("invalid private key for certificate request: %v", err)
 	}
-	csr, err := certutil.MakeCSR(privateKey, subject, nil, nil)
+	csrData, err := certutil.MakeCSR(privateKey, subject, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate certificate request: %v", err)
 	}
+	return RequestCertificate(client, csrData, []certificates.KeyUsage{
+		certificates.UsageDigitalSignature,
+		certificates.UsageKeyEncipherment,
+		certificates.UsageClientAuth,
+	})
+}
 
+// RequestCertificate will create a certificate signing request using the PEM
+// encoded CSR and send it to API server, then it will watch the object's
+// status, once approved by API server, it will return the API server's issued
+// certificate (pem-encoded). If there is any errors, or the watch timeouts, it
+// will return an error.
+func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, usages []certificates.KeyUsage) (certData []byte, err error) {
 	req, err := client.Create(&certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta:   metav1.TypeMeta{Kind: "CertificateSigningRequest"},
-		ObjectMeta: v1.ObjectMeta{GenerateName: "csr-"},
+		ObjectMeta: metav1.ObjectMeta{GenerateName: "csr-"},
 
-		// TODO: For now, this is a request for a certificate with allowed usage of "TLS Web Client Authentication".
-		// Need to figure out whether/how to surface the allowed usage in the spec.
-		Spec: certificates.CertificateSigningRequestSpec{Request: csr},
+		Spec: certificates.CertificateSigningRequestSpec{
+			Request: csrData,
+			Usages:  usages,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create certificate signing request: %v", err)
-
 	}
 
 	// Make a default timeout = 3600s.
 	var defaultTimeoutSeconds int64 = 3600
-	resultCh, err := client.Watch(v1.ListOptions{
+	certWatch, err := client.Watch(metav1.ListOptions{
 		Watch:          true,
 		TimeoutSeconds: &defaultTimeoutSeconds,
 		FieldSelector:  fields.OneTermEqualSelector("metadata.name", req.Name).String(),
@@ -73,9 +87,8 @@ func RequestNodeCertificate(client unversionedcertificates.CertificateSigningReq
 	if err != nil {
 		return nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)
 	}
-
-	var status certificates.CertificateSigningRequestStatus
-	ch := resultCh.ResultChan()
+	defer certWatch.Stop()
+	ch := certWatch.ResultChan()
 
 	for {
 		event, ok := <-ch
@@ -87,7 +100,7 @@ func RequestNodeCertificate(client unversionedcertificates.CertificateSigningReq
 			if event.Object.(*certificates.CertificateSigningRequest).UID != req.UID {
 				continue
 			}
-			status = event.Object.(*certificates.CertificateSigningRequest).Status
+			status := event.Object.(*certificates.CertificateSigningRequest).Status
 			for _, c := range status.Conditions {
 				if c.Type == certificates.CertificateDenied {
 					return nil, fmt.Errorf("certificate signing request is not approved, reason: %v, message: %v", c.Reason, c.Message)

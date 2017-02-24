@@ -19,6 +19,7 @@ package cinder
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -174,9 +175,12 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 }
 
 func probeAttachedVolume() error {
+	// rescan scsi bus
+	scsiHostRescan()
+
 	executor := exec.New()
 	args := []string{"trigger"}
-	cmd := executor.Command("/usr/bin/udevadm", args...)
+	cmd := executor.Command("udevadm", args...)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
 		glog.Errorf("error running udevadm trigger %v\n", err)
@@ -184,4 +188,15 @@ func probeAttachedVolume() error {
 	}
 	glog.V(4).Infof("Successfully probed all attachments")
 	return nil
+}
+
+func scsiHostRescan() {
+	scsi_path := "/sys/class/scsi_host/"
+	if dirs, err := ioutil.ReadDir(scsi_path); err == nil {
+		for _, f := range dirs {
+			name := scsi_path + f.Name() + "/scan"
+			data := []byte("- - -")
+			ioutil.WriteFile(name, data, 0666)
+		}
+	}
 }

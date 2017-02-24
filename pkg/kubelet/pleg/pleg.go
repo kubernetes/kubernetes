@@ -17,7 +17,7 @@ limitations under the License.
 package pleg
 
 import (
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type PodLifeCycleEventType string

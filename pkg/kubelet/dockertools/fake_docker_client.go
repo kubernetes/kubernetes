@@ -23,12 +23,13 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
-	"k8s.io/kubernetes/pkg/util/clock"
+	"k8s.io/client-go/util/clock"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -55,8 +56,9 @@ type FakeDockerClient struct {
 	Errors               map[string]error
 	called               []calledDetail
 	pulled               []string
+	EnableTrace          bool
 
-	// Created, Stopped and Removed all container docker ID
+	// Created, Started, Stopped and Removed all contain container docker ID
 	Created         []string
 	Started         []string
 	Stopped         []string
@@ -74,25 +76,64 @@ type FakeDockerClient struct {
 const fakeDockerVersion = "1.8.1"
 
 func NewFakeDockerClient() *FakeDockerClient {
-	return NewFakeDockerClientWithVersion(fakeDockerVersion, minimumDockerAPIVersion)
-}
-
-func NewFakeDockerClientWithClock(c clock.Clock) *FakeDockerClient {
-	return newClientWithVersionAndClock(fakeDockerVersion, minimumDockerAPIVersion, c)
-}
-
-func NewFakeDockerClientWithVersion(version, apiVersion string) *FakeDockerClient {
-	return newClientWithVersionAndClock(version, apiVersion, clock.RealClock{})
-}
-
-func newClientWithVersionAndClock(version, apiVersion string, c clock.Clock) *FakeDockerClient {
 	return &FakeDockerClient{
-		VersionInfo:  dockertypes.Version{Version: version, APIVersion: apiVersion},
+		VersionInfo:  dockertypes.Version{Version: fakeDockerVersion, APIVersion: minimumDockerAPIVersion},
 		Errors:       make(map[string]error),
 		ContainerMap: make(map[string]*dockertypes.ContainerJSON),
-		Clock:        c,
+		Clock:        clock.RealClock{},
 		// default this to an empty result, so that we never have a nil non-error response from InspectImage
 		Image: &dockertypes.ImageInspect{},
+		// default this to true, so that we trace calls, image pulls and container lifecycle
+		EnableTrace: true,
+	}
+}
+
+func (f *FakeDockerClient) WithClock(c clock.Clock) *FakeDockerClient {
+	f.Lock()
+	defer f.Unlock()
+	f.Clock = c
+	return f
+}
+
+func (f *FakeDockerClient) WithVersion(version, apiVersion string) *FakeDockerClient {
+	f.Lock()
+	defer f.Unlock()
+	f.VersionInfo = dockertypes.Version{Version: version, APIVersion: apiVersion}
+	return f
+}
+
+func (f *FakeDockerClient) WithTraceDisabled() *FakeDockerClient {
+	f.Lock()
+	defer f.Unlock()
+	f.EnableTrace = false
+	return f
+}
+
+func (f *FakeDockerClient) appendCalled(callDetail calledDetail) {
+	if f.EnableTrace {
+		f.called = append(f.called, callDetail)
+	}
+}
+
+func (f *FakeDockerClient) appendPulled(pull string) {
+	if f.EnableTrace {
+		f.pulled = append(f.pulled, pull)
+	}
+}
+
+func (f *FakeDockerClient) appendContainerTrace(traceCategory string, containerName string) {
+	if !f.EnableTrace {
+		return
+	}
+	switch traceCategory {
+	case "Created":
+		f.Created = append(f.Created, containerName)
+	case "Started":
+		f.Started = append(f.Started, containerName)
+	case "Stopped":
+		f.Stopped = append(f.Stopped, containerName)
+	case "Removed":
+		f.Removed = append(f.Removed, containerName)
 	}
 }
 
@@ -120,9 +161,10 @@ func (f *FakeDockerClient) ClearCalls() {
 	f.Lock()
 	defer f.Unlock()
 	f.called = []calledDetail{}
-	f.Stopped = []string{}
 	f.pulled = []string{}
 	f.Created = []string{}
+	f.Started = []string{}
+	f.Stopped = []string{}
 	f.Removed = []string{}
 }
 
@@ -190,6 +232,9 @@ func (f *FakeDockerClient) SetFakeContainers(containers []*FakeContainer) {
 		container := dockertypes.Container{
 			Names: []string{c.Name},
 			ID:    c.ID,
+		}
+		if c.Config != nil {
+			container.Labels = c.Config.Labels
 		}
 		if c.Running {
 			f.RunningContainerList = append(f.RunningContainerList, container)
@@ -270,6 +315,17 @@ func (f *FakeDockerClient) AssertStopped(stopped []string) error {
 	return nil
 }
 
+func (f *FakeDockerClient) AssertRemoved(removed []string) error {
+	f.Lock()
+	defer f.Unlock()
+	sort.StringSlice(removed).Sort()
+	sort.StringSlice(f.Removed).Sort()
+	if !reflect.DeepEqual(removed, f.Removed) {
+		return fmt.Errorf("expected %#v, got %#v", removed, f.Removed)
+	}
+	return nil
+}
+
 func (f *FakeDockerClient) popError(op string) error {
 	if f.Errors == nil {
 		return nil
@@ -288,7 +344,7 @@ func (f *FakeDockerClient) popError(op string) error {
 func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "list"})
+	f.appendCalled(calledDetail{name: "list"})
 	err := f.popError("list")
 	containerList := append([]dockertypes.Container{}, f.RunningContainerList...)
 	if options.All {
@@ -297,7 +353,30 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 		// TODO(random-liu): Is a fully sorted array needed?
 		containerList = append(containerList, f.ExitedContainerList...)
 	}
-	return containerList, err
+	// TODO: Support other filters.
+	// Filter containers with label filter.
+	labelFilters := options.Filter.Get("label")
+	if len(labelFilters) == 0 {
+		return containerList, err
+	}
+	var filtered []dockertypes.Container
+	for _, container := range containerList {
+		match := true
+		for _, labelFilter := range labelFilters {
+			kv := strings.Split(labelFilter, "=")
+			if len(kv) != 2 {
+				return nil, fmt.Errorf("invalid label filter %q", labelFilter)
+			}
+			if container.Labels[kv[0]] != kv[1] {
+				match = false
+				break
+			}
+		}
+		if match {
+			filtered = append(filtered, container)
+		}
+	}
+	return filtered, err
 }
 
 // InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
@@ -305,7 +384,7 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 func (f *FakeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "inspect_container"})
+	f.appendCalled(calledDetail{name: "inspect_container"})
 	err := f.popError("inspect_container")
 	if container, ok := f.ContainerMap[id]; ok {
 		return container, err
@@ -322,7 +401,7 @@ func (f *FakeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 func (f *FakeDockerClient) InspectImageByRef(name string) (*dockertypes.ImageInspect, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "inspect_image"})
+	f.appendCalled(calledDetail{name: "inspect_image"})
 	err := f.popError("inspect_image")
 	return f.Image, err
 }
@@ -332,7 +411,7 @@ func (f *FakeDockerClient) InspectImageByRef(name string) (*dockertypes.ImageIns
 func (f *FakeDockerClient) InspectImageByID(name string) (*dockertypes.ImageInspect, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "inspect_image"})
+	f.appendCalled(calledDetail{name: "inspect_image"})
 	err := f.popError("inspect_image")
 	return f.Image, err
 }
@@ -356,7 +435,7 @@ func (f *FakeDockerClient) normalSleep(mean, stdDev, cutOffMillis int) {
 func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "create"})
+	f.appendCalled(calledDetail{name: "create"})
 	if err := f.popError("create"); err != nil {
 		return nil, err
 	}
@@ -364,7 +443,7 @@ func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) 
 	// Docker likes to add a '/', so copy that behavior.
 	name := "/" + c.Name
 	id := name
-	f.Created = append(f.Created, name)
+	f.appendContainerTrace("Created", name)
 	// The newest container should be in front, because we assume so in GetPodStatus()
 	f.RunningContainerList = append([]dockertypes.Container{
 		{ID: name, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
@@ -380,11 +459,11 @@ func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) 
 func (f *FakeDockerClient) StartContainer(id string) error {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "start"})
+	f.appendCalled(calledDetail{name: "start"})
 	if err := f.popError("start"); err != nil {
 		return err
 	}
-	f.Started = append(f.Started, id)
+	f.appendContainerTrace("Started", id)
 	container, ok := f.ContainerMap[id]
 	if !ok {
 		container = convertFakeContainer(&FakeContainer{ID: id, Name: id})
@@ -404,11 +483,11 @@ func (f *FakeDockerClient) StartContainer(id string) error {
 func (f *FakeDockerClient) StopContainer(id string, timeout int) error {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "stop"})
+	f.appendCalled(calledDetail{name: "stop"})
 	if err := f.popError("stop"); err != nil {
 		return err
 	}
-	f.Stopped = append(f.Stopped, id)
+	f.appendContainerTrace("Stopped", id)
 	// Container status should be Updated before container moved to ExitedContainerList
 	f.updateContainerStatus(id, statusExitedPrefix)
 	var newList []dockertypes.Container
@@ -442,7 +521,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout int) error {
 func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "remove"})
+	f.appendCalled(calledDetail{name: "remove"})
 	err := f.popError("remove")
 	if err != nil {
 		return err
@@ -451,7 +530,7 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 		if f.ExitedContainerList[i].ID == id {
 			delete(f.ContainerMap, id)
 			f.ExitedContainerList = append(f.ExitedContainerList[:i], f.ExitedContainerList[i+1:]...)
-			f.Removed = append(f.Removed, id)
+			f.appendContainerTrace("Removed", id)
 			return nil
 		}
 
@@ -465,7 +544,7 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "logs"})
+	f.appendCalled(calledDetail{name: "logs"})
 	return f.popError("logs")
 }
 
@@ -474,11 +553,15 @@ func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "pull"})
+	f.appendCalled(calledDetail{name: "pull"})
 	err := f.popError("pull")
 	if err == nil {
 		authJson, _ := json.Marshal(auth)
-		f.pulled = append(f.pulled, fmt.Sprintf("%s using %s", image, string(authJson)))
+		f.Image = &dockertypes.ImageInspect{
+			ID:       image,
+			RepoTags: []string{image},
+		}
+		f.appendPulled(fmt.Sprintf("%s using %s", image, string(authJson)))
 	}
 	return err
 }
@@ -486,7 +569,8 @@ func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 func (f *FakeDockerClient) Version() (*dockertypes.Version, error) {
 	f.Lock()
 	defer f.Unlock()
-	return &f.VersionInfo, f.popError("version")
+	v := f.VersionInfo
+	return &v, f.popError("version")
 }
 
 func (f *FakeDockerClient) Info() (*dockertypes.Info, error) {
@@ -497,21 +581,21 @@ func (f *FakeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*
 	f.Lock()
 	defer f.Unlock()
 	f.execCmd = opts.Cmd
-	f.called = append(f.called, calledDetail{name: "create_exec"})
+	f.appendCalled(calledDetail{name: "create_exec"})
 	return &dockertypes.ContainerExecCreateResponse{ID: "12345678"}, nil
 }
 
 func (f *FakeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "start_exec"})
+	f.appendCalled(calledDetail{name: "start_exec"})
 	return nil
 }
 
 func (f *FakeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "attach"})
+	f.appendCalled(calledDetail{name: "attach"})
 	return nil
 }
 
@@ -520,13 +604,13 @@ func (f *FakeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecIns
 }
 
 func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
-	f.called = append(f.called, calledDetail{name: "list_images"})
+	f.appendCalled(calledDetail{name: "list_images"})
 	err := f.popError("list_images")
 	return f.Images, err
 }
 
 func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
-	f.called = append(f.called, calledDetail{name: "remove_image", arguments: []interface{}{image, opts}})
+	f.appendCalled(calledDetail{name: "remove_image", arguments: []interface{}{image, opts}})
 	err := f.popError("remove_image")
 	if err == nil {
 		for i := range f.Images {
@@ -556,14 +640,14 @@ func (f *FakeDockerClient) updateContainerStatus(id, status string) {
 func (f *FakeDockerClient) ResizeExecTTY(id string, height, width int) error {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "resize_exec"})
+	f.appendCalled(calledDetail{name: "resize_exec"})
 	return nil
 }
 
 func (f *FakeDockerClient) ResizeContainerTTY(id string, height, width int) error {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "resize_container"})
+	f.appendCalled(calledDetail{name: "resize_container"})
 	return nil
 }
 
@@ -592,23 +676,23 @@ func (f *FakeDockerPuller) Pull(image string, secrets []v1.Secret) (err error) {
 	return err
 }
 
-func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
+func (f *FakeDockerPuller) GetImageRef(name string) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 	if f.HasImages == nil {
-		return true, nil
+		return name, nil
 	}
 	for _, s := range f.HasImages {
 		if s == name {
-			return true, nil
+			return s, nil
 		}
 	}
-	return false, nil
+	return "", nil
 }
 func (f *FakeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, calledDetail{name: "image_history"})
+	f.appendCalled(calledDetail{name: "image_history"})
 	history := f.ImageHistoryMap[id]
 	return history, nil
 }

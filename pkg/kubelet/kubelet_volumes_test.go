@@ -21,21 +21,77 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
+func TestListVolumesForPod(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	kubelet := testKubelet.kubelet
+
+	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+		Volumes: []v1.Volume{
+			{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName: "fake-device1",
+					},
+				},
+			},
+			{
+				Name: "vol2",
+				VolumeSource: v1.VolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName: "fake-device2",
+					},
+				},
+			},
+		},
+	})
+
+	stopCh := runVolumeManager(kubelet)
+	defer func() {
+		close(stopCh)
+	}()
+
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	assert.NoError(t, err)
+
+	podName := volumehelper.GetUniquePodName(pod)
+
+	volumesToReturn, volumeExsit := kubelet.ListVolumesForPod(types.UID(podName))
+	if !volumeExsit {
+		t.Errorf("Expected to find volumes for pod %q, but ListVolumesForPod find no volume", podName)
+	}
+
+	outerVolumeSpecName1 := "vol1"
+	if volumesToReturn[outerVolumeSpecName1] == nil {
+		t.Errorf("Value of map volumesToReturn is not expected to be nil, which key is : %s", outerVolumeSpecName1)
+	}
+
+	outerVolumeSpecName2 := "vol2"
+	if volumesToReturn[outerVolumeSpecName2] == nil {
+		t.Errorf("Value of map volumesToReturn is not expected to be nil, which key is : %s", outerVolumeSpecName2)
+	}
+
+}
+
 func TestPodVolumesExist(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod1",
 				UID:  "pod1uid",
 			},
@@ -53,7 +109,7 @@ func TestPodVolumesExist(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod2",
 				UID:  "pod2uid",
 			},
@@ -71,7 +127,7 @@ func TestPodVolumesExist(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod3",
 				UID:  "pod3uid",
 			},
@@ -115,6 +171,7 @@ func TestPodVolumesExist(t *testing.T) {
 
 func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
@@ -160,6 +217,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 
 func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
@@ -230,12 +288,13 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 
 func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
 			return true, &v1.Node{
-				ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{
@@ -298,12 +357,13 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 
 func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
 			return true, &v1.Node{
-				ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{

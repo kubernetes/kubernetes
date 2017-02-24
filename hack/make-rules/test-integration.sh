@@ -42,7 +42,7 @@ kube::test::find_integration_test_dirs() {
   (
     cd ${KUBE_ROOT}
     find test/integration/${1-} -name '*_test.go' -print0 \
-      | xargs -0n1 dirname \
+      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
       | LC_ALL=C sort -u
   )
 }
@@ -62,8 +62,8 @@ runTests() {
   # KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
       WHAT="$(kube::test::find_integration_test_dirs ${2-} | paste -sd' ' -) $(echo ${@:3})" \
-      KUBE_GOFLAGS="${KUBE_GOFLAGS:-} ${SHORT:--short=true} -tags 'integration no-docker'" \
-      KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} --vmodule=garbage*collector*=6 --alsologtostderr=true" \
+      KUBE_GOFLAGS="${KUBE_GOFLAGS:-} -tags 'integration no-docker'" \
+      KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=garbage*collector*=6 --alsologtostderr=true" \
       KUBE_RACE="" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_TEST_API_VERSIONS="$1"

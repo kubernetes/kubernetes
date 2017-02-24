@@ -22,14 +22,15 @@ import (
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
 	"github.com/golang/glog"
 )
@@ -79,7 +80,7 @@ type FederationView interface {
 	// GetUnreadyClusters returns a list of all clusters that are not ready yet.
 	GetUnreadyClusters() ([]*federationapi.Cluster, error)
 
-	// GetReadyClusers returns all clusters for which the sub-informers are run.
+	// GetReadyClusters returns all clusters for which the sub-informers are run.
 	GetReadyClusters() ([]*federationapi.Cluster, error)
 
 	// GetReadyCluster returns the cluster with the given name, if found.
@@ -116,7 +117,7 @@ type FederatedInformerForTestOnly interface {
 
 // A function that should be used to create an informer on the target object. Store should use
 // cache.DeletionHandlingMetaNamespaceKeyFunc as a keying function.
-type TargetInformerFactory func(*federationapi.Cluster, kubeclientset.Interface) (cache.Store, cache.ControllerInterface)
+type TargetInformerFactory func(*federationapi.Cluster, kubeclientset.Interface) (cache.Store, cache.Controller)
 
 // A structure with cluster lifecycle handler functions. Cluster is available (and ClusterAvailable is fired)
 // when it is created in federated etcd and ready. Cluster becomes unavailable (and ClusterUnavailable is fired)
@@ -160,10 +161,10 @@ func NewFederatedInformer(
 
 	federatedInformer.clusterInformer.store, federatedInformer.clusterInformer.controller = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options apiv1.ListOptions) (pkgruntime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
 				return federationClient.Federation().Clusters().List(options)
 			},
-			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return federationClient.Federation().Clusters().Watch(options)
 			},
 		},
@@ -242,7 +243,7 @@ func isClusterReady(cluster *federationapi.Cluster) bool {
 }
 
 type informer struct {
-	controller cache.ControllerInterface
+	controller cache.Controller
 	store      cache.Store
 	stopChan   chan struct{}
 }
@@ -337,7 +338,7 @@ func (f *federatedInformerImpl) GetUnreadyClusters() ([]*federationapi.Cluster, 
 	return result, nil
 }
 
-// GetReadyClusers returns all clusters for which the sub-informers are run.
+// GetReadyClusters returns all clusters for which the sub-informers are run.
 func (f *federatedInformerImpl) GetReadyClusters() ([]*federationapi.Cluster, error) {
 	f.Lock()
 	defer f.Unlock()

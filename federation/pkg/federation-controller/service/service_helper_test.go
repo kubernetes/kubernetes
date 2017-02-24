@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -74,7 +75,7 @@ func TestProcessServiceUpdate(t *testing.T) {
 			"diff-cluster",
 			&cachedService{
 				lastState: &v1.Service{
-					ObjectMeta: v1.ObjectMeta{Name: "bar1"},
+					ObjectMeta: metav1.ObjectMeta{Name: "bar1"},
 				},
 				serviceStatusMap: map[string]v1.LoadBalancerStatus{
 					"foo2": {Ingress: []v1.LoadBalancerIngress{{IP: "ip1", Hostname: ""}}},

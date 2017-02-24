@@ -21,15 +21,15 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/discovery"
+	restclient "k8s.io/client-go/rest"
 	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -142,7 +142,7 @@ func getRegionNameForNode(node api.Node) (string, error) {
 // Find the names of all zones and the region in which we have nodes in this cluster.
 func getZoneNames(client *clientset.Clientset) (zones []string, region string, err error) {
 	zoneNames := sets.NewString()
-	nodes, err := client.Core().Nodes().List(api.ListOptions{})
+	nodes, err := client.Core().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("Failed to list nodes while getting zone names: %v", err)
 		return nil, "", err

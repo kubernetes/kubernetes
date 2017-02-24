@@ -21,10 +21,12 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/cache"
+	"github.com/golang/glog"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // SharedInformerFactory provides interface which holds unique informers for pods, nodes, namespaces, persistent volume
@@ -50,6 +52,7 @@ type SharedInformerFactory interface {
 	DaemonSets() DaemonSetInformer
 	Deployments() DeploymentInformer
 	ReplicaSets() ReplicaSetInformer
+	ReplicationControllers() ReplicationControllerInformer
 
 	ClusterRoleBindings() ClusterRoleBindingInformer
 	ClusterRoles() ClusterRoleInformer
@@ -90,8 +93,11 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	glog.V(1).Infoln("Starting informer factory")
+
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
+			glog.V(2).Infof("Starting informer for %v", informerType)
 			go informer.Run(stopCh)
 			f.startedInformers[informerType] = true
 		}
@@ -144,6 +150,10 @@ func (f *sharedInformerFactory) Deployments() DeploymentInformer {
 
 func (f *sharedInformerFactory) ReplicaSets() ReplicaSetInformer {
 	return &replicaSetInformer{sharedInformerFactory: f}
+}
+
+func (f *sharedInformerFactory) ReplicationControllers() ReplicationControllerInformer {
+	return &replicationControllerInformer{sharedInformerFactory: f}
 }
 
 func (f *sharedInformerFactory) ClusterRoles() ClusterRoleInformer {

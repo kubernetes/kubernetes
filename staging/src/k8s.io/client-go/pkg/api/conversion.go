@@ -18,16 +18,17 @@ package api
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
-	"k8s.io/client-go/pkg/api/resource"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/conversion"
-	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utillabels "k8s.io/client-go/pkg/util/labels"
-	"k8s.io/client-go/pkg/util/validation/field"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -67,6 +68,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_map_to_unversioned_LabelSelector,
 		Convert_unversioned_LabelSelector_to_map,
+
+		Convert_Slice_string_To_Slice_int32,
 	)
 }
 
@@ -243,8 +246,21 @@ func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *metav1
 func Convert_unversioned_LabelSelector_to_map(in *metav1.LabelSelector, out *map[string]string, s conversion.Scope) error {
 	var err error
 	*out, err = metav1.LabelSelectorAsMap(in)
-	if err != nil {
-		err = field.Invalid(field.NewPath("labelSelector"), *in, fmt.Sprintf("cannot convert to old selector: %v", err))
-	}
 	return err
+}
+
+// Convert_Slice_string_To_Slice_int32 converts multiple query parameters or
+// a single query parameter with a comma delimited value to multiple int32.
+// This is used for port forwarding which needs the ports as int32.
+func Convert_Slice_string_To_Slice_int32(in *[]string, out *[]int32, s conversion.Scope) error {
+	for _, s := range *in {
+		for _, v := range strings.Split(s, ",") {
+			x, err := strconv.ParseUint(v, 10, 16)
+			if err != nil {
+				return fmt.Errorf("cannot convert to []int32: %v", err)
+			}
+			*out = append(*out, int32(x))
+		}
+	}
+	return nil
 }

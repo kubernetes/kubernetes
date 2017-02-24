@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -61,7 +62,7 @@ var (
 func NewCmdCp(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "cp <file-spec-src> <file-spec-dest>",
-		Short:   "Copy files and directories to and from containers.",
+		Short:   i18n.T("Copy files and directories to and from containers."),
 		Long:    "Copy files and directories to and from containers.",
 		Example: cp_example,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -79,6 +79,20 @@ type Logger interface {
 	Log(...interface{})
 }
 
+// A LoggerFunc is a convenience type to convert a function taking a variadic
+// list of arguments and wrap it so the Logger interface can be used.
+//
+// Example:
+//     s3.New(sess, &aws.Config{Logger: aws.LoggerFunc(func(args ...interface{}) {
+//         fmt.Fprintln(os.Stdout, args...)
+//     })})
+type LoggerFunc func(...interface{})
+
+// Log calls the wrapped function with the arguments provided
+func (f LoggerFunc) Log(args ...interface{}) {
+	f(args...)
+}
+
 // NewDefaultLogger returns a Logger which will write log messages to stdout, and
 // use same formatting runes as the stdlib log.Logger
 func NewDefaultLogger() Logger {

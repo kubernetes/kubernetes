@@ -13,6 +13,5 @@
 # limitations under the License.
 
 FROM busybox
-MAINTAINER Prashanth B <beeps@google.com>
 ADD main main
 ENTRYPOINT ["/main"]

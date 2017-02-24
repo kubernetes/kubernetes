@@ -28,7 +28,7 @@ import (
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // libcontainerCgroupManagerType defines how to interface with libcontainer
@@ -49,25 +49,37 @@ func ConvertCgroupNameToSystemd(cgroupName CgroupName, outputToCgroupFs bool) st
 	name := string(cgroupName)
 	result := ""
 	if name != "" && name != "/" {
-		// systemd treats - as a step in the hierarchy, we convert all - to _
-		name = strings.Replace(name, "-", "_", -1)
 		parts := strings.Split(name, "/")
+		results := []string{}
 		for _, part := range parts {
-			// ignore leading stuff for now
+			// ignore leading stuff
 			if part == "" {
 				continue
 			}
-			if len(result) > 0 {
-				result = result + "-"
+			// detect if we are given a systemd style name.
+			// if so, we do not want to do double encoding.
+			if strings.HasSuffix(part, ".slice") {
+				part = strings.TrimSuffix(part, ".slice")
+				separatorIndex := strings.LastIndex(part, "-")
+				if separatorIndex >= 0 && separatorIndex < len(part) {
+					part = part[separatorIndex+1:]
+				}
+			} else {
+				// systemd treats - as a step in the hierarchy, we convert all - to _
+				part = strings.Replace(part, "-", "_", -1)
 			}
-			result = result + part
+			results = append(results, part)
 		}
+		// each part is appended with systemd style -
+		result = strings.Join(results, "-")
 	} else {
 		// root converts to -
 		result = "-"
 	}
 	// always have a .slice suffix
-	result = result + ".slice"
+	if !strings.HasSuffix(result, ".slice") {
+		result = result + ".slice"
+	}
 
 	// if the caller desired the result in cgroupfs format...
 	if outputToCgroupFs {

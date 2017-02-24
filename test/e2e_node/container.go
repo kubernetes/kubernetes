@@ -19,9 +19,10 @@ package e2e_node
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -45,7 +46,7 @@ func (cc *ConformanceContainer) Create() {
 		imagePullSecrets = append(imagePullSecrets, v1.LocalObjectReference{Name: s})
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: cc.podName,
 		},
 		Spec: v1.PodSpec{
@@ -62,11 +63,11 @@ func (cc *ConformanceContainer) Create() {
 }
 
 func (cc *ConformanceContainer) Delete() error {
-	return cc.PodClient.Delete(cc.podName, v1.NewDeleteOptions(0))
+	return cc.PodClient.Delete(cc.podName, metav1.NewDeleteOptions(0))
 }
 
 func (cc *ConformanceContainer) IsReady() (bool, error) {
-	pod, err := cc.PodClient.Get(cc.podName)
+	pod, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -74,7 +75,7 @@ func (cc *ConformanceContainer) IsReady() (bool, error) {
 }
 
 func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
-	pod, err := cc.PodClient.Get(cc.podName)
+	pod, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return v1.PodUnknown, err
 	}
@@ -82,7 +83,7 @@ func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
 }
 
 func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
-	pod, err := cc.PodClient.Get(cc.podName)
+	pod, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return v1.ContainerStatus{}, err
 	}
@@ -94,7 +95,7 @@ func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
 }
 
 func (cc *ConformanceContainer) Present() (bool, error) {
-	_, err := cc.PodClient.Get(cc.podName)
+	_, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
 	if err == nil {
 		return true, nil
 	}

@@ -27,11 +27,14 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/kubelet/server/portforward"
-	"k8s.io/client-go/pkg/util/httpstream"
-	"k8s.io/client-go/pkg/util/runtime"
 )
+
+// TODO move to API machinery and re-unify with kubelet/server/portfoward
+// The subprotocol "portforward.k8s.io" is used for port forwarding.
+const PortForwardProtocolV1Name = "portforward.k8s.io"
 
 // PortForwarder knows how to listen for local connections and forward them to
 // a remote pod via an upgraded HTTP request.
@@ -132,7 +135,7 @@ func (pf *PortForwarder) ForwardPorts() error {
 	defer pf.Close()
 
 	var err error
-	pf.streamConn, _, err = pf.dialer.Dial(portforward.PortForwardProtocolV1Name)
+	pf.streamConn, _, err = pf.dialer.Dial(PortForwardProtocolV1Name)
 	if err != nil {
 		return fmt.Errorf("error upgrading connection: %s", err)
 	}

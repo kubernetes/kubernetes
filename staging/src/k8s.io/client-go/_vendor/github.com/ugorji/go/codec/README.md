@@ -68,7 +68,7 @@ Rich Feature Set includes:
   - Encode/Decode from/to chan types (for iterative streaming support)
   - Drop-in replacement for encoding/json. `json:` key in struct tag supported.
   - Provides a RPC Server and Client Codec for net/rpc communication protocol.
-  - Handle unique idiosynchracies of codecs e.g. 
+  - Handle unique idiosyncrasies of codecs e.g. 
     - For messagepack, configure how ambiguities in handling raw bytes are resolved 
     - For messagepack, provide rpc server/client codec to support
       msgpack-rpc protocol defined at:

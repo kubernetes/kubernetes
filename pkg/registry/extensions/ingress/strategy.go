@@ -20,25 +20,27 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // ingressStrategy implements verification logic for Replication Ingresss.
 type ingressStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication Ingress objects.
-var Strategy = ingressStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = ingressStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all Ingress' need to be within a namespace.
 func (ingressStrategy) NamespaceScoped() bool {
@@ -46,7 +48,7 @@ func (ingressStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an Ingress before creation.
-func (ingressStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+func (ingressStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	ingress := obj.(*extensions.Ingress)
 	// create cannot set status
 	ingress.Status = extensions.IngressStatus{}
@@ -55,7 +57,7 @@ func (ingressStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (ingressStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (ingressStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newIngress := obj.(*extensions.Ingress)
 	oldIngress := old.(*extensions.Ingress)
 	// Update is not allowed to set status
@@ -63,7 +65,7 @@ func (ingressStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
-	// See api.ObjectMeta description for more information on Generation.
+	// See metav1.ObjectMeta description for more information on Generation.
 	if !reflect.DeepEqual(oldIngress.Spec, newIngress.Spec) {
 		newIngress.Generation = oldIngress.Generation + 1
 	}
@@ -71,7 +73,7 @@ func (ingressStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object
 }
 
 // Validate validates a new Ingress.
-func (ingressStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+func (ingressStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	ingress := obj.(*extensions.Ingress)
 	err := validation.ValidateIngress(ingress)
 	return err
@@ -87,7 +89,7 @@ func (ingressStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (ingressStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (ingressStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateIngress(obj.(*extensions.Ingress))
 	updateErrorList := validation.ValidateIngressUpdate(obj.(*extensions.Ingress), old.(*extensions.Ingress))
 	return append(validationErrorList, updateErrorList...)
@@ -130,7 +132,7 @@ type ingressStatusStrategy struct {
 var StatusStrategy = ingressStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (ingressStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (ingressStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newIngress := obj.(*extensions.Ingress)
 	oldIngress := old.(*extensions.Ingress)
 	// status changes are not allowed to update spec
@@ -138,6 +140,6 @@ func (ingressStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
-func (ingressStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (ingressStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateIngressStatusUpdate(obj.(*extensions.Ingress), old.(*extensions.Ingress))
 }

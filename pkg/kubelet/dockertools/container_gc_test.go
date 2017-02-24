@@ -23,17 +23,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/types"
+	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 )
 
-func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient) {
-	fakeDocker := new(FakeDockerClient)
+func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient, *nettest.MockNetworkPlugin) {
+	fakeDocker := NewFakeDockerClient()
 	fakePodGetter := newFakePodGetter()
-	gc := NewContainerGC(fakeDocker, fakePodGetter, "")
-	return gc, fakeDocker
+	fakePlugin := nettest.NewMockNetworkPlugin(gomock.NewController(t))
+	fakePlugin.EXPECT().Name().Return("someNetworkPlugin").AnyTimes()
+	gc := NewContainerGC(fakeDocker, fakePodGetter, knetwork.NewPluginManager(fakePlugin), "")
+	return gc, fakeDocker, fakePlugin
 }
 
 // Makes a stable time object, lower id is earlier time.
@@ -66,7 +72,7 @@ func addPods(podGetter podGetter, podUIDs ...types.UID) {
 	fakePodGetter := podGetter.(*fakePodGetter)
 	for _, uid := range podUIDs {
 		fakePodGetter.pods[uid] = &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uid),
 				Namespace: "test",
 				UID:       uid,
@@ -90,7 +96,7 @@ func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
 }
 
 func TestDeleteContainerSkipRunningContainer(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, _ := newTestContainerGC(t)
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", true, makeTime(0)),
 	})
@@ -101,29 +107,65 @@ func TestDeleteContainerSkipRunningContainer(t *testing.T) {
 }
 
 func TestDeleteContainerRemoveDeadContainer(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, fakePlugin := newTestContainerGC(t)
+	defer fakePlugin.Finish()
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 	})
 	addPods(gc.podGetter, "foo")
+
+	fakePlugin.EXPECT().TearDownPod(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	assert.Nil(t, gc.deleteContainer("1876"))
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
+func TestGarbageCollectNetworkTeardown(t *testing.T) {
+	// Ensure infra container gets teardown called
+	gc, fakeDocker, fakePlugin := newTestContainerGC(t)
+	defer fakePlugin.Finish()
+	id := kubecontainer.DockerID("1867").ContainerID()
+	fakeDocker.SetFakeContainers([]*FakeContainer{
+		makeContainer(id.ID, "foo", "POD", false, makeTime(0)),
+	})
+	addPods(gc.podGetter, "foo")
+
+	fakePlugin.EXPECT().TearDownPod(gomock.Any(), gomock.Any(), id).Return(nil)
+
+	assert.Nil(t, gc.deleteContainer(id.ID))
+	assert.Len(t, fakeDocker.Removed, 1)
+
+	// Ensure non-infra container does not have teardown called
+	gc, fakeDocker, fakePlugin = newTestContainerGC(t)
+	id = kubecontainer.DockerID("1877").ContainerID()
+	fakeDocker.SetFakeContainers([]*FakeContainer{
+		makeContainer(id.ID, "foo", "adsfasdfasdf", false, makeTime(0)),
+	})
+	fakePlugin.EXPECT().SetUpPod(gomock.Any(), gomock.Any(), id).Return(nil)
+
+	addPods(gc.podGetter, "foo")
+
+	assert.Nil(t, gc.deleteContainer(id.ID))
+	assert.Len(t, fakeDocker.Removed, 1)
+}
+
 func TestGarbageCollectZeroMaxContainers(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, fakePlugin := newTestContainerGC(t)
+	defer fakePlugin.Finish()
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 	})
 	addPods(gc.podGetter, "foo")
+
+	fakePlugin.EXPECT().TearDownPod(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: 1, MaxContainers: 0}, true))
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
 func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, fakePlugin := newTestContainerGC(t)
+	defer fakePlugin.Finish()
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 		makeContainer("2876", "foo1", "POD", false, makeTime(1)),
@@ -133,12 +175,15 @@ func TestGarbageCollectNoMaxPerPodContainerLimit(t *testing.T) {
 	})
 	addPods(gc.podGetter, "foo", "foo1", "foo2", "foo3", "foo4")
 
+	fakePlugin.EXPECT().TearDownPod(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(5)
+
 	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: 4}, true))
 	assert.Len(t, fakeDocker.Removed, 1)
 }
 
 func TestGarbageCollectNoMaxLimit(t *testing.T) {
-	gc, fakeDocker := newTestContainerGC(t)
+	gc, fakeDocker, fakePlugin := newTestContainerGC(t)
+	defer fakePlugin.Finish()
 	fakeDocker.SetFakeContainers([]*FakeContainer{
 		makeContainer("1876", "foo", "POD", false, makeTime(0)),
 		makeContainer("2876", "foo1", "POD", false, makeTime(0)),
@@ -147,6 +192,8 @@ func TestGarbageCollectNoMaxLimit(t *testing.T) {
 		makeContainer("5876", "foo4", "POD", false, makeTime(0)),
 	})
 	addPods(gc.podGetter, "foo", "foo1", "foo2", "foo3", "foo4")
+
+	fakePlugin.EXPECT().TearDownPod(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(5)
 
 	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: -1}, true))
 	assert.Len(t, fakeDocker.Removed, 0)
@@ -260,10 +307,12 @@ func TestGarbageCollect(t *testing.T) {
 	}
 	for i, test := range tests {
 		t.Logf("Running test case with index %d", i)
-		gc, fakeDocker := newTestContainerGC(t)
+		gc, fakeDocker, fakePlugin := newTestContainerGC(t)
 		fakeDocker.SetFakeContainers(test.containers)
 		addPods(gc.podGetter, "foo", "foo1", "foo2", "foo3", "foo4", "foo5", "foo6", "foo7")
+		fakePlugin.EXPECT().TearDownPod(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}, true))
 		verifyStringArrayEqualsAnyOrder(t, fakeDocker.Removed, test.expectedRemoved)
+		fakePlugin.Finish()
 	}
 }

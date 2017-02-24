@@ -17,9 +17,11 @@ limitations under the License.
 package bootstrappolicy
 
 import (
+	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // rolesWithAllowStar are the controller roles which are allowed to contain a *.  These are
@@ -28,6 +30,7 @@ import (
 var rolesWithAllowStar = sets.NewString(
 	saRolePrefix+"namespace-controller",
 	saRolePrefix+"generic-garbage-collector",
+	saRolePrefix+"resourcequota-controller",
 )
 
 // TestNoStarsForControllers confirms that no controller role has star verbs, groups,
@@ -55,6 +58,32 @@ func TestNoStarsForControllers(t *testing.T) {
 					t.Errorf("%s.Rule[%d].Resources[%d] is star", role.Name, i, j)
 				}
 			}
+		}
+	}
+}
+
+func TestControllerRoleLabel(t *testing.T) {
+	roles := ControllerRoles()
+	for i := range roles {
+		role := roles[i]
+		accessor, err := meta.Accessor(&role)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("ClusterRole: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+		}
+	}
+
+	rolebindings := ControllerRoleBindings()
+	for i := range rolebindings {
+		rolebinding := rolebindings[i]
+		accessor, err := meta.Accessor(&rolebinding)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("ClusterRoleBinding: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
 		}
 	}
 }

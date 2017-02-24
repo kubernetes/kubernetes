@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
+	testing "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/api"
-	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeReplicationControllers implements ReplicationControllerInterface
@@ -34,7 +36,7 @@ var replicationcontrollersResource = schema.GroupVersionResource{Group: "", Vers
 
 func (c *FakeReplicationControllers) Create(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), &api.ReplicationController{})
+		Invokes(testing.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), &api.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -44,7 +46,7 @@ func (c *FakeReplicationControllers) Create(replicationController *api.Replicati
 
 func (c *FakeReplicationControllers) Update(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(replicationcontrollersResource, c.ns, replicationController), &api.ReplicationController{})
+		Invokes(testing.NewUpdateAction(replicationcontrollersResource, c.ns, replicationController), &api.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -54,7 +56,7 @@ func (c *FakeReplicationControllers) Update(replicationController *api.Replicati
 
 func (c *FakeReplicationControllers) UpdateStatus(replicationController *api.ReplicationController) (*api.ReplicationController, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(replicationcontrollersResource, "status", c.ns, replicationController), &api.ReplicationController{})
+		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "status", c.ns, replicationController), &api.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -62,23 +64,23 @@ func (c *FakeReplicationControllers) UpdateStatus(replicationController *api.Rep
 	return obj.(*api.ReplicationController), err
 }
 
-func (c *FakeReplicationControllers) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeReplicationControllers) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(replicationcontrollersResource, c.ns, name), &api.ReplicationController{})
+		Invokes(testing.NewDeleteAction(replicationcontrollersResource, c.ns, name), &api.ReplicationController{})
 
 	return err
 }
 
-func (c *FakeReplicationControllers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	action := core.NewDeleteCollectionAction(replicationcontrollersResource, c.ns, listOptions)
+func (c *FakeReplicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(replicationcontrollersResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ReplicationControllerList{})
 	return err
 }
 
-func (c *FakeReplicationControllers) Get(name string) (result *api.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Get(name string, options v1.GetOptions) (result *api.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(replicationcontrollersResource, c.ns, name), &api.ReplicationController{})
+		Invokes(testing.NewGetAction(replicationcontrollersResource, c.ns, name), &api.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -86,15 +88,15 @@ func (c *FakeReplicationControllers) Get(name string) (result *api.ReplicationCo
 	return obj.(*api.ReplicationController), err
 }
 
-func (c *FakeReplicationControllers) List(opts api.ListOptions) (result *api.ReplicationControllerList, err error) {
+func (c *FakeReplicationControllers) List(opts v1.ListOptions) (result *api.ReplicationControllerList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(replicationcontrollersResource, c.ns, opts), &api.ReplicationControllerList{})
+		Invokes(testing.NewListAction(replicationcontrollersResource, c.ns, opts), &api.ReplicationControllerList{})
 
 	if obj == nil {
 		return nil, err
 	}
 
-	label, _, _ := core.ExtractFromListOptions(opts)
+	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -108,16 +110,16 @@ func (c *FakeReplicationControllers) List(opts api.ListOptions) (result *api.Rep
 }
 
 // Watch returns a watch.Interface that watches the requested replicationControllers.
-func (c *FakeReplicationControllers) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeReplicationControllers) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(core.NewWatchAction(replicationcontrollersResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(replicationcontrollersResource, c.ns, opts))
 
 }
 
 // Patch applies the patch and returns the patched replicationController.
-func (c *FakeReplicationControllers) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, data, subresources...), &api.ReplicationController{})
+		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, data, subresources...), &api.ReplicationController{})
 
 	if obj == nil {
 		return nil, err

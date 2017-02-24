@@ -17,10 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -28,8 +28,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return scheme.AddDefaultingFuncs(
 		SetDefaults_DaemonSet,
 		SetDefaults_Deployment,
-		SetDefaults_Job,
-		SetDefaults_HorizontalPodAutoscaler,
 		SetDefaults_ReplicaSet,
 		SetDefaults_NetworkPolicy,
 	)
@@ -88,50 +86,6 @@ func SetDefaults_Deployment(obj *Deployment) {
 			maxSurge := intstr.FromInt(1)
 			strategy.RollingUpdate.MaxSurge = &maxSurge
 		}
-	}
-}
-
-func SetDefaults_Job(obj *Job) {
-	labels := obj.Spec.Template.Labels
-	// TODO: support templates defined elsewhere when we support them in the API
-	if labels != nil {
-		// if an autoselector is requested, we'll build the selector later with controller-uid and job-name
-		autoSelector := bool(obj.Spec.AutoSelector != nil && *obj.Spec.AutoSelector)
-
-		// otherwise, we are using a manual selector
-		manualSelector := !autoSelector
-
-		// and default behavior for an unspecified manual selector is to use the pod template labels
-		if manualSelector && obj.Spec.Selector == nil {
-			obj.Spec.Selector = &metav1.LabelSelector{
-				MatchLabels: labels,
-			}
-		}
-		if len(obj.Labels) == 0 {
-			obj.Labels = labels
-		}
-	}
-	// For a non-parallel job, you can leave both `.spec.completions` and
-	// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.
-	if obj.Spec.Completions == nil && obj.Spec.Parallelism == nil {
-		obj.Spec.Completions = new(int32)
-		*obj.Spec.Completions = 1
-		obj.Spec.Parallelism = new(int32)
-		*obj.Spec.Parallelism = 1
-	}
-	if obj.Spec.Parallelism == nil {
-		obj.Spec.Parallelism = new(int32)
-		*obj.Spec.Parallelism = 1
-	}
-}
-
-func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {
-	if obj.Spec.MinReplicas == nil {
-		minReplicas := int32(1)
-		obj.Spec.MinReplicas = &minReplicas
-	}
-	if obj.Spec.CPUUtilization == nil {
-		obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
 	}
 }
 

@@ -21,17 +21,17 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	clustercache "k8s.io/kubernetes/federation/client/cache"
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 type ClusterController struct {
@@ -49,7 +49,7 @@ type ClusterController struct {
 	clusterKubeClientMap map[string]ClusterClient
 
 	// cluster framework and store
-	clusterController *cache.Controller
+	clusterController cache.Controller
 	clusterStore      clustercache.StoreToClusterLister
 }
 
@@ -64,10 +64,10 @@ func NewclusterController(federationClient federationclientset.Interface, cluste
 	}
 	cc.clusterStore.Store, cc.clusterController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return cc.federationClient.Federation().Clusters().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return cc.federationClient.Federation().Clusters().Watch(options)
 			},
 		},
@@ -134,7 +134,7 @@ func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster
 
 // UpdateClusterStatus checks cluster status and get the metrics from cluster's restapi
 func (cc *ClusterController) UpdateClusterStatus() error {
-	clusters, err := cc.federationClient.Federation().Clusters().List(v1.ListOptions{})
+	clusters, err := cc.federationClient.Federation().Clusters().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

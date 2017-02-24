@@ -21,7 +21,7 @@ all: push
 container: image
 
 image:
-	docker build -t $(PREFIX)/${IMAGE} . # Build new image and automatically tag it as latest
+	docker build --pull -t $(PREFIX)/${IMAGE} . # Build new image and automatically tag it as latest
 	docker tag $(PREFIX)/${IMAGE} $(PREFIX)/${IMAGE}:$(TAG) # Add the version tag to the latest image
 
 push: image

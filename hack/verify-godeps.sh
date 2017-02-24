@@ -28,14 +28,17 @@ preload-dep() {
   org="$1"
   project="$2"
   sha="$3"
+  # project_dir ($4) is optional, if unset we will generate it
+  if [[ -z ${4:-} ]]; then
+    project_dir="${GOPATH}/src/${org}/${project}.git"
+  else
+    project_dir="${4}"
+  fi
 
-  org_dir="${GOPATH}/src/${org}"
-  mkdir -p "${org_dir}"
-  pushd "${org_dir}" > /dev/null
-    git clone "https://${org}/${project}.git" > /dev/null 2>&1
-    pushd "${org_dir}/${project}" > /dev/null
-      git checkout "${sha}" > /dev/null 2>&1
-    popd > /dev/null
+  echo "**HACK** preloading dep for ${org} ${project} at ${sha} into ${project_dir}"
+  git clone "https://${org}/${project}" "${project_dir}" > /dev/null 2>&1
+  pushd "${project_dir}" > /dev/null
+    git checkout "${sha}"
   popd > /dev/null
 }
 
@@ -50,9 +53,17 @@ if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
   exit 0
 fi
 
-# Create a nice clean place to put our new godeps
-_tmpdir="$(mktemp -d -t gopath.XXXXXX)"
-KEEP_TMP=false
+if [[ -z ${TMP_GOPATH:-} ]]; then
+  # Create a nice clean place to put our new godeps
+  _tmpdir="$(mktemp -d -t gopath.XXXXXX)"
+else
+  # reuse what we might have saved previously
+  _tmpdir="${TMP_GOPATH}"
+fi
+
+if [[ -z ${KEEP_TMP:-} ]]; then
+    KEEP_TMP=false
+fi
 function cleanup {
   if [ "${KEEP_TMP}" == "true" ]; then
     echo "Leaving ${_tmpdir} for you to examine or copy. Please delete it manually when finished. (rm -rf ${_tmpdir})"

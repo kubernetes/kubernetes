@@ -29,23 +29,26 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
-	"k8s.io/kubernetes/pkg/client/record"
-	fcache "k8s.io/kubernetes/pkg/client/testing/cache"
-	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/v1beta1"
+	"k8s.io/kubernetes/pkg/controller"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
 
@@ -112,9 +115,10 @@ var noerrors = []reactorError{}
 //   is updated first and claim.Phase second. This queue will then contain both
 //   updates as separate entries.
 // - Number of changes since the last call to volumeReactor.syncAll().
-// - Optionally, volume and claim event sources. When set, all changed
-//   volumes/claims are sent as Modify event to these sources. These sources can
-//   be linked back to the controller watcher as "volume/claim updated" events.
+// - Optionally, volume and claim fake watchers which should be the same ones
+//   used by the controller. Any time an event function like deleteVolumeEvent
+//   is called to simulate an event, the reactor's stores are updated and the
+//   controller is sent the event via the fake watcher.
 // - Optionally, list of error that should be returned by reactor, simulating
 //   etcd / API server failures. These errors are evaluated in order and every
 //   error is returned only once. I.e. when the reactor finds matching
@@ -126,8 +130,8 @@ type volumeReactor struct {
 	changedObjects       []interface{}
 	changedSinceLastSync int
 	ctrl                 *PersistentVolumeController
-	volumeSource         *fcache.FakePVControllerSource
-	claimSource          *fcache.FakePVCControllerSource
+	fakeVolumeWatch      *watch.FakeWatcher
+	fakeClaimWatch       *watch.FakeWatcher
 	lock                 sync.Mutex
 	errors               []reactorError
 }
@@ -176,9 +180,6 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		}
 
 		// Store the updated object to appropriate places.
-		if r.volumeSource != nil {
-			r.volumeSource.Add(volume)
-		}
 		r.volumes[volume.Name] = volume
 		r.changedObjects = append(r.changedObjects, volume)
 		r.changedSinceLastSync++
@@ -203,9 +204,6 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		}
 
 		// Store the updated object to appropriate places.
-		if r.volumeSource != nil {
-			r.volumeSource.Modify(volume)
-		}
 		r.volumes[volume.Name] = volume
 		r.changedObjects = append(r.changedObjects, volume)
 		r.changedSinceLastSync++
@@ -231,9 +229,6 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 
 		// Store the updated object to appropriate places.
 		r.claims[claim.Name] = claim
-		if r.claimSource != nil {
-			r.claimSource.Modify(claim)
-		}
 		r.changedObjects = append(r.changedObjects, claim)
 		r.changedSinceLastSync++
 		glog.V(4).Infof("saved updated claim %s", claim.Name)
@@ -314,7 +309,7 @@ func (r *volumeReactor) checkVolumes(expectedVolumes []*v1.PersistentVolume) err
 	for _, v := range r.volumes {
 		// We must clone the volume because of golang race check - it was
 		// written by the controller without any locks on it.
-		clone, _ := conversion.NewCloner().DeepCopy(v)
+		clone, _ := api.Scheme.DeepCopy(v)
 		v = clone.(*v1.PersistentVolume)
 		v.ResourceVersion = ""
 		if v.Spec.ClaimRef != nil {
@@ -345,7 +340,7 @@ func (r *volumeReactor) checkClaims(expectedClaims []*v1.PersistentVolumeClaim) 
 	for _, c := range r.claims {
 		// We must clone the claim because of golang race check - it was
 		// written by the controller without any locks on it.
-		clone, _ := conversion.NewCloner().DeepCopy(c)
+		clone, _ := api.Scheme.DeepCopy(c)
 		c = clone.(*v1.PersistentVolumeClaim)
 		c.ResourceVersion = ""
 		gotMap[c.Name] = c
@@ -461,7 +456,7 @@ func (r *volumeReactor) getChangeCount() int {
 // waitForIdle waits until all tests, controllers and other goroutines do their
 // job and no new actions are registered for 10 milliseconds.
 func (r *volumeReactor) waitForIdle() {
-	r.ctrl.runningOperations.Wait()
+	r.ctrl.runningOperations.WaitForCompletion()
 	// Check every 10ms if the controller does something and stop if it's
 	// idle.
 	oldChanges := -1
@@ -489,7 +484,7 @@ func (r *volumeReactor) waitTest(test controllerTest) error {
 	}
 	err := wait.ExponentialBackoff(backoff, func() (done bool, err error) {
 		// Finish all operations that are in progress
-		r.ctrl.runningOperations.Wait()
+		r.ctrl.runningOperations.WaitForCompletion()
 
 		// Return 'true' if the reactor reached the expected state
 		err1 := r.checkClaims(test.expectedClaims)
@@ -513,9 +508,11 @@ func (r *volumeReactor) deleteVolumeEvent(volume *v1.PersistentVolume) {
 
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
-	clone, _ := conversion.NewCloner().DeepCopy(volume)
-	volumeClone := clone.(*v1.PersistentVolume)
-	r.volumeSource.Delete(volumeClone)
+	if r.fakeVolumeWatch != nil {
+		clone, _ := api.Scheme.DeepCopy(volume)
+		volumeClone := clone.(*v1.PersistentVolume)
+		r.fakeVolumeWatch.Delete(volumeClone)
+	}
 }
 
 // deleteClaimEvent simulates that a claim has been deleted in etcd and the
@@ -529,9 +526,11 @@ func (r *volumeReactor) deleteClaimEvent(claim *v1.PersistentVolumeClaim) {
 
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
-	clone, _ := conversion.NewCloner().DeepCopy(claim)
-	claimClone := clone.(*v1.PersistentVolumeClaim)
-	r.claimSource.Delete(claimClone)
+	if r.fakeClaimWatch != nil {
+		clone, _ := api.Scheme.DeepCopy(claim)
+		claimClone := clone.(*v1.PersistentVolumeClaim)
+		r.fakeClaimWatch.Delete(claimClone)
+	}
 }
 
 // addVolumeEvent simulates that a volume has been added in etcd and the
@@ -543,7 +542,9 @@ func (r *volumeReactor) addVolumeEvent(volume *v1.PersistentVolume) {
 	r.volumes[volume.Name] = volume
 	// Generate event. No cloning is needed, this claim is not stored in the
 	// controller cache yet.
-	r.volumeSource.Add(volume)
+	if r.fakeVolumeWatch != nil {
+		r.fakeVolumeWatch.Add(volume)
+	}
 }
 
 // modifyVolumeEvent simulates that a volume has been modified in etcd and the
@@ -555,9 +556,11 @@ func (r *volumeReactor) modifyVolumeEvent(volume *v1.PersistentVolume) {
 	r.volumes[volume.Name] = volume
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
-	clone, _ := conversion.NewCloner().DeepCopy(volume)
-	volumeClone := clone.(*v1.PersistentVolume)
-	r.volumeSource.Modify(volumeClone)
+	if r.fakeVolumeWatch != nil {
+		clone, _ := api.Scheme.DeepCopy(volume)
+		volumeClone := clone.(*v1.PersistentVolume)
+		r.fakeVolumeWatch.Modify(volumeClone)
+	}
 }
 
 // addClaimEvent simulates that a claim has been deleted in etcd and the
@@ -569,45 +572,49 @@ func (r *volumeReactor) addClaimEvent(claim *v1.PersistentVolumeClaim) {
 	r.claims[claim.Name] = claim
 	// Generate event. No cloning is needed, this claim is not stored in the
 	// controller cache yet.
-	r.claimSource.Add(claim)
+	if r.fakeClaimWatch != nil {
+		r.fakeClaimWatch.Add(claim)
+	}
 }
 
-func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, volumeSource *fcache.FakePVControllerSource, claimSource *fcache.FakePVCControllerSource, errors []reactorError) *volumeReactor {
+func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, fakeVolumeWatch, fakeClaimWatch *watch.FakeWatcher, errors []reactorError) *volumeReactor {
 	reactor := &volumeReactor{
-		volumes:      make(map[string]*v1.PersistentVolume),
-		claims:       make(map[string]*v1.PersistentVolumeClaim),
-		ctrl:         ctrl,
-		volumeSource: volumeSource,
-		claimSource:  claimSource,
-		errors:       errors,
+		volumes:         make(map[string]*v1.PersistentVolume),
+		claims:          make(map[string]*v1.PersistentVolumeClaim),
+		ctrl:            ctrl,
+		fakeVolumeWatch: fakeVolumeWatch,
+		fakeClaimWatch:  fakeClaimWatch,
+		errors:          errors,
 	}
-	client.AddReactor("*", "*", reactor.React)
+	client.AddReactor("create", "persistentvolumes", reactor.React)
+	client.AddReactor("update", "persistentvolumes", reactor.React)
+	client.AddReactor("update", "persistentvolumeclaims", reactor.React)
+	client.AddReactor("get", "persistentvolumes", reactor.React)
+	client.AddReactor("delete", "persistentvolumes", reactor.React)
+	client.AddReactor("delete", "persistentvolumeclaims", reactor.React)
+
 	return reactor
 }
+func alwaysReady() bool { return true }
 
-func newTestController(kubeClient clientset.Interface, volumeSource, claimSource, classSource cache.ListerWatcher, enableDynamicProvisioning bool) *PersistentVolumeController {
-	if volumeSource == nil {
-		volumeSource = fcache.NewFakePVControllerSource()
+func newTestController(kubeClient clientset.Interface, informerFactory informers.SharedInformerFactory, enableDynamicProvisioning bool) *PersistentVolumeController {
+	if informerFactory == nil {
+		informerFactory = informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	}
-	if claimSource == nil {
-		claimSource = fcache.NewFakePVCControllerSource()
-	}
-	if classSource == nil {
-		classSource = fcache.NewFakeControllerSource()
-	}
-
 	params := ControllerParameters{
 		KubeClient:                kubeClient,
 		SyncPeriod:                5 * time.Second,
 		VolumePlugins:             []vol.VolumePlugin{},
-		VolumeSource:              volumeSource,
-		ClaimSource:               claimSource,
-		ClassSource:               classSource,
+		VolumeInformer:            informerFactory.Core().V1().PersistentVolumes(),
+		ClaimInformer:             informerFactory.Core().V1().PersistentVolumeClaims(),
+		ClassInformer:             informerFactory.Storage().V1beta1().StorageClasses(),
 		EventRecorder:             record.NewFakeRecorder(1000),
 		EnableDynamicProvisioning: enableDynamicProvisioning,
 	}
 	ctrl := NewController(params)
-
+	ctrl.volumeListerSynced = alwaysReady
+	ctrl.claimListerSynced = alwaysReady
+	ctrl.classListerSynced = alwaysReady
 	// Speed up the test
 	ctrl.createProvisionedPVInterval = 5 * time.Millisecond
 	return ctrl
@@ -616,7 +623,7 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 // newVolume returns a new volume with given attributes
 func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase v1.PersistentVolumePhase, reclaimPolicy v1.PersistentVolumeReclaimPolicy, annotations ...string) *v1.PersistentVolume {
 	volume := v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			ResourceVersion: "1",
 		},
@@ -722,7 +729,7 @@ func newVolumeArray(name, capacity, boundToClaimUID, boundToClaimName string, ph
 // newClaim returns a new claim with given attributes
 func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.PersistentVolumeClaimPhase, annotations ...string) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			Namespace:       testNamespace,
 			UID:             types.UID(claimUID),
@@ -888,7 +895,7 @@ func wrapTestWithInjectedOperation(toWrap testCall, injectBeforeOperation func(c
 			atomic.StoreInt32(&testFinished, 1)
 		}()
 
-		// Wait for the controler to finish the test function.
+		// Wait for the controller to finish the test function.
 		for atomic.LoadInt32(&testFinished) == 0 {
 			time.Sleep(time.Millisecond * 10)
 		}
@@ -924,7 +931,7 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, nil, nil, true)
+		ctrl := newTestController(client, nil, true)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
@@ -935,14 +942,12 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 			reactor.volumes[volume.Name] = volume
 		}
 
-		// Convert classes to []interface{} and forcefully inject them into
-		// controller.
-		storageClassPtrs := make([]interface{}, len(storageClasses))
-		for i, s := range storageClasses {
-			storageClassPtrs[i] = s
+		// Inject classes into controller via a custom lister.
+		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+		for _, class := range storageClasses {
+			indexer.Add(class)
 		}
-		// 1 is the resource version
-		ctrl.classes.Replace(storageClassPtrs, "1")
+		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
 
 		// Run the tested functions
 		err := test.test(ctrl, reactor, test)
@@ -980,15 +985,14 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, nil, nil, true)
+		ctrl := newTestController(client, nil, true)
 
-		// Convert classes to []interface{}  and forcefully inject them into
-		// controller.
-		storageClassPtrs := make([]interface{}, len(storageClasses))
-		for i, s := range storageClasses {
-			storageClassPtrs[i] = s
+		// Inject classes into controller via a custom lister.
+		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+		for _, class := range storageClasses {
+			indexer.Add(class)
 		}
-		ctrl.classes.Replace(storageClassPtrs, "1")
+		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
 
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
@@ -1038,6 +1042,8 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 					break
 				}
 			}
+			// waiting here cools down exponential backoff
+			time.Sleep(600 * time.Millisecond)
 
 			// There were some changes, process them
 			switch obj.(type) {
@@ -1165,7 +1171,7 @@ func (plugin *mockVolumePlugin) Provision() (*v1.PersistentVolume, error) {
 		capacity := plugin.provisionOptions.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 		accessModes := plugin.provisionOptions.PVC.Spec.AccessModes
 		pv = &v1.PersistentVolume{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: plugin.provisionOptions.PVName,
 			},
 			Spec: v1.PersistentVolumeSpec{
@@ -1220,17 +1226,11 @@ func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
 
 // Recycler interfaces
 
-func (plugin *mockVolumePlugin) NewRecycler(pvName string, spec *vol.Spec, eventRecorder vol.RecycleEventRecorder) (vol.Recycler, error) {
-	if len(plugin.recycleCalls) > 0 {
-		// mockVolumePlugin directly implements Recycler interface
-		glog.V(4).Infof("mock plugin NewRecycler called, returning mock recycler")
-		return plugin, nil
-	} else {
-		return nil, fmt.Errorf("Mock plugin error: no recycleCalls configured")
+func (plugin *mockVolumePlugin) Recycle(pvName string, spec *vol.Spec, eventRecorder vol.RecycleEventRecorder) error {
+	if len(plugin.recycleCalls) == 0 {
+		return fmt.Errorf("Mock plugin error: no recycleCalls configured")
 	}
-}
 
-func (plugin *mockVolumePlugin) Recycle() error {
 	if len(plugin.recycleCalls) <= plugin.recycleCallCounter {
 		return fmt.Errorf("Mock plugin error: unexpected recycle call %d", plugin.recycleCallCounter)
 	}

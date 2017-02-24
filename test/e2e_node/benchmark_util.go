@@ -23,7 +23,7 @@ import (
 	"sort"
 	"time"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/perftype"
 
@@ -126,7 +126,7 @@ func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatenc
 // getTestNodeInfo fetches the capacity of a node from API server and returns a map of labels.
 func getTestNodeInfo(f *framework.Framework, testName string) map[string]string {
 	nodeName := framework.TestContext.NodeName
-	node, err := f.ClientSet.Core().Nodes().Get(nodeName)
+	node, err := f.ClientSet.Core().Nodes().Get(nodeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	cpu, ok := node.Status.Capacity["cpu"]

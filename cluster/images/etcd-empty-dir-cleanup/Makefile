@@ -14,9 +14,9 @@
 
 .PHONY:	build push
 
-ETCD_VERSION = 2.2.1
-IMAGE = gcr.io/google_containers/etcd-empty-dir-cleanup
-TAG = 0.0.1
+ETCD_VERSION = 3.0.14
+IMAGE = gcr.io/google-containers/etcd-empty-dir-cleanup
+TAG = 3.0.14.0
 
 clean:
 	rm -rf etcdctl etcd-v$(ETCD_VERSION)-linux-amd64 etcd-v$(ETCD_VERSION)-linux-amd64.tar.gz
@@ -25,7 +25,7 @@ build: clean
 	curl -L -O https://github.com/coreos/etcd/releases/download/v$(ETCD_VERSION)/etcd-v$(ETCD_VERSION)-linux-amd64.tar.gz
 	tar xzvf etcd-v$(ETCD_VERSION)-linux-amd64.tar.gz
 	cp etcd-v$(ETCD_VERSION)-linux-amd64/etcdctl .
-	docker build -t $(IMAGE):$(TAG) .
+	docker build --pull -t $(IMAGE):$(TAG) .
 	rm -rf etcdctl etcd-v$(ETCD_VERSION)-linux-amd64 etcd-v$(ETCD_VERSION)-linux-amd64.tar.gz
 
 push: build
