@@ -17,6 +17,8 @@ limitations under the License.
 package e2e_node
 
 import (
+	"path"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -49,11 +51,16 @@ func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequir
 	return res
 }
 
+// Kubelet internal cgroup name for node allocatable cgroup.
+const defaultNodeAllocatableCgroup = "kubepods"
+
 // makePodToVerifyCgroups returns a pod that verifies the existence of the specified cgroups.
 func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *v1.Pod {
 	// convert the names to their literal cgroupfs forms...
 	cgroupFsNames := []string{}
 	for _, cgroupName := range cgroupNames {
+		// Add top level cgroup used to enforce node allocatable.
+		cgroupName = path.Join(defaultNodeAllocatableCgroup, cgroupName)
 		if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 			cgroupFsNames = append(cgroupFsNames, cm.ConvertCgroupNameToSystemd(cgroupName, true))
 		} else {

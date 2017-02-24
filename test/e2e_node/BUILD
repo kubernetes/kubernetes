@@ -50,7 +50,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "apparmor_test.go",
-        "cgroup_manager_test.go",
         "container_manager_test.go",
         "density_test.go",
         "disk_eviction_test.go",
@@ -64,6 +63,7 @@ go_test(
         "log_path_test.go",
         "memory_eviction_test.go",
         "mirror_pod_test.go",
+        "pods_container_manager_test.go",
         "resource_usage_test.go",
         "restart_test.go",
         "runtime_conformance_test.go",
