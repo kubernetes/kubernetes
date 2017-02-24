@@ -20,7 +20,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -72,7 +71,7 @@ func ValidateAuthorizationMode(authzMode string, fldPath *field.Path) field.Erro
 
 func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateTLSBootstrapToken(c, fldPath)...)
+	allErrs = append(allErrs, ValidateArgSelection(c, fldPath)...)
 	var count int
 	if len(c.DiscoveryToken) != 0 {
 		allErrs = append(allErrs, ValidateDiscoveryToken(c, fldPath)...)
@@ -86,13 +85,15 @@ func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.
 		allErrs = append(allErrs, ValidateDiscoveryURL(c, fldPath)...)
 		count++
 	}
+	allErrs = append(allErrs, ValidateTLSBootstrapToken(c, fldPath)...)
+	allErrs = append(allErrs, ValidateJoinMastersArgs(c, fldPath)...)
 	if count > 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one discovery strategy can be provided"))
 	}
 	return allErrs
 }
 
-func ValidateTLSBootstrapToken(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cfg.Token) != 0 && (len(cfg.TLSBootstrapToken) != 0 || len(cfg.DiscoveryToken) != 0) {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "--token is mutually exclusive with --bootstrap-token and --discovery-token"))
@@ -104,20 +105,32 @@ func ValidateTLSBootstrapToken(cfg *kubeadm.NodeConfiguration, fldPath *field.Pa
 		)
 	}
 	if len(cfg.Token) != 0 {
-		if len(cfg.DiscoveryURL) != 0 {
-			cfg.TLSBootstrapToken = cfg.Token
-		} else {
-			cfg.DiscoveryURL = cfg.Token
-		}
-		if len(cfg.DiscoveryToken) != 0 {
-			cfg.TLSBootstrapToken = cfg.Token
-		} else {
-			cfg.DiscoveryToken = cfg.Token
-		}
+		cfg.TLSBootstrapToken = cfg.Token
+		cfg.DiscoveryToken = cfg.Token
 	}
 	if len(cfg.Masters) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "master address(es) not specified"))
 	}
+	return allErrs
+}
+
+func ValidateTLSBootstrapToken(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	id, secret, err := tokenutil.ParseToken(c.TLSBootstrapToken)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
+	}
+
+	if len(id) == 0 || len(secret) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "token must be specific as <ID>:<Secret>"))
+	}
+
+	return allErrs
+}
+
+func ValidateJoinMastersArgs(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+	// TODO have masters arg parsing verified
+	allErrs := field.ErrorList{}
 	return allErrs
 }
 
@@ -144,9 +157,6 @@ func ValidateDiscoveryURL(c *kubeadm.NodeConfiguration, fldPath *field.Path) fie
 
 func ValidateDiscoveryToken(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !strings.Contains(c.DiscoveryToken, "@") {
-		c.DiscoveryToken = c.DiscoveryToken + "@"
-	}
 
 	id, secret, err := tokenutil.ParseToken(c.DiscoveryToken)
 	if err != nil {

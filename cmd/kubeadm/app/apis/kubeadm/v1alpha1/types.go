@@ -74,8 +74,13 @@ type Etcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	Discovery  Discovery `json:"discovery"`
-	CACertPath string    `json:"caCertPath"`
+	CACertPath        string   `json:"caCertPath"`
+	DiscoveryURL      string   `json:"discoveryUrl"`
+	DiscoveryFile     string   `json:"discoveryFile"`
+	DiscoveryToken    string   `json:"discoveryToken"`
+	TLSBootstrapToken string   `json:"tlsBootstrapToken"`
+	Token             string   `json:"token"`
+	Masters           []string `json:"masters"`
 }
 
 // ClusterInfo TODO add description
