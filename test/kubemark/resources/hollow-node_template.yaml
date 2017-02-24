@@ -56,7 +56,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - ./kubemark.sh --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1
+        - ./kubemark.sh --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) {{kubelet_verbosity_level}} 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
@@ -84,7 +84,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - ./kubemark.sh --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
+        - ./kubemark.sh --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) {{kubeproxy_verbosity_level}} 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
