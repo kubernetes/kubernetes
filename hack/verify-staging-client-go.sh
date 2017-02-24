@@ -34,6 +34,11 @@ readonly V
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd ${KUBE_ROOT}
 
+if ! git diff --exit-code; then
+    echo "ERROR: $0 cannot be run on a dirty working directory."
+    exit 1
+fi
+
 # Smoke test client-go examples
 go install ./staging/src/k8s.io/client-go/examples/...
 
