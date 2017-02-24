@@ -17,12 +17,12 @@ limitations under the License.
 package vim25
 
 import (
+	"context"
 	"net"
 	"net/url"
 	"time"
 
 	"github.com/vmware/govmomi/vim25/soap"
-	"golang.org/x/net/context"
 )
 
 type RetryFunc func(err error) (retry bool, delay time.Duration)
