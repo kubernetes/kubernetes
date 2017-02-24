@@ -151,8 +151,8 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			return err
 		}
 
-		saveConifg := cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
-		if err := handleApplyAnnotationForReplace(info, saveConifg, f.JSONEncoder()); err != nil {
+		saveConfig := cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+		if err := handleApplyAnnotation(info, false, saveConfig, nil, f.JSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 
@@ -220,7 +220,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	if err != nil {
 		return err
 	}
-	oldInfos, err := r.Infos()
+	liveInfos, err := r.Infos()
 	if err != nil {
 		return err
 	}
@@ -293,8 +293,8 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return err
 		}
 
-		saveConifg := cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
-		if err := handleApplyAnnotationForForceReplace(info, oldInfos, saveConifg, f.JSONEncoder()); err != nil {
+		saveConfig := cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+		if err := handleApplyAnnotation(info, true, saveConfig, liveInfos, f.JSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 
@@ -327,97 +327,117 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 // If saveConfig is true, create or update the annotation.
 // If saveConfig is false and the local config file doesn't have the annotation, we save the annotation from the live object if there is one.
 // If saveConfig is false and the local config file has the annotation, we use the annotation in the config file.
-func handleApplyAnnotationForReplace(info *resource.Info, saveConfig bool, encoder runtime.Encoder) error {
+// force indicates if this is force replace. saveConfig indicate if we want to save the config in the annotation.
+// liveInfos is used only when saveConfig is true.
+func handleApplyAnnotation(info *resource.Info, force, saveConfig bool, liveInfos []*resource.Info, encoder runtime.Encoder) error {
 	if saveConfig {
 		if err := kubectl.CreateOrUpdateAnnotation(true, info, encoder); err != nil {
 			return err
 		}
-	} else {
-		anno, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
-		if err != nil {
-			return err
-		}
-		// The user-provided config doesn't have the annotation, try to get it from live object
-		if anno == nil {
-			modifiedObj := info.Object
-			err := info.Get()
-			// If the resource is not found in the server, ignore the error
-			switch {
-			case errors.IsNotFound(err):
-				info.Object = modifiedObj
-				return nil
-			case err != nil:
-				return err
-			}
-			annotationFromLiveObj, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+		return nil
+	}
+
+	anno, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+	if err != nil {
+		return err
+	}
+	// The user-provided config doesn't have the annotation, try to get it from live object
+	if anno == nil {
+		var annotationFromLiveObj []byte
+		if !force {
+			var lr lookupResources
+			annotationFromLiveObj, err = lr.getAnnotationForResource(info)
+		} else {
+			var lr liveResources
+			err = lr.buildMap(liveInfos)
 			if err != nil {
 				return err
 			}
-			info.Object = modifiedObj
-			if err = kubectl.SetOriginalConfiguration(info, annotationFromLiveObj); err != nil {
-				return err
-			}
+			annotationFromLiveObj, err = lr.getAnnotationForResource(info)
+
+		}
+		if err != nil {
+			return err
+		}
+		if err = kubectl.SetOriginalConfiguration(info, annotationFromLiveObj); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-// If saveConfig is true, create or update the annotation.
-// If saveConfig is false and the local config file doesn't have the annotation, we save the annotation from the live object if there is one.
-// If saveConfig is false and the local config file has the annotation, we use the annotation in the config file.
-func handleApplyAnnotationForForceReplace(info *resource.Info, oldInfos []*resource.Info, saveConfig bool, encoder runtime.Encoder) error {
-	if saveConfig {
-		if err := kubectl.CreateOrUpdateAnnotation(true, info, encoder); err != nil {
+type lookupResources struct {
+	localObject runtime.Object
+}
+
+func (lr *lookupResources) getAnnotationForResource(info *resource.Info) ([]byte, error) {
+	// save the the local obj before the live obj overwrite it
+	lr.localObject = info.Object
+	err := info.Get()
+	// If the resource is not found in the server, ignore the error
+	switch {
+	case errors.IsNotFound(err):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	}
+	anno, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+	// restore the local obj
+	info.Object = lr.localObject
+	return anno, err
+}
+
+type liveResources struct {
+	lookup map[resourceType][]byte
+}
+
+type resourceType struct {
+	ApiVersion string
+	Kind       string
+	Name       string
+}
+
+func (lr *liveResources) buildMap(infos []*resource.Info) error {
+	lr.lookup = make(map[resourceType][]byte)
+	for _, info := range infos {
+		rt, err := getApiVersionKindName(info)
+		if err != nil {
 			return err
 		}
-	} else {
 		anno, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
 		if err != nil {
 			return err
 		}
-		// The user-provided config doesn't have the annotation, try to get it from live object
-		if anno == nil {
-			accessor := info.Mapping.MetadataAccessor
-			apiVersion, err := accessor.APIVersion(info.Object)
-			if err != nil {
-				return err
-			}
-			kind, err := accessor.Kind(info.Object)
-			if err != nil {
-				return err
-			}
-			name, err := accessor.Name(info.Object)
-			if err != nil {
-				return err
-			}
-
-			for _, oldInfo := range oldInfos {
-				oldAccessor := oldInfo.Mapping.MetadataAccessor
-				oldApiVersion, err := oldAccessor.APIVersion(oldInfo.Object)
-				if err != nil {
-					return err
-				}
-				oldKind, err := oldAccessor.Kind(oldInfo.Object)
-				if err != nil {
-					return err
-				}
-				oldName, err := oldAccessor.Name(oldInfo.Object)
-				if err != nil {
-					return err
-				}
-
-				if apiVersion == oldApiVersion && kind == oldKind && name == oldName {
-					annotationFromLiveObj, err := kubectl.GetOriginalConfiguration(oldInfo.Mapping, oldInfo.Object)
-					if err != nil {
-						return err
-					}
-					if err = kubectl.SetOriginalConfiguration(info, annotationFromLiveObj); err != nil {
-						return err
-					}
-					break
-				}
-			}
-		}
+		lr.lookup[*rt] = anno
 	}
 	return nil
+}
+
+func (lr *liveResources) getAnnotationForResource(info *resource.Info) ([]byte, error) {
+	rt, err := getApiVersionKindName(info)
+	if err != nil {
+		return nil, err
+	}
+	return lr.lookup[*rt], nil
+}
+
+func getApiVersionKindName(info *resource.Info) (*resourceType, error) {
+	accessor := info.Mapping.MetadataAccessor
+	apiVersion, err := accessor.APIVersion(info.Object)
+	if err != nil {
+		return nil, err
+	}
+	kind, err := accessor.Kind(info.Object)
+	if err != nil {
+		return nil, err
+	}
+	name, err := accessor.Name(info.Object)
+	if err != nil {
+		return nil, err
+	}
+	return &resourceType{
+		ApiVersion: apiVersion,
+		Kind:       kind,
+		Name:       name,
+	}, nil
 }
