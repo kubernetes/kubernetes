@@ -79,6 +79,8 @@ pkg/apis/imagepolicy/install
 pkg/apis/policy/install
 pkg/apis/rbac/install
 pkg/apis/rbac/v1alpha1
+pkg/apis/settings/install
+pkg/apis/settings/validation
 pkg/apis/storage/install
 pkg/apis/storage/validation
 pkg/bootstrap/api
@@ -103,6 +105,8 @@ pkg/client/informers/informers_generated/externalversions/policy/v1beta1
 pkg/client/informers/informers_generated/externalversions/rbac
 pkg/client/informers/informers_generated/externalversions/rbac/v1alpha1
 pkg/client/informers/informers_generated/externalversions/rbac/v1beta1
+pkg/client/informers/informers_generated/externalversions/settings
+pkg/client/informers/informers_generated/externalversions/settings/v1alpha1
 pkg/client/informers/informers_generated/externalversions/storage
 pkg/client/informers/informers_generated/externalversions/storage/v1beta1
 pkg/client/informers/informers_generated/internalversion
@@ -122,6 +126,8 @@ pkg/client/informers/informers_generated/internalversion/policy
 pkg/client/informers/informers_generated/internalversion/policy/internalversion
 pkg/client/informers/informers_generated/internalversion/rbac
 pkg/client/informers/informers_generated/internalversion/rbac/internalversion
+pkg/client/informers/informers_generated/internalversion/settings
+pkg/client/informers/informers_generated/internalversion/settings/internalversion
 pkg/client/informers/informers_generated/internalversion/storage
 pkg/client/informers/informers_generated/internalversion/storage/internalversion
 pkg/client/listers/apps/internalversion
@@ -152,6 +158,8 @@ pkg/client/listers/policy/v1beta1
 pkg/client/listers/rbac/internalversion
 pkg/client/listers/rbac/v1alpha1
 pkg/client/listers/rbac/v1beta1
+pkg/client/listers/settings/internalversion
+pkg/client/listers/settings/v1alpha1
 pkg/client/listers/storage/internalversion
 pkg/client/listers/storage/v1beta1
 pkg/client/metrics
