@@ -1664,7 +1664,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"orphanDependents": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Deprecated: please use the PropagationPolicy. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+								Description: "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
 								Type:        []string{"boolean"},
 								Format:      "",
 							},

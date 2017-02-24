@@ -584,9 +584,9 @@ func shouldUpdateFinalizerOrphanDependents(e *Store, accessor metav1.Object, opt
 // priority, there are three factors affect whether to add/remove the
 // FinalizerDeleteDependents: options, existing finalizers of the object, and
 // e.DeleteStrategy.DefaultGarbageCollectionPolicy.
-func shouldUpdateFinalizerDeletingDependents(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (shouldUpdate bool, shouldDeleteInForeground bool) {
+func shouldUpdateFinalizerDeleteDependents(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (shouldUpdate bool, shouldDeleteDependentInForeground bool) {
 	// default to false
-	shouldDeleteInForeground = false
+	shouldDeleteDependentInForeground = false
 
 	// If a finalizer is set in the object, it overrides the default
 	hasFinalizerDeleteDependents := false
@@ -596,37 +596,37 @@ func shouldUpdateFinalizerDeletingDependents(e *Store, accessor metav1.Object, o
 		// time.
 		switch f {
 		case metav1.FinalizerDeleteDependents:
-			shouldDeleteInForeground = true
+			shouldDeleteDependentInForeground = true
 			hasFinalizerDeleteDependents = true
 			break
 		case metav1.FinalizerOrphanDependents:
-			shouldDeleteInForeground = false
+			shouldDeleteDependentInForeground = false
 			break
 		}
 	}
 
 	// If an explicit policy was set at deletion time, that overrides both
 	if options != nil && options.OrphanDependents != nil {
-		shouldDeleteInForeground = false
+		shouldDeleteDependentInForeground = false
 	}
 	if options != nil && options.PropagationPolicy != nil {
 		switch *options.PropagationPolicy {
 		case metav1.DeletePropagationForeground:
-			shouldDeleteInForeground = true
+			shouldDeleteDependentInForeground = true
 		case metav1.DeletePropagationBackground, metav1.DeletePropagationOrphan:
-			shouldDeleteInForeground = false
+			shouldDeleteDependentInForeground = false
 		}
 	}
 
-	shouldUpdate = shouldDeleteInForeground != hasFinalizerDeleteDependents
-	return shouldUpdate, shouldDeleteInForeground
+	shouldUpdate = shouldDeleteDependentInForeground != hasFinalizerDeleteDependents
+	return shouldUpdate, shouldDeleteDependentInForeground
 }
 
 // shouldUpdateFinalizers returns if we need to update the finalizers of the
 // object, and the desired list of finalizers.
 func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
 	shouldUpdate1, shouldOrphan := shouldUpdateFinalizerOrphanDependents(e, accessor, options)
-	shouldUpdate2, shouldDeleteInForeground := shouldUpdateFinalizerDeletingDependents(e, accessor, options)
+	shouldUpdate2, shouldDeleteDependentInForeground := shouldUpdateFinalizerDeleteDependents(e, accessor, options)
 	oldFinalizers := accessor.GetFinalizers()
 	if !shouldUpdate1 && !shouldUpdate2 {
 		return false, oldFinalizers
@@ -642,7 +642,7 @@ func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *metav1.De
 	if shouldOrphan {
 		newFinalizers = append(newFinalizers, metav1.FinalizerOrphanDependents)
 	}
-	if shouldDeleteInForeground {
+	if shouldDeleteDependentInForeground {
 		newFinalizers = append(newFinalizers, metav1.FinalizerDeleteDependents)
 	}
 	return true, newFinalizers

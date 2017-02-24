@@ -44,7 +44,7 @@ type node struct {
 	// metadata.ownerReference.
 	dependents map[*node]struct{}
 	// this is set by processEvent() if the object has non-nil DeletionTimestamp
-	// and has the FianlizerDeleteDependents.
+	// and has the FinalizerDeleteDependents.
 	deletingDependents     bool
 	deletingDependentsLock sync.RWMutex
 	// this records if the object's deletionTimestamp is non-nil.
@@ -111,8 +111,9 @@ func (ownerNode *node) getDependents() []*node {
 // n, i.e., the dependent that has an ownerReference pointing to n, and
 // the BlockOwnerDeletion field of that ownerReference is true.
 func (n *node) blockingDependents() []*node {
+	dependents := n.getDependents()
 	var ret []*node
-	for dep := range n.dependents {
+	for _, dep := range dependents {
 		for _, owner := range dep.owners {
 			if owner.UID == n.identity.UID && owner.BlockOwnerDeletion != nil && *owner.BlockOwnerDeletion {
 				ret = append(ret, dep)
