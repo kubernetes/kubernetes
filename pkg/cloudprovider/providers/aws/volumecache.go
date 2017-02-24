@@ -25,6 +25,7 @@ import (
 	"sync"
 )
 
+// volumeCache is a cache of AWS volumes.  See instanceCache for an explanation of the caching approach.
 type volumeCache struct {
 	ec2 EC2
 
@@ -32,11 +33,13 @@ type volumeCache struct {
 	latest *volumeCacheSnapshot
 }
 
+// volumeCacheSnapshot holds a view at a moment in time of all the volumes
 type volumeCacheSnapshot struct {
 	timestamp  int64
 	byVolumeId map[awsVolumeID]*cachedVolume
 }
 
+// cachedInstance is a reusable volume wrapper, holding some immutable state and caching access to mutable state
 type cachedVolume struct {
 	ID awsVolumeID
 
@@ -45,19 +48,25 @@ type cachedVolume struct {
 
 	cache *volumeCache
 
+	// mutex protects the mutable elements below
 	mutex sync.Mutex
 
-	state          *ec2.Volume
+	// state is the state in EC2 as observed last
+	state *ec2.Volume
+
+	// stateTimestamp is the timestamp at which we last updated state
 	stateTimestamp int64
 }
 
+// DescribeInstance gets the state for the volume, subject to the cache policy.
+// Currently a cache-miss will cause a refresh of all volumes, because this is the same "price" in terms of quota.
 func (i *cachedVolume) DescribeVolume(cachePolicy *CachePolicy) (*ec2.Volume, error) {
 	snapshot := i.cache.latestSnapshot()
 
 	if snapshot != nil {
 		instance := snapshot.findCachedVolume(i.ID)
 		if instance != nil {
-			state := i.findLatestState(cachePolicy)
+			state := i.findStateIfCached(cachePolicy)
 			if state != nil {
 				return state, nil
 			} else {
@@ -76,7 +85,7 @@ func (i *cachedVolume) DescribeVolume(cachePolicy *CachePolicy) (*ec2.Volume, er
 		return nil, cloudprovider.InstanceNotFound
 	}
 
-	state := i.findLatestState(nil)
+	state := i.findStateIfCached(nil)
 	if state != nil {
 		return state, nil
 	}
@@ -84,7 +93,9 @@ func (i *cachedVolume) DescribeVolume(cachePolicy *CachePolicy) (*ec2.Volume, er
 	return nil, cloudprovider.InstanceNotFound
 }
 
-func (i *cachedVolume) findLatestState(cachePolicy *CachePolicy) *ec2.Volume {
+// findStateIfCached returns the last state, if it is valid under the cache policy.
+// If there is no state, or the state has expired, it returns nil.
+func (i *cachedVolume) findStateIfCached(cachePolicy *CachePolicy) *ec2.Volume {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -99,12 +110,14 @@ func (i *cachedVolume) findLatestState(cachePolicy *CachePolicy) *ec2.Volume {
 	return nil
 }
 
+// newInstanceCache is a constructor for an volumeCache
 func newVolumeCache(ec2 EC2) *volumeCache {
 	return &volumeCache{
 		ec2: ec2,
 	}
 }
 
+// latestSnapshot returns the last view of all volumes (or nil if no snapshot)
 func (c *volumeCache) latestSnapshot() *volumeCacheSnapshot {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -112,6 +125,8 @@ func (c *volumeCache) latestSnapshot() *volumeCacheSnapshot {
 	return c.latest
 }
 
+// refreshAll builds an updated snapshot by calling DescribeVolume.
+// It accepts the previous snapshot, and will not refresh if a concurrent request has triggered a concurrent refresh.
 func (c *volumeCache) refreshAll(previous *volumeCacheSnapshot) (*volumeCacheSnapshot, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -186,7 +201,9 @@ func (c *volumeCache) refreshAll(previous *volumeCacheSnapshot) (*volumeCacheSna
 	return next, nil
 }
 
-func (c *volumeCache) FindVolumesById(cachePolicy *CachePolicy, ids []awsVolumeID) (map[awsVolumeID]*cachedVolume, error) {
+// findVolumesById is a helper that looks up volumes against the snapshot.  If the snapshot is invalid,
+// or any are not found, it will trigger a full refresh.
+func (c *volumeCache) findVolumesById(cachePolicy *CachePolicy, ids []awsVolumeID) (map[awsVolumeID]*cachedVolume, error) {
 	snapshot := c.latestSnapshot()
 
 	if snapshot != nil {
@@ -211,8 +228,10 @@ func (c *volumeCache) FindVolumesById(cachePolicy *CachePolicy, ids []awsVolumeI
 	return volumes, nil
 }
 
+// FindVolumeById looks up the volume in the current cached view of volumes.  If the cached
+// view is invalid according to cachePolicy, or if the volume is not found, a full refresh will be triggered.
 func (c *volumeCache) FindVolumeById(cachePolicy *CachePolicy, id awsVolumeID) (*cachedVolume, error) {
-	volumes, err := c.FindVolumesById(cachePolicy, []awsVolumeID{id})
+	volumes, err := c.findVolumesById(cachePolicy, []awsVolumeID{id})
 	if err != nil {
 		return nil, err
 	}
@@ -224,11 +243,15 @@ func (c *volumeCache) FindVolumeById(cachePolicy *CachePolicy, id awsVolumeID) (
 	return volume, nil
 }
 
+// findCachedVolume does a lookup of the volume by id, returning nil if not found.
+// It does not trigger a cache refresh.
 func (s *volumeCacheSnapshot) findCachedVolume(id awsVolumeID) *cachedVolume {
 	volume := s.byVolumeId[id]
 	return volume
 }
 
+// findCachedInstances does a lookup of the volumes, returning any that are found.
+// It does not trigger a refresh.
 func (s *volumeCacheSnapshot) findCachedVolumes(ids []awsVolumeID) map[awsVolumeID]*cachedVolume {
 	volumes := make(map[awsVolumeID]*cachedVolume)
 

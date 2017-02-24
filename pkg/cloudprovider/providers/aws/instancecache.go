@@ -26,6 +26,26 @@ import (
 	"sync"
 )
 
+// instanceCache is a cache of instances, that minimizes the number of AWS requests.
+//
+// On AWS, rate limits are based primarily on the number of requests, not their complexity;
+// even on other platforms typically the overhead of a call is fairly large and thus the
+// same cache pattern might well be usable for other clouds also.
+//
+// The cache has a two level structure: we cache all instances (with a timestamp).  That cache
+// can be queried with an expiration time.  Typically if looking up by ID, it is safe to query
+// without any expiration; a cache miss (currently) automatically triggers a full refresh.
+//
+// For each instance there is some immutable data stored (AZ, NodeName etc).
+//
+// In addition, there is a per-instance state cache, where we can get the latest state for a
+// particular instance.  Currently a cache refresh for an instance triggers a full cache refresh
+// for all instances, because a single-instance query counts the same against quota as a full refresh.
+//
+// Although we optimize for quota request, we do so at the expense of bytes transferred (for
+// example).  We introduce a CachePolicy object that can express other strategies as and when
+// we need them - for example only refreshing a particular instance.
+
 type instanceCache struct {
 	cloud *Cloud
 
@@ -39,12 +59,14 @@ func (i awsInstanceID) awsString() *string {
 	return aws.String(string(i))
 }
 
+// instanceCacheSnapshot holds a view at a moment in time of all the instances
 type instanceCacheSnapshot struct {
 	timestamp    int64
 	byInstanceID map[awsInstanceID]*cachedInstance
 	byNodeName   map[types.NodeName]*cachedInstance
 }
 
+// cachedInstance is a reusable instance wrapper, holding some immutable state and caching access to mutable state
 type cachedInstance struct {
 	ID awsInstanceID
 
@@ -57,19 +79,25 @@ type cachedInstance struct {
 
 	cache *instanceCache
 
+	// mutex protects the mutable elements below
 	mutex sync.Mutex
 
-	state          *ec2.Instance
+	// state is the state in EC2 as observed last
+	state *ec2.Instance
+
+	// stateTimestamp is the timestamp at which we last updated state
 	stateTimestamp int64
 }
 
+// DescribeInstance gets the state for the instance, subject to the cache policy.
+// Currently a cache-miss will cause a refresh of all instances, because this is the same "price" in terms of quota.
 func (i *cachedInstance) DescribeInstance(cachePolicy *CachePolicy) (*ec2.Instance, error) {
 	snapshot := i.cache.latestSnapshot()
 
 	if snapshot != nil {
 		instance := snapshot.findCachedInstance(i.ID)
 		if instance != nil {
-			state := i.findLatestState(cachePolicy)
+			state := i.findStateIfCached(cachePolicy)
 			if state != nil {
 				return state, nil
 			} else {
@@ -88,7 +116,7 @@ func (i *cachedInstance) DescribeInstance(cachePolicy *CachePolicy) (*ec2.Instan
 		return nil, cloudprovider.InstanceNotFound
 	}
 
-	state := i.findLatestState(nil)
+	state := i.findStateIfCached(nil)
 	if state != nil {
 		return state, nil
 	}
@@ -96,7 +124,9 @@ func (i *cachedInstance) DescribeInstance(cachePolicy *CachePolicy) (*ec2.Instan
 	return nil, cloudprovider.InstanceNotFound
 }
 
-func (i *cachedInstance) findLatestState(cachePolicy *CachePolicy) *ec2.Instance {
+// findStateIfCached returns the last state, if it is valid under the cache policy.
+// If there is no state, or the state has expired, it returns nil.
+func (i *cachedInstance) findStateIfCached(cachePolicy *CachePolicy) *ec2.Instance {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -111,12 +141,14 @@ func (i *cachedInstance) findLatestState(cachePolicy *CachePolicy) *ec2.Instance
 	return nil
 }
 
+// newInstanceCache is a constructor for an instanceCache
 func newInstanceCache(cloud *Cloud) *instanceCache {
 	return &instanceCache{
 		cloud: cloud,
 	}
 }
 
+// latestSnapshot returns the last view of all instances (or nil if no snapshot)
 func (c *instanceCache) latestSnapshot() *instanceCacheSnapshot {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -124,6 +156,8 @@ func (c *instanceCache) latestSnapshot() *instanceCacheSnapshot {
 	return c.latest
 }
 
+// refreshAll builds an updated snapshot by calling DescribeInstances.
+// It accepts the previous snapshot, and will not refresh if a concurrent request has triggered a concurrent refresh.
 func (c *instanceCache) refreshAll(previous *instanceCacheSnapshot) (*instanceCacheSnapshot, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -178,6 +212,7 @@ func (c *instanceCache) refreshAll(previous *instanceCacheSnapshot) (*instanceCa
 		ci := latest.byInstanceID[instanceID]
 		nodeName := mapInstanceToNodeName(i)
 
+		// CachedInstances are long-lived - we reuse them
 		if ci == nil {
 			az := ""
 			if i.Placement != nil {
@@ -225,12 +260,14 @@ func (c *instanceCache) refreshAll(previous *instanceCacheSnapshot) (*instanceCa
 	return next, nil
 }
 
-func (c *instanceCache) FindInstancesByNodeNames(cachePolicy *CachePolicy, nodeNames []types.NodeName) (map[types.NodeName]*cachedInstance, error) {
+// findInstancesByNodeNames is a helper that looks up instances against the snapshot.  If the snapshot is invalid,
+// or any are not found, it will trigger a full refresh.
+func (c *instanceCache) findInstancesByNodeNames(cachePolicy *CachePolicy, nodeNames []types.NodeName) (map[types.NodeName]*cachedInstance, error) {
 	snapshot := c.latestSnapshot()
 
 	if snapshot != nil {
 		if cachePolicy.IsValid(snapshot.timestamp) {
-			instances := snapshot.findInstancesByNodeNames(nodeNames)
+			instances := snapshot.findCachedInstancesByNodeNames(nodeNames)
 			if len(nodeNames) == len(instances) {
 				return instances, nil
 			} else {
@@ -246,28 +283,19 @@ func (c *instanceCache) FindInstancesByNodeNames(cachePolicy *CachePolicy, nodeN
 	if err != nil {
 		return nil, err
 	}
-	instances := updated.findInstancesByNodeNames(nodeNames)
+	instances := updated.findCachedInstancesByNodeNames(nodeNames)
 	return instances, nil
 }
 
-func (c *instanceCache) GetInstancesByNodeNames(cachePolicy *CachePolicy, nodeNames []types.NodeName) (map[types.NodeName]*cachedInstance, error) {
-	instances, err := c.FindInstancesByNodeNames(cachePolicy, nodeNames)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(instances) != len(nodeNames) {
-		for _, nodeName := range nodeNames {
-			if instances[nodeName] == nil {
-				return nil, cloudprovider.InstanceNotFound
-			}
-		}
-	}
-	return instances, nil
-}
-
+// GetInstanceByNodeName looks up the instance in the current cached view of instances.  If the cached
+// view is invalid according to cachePolicy, or if the node name is not found, a full refresh will be triggered.
 func (c *instanceCache) GetInstanceByNodeName(cachePolicy *CachePolicy, nodeName types.NodeName) (*cachedInstance, error) {
-	instances, err := c.FindInstancesByNodeNames(cachePolicy, []types.NodeName{nodeName})
+	if cachePolicy.Validity == 0 {
+		// In general, this is not safe because a new node can be replaced
+		glog.Warningf("Doing instance cached NodeName lookup without cache expiry")
+	}
+
+	instances, err := c.findInstancesByNodeNames(cachePolicy, []types.NodeName{nodeName})
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +307,9 @@ func (c *instanceCache) GetInstanceByNodeName(cachePolicy *CachePolicy, nodeName
 	return instance, nil
 }
 
-func (c *instanceCacheSnapshot) findInstancesByNodeNames(nodeNames []types.NodeName) map[types.NodeName]*cachedInstance {
+// findCachedInstancesByNodeNames does a lookup of the instances by node name, returning any that are found.
+// It does not trigger a refresh.
+func (c *instanceCacheSnapshot) findCachedInstancesByNodeNames(nodeNames []types.NodeName) map[types.NodeName]*cachedInstance {
 	instances := make(map[types.NodeName]*cachedInstance)
 	for _, nodeName := range nodeNames {
 		instance := c.byNodeName[nodeName]
@@ -290,19 +320,9 @@ func (c *instanceCacheSnapshot) findInstancesByNodeNames(nodeNames []types.NodeN
 	return instances
 }
 
+// findCachedInstance does a lookup of the instance by id, returning nil if not found.
+// It does not trigger a cache refresh.
 func (s *instanceCacheSnapshot) findCachedInstance(instanceID awsInstanceID) *cachedInstance {
 	instance := s.byInstanceID[instanceID]
 	return instance
-}
-
-func (s *instanceCacheSnapshot) findCachedInstances(instanceIDs []awsInstanceID) map[awsInstanceID]*cachedInstance {
-	instances := make(map[awsInstanceID]*cachedInstance)
-
-	for _, id := range instanceIDs {
-		instance := s.byInstanceID[id]
-		if instance != nil {
-			instances[id] = instance
-		}
-	}
-	return instances
 }
