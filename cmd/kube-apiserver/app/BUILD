@@ -23,7 +23,6 @@ go_library(
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
-        "//pkg/controller/informers:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/kubeapiserver:go_default_library",

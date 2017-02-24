@@ -310,7 +310,12 @@ func ClusterRoles() []rbac.ClusterRole {
 					"services",
 					"serviceaccounts",
 				).RuleOrDie(),
-				rbac.NewRule("list", "watch").Groups(extensionsGroup).Resources("daemonsets", "deployments", "replicasets").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(extensionsGroup).Resources(
+					"daemonsets",
+					"deployments",
+					"podsecuritypolicies",
+					"replicasets",
+				).RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),

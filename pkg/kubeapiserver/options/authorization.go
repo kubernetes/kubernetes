@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
