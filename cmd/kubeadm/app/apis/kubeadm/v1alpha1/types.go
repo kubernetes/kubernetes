@@ -23,13 +23,14 @@ import (
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	API               API        `json:"api"`
-	Discovery         Discovery  `json:"discovery"`
-	Etcd              Etcd       `json:"etcd"`
-	Networking        Networking `json:"networking"`
-	KubernetesVersion string     `json:"kubernetesVersion"`
-	CloudProvider     string     `json:"cloudProvider"`
-	AuthorizationMode string     `json:"authorizationMode"`
+	API                API               `json:"api"`
+	Discovery          Discovery         `json:"discovery"`
+	Etcd               Etcd              `json:"etcd"`
+	Networking         Networking        `json:"networking"`
+	KubernetesVersion  string            `json:"kubernetesVersion"`
+	CloudProvider      string            `json:"cloudProvider"`
+	AuthorizationMode  string            `json:"authorizationMode"`
+	ExtraAPIServerArgs map[string]string `json:"extraAPIServerArgs"`
 }
 
 type API struct {

@@ -303,31 +303,61 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	command = append(getComponentBaseCommand(apiServer),
-		"--insecure-bind-address=127.0.0.1",
-		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
-		"--service-cluster-ip-range="+cfg.Networking.ServiceSubnet,
-		"--service-account-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
-		"--client-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--tls-cert-file="+getCertFilePath(kubeadmconstants.APIServerCertName),
-		"--tls-private-key-file="+getCertFilePath(kubeadmconstants.APIServerKeyName),
-		"--kubelet-client-certificate="+getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
-		"--kubelet-client-key="+getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
-		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
-		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
-		"--allow-privileged",
-		"--storage-backend=etcd3",
-		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+	constantDefaultCommands := map[string]string{
+		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
+		"service-account-key-file":        getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
+		"client-ca-file":                  getCertFilePath(kubeadmconstants.CACertName),
+		"tls-cert-file":                   getCertFilePath(kubeadmconstants.APIServerCertName),
+		"tls-private-key-file":            getCertFilePath(kubeadmconstants.APIServerKeyName),
+		"kubelet-client-certificate":      getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
+		"kubelet-client-key":              getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
+		"token-auth-file":                 path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CSVTokenFileName),
+		"secure-port":                     fmt.Sprintf("%d", cfg.API.Port),
+		"storage-backend":                 "etcd3",
+		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+
 		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
 		// so add it unconditionally with recommended values
-		"--requestheader-username-headers=X-Remote-User",
-		"--requestheader-group-headers=X-Remote-Group",
-		"--requestheader-extra-headers-prefix=X-Remote-Extra-",
-		"--requestheader-client-ca-file="+getCertFilePath(kubeadmconstants.FrontProxyCACertName),
-		"--requestheader-allowed-names=front-proxy-client",
-	)
+		"requestheader-username-headers":     "X-Remote-User",
+		"requestheader-group-headers":        "X-Remote-Group",
+		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
+		"requestheader-client-ca-file":       getCertFilePath(kubeadmconstants.FrontProxyCACertName),
+		"requestheader-allowed-names":        "front-proxy-client",
+	}
 
+	// These arguments are defaults that can be overridden by ExtraAPIServerArgs
+	configurableDefaultCommands := map[string]string{
+		"admission-control":     kubeadmconstants.DefaultAdmissionControl,
+		"insecure-bind-address": "127.0.0.1",
+		"allow-privileged":      "true",
+	}
+
+	getConstantParameters := func() []string {
+		var command []string
+		for k, v := range constantDefaultCommands {
+			command = append(command, fmt.Sprintf("--%s=%s", k, v))
+		}
+		return command
+	}
+
+	getExtraParameters := func(args map[string]string) []string {
+		var command []string
+		for k, v := range args {
+			if _, overrideExists := constantDefaultCommands[k]; !overrideExists {
+				command = append(command, fmt.Sprintf("--%s=%s", k, v))
+			}
+		}
+		for k, v := range configurableDefaultCommands {
+			if _, overrideExists := args[k]; !overrideExists {
+				command = append(command, fmt.Sprintf("--%s=%s", k, v))
+			}
+		}
+		return command
+	}
+
+	command = append(getComponentBaseCommand(apiServer), getConstantParameters()...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationMode)...)
+	command = append(command, getExtraParameters(cfg.ExtraAPIServerArgs)...)
 
 	// Use first address we are given
 	if len(cfg.API.AdvertiseAddresses) > 0 {
