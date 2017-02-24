@@ -43,7 +43,7 @@ Resuming the workload will [uncordon](http://kubernetes.io/docs/user-guide/kubec
 
 ## Known Limitations
 
-Kubernetes workers currently only support 'phaux' HA scenarios. Even when configured with an HA cluster string, they will only ever contact the first unit in the cluster map. To enalbe a proper HA story, kubernetes-worker units are encouraged to proxy through a [kubeapi-load-balancer](https://jujucharms.com/kubeapi-load-balancer)
+Kubernetes workers currently only support 'phaux' HA scenarios. Even when configured with an HA cluster string, they will only ever contact the first unit in the cluster map. To enable a proper HA story, kubernetes-worker units are encouraged to proxy through a [kubeapi-load-balancer](https://jujucharms.com/kubeapi-load-balancer)
 application. This enables a HA deployment without the need to
 re-render configuration and disrupt the worker services.
 
