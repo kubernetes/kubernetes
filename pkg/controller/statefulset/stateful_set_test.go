@@ -352,6 +352,7 @@ func newFakeStatefulSetController() (*StatefulSetController, *fakeStatefulPodCon
 	ssc := NewStatefulSetController(
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
 		client,
 	)
 	ssc.podListerSynced = alwaysReady
