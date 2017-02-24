@@ -51,8 +51,8 @@ type baseControllerRefManager struct {
 // claimObject tries to take ownership of an object for this controller.
 //
 // It will reconcile the following:
-//   * Adopt orphans if the selector matches.
-//   * Release owned objects if the selector no longer matches.
+//   * Adopt orphans if the match function returns true.
+//   * Release owned objects if the match function returns false.
 //
 // A non-nil error is returned if some form of reconciliation was attemped and
 // failed. Usually, controllers should try again later in case reconciliation
@@ -63,14 +63,14 @@ type baseControllerRefManager struct {
 // own the object.
 //
 // No reconciliation will be attempted if the controller is being deleted.
-func (m *baseControllerRefManager) claimObject(obj metav1.Object, adopt, release func(metav1.Object) error) (bool, error) {
+func (m *baseControllerRefManager) claimObject(obj metav1.Object, match func(metav1.Object) bool, adopt, release func(metav1.Object) error) (bool, error) {
 	controllerRef := GetControllerOf(obj)
 	if controllerRef != nil {
 		if controllerRef.UID != m.controller.GetUID() {
 			// Owned by someone else. Ignore.
 			return false, nil
 		}
-		if m.selector.Matches(labels.Set(obj.GetLabels())) {
+		if match(obj) {
 			// We already own it and the selector matches.
 			// Return true (successfully claimed) before checking deletion timestamp.
 			// We're still allowed to claim things we already own while being deleted
@@ -96,8 +96,7 @@ func (m *baseControllerRefManager) claimObject(obj metav1.Object, adopt, release
 	}
 
 	// It's an orphan.
-	if m.controller.GetDeletionTimestamp() != nil ||
-		!m.selector.Matches(labels.Set(obj.GetLabels())) {
+	if m.controller.GetDeletionTimestamp() != nil || !match(obj) {
 		// Ignore if we're being deleted or selector doesn't match.
 		return false, nil
 	}
@@ -145,16 +144,32 @@ func NewPodControllerRefManager(
 //   * Adopt orphans if the selector matches.
 //   * Release owned objects if the selector no longer matches.
 //
+// Optional: If one or more filters are specified, a Pod will only be claimed if
+// all filters return true.
+//
 // A non-nil error is returned if some form of reconciliation was attemped and
 // failed. Usually, controllers should try again later in case reconciliation
 // is still needed.
 //
 // If the error is nil, either the reconciliation succeeded, or no
 // reconciliation was necessary. The list of Pods that you now own is returned.
-func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod) ([]*v1.Pod, error) {
+func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod, filters ...func(*v1.Pod) bool) ([]*v1.Pod, error) {
 	var claimed []*v1.Pod
 	var errlist []error
 
+	match := func(obj metav1.Object) bool {
+		pod := obj.(*v1.Pod)
+		// Check selector first so filters only run on potentially matching Pods.
+		if !m.selector.Matches(labels.Set(pod.Labels)) {
+			return false
+		}
+		for _, filter := range filters {
+			if !filter(pod) {
+				return false
+			}
+		}
+		return true
+	}
 	adopt := func(obj metav1.Object) error {
 		return m.AdoptPod(obj.(*v1.Pod))
 	}
@@ -163,7 +178,7 @@ func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod) ([]*v1.Pod, error) {
 	}
 
 	for _, pod := range pods {
-		ok, err := m.claimObject(pod, adopt, release)
+		ok, err := m.claimObject(pod, match, adopt, release)
 		if err != nil {
 			errlist = append(errlist, err)
 			continue
@@ -265,6 +280,9 @@ func (m *ReplicaSetControllerRefManager) ClaimReplicaSets(sets []*extensions.Rep
 	var claimed []*extensions.ReplicaSet
 	var errlist []error
 
+	match := func(obj metav1.Object) bool {
+		return m.selector.Matches(labels.Set(obj.GetLabels()))
+	}
 	adopt := func(obj metav1.Object) error {
 		return m.AdoptReplicaSet(obj.(*extensions.ReplicaSet))
 	}
@@ -273,7 +291,7 @@ func (m *ReplicaSetControllerRefManager) ClaimReplicaSets(sets []*extensions.Rep
 	}
 
 	for _, rs := range sets {
-		ok, err := m.claimObject(rs, adopt, release)
+		ok, err := m.claimObject(rs, match, adopt, release)
 		if err != nil {
 			errlist = append(errlist, err)
 			continue
