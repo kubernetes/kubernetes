@@ -1190,14 +1190,20 @@ func TestPatchPodFails(t *testing.T) {
 	podInformer.Informer().GetIndexer().Add(newPod("pod1", rc, v1.PodRunning, nil))
 	podInformer.Informer().GetIndexer().Add(newPod("pod2", rc, v1.PodRunning, nil))
 	// let both patches fail. The rc manager will assume it fails to take
-	// control of the pods and create new ones.
+	// control of the pods and requeue to try again.
 	fakePodControl.Err = fmt.Errorf("Fake Error")
-	err := manager.syncReplicationController(getKey(rc, t))
-	if err == nil || err.Error() != "Fake Error" {
+	rcKey := getKey(rc, t)
+	err := manager.syncReplicationController(rcKey)
+	if err == nil || !strings.Contains(err.Error(), "Fake Error") {
 		t.Fatalf("expected Fake Error, got %v", err)
 	}
-	// 2 patches to take control of pod1 and pod2 (both fail), 2 creates.
-	validateSyncReplication(t, fakePodControl, 2, 0, 2)
+	// 2 patches to take control of pod1 and pod2 (both fail).
+	validateSyncReplication(t, fakePodControl, 0, 0, 2)
+	// RC should requeue itself.
+	queueRC, _ := manager.queue.Get()
+	if queueRC != rcKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rcKey, queueRC)
+	}
 }
 
 func TestPatchExtraPodsThenDelete(t *testing.T) {

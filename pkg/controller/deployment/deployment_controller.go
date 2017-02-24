@@ -443,11 +443,11 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 	dc.queue.Forget(key)
 }
 
-// classifyReplicaSets uses NewReplicaSetControllerRefManager to classify ReplicaSets
+// claimReplicaSets uses NewReplicaSetControllerRefManager to classify ReplicaSets
 // and adopts them if their labels match the Deployment but are missing the reference.
 // It also removes the controllerRef for ReplicaSets, whose labels no longer matches
 // the deployment.
-func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deployment) error {
+func (dc *DeploymentController) claimReplicaSets(deployment *extensions.Deployment) error {
 	rsList, err := dc.rsLister.ReplicaSets(deployment.Namespace).List(labels.Everything())
 	if err != nil {
 		return err
@@ -457,32 +457,9 @@ func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deplo
 	if err != nil {
 		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
 	}
-	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, deployment.ObjectMeta, deploymentSelector, getDeploymentKind())
-	matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(rsList)
-	// Adopt replica sets only if this deployment is not going to be deleted.
-	if deployment.DeletionTimestamp == nil {
-		for _, replicaSet := range matchesNeedsController {
-			err := cm.AdoptReplicaSet(replicaSet)
-			// continue to next RS if adoption fails.
-			if err != nil {
-				// If the RS no longer exists, don't even log the error.
-				if !errors.IsNotFound(err) {
-					utilruntime.HandleError(err)
-				}
-			} else {
-				matchesAndControlled = append(matchesAndControlled, replicaSet)
-			}
-		}
-	}
-	// remove the controllerRef for the RS that no longer have matching labels
-	var errlist []error
-	for _, replicaSet := range controlledDoesNotMatch {
-		err := cm.ReleaseReplicaSet(replicaSet)
-		if err != nil {
-			errlist = append(errlist, err)
-		}
-	}
-	return utilerrors.NewAggregate(errlist)
+	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, deployment, deploymentSelector, getDeploymentKind())
+	_, err = cm.ClaimReplicaSets(rsList)
+	return err
 }
 
 // syncDeployment will sync the deployment with the given key.
@@ -565,7 +542,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		dc.cleanupDeployment(oldRSs, d)
 	}
 
-	err = dc.classifyReplicaSets(d)
+	err = dc.claimReplicaSets(d)
 	if err != nil {
 		return err
 	}
