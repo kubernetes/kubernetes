@@ -60,7 +60,7 @@ func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *v1.Pod {
 	cgroupFsNames := []string{}
 	for _, cgroupName := range cgroupNames {
 		// Add top level cgroup used to enforce node allocatable.
-		cgroupName = path.Join(defaultNodeAllocatableCgroup, cgroupName)
+		cgroupName = cm.CgroupName(path.Join(defaultNodeAllocatableCgroup, string(cgroupName)))
 		if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 			cgroupFsNames = append(cgroupFsNames, cm.ConvertCgroupNameToSystemd(cgroupName, true))
 		} else {

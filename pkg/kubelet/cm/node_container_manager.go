@@ -38,6 +38,8 @@ const (
 func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	cgroupConfig := &CgroupConfig{
 		Name: CgroupName(cm.cgroupRoot),
+		// The default limits for cpu shares can be very low which can lead to CPU starvation for pods.
+		ResourceParameters: getCgroupConfig(cm.capacity),
 	}
 	if cm.cgroupManager.Exists(cgroupConfig.Name) {
 		return nil
@@ -67,32 +69,36 @@ func runUntilSuccess(f func() error, success func(), failure func(error), retryP
 // Enforce Node Allocatable Cgroup settings.
 func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	nc := cm.NodeConfig.NodeAllocatableConfig
-	nodeAllocatable := cm.getNodeAllocatableAbsolute()
+
+	// We need to update limits on node allocatable cgroup no matter what because
+	// default cpu shares on cgroups are low and can cause cpu starvation.
+	nodeAllocatable := cm.capacity
+	// Use Node Allocatable limits instead of capacity if the user requested enforcing node allocatable.
+	if nc.EnforceNodeAllocatable.Has(NodeAllocatableEnforcementKey) {
+		nodeAllocatable = cm.getNodeAllocatableAbsolute()
+	}
 
 	glog.V(4).Infof("Attempting to enforce Node Allocatable with config: %+v", nc)
-	glog.V(4).Infof("Node Allocatable resources: %+v", nodeAllocatable)
-	// Create top level cgroups for all pods if necessary.
-	if nc.EnforceNodeAllocatable.Has(NodeAllocatableEnforcementKey) {
-		cgroupConfig := &CgroupConfig{
-			Name:               CgroupName(cm.cgroupRoot),
-			ResourceParameters: getCgroupConfig(nodeAllocatable),
-		}
-		// If Node Allocatable is enforced on a node that has not been drained or is updated on an existing node to a lower value,
-		// existing memory usage across pods might be higher that current Node Allocatable Memory Limits.
-		// Pod Evictions are expected to bring down memory usage to below Node Allocatable limits.
-		// Until evictions happen retry cgroup updates.
-		go runUntilSuccess(
-			func() error { return cm.cgroupManager.Update(cgroupConfig) }, // run method
-			func() { // invoked on success
-				cm.recorder.Event(cm.nodeInfo, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated Node Allocatable limit across pods")
-			},
-			func(err error) { // invoked on failure
-				message := fmt.Sprintf("Failed to update Node Allocatable Limits %q: %v", cm.cgroupRoot, err)
-				cm.recorder.Event(cm.nodeInfo, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
-			},
-			time.Minute, // retry period.
-		)
+
+	cgroupConfig := &CgroupConfig{
+		Name:               CgroupName(cm.cgroupRoot),
+		ResourceParameters: getCgroupConfig(nodeAllocatable),
 	}
+	// If Node Allocatable is enforced on a node that has not been drained or is updated on an existing node to a lower value,
+	// existing memory usage across pods might be higher that current Node Allocatable Memory Limits.
+	// Pod Evictions are expected to bring down memory usage to below Node Allocatable limits.
+	// Until evictions happen retry cgroup updates.
+	go runUntilSuccess(
+		func() error { return cm.cgroupManager.Update(cgroupConfig) }, // run method
+		func() { // invoked on success
+			cm.recorder.Event(cm.nodeInfo, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated Node Allocatable limit across pods")
+		},
+		func(err error) { // invoked on failure
+			message := fmt.Sprintf("Failed to update Node Allocatable Limits %q: %v", cm.cgroupRoot, err)
+			cm.recorder.Event(cm.nodeInfo, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
+		},
+		time.Minute, // retry period.
+	)
 	// Now apply kube reserved and system reserved limits if required.
 	if nc.EnforceNodeAllocatable.Has(SystemReservedEnforcementKey) {
 		glog.V(2).Infof("Enforcing System reserved on cgroup %q with limits: %+v", nc.SystemReservedCgroupName, nc.SystemReserved)
