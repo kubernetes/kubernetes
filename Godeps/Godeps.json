@@ -2370,6 +2370,14 @@
 			"Rev": "789a4c4bd4c118f7564954f441b29c153ccd6a96"
 		},
 		{
+			"ImportPath": "github.com/storageos/go-api",
+			"Rev": "74f9beb613cacf0cc282facc2e1550a3231e126f"
+		},
+		{
+			"ImportPath": "github.com/storageos/go-api/types",
+			"Rev": "74f9beb613cacf0cc282facc2e1550a3231e126f"
+		},
+		{
 			"ImportPath": "github.com/stretchr/objx",
 			"Rev": "1a9d0bb9f541897e62256577b352fdbc1fb4fd94"
 		},

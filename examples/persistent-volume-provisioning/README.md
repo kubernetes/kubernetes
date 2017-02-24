@@ -92,6 +92,26 @@ parameters:
 
 For a complete example refer ([Portworx Volume docs](../volumes/portworx/README.md))
 
+#### StorageOS
+
+```yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: fast
+provisioner: kubernetes.io/storageos
+parameters:
+  pool: default
+  description: Kubernetes volume
+  fsType: ext4
+```
+
+*  `pool`: The name of the StorageOS distributed capacity pool to provision the volume from. Uses the `default` pool which is normally present if not specified.
+*  `description`: The description to assign to volumes that were created dynamically. All volume descriptions will be the same for the storage class, but different storage classes can be used to allow descriptions for different use cases. Defaults to `Kubernetes volume`.
+* `fsType`: The default filesystem type to request. Note that user-defined rules within StorageOS may override this value. Defaults to `ext4`.
+
+For a complete example refer to the ([StorageOS example](../../volumes/storageos/README.md))
+
 #### GLUSTERFS
 
 ```yaml

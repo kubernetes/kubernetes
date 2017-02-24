@@ -1,0 +1,854 @@
+
+# A Swagger 2.0 (a.k.a. OpenAPI) definition of the StorageOS API.
+#
+# This is used for generating API documentation and the types used by the
+# client/server. See api/README.md for more information.
+#
+# Some style notes:
+# - This file is used by ReDoc, which allows GitHub Flavored Markdown in
+#   descriptions.
+# - There is no maximum line length, for ease of editing and pretty diffs.
+# - operationIds are in the format "NounVerb", with a singular noun.
+
+swagger: "2.0"
+schemes:
+  - "http"
+  - "https"
+produces:
+  - "application/json"
+  - "text/plain"
+consumes:
+  - "application/json"
+  - "text/plain"
+basePath: "/v1"
+info:
+  title: "StorageOS API"
+  version: "0.7"
+  x-logo:
+    url: "http://storageos.wpengine.com/wp-content/uploads/2017/03/cropped-logo-1.png"
+  description: |
+    The StorageOS API is an HTTP API used for managing volumes and StorageOS services. It is the API that the StorageOS UI, CLI and platform integrations use to communicate with the StorageOS backend.
+
+    # Errors
+
+    The API uses standard HTTP status codes to indicate the success or failure of the API call. The body of the response will be JSON in the following format:
+    ```
+    {
+      "message": "page not found"
+    }
+    ```
+# The tags on paths define the menu sections in the ReDoc documentation, so
+# the usage of tags must make sense for that:
+# - They should be singular, not plural.
+# - There should not be too many tags, or the menu becomes unwieldy. For
+#   example, it is preferable to add a path to the "System" tag instead of
+#   creating a tag with a single path in it.
+# - The order of tags in this list defines the order in the menu.
+tags:
+  # Primary objects
+  - name: "Volume"
+    x-displayName: "Volumes"
+    description: |
+      Create and manage volumes.
+  - name: "Pool"
+    x-displayName: "Pools"
+    description: |
+      Create and manage distributed capacity pools.
+
+definitions:
+
+  ErrorResponse:
+    description: "Represents an error."
+    type: "object"
+    required: ["message"]
+    properties:
+      message:
+        description: "The error message."
+        type: "string"
+        x-nullable: false
+    example:
+      message: "Something went wrong."
+
+  Deployment:
+    type: "object"
+    description: "Volume master or replica deployment details."
+    properties:
+      ID:
+        type: "string"
+        readOnly: true
+      Controller:
+        type: "string"
+        readOnly: true
+      Inode:
+        type: "integer"
+        format: "uint32"
+        readOnly: true
+      Status:
+        type: "string"
+        readOnly: true
+      Health:
+        type: "string"
+        readOnly: true
+      CreatedAt:
+        type: "string"
+        format: "datetime"
+        readOnly: true
+
+  VolumeCreateOptions:
+    type: "object"
+    description: "Parameters available for creating new volumes."
+    required: [Name]
+    properties:
+      Name:
+        description: "Volume name."
+        type: "string"
+        x-nullable: false
+      Description:
+        type: "string"
+        x-nullable: false
+        description: "Volume description."
+      Size:
+        type: "integer"
+        description: "Size in GB (if 0 or not specified, then defaults to 10 GB)."
+        x-nullable: false
+      Pool:
+        type: "string"
+        description: "Name of capacity pool to provision the volume in, or the name of the current pool."
+      Labels:
+        type: "object"
+        description: "User-defined key/value metadata."
+        x-nullable: false
+        additionalProperties:
+          type: "string"
+
+  VolumeUpdateOptions:
+    type: "object"
+    description: "Parameters available for updating existing volumes."
+    properties:
+      Description:
+        type: "string"
+        x-nullable: false
+        description: "Volume description."
+      Size:
+        type: "integer"
+        description: "Size in GB."
+        x-nullable: false
+      Labels:
+        type: "object"
+        description: "User-defined key/value metadata."
+        x-nullable: false
+        additionalProperties:
+          type: "string"
+
+  # VolumeMountOptions:
+  #   type: "object"
+  #   description: "Parameters available for mounting volumes."
+  #   properties:
+  #     ID:
+  #       type: "string"
+  #       x-nullable: false
+  #       description: "Volume unique ID."
+  #     Name:
+  #       description: "Volume name."
+  #       type: "string"
+  #       x-nullable: false
+  #     Namespace:
+  #       description: "The object scope, such as for teams and projects."
+  #       type: "string"
+  #       x-nullable: false
+  #     Client:
+  #       type: "string"
+  #       x-nullable: false
+  #       description: "Hostname of the client performing the mount."
+  #
+  # VolumeUnmountOptions:
+  #   type: "object"
+  #   description: "Parameters available for unmounting volumes."
+  #   properties:
+  #     ID:
+  #       type: "string"
+  #       x-nullable: false
+  #       description: "Volume unique ID."
+  #     Name:
+  #       description: "Volume name."
+  #       type: "string"
+  #       x-nullable: false
+  #     Namespace:
+  #       description: "The object scope, such as for teams and projects."
+  #       type: "string"
+  #       x-nullable: false
+  #     Client:
+  #       type: "string"
+  #       x-nullable: false
+  #       description: "Hostname of the client performing the unmount."
+
+  # ListOptions:
+  #   type: "object"
+  #   description: "Parameters for finding volumes."
+  #   properties:
+  #     LabelSelector:
+  #       description: "A selector to restrict the list of returned objects by their labels. Defaults to everything."
+  #       type: "string"
+  #     FieldSelector:
+  #       type: "string"
+  #       description: "A selector to restrict the list of returned objects by their fields. Defaults to everything."
+  #     TimeoutSeconds:
+  #       type: "integer"
+  #       description: "Timeout for the list call."
+  #     Namespace:
+  #       type: "string"
+  #       description: "Object name and auth scope, such as for teams and projects"
+
+  Volume:
+    type: "object"
+    description: "A storage volume."
+    required: [Name, Size]
+    properties:
+      ID:
+        description: "Volume unique ID."
+        type: "string"
+        x-nullable: false
+        readOnly: true
+      Name:
+        description: "Volume name."
+        type: "string"
+        x-nullable: false
+      Description:
+        type: "string"
+        x-nullable: false
+        description: "Volume description."
+      Size:
+        type: integer
+        description: "Size in GB."
+        x-nullable: false
+      Pool:
+        type: "string"
+        description: "Name of capacity pool to provision the volume in, or the name of the current pool."
+      Labels:
+        type: "object"
+        description: "User-defined key/value metadata."
+        x-nullable: false
+        additionalProperties:
+          type: "string"
+      Master:
+        $ref: "#/definitions/Deployment"
+      Replicas:
+        type: "array"
+        description: "Volume deployment information for the replica volumes."
+        items:
+          $ref: "#/definitions/Deployment"
+        readOnly: true
+      Status:
+        type: "string"
+        description: "Short status, one of: pending, evaluating, deploying, active, unavailable, failed, updating, deleting."
+        readOnly: true
+      StatusMessage:
+        type: "string"
+        description: "Status message explaining current status."
+        readOnly: true
+      Health:
+        type: "string"
+        description: "Volume health, one of: healthy, degraded or dead."
+        readOnly: true
+      Inode:
+        type: "integer"
+        format: "uint32"
+        description: "Block device inode."
+        readOnly: true
+      Deleted:
+        type: "boolean"
+        description: "Flag indicating if the volume has been deleted and is waiting for scrubbing."
+        readOnly: true
+      Mounted:
+        type: "boolean"
+        description: "Flag indicating if the volume is mounted and in use."
+        readOnly: true
+      MountedBy:
+        type: "string"
+        description: "Reference to the node that has the volume mounted."
+        readOnly: true
+      Mountpoint:
+        type: "string"
+        description: "Mountpoint where the volume was mounted."
+        readOnly: true  
+      MountedAt:
+        type: "string"
+        format: "dateTime"
+        description: "When the volume was mounted."
+        readOnly: true
+      CreatedBy:
+        type: "string"
+        description: "User that created the volume."
+        readOnly: true
+      CreatedAt:
+        type: "string"
+        format: "dateTime"
+        description: "When the volume was created."
+        readOnly: true
+    example:
+      Name: vol01
+      Size: 5
+      Labels:
+        com.example.some-label: "some-value"
+        com.example.some-other-label: "some-other-value"
+
+  PoolCreateOptions:
+    type: "object"
+    description: "Parameters available for creating new pools."
+    required: [Name]
+    properties:
+      Name:
+        description: "Pool name."
+        type: "string"
+        x-nullable: false
+      Description:
+        type: "string"
+        x-nullable: false
+        description: "Pool description."
+      Default:
+        type: "boolean"
+        description: "Default determines whether this pool is the default if a volume is provisioned without a pool specified.  There can only be one default pool."
+        x-nullable: false
+      DefaultDriver:
+        type: "string"
+        x-nullable: false
+        description: "DefaultDriver specifies the storage driver to use by default if there are multiple drivers in the pool and no driver was specified in the provisioning request or assigned by rules.  If no driver was specified and no default set, driver weight is used to determine the default."
+      ControllerNames:
+        type: "array"
+        description: "ControllerNames is a list of controller names that are participating in the storage pool."
+        items:
+          type: "string"
+      DriverNames:
+        type: "array"
+        description: "DriverNames is a list of backend storage drivers that are available in the storage pool."
+        items:
+          type: "string"
+      Active:
+        type: "boolean"
+        x-nullable: false
+        description: "Flag describing whether rule is active."
+        default: false
+      Labels:
+        type: "object"
+        description: "Labels define a list of labels that describe the pool."
+        additionalProperties:
+          type: "string"
+
+  Pool:
+    type: "object"
+    description: |
+      Pools are used to define distributed capacity that can be used to provision
+      volumes from.  Typically, each server that makes storage available will be
+      added to one or more pools.
+
+      Capacity drivers are also added to the pool to determine which backend
+      storage driver to use.  Currently this is limited to a single type of
+      driver per pool, but in the future we will allow multiple, allowing for
+      dynamic tiering and snapshots from one driver type to another.
+    required: [Name]
+    properties:
+      ID:
+        description: "Pool unique ID."
+        type: "string"
+        x-nullable: false
+        readOnly: true
+      Name:
+        description: "Pool name."
+        type: "string"
+        x-nullable: false
+      Description:
+        type: "string"
+        x-nullable: false
+        description: "Pool description."
+      Default:
+        type: "boolean"
+        x-nullable: false
+        description: |
+          Default determines whether this pool is the default if a volume is
+          provisioned without a pool specified.  There can only be one default
+          pool.
+      DefaultDriver:
+        type: "string"
+        description: |
+          DefaultDriver specifies the storage driver to use by default if there
+          are multiple drivers in the pool and no driver was specified in the
+          provisioning request or assigned by rules.  If no driver was specified
+          and no default set, driver weight is used to determine the default.
+      ControllerNames:
+        type: "array"
+        description: "ControllerNames is a list of controller names that are participating in the storage pool."
+        items:
+          type: "string"
+      DriverNames:
+        type: "array"
+        description: "DriverNames is a list of backend storage drivers that are available in the storage pool."
+        items:
+          type: "string"
+      DriverInstances:
+        $ref: "#/definitions/DriverInstances"
+      Active:
+        type: "boolean"
+        x-nullable: false
+        description: "Flag describing whether rule is active."
+        default: false
+      CapacityStats:
+        $ref: "#/definitions/CapacityStats"
+      Labels:
+        type: "object"
+        description: "Labels define a list of labels that describe the pool."
+        additionalProperties:
+          type: "string"
+
+  Rule:
+    type: "object"
+    description: "A policy rule."
+    required: [Name]
+    properties:
+      ID:
+        description: "Rule unique ID."
+        type: "string"
+        x-nullable: false
+        readOnly: true
+      Name:
+        description: "Rule name."
+        type: "string"
+        x-nullable: false
+      Description:
+        type: "string"
+        x-nullable: false
+        description: "Rule description."
+      Active:
+        type: "boolean"
+        x-nullable: false
+        description: "Flag describing whether rule is active."
+        default: false
+      Weight:
+        type: "integer"
+        x-nullable: false
+        description: |
+          "Weight is used to determine order during rule processing.  Rules with heavier weights are processed later."
+        default: 0
+      Operator:
+        type: "string"
+        description: "Operator is used to compare objects or labels."
+        enum:
+          - "!"
+          - "="
+          - "=="
+          - "in"
+          - "!="
+          - "notin"
+          - "exists"
+          - "gt"
+          - "lt"
+      RuleAction:
+        type: "string"
+        description: "RuleAction controls whether the action is to add or remove a label from the matching object(s)."
+        enum:
+          - "add"
+          - "remove"
+        default: "add"
+      Selectors:
+        type: "object"
+        description: "Selectors defines the list of labels that should trigger a rule."
+        additionalProperties:
+          type: "string"
+      Labels:
+        type: "object"
+        description: "Labels define the list of labels that will be added or removed from the matching object(s).."
+        additionalProperties:
+          type: "string"
+
+  CapacityStats:
+    type: "object"
+    description: "CapacityStats is used to report capacity statistics on pools and controllers."
+    properties:
+      TotalCapacityBytes:
+        description: "TotalCapacityBytes is the object's total capacity in bytes."
+        type: "integer"
+        readOnly: true
+      AvailableCapacityBytes:
+        description: "AvailableCapacityBytes is the object's available capacity in bytes."
+        type: "integer"
+        readOnly: true
+      ProvisionedCapacityBytes:
+        description: "ProvisionedCapacityBytes is the object's provisioned capacity in bytes."
+        type: "integer"
+        readOnly: true
+
+  DriverInstances:
+    type: "object"
+    description: "DriverInstances shows the internal configuration and state of each driver on all the nodes in the pool. Data within DriverInstances can not be modified directly."
+    properties:
+      ID:
+        description: "Instance unique ID."
+        type: "string"
+        x-nullable: false
+        readOnly: true
+      Name:
+        description: "Instance name."
+        type: "string"
+        x-nullable: false
+        readOnly: true
+      Description:
+        description: "Instance description."
+        type: "string"
+        x-nullable: false
+        readOnly: true
+      Active:
+        description: "Flag describing whether the template is active."
+        type: "boolean"
+        x-nullable: false
+        readOnly: true
+      Config:
+        description: "Config is JSON struct that is passed directly to the driver.  There is no specific format, and the driver is responsible for validation."
+        type: "object"
+        readOnly: true
+        additionalProperties:
+          type: "string"
+      Labels:
+        description: "Labels define a list of labels that describe the driver instance.  These are inherited from the pool when the driver instance is created."
+        type: "object"
+        readOnly: true
+        additionalProperties:
+          type: "string"
+      ControllerName:
+        description: "ControllerName specifies the controller that this instance is running on."
+        type: "string"
+        x-nullable: false
+        readOnly: true
+      PoolID:
+        description: "PoolID refers to the pool that this driver instance relates to."
+        type: "string"
+        x-nullable: false
+        readOnly: true
+      DriverName:
+        description: "DriverName specifies which capacity driver this is an instance of."
+        type: "string"
+        x-nullable: false
+        readOnly: true
+      CapacityStats:
+        $ref: "#/definitions/CapacityStats"
+
+parameters:
+  Name:
+    name: "name"
+    in: "path"
+    type: "string"
+    description: "Volume name or ID."
+    required: true
+  Namespace:
+    name: "namespace"
+    in: "path"
+    type: "string"
+    description: "Object name and auth scope, such as for teams and projects."
+    required: true
+  NamespaceQuery:
+    name: "namespace"
+    in: "query"
+    type: "string"
+    description: "Object name and auth scope, such as for teams and projects."
+    default: "default"
+  LabelSelector:
+    name: "labelSelector"
+    in: "query"
+    description: "A selector to restrict the list of returned objects by their labels. Defaults to everything."
+    type: "string"
+  FieldSelector:
+    name: "fieldSelector"
+    in: "query"
+    type: "string"
+    description: "A selector to restrict the list of returned objects by their fields. Defaults to everything."
+  TimeoutSeconds:
+    name: "timeoutSeconds"
+    in: "query"
+    type: "integer"
+    description: "Timeout for the list call."
+
+paths:
+  /namespaces/{namespace}/volumes:
+    get:
+      summary: "List volumes"
+      description: "List of volumes that match the query."
+      produces:
+        - "application/json"
+      tags: ["Volume"]
+      parameters:
+        - name: "namespace"
+          in: "path"
+          required: true
+          description: "The object scope, such as for teams and projects."
+          type: "string"
+        - $ref: "#/parameters/LabelSelector"
+        - $ref: "#/parameters/FieldSelector"
+        - $ref: "#/parameters/TimeoutSeconds"
+        - $ref: "#/parameters/NamespaceQuery"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Volume"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    post:
+      summary: "Create volume"
+      description: "Provisions a new volume."
+      produces:
+        - "application/json"
+      tags: ["Volume"]
+      parameters:
+        - $ref: "#/parameters/Namespace"
+        - name: "VolumeCreateOptions"
+          in: "body"
+          schema:
+            $ref: "#/definitions/VolumeCreateOptions"
+      responses:
+        201:
+          description: "Volume created successfully"
+          schema:
+            $ref: "#/definitions/Volume"
+        401:
+          description: "Unauthorized"
+        409:
+          description: "Volume with name already exists"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /namespaces/{namespace}/volumes/{name}:
+    get:
+      summary: "Get a volume"
+      description: "Gets a volume by name or ID.  Returns to whole volume object."
+      produces:
+        - "application/json"
+      tags: ["Volume"]
+      parameters:
+        - $ref: "#/parameters/Name"
+        - $ref: "#/parameters/Namespace"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            $ref: "#/definitions/Volume"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not found"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        407:
+          description: "Volume already exists"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    put:
+      summary: "Update volume"
+      description: "Updates an existing volume."
+      produces:
+        - "application/json"
+      tags: ["Volume"]
+      parameters:
+        - $ref: "#/parameters/Name"
+        - $ref: "#/parameters/Namespace"
+        - name: "VolumeUpdateOptions"
+          in: "body"
+          schema:
+            $ref: "#/definitions/VolumeUpdateOptions"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            $ref: "#/definitions/Volume"
+        401:
+          description: "Unauthorized"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    delete:
+      summary: "Delete volume"
+      description: "Deletes a volume."
+      produces:
+        - "application/json"
+      tags: ["Volume"]
+      parameters:
+        - name: "namespace"
+          in: "path"
+          required: true
+          description: "The object scope, such as for teams and projects."
+          type: "string"
+        - name: "name"
+          in: "path"
+          required: true
+          description: "Volume name or ID."
+          type: "string"
+      responses:
+        200:
+          description: "Success"
+        401:
+          description: "Unauthorized"
+        407:
+          description: "Volume in use"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /namespaces/{namespace}/volumes/{name}/mount:
+    post:
+      summary: "Mount volume"
+      description: "Updates the mount reference for the volume."
+      produces:
+        - "application/json"
+      tags: ["Volume"]
+      parameters:
+        - $ref: "#/parameters/Name"
+        - $ref: "#/parameters/Namespace"
+        - name: "client"
+          in: "body"
+          description: "Hostname of the client mounting the volume"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            $ref: "#/definitions/Volume"
+        401:
+          description: "Unauthorized"
+        407:
+          description: "Volume already mounted"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /namespaces/{namespace}/volumes/{name}/unmount:
+    post:
+      summary: "Mount volume"
+      description: "Updates the mount reference for the volume."
+      produces:
+        - "application/json"
+      tags: ["Volume"]
+      parameters:
+        - $ref: "#/parameters/Name"
+        - $ref: "#/parameters/Namespace"
+        - name: "client"
+          in: "body"
+          description: "Hostname of the client mounting the volume"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            $ref: "#/definitions/Volume"
+        401:
+          description: "Unauthorized"
+        407:
+          description: "Volume not mounted"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /pools:
+    get:
+      summary: "List pools"
+      description: "List of pools that match the query."
+      produces:
+        - "application/json"
+      tags: ["Pool"]
+      #parameters:
+      #  - $ref: "#/parameters/LabelSelector"
+      #  - $ref: "#/parameters/FieldSelector"
+      #  - $ref: "#/parameters/TimeoutSeconds"
+      #  - $ref: "#/parameters/NamespaceQuery"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Pool"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    post:
+      summary: "Create pool"
+      description: "Provisions a new pool."
+      produces:
+        - "application/json"
+      tags: ["Pool"]
+      parameters:
+        - name: "PoolCreateOptions"
+          in: "body"
+          schema:
+            $ref: "#/definitions/PoolCreateOptions"
+      responses:
+        201:
+          description: "Pool created successfully"
+          schema:
+            $ref: "#/definitions/Pool"
+        401:
+          description: "Unauthorized"
+        409:
+          description: "Pool with name already exists"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /pools/{name}:
+    get:
+      summary: "Get a pool"
+      description: "Gets a pool by name or ID.  Returns to whole pool object."
+      produces:
+        - "application/json"
+      tags: ["Pool"]
+      parameters:
+        - $ref: "#/parameters/Name"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            $ref: "#/definitions/Pool"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not found"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+        407:
+          description: "Pool already exists"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    delete:
+      summary: "Delete pool"
+      description: "Deletes a pool."
+      produces:
+        - "application/json"
+      tags: ["Pool"]
+      parameters:
+        - name: "name"
+          in: "path"
+          required: true
+          description: "Pool name or ID."
+          type: "string"
+      responses:
+        200:
+          description: "Success"
+        401:
+          description: "Unauthorized"
+        407:
+          description: "Pool in use"
+        500:
+          description: "Server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"

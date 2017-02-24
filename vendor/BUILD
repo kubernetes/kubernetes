@@ -296,6 +296,7 @@ filegroup(
         "//vendor/github.com/spf13/pflag:all-srcs",
         "//vendor/github.com/spf13/viper:all-srcs",
         "//vendor/github.com/square/go-jose:all-srcs",
+        "//vendor/github.com/storageos/go-api:all-srcs",
         "//vendor/github.com/stretchr/objx:all-srcs",
         "//vendor/github.com/stretchr/testify/assert:all-srcs",
         "//vendor/github.com/stretchr/testify/mock:all-srcs",

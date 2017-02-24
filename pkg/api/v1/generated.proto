@@ -2185,6 +2185,10 @@ message PersistentVolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 19;
+
+  // StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+  // +optional
+  optional StorageOSVolumeSource storageos = 20;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -3707,6 +3711,37 @@ message ServiceStatus {
   optional LoadBalancerStatus loadBalancer = 1;
 }
 
+// Represents a StorageOS persistent volume resource.
+message StorageOSVolumeSource {
+  // VolumeName is the human-readable name of the StorageOS volume.  Volume
+  // names are only unique within a namespace.
+  optional string volumeName = 1;
+
+  // Namespace specifies the scope of the volume name within StorageOS.  If no
+  // namespace is specified, the namespace of the pod will be used.  Set to
+  // "default" if you are not using namespaces within StorageOS.
+  // +optional
+  optional string namespace = 2;
+
+  // The name of the storage pool to provision from.  Pools can have different
+  // capacity and performance characteristics depending on the underlying
+  // storage resources used in them.  If not specified, the default pool will be
+  // used.
+  // +optional
+  optional string pool = 3;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 4;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 5;
+}
+
 // Sysctl defines a kernel parameter to be set
 message Sysctl {
   // Name of a property to set
@@ -3958,6 +3993,10 @@ message VolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 25;
+
+  // StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
+  // +optional
+  optional StorageOSVolumeSource storageos = 27;
 }
 
 // Represents a vSphere volume resource.

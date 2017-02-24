@@ -1381,6 +1381,10 @@
      "scaleIO": {
       "$ref": "v1.ScaleIOVolumeSource",
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
+     },
+     "storageos": {
+      "$ref": "v1.StorageOSVolumeSource",
+      "description": "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes."
      }
     }
    },
@@ -2175,6 +2179,32 @@
      "volumeName": {
       "type": "string",
       "description": "The name of a volume already created in the ScaleIO system that is associated with this volume source."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.StorageOSVolumeSource": {
+    "id": "v1.StorageOSVolumeSource",
+    "description": "Represents a StorageOS persistent volume resource.",
+    "properties": {
+     "volumeName": {
+      "type": "string",
+      "description": "VolumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace."
+     },
+     "namespace": {
+      "type": "string",
+      "description": "Namespace specifies the scope of the volume name within StorageOS.  If no namespace is specified, the namespace of the pod will be used.  Set to \"default\" if you are not using namespaces within StorageOS."
+     },
+     "pool": {
+      "type": "string",
+      "description": "The name of the storage pool to provision from.  Pools can have different capacity and performance characteristics depending on the underlying storage resources used in them.  If not specified, the default pool will be used."
      },
      "fsType": {
       "type": "string",

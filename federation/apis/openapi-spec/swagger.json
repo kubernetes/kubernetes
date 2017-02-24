@@ -11476,6 +11476,31 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.StorageOSVolumeSource": {
+    "description": "Represents a StorageOS persistent volume resource.",
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "namespace": {
+      "description": "Namespace specifies the scope of the volume name within StorageOS.  If no namespace is specified, the namespace of the pod will be used.  Set to \"default\" if you are not using namespaces within StorageOS.",
+      "type": "string"
+     },
+     "pool": {
+      "description": "The name of the storage pool to provision from.  Pools can have different capacity and performance characteristics depending on the underlying storage resources used in them.  If not specified, the default pool will be used.",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     },
+     "volumeName": {
+      "description": "VolumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.TCPSocketAction": {
     "description": "TCPSocketAction describes an action based on opening a socket",
     "required": [
@@ -11629,6 +11654,10 @@
      "secret": {
       "description": "Secret represents a secret that should populate this volume. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SecretVolumeSource"
+     },
+     "storageos": {
+      "description": "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.StorageOSVolumeSource"
      },
      "vsphereVolume": {
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",

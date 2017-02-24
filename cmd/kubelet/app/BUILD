@@ -100,6 +100,7 @@ go_library(
         "//pkg/volume/rbd:go_default_library",
         "//pkg/volume/scaleio:go_default_library",
         "//pkg/volume/secret:go_default_library",
+        "//pkg/volume/storageos:go_default_library",
         "//pkg/volume/vsphere_volume:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
