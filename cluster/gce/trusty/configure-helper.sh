@@ -566,6 +566,7 @@ remove_salt_config_comments() {
 #   DOCKER_REGISTRY
 start_kube_apiserver() {
   prepare_log_file /var/log/kube-apiserver.log
+  prepare_log_file /var/log/kube-apiserver-audit.log
   # Load the docker image from file.
   echo "Try to load docker image file kube-apiserver.tar"
   timeout 30 docker load -i /home/kubernetes/kube-docker-files/kube-apiserver.tar
@@ -603,6 +604,21 @@ start_kube_apiserver() {
   fi
   if [ -n "${ETCD_QUORUM_READ:-}" ]; then
     params="${params} --etcd-quorum-read=${ETCD_QUORUM_READ}"
+  fi
+
+  if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
+    # We currently only support enabling with a fixed path and with built-in log
+    # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
+    # External log rotation should be set up the same as for kube-apiserver.log.
+    params="${params} --audit-log-path=/var/log/kube-apiserver-audit.log"
+    params="${params} --audit-log-maxage=0"
+    params="${params} --audit-log-maxbackup=0"
+    # Lumberjack doesn't offer any way to disable size-based rotation. It also
+    # has an in-memory counter that doesn't notice if you truncate the file.
+    # 2000000000 (in MiB) is a large number that fits in 31 bits. If the log
+    # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
+    # never restarts. Please manually restart apiserver before this time.
+    params="${params} --audit-log-maxsize=2000000000"
   fi
 
   local admission_controller_config_mount=""
