@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -603,38 +602,13 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		if err != nil {
 			return err
 		}
-		cm := controller.NewPodControllerRefManager(rsc.podControl, rs.ObjectMeta, selector, getRSKind())
-		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(pods)
-		// Adopt pods only if this replica set is not going to be deleted.
-		if rs.DeletionTimestamp == nil {
-			for _, pod := range matchesNeedsController {
-				err := cm.AdoptPod(pod)
-				// continue to next pod if adoption fails.
-				if err != nil {
-					// If the pod no longer exists, don't even log the error.
-					if !errors.IsNotFound(err) {
-						utilruntime.HandleError(err)
-					}
-				} else {
-					matchesAndControlled = append(matchesAndControlled, pod)
-				}
-			}
-		}
-		filteredPods = matchesAndControlled
-		// remove the controllerRef for the pods that no longer have matching labels
-		var errlist []error
-		for _, pod := range controlledDoesNotMatch {
-			err := cm.ReleasePod(pod)
-			if err != nil {
-				errlist = append(errlist, err)
-			}
-		}
-		if len(errlist) != 0 {
-			aggregate := utilerrors.NewAggregate(errlist)
-			// push the RS into work queue again. We need to try to free the
-			// pods again otherwise they will stuck with the stale
-			// controllerRef.
-			return aggregate
+		cm := controller.NewPodControllerRefManager(rsc.podControl, rs, selector, getRSKind())
+		filteredPods, err = cm.ClaimPods(pods)
+		if err != nil {
+			// Something went wrong with adoption or release.
+			// Requeue and try again so we don't leave orphans sitting around.
+			rsc.queue.Add(key)
+			return err
 		}
 	} else {
 		pods, err := rsc.podLister.Pods(rs.Namespace).List(selector)
