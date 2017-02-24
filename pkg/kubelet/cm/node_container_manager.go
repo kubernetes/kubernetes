@@ -74,7 +74,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	// default cpu shares on cgroups are low and can cause cpu starvation.
 	nodeAllocatable := cm.capacity
 	// Use Node Allocatable limits instead of capacity if the user requested enforcing node allocatable.
-	if nc.EnforceNodeAllocatable.Has(NodeAllocatableEnforcementKey) {
+	if cm.CgroupsPerQOS && nc.EnforceNodeAllocatable.Has(NodeAllocatableEnforcementKey) {
 		nodeAllocatable = cm.getNodeAllocatableAbsolute()
 	}
 
@@ -88,17 +88,20 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	// existing memory usage across pods might be higher that current Node Allocatable Memory Limits.
 	// Pod Evictions are expected to bring down memory usage to below Node Allocatable limits.
 	// Until evictions happen retry cgroup updates.
-	go runUntilSuccess(
-		func() error { return cm.cgroupManager.Update(cgroupConfig) }, // run method
-		func() { // invoked on success
-			cm.recorder.Event(cm.nodeInfo, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated Node Allocatable limit across pods")
-		},
-		func(err error) { // invoked on failure
-			message := fmt.Sprintf("Failed to update Node Allocatable Limits %q: %v", cm.cgroupRoot, err)
-			cm.recorder.Event(cm.nodeInfo, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
-		},
-		time.Minute, // retry period.
-	)
+	// Update limits on non root cgroup-root to be safe since the default limits for CPU can be too low.
+	if cm.cgroupRoot != "/" {
+		go runUntilSuccess(
+			func() error { return cm.cgroupManager.Update(cgroupConfig) }, // run method
+			func() { // invoked on success
+				cm.recorder.Event(cm.nodeInfo, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated Node Allocatable limit across pods")
+			},
+			func(err error) { // invoked on failure
+				message := fmt.Sprintf("Failed to update Node Allocatable Limits %q: %v", cm.cgroupRoot, err)
+				cm.recorder.Event(cm.nodeInfo, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
+			},
+			time.Minute, // retry period.
+		)
+	}
 	// Now apply kube reserved and system reserved limits if required.
 	if nc.EnforceNodeAllocatable.Has(SystemReservedEnforcementKey) {
 		glog.V(2).Infof("Enforcing System reserved on cgroup %q with limits: %+v", nc.SystemReservedCgroupName, nc.SystemReserved)
