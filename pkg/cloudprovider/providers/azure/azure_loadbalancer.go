@@ -24,6 +24,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -35,8 +36,12 @@ import (
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 	lbName := getLoadBalancerName(clusterName)
-	pipName := getPublicIPName(clusterName, service)
 	serviceName := getServiceName(service)
+
+	pipName, err := az.getPublicIPName(clusterName, service)
+	if err != nil {
+		return nil, false, err
+	}
 
 	_, existsLb, err := az.getAzureLoadBalancer(lbName)
 	if err != nil {
@@ -61,10 +66,38 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 	}, true, nil
 }
 
+func (az *Cloud) getPublicIPName(clusterName string, service *v1.Service) (string, error) {
+	loadBalancerIP := service.Spec.LoadBalancerIP
+	if len(loadBalancerIP) == 0 {
+		return fmt.Sprintf("%s-%s", clusterName, cloudprovider.GetLoadBalancerName(service)), nil
+	}
+
+	list, err := az.PublicIPAddressesClient.List(az.ResourceGroup)
+	if err != nil {
+		return "", err
+	}
+
+	if list.Value != nil {
+		for ix := range *list.Value {
+			ip := &(*list.Value)[ix]
+			if ip.PublicIPAddressPropertiesFormat.IPAddress != nil &&
+				*ip.PublicIPAddressPropertiesFormat.IPAddress == loadBalancerIP {
+				return *ip.Name, nil
+			}
+		}
+	}
+	// TODO: follow next link here? Will there really ever be that many public IPs?
+
+	return "", fmt.Errorf("user supplied IP Address %s was not found", loadBalancerIP)
+}
+
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	lbName := getLoadBalancerName(clusterName)
-	pipName := getPublicIPName(clusterName, service)
+	pipName, err := az.getPublicIPName(clusterName, service)
+	if err != nil {
+		return nil, err
+	}
 	serviceName := getServiceName(service)
 	glog.V(2).Infof("ensure(%s): START clusterName=%q lbName=%q", serviceName, clusterName, lbName)
 
@@ -158,8 +191,12 @@ func (az *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nod
 // doesn't exist even if some part of it is still laying around.
 func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
 	lbName := getLoadBalancerName(clusterName)
-	pipName := getPublicIPName(clusterName, service)
 	serviceName := getServiceName(service)
+
+	pipName, err := az.getPublicIPName(clusterName, service)
+	if err != nil {
+		return err
+	}
 
 	glog.V(2).Infof("delete(%s): START clusterName=%q lbName=%q", serviceName, clusterName, lbName)
 
@@ -214,10 +251,12 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 			}
 		}
 	}
-
-	err = az.ensurePublicIPDeleted(serviceName, pipName)
-	if err != nil {
-		return err
+	// Only delete an IP address if we created it.
+	if service.Spec.LoadBalancerIP == "" {
+		err = az.ensurePublicIPDeleted(serviceName, pipName)
+		if err != nil {
+			return err
+		}
 	}
 
 	glog.V(2).Infof("delete(%s): FINISH", serviceName)
