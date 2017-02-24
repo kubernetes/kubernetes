@@ -46,7 +46,7 @@ func TestRunInitMasterChecks(t *testing.T) {
 	}{
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadm.API{AdvertiseAddresses: []string{"foo"}},
+				API: kubeadm.API{BindAddress: "foo"},
 			},
 			expected: false,
 		},
