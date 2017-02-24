@@ -11,12 +11,20 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "generated.pb.go",
         "register.go",
         "types.go",
+        "types_swagger_doc_generated.go",
+        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/storage:go_default_library",
+        "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -35,11 +43,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/apis/storage/install:all-srcs",
-        "//pkg/apis/storage/util:all-srcs",
-        "//pkg/apis/storage/v1:all-srcs",
-        "//pkg/apis/storage/v1beta1:all-srcs",
-        "//pkg/apis/storage/validation:all-srcs",
+        "//pkg/apis/storage/v1/util:all-srcs",
     ],
     tags = ["automanaged"],
 )
