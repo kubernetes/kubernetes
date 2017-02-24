@@ -71,6 +71,7 @@ func TestRunServer(t *testing.T) {
 		"--authorization-kubeconfig", kubeconfigFile.Name(),
 		"--etcd-servers", framework.GetEtcdURLFromEnv(),
 		"--cert-dir", certDir,
+		"--authentication-skip-lookup", "true",
 	})
 	go cmd.Execute()
 
