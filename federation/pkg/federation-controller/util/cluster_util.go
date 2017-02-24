@@ -66,8 +66,22 @@ func BuildClusterConfig(c *federation_v1beta1.Cluster) (*restclient.Config, erro
 			glog.Infof("didn't find secretRef for cluster %s. Trying insecure access", c.Name)
 			clusterConfig, err = clientcmd.BuildConfigFromFlags(serverAddress, "")
 		} else {
-			kubeconfigGetter := KubeconfigGetterForCluster(c)
-			clusterConfig, err = clientcmd.BuildConfigFromKubeconfigGetter(serverAddress, kubeconfigGetter)
+			secret, err := GetSecret(c.Spec.SecretRef.Name)
+			if err != nil {
+				return nil, err
+			}
+			// Pre-1.6, the secret contained a serialized kubeconfig which contained appropriate credentials.
+			// Post-1.6, the secret contains credentials for a service account.
+			// Check for the service account credentials, and use them if they exist; if not, use the
+			// serialized kubeconfig.
+			if _, ok := secret.Data["token"]; ok {
+				clusterConfig, err = clientcmd.BuildConfigFromFlags(serverAddress, "")
+				clusterConfig.CAData = secret.Data["ca.crt"]
+				clusterConfig.BearerToken = string(secret.Data["token"])
+			} else {
+				kubeconfigGetter := KubeconfigGetterForCluster(c)
+				clusterConfig, err = clientcmd.BuildConfigFromKubeconfigGetter(serverAddress, kubeconfigGetter)
+			}
 		}
 		if err != nil {
 			return nil, err
@@ -92,46 +106,51 @@ var KubeconfigGetterForCluster = func(c *federation_v1beta1.Cluster) clientcmd.K
 	}
 }
 
-// KubeconfigGetterForSecret is used to get the kubeconfig from the given secret.
-var KubeconfigGetterForSecret = func(secretName string) clientcmd.KubeconfigGetter {
+// GetterForSecret is used to get a secret from the cluster. It is used to inject a different implementation in tests.
+func GetSecret(secretName string) (*api.Secret, error) {
+	if secretName == "" {
+		return nil, nil
+	}
+
+	// Get the namespace this is running in from the env variable.
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		return nil, fmt.Errorf("unexpected: POD_NAMESPACE env var returned empty string")
+	}
+	// Get a client to talk to the k8s apiserver, to fetch secrets from it.
+	cc, err := restclient.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error in creating in-cluster config: %s", err)
+	}
+	client, err := clientset.NewForConfig(cc)
+	if err != nil {
+		return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
+	}
+	var secret *api.Secret
+	err = wait.PollImmediate(1*time.Second, getSecretTimeout, func() (bool, error) {
+		secret, err = client.Core().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+		if err == nil {
+			return true, nil
+		}
+		glog.Warningf("error in fetching secret: %s", err)
+		return false, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("timed out waiting for secret: %s", err)
+	}
+	if secret == nil {
+		return nil, fmt.Errorf("unexpected: received null secret %s", secretName)
+	}
+	return secret, nil
+}
+
+// KubeconfigGetterForSecret gets the kubeconfig from the given secret.
+func KubeconfigGetterForSecret(secretName string) clientcmd.KubeconfigGetter {
 	return func() (*clientcmdapi.Config, error) {
-		var data []byte
-		if secretName != "" {
-			// Get the namespace this is running in from the env variable.
-			namespace := os.Getenv("POD_NAMESPACE")
-			if namespace == "" {
-				return nil, fmt.Errorf("unexpected: POD_NAMESPACE env var returned empty string")
-			}
-			// Get a client to talk to the k8s apiserver, to fetch secrets from it.
-			cc, err := restclient.InClusterConfig()
-			if err != nil {
-				return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
-			}
-			client, err := clientset.NewForConfig(cc)
-			if err != nil {
-				return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
-			}
-			data = []byte{}
-			var secret *api.Secret
-			err = wait.PollImmediate(1*time.Second, getSecretTimeout, func() (bool, error) {
-				secret, err = client.Core().Secrets(namespace).Get(secretName, metav1.GetOptions{})
-				if err == nil {
-					return true, nil
-				}
-				glog.Warningf("error in fetching secret: %s", err)
-				return false, nil
-			})
-			if err != nil {
-				return nil, fmt.Errorf("timed out waiting for secret: %s", err)
-			}
-			if secret == nil {
-				return nil, fmt.Errorf("unexpected: received null secret %s", secretName)
-			}
-			ok := false
-			data, ok = secret.Data[KubeconfigSecretDataKey]
-			if !ok {
-				return nil, fmt.Errorf("secret does not have data with key: %s", KubeconfigSecretDataKey)
-			}
+		secret, err := GetSecret(secretName)
+		data, ok := secret.Data[KubeconfigSecretDataKey]
+		if !ok {
+			return nil, fmt.Errorf("secret does not have data with key %s", KubeconfigSecretDataKey)
 		}
 		return clientcmd.Load(data)
 	}

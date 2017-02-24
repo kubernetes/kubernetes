@@ -95,7 +95,7 @@ function join_clusters() {
         "${context}" \
         --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
         --context="${FEDERATION_NAME}" \
-        --secret-name="${context//_/-}"    # Replace "_" by "-"
+        --secret-name="${context//_/-}" -v=2    # Replace "_" by "-"
 
 
     # Create kube-dns configmap in each cluster for kube-dns to accept

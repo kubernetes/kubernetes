@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +41,13 @@ const (
 	// DefaultFederationSystemNamespace is the namespace in which
 	// federation system components are hosted.
 	DefaultFederationSystemNamespace = "federation-system"
+
+	// ClusterServiceAccoutNamePrefix is the prefix of the name of
+	// the service account created on non-host clusters joined to
+	// the federation. The secrets associated with the created
+	// accounts are used by the Federation control plane to access
+	// the cluster's API server.
+	clusterServiceAccountNamePrefix = "federation-controller-manager"
 )
 
 // AdminConfig provides a filesystem based kubeconfig (via
@@ -50,9 +59,9 @@ type AdminConfig interface {
 	// FedClientSet provides a federation API compliant clientset
 	// to communicate with the federation control plane api server
 	FederationClientset(context, kubeconfigPath string) (*fedclient.Clientset, error)
-	// HostFactory provides a mechanism to communicate with the
-	// cluster where federation control plane is hosted.
-	HostFactory(hostcontext, kubeconfigPath string) cmdutil.Factory
+	// ClusterFactory provides a mechanism to communicate with any
+	// of the clusters in the federation.
+	ClusterFactory(hostcontext, kubeconfigPath string) cmdutil.Factory
 }
 
 // adminConfig implements the AdminConfig interface.
@@ -81,7 +90,7 @@ func (a *adminConfig) FederationClientset(context, kubeconfigPath string) (*fedc
 	return fedclient.NewForConfigOrDie(fedClientConfig), nil
 }
 
-func (a *adminConfig) HostFactory(hostcontext, kubeconfigPath string) cmdutil.Factory {
+func (a *adminConfig) ClusterFactory(hostcontext, kubeconfigPath string) cmdutil.Factory {
 	hostClientConfig := a.getClientConfig(hostcontext, kubeconfigPath)
 	return cmdutil.NewFactory(hostClientConfig)
 }
@@ -143,4 +152,18 @@ func CreateKubeconfigSecret(clientset *client.Clientset, kubeconfig *clientcmdap
 		return clientset.Core().Secrets(namespace).Create(secret)
 	}
 	return secret, nil
+}
+
+// ClusterServiceAccountName returns the name of a service account
+// whose credentials are used by the host cluster to access the
+// client cluster.
+func ClusterServiceAccountName(hostContext string) string {
+	return fmt.Sprintf("%s-%s", clusterServiceAccountNamePrefix, hostContext)
+}
+
+// ClusterRoleName returns the name of a ClusterRole and its associated
+// ClusterRoleBinding that are used to allow the service account to
+// access necessary resources on the cluster.
+func ClusterRoleName(serviceAccountName string) string {
+	return fmt.Sprintf("federation-controller-manager:%s", serviceAccountName)
 }

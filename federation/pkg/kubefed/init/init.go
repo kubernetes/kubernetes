@@ -225,7 +225,7 @@ func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
 // See the design doc in https://github.com/kubernetes/kubernetes/pull/34484
 // for details.
 func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
-	hostFactory := config.HostFactory(i.commonOptions.Host, i.commonOptions.Kubeconfig)
+	hostFactory := config.ClusterFactory(i.commonOptions.Host, i.commonOptions.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
 	if err != nil {
 		return err
