@@ -28,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
@@ -37,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -221,30 +220,6 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 		secretName = clusterName
 	}
 
-	kubeconfig := clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{
-			clusterCtx: {
-				Server: server,
-			},
-		},
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			clusterCtx: {
-				Token: token,
-			},
-		},
-		Contexts: map[string]*clientcmdapi.Context{
-			clusterCtx: {
-				Cluster:  clusterCtx,
-				AuthInfo: clusterCtx,
-			},
-		},
-		CurrentContext: clusterCtx,
-	}
-	configBytes, err := clientcmd.Write(kubeconfig)
-	if err != nil {
-		return nil, err
-	}
-
 	secretObject := v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -255,7 +230,8 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 			Namespace: util.DefaultFederationSystemNamespace,
 		},
 		Data: map[string][]byte{
-			"kubeconfig": configBytes,
+			"ca.crt": []byte("cert"),
+			"token":  []byte("token"),
 		},
 	}
 
@@ -326,11 +302,59 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx string) (cmdutil.Facto
 			Namespace: metav1.NamespaceSystem,
 		},
 		Data: map[string]string{
-			util.FedDomainMapKey: fmt.Sprintf("%s=%s", clusterCtx, "test-dns-zone"),
+			util.FedDomainMapKey: fmt.Sprintf("%s-%s", clusterName, "test-dns-zone"),
 		},
 	}
 
+	saSecretName := "serviceaccountsecret"
+	saSecret := v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      saSecretName,
+			Namespace: util.DefaultFederationSystemNamespace,
+		},
+		Data: map[string][]byte{
+			"ca.crt": []byte("cert"),
+			"token":  []byte("token"),
+		},
+		Type: v1.SecretTypeServiceAccountToken,
+	}
+
+	saName := fmt.Sprintf("%s-substrate", clusterName)
+
+	serviceAccount := v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: saName,
+		},
+		Secrets: []v1.ObjectReference{
+			v1.ObjectReference{Name: saSecretName},
+		},
+	}
+
+	namespace := v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "federation-system",
+		},
+	}
+
+	roleName := util.ClusterRoleName(saName)
+	clusterRole := rbacv1beta1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      roleName,
+			Namespace: util.DefaultFederationSystemNamespace,
+		},
+		Rules: []rbacv1beta1.PolicyRule{
+			rbacv1beta1.NewRule(rbacv1beta1.VerbAll).Groups(rbacv1beta1.APIGroupAll).Resources(rbacv1beta1.ResourceAll).RuleOrDie(),
+		},
+	}
+
+	clusterRoleBinding, err := rbacv1beta1.NewClusterBinding(roleName).SAs(util.DefaultFederationSystemNamespace, saName).Binding()
+	if err != nil {
+		return nil, err
+	}
+
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	defaultCodec := testapi.Default.Codec()
+	rbacCodec := testapi.Rbac.Codec()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.Client = &fake.RESTClient{
@@ -338,6 +362,22 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx string) (cmdutil.Facto
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces" && m == http.MethodPost:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(defaultCodec, &namespace)}, nil
+
+			case p == fmt.Sprintf("/api/v1/namespaces/federation-system/serviceaccounts/%s", saName) && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(defaultCodec, &serviceAccount)}, nil
+			case p == "/api/v1/namespaces/federation-system/serviceaccounts" && m == http.MethodPost:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(defaultCodec, &serviceAccount)}, nil
+
+			case p == "/apis/rbac.authorization.k8s.io/v1beta1/clusterroles" && m == http.MethodPost:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &clusterRole)}, nil
+			case p == "/apis/rbac.authorization.k8s.io/v1beta1/clusterrolebindings" && m == http.MethodPost:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &clusterRoleBinding)}, nil
+
+			case p == "/api/v1/namespaces/federation-system/secrets/serviceaccountsecret" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(defaultCodec, &saSecret)}, nil
+
 			case p == "/api/v1/namespaces/kube-system/configmaps/" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {

@@ -211,3 +211,20 @@ func buildConfigFromSecret(secret *api.Secret, serverAddress string) (*restclien
 
 	return clusterConfig, nil
 }
+
+// ClusterServiceAccountName returns the name of a service account
+// whose credentials are used by the host cluster to access the
+// client cluster.
+//
+// TODO: This is not a very unique name, and will be problematic if a
+// cluster joins two federations with the same name.
+func ClusterServiceAccountName(federationName, hostContext string) string {
+	return fmt.Sprintf("%s-%s", federationName, hostContext)
+}
+
+// ClusterRoleName returns the name of a ClusterRole and its associated
+// ClusterRoleBinding that are used to allow the service account to
+// access necessary resources on the cluster.
+func ClusterRoleName(serviceAccountName string) string {
+	return fmt.Sprintf("federation-controller-manager:%s", serviceAccountName)
+}

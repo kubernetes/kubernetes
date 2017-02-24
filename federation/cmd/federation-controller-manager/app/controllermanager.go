@@ -215,7 +215,11 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 // TODO(madhusudancs): Remove this in 1.6. This is only temporary to give an
 // upgrade path in 1.4/1.5.
 func restClientConfigFromSecret(master string) (*restclient.Config, error) {
-	kubeconfigGetter := util.KubeconfigGetterForSecret(DeprecatedKubeconfigSecretName)
+	secret, err := util.GetSecret(DeprecatedKubeconfigSecretName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find deprecated secret %s: %v", DeprecatedKubeconfigSecretName, err)
+	}
+	kubeconfigGetter := util.KubeconfigGetterForSecret(secret)
 	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(master, kubeconfigGetter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find the Federation API server kubeconfig, tried the --kubeconfig flag and the deprecated secret %s: %v", DeprecatedKubeconfigSecretName, err)

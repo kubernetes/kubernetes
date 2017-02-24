@@ -20,10 +20,15 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
@@ -33,8 +38,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -90,7 +93,7 @@ func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *c
 		Long:    join_long,
 		Example: join_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(opts.Complete(cmd, args))
+			cmdutil.CheckErr(opts.Complete(cmd, args, config))
 			cmdutil.CheckErr(opts.Run(f, cmdOut, config, cmd))
 		},
 	}
@@ -108,7 +111,7 @@ func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *c
 }
 
 // Complete ensures that options are valid and marshals them if necessary.
-func (j *joinFederation) Complete(cmd *cobra.Command, args []string) error {
+func (j *joinFederation) Complete(cmd *cobra.Command, args []string, config util.AdminConfig) error {
 	err := j.commonOptions.SetName(cmd, args)
 	if err != nil {
 		return err
@@ -125,112 +128,125 @@ func (j *joinFederation) Complete(cmd *cobra.Command, args []string) error {
 
 	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, cluster-context: %s, secret-name: %s, dry-run: %s", j.commonOptions.Name, j.commonOptions.Host, j.commonOptions.FederationSystemNamespace, j.commonOptions.Kubeconfig, j.options.clusterContext, j.options.secretName, j.options.dryRun)
 
+	glog.V(2).Infof("Performing preflight checks.")
+	err = j.performPreflightChecks(config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// performPreflightChecks checks that the host and joining clusters are in
+// a consistent state.
+// TODO: This currently only verifies a few things. Add more checks.
+func (j *joinFederation) performPreflightChecks(config util.AdminConfig) error {
+	joiningClusterFactory := config.ClusterFactory(j.options.clusterContext, j.commonOptions.Kubeconfig)
+	joiningClusterClient, err := joiningClusterFactory.ClientSet()
+
+	// Make sure there is no existing service account in the joining cluster.
+	saName := util.ClusterServiceAccountName(j.commonOptions.Name, j.commonOptions.Host)
+	sa, err := joiningClusterClient.Core().ServiceAccounts(j.commonOptions.FederationSystemNamespace).Get(saName, metav1.GetOptions{})
+	if sa != nil {
+		return fmt.Errorf("service account already exists in")
+	}
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
 	return nil
 }
 
 // Run is the implementation of the `join federation` command.
 func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Command) error {
+	clusterContext := j.options.clusterContext
+	dryRun := j.options.dryRun
+	federationNamespace := j.commonOptions.FederationSystemNamespace
+	host := j.commonOptions.Host
+	kubeconfig := j.commonOptions.Kubeconfig
+	federationName := j.commonOptions.Name
+	secretName := j.options.secretName
+
 	po := config.PathOptions()
-	po.LoadingRules.ExplicitPath = j.commonOptions.Kubeconfig
+	po.LoadingRules.ExplicitPath = kubeconfig
 	clientConfig, err := po.GetStartingConfig()
 	if err != nil {
 		return err
 	}
-	generator, err := clusterGenerator(clientConfig, j.commonOptions.Name, j.options.clusterContext, j.options.secretName)
+
+	joiningClusterFactory := config.ClusterFactory(clusterContext, kubeconfig)
+	joiningClusterClient, err := joiningClusterFactory.ClientSet()
+	if err != nil {
+		glog.V(2).Infof("Could not create client for joining cluster: %v", err)
+		return err
+	}
+
+	// TODO: This needs to check if the API server for the joining cluster supports RBAC.
+	// If the cluster does not, this should fall back to the old secret creation strategy.
+	glog.V(2).Info("Creating federation system namespace in joining cluster")
+	err = createFederationSystemNamespace(joiningClusterClient, federationNamespace, dryRun)
+	if err != nil {
+		glog.V(2).Info("Error creating federation system namespace in joining cluster: %v", err)
+		return err
+	}
+
+	glog.V(2).Info("Creating service account in joining cluster")
+	saName, err := createServiceAccount(joiningClusterClient, federationNamespace, federationName, host, dryRun)
+	if err != nil {
+		glog.V(2).Info("Error creating service account in joining cluster: %v", err)
+		return err
+	}
+	glog.V(2).Infof("Cluster credentials secret created")
+
+	glog.V(2).Info("Creating role binding for service account in joining cluster")
+	err = createClusterRoleBinding(joiningClusterClient, saName, clusterContext, federationNamespace, dryRun)
+	if err != nil {
+		glog.V(2).Info("Error creating role binding for service account in joining cluster: %v", err)
+		return err
+	}
+
+	hostFactory := config.ClusterFactory(host, kubeconfig)
+	hostClientset, err := hostFactory.ClientSet()
+	if err != nil {
+		glog.V(2).Infof("Could not get host clientset: %v", err)
+		return err
+	}
+
+	glog.V(2).Info("Creating secret in host cluster")
+	err = populateSecretInHostCluster(joiningClusterClient, hostClientset, saName, federationNamespace, secretName, dryRun)
+	if err != nil {
+		glog.V(2).Info("Error creating secret in host cluster: %v", err)
+		return err
+	}
+
+	glog.V(2).Info("Generating client")
+	generator, err := clusterGenerator(clientConfig, federationName, clusterContext, secretName)
 	if err != nil {
 		glog.V(2).Infof("Failed creating cluster generator: %v", err)
 		return err
 	}
 	glog.V(2).Infof("Created cluster generator: %#v", generator)
 
-	hostFactory := config.ClusterFactory(j.commonOptions.Host, j.commonOptions.Kubeconfig)
-	hostClientset, err := hostFactory.ClientSet()
-	if err != nil {
-		glog.V(2).Infof("Failed to get the cluster client for the host cluster: %q", j.commonOptions.Host, err)
-		return err
-	}
-
-	// We are not using the `kubectl create secret` machinery through
-	// `RunCreateSubcommand` as we do to the cluster resource below
-	// because we have a bunch of requirements that the machinery does
-	// not satisfy.
-	// 1. We want to create the secret in a specific namespace, which
-	//    is neither the "default" namespace nor the one specified
-	//    via the `--namespace` flag.
-	// 2. `SecretGeneratorV1` requires LiteralSources in a string-ified
-	//    form that it parses to generate the secret data key-value
-	//    pairs. We, however, have the key-value pairs ready without a
-	//    need for parsing.
-	// 3. The result printing mechanism needs to be mostly quiet. We
-	//    don't have to print the created secret in the default case.
-	// Having said that, secret generation machinery could be altered to
-	// suit our needs, but it is far less invasive and readable this way.
-	_, err = createSecret(hostClientset, clientConfig, j.commonOptions.FederationSystemNamespace, j.options.clusterContext, j.options.secretName, j.options.dryRun)
-	if err != nil {
-		glog.V(2).Infof("Failed creating the cluster credentials secret: %v", err)
-		return err
-	}
-	glog.V(2).Infof("Cluster credentials secret created")
-
+	glog.V(2).Info("Running kubectl")
 	err = kubectlcmd.RunCreateSubcommand(f, cmd, cmdOut, &kubectlcmd.CreateSubcommandOptions{
-		Name:                j.commonOptions.Name,
+		Name:                federationName,
 		StructuredGenerator: generator,
-		DryRun:              j.options.dryRun,
+		DryRun:              dryRun,
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
 	})
 	if err != nil {
+		glog.V(2).Infof("Failed rnning kubectl subcommand %v", err)
 		return err
 	}
 
 	// We further need to create a configmap named kube-config in the
 	// just registered cluster which will be consumed by the kube-dns
 	// of this cluster.
-	_, err = createConfigMap(hostClientset, config, j.commonOptions.FederationSystemNamespace, j.options.clusterContext, j.commonOptions.Kubeconfig, j.options.dryRun)
+	_, err = createConfigMap(hostClientset, config, federationNamespace, clusterContext, kubeconfig, dryRun)
 	if err != nil {
 		glog.V(2).Infof("Failed creating the config map in cluster: %v", err)
 		return err
 	}
 
 	return err
-}
-
-// minifyConfig is a wrapper around `clientcmdapi.MinifyConfig()` that
-// sets the current context to the given context before calling
-// `clientcmdapi.MinifyConfig()`.
-func minifyConfig(clientConfig *clientcmdapi.Config, context string) (*clientcmdapi.Config, error) {
-	// MinifyConfig inline-modifies the passed clientConfig. So we make a
-	// copy of it before passing the config to it. A shallow copy is
-	// sufficient because the underlying fields will be reconstructed by
-	// MinifyConfig anyway.
-	newClientConfig := *clientConfig
-	newClientConfig.CurrentContext = context
-	err := clientcmdapi.MinifyConfig(&newClientConfig)
-	if err != nil {
-		return nil, err
-	}
-	return &newClientConfig, nil
-}
-
-// createSecret extracts the kubeconfig for a given cluster and populates
-// a secret with that kubeconfig.
-func createSecret(clientset internalclientset.Interface, clientConfig *clientcmdapi.Config, namespace, contextName, secretName string, dryRun bool) (runtime.Object, error) {
-	// Minify the kubeconfig to ensure that there is only information
-	// relevant to the cluster we are registering.
-	newClientConfig, err := minifyConfig(clientConfig, contextName)
-	if err != nil {
-		glog.V(2).Infof("Failed to minify the kubeconfig for the given context %q: %v", contextName, err)
-		return nil, err
-	}
-
-	// Flatten the kubeconfig to ensure that all the referenced file
-	// contents are inlined.
-	err = clientcmdapi.FlattenConfig(newClientConfig)
-	if err != nil {
-		glog.V(2).Infof("Failed to flatten the kubeconfig for the given context %q: %v", contextName, err)
-		return nil, err
-	}
-
-	return util.CreateKubeconfigSecret(clientset, newClientConfig, namespace, secretName, dryRun)
 }
 
 // createConfigMap creates a configmap with name kube-dns in the joining cluster
@@ -365,4 +381,143 @@ func appendConfigMapString(existing string, toAppend string) string {
 		}
 	}
 	return fmt.Sprintf("%s,%s", existing, toAppend)
+}
+
+// createFederationSystemNamespace creates the federation-system namespace in the cluster
+// associated with clusterClient, if it doesn't already exist.
+func createFederationSystemNamespace(clusterClient internalclientset.Interface, federationNamespace string, dryRun bool) error {
+	federationNS := api.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: federationNamespace,
+		},
+	}
+
+	if dryRun {
+		return nil
+	}
+
+	_, err := clusterClient.Core().Namespaces().Create(&federationNS)
+	if err != nil && !errors.IsAlreadyExists(err) {
+		glog.V(2).Infof("Could not create federation-system namespace in client: %v", err)
+		return err
+	}
+	return nil
+}
+
+// createServiceAccount creates a service account in the cluster associated with clusterClient with
+// credentials that will be used by the host cluster to access its API server.
+func createServiceAccount(clusterClient internalclientset.Interface, namespace, federationName, hostContext string, dryRun bool) (string, error) {
+	saName := util.ClusterServiceAccountName(federationName, hostContext)
+	sa := &api.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      saName,
+			Namespace: namespace,
+		},
+	}
+
+	if dryRun {
+		return saName, nil
+	}
+
+	// Create a new service account.
+	_, err := clusterClient.Core().ServiceAccounts(namespace).Create(sa)
+	if err != nil {
+		glog.V(2).Infof("Could not create service account in joining cluster: %v", err)
+		return "", err
+	}
+
+	return saName, nil
+}
+
+// createClusterRoleBinding creates an RBAC role and binding that allows the
+// service account identified by saName to access all resources in all namespaces
+// in the cluster associated with clusterClient.
+func createClusterRoleBinding(clusterClient internalclientset.Interface, saName, clusterContext, namespace string, dryRun bool) error {
+	roleName := util.ClusterRoleName(saName)
+	role := &rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      roleName,
+			Namespace: namespace,
+		},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule(rbac.VerbAll).Groups(rbac.APIGroupAll).Resources(rbac.ResourceAll).RuleOrDie(),
+		},
+	}
+
+	// TODO: This should limit its access to only necessary resources.
+	rolebinding, err := rbac.NewClusterBinding(roleName).SAs(namespace, saName).Binding()
+	rolebinding.ObjectMeta.Namespace = namespace
+	if err != nil {
+		glog.V(2).Infof("Could not create role binding for service account: %v", err)
+		return err
+	}
+
+	if dryRun {
+		return nil
+	}
+
+	_, err = clusterClient.Rbac().ClusterRoles().Create(role)
+	if err != nil {
+		glog.V(2).Infof("Could not create role for service account in joining cluster: %v", err)
+		return err
+	}
+
+	_, err = clusterClient.Rbac().ClusterRoleBindings().Create(&rolebinding)
+	if err != nil {
+		glog.V(2).Infof("Could not create role binding for service account in joining cluster: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// populateSecretInHostCluster copies the service account secret for saName from the cluster
+// referenced by clusterClient to the client referenced by hostClient, putting it in a secret
+// named secretName in the provided namespace.
+func populateSecretInHostCluster(clusterClient, hostClient internalclientset.Interface, saName, namespace, secretName string, dryRun bool) error {
+	if dryRun {
+		return nil
+	}
+	// Get the secret from the joining cluster.
+	var sa *api.ServiceAccount
+	err := wait.PollInfinite(1*time.Second, func() (bool, error) {
+		var err error
+		sa, err = clusterClient.Core().ServiceAccounts(namespace).Get(saName, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(sa.Secrets) != 1 {
+		return fmt.Errorf("Expected 1 secret for service account %s, but got %v", sa.Name, sa.Secrets)
+	}
+
+	glog.V(2).Info("Getting secret named: %s", sa.Secrets[0].Name)
+	secret, err := clusterClient.Core().Secrets(namespace).Get(sa.Secrets[0].Name, metav1.GetOptions{})
+	if err != nil {
+		glog.V(2).Infof("Could not get service account secret from joining cluster: %v", err)
+		return err
+	}
+
+	// Create a parallel secret in the host cluster.
+	v1Secret := api.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+		},
+		Data: secret.Data,
+	}
+
+	glog.V(2).Infof("Creating secret in host cluster named: %s", v1Secret.Name)
+	_, err = hostClient.Core().Secrets(namespace).Create(&v1Secret)
+	if err != nil {
+		glog.V(2).Infof("Could not create secret in host cluster: %v", err)
+		return err
+	}
+	return nil
 }
