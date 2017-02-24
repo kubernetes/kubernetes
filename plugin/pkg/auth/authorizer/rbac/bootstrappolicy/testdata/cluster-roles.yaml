@@ -369,6 +369,7 @@ items:
     - /api/*
     - /apis
     - /apis/*
+    - /healthz
     - /swaggerapi
     - /swaggerapi/*
     - /version
