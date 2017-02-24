@@ -20,34 +20,46 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+func getClaimRefNamespace(pv *api.PersistentVolume) string {
+	if pv.Spec.ClaimRef != nil {
+		return pv.Spec.ClaimRef.Namespace
+	}
+	return ""
+}
+
 // VisitPVSecretNames invokes the visitor function with the name of every secret
 // referenced by the PV spec. If visitor returns false, visiting is short-circuited.
 // Returns true if visiting completed, false if visiting was short-circuited.
-func VisitPVSecretNames(pv *api.PersistentVolume, visitor func(string) bool) bool {
+func VisitPVSecretNames(pv *api.PersistentVolume, visitor func(string, string) bool) bool {
 	source := &pv.Spec.PersistentVolumeSource
 	switch {
 	case source.AzureFile != nil:
-		if len(source.AzureFile.SecretName) > 0 && !visitor(source.AzureFile.SecretName) {
+		if len(source.AzureFile.SecretName) > 0 && !visitor(getClaimRefNamespace(pv), source.AzureFile.SecretName) {
 			return false
 		}
+		return true
 	case source.CephFS != nil:
-		if source.CephFS.SecretRef != nil && !visitor(source.CephFS.SecretRef.Name) {
+		if source.CephFS.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.CephFS.SecretRef.Name) {
 			return false
 		}
 	case source.FlexVolume != nil:
-		if source.FlexVolume.SecretRef != nil && !visitor(source.FlexVolume.SecretRef.Name) {
+		if source.FlexVolume.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.FlexVolume.SecretRef.Name) {
 			return false
 		}
 	case source.RBD != nil:
-		if source.RBD.SecretRef != nil && !visitor(source.RBD.SecretRef.Name) {
+		if source.RBD.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.RBD.SecretRef.Name) {
 			return false
 		}
 	case source.ScaleIO != nil:
-		if source.ScaleIO.SecretRef != nil && !visitor(source.ScaleIO.SecretRef.Name) {
+		if source.ScaleIO.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.ScaleIO.SecretRef.Name) {
 			return false
 		}
 	case source.ISCSI != nil:
-		if source.ISCSI.SecretRef != nil && !visitor(source.ISCSI.SecretRef.Name) {
+		if source.ISCSI.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.ISCSI.SecretRef.Name) {
+			return false
+		}
+	case source.StorageOS != nil:
+		if source.StorageOS.SecretRef != nil && !visitor(source.StorageOS.SecretRef.Namespace, source.StorageOS.SecretRef.Name) {
 			return false
 		}
 	}

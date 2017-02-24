@@ -1161,6 +1161,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
 	"local":                "Local represents directly-attached storage with node affinity",
+	"storageos":            "StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1875,6 +1876,32 @@ func (ServiceStatus) SwaggerDoc() map[string]string {
 	return map_ServiceStatus
 }
 
+var map_StorageOSPersistentVolumeSource = map[string]string{
+	"":                "Represents a StorageOS persistent volume resource.",
+	"volumeName":      "VolumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
+	"volumeNamespace": "VolumeNamespace specifies the scope of the volume within StorageOS.  If no namespace is specified then the Pod's namespace will be used.  This allows the Kubernetes name scoping to be mirrored within StorageOS for tighter integration. Set VolumeName to any name to override the default behaviour. Set to \"default\" if you are not using namespaces within StorageOS. Namespaces that do not pre-exist within StorageOS will be created.",
+	"fsType":          "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":        "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"secretRef":       "SecretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.",
+}
+
+func (StorageOSPersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_StorageOSPersistentVolumeSource
+}
+
+var map_StorageOSVolumeSource = map[string]string{
+	"":                "Represents a StorageOS persistent volume resource.",
+	"volumeName":      "VolumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
+	"volumeNamespace": "VolumeNamespace specifies the scope of the volume within StorageOS.  If no namespace is specified then the Pod's namespace will be used.  This allows the Kubernetes name scoping to be mirrored within StorageOS for tighter integration. Set VolumeName to any name to override the default behaviour. Set to \"default\" if you are not using namespaces within StorageOS. Namespaces that do not pre-exist within StorageOS will be created.",
+	"fsType":          "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":        "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"secretRef":       "SecretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.",
+}
+
+func (StorageOSVolumeSource) SwaggerDoc() map[string]string {
+	return map_StorageOSVolumeSource
+}
+
 var map_Sysctl = map[string]string{
 	"":      "Sysctl defines a kernel parameter to be set",
 	"Name":  "Name of a property to set",
@@ -1980,6 +2007,7 @@ var map_VolumeSource = map[string]string{
 	"projected":            "Items for all in one resources secrets, configmaps, and downward API",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"storageos":            "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {
