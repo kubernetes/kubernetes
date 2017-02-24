@@ -12965,58 +12965,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/apps/v1beta1.DeploymentSpec", "k8s.io/kubernetes/pkg/apis/apps/v1beta1.DeploymentStatus"},
 		},
-		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.DeploymentCondition": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "DeploymentCondition describes the state of a deployment at a certain point.",
-					Properties: map[string]spec.Schema{
-						"type": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Type of deployment condition.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"status": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Status of the condition, one of True, False, Unknown.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"lastUpdateTime": {
-							SchemaProps: spec.SchemaProps{
-								Description: "The last time this condition was updated.",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
-							},
-						},
-						"lastTransitionTime": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Last time the condition transitioned from one status to another.",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
-							},
-						},
-						"reason": {
-							SchemaProps: spec.SchemaProps{
-								Description: "The reason for the condition's last transition.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"message": {
-							SchemaProps: spec.SchemaProps{
-								Description: "A human readable message indicating details about the transition.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-					},
-					Required: []string{"type", "status"},
-				},
-			},
-			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
-		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DeploymentCondition": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -13069,50 +13017,57 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 		},
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DeploymentList": {
+		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.DeploymentCondition": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
-					Description: "DeploymentList is a list of Deployments.",
+					Description: "DeploymentCondition describes the state of a deployment at a certain point.",
 					Properties: map[string]spec.Schema{
-						"kind": {
+						"type": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Description: "Type of deployment condition.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
-						"apiVersion": {
+						"status": {
 							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Description: "Status of the condition, one of True, False, Unknown.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
-						"metadata": {
+						"lastUpdateTime": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Standard list metadata.",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+								Description: "The last time this condition was updated.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 							},
 						},
-						"items": {
+						"lastTransitionTime": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Items is the list of Deployments.",
-								Type:        []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Deployment"),
-										},
-									},
-								},
+								Description: "Last time the condition transitioned from one status to another.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							},
+						},
+						"reason": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The reason for the condition's last transition.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"message": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A human readable message indicating details about the transition.",
+								Type:        []string{"string"},
+								Format:      "",
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"type", "status"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Deployment"},
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 		},
 		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.DeploymentList": {
 			Schema: spec.Schema{
@@ -13159,10 +13114,10 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/apps/v1beta1.Deployment"},
 		},
-		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.DeploymentRollback": {
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DeploymentList": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
-					Description: "DeploymentRollback stores the information required to rollback a deployment.",
+					Description: "DeploymentList is a list of Deployments.",
 					Properties: map[string]spec.Schema{
 						"kind": {
 							SchemaProps: spec.SchemaProps{
@@ -13178,39 +13133,31 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"name": {
+						"metadata": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Required: This must match the Name of a deployment.",
-								Type:        []string{"string"},
-								Format:      "",
+								Description: "Standard list metadata.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
 							},
 						},
-						"updatedAnnotations": {
+						"items": {
 							SchemaProps: spec.SchemaProps{
-								Description: "The annotations to be updated to a deployment",
-								Type:        []string{"object"},
-								AdditionalProperties: &spec.SchemaOrBool{
+								Description: "Items is the list of Deployments.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
-											Type:   []string{"string"},
-											Format: "",
+											Ref: ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Deployment"),
 										},
 									},
 								},
 							},
 						},
-						"rollbackTo": {
-							SchemaProps: spec.SchemaProps{
-								Description: "The config of this deployment rollback.",
-								Ref:         ref("k8s.io/kubernetes/pkg/apis/apps/v1beta1.RollbackConfig"),
-							},
-						},
 					},
-					Required: []string{"name", "rollbackTo"},
+					Required: []string{"items"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/apis/apps/v1beta1.RollbackConfig"},
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Deployment"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DeploymentRollback": {
 			Schema: spec.Schema{
@@ -13264,6 +13211,59 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollbackConfig"},
+		},
+		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.DeploymentRollback": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "DeploymentRollback stores the information required to rollback a deployment.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Required: This must match the Name of a deployment.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"updatedAnnotations": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The annotations to be updated to a deployment",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"rollbackTo": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The config of this deployment rollback.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/apps/v1beta1.RollbackConfig"),
+							},
+						},
+					},
+					Required: []string{"name", "rollbackTo"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/apps/v1beta1.RollbackConfig"},
 		},
 		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.DeploymentSpec": {
 			Schema: spec.Schema{
@@ -15401,7 +15401,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDeployment": {
+		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.RollingUpdateDeployment": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					Description: "Spec to control the desired behavior of rolling update.",
@@ -15424,7 +15424,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 		},
-		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.RollingUpdateDeployment": {
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDeployment": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					Description: "Spec to control the desired behavior of rolling update.",
@@ -15504,49 +15504,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/api/v1.SELinuxOptions"},
 		},
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Scale": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "represents a scaling request for a resource.",
-					Properties: map[string]spec.Schema{
-						"kind": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"apiVersion": {
-							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"metadata": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-							},
-						},
-						"spec": {
-							SchemaProps: spec.SchemaProps{
-								Description: "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
-								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ScaleSpec"),
-							},
-						},
-						"status": {
-							SchemaProps: spec.SchemaProps{
-								Description: "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.",
-								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ScaleStatus"),
-							},
-						},
-					},
-				},
-			},
-			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ScaleSpec", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ScaleStatus"},
-		},
 		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.Scale": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -15590,6 +15547,49 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/apps/v1beta1.ScaleSpec", "k8s.io/kubernetes/pkg/apis/apps/v1beta1.ScaleStatus"},
 		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Scale": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "represents a scaling request for a resource.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ScaleSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ScaleStatus"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ScaleSpec", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ScaleStatus"},
+		},
 		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.ScaleSpec": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -15624,10 +15624,10 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
-		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.ScaleStatus": {
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ScaleStatus": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
-					Description: "ScaleStatus represents the current status of a scale subresource.",
+					Description: "represents the current status of a scale subresource.",
 					Properties: map[string]spec.Schema{
 						"replicas": {
 							SchemaProps: spec.SchemaProps{
@@ -15663,10 +15663,10 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
-		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ScaleStatus": {
+		"k8s.io/kubernetes/pkg/apis/apps/v1beta1.ScaleStatus": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
-					Description: "represents the current status of a scale subresource.",
+					Description: "ScaleStatus represents the current status of a scale subresource.",
 					Properties: map[string]spec.Schema{
 						"replicas": {
 							SchemaProps: spec.SchemaProps{

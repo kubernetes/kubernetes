@@ -905,6 +905,7 @@ var (
 	Quobyte               FSType = "quobyte"
 	AzureDisk             FSType = "azureDisk"
 	PhotonPersistentDisk  FSType = "photonPersistentDisk"
+	Projected             FSType = "projected"
 	All                   FSType = "*"
 )
 
