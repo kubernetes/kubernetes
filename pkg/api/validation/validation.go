@@ -1015,12 +1015,12 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 
 	metaField := field.NewPath("metadata")
 	if volumePlugin == nil && len(mountOptions) > 0 {
-		allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", volume.MountOptionAnnotation), "may not specify mount options for this volume type"))
+		allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", volume.MountOptionAnnotation), "1 may not specify mount options for this volume type"))
 	}
 
 	if volumePlugin != nil {
 		if !volumePlugin.SupportsMountOption() && len(mountOptions) > 0 {
-			allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", volume.MountOptionAnnotation), "may not specify mount options for this volume type"))
+			allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", volume.MountOptionAnnotation), " 2 may not specify mount options for this volume type"))
 		}
 	}
 

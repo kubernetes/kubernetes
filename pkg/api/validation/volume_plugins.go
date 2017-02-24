@@ -101,7 +101,7 @@ func findPluginBySpec(volumePlugins []volume.VolumePlugin, pv *api.PersistentVol
 		return nil
 	}
 
-	if len(matches) > 0 {
+	if len(matches) > 1 {
 		glog.V(3).Infof("multiple volume plugins matched for : %s ", pv.Name)
 		return nil
 	}
