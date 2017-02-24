@@ -107,6 +107,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/credentialprovider:go_default_library",
+        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/events:go_default_library",

@@ -1154,57 +1154,6 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestMakePortMappings(t *testing.T) {
-	port := func(name string, protocol v1.Protocol, containerPort, hostPort int32, ip string) v1.ContainerPort {
-		return v1.ContainerPort{
-			Name:          name,
-			Protocol:      protocol,
-			ContainerPort: containerPort,
-			HostPort:      hostPort,
-			HostIP:        ip,
-		}
-	}
-	portMapping := func(name string, protocol v1.Protocol, containerPort, hostPort int, ip string) kubecontainer.PortMapping {
-		return kubecontainer.PortMapping{
-			Name:          name,
-			Protocol:      protocol,
-			ContainerPort: containerPort,
-			HostPort:      hostPort,
-			HostIP:        ip,
-		}
-	}
-
-	tests := []struct {
-		container            *v1.Container
-		expectedPortMappings []kubecontainer.PortMapping
-	}{
-		{
-			&v1.Container{
-				Name: "fooContainer",
-				Ports: []v1.ContainerPort{
-					port("", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-					port("", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
-					port("foo", v1.ProtocolUDP, 555, 5555, ""),
-					// Duplicated, should be ignored.
-					port("foo", v1.ProtocolUDP, 888, 8888, ""),
-					// Duplicated, should be ignored.
-					port("", v1.ProtocolTCP, 80, 8888, ""),
-				},
-			},
-			[]kubecontainer.PortMapping{
-				portMapping("fooContainer-TCP:80", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-				portMapping("fooContainer-TCP:443", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
-				portMapping("fooContainer-foo", v1.ProtocolUDP, 555, 5555, ""),
-			},
-		},
-	}
-
-	for i, tt := range tests {
-		actual := makePortMappings(tt.container)
-		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
-	}
-}
-
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
