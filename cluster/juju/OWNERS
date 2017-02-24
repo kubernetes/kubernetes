@@ -4,13 +4,14 @@ approvers:
 - marcoceppi
 - mbruzek
 reviewers:
+- chuckbutler
+- marcoceppi
+- mbruzek
 - thockin
 - mikedanese
 - nikhiljindal
-- pmorie
 - eparis
 - jlowdermilk
-- jsafrane
 - krousey
 - david-mcmahon
 - Cynerva
