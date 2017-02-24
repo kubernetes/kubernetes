@@ -325,9 +325,9 @@ func InitQOS(cgroupDriver, rootContainer string, subsystems *CgroupSubsystems) (
 	}
 	// Store the top level qos container names
 	qosContainersInfo := QOSContainersInfo{
-		Guaranteed: path.Join(rootContainer, defaultNodeAllocatableCgroupName),
-		Burstable:  path.Join(rootContainer, defaultNodeAllocatableCgroupName, string(v1.PodQOSBurstable)),
-		BestEffort: path.Join(rootContainer, defaultNodeAllocatableCgroupName, string(v1.PodQOSBestEffort)),
+		Guaranteed: rootContainer,
+		Burstable:  path.Join(rootContainer, string(v1.PodQOSBurstable)),
+		BestEffort: path.Join(rootContainer, string(v1.PodQOSBestEffort)),
 	}
 	return qosContainersInfo, nil
 }

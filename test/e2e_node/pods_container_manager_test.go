@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -67,7 +68,7 @@ func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *v1.Pod {
 			cgroupFsNames = append(cgroupFsNames, string(cgroupName))
 		}
 	}
-
+	glog.Infof("expecting %v cgroups to be found", cgroupFsNames)
 	// build the pod command to either verify cgroups exist
 	command := ""
 	for _, cgroupFsName := range cgroupFsNames {
