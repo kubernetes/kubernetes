@@ -104,7 +104,7 @@ func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRem
 		var node *v1.Node
 		var err error
 		for i := 0; i < maxRetries; i++ {
-			node, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("Error getting node %s: %v", nodeName, err)
 				continue
@@ -119,7 +119,7 @@ func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRem
 					delete(node.ObjectMeta.Labels, k)
 				}
 			}
-			_, err = c.Core().Nodes().Update(node)
+			_, err = c.CoreV1().Nodes().Update(node)
 			if err != nil {
 				framework.Logf("Error updating node %s: %v", nodeName, err)
 			} else {
@@ -213,13 +213,13 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 			},
 		},
 	}
-	rtnPod, err := c.Core().Pods(ns).Create(pod)
+	rtnPod, err := c.CoreV1().Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = f.WaitForPodReady(rtnPod.Name) // running & ready
 	Expect(err).NotTo(HaveOccurred())
 
-	rtnPod, err = c.Core().Pods(ns).Get(rtnPod.Name, metav1.GetOptions{}) // return fresh pod
+	rtnPod, err = c.CoreV1().Pods(ns).Get(rtnPod.Name, metav1.GetOptions{}) // return fresh pod
 	Expect(err).NotTo(HaveOccurred())
 
 	return rtnPod
@@ -503,7 +503,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				movePodUidDir(c, pod)
 
 				By("Delete the pod mounted to the NFS volume")
-				deletePodWithWait(f, c, pod)
+				framework.DeletePodWithWait(f, c, pod)
 				// pod object is now stale, but is intentionally not nil
 				// Note: the pod's nfs mount, now in /tmp, will not be unmounted
 
