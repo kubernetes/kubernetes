@@ -40,12 +40,11 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		gclLogsProvider, err := newGclLogsProvider(f)
 		framework.ExpectNoError(err, "Failed to create GCL logs provider")
 
-		nodeCount := len(framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items)
-		podCount := 30 * nodeCount
+		podCount := 30
 		loggingDuration := 10 * time.Minute
-		linesPerSecond := 1000 * nodeCount
+		linesPerSecond := 1000
 		linesPerPod := linesPerSecond * int(loggingDuration.Seconds()) / podCount
-		ingestionTimeout := 10 * time.Minute
+		ingestionTimeout := 1 * time.Hour
 
 		By("Running logs generator pods")
 		pods := []*loggingPod{}
@@ -79,12 +78,11 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		gclLogsProvider, err := newGclLogsProvider(f)
 		framework.ExpectNoError(err, "Failed to create GCL logs provider")
 
-		nodeCount := len(framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items)
-		maxPodCount := 10 * nodeCount
+		maxPodCount := 10
 		jobDuration := 1 * time.Minute
-		linesPerPodPerSecond := 100
-		testDuration := 10 * time.Minute
-		ingestionTimeout := 10 * time.Minute
+		linesPerPodPerSecond := 10
+		testDuration := 1 * time.Hour
+		ingestionTimeout := 1 * time.Hour
 
 		podRunDelay := time.Duration(int64(jobDuration) / int64(maxPodCount))
 		podRunCount := int(testDuration.Seconds())/int(podRunDelay.Seconds()) - 1
