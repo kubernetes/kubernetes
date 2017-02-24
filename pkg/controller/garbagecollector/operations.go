@@ -47,7 +47,7 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool
 	return &resource, nil
 }
 
-func (gc *GarbageCollector) deleteObject(item objectReference, policy metav1.DeletionPropagation) error {
+func (gc *GarbageCollector) deleteObject(item objectReference, policy *metav1.DeletionPropagation) error {
 	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
@@ -57,7 +57,7 @@ func (gc *GarbageCollector) deleteObject(item objectReference, policy metav1.Del
 	}
 	uid := item.UID
 	preconditions := metav1.Preconditions{UID: &uid}
-	deleteOptions := metav1.DeleteOptions{Preconditions: &preconditions, PropagationPolicy: &policy}
+	deleteOptions := metav1.DeleteOptions{Preconditions: &preconditions, PropagationPolicy: policy}
 	return client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
 }
 

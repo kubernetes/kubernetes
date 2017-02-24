@@ -3416,16 +3416,14 @@ type Preconditions struct {
 type DeletionPropagation string
 
 const (
-	// The default depends on the existing finalizers on the object and the type of the object.
-	Default DeletionPropagation = "Default"
 	// Orphans the dependents.
-	Orphan DeletionPropagation = "Orphan"
+	DeletePropagationOrphan DeletionPropagation = "Orphan"
 	// Deletes the object from the key-value store, the garbage collector will delete the dependents in the background.
-	Background DeletionPropagation = "Background"
+	DeletePropagationBackground DeletionPropagation = "Background"
 	// The object exists in the key-value store until the garbage collector deletes all the dependents whose ownerReference.blockOwnerDeletion=true from the key-value store.
 	// API sever will put the "DeletingDependents" finalizer on the object, and sets its deletionTimestamp.
 	// This policy is cascading, i.e., the dependents will be deleted with Foreground.
-	Foreground DeletionPropagation = "Foreground"
+	DeletePropagationForeground DeletionPropagation = "Foreground"
 )
 
 // DeleteOptions may be provided when deleting an API object
@@ -3446,8 +3444,10 @@ type DeleteOptions struct {
 	// +optional
 	Preconditions *Preconditions `json:"preconditions,omitempty" protobuf:"bytes,2,opt,name=preconditions"`
 
+	// Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7.
 	// Should the dependent objects be orphaned. If true/false, the "orphan"
 	// finalizer will be added to/removed from the object's finalizers list.
+	// Either this field or PropagationPolicy may be set, but not both.
 	// +optional
 	OrphanDependents *bool `json:"orphanDependents,omitempty" protobuf:"varint,3,opt,name=orphanDependents"`
 

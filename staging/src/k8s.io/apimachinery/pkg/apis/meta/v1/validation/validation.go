@@ -83,9 +83,8 @@ func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 	if options.PropagationPolicy != nil &&
 		*options.PropagationPolicy != metav1.DeletePropagationForeground &&
 		*options.PropagationPolicy != metav1.DeletePropagationBackground &&
-		*options.PropagationPolicy != metav1.DeletePropagationDefault &&
 		*options.PropagationPolicy != metav1.DeletePropagationOrphan {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(""), options, fmt.Sprintf("DeletionPropagation need to be one of %q, %q, %q or %q", metav1.DeletePropagationForeground, metav1.DeletePropagationBackground, metav1.DeletePropagationDefault, metav1.DeletePropagationOrphan)))
+		allErrs = append(allErrs, field.Invalid(field.NewPath(""), options, fmt.Sprintf("DeletionPropagation need to be one of %q, %q, %q or nil", metav1.DeletePropagationForeground, metav1.DeletePropagationBackground, metav1.DeletePropagationOrphan)))
 	}
 	return allErrs
 }

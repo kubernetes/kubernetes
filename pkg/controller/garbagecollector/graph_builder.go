@@ -313,10 +313,7 @@ func deletionStarts(oldObj interface{}, newAccessor metav1.Object) bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err))
 		return false
 	}
-	if newAccessor.GetDeletionTimestamp() == nil || oldAccessor.GetDeletionTimestamp() != nil {
-		return false
-	}
-	return true
+	return beingDeleted(newAccessor) && !beingDeleted(oldAccessor)
 }
 
 func beingDeleted(accessor metav1.Object) bool {
@@ -333,7 +330,7 @@ func hasDeleteDependentsFinalizer(accessor metav1.Object) bool {
 	return false
 }
 
-func hasOrphanFianlizer(accessor metav1.Object) bool {
+func hasOrphanFinalizer(accessor metav1.Object) bool {
 	finalizers := accessor.GetFinalizers()
 	for _, finalizer := range finalizers {
 		if finalizer == metav1.FinalizerOrphanDependents {
@@ -352,11 +349,11 @@ func startsWaitingForDependentsDeleted(oldObj interface{}, newAccessor metav1.Ob
 // this function takes newAccessor directly because the caller already
 // instantiates an accessor for the newObj.
 func startsWaitingForDependentsOrphaned(oldObj interface{}, newAccessor metav1.Object) bool {
-	return deletionStarts(oldObj, newAccessor) && hasOrphanFianlizer(newAccessor)
+	return deletionStarts(oldObj, newAccessor) && hasOrphanFinalizer(newAccessor)
 }
 
 // if an blocking ownerReference points to an object gets removed, or gets set to
-// "BlockOwnerDeletion=false", add the object to the dirty queue.
+// "BlockOwnerDeletion=false", add the object to the attemptToDelete queue.
 func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerReference, changed []ownerRefPair) {
 	for _, ref := range removed {
 		if ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion {

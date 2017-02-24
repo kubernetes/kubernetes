@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -163,6 +164,51 @@ func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.Metadata
 	}
 }
 
+// isDangling check if a reference is pointing to an object that doesn't exist.
+// If isDangling looks up the referenced object at the API server, it also
+// returns its latest state.
+func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *node) (
+	dangling bool, owner *unstructured.Unstructured, err error) {
+	if gc.absentOwnerCache.Has(reference.UID) {
+		glog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		return true, nil, nil
+	}
+	// TODO: we need to verify the reference resource is supported by the
+	// system. If it's not a valid resource, the garbage collector should i)
+	// ignore the reference when decide if the object should be deleted, and
+	// ii) should update the object to remove such references. This is to
+	// prevent objects having references to an old resource from being
+	// deleted during a cluster upgrade.
+	fqKind := schema.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
+	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+	if err != nil {
+		return false, nil, err
+	}
+	resource, err := gc.apiResource(reference.APIVersion, reference.Kind, len(item.identity.Namespace) != 0)
+	if err != nil {
+		return false, nil, err
+	}
+	// TODO: It's only necessary to talk to the API server if the owner node
+	// is a "virtual" node. The local graph could lag behind the real
+	// status, but in practice, the difference is small.
+	owner, err = client.Resource(resource, item.identity.Namespace).Get(reference.Name)
+	switch {
+	case errors.IsNotFound(err):
+		gc.absentOwnerCache.Add(reference.UID)
+		glog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		return true, nil, nil
+	case err != nil:
+		return false, nil, err
+	}
+
+	if owner.GetUID() != reference.UID {
+		glog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		gc.absentOwnerCache.Add(reference.UID)
+		return true, nil, nil
+	}
+	return false, owner, nil
+}
+
 // classify the latestReferences to three categories:
 // solid: the owner exists, and is not "waitingForDependentsDeletion"
 // dangling: the owner does not exist
@@ -172,43 +218,11 @@ func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.Metadata
 func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []metav1.OwnerReference) (
 	solid, dangling, waitingForDependentsDeletion []metav1.OwnerReference, err error) {
 	for _, reference := range latestReferences {
-		if gc.absentOwnerCache.Has(reference.UID) {
-			glog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
-			dangling = append(dangling, reference)
-			continue
-		}
-		// TODO: we need to verify the reference resource is supported by the
-		// system. If it's not a valid resource, the garbage collector should i)
-		// ignore the reference when decide if the object should be deleted, and
-		// ii) should update the object to remove such references. This is to
-		// prevent objects having references to an old resource from being
-		// deleted during a cluster upgrade.
-		fqKind := schema.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
-		client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+		isDangling, owner, err := gc.isDangling(reference, item)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		resource, err := gc.apiResource(reference.APIVersion, reference.Kind, len(item.identity.Namespace) != 0)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		// TODO: It's only necessary to talk to the API server if the owner node
-		// is a "virtual" node. The local graph could lag behind the real
-		// status, but in practice, the difference is small.
-		owner, err := client.Resource(resource, item.identity.Namespace).Get(reference.Name)
-		switch {
-		case errors.IsNotFound(err):
-			gc.absentOwnerCache.Add(reference.UID)
-			glog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
-			dangling = append(dangling, reference)
-			continue
-		case err != nil:
-			return nil, nil, nil, err
-		}
-
-		if owner.GetUID() != reference.UID {
-			glog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
-			gc.absentOwnerCache.Add(reference.UID)
+		if isDangling {
 			dangling = append(dangling, reference)
 			continue
 		}
@@ -329,13 +343,14 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		// doesn't have dependents, the function will remove the
 		// FinalizerDeletingDependents from the item, resulting in the final
 		// deletion of the item.
-		return gc.deleteObject(item.identity, metav1.DeletePropagationForeground)
+		policy := metav1.DeletePropagationForeground
+		return gc.deleteObject(item.identity, &policy)
 	default:
 		// item doesn't have any solid owner, so it needs to be garbage
 		// collected. Also, none of item's owners is waiting for the deletion of
 		// the dependents, so GC deletes item with Default.
 		glog.V(2).Infof("delete object %s with Default", item.identity)
-		return gc.deleteObject(item.identity, metav1.DeletePropagationDefault)
+		return gc.deleteObject(item.identity, nil)
 	}
 }
 
@@ -372,7 +387,7 @@ func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents [
 	if len(failedDependents) != 0 {
 		return fmt.Errorf("failed to orphan dependents of owner %s, got errors: %s", owner, utilerrors.NewAggregate(errorsSlice).Error())
 	}
-	glog.V(5).Infof("successfully updated all dependents")
+	glog.V(5).Infof("successfully updated all dependents of owner %s", owner)
 	return nil
 }
 
@@ -420,8 +435,7 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 	return true
 }
 
-// *FOR TEST USE ONLY* It's not safe to call this function when the GC is still
-// busy.
+// *FOR TEST USE ONLY*
 // GraphHasUID returns if the GraphBuilder has a particular UID store in its
 // uidToNode graph. It's useful for debugging.
 // This method is used by integration tests.

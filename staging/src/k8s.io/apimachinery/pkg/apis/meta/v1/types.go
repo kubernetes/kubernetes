@@ -73,7 +73,6 @@ type ListMeta struct {
 
 // These are internal finalizer values for Kubernetes-like APIs, must be qualified name unless defined here
 const (
-	FinalizerOrphan           string = "orphan"
 	FinalizerOrphanDependents string = "orphan"
 	FinalizerDeleteDependents string = "foregroundDeletion"
 )
@@ -320,9 +319,6 @@ type GetOptions struct {
 type DeletionPropagation string
 
 const (
-	// The default depends on the existing finalizers on the object and the type
-	// of the object.
-	DeletePropagationDefault DeletionPropagation = "Default"
 	// Orphans the dependents.
 	DeletePropagationOrphan DeletionPropagation = "Orphan"
 	// Deletes the object from the key-value store, the garbage collector will
@@ -352,9 +348,10 @@ type DeleteOptions struct {
 	// +optional
 	Preconditions *Preconditions `json:"preconditions,omitempty" protobuf:"bytes,2,opt,name=preconditions"`
 
-	// Deprecated: please use the PropagationPolicy.
+	// Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7.
 	// Should the dependent objects be orphaned. If true/false, the "orphan"
 	// finalizer will be added to/removed from the object's finalizers list.
+	// Either this field or PropagationPolicy may be set, but not both.
 	// +optional
 	OrphanDependents *bool `json:"orphanDependents,omitempty" protobuf:"varint,3,opt,name=orphanDependents"`
 

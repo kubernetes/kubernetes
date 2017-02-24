@@ -1097,7 +1097,6 @@ func TestStoreDeletionPropagation(t *testing.T) {
 	foregroundPolicy := metav1.DeletePropagationForeground
 	backgroundPolicy := metav1.DeletePropagationBackground
 	orphanPolicy := metav1.DeletePropagationOrphan
-	defaultPolicy := metav1.DeletePropagationDefault
 
 	testcases := map[string]struct {
 		options  *metav1.DeleteOptions
@@ -1138,12 +1137,12 @@ func TestStoreDeletionPropagation(t *testing.T) {
 			expectedFinalizers: []string{metav1.FinalizerOrphanDependents},
 		},
 		"no existing finalizers, PropagationPolicy=Default, defaultDeleteStrategy": {
-			options:          &metav1.DeleteOptions{PropagationPolicy: &defaultPolicy},
+			options:          &metav1.DeleteOptions{PropagationPolicy: nil},
 			strategy:         defaultDeleteStrategy,
 			expectedNotFound: true,
 		},
 		"no existing finalizers, PropagationPolicy=Default, orphanDeleteStrategy": {
-			options:            &metav1.DeleteOptions{PropagationPolicy: &defaultPolicy},
+			options:            &metav1.DeleteOptions{PropagationPolicy: nil},
 			strategy:           orphanDeleteStrategy,
 			expectedFinalizers: []string{metav1.FinalizerOrphanDependents},
 		},
@@ -1186,13 +1185,13 @@ func TestStoreDeletionPropagation(t *testing.T) {
 			expectedFinalizers: []string{metav1.FinalizerOrphanDependents},
 		},
 		"existing orphan finalizer, PropagationPolicy=Default, defaultDeleteStrategy": {
-			options:            &metav1.DeleteOptions{PropagationPolicy: &defaultPolicy},
+			options:            &metav1.DeleteOptions{PropagationPolicy: nil},
 			strategy:           defaultDeleteStrategy,
 			existingFinalizers: []string{metav1.FinalizerOrphanDependents},
 			expectedFinalizers: []string{metav1.FinalizerOrphanDependents},
 		},
 		"existing orphan finalizer, PropagationPolicy=Default, orphanDeleteStrategy": {
-			options:            &metav1.DeleteOptions{PropagationPolicy: &defaultPolicy},
+			options:            &metav1.DeleteOptions{PropagationPolicy: nil},
 			strategy:           orphanDeleteStrategy,
 			existingFinalizers: []string{metav1.FinalizerOrphanDependents},
 			expectedFinalizers: []string{metav1.FinalizerOrphanDependents},
@@ -1236,13 +1235,13 @@ func TestStoreDeletionPropagation(t *testing.T) {
 			expectedFinalizers: []string{metav1.FinalizerOrphanDependents},
 		},
 		"existing deleteDependents finalizer, PropagationPolicy=Default, defaultDeleteStrategy": {
-			options:            &metav1.DeleteOptions{PropagationPolicy: &defaultPolicy},
+			options:            &metav1.DeleteOptions{PropagationPolicy: nil},
 			strategy:           defaultDeleteStrategy,
 			existingFinalizers: []string{metav1.FinalizerDeleteDependents},
 			expectedFinalizers: []string{metav1.FinalizerDeleteDependents},
 		},
 		"existing deleteDependents finalizer, PropagationPolicy=Default, orphanDeleteStrategy": {
-			options:            &metav1.DeleteOptions{PropagationPolicy: &defaultPolicy},
+			options:            &metav1.DeleteOptions{PropagationPolicy: nil},
 			strategy:           orphanDeleteStrategy,
 			existingFinalizers: []string{metav1.FinalizerDeleteDependents},
 			expectedFinalizers: []string{metav1.FinalizerDeleteDependents},
