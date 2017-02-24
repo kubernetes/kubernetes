@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -342,6 +343,88 @@ func TestStatefulSetControllerGetStatefulSetForPodOverlapping(t *testing.T) {
 		t.Error("Failed to get StatefulSet for Pod")
 	} else if found.Name != set.Name {
 		t.Errorf("Returned wrong StatefulSet %s for Pod", set.Name)
+	}
+}
+
+func TestGetPodsForStatefulSetAdopt(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set := newStatefulSet(5)
+	pod1 := newStatefulSetPod(set, 1)
+	// pod2 is an orphan with matching labels and name.
+	pod2 := newStatefulSetPod(set, 2)
+	pod2.OwnerReferences = nil
+	// pod3 has wrong labels.
+	pod3 := newStatefulSetPod(set, 3)
+	pod3.OwnerReferences = nil
+	pod3.Labels = nil
+	// pod4 has wrong name.
+	pod4 := newStatefulSetPod(set, 4)
+	pod4.OwnerReferences = nil
+	pod4.Name = "x" + pod4.Name
+
+	spc.podsIndexer.Add(pod1)
+	spc.podsIndexer.Add(pod2)
+	spc.podsIndexer.Add(pod3)
+	spc.podsIndexer.Add(pod4)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods, err := ssc.getPodsForStatefulSet(set, selector)
+	if err != nil {
+		t.Fatalf("getPodsForStatefulSet() error: %v", err)
+	}
+	var got []string
+	for _, pod := range pods {
+		got = append(got, pod.Name)
+	}
+
+	// pod2 should be claimed, pod3 and pod4 ignored
+	want := []string{pod1.Name, pod2.Name}
+	sort.Strings(got)
+	sort.Strings(want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("getPodsForStatefulSet() = %v, want %v", got, want)
+	}
+}
+
+func TestGetPodsForStatefulSetRelease(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set := newStatefulSet(3)
+	pod1 := newStatefulSetPod(set, 1)
+	// pod2 is owned but has wrong name.
+	pod2 := newStatefulSetPod(set, 2)
+	pod2.Name = "x" + pod2.Name
+	// pod3 is owned but has wrong labels.
+	pod3 := newStatefulSetPod(set, 3)
+	pod3.Labels = nil
+	// pod4 is an orphan that doesn't match.
+	pod4 := newStatefulSetPod(set, 4)
+	pod4.OwnerReferences = nil
+	pod4.Labels = nil
+
+	spc.podsIndexer.Add(pod1)
+	spc.podsIndexer.Add(pod2)
+	spc.podsIndexer.Add(pod3)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods, err := ssc.getPodsForStatefulSet(set, selector)
+	if err != nil {
+		t.Fatalf("getPodsForStatefulSet() error: %v", err)
+	}
+	var got []string
+	for _, pod := range pods {
+		got = append(got, pod.Name)
+	}
+
+	// Expect only pod1 (pod2 and pod3 should be released, pod4 ignored).
+	want := []string{pod1.Name}
+	sort.Strings(got)
+	sort.Strings(want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("getPodsForStatefulSet() = %v, want %v", got, want)
 	}
 }
 
