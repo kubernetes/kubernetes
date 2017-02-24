@@ -192,10 +192,6 @@ func getFrontendIPConfigName(service *v1.Service) string {
 	return cloudprovider.GetLoadBalancerName(service)
 }
 
-func getPublicIPName(clusterName string, service *v1.Service) string {
-	return fmt.Sprintf("%s-%s", clusterName, cloudprovider.GetLoadBalancerName(service))
-}
-
 // This returns the next available rule priority level for a given set of security rules.
 func getNextAvailablePriority(rules []network.SecurityRule) (int32, error) {
 	var smallest int32 = loadBalancerMinimumPriority
