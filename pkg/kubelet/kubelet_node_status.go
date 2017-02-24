@@ -489,7 +489,10 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		node.Status.Capacity = v1.ResourceList{}
 	}
 
-	nvidiaGPUCapacity := kl.nvidiaGPUManager.Capacity()
+	nvidiaGPUCapacity := 0
+	if kl.enableNvidiaGPU {
+		nvidiaGPUCapacity = kl.nvidiaGPUManager.Capacity()
+	}
 
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
 	// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.

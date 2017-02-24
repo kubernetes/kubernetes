@@ -68,6 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -102,7 +103,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 )
 
 const (
@@ -460,6 +460,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		writer:            kubeDeps.Writer,
 		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
 		maxPods:           int(kubeCfg.MaxPods),
+		enableNvidiaGPU:   kubeCfg.EnableNvidiaGPU,
 		podsPerCore:       int(kubeCfg.PodsPerCore),
 		syncLoopMonitor:   atomic.Value{},
 		resolverConfig:    kubeCfg.ResolverConfig,
@@ -983,6 +984,9 @@ type Kubelet struct {
 	// Maximum Number of Pods which can be run by this Kubelet
 	maxPods int
 
+	// Enable experimental Nvidia GPU
+	enableNvidiaGPU bool
+
 	// Monitor Kubelet's sync loop
 	syncLoopMonitor atomic.Value
 
@@ -1189,7 +1193,10 @@ func (kl *Kubelet) initializeModules() error {
 	}
 
 	// Step 7: Init Nvidia Manager. Do not need to return err until we use NVML instead.
-	kl.nvidiaGPUManager.Init(kl.dockerClient)
+	// Only works when user give true to EnableNvidiaGPU
+	if kl.enableNvidiaGPU {
+		kl.nvidiaGPUManager.Init(kl.dockerClient)
+	}
 
 	// Step 8: Start resource analyzer
 	kl.resourceAnalyzer.Start()

@@ -28,10 +28,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"strconv"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
@@ -60,7 +61,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
-	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 )
 
 // Get a list of pods that have data directories.
@@ -87,6 +87,10 @@ func (kl *Kubelet) getActivePods() []*v1.Pod {
 
 // makeDevices determines the devices for the given container.
 func (kl *Kubelet) makeDevices(container *v1.Container) []kubecontainer.DeviceInfo {
+	if !kl.enableNvidiaGPU {
+		return nil
+	}
+
 	nvidiaGPULimit := container.Resources.Limits.NvidiaGPU()
 
 	if nvidiaGPULimit.Value() != 0 {
