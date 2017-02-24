@@ -46,6 +46,7 @@ readonly V IN_PLACE
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+kube::util::ensure_clean_working_dir
 kube::util::ensure_godep_version v74
 
 cd ${KUBE_ROOT}

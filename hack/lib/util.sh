@@ -453,6 +453,14 @@ kube::util::godep_restored() {
   return 0
 }
 
+# Exits script if working directory is dirty.
+kube::util::ensure_clean_working_dir() {
+    if ! git diff --exit-code; then
+        echo -e "\nUnexpected dirty working directory."
+        exit 1
+    fi
+}
+
 # Ensure that the given godep version is installed and in the path
 kube::util::ensure_godep_version() {
   if [[ "$(godep version)" == *"godep ${1}"* ]]; then

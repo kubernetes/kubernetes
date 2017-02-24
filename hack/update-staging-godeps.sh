@@ -55,6 +55,7 @@ if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
   exit 1
 fi
 
+kube::util::ensure_clean_working_dir
 kube::util::ensure-temp-dir
 kube::util::ensure_godep_version v74
 
