@@ -794,6 +794,8 @@ type KubeControllerManagerConfiguration struct {
 	// If set to true enables NoExecute Taints and will evict all not-tolerating
 	// Pod running on Nodes tainted with this kind of Taints.
 	EnableTaintManager bool
+	// If set to true NodeController will use taints to evict Pods from notReady and unreachable Nodes.
+	UseTaintBasedEvictions bool
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume
