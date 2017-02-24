@@ -18,6 +18,8 @@ package v1
 
 import (
 	"fmt"
+	"math"
+	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -275,16 +277,30 @@ func ExtractContainerResourceValue(fs *ResourceFieldSelector, container *Contain
 
 	switch fs.Resource {
 	case "limits.cpu":
-		return api.ConvertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
+		return convertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
 	case "limits.memory":
-		return api.ConvertResourceMemoryToString(container.Resources.Limits.Memory(), divisor)
+		return convertResourceMemoryToString(container.Resources.Limits.Memory(), divisor)
 	case "requests.cpu":
-		return api.ConvertResourceCPUToString(container.Resources.Requests.Cpu(), divisor)
+		return convertResourceCPUToString(container.Resources.Requests.Cpu(), divisor)
 	case "requests.memory":
-		return api.ConvertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
+		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
 	}
 
 	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
+}
+
+// convertResourceCPUToString converts cpu value to the format of divisor and returns
+// ceiling of the value.
+func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantity) (string, error) {
+	c := int64(math.Ceil(float64(cpu.MilliValue()) / float64(divisor.MilliValue())))
+	return strconv.FormatInt(c, 10), nil
+}
+
+// convertResourceMemoryToString converts memory value to the format of divisor and returns
+// ceiling of the value.
+func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Quantity) (string, error) {
+	m := int64(math.Ceil(float64(memory.Value()) / float64(divisor.Value())))
+	return strconv.FormatInt(m, 10), nil
 }
 
 // findContainerInPod finds a container by its name in the provided pod
