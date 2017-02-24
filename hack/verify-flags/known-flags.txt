@@ -639,6 +639,8 @@ upgrade-image
 upgrade-target
 use-kubernetes-cluster-service
 use-service-account-credentials
+use-kubernetes-version
+use-taint-based-evictions
 user-whitelist
 verb
 verify-only

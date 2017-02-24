@@ -873,7 +873,22 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint *v1.Ta
 
 // RemoveTaintOffNode is for cleaning up taints temporarily added to node,
 // won't fail if target taint doesn't exist or has been removed.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint) error {
+// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
+// any API calls.
+func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint, node *v1.Node) error {
+	// Short circuit for limiting amout of API calls.
+	if node != nil {
+		match := false
+		for i := range node.Spec.Taints {
+			if node.Spec.Taints[i].MatchTaint(taint) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return nil
+		}
+	}
 	firstTry := true
 	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
 		var err error
@@ -907,7 +922,7 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 		return fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNode, nodeName, err)
 	}
 
-	newAnnotations := newNode.Annotations
+	newTaints := newNode.Spec.Taints
 	objCopy, err := api.Scheme.DeepCopy(oldNode)
 	if err != nil {
 		return fmt.Errorf("failed to copy node object %#v: %v", oldNode, err)
@@ -916,7 +931,7 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 	if !ok {
 		return fmt.Errorf("failed to cast copy onto node object %#v: %v", newNode, err)
 	}
-	newNode.Annotations = newAnnotations
+	newNode.Spec.Taints = newTaints
 	newData, err := json.Marshal(newNode)
 	if err != nil {
 		return fmt.Errorf("failed to marshal new node %#v for node %q: %v", newNode, nodeName, err)
