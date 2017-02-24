@@ -470,6 +470,16 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	// Apply resource options.
 	setSandboxResources(hc)
 
+	// Apply cgroupsParent derived from the sandbox config.
+	if lc := c.GetLinux(); lc != nil {
+		// Apply Cgroup options.
+		cgroupParent, err := ds.GenerateExpectedCgroupParent(lc.CgroupParent)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate cgroup parent in expected syntax for container %q: %v", c.Metadata.Name, err)
+		}
+		hc.CgroupParent = cgroupParent
+	}
+
 	// Set security options.
 	securityOpts, err := getSandboxSecurityOpts(c, ds.seccompProfileRoot, securityOptSep)
 	if err != nil {
