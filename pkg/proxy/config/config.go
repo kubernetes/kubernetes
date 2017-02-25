@@ -31,28 +31,21 @@ type Operation int
 
 // These are the available operation types.
 const (
-	SET Operation = iota
-	ADD
+	ADD Operation = iota
 	REMOVE
 )
 
 // ServiceUpdate describes an operation of services, sent on the channel.
 // You can add or remove single services by sending an array of size one and Op == ADD|REMOVE.
-// For setting the state of the system to a given state for this source configuration, set Services as desired and Op to SET,
-// which will reset the system state to that specified in this operation for this source channel.
-// To remove all services, set Services to empty array and Op to SET
 type ServiceUpdate struct {
-	Services []api.Service
-	Op       Operation
+	Service *api.Service
+	Op      Operation
 }
 
 // EndpointsUpdate describes an operation of endpoints, sent on the channel.
 // You can add or remove single endpoints by sending an array of size one and Op == ADD|REMOVE.
-// For setting the state of the system to a given state for this source configuration, set Endpoints as desired and Op to SET,
-// which will reset the system state to that specified in this operation for this source channel.
-// To remove all endpoints, set Endpoints to empty array and Op to SET
 type EndpointsUpdate struct {
-	Endpoints []api.Endpoints
+	Endpoints *api.Endpoints
 	Op        Operation
 }
 
@@ -87,7 +80,7 @@ func NewEndpointsConfig() *EndpointsConfig {
 	// pending interrupt, but don't want to drop them if the handler is doing
 	// work.
 	updates := make(chan struct{}, 1)
-	store := &endpointsStore{updates: updates, endpoints: make(map[string]map[types.NamespacedName]api.Endpoints)}
+	store := &endpointsStore{updates: updates, endpoints: make(map[string]map[types.NamespacedName]*api.Endpoints)}
 	mux := config.NewMux(store)
 	bcaster := config.NewBroadcaster()
 	go watchForUpdates(bcaster, store, updates)
@@ -118,7 +111,7 @@ func (c *EndpointsConfig) Config() []api.Endpoints {
 
 type endpointsStore struct {
 	endpointLock sync.RWMutex
-	endpoints    map[string]map[types.NamespacedName]api.Endpoints
+	endpoints    map[string]map[types.NamespacedName]*api.Endpoints
 	updates      chan<- struct{}
 }
 
@@ -126,30 +119,18 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 	s.endpointLock.Lock()
 	endpoints := s.endpoints[source]
 	if endpoints == nil {
-		endpoints = make(map[types.NamespacedName]api.Endpoints)
+		endpoints = make(map[types.NamespacedName]*api.Endpoints)
 	}
 	update := change.(EndpointsUpdate)
 	switch update.Op {
 	case ADD:
 		glog.V(5).Infof("Adding new endpoint from source %s : %s", source, spew.Sdump(update.Endpoints))
-		for _, value := range update.Endpoints {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			endpoints[name] = value
-		}
+		name := types.NamespacedName{Namespace: update.Endpoints.Namespace, Name: update.Endpoints.Name}
+		endpoints[name] = update.Endpoints
 	case REMOVE:
-		glog.V(5).Infof("Removing an endpoint %s", spew.Sdump(update))
-		for _, value := range update.Endpoints {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			delete(endpoints, name)
-		}
-	case SET:
-		glog.V(5).Infof("Setting endpoints %s", spew.Sdump(update))
-		// Clear the old map entries by just creating a new map
-		endpoints = make(map[types.NamespacedName]api.Endpoints)
-		for _, value := range update.Endpoints {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			endpoints[name] = value
-		}
+		glog.V(5).Infof("Removing an endpoint %s", spew.Sdump(update.Endpoints))
+		name := types.NamespacedName{Namespace: update.Endpoints.Namespace, Name: update.Endpoints.Name}
+		delete(endpoints, name)
 	default:
 		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
 	}
@@ -173,7 +154,7 @@ func (s *endpointsStore) MergedState() interface{} {
 	endpoints := make([]api.Endpoints, 0)
 	for _, sourceEndpoints := range s.endpoints {
 		for _, value := range sourceEndpoints {
-			endpoints = append(endpoints, value)
+			endpoints = append(endpoints, *value)
 		}
 	}
 	return endpoints
@@ -195,7 +176,7 @@ func NewServiceConfig() *ServiceConfig {
 	// pending interrupt, but don't want to drop them if the handler is doing
 	// work.
 	updates := make(chan struct{}, 1)
-	store := &serviceStore{updates: updates, services: make(map[string]map[types.NamespacedName]api.Service)}
+	store := &serviceStore{updates: updates, services: make(map[string]map[types.NamespacedName]*api.Service)}
 	mux := config.NewMux(store)
 	bcaster := config.NewBroadcaster()
 	go watchForUpdates(bcaster, store, updates)
@@ -226,7 +207,7 @@ func (c *ServiceConfig) Config() []api.Service {
 
 type serviceStore struct {
 	serviceLock sync.RWMutex
-	services    map[string]map[types.NamespacedName]api.Service
+	services    map[string]map[types.NamespacedName]*api.Service
 	updates     chan<- struct{}
 }
 
@@ -234,30 +215,18 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 	s.serviceLock.Lock()
 	services := s.services[source]
 	if services == nil {
-		services = make(map[types.NamespacedName]api.Service)
+		services = make(map[types.NamespacedName]*api.Service)
 	}
 	update := change.(ServiceUpdate)
 	switch update.Op {
 	case ADD:
-		glog.V(5).Infof("Adding new service from source %s : %s", source, spew.Sdump(update.Services))
-		for _, value := range update.Services {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			services[name] = value
-		}
+		glog.V(5).Infof("Adding new service from source %s : %s", source, spew.Sdump(update.Service))
+		name := types.NamespacedName{Namespace: update.Service.Namespace, Name: update.Service.Name}
+		services[name] = update.Service
 	case REMOVE:
-		glog.V(5).Infof("Removing a service %s", spew.Sdump(update))
-		for _, value := range update.Services {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			delete(services, name)
-		}
-	case SET:
-		glog.V(5).Infof("Setting services %s", spew.Sdump(update))
-		// Clear the old map entries by just creating a new map
-		services = make(map[types.NamespacedName]api.Service)
-		for _, value := range update.Services {
-			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			services[name] = value
-		}
+		glog.V(5).Infof("Removing a service %s", spew.Sdump(update.Service))
+		name := types.NamespacedName{Namespace: update.Service.Namespace, Name: update.Service.Name}
+		delete(services, name)
 	default:
 		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
 	}
@@ -281,7 +250,7 @@ func (s *serviceStore) MergedState() interface{} {
 	services := make([]api.Service, 0)
 	for _, sourceServices := range s.services {
 		for _, value := range sourceServices {
-			services = append(services, value)
+			services = append(services, *value)
 		}
 	}
 	return services
