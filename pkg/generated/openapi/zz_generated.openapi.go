@@ -559,6 +559,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Defaults to shared shared: mulitple blob disks per storage account dedicated: single blob disk per storage account managed: azure managed data disk (only in managed availability set)",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
 					},
 					Required: []string{"diskName", "diskURI"},
 				},

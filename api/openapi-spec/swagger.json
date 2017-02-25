@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Kubernetes",
-   "version": "v1.7.0"
+   "version": "v1.6.0"
   },
   "paths": {
    "/api/": {
@@ -35569,6 +35569,10 @@
      },
      "fsType": {
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Defaults to shared shared: mulitple blob disks per storage account dedicated: single blob disk per storage account managed: azure managed data disk (only in managed availability set)",
       "type": "string"
      },
      "readOnly": {

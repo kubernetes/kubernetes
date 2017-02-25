@@ -120,6 +120,12 @@ message AzureDiskVolumeSource {
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 5;
+
+  // Defaults to shared
+  // shared: mulitple blob disks per storage account
+  // dedicated: single blob disk per storage account
+  // managed: azure managed data disk (only in managed availability set)
+  optional string kind = 6;
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.

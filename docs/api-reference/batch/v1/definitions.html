@@ -3810,6 +3810,13 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Defaults to shared shared: mulitple blob disks per storage account dedicated: single blob disk per storage account managed: azure managed data disk (only in managed availability set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_azuredatadiskkind">v1.AzureDataDiskKind</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -4682,6 +4689,10 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 
 </div>
 <div class="sect2">
+<h3 id="_v1_azuredatadiskkind">v1.AzureDataDiskKind</h3>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_podspec">v1.PodSpec</h3>
 <div class="paragraph">
 <p>PodSpec is a description of a pod.</p>
@@ -5321,7 +5332,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-02-21 16:53:18 UTC
+Last updated 2017-02-25 06:57:32 UTC
 </div>
 </div>
 </body>
