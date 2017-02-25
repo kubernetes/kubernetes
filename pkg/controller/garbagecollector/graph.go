@@ -55,10 +55,15 @@ type node struct {
 	owners []metav1.OwnerReference
 }
 
-func (n *node) setBeingDeleted(v bool) {
+// WARNING: the following setters/getters use different locks, so the return
+// values of the getters can be inconsistent.
+
+func (n *node) setBeingDeletedToTrue() {
 	n.beingDeletedLock.Lock()
 	defer n.beingDeletedLock.Unlock()
-	n.beingDeleted = v
+	// an object is on a one way trip to its final deletion if it starts being
+	// deleted, so we only provide a function to set beingDeleted to true.
+	n.beingDeleted = true
 }
 
 func (n *node) isBeingDeleted() bool {
@@ -67,10 +72,10 @@ func (n *node) isBeingDeleted() bool {
 	return n.beingDeleted
 }
 
-func (n *node) setDeletingDependents(v bool) {
+func (n *node) setDeletingDependentsToTrue() {
 	n.deletingDependentsLock.Lock()
 	defer n.deletingDependentsLock.Unlock()
-	n.deletingDependents = v
+	n.deletingDependents = true
 }
 
 func (n *node) isDeletingDependents() bool {
@@ -97,6 +102,9 @@ func (ownerNode *node) dependentsLength() int {
 	return len(ownerNode.dependents)
 }
 
+// Note that this function does not provide any synchronization guarantees;
+// items could be added to or removed from ownerNode.dependents the moment this
+// function returns.
 func (ownerNode *node) getDependents() []*node {
 	ownerNode.dependentsLock.RLock()
 	defer ownerNode.dependentsLock.RUnlock()
@@ -110,6 +118,9 @@ func (ownerNode *node) getDependents() []*node {
 // blockingDependents returns the dependents that are blocking the deletion of
 // n, i.e., the dependent that has an ownerReference pointing to n, and
 // the BlockOwnerDeletion field of that ownerReference is true.
+// Note that this function does not provide any synchronization guarantees;
+// items could be added to or removed from ownerNode.dependents the moment this
+// function returns.
 func (n *node) blockingDependents() []*node {
 	dependents := n.getDependents()
 	var ret []*node

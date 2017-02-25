@@ -145,7 +145,7 @@ func newGCPod(name string) *v1.Pod {
 			Name: name,
 		},
 		Spec: v1.PodSpec{
-			TerminationGracePeriodSeconds: func() *int64 { i := int64(0); return &i }(),
+			TerminationGracePeriodSeconds: new(int64),
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
@@ -256,9 +256,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		rc := newOwnerRC(f, rcName, 2)
-		replicas := int32(10)
-		rc.Spec.Replicas = &replicas
+		rc := newOwnerRC(f, rcName, 100)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -477,9 +475,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		rc := newOwnerRC(f, rcName, 2)
-		replicas := int32(100)
-		rc.Spec.Replicas = &replicas
+		rc := newOwnerRC(f, rcName, 100)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -507,7 +503,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		By("wait for the rc to be deleted")
 		// default client QPS is 20, deleting each pod requires 2 requests, so 30s should be enough
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+		if err := wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
 			_, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(metav1.ListOptions{})
@@ -558,7 +554,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rc1Name := "simpletest-rc-to-be-deleted"
 		replicas := int32(100)
-		halfReplicas := 50
+		halfReplicas := int(replicas / 2)
 		rc1 := newOwnerRC(f, rc1Name, replicas)
 		By("create the rc1")
 		rc1, err := rcClient.Create(rc1)

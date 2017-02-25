@@ -388,7 +388,7 @@ func (gb *GraphBuilder) processTransitions(oldObj interface{}, newAccessor metav
 	if startsWaitingForDependentsDeleted(oldObj, newAccessor) {
 		glog.V(2).Infof("add %s to the attemptToDelete, because it's waiting for its dependents to be deleted", n.identity)
 		// if the n is added as a "virtual" node, its deletingDependents field is not properly set, so always set it here.
-		n.setDeletingDependents(true)
+		n.setDeletingDependentsToTrue()
 		for dep := range n.dependents {
 			gb.attemptToDelete.Add(dep)
 		}
@@ -465,7 +465,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		}
 
 		if beingDeleted(accessor) {
-			existingNode.setBeingDeleted(true)
+			existingNode.setBeingDeletedToTrue()
 		}
 		gb.processTransitions(event.oldObj, accessor, existingNode)
 	case event.eventType == deleteEvent:

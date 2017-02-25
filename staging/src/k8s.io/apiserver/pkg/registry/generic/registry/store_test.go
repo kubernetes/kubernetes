@@ -1271,7 +1271,7 @@ func TestStoreDeletionPropagation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		_, err = registry.Delete(testContext, pod.Name, tc.options)
+		_, _, err = registry.Delete(testContext, pod.Name, tc.options)
 		obj, err := registry.Get(testContext, pod.Name, &metav1.GetOptions{})
 		if tc.expectedNotFound {
 			if err == nil || !errors.IsNotFound(err) {

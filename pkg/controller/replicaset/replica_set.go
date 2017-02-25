@@ -488,15 +488,14 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 				var err error
 
 				if rsc.garbageCollectorEnabled {
-					var trueVar1 = true
-					var trueVar2 = true
+					boolPtr := func(b bool) *bool { return &b }
 					controllerRef := &metav1.OwnerReference{
 						APIVersion:         getRSKind().GroupVersion().String(),
 						Kind:               getRSKind().Kind,
 						Name:               rs.Name,
 						UID:                rs.UID,
-						BlockOwnerDeletion: &trueVar1,
-						Controller:         &trueVar2,
+						BlockOwnerDeletion: boolPtr(true),
+						Controller:         boolPtr(true),
 					}
 					err = rsc.podControl.CreatePodsWithControllerRef(rs.Namespace, &rs.Spec.Template, rs, controllerRef)
 				} else {
