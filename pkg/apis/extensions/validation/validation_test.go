@@ -836,6 +836,119 @@ func TestValidateDeployment(t *testing.T) {
 	}
 }
 
+func TestValidateDeploymentStatus(t *testing.T) {
+	tests := []struct {
+		name string
+
+		replicas           int32
+		updatedReplicas    int32
+		readyReplicas      int32
+		availableReplicas  int32
+		observedGeneration int64
+
+		expectedErr bool
+	}{
+		{
+			name:               "valid status",
+			replicas:           3,
+			updatedReplicas:    3,
+			readyReplicas:      2,
+			availableReplicas:  1,
+			observedGeneration: 2,
+			expectedErr:        false,
+		},
+		{
+			name:               "invalid replicas",
+			replicas:           -1,
+			updatedReplicas:    2,
+			readyReplicas:      2,
+			availableReplicas:  1,
+			observedGeneration: 2,
+			expectedErr:        true,
+		},
+		{
+			name:               "invalid updatedReplicas",
+			replicas:           2,
+			updatedReplicas:    -1,
+			readyReplicas:      2,
+			availableReplicas:  1,
+			observedGeneration: 2,
+			expectedErr:        true,
+		},
+		{
+			name:               "invalid readyReplicas",
+			replicas:           3,
+			readyReplicas:      -1,
+			availableReplicas:  1,
+			observedGeneration: 2,
+			expectedErr:        true,
+		},
+		{
+			name:               "invalid availableReplicas",
+			replicas:           3,
+			readyReplicas:      3,
+			availableReplicas:  -1,
+			observedGeneration: 2,
+			expectedErr:        true,
+		},
+		{
+			name:               "invalid observedGeneration",
+			replicas:           3,
+			readyReplicas:      3,
+			availableReplicas:  3,
+			observedGeneration: -1,
+			expectedErr:        true,
+		},
+		{
+			name:               "updatedReplicas greater than replicas",
+			replicas:           3,
+			updatedReplicas:    4,
+			readyReplicas:      3,
+			availableReplicas:  3,
+			observedGeneration: 1,
+			expectedErr:        true,
+		},
+		{
+			name:               "readyReplicas greater than replicas",
+			replicas:           3,
+			readyReplicas:      4,
+			availableReplicas:  3,
+			observedGeneration: 1,
+			expectedErr:        true,
+		},
+		{
+			name:               "availableReplicas greater than replicas",
+			replicas:           3,
+			readyReplicas:      3,
+			availableReplicas:  4,
+			observedGeneration: 1,
+			expectedErr:        true,
+		},
+		{
+			name:               "availableReplicas greater than readyReplicas",
+			replicas:           3,
+			readyReplicas:      2,
+			availableReplicas:  3,
+			observedGeneration: 1,
+			expectedErr:        true,
+		},
+	}
+
+	for _, test := range tests {
+		status := extensions.DeploymentStatus{
+			Replicas:           test.replicas,
+			UpdatedReplicas:    test.updatedReplicas,
+			ReadyReplicas:      test.readyReplicas,
+			AvailableReplicas:  test.availableReplicas,
+			ObservedGeneration: test.observedGeneration,
+		}
+
+		if hasErr := len(ValidateDeploymentStatus(&status, field.NewPath("status"))) > 0; hasErr != test.expectedErr {
+			t.Errorf("%s: expected error: %t, got error: %t", test.name, test.expectedErr, hasErr)
+		}
+	}
+}
+
 func validDeploymentRollback() *extensions.DeploymentRollback {
 	return &extensions.DeploymentRollback{
 		Name: "abc",
@@ -1204,6 +1317,125 @@ func TestValidateScale(t *testing.T) {
 			t.Errorf("expected failure for %s", c.msg)
 		} else if !strings.Contains(errs[0].Error(), c.msg) {
 			t.Errorf("unexpected error: %v, expected: %s", errs[0], c.msg)
+		}
+	}
+}
+
+func TestValidateReplicaSetStatus(t *testing.T) {
+	tests := []struct {
+		name string
+
+		replicas             int32
+		fullyLabeledReplicas int32
+		readyReplicas        int32
+		availableReplicas    int32
+		observedGeneration   int64
+
+		expectedErr bool
+	}{
+		{
+			name:                 "valid status",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        2,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          false,
+		},
+		{
+			name:                 "invalid replicas",
+			replicas:             -1,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        2,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid fullyLabeledReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: -1,
+			readyReplicas:        2,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid readyReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        -1,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid availableReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        3,
+			availableReplicas:    -1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid observedGeneration",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        3,
+			availableReplicas:    3,
+			observedGeneration:   -1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "fullyLabeledReplicas greater than replicas",
+			replicas:             3,
+			fullyLabeledReplicas: 4,
+			readyReplicas:        3,
+			availableReplicas:    3,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "readyReplicas greater than replicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        4,
+			availableReplicas:    3,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "availableReplicas greater than replicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        3,
+			availableReplicas:    4,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "availableReplicas greater than readyReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        2,
+			availableReplicas:    3,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+	}
+
+	for _, test := range tests {
+		status := extensions.ReplicaSetStatus{
+			Replicas:             test.replicas,
+			FullyLabeledReplicas: test.fullyLabeledReplicas,
+			ReadyReplicas:        test.readyReplicas,
+			AvailableReplicas:    test.availableReplicas,
+			ObservedGeneration:   test.observedGeneration,
+		}
+
+		if hasErr := len(ValidateReplicaSetStatus(status, field.NewPath("status"))) > 0; hasErr != test.expectedErr {
+			t.Errorf("%s: expected error: %t, got error: %t", test.name, test.expectedErr, hasErr)
 		}
 	}
 }
