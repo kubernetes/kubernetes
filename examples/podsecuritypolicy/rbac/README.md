@@ -82,10 +82,12 @@ podsecuritypolicy "restricted" created
 
 ### Roles and bindings
 
-In order to a `PodSecurityPolicy` a user must have the ability to perform the `use` verb on the policy.
-The `use` verb is a special verb that grants access to use the policy while
-not allowing any other access.  This verb is specific to `PodSecurityPolicy`.
-To enable the `use` access we will create cluster roles.  In this example we will provide the roles:
+In order to create a pod with a `securityContext`, a user must have the ability
+to perform the `use` verb on a `PodSecurityPolicy` that allows that context.
+The `use` verb is a special verb that grants access to use the policy while not
+allowing any other access.  This verb is specific to `PodSecurityPolicy`. To
+enable the `use` access we will create cluster roles. In this example we will
+provide the roles:
 
 1. `restricted-psp-user`: this role allows the `use` verb on the `restricted` policy only
 2. `privileged-psp-user`: this role allows the `use` verb on the `privileged` policy only
