@@ -95,17 +95,12 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	logDir := buildPodLogsDirectory(pod.UID)
 	podSandboxConfig.LogDirectory = logDir
 
-	cgroupParent := ""
 	portMappings := []*runtimeapi.PortMapping{}
 	for _, c := range pod.Spec.Containers {
-		// TODO: use a separate interface to only generate portmappings
-		opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, &c, "")
-		if err != nil {
-			return nil, err
-		}
+		containerPortMappings := kubecontainer.MakePortMappings(&c)
 
-		for idx := range opts.PortMappings {
-			port := opts.PortMappings[idx]
+		for idx := range containerPortMappings {
+			port := containerPortMappings[idx]
 			hostPort := int32(port.HostPort)
 			containerPort := int32(port.ContainerPort)
 			protocol := toRuntimeProtocol(port.Protocol)
@@ -117,9 +112,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 			})
 		}
 
-		// TODO: refactor kubelet to get cgroup parent for pod instead of containers
-		cgroupParent = opts.CgroupParent
 	}
+
+	_, cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
 	podSandboxConfig.Linux = m.generatePodSandboxLinuxConfig(pod, cgroupParent)
 	if len(portMappings) > 0 {
 		podSandboxConfig.PortMappings = portMappings
