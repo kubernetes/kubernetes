@@ -178,7 +178,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	changeCause := f.Command()
+	changeCause := f.Command(cmd, false)
 
 	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {

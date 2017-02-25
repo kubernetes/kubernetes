@@ -437,7 +437,7 @@ func (f *FakeFactory) EditorEnvs() []string {
 func (f *FakeFactory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writer) {
 }
 
-func (f *FakeFactory) Command() string {
+func (f *FakeFactory) Command(*cobra.Command, bool) string {
 	return f.tf.Command
 }
 
@@ -638,7 +638,7 @@ func (f *fakeAPIFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
 }
 
-func (f *fakeAPIFactory) Command() string {
+func (f *fakeAPIFactory) Command(*cobra.Command, bool) string {
 	return f.tf.Command
 }
 
