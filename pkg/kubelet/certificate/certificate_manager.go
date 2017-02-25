@@ -152,7 +152,7 @@ func NewManager(config *Config) (Manager, error) {
 	}
 
 	if config.CertificateRotationPercent > 100 {
-		config.CertificateRotationPercent = 100
+		return nil, fmt.Errorf("certificate rotation percent was over 100%")
 	}
 
 	m := manager{
