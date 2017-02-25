@@ -3,6 +3,7 @@
   {% set daemon_args = "" -%}
 {% endif -%}
 
+{% set kubeconfig = "--kubeconfig=/var/lib/kubelet/kubeconfig" -%}
 {% if grains.api_servers is defined -%}
   {% set api_servers = "--api-servers=https://" + grains.api_servers -%}
 {% elif grains.apiservers is defined -%} # TODO(remove after 0.16.0): Deprecated form

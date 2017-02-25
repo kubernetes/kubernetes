@@ -22,9 +22,32 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBECONFIG_PATH=${KUBECONFIG_PATH:-/var/lib/kubelet}
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/test.sh"
 source "${KUBE_ROOT}/hack/make-rules/test-cmd-util.sh"
+
+# creates a kubeconfig for kubelet: args are host, port, dest-dir
+function write_kubeconfig_for_kubelet() {
+    local api_host=$1
+    local api_port=$2
+    local dest_dir=$3
+    mkdir -p "${dest_dir}" &>/dev/null || sudo mkdir -p "${dest_dir}"
+    sudo=$(test -w "${dest_dir}" || echo "sudo -E")
+    cat <<EOF | ${sudo} tee "${dest_dir}"/kubelet.kubeconfig > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: http://${api_host}:${api_port}/
+    name: kubelet-env
+contexts:
+  - context:
+      cluster: kubelet-env
+    name: kubelet-env
+current-context: kubelet-env
+EOF
+}
 
 function run_kube_apiserver() {
   kube::log::status "Building kube-apiserver"
@@ -69,24 +92,11 @@ function run_kube_controller_manager() {
 }
 
 function run_kubelet() {
+  write_kubeconfig_for_kubelet ${API_HOST} ${API_PORT} ${KUBECONFIG_PATH}
   # Only run kubelet on platforms it supports
   if [[ "$(go env GOHOSTOS)" == "linux" ]]; then
     kube::log::status "Building kubelet"
     make -C "${KUBE_ROOT}" WHAT="cmd/kubelet"
-
-    kube::log::status "Starting kubelet in masterless mode"
-    "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
-      --really-crash-for-testing=true \
-      --root-dir=/tmp/kubelet.$$ \
-      --cert-dir="${TMPDIR:-/tmp/}" \
-      --docker-endpoint="fake://" \
-      --hostname-override="127.0.0.1" \
-      --address="127.0.0.1" \
-      --port="$KUBELET_PORT" \
-      --healthz-port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
-    KUBELET_PID=$!
-    kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet(masterless)"
-    kill ${KUBELET_PID} 1>&2 2>/dev/null
 
     kube::log::status "Starting kubelet in masterful mode"
     "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
@@ -96,7 +106,7 @@ function run_kubelet() {
       --docker-endpoint="fake://" \
       --hostname-override="127.0.0.1" \
       --address="127.0.0.1" \
-      --api-servers="${API_HOST}:${API_PORT}" \
+      --kubeconfig=${KUBECONFIG_PATH}/kubelet.kubeconfig \
       --port="$KUBELET_PORT" \
       --healthz-port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
     KUBELET_PID=$!

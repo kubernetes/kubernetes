@@ -19,6 +19,21 @@ MASTER_ADDRESS=${1:-"8.8.8.18"}
 NODE_ADDRESS=${2:-"8.8.8.20"}
 DNS_SERVER_IP=${3:-"192.168.3.100"}
 DNS_DOMAIN=${4:-"cluster.local"}
+KUBECONFIG_PATH=${KUBECONFIG_PATH:-/opt/kubernetes/cfg}
+
+cat <<EOF > ${KUBECONFIG_PATH}/kubelet.kubeconfig
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: http://${MASTER_ADDRESS}:8080/
+    name: kubelet-env
+contexts:
+  - context:
+      cluster: kubelet-env
+    name: kubelet-env
+current-context: kubelet-env
+EOF
 
 
 cat <<EOF >/opt/kubernetes/cfg/kubelet
@@ -37,9 +52,8 @@ NODE_PORT="--port=10250"
 # --hostname-override="": If non-empty, will use this string as identification instead of the actual hostname.
 NODE_HOSTNAME="--hostname-override=${NODE_ADDRESS}"
 
-# --api-servers=[]: List of Kubernetes API servers for publishing events,
-# and reading pods and services. (ip:port), comma separated.
-KUBELET_API_SERVER="--api-servers=${MASTER_ADDRESS}:8080"
+# Path to a kubeconfig file, specifying how to connect to the API server.
+KUBELET_KUBECONFIG="--kubeconfig=${KUBECONFIG_PATH}/kubelet.kubeconfig"
 
 # --allow-privileged=false: If true, allow containers to request privileged mode. [default=false]
 KUBE_ALLOW_PRIV="--allow-privileged=false"
@@ -57,7 +71,7 @@ KUBE_PROXY_OPTS="   \${KUBE_LOGTOSTDERR}     \\
                     \${NODE_ADDRESS}         \\
                     \${NODE_PORT}            \\
                     \${NODE_HOSTNAME}        \\
-                    \${KUBELET_API_SERVER}   \\
+                    \${KUBELET_KUBECONFIG}   \\
                     \${KUBE_ALLOW_PRIV}      \\
                     \${KUBELET__DNS_IP}      \\
                     \${KUBELET_DNS_DOMAIN}      \\

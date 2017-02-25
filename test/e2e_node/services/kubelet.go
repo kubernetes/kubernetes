@@ -28,6 +28,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 )
@@ -87,10 +89,25 @@ const (
 	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
 )
 
+func newStartingConfig() clientcmdapi.Config {
+	return clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"kubelet-env": {Server: getAPIServerClientURL()}},
+		CurrentContext: "kubelet-env",
+	}
+}
+
 // startKubelet starts the Kubelet in a separate process or returns an error
 // if the Kubelet fails to start.
 func (e *E2EServices) startKubelet() (*server, error) {
 	glog.Info("Starting kubelet")
+
+	kubeConfig := "/tmp/kubelet.kubeconfig"
+	startingConfig := newStartingConfig()
+	err := clientcmd.WriteToFile(startingConfig, kubeConfig)
+	if err != nil {
+		return nil, err
+	}
 	// Create pod manifest path
 	manifestPath, err := createPodManifestDirectory()
 	if err != nil {
@@ -124,7 +141,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		)
 	}
 	cmdArgs = append(cmdArgs,
-		"--api-servers", getAPIServerClientURL(),
+		"--kubeconfig", kubeConfig,
 		"--address", "0.0.0.0",
 		"--port", kubeletPort,
 		"--read-only-port", kubeletReadOnlyPort,

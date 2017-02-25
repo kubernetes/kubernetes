@@ -160,6 +160,28 @@ function clear-kubeconfig() {
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
 
+# creates a kubeconfig for kubelet: args are host, port, dest-dir
+function write_kubeconfig_for_kubelet() {
+    local api_host=$1
+    local api_port=$2
+    local dest_dir=$3
+    mkdir -p "${dest_dir}" &>/dev/null || sudo mkdir -p "${dest_dir}"
+    sudo=$(test -w "${dest_dir}" || echo "sudo -E")
+    cat <<EOF | ${sudo} tee "${dest_dir}"/kubelet.kubeconfig > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: http://${api_host}:${api_port}/
+    name: kubelet-env
+contexts:
+  - context:
+      cluster: kubelet-env
+    name: kubelet-env
+current-context: kubelet-env
+EOF
+}
+
 # Creates a kubeconfig file with the credentials for only the current-context
 # cluster. This is used by federation to create secrets in test setup.
 function create-kubeconfig-for-federation() {

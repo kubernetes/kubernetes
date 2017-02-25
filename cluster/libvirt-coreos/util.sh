@@ -33,6 +33,25 @@ readonly POOL_PATH=/var/lib/libvirt/images/kubernetes
 
 [ ! -d "${POOL_PATH}" ] && (echo "$POOL_PATH" does not exist ; exit 1 )
 
+# creates a kubeconfig for kubelet: args are host, port, dest-dir
+function write_kubeconfig_for_kubelet {
+    local dest_dir="${POOL_PATH}/kubernetes/kubeconfig"
+    mkdir -p ${dest_dir}
+    cat <<EOF | tee "${dest_dir}"/kubelet.kubeconfig > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: http://${MASTER_IP}:8080/
+    name: kubelet-env
+contexts:
+  - context:
+      cluster: kubelet-env
+    name: kubelet-env
+current-context: kubelet-env
+EOF
+}
+
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
 #
@@ -278,6 +297,7 @@ function kube-up {
   export KUBE_SERVER="http://192.168.10.1:8080"
   export CONTEXT="libvirt-coreos"
   create-kubeconfig
+  write_kubeconfig_for_kubelet
 
   wait-cluster-readiness
 

@@ -74,7 +74,7 @@ func NewKubeletServer() *KubeletServer {
 	api.Scheme.Convert(versioned, &config, nil)
 	return &KubeletServer{
 		KubeConfig:           flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
-		RequireKubeConfig:    false, // in 1.5, default to true
+		RequireKubeConfig:    true,
 		KubeletConfiguration: config,
 	}
 }
