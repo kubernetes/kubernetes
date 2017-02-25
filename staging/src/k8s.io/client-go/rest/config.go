@@ -83,10 +83,6 @@ type Config struct {
 	// TLSClientConfig contains settings to enable transport layer security
 	TLSClientConfig
 
-	// Server should be accessed without verifying the TLS
-	// certificate. For testing only.
-	Insecure bool
-
 	// UserAgent is an optional field that specifies the caller of this request.
 	UserAgent string
 
@@ -132,6 +128,13 @@ type ImpersonationConfig struct {
 
 // TLSClientConfig contains settings to enable transport layer security
 type TLSClientConfig struct {
+	// Server should be accessed without verifying the TLS certificate. For testing only.
+	Insecure bool
+	// ServerName is passed to the server for SNI and is used in the client to check server
+	// ceritificates against. If ServerName is empty, the hostname used to contact the
+	// server is used.
+	ServerName string
+
 	// Server requires TLS client certificate authentication
 	CertFile string
 	// Server requires TLS client certificate authentication
@@ -365,11 +368,12 @@ func AnonymousClientConfig(config *Config) *Config {
 		Prefix:        config.Prefix,
 		ContentConfig: config.ContentConfig,
 		TLSClientConfig: TLSClientConfig{
-			CAFile: config.TLSClientConfig.CAFile,
-			CAData: config.TLSClientConfig.CAData,
+			Insecure:   config.Insecure,
+			ServerName: config.ServerName,
+			CAFile:     config.TLSClientConfig.CAFile,
+			CAData:     config.TLSClientConfig.CAData,
 		},
 		RateLimiter:   config.RateLimiter,
-		Insecure:      config.Insecure,
 		UserAgent:     config.UserAgent,
 		Transport:     config.Transport,
 		WrapTransport: config.WrapTransport,
