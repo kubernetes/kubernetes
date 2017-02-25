@@ -40977,6 +40977,11 @@
       "description": "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
       "type": "string"
      },
+     "failedJobsHistoryLimit": {
+      "description": "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+      "type": "integer",
+      "format": "int32"
+     },
      "jobTemplate": {
       "description": "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobTemplateSpec"
@@ -40989,6 +40994,11 @@
       "description": "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
       "type": "integer",
       "format": "int64"
+     },
+     "successfulJobsHistoryLimit": {
+      "description": "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+      "type": "integer",
+      "format": "int32"
      },
      "suspend": {
       "description": "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
