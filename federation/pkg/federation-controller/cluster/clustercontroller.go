@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	clustercache "k8s.io/kubernetes/federation/client/cache"
@@ -51,6 +52,15 @@ type ClusterController struct {
 	// cluster framework and store
 	clusterController cache.Controller
 	clusterStore      clustercache.StoreToClusterLister
+}
+
+// StartClusterController starts a new cluster controller
+func StartClusterController(config *restclient.Config, stopChan <-chan struct{}, clusterMonitorPeriod time.Duration) {
+	restclient.AddUserAgent(config, "cluster-controller")
+	client := federationclientset.NewForConfigOrDie(config)
+	controller := NewClusterController(client, clusterMonitorPeriod)
+	glog.Infof("Starting cluster controller")
+	controller.Run(stopChan)
 }
 
 // NewClusterController returns a new cluster controller
@@ -104,15 +114,15 @@ func (cc *ClusterController) addToClusterSet(obj interface{}) {
 }
 
 // Run begins watching and syncing.
-func (cc *ClusterController) Run() {
+func (cc *ClusterController) Run(stopChan <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	go cc.clusterController.Run(wait.NeverStop)
+	go cc.clusterController.Run(stopChan)
 	// monitor cluster status periodically, in phase 1 we just get the health state from "/healthz"
 	go wait.Until(func() {
 		if err := cc.UpdateClusterStatus(); err != nil {
 			glog.Errorf("Error monitoring cluster status: %v", err)
 		}
-	}, cc.clusterMonitorPeriod, wait.NeverStop)
+	}, cc.clusterMonitorPeriod, stopChan)
 }
 
 func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster) (*federationv1beta1.ClusterStatus, error) {
