@@ -69,6 +69,9 @@ const (
 	FailedDaemonPodReason = "FailedDaemonPod"
 )
 
+// ControllerKind contains the schema.GroupVersionKind for this controller type.
+var ControllerKind = extensions.SchemeGroupVersion.WithKind("DaemonSet")
+
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
 // in the system with actual running pods.
 type DaemonSetsController struct {
@@ -580,7 +583,15 @@ func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelet
 	for i := 0; i < createDiff; i++ {
 		go func(ix int) {
 			defer createWait.Done()
-			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds); err != nil {
+			isController := true
+			controllerRef := &metav1.OwnerReference{
+				APIVersion: ControllerKind.GroupVersion().String(),
+				Kind:       ControllerKind.Kind,
+				Name:       ds.Name,
+				UID:        ds.UID,
+				Controller: &isController,
+			}
+			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds, controllerRef); err != nil {
 				glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 				dsc.expectations.CreationObserved(dsKey)
 				errCh <- err
