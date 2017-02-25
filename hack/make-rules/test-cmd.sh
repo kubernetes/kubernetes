@@ -89,6 +89,7 @@ function run_kubelet() {
     kill ${KUBELET_PID} 1>&2 2>/dev/null
 
     kube::log::status "Starting kubelet in masterful mode"
+    # TODO: Eanble CRI once #41834 is fixed.
     "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
       --really-crash-for-testing=true \
       --root-dir=/tmp/kubelet.$$ \
@@ -98,7 +99,8 @@ function run_kubelet() {
       --address="127.0.0.1" \
       --api-servers="${API_HOST}:${API_PORT}" \
       --port="$KUBELET_PORT" \
-      --healthz-port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
+      --healthz-port="${KUBELET_HEALTHZ_PORT}"
+      --enable-cri=false 1>&2 &
     KUBELET_PID=$!
 
     kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet"
