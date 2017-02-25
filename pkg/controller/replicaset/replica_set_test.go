@@ -189,6 +189,24 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, labelMap map[s
 	}
 }
 
+// processSync initiates a sync via processNextWorkItem() to test behavior that
+// depends on both functions (such as re-queueing on sync error).
+func processSync(rsc *ReplicaSetController, key string) error {
+	// Save old syncHandler and replace with one that captures the error.
+	oldSyncHandler := rsc.syncHandler
+	defer func() {
+		rsc.syncHandler = oldSyncHandler
+	}()
+	var syncErr error
+	rsc.syncHandler = func(key string) error {
+		syncErr = oldSyncHandler(key)
+		return syncErr
+	}
+	rsc.queue.Add(key)
+	rsc.processNextWorkItem()
+	return syncErr
+}
+
 func validateSyncReplicaSet(t *testing.T, fakePodControl *controller.FakePodControl, expectedCreates, expectedDeletes, expectedPatches int) {
 	if e, a := expectedCreates, len(fakePodControl.Templates); e != a {
 		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", e, a)
@@ -1303,7 +1321,7 @@ func TestPatchPodFails(t *testing.T) {
 	// control of the pods and requeue to try again.
 	fakePodControl.Err = fmt.Errorf("Fake Error")
 	rsKey := getKey(rs, t)
-	err := manager.syncReplicaSet(rsKey)
+	err := processSync(manager, rsKey)
 	if err == nil || !strings.Contains(err.Error(), "Fake Error") {
 		t.Errorf("expected Fake Error, got %+v", err)
 	}
