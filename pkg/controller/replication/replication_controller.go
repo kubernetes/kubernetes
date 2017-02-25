@@ -587,10 +587,17 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		rm.queue.Add(key)
 		return err
 	}
+	// Ignore inactive pods.
+	var filteredPods []*v1.Pod
+	for _, pod := range pods {
+		if controller.IsPodActive(pod) {
+			filteredPods = append(filteredPods, pod)
+		}
+	}
 	cm := controller.NewPodControllerRefManager(rm.podControl, rc, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), ControllerKind)
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
-	filteredPods, err := cm.ClaimPods(pods)
+	filteredPods, err = cm.ClaimPods(pods)
 	if err != nil {
 		return err
 	}
