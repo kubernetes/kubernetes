@@ -1456,17 +1456,11 @@ func WaitForService(c clientset.Interface, namespace, name string, exist bool, i
 		_, err := c.Core().Services(namespace).Get(name, metav1.GetOptions{})
 		switch {
 		case err == nil:
-			if !exist {
-				return false, nil
-			}
 			Logf("Service %s in namespace %s found.", name, namespace)
-			return true, nil
+			return exist, nil
 		case apierrs.IsNotFound(err):
-			if exist {
-				return false, nil
-			}
 			Logf("Service %s in namespace %s disappeared.", name, namespace)
-			return true, nil
+			return !exist, nil
 		default:
 			Logf("Get service %s in namespace %s failed: %v", name, namespace, err)
 			return false, nil
@@ -1475,6 +1469,30 @@ func WaitForService(c clientset.Interface, namespace, name string, exist bool, i
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
 		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+	}
+	return nil
+}
+
+// WaitForServiceWithSelector waits until any service with given selector appears (exist == true), or disappears (exist == false)
+func WaitForServiceWithSelector(c clientset.Interface, namespace string, selector labels.Selector, exist bool, interval,
+	timeout time.Duration) error {
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		services, err := c.Core().Services(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		switch {
+		case len(services.Items) != 0:
+			Logf("Service with %s in namespace %s found.", selector.String(), namespace)
+			return exist, nil
+		case len(services.Items) == 0:
+			Logf("Service with %s in namespace %s disappeared.", selector.String(), namespace)
+			return !exist, nil
+		default:
+			Logf("List service with %s in namespace %s failed: %v", selector.String(), namespace, err)
+			return false, nil
+		}
+	})
+	if err != nil {
+		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
+		return fmt.Errorf("error waiting for service with %s in namespace %s %s: %v", selector.String(), namespace, stateMsg[exist], err)
 	}
 	return nil
 }
@@ -1520,6 +1538,30 @@ func WaitForReplicationController(c clientset.Interface, namespace, name string,
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
 		return fmt.Errorf("error waiting for ReplicationController %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+	}
+	return nil
+}
+
+// WaitForReplicationControllerwithSelector waits until any RC with given selector appears (exist == true), or disappears (exist == false)
+func WaitForReplicationControllerwithSelector(c clientset.Interface, namespace string, selector labels.Selector, exist bool, interval,
+	timeout time.Duration) error {
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		rcs, err := c.Core().ReplicationControllers(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		switch {
+		case len(rcs.Items) != 0:
+			Logf("ReplicationController with %s in namespace %s found.", selector.String(), namespace)
+			return exist, nil
+		case len(rcs.Items) == 0:
+			Logf("ReplicationController with %s in namespace %s disappeared.", selector.String(), namespace)
+			return !exist, nil
+		default:
+			Logf("List ReplicationController with %s in namespace %s failed: %v", selector.String(), namespace, err)
+			return false, nil
+		}
+	})
+	if err != nil {
+		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
+		return fmt.Errorf("error waiting for ReplicationControllers with %s in namespace %s %s: %v", selector.String(), namespace, stateMsg[exist], err)
 	}
 	return nil
 }
