@@ -35,6 +35,7 @@ source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
+DNS_PROVIDER="${FEDERATION_DNS_PROVIDER:-google-clouddns}"
 FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
 
 # get_version returns the version in KUBERNETES_RELEASE or defaults to the
@@ -82,6 +83,7 @@ function init() {
       "${FEDERATION_NAME}" \
       --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
       --dns-zone-name="${DNS_ZONE_NAME}" \
+      --dns-provider="${DNS_PROVIDER}" \
       --image="${kube_registry}/hyperkube-amd64:${kube_version}"
 }
 
