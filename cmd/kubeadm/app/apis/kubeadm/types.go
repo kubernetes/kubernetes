@@ -33,13 +33,14 @@ type EnvParams struct {
 type MasterConfiguration struct {
 	metav1.TypeMeta
 
-	API               API
-	Discovery         Discovery
-	Etcd              Etcd
-	Networking        Networking
-	KubernetesVersion string
-	CloudProvider     string
-	AuthorizationMode string
+	API                API
+	Discovery          Discovery
+	Etcd               Etcd
+	Networking         Networking
+	KubernetesVersion  string
+	CloudProvider      string
+	AuthorizationMode  string
+	APIServerExtraArgs map[string]string
 }
 
 type API struct {

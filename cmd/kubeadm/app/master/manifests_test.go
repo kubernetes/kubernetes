@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
+	"sort"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -380,7 +382,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--kubelet-client-key=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.key",
 				"--token-auth-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/tokens.csv",
 				fmt.Sprintf("--secure-port=%d", 123),
-				"--allow-privileged",
+				"--allow-privileged=true",
 				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--requestheader-username-headers=X-Remote-User",
@@ -410,7 +412,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--kubelet-client-key=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.key",
 				"--token-auth-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/tokens.csv",
 				fmt.Sprintf("--secure-port=%d", 123),
-				"--allow-privileged",
+				"--allow-privileged=true",
 				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--requestheader-username-headers=X-Remote-User",
@@ -442,7 +444,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--kubelet-client-key=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-kubelet-client.key",
 				"--token-auth-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/tokens.csv",
 				fmt.Sprintf("--secure-port=%d", 123),
-				"--allow-privileged",
+				"--allow-privileged=true",
 				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--requestheader-username-headers=X-Remote-User",
@@ -460,14 +462,10 @@ func TestGetAPIServerCommand(t *testing.T) {
 
 	for _, rt := range tests {
 		actual := getAPIServerCommand(rt.cfg, false)
-		for i := range actual {
-			if actual[i] != rt.expected[i] {
-				t.Errorf(
-					"failed getAPIServerCommand:\n\texpected: %s\n\t  actual: %s",
-					rt.expected[i],
-					actual[i],
-				)
-			}
+		sort.Strings(actual)
+		sort.Strings(rt.expected)
+		if !reflect.DeepEqual(actual, rt.expected) {
+			t.Errorf("failed getAPIServerCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 		}
 	}
 }
@@ -529,14 +527,10 @@ func TestGetControllerManagerCommand(t *testing.T) {
 
 	for _, rt := range tests {
 		actual := getControllerManagerCommand(rt.cfg, false)
-		for i := range actual {
-			if actual[i] != rt.expected[i] {
-				t.Errorf(
-					"failed getControllerManagerCommand:\n\texpected: %s\n\t  actual: %s",
-					rt.expected[i],
-					actual[i],
-				)
-			}
+		sort.Strings(actual)
+		sort.Strings(rt.expected)
+		if !reflect.DeepEqual(actual, rt.expected) {
+			t.Errorf("failed getControllerManagerCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 		}
 	}
 }
@@ -559,14 +553,10 @@ func TestGetSchedulerCommand(t *testing.T) {
 
 	for _, rt := range tests {
 		actual := getSchedulerCommand(rt.cfg, false)
-		for i := range actual {
-			if actual[i] != rt.expected[i] {
-				t.Errorf(
-					"failed getSchedulerCommand:\n\texpected: %s\n\t  actual: %s",
-					rt.expected[i],
-					actual[i],
-				)
-			}
+		sort.Strings(actual)
+		sort.Strings(rt.expected)
+		if !reflect.DeepEqual(actual, rt.expected) {
+			t.Errorf("failed getSchedulerCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 		}
 	}
 }
@@ -626,6 +616,53 @@ func TestGetAuthzParameters(t *testing.T) {
 					actual[i],
 				)
 			}
+		}
+	}
+}
+
+func TestGetExtraParameters(t *testing.T) {
+	var tests = []struct {
+		overrides map[string]string
+		defaults  map[string]string
+		expected  []string
+	}{
+		{
+			overrides: map[string]string{
+				"admission-control": "NamespaceLifecycle,LimitRanger",
+			},
+			defaults: map[string]string{
+				"admission-control":     "NamespaceLifecycle",
+				"insecure-bind-address": "127.0.0.1",
+				"allow-privileged":      "true",
+			},
+			expected: []string{
+				"--admission-control=NamespaceLifecycle,LimitRanger",
+				"--insecure-bind-address=127.0.0.1",
+				"--allow-privileged=true",
+			},
+		},
+		{
+			overrides: map[string]string{
+				"admission-control": "NamespaceLifecycle,LimitRanger",
+			},
+			defaults: map[string]string{
+				"insecure-bind-address": "127.0.0.1",
+				"allow-privileged":      "true",
+			},
+			expected: []string{
+				"--admission-control=NamespaceLifecycle,LimitRanger",
+				"--insecure-bind-address=127.0.0.1",
+				"--allow-privileged=true",
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		actual := getExtraParameters(rt.overrides, rt.defaults)
+		sort.Strings(actual)
+		sort.Strings(rt.expected)
+		if !reflect.DeepEqual(actual, rt.expected) {
+			t.Errorf("failed getExtraParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 		}
 	}
 }

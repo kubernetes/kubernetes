@@ -77,6 +77,9 @@ const (
 	CSVTokenBootstrapGroup = "kubeadm:kubelet-bootstrap"
 	// The file name of the tokens file that can be used for bootstrapping
 	CSVTokenFileName = "tokens.csv"
+
+	// DefaultAdmissionControl specifies the default admission control options that will be used
+	DefaultAdmissionControl = "NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota"
 )
 
 var (

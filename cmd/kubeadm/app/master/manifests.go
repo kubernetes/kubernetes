@@ -303,30 +303,43 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	command = append(getComponentBaseCommand(apiServer),
-		"--insecure-bind-address=127.0.0.1",
-		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
-		"--service-cluster-ip-range="+cfg.Networking.ServiceSubnet,
-		"--service-account-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
-		"--client-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--tls-cert-file="+getCertFilePath(kubeadmconstants.APIServerCertName),
-		"--tls-private-key-file="+getCertFilePath(kubeadmconstants.APIServerKeyName),
-		"--kubelet-client-certificate="+getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
-		"--kubelet-client-key="+getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
-		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
-		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
-		"--allow-privileged",
-		"--storage-backend=etcd3",
-		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+	defaultArguments := map[string]string{
+		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
+		"service-account-key-file":        getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
+		"client-ca-file":                  getCertFilePath(kubeadmconstants.CACertName),
+		"tls-cert-file":                   getCertFilePath(kubeadmconstants.APIServerCertName),
+		"tls-private-key-file":            getCertFilePath(kubeadmconstants.APIServerKeyName),
+		"kubelet-client-certificate":      getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
+		"kubelet-client-key":              getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
+		"token-auth-file":                 path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CSVTokenFileName),
+		"secure-port":                     fmt.Sprintf("%d", cfg.API.Port),
+		"storage-backend":                 "etcd3",
+		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+
 		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
 		// so add it unconditionally with recommended values
-		"--requestheader-username-headers=X-Remote-User",
-		"--requestheader-group-headers=X-Remote-Group",
-		"--requestheader-extra-headers-prefix=X-Remote-Extra-",
-		"--requestheader-client-ca-file="+getCertFilePath(kubeadmconstants.FrontProxyCACertName),
-		"--requestheader-allowed-names=front-proxy-client",
-	)
+		"requestheader-username-headers":     "X-Remote-User",
+		"requestheader-group-headers":        "X-Remote-Group",
+		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
+		"requestheader-client-ca-file":       getCertFilePath(kubeadmconstants.FrontProxyCACertName),
+		"requestheader-allowed-names":        "front-proxy-client",
+	}
 
+	// These arguments are defaults that can be canceled by APIServerExtraArgs
+	configurableDefaultArguments := map[string]string{
+		"admission-control":     kubeadmconstants.DefaultAdmissionControl,
+		"insecure-bind-address": "127.0.0.1",
+		"allow-privileged":      "true",
+	}
+
+	command = getComponentBaseCommand(apiServer)
+	for k, v := range defaultArguments {
+		if _, overrideExists := cfg.APIServerExtraArgs[k]; !overrideExists {
+			command = append(command, fmt.Sprintf("--%s=%s", k, v))
+		}
+	}
+
+	command = append(command, getExtraParameters(cfg.APIServerExtraArgs, configurableDefaultArguments)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationMode)...)
 
 	// Use first address we are given
@@ -468,6 +481,21 @@ func getAuthzParameters(authzMode string) []string {
 		command = append(command, "--authorization-policy-file="+kubeadmconstants.AuthorizationPolicyPath)
 	case authzmodes.ModeWebhook:
 		command = append(command, "--authorization-webhook-config-file="+kubeadmconstants.AuthorizationWebhookConfigPath)
+	}
+	return command
+}
+
+func getExtraParameters(overrides map[string]string, defaults map[string]string) []string {
+	var command []string
+	for k, v := range overrides {
+		if len(v) > 0 {
+			command = append(command, fmt.Sprintf("--%s=%s", k, v))
+		}
+	}
+	for k, v := range defaults {
+		if _, overrideExists := overrides[k]; !overrideExists {
+			command = append(command, fmt.Sprintf("--%s=%s", k, v))
+		}
 	}
 	return command
 }
