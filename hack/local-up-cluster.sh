@@ -36,7 +36,10 @@ NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 # if enabled, must set CGROUP_ROOT
-CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-true}
+CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-false}
+# this is not defaulted to preserve backward compatibility.
+# if EXPERIMENTAL_CGROUPS_PER_QOS is enabled, recommend setting to /
+CGROUP_ROOT=${CGROUP_ROOT:-""}
 # name of the cgroup driver, i.e. cgroupfs or systemd
 CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 # owner of client certs, default to current user if not specified
@@ -591,6 +594,7 @@ function start_kubelet {
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
         --cgroups-per-qos=${CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
+        --cgroup-root=${CGROUP_ROOT} \
         --keep-terminated-pod-volumes=true \
         --eviction-hard=${EVICTION_HARD} \
         --eviction-soft=${EVICTION_SOFT} \
