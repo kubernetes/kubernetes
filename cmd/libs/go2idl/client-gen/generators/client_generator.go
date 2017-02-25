@@ -28,6 +28,7 @@ import (
 	"k8s.io/gengo/types"
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/fake"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/scheme"
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 
 	"github.com/golang/glog"
@@ -158,6 +159,19 @@ func packageForClientset(customArgs clientgenargs.Args, clientsetPackage string,
 
 func packageForScheme(customArgs clientgenargs.Args, clientsetPackage string, srcTreePath string, boilerplate []byte, generatedBy string) generator.Package {
 	schemePackage := filepath.Join(clientsetPackage, "scheme")
+
+	// create runtime.Registry for internal client because it has to know about group versions
+	internalClient := false
+NextGroup:
+	for _, group := range customArgs.Groups {
+		for _, v := range group.Versions {
+			if v == "" {
+				internalClient = true
+				break NextGroup
+			}
+		}
+	}
+
 	return &generator.DefaultPackage{
 		PackageName: "scheme",
 		PackagePath: schemePackage,
@@ -173,15 +187,16 @@ func packageForScheme(customArgs clientgenargs.Args, clientsetPackage string, sr
 				// Always generate a "doc.go" file.
 				generator.DefaultGen{OptionalName: "doc"},
 
-				&genScheme{
+				&scheme.GenScheme{
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "register",
 					},
-					inputPackages: customArgs.GroupVersionToInputPath,
-					outputPackage: schemePackage,
-					outputPath:    filepath.Join(srcTreePath, schemePackage),
-					groups:        customArgs.Groups,
-					imports:       generator.NewImportTracker(),
+					InputPackages:  customArgs.GroupVersionToInputPath,
+					OutputPackage:  schemePackage,
+					OutputPath:     filepath.Join(srcTreePath, schemePackage),
+					Groups:         customArgs.Groups,
+					ImportTracker:  generator.NewImportTracker(),
+					CreateRegistry: internalClient,
 				},
 			}
 			return generators

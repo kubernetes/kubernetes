@@ -70,7 +70,6 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, fmt.Sprintf("clientset \"%s\"", g.realClientsetPackage))
 	// imports for the code in commonTemplate
 	imports = append(imports,
-		"k8s.io/kubernetes/pkg/api",
 		"k8s.io/client-go/testing",
 		"k8s.io/client-go/discovery",
 		"fakediscovery \"k8s.io/client-go/discovery/fake\"",
@@ -109,7 +108,7 @@ var common = `
 // without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
-	o := testing.NewObjectTracker(api.Registry, api.Scheme, api.Codecs.UniversalDecoder())
+	o := testing.NewObjectTracker(registry, scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
@@ -117,7 +116,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	}
 
 	fakePtr := testing.Fake{}
-	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o, api.Registry.RESTMapper()))
+	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o, registry.RESTMapper()))
 
 	fakePtr.AddWatchReactor("*", testing.DefaultWatchReactor(watch.NewFake(), nil))
 
