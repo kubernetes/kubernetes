@@ -214,7 +214,7 @@ func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, 
 }
 
 // kubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod.
-// Allowed kubeltOps are `kStart`, `kStop`, and `kRestart`
+// Allowed kubeletOps are `kStart`, `kStop`, and `kRestart`
 func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
