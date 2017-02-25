@@ -183,10 +183,10 @@ func newFakePodControl() *fakePodControl {
 		podIDMap:       podIDMap}
 }
 
-func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
+func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	f.Lock()
 	defer f.Unlock()
-	if err := f.FakePodControl.CreatePodsOnNode(nodeName, namespace, template, object); err != nil {
+	if err := f.FakePodControl.CreatePodsOnNode(nodeName, namespace, template, object, controllerRef); err != nil {
 		return fmt.Errorf("failed to create pod on node %q", nodeName)
 	}
 
@@ -268,6 +268,22 @@ func validateSyncDaemonSets(t *testing.T, fakePodControl *fakePodControl, expect
 	}
 	if len(fakePodControl.DeletePodName) != expectedDeletes {
 		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.DeletePodName))
+	}
+	// Every Pod created should have a ControllerRef.
+	if got, want := len(fakePodControl.ControllerRefs), expectedCreates; got != want {
+		t.Errorf("len(ControllerRefs) = %v, want %v", got, want)
+	}
+	// Make sure the ControllerRefs are correct.
+	for _, controllerRef := range fakePodControl.ControllerRefs {
+		if got, want := controllerRef.APIVersion, "extensions/v1beta1"; got != want {
+			t.Errorf("controllerRef.APIVersion = %q, want %q", got, want)
+		}
+		if got, want := controllerRef.Kind, "DaemonSet"; got != want {
+			t.Errorf("controllerRef.Kind = %q, want %q", got, want)
+		}
+		if controllerRef.Controller == nil || *controllerRef.Controller != true {
+			t.Errorf("controllerRef.Controller is not set to true")
+		}
 	}
 }
 
