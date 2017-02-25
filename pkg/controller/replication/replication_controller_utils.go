@@ -30,7 +30,7 @@ import (
 )
 
 // updateReplicationControllerStatus attempts to update the Status.Replicas of the given controller, with a single GET/PUT retry.
-func updateReplicationControllerStatus(c unversionedcore.ReplicationControllerInterface, rc api.ReplicationController, newStatus api.ReplicationControllerStatus) (updateErr error) {
+func updateReplicationControllerStatus(c unversionedcore.ReplicationControllerInterface, rc api.ReplicationController, newStatus api.ReplicationControllerStatus) (*api.ReplicationController, error) {
 	// This is the steady state. It happens when the rc doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
@@ -40,7 +40,7 @@ func updateReplicationControllerStatus(c unversionedcore.ReplicationControllerIn
 		rc.Status.AvailableReplicas == newStatus.AvailableReplicas &&
 		rc.Generation == rc.Status.ObservedGeneration &&
 		reflect.DeepEqual(rc.Status.Conditions, newStatus.Conditions) {
-		return nil
+		return &rc, nil
 	}
 	// Save the generation number we acted on, otherwise we might wrongfully indicate
 	// that we've seen a spec update when we retry.
@@ -48,9 +48,10 @@ func updateReplicationControllerStatus(c unversionedcore.ReplicationControllerIn
 	// same status.
 	newStatus.ObservedGeneration = rc.Generation
 
-	var getErr error
+	var getErr, updateErr error
+	var updatedRC *api.ReplicationController
 	for i, rc := 0, &rc; ; i++ {
-		glog.V(4).Infof(fmt.Sprintf("Updating replica count for rc: %s/%s, ", rc.Namespace, rc.Name) +
+		glog.V(4).Infof(fmt.Sprintf("Updating status for rc: %s/%s, ", rc.Namespace, rc.Name) +
 			fmt.Sprintf("replicas %d->%d (need %d), ", rc.Status.Replicas, newStatus.Replicas, rc.Spec.Replicas) +
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rc.Status.FullyLabeledReplicas, newStatus.FullyLabeledReplicas) +
 			fmt.Sprintf("readyReplicas %d->%d, ", rc.Status.ReadyReplicas, newStatus.ReadyReplicas) +
@@ -58,17 +59,23 @@ func updateReplicationControllerStatus(c unversionedcore.ReplicationControllerIn
 			fmt.Sprintf("sequence No: %v->%v", rc.Status.ObservedGeneration, newStatus.ObservedGeneration))
 
 		rc.Status = newStatus
-		_, updateErr = c.UpdateStatus(rc)
-		if updateErr == nil || i >= statusUpdateRetries {
-			return updateErr
+		updatedRC, updateErr = c.UpdateStatus(rc)
+		if updateErr == nil {
+			return updatedRC, nil
+		}
+		// Stop retrying if we exceed statusUpdateRetries - the replicationController will be requeued with a rate limit.
+		if i >= statusUpdateRetries {
+			break
 		}
 		// Update the controller with the latest resource version for the next poll
 		if rc, getErr = c.Get(rc.Name); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
-			return getErr
+			return nil, getErr
 		}
 	}
+
+	return nil, updateErr
 }
 
 // OverlappingControllers sorts a list of controllers by creation timestamp, using their names as a tie breaker.

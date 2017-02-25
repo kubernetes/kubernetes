@@ -741,10 +741,16 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	newStatus := calculateStatus(rc, filteredPods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicationControllerStatus(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, newStatus); err != nil {
+	updatedRC, err := updateReplicationControllerStatus(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, newStatus)
+	if err != nil {
 		// Multiple things could lead to this update failing.  Returning an error causes a requeue without forcing a hotloop
 		return err
 	}
-
+	// Resync the ReplicationController after MinReadySeconds as a last line of defense to guard against clock-skew.
+	if manageReplicasErr == nil && updatedRC.Spec.MinReadySeconds > 0 &&
+		updatedRC.Status.ReadyReplicas == updatedRC.Spec.Replicas &&
+		updatedRC.Status.AvailableReplicas != updatedRC.Spec.Replicas {
+		rm.enqueueControllerAfter(updatedRC, time.Duration(updatedRC.Spec.MinReadySeconds)*time.Second)
+	}
 	return manageReplicasErr
 }
