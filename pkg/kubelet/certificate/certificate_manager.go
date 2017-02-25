@@ -214,7 +214,7 @@ func (m *manager) Start() {
 func getCurrentCertificateOrBootstrap(
 	store Store,
 	bootstrapCertificatePEM []byte,
-	bootstrapKeyPEM []byte) (*CertKeyData, bool, error) {
+	bootstrapKeyPEM []byte) (certKeyData *CertKeyData, rotated bool, errResult error) {
 
 	certKeyData, err := store.Current()
 	if err == nil {
