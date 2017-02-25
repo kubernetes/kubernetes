@@ -490,7 +490,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 	}
 
 	nvidiaGPUCapacity := 0
-	if kl.enableNvidiaGPU {
+	if kl.enableExperimentalNvidiaGPU {
 		nvidiaGPUCapacity = kl.nvidiaGPUManager.Capacity()
 	}
 

@@ -452,23 +452,23 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		nodeRef:                   nodeRef,
 		nodeLabels:                kubeCfg.NodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
-		os:                kubeDeps.OSInterface,
-		oomWatcher:        oomWatcher,
-		cgroupsPerQOS:     kubeCfg.ExperimentalCgroupsPerQOS,
-		cgroupRoot:        kubeCfg.CgroupRoot,
-		mounter:           kubeDeps.Mounter,
-		writer:            kubeDeps.Writer,
-		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
-		maxPods:           int(kubeCfg.MaxPods),
-		enableNvidiaGPU:   kubeCfg.EnableNvidiaGPU,
-		podsPerCore:       int(kubeCfg.PodsPerCore),
-		syncLoopMonitor:   atomic.Value{},
-		resolverConfig:    kubeCfg.ResolverConfig,
-		cpuCFSQuota:       kubeCfg.CPUCFSQuota,
-		daemonEndpoints:   daemonEndpoints,
-		containerManager:  kubeDeps.ContainerManager,
-		nodeIP:            net.ParseIP(kubeCfg.NodeIP),
-		clock:             clock.RealClock{},
+		os:                          kubeDeps.OSInterface,
+		oomWatcher:                  oomWatcher,
+		cgroupsPerQOS:               kubeCfg.ExperimentalCgroupsPerQOS,
+		cgroupRoot:                  kubeCfg.CgroupRoot,
+		mounter:                     kubeDeps.Mounter,
+		writer:                      kubeDeps.Writer,
+		nonMasqueradeCIDR:           kubeCfg.NonMasqueradeCIDR,
+		maxPods:                     int(kubeCfg.MaxPods),
+		enableExperimentalNvidiaGPU: kubeCfg.EnableExperimentalNvidiaGPU,
+		podsPerCore:                 int(kubeCfg.PodsPerCore),
+		syncLoopMonitor:             atomic.Value{},
+		resolverConfig:              kubeCfg.ResolverConfig,
+		cpuCFSQuota:                 kubeCfg.CPUCFSQuota,
+		daemonEndpoints:             daemonEndpoints,
+		containerManager:            kubeDeps.ContainerManager,
+		nodeIP:                      net.ParseIP(kubeCfg.NodeIP),
+		clock:                       clock.RealClock{},
 		outOfDiskTransitionFrequency:            kubeCfg.OutOfDiskTransitionFrequency.Duration,
 		reservation:                             *reservation,
 		enableCustomMetrics:                     kubeCfg.EnableCustomMetrics,
@@ -985,7 +985,7 @@ type Kubelet struct {
 	maxPods int
 
 	// Enable experimental Nvidia GPU
-	enableNvidiaGPU bool
+	enableExperimentalNvidiaGPU bool
 
 	// Monitor Kubelet's sync loop
 	syncLoopMonitor atomic.Value
@@ -1193,8 +1193,8 @@ func (kl *Kubelet) initializeModules() error {
 	}
 
 	// Step 7: Init Nvidia Manager. Do not need to return err until we use NVML instead.
-	// Only works when user give true to EnableNvidiaGPU
-	if kl.enableNvidiaGPU {
+	// Only works when user give true to EnableExperimentalNvidiaGPU
+	if kl.enableExperimentalNvidiaGPU {
 		kl.nvidiaGPUManager.Init(kl.dockerClient)
 	}
 

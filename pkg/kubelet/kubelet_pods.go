@@ -87,7 +87,7 @@ func (kl *Kubelet) getActivePods() []*v1.Pod {
 
 // makeDevices determines the devices for the given container.
 func (kl *Kubelet) makeDevices(container *v1.Container) []kubecontainer.DeviceInfo {
-	if !kl.enableNvidiaGPU {
+	if !kl.enableExperimentalNvidiaGPU {
 		return nil
 	}
 
