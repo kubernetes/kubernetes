@@ -16873,6 +16873,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/spf13/cobra",
+        "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/server",
