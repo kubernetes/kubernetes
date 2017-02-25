@@ -78,6 +78,11 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		"skip preflight checks normally run before modifying the system",
 	)
 
+	cmd.PersistentFlags().StringVar(
+		&cfg.CACertPath, "ca-cert-path", kubeadmapiext.DefaultCACertPath,
+		"Path where the ca certificate of the cluster should be stored",
+	)
+
 	cmd.PersistentFlags().Var(
 		discovery.NewDiscoveryValue(&cfg.Discovery), "discovery",
 		"The discovery method kubeadm will use for connecting nodes to the master",
@@ -146,8 +151,7 @@ func (j *Join) Run(out io.Writer) error {
 
 	// Write the ca certificate to disk so kubelet can use it for authentication
 	cluster := cfg.Contexts[cfg.CurrentContext].Cluster
-	caCertFile := filepath.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)
-	err = certutil.WriteCert(caCertFile, cfg.Clusters[cluster].CertificateAuthorityData)
+	err = certutil.WriteCert(j.cfg.CACertPath, cfg.Clusters[cluster].CertificateAuthorityData)
 	if err != nil {
 		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}
