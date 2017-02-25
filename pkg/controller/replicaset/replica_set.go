@@ -541,18 +541,24 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return nil
 	}
 
-	// NOTE: filteredPods are pointing to objects from cache - if you need to
-	// modify them, you need to copy it first.
-	// TODO: Do the List and Filter in a single pass, or use an index.
-	var filteredPods []*v1.Pod
 	// list all pods to include the pods that don't match the rs`s selector
 	// anymore but has the stale controller ref.
+	// TODO: Do the List and Filter in a single pass, or use an index.
 	pods, err := rsc.podLister.Pods(rs.Namespace).List(labels.Everything())
 	if err != nil {
 		return err
 	}
+	// Ignore inactive pods.
+	var filteredPods []*v1.Pod
+	for _, pod := range pods {
+		if controller.IsPodActive(pod) {
+			filteredPods = append(filteredPods, pod)
+		}
+	}
 	cm := controller.NewPodControllerRefManager(rsc.podControl, rs, selector, controllerKind)
-	filteredPods, err = cm.ClaimPods(pods)
+	// NOTE: filteredPods are pointing to objects from cache - if you need to
+	// modify them, you need to copy it first.
+	filteredPods, err = cm.ClaimPods(filteredPods)
 	if err != nil {
 		return err
 	}

@@ -559,17 +559,23 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	rcNeedsSync := rm.expectations.SatisfiedExpectations(key)
 	trace.Step("Expectations restored")
 
-	// NOTE: filteredPods are pointing to objects from cache - if you need to
-	// modify them, you need to copy it first.
-	// TODO: Do the List and Filter in a single pass, or use an index.
-	var filteredPods []*v1.Pod
 	// list all pods to include the pods that don't match the rc's selector
 	// anymore but has the stale controller ref.
+	// TODO: Do the List and Filter in a single pass, or use an index.
 	pods, err := rm.podLister.Pods(rc.Namespace).List(labels.Everything())
 	if err != nil {
 		return err
 	}
+	// Ignore inactive pods.
+	var filteredPods []*v1.Pod
+	for _, pod := range pods {
+		if controller.IsPodActive(pod) {
+			filteredPods = append(filteredPods, pod)
+		}
+	}
 	cm := controller.NewPodControllerRefManager(rm.podControl, rc, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), controllerKind)
+	// NOTE: filteredPods are pointing to objects from cache - if you need to
+	// modify them, you need to copy it first.
 	filteredPods, err = cm.ClaimPods(pods)
 	if err != nil {
 		return err
