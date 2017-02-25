@@ -156,7 +156,7 @@ func (o *initFederationOptions) Bind(flags *pflag.FlagSet) {
 
 	flags.StringVar(&o.dnsZoneName, "dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
 	flags.StringVar(&o.image, "image", defaultImage, "Image to use for federation API server and controller manager binaries.")
-	flags.StringVar(&o.dnsProvider, "dns-provider", "google-clouddns", "Dns provider to be used for this deployment.")
+	flags.StringVar(&o.dnsProvider, "dns-provider", "", "Dns provider to be used for this deployment.")
 	flags.StringVar(&o.dnsProviderConfig, "dns-provider-config", "", "Config file path on local file system for configuring DNS provider.")
 	flags.StringVar(&o.etcdPVCapacity, "etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
 	flags.BoolVar(&o.etcdPersistentStorage, "etcd-persistent-storage", true, "Use persistent volume for etcd. Defaults to 'true'.")
@@ -200,6 +200,10 @@ type entityKeyPairs struct {
 
 // Complete ensures that options are valid and marshals them if necessary.
 func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
+	if len(i.options.dnsProvider) == 0 {
+		return fmt.Errorf("--dns-provider is mandatory")
+	}
+
 	err := i.commonOptions.SetName(cmd, args)
 	if err != nil {
 		return err
