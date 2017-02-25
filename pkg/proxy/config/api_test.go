@@ -23,6 +23,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
@@ -63,24 +64,16 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 
 	ch := make(chan ServiceUpdate)
 
-	cache.NewReflector(lw, &api.Service{}, NewServiceStore(nil, ch), 30*time.Second).Run()
+	serviceController := NewServiceController(lw, 30*time.Second, ch)
+	go serviceController.Run(wait.NeverStop)
 
+	// Add the first service
+	fakeWatch.Add(service1v1)
 	got, ok := <-ch
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	expected := ServiceUpdate{Op: SET, Services: []api.Service{}}
-	if !apiequality.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
-	}
-
-	// Add the first service
-	fakeWatch.Add(service1v1)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected = ServiceUpdate{Op: SET, Services: []api.Service{*service1v1}}
+	expected := ServiceUpdate{Op: ADD, Service: service1v1}
 	if !apiequality.Semantic.DeepEqual(expected, got) {
 		t.Errorf("Expected %#v; Got %#v", expected, got)
 	}
@@ -92,11 +85,10 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 		t.Errorf("Unable to read from channel when expected")
 	}
 	// Could be sorted either of these two ways:
-	expectedA := ServiceUpdate{Op: SET, Services: []api.Service{*service1v1, *service2}}
-	expectedB := ServiceUpdate{Op: SET, Services: []api.Service{*service2, *service1v1}}
+	expected = ServiceUpdate{Op: ADD, Service: service2}
 
-	if !apiequality.Semantic.DeepEqual(expectedA, got) && !apiequality.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
+	if !apiequality.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
 
 	// Modify service1
@@ -105,11 +97,10 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	expectedA = ServiceUpdate{Op: SET, Services: []api.Service{*service1v2, *service2}}
-	expectedB = ServiceUpdate{Op: SET, Services: []api.Service{*service2, *service1v2}}
+	expected = ServiceUpdate{Op: UPDATE, Service: service1v2}
 
-	if !apiequality.Semantic.DeepEqual(expectedA, got) && !apiequality.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
+	if !apiequality.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
 
 	// Delete service1
@@ -118,7 +109,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	expected = ServiceUpdate{Op: SET, Services: []api.Service{*service2}}
+	expected = ServiceUpdate{Op: REMOVE, Service: service1v2}
 	if !apiequality.Semantic.DeepEqual(expected, got) {
 		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
@@ -129,7 +120,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	expected = ServiceUpdate{Op: SET, Services: []api.Service{}}
+	expected = ServiceUpdate{Op: REMOVE, Service: service2}
 	if !apiequality.Semantic.DeepEqual(expected, got) {
 		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
@@ -174,24 +165,16 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 
 	ch := make(chan EndpointsUpdate)
 
-	cache.NewReflector(lw, &api.Endpoints{}, NewEndpointsStore(nil, ch), 30*time.Second).Run()
+	endpointsController := NewEndpointsController(lw, 30*time.Second, ch)
+	go endpointsController.Run(wait.NeverStop)
 
+	// Add the first endpoints
+	fakeWatch.Add(endpoints1v1)
 	got, ok := <-ch
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	expected := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{}}
-	if !apiequality.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
-	}
-
-	// Add the first endpoints
-	fakeWatch.Add(endpoints1v1)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v1}}
+	expected := EndpointsUpdate{Op: ADD, Endpoints: endpoints1v1}
 	if !apiequality.Semantic.DeepEqual(expected, got) {
 		t.Errorf("Expected %#v; Got %#v", expected, got)
 	}
@@ -203,11 +186,10 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 		t.Errorf("Unable to read from channel when expected")
 	}
 	// Could be sorted either of these two ways:
-	expectedA := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v1, *endpoints2}}
-	expectedB := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2, *endpoints1v1}}
+	expected = EndpointsUpdate{Op: ADD, Endpoints: endpoints2}
 
-	if !apiequality.Semantic.DeepEqual(expectedA, got) && !apiequality.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
+	if !apiequality.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
 
 	// Modify endpoints1
@@ -216,11 +198,10 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	expectedA = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v2, *endpoints2}}
-	expectedB = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2, *endpoints1v2}}
+	expected = EndpointsUpdate{Op: UPDATE, Endpoints: endpoints1v2}
 
-	if !apiequality.Semantic.DeepEqual(expectedA, got) && !apiequality.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
+	if !apiequality.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
 
 	// Delete endpoints1
@@ -229,7 +210,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2}}
+	expected = EndpointsUpdate{Op: REMOVE, Endpoints: endpoints1v2}
 	if !apiequality.Semantic.DeepEqual(expected, got) {
 		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
@@ -240,7 +221,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{}}
+	expected = EndpointsUpdate{Op: REMOVE, Endpoints: endpoints2}
 	if !apiequality.Semantic.DeepEqual(expected, got) {
 		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
