@@ -2736,8 +2736,8 @@ func ValidateReplicationControllerStatusUpdate(controller, oldController *api.Re
 	if controller.Status.AvailableReplicas > controller.Status.Replicas {
 		allErrs = append(allErrs, field.Invalid(statusPath.Child("availableReplicas"), controller.Status.AvailableReplicas, msg))
 	}
-	if controller.Status.ReadyReplicas > controller.Status.AvailableReplicas {
-		allErrs = append(allErrs, field.Invalid(statusPath.Child("readyReplicas"), controller.Status.ReadyReplicas, "cannot be greater than availableReplicas"))
+	if controller.Status.AvailableReplicas > controller.Status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("availableReplicas"), controller.Status.AvailableReplicas, "cannot be greater than readyReplicas"))
 	}
 	return allErrs
 }
