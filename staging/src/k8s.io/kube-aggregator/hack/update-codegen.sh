@@ -77,13 +77,3 @@ ${informergen} \
   --listers-package k8s.io/kube-aggregator/pkg/client/listers \
   --output-package k8s.io/kube-aggregator/pkg/client/informers
   "$@"
-
-
-# this is a temporary hack until we manage to update codegen to accept a scheme instead of hardcoding it
-echo "rewriting imports"
-grep -R -H  "\"k8s.io/kubernetes/pkg" "${KUBE_ROOT}/vendor/k8s.io/kube-aggregator/pkg/client" | cut -d: -f1 | sort | uniq | \
-    grep "\.go" | \
-    xargs ${SED} -i "s|\"k8s.io/kubernetes/pkg|\"k8s.io/client-go/pkg|g"
-
-echo "running gofmt"
-find "${KUBE_ROOT}/vendor/k8s.io/kube-aggregator/pkg/client" -type f -name "*.go" -print0 | xargs -0 gofmt -w
