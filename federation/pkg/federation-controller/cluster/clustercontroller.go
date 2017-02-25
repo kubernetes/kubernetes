@@ -53,8 +53,8 @@ type ClusterController struct {
 	clusterStore      clustercache.StoreToClusterLister
 }
 
-// NewclusterController returns a new cluster controller
-func NewclusterController(federationClient federationclientset.Interface, clusterMonitorPeriod time.Duration) *ClusterController {
+// NewClusterController returns a new cluster controller
+func NewClusterController(federationClient federationclientset.Interface, clusterMonitorPeriod time.Duration) *ClusterController {
 	cc := &ClusterController{
 		knownClusterSet:         make(sets.String),
 		federationClient:        federationClient,
