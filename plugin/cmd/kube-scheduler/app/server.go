@@ -85,6 +85,8 @@ func Run(s *options.SchedulerServer) error {
 	if err != nil {
 		return fmt.Errorf("unable to get hostname: %v", err)
 	}
+	glog.V(3).Info("Initiating leader election process to startup the scheduler server.")
+
 	// TODO: enable other lock types
 	rl := &resourcelock.EndpointsLock{
 		EndpointsMeta: metav1.ObjectMeta{
