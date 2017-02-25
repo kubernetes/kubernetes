@@ -392,7 +392,10 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.IPTablesDropBit = &temp
 	}
 	if obj.CgroupsPerQOS == nil {
-		temp := true
+		// disabled pending merge of https://github.com/kubernetes/kubernetes/pull/41753
+		// as enabling the new hierarchy without setting /Burstable/cpu.shares may cause
+		// regression.
+		temp := false
 		obj.CgroupsPerQOS = &temp
 	}
 	if obj.CgroupDriver == "" {
