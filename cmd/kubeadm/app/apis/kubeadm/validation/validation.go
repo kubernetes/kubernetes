@@ -18,6 +18,8 @@ package validation
 
 import (
 	"net"
+	"path"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -53,6 +55,10 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
+
+	if !path.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("ca-cert-path"), nil, "the ca certificate path must be an absolute path"))
+	}
 	return allErrs
 }
 
