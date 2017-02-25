@@ -49,7 +49,6 @@ function kubeconfig-federation-context() {
   CLUSTER_CONTEXT="federation-e2e-${KUBERNETES_PROVIDER}-${1}"
 }
 
-
 # Should NOT be called within the global scope, unless setting the desired global zone vars
 # This function is currently NOT USED in the global scope
 function set-federation-zone-vars {
