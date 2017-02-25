@@ -33,7 +33,7 @@ import (
 )
 
 func TestDeepCopyApiObjects(t *testing.T) {
-	for i := 0; i < *fuzzIters; i++ {
+	for i := 0; i < *apitesting.FuzzIters; i++ {
 		for _, version := range []schema.GroupVersion{testapi.Default.InternalGroupVersion(), api.Registry.GroupOrDie(api.GroupName).GroupVersion} {
 			f := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t, api.Codecs), rand.NewSource(rand.Int63()))
 			for kind := range api.Scheme.KnownTypes(version) {
@@ -82,7 +82,7 @@ func doDeepCopyTest(t *testing.T, kind schema.GroupVersionKind, f *fuzz.Fuzzer) 
 }
 
 func TestDeepCopySingleType(t *testing.T) {
-	for i := 0; i < *fuzzIters; i++ {
+	for i := 0; i < *apitesting.FuzzIters; i++ {
 		for _, version := range []schema.GroupVersion{testapi.Default.InternalGroupVersion(), api.Registry.GroupOrDie(api.GroupName).GroupVersion} {
 			f := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t, api.Codecs), rand.NewSource(rand.Int63()))
 			doDeepCopyTest(t, version.WithKind("Pod"), f)

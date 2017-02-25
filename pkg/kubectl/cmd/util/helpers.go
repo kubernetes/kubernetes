@@ -301,10 +301,7 @@ func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
 }
 
 func IsFilenameEmpty(filenames []string) bool {
-	if len(filenames) == 0 {
-		return true
-	}
-	return false
+	return len(filenames) == 0
 }
 
 // Whether this cmd need watching objects.
@@ -349,7 +346,7 @@ func GetFlagStringArray(cmd *cobra.Command, flag string) []string {
 // GetWideFlag is used to determine if "-o wide" is used
 func GetWideFlag(cmd *cobra.Command) bool {
 	f := cmd.Flags().Lookup("output")
-	if f.Value.String() == "wide" {
+	if f != nil && f.Value != nil && f.Value.String() == "wide" {
 		return true
 	}
 	return false
@@ -452,10 +449,11 @@ func Merge(codec runtime.Codec, dst runtime.Object, fragment, kind string) (runt
 // (usually for temporary use).
 func DumpReaderToFile(reader io.Reader, filename string) error {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	defer f.Close()
 	if err != nil {
 		return err
 	}
+	defer f.Close()
+
 	buffer := make([]byte, 1024)
 	for {
 		count, err := reader.Read(buffer)
@@ -604,28 +602,30 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 		removePairs = []string{}
 	}
 	var invalidBuf bytes.Buffer
-
+	var invalidBufNonEmpty bool
 	for _, pairArg := range pairArgs {
-		if strings.Index(pairArg, "=") != -1 {
+		if strings.Contains(pairArg, "=") {
 			parts := strings.SplitN(pairArg, "=", 2)
 			if len(parts) != 2 {
-				if invalidBuf.Len() > 0 {
+				if invalidBufNonEmpty {
 					invalidBuf.WriteString(", ")
 				}
-				invalidBuf.WriteString(fmt.Sprintf(pairArg))
+				invalidBuf.WriteString(pairArg)
+				invalidBufNonEmpty = true
 			} else {
 				newPairs[parts[0]] = parts[1]
 			}
 		} else if supportRemove && strings.HasSuffix(pairArg, "-") {
 			removePairs = append(removePairs, pairArg[:len(pairArg)-1])
 		} else {
-			if invalidBuf.Len() > 0 {
+			if invalidBufNonEmpty {
 				invalidBuf.WriteString(", ")
 			}
-			invalidBuf.WriteString(fmt.Sprintf(pairArg))
+			invalidBuf.WriteString(pairArg)
+			invalidBufNonEmpty = true
 		}
 	}
-	if invalidBuf.Len() > 0 {
+	if invalidBufNonEmpty {
 		err = fmt.Errorf("invalid %s format: %s", pairType, invalidBuf.String())
 		return
 	}

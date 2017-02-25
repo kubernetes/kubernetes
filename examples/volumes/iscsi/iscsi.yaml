@@ -5,28 +5,17 @@ metadata:
   name: iscsipd
 spec:
   containers:
-  - name: iscsipd-ro
-    image: kubernetes/pause
-    volumeMounts:
-    - mountPath: "/mnt/iscsipd"
-      name: iscsipd-ro
   - name: iscsipd-rw
     image: kubernetes/pause
     volumeMounts:
     - mountPath: "/mnt/iscsipd"
       name: iscsipd-rw
   volumes:
-  - name: iscsipd-ro
+  - name: iscsipd-rw
     iscsi:
       targetPortal: 10.0.2.15:3260
+      portals: ['10.0.2.16:3260', '10.0.2.17:3260']
       iqn: iqn.2001-04.com.example:storage.kube.sys1.xyz
       lun: 0
       fsType: ext4
       readOnly: true
-  - name: iscsipd-rw
-    iscsi:
-      targetPortal: 10.0.2.15:3260
-      iqn: iqn.2001-04.com.example:storage.kube.sys1.xyz
-      lun: 1
-      fsType: ext4
-      readOnly: false

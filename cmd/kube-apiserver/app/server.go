@@ -32,10 +32,10 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
-	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -43,17 +43,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
@@ -61,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -106,15 +108,25 @@ func Run(s *options.ServerRunOptions) error {
 
 	// create config from options
 	genericConfig := genericapiserver.NewConfig().
-		WithSerializer(api.Codecs).
-		ApplyOptions(s.GenericServerRunOptions).
-		ApplyInsecureServingOptions(s.InsecureServing)
+		WithSerializer(api.Codecs)
 
-	if _, err := genericConfig.ApplySecureServingOptions(s.SecureServing); err != nil {
-		return fmt.Errorf("failed to configure https: %s", err)
+	if err := s.GenericServerRunOptions.ApplyTo(genericConfig); err != nil {
+		return err
 	}
-	if err = s.Authentication.Apply(genericConfig); err != nil {
-		return fmt.Errorf("failed to configure authentication: %s", err)
+	if err := s.InsecureServing.ApplyTo(genericConfig); err != nil {
+		return err
+	}
+	if err := s.SecureServing.ApplyTo(genericConfig); err != nil {
+		return err
+	}
+	if err := s.Authentication.ApplyTo(genericConfig); err != nil {
+		return err
+	}
+	if err := s.Audit.ApplyTo(genericConfig); err != nil {
+		return err
+	}
+	if err := s.Features.ApplyTo(genericConfig); err != nil {
+		return err
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{
@@ -194,12 +206,12 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("error generating storage version map: %s", err)
 	}
-	storageFactory, err := kubeapiserver.BuildDefaultStorageFactory(
-		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
-		genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
+	storageFactory, err := kubeapiserver.NewStorageFactory(
+		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, api.Codecs,
+		serverstorage.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
-		master.DefaultAPIResourceConfigSource(), s.GenericServerRunOptions.RuntimeConfig)
+		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {
 		return fmt.Errorf("error in initializing storage factory: %s", err)
 	}
@@ -243,17 +255,7 @@ func Run(s *options.ServerRunOptions) error {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
 
-	apiAuthenticator, securityDefinitions, err := authenticatorConfig.New()
-	if err != nil {
-		return fmt.Errorf("invalid Authentication Config: %v", err)
-	}
-
-	privilegedLoopbackToken := uuid.NewRandom().String()
-	selfClientConfig, err := genericapiserver.NewSelfClientConfig(genericConfig.SecureServingInfo, genericConfig.InsecureServingInfo, privilegedLoopbackToken)
-	if err != nil {
-		return fmt.Errorf("failed to create clientset: %v", err)
-	}
-	client, err := internalclientset.NewForConfig(selfClientConfig)
+	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
 		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
 		if len(kubeAPIVersions) == 0 {
@@ -262,10 +264,26 @@ func Run(s *options.ServerRunOptions) error {
 
 		// KUBE_API_VERSIONS is used in test-update-storage-objects.sh, disabling a number of API
 		// groups. This leads to a nil client above and undefined behaviour further down.
+		//
 		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
 		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
+
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+
+	if client == nil {
+		// TODO: Remove check once client can never be nil.
+		glog.Errorf("Failed to setup bootstrap token authenticator because the loopback clientset was not setup properly.")
+	} else {
+		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
+			sharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
+		)
+	}
+
+	apiAuthenticator, securityDefinitions, err := authenticatorConfig.New()
+	if err != nil {
+		return fmt.Errorf("invalid authentication config: %v", err)
+	}
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizationConfig.New()
@@ -275,7 +293,7 @@ func Run(s *options.ServerRunOptions) error {
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
 	pluginInitializer := kubeadmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
-	admissionConfigProvider, err := kubeadmission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
+	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}
@@ -291,7 +309,6 @@ func Run(s *options.ServerRunOptions) error {
 	kubeVersion := version.Get()
 
 	genericConfig.Version = &kubeVersion
-	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
@@ -306,14 +323,16 @@ func Run(s *options.ServerRunOptions) error {
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
 
+	if err := s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); err != nil {
+		return err
+	}
+
 	config := &master.Config{
 		GenericConfig: genericConfig,
 
 		APIResourceConfigSource: storageFactory.APIResourceConfigSource,
 		StorageFactory:          storageFactory,
-		EnableWatchCache:        s.GenericServerRunOptions.EnableWatchCache,
 		EnableCoreControllers:   true,
-		DeleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
 		EventTTL:                s.EventTTL,
 		KubeletClientConfig:     s.KubeletConfig,
 		EnableUISupport:         true,
@@ -332,7 +351,7 @@ func Run(s *options.ServerRunOptions) error {
 		MasterCount: s.MasterCount,
 	}
 
-	if s.GenericServerRunOptions.EnableWatchCache {
+	if s.Etcd.EnableWatchCache {
 		glog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.InitializeWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)

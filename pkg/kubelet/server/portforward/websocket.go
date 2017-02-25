@@ -45,6 +45,8 @@ const (
 
 // options contains details about which streams are required for
 // port forwarding.
+// All fields incldued in V4Options need to be expressed explicilty in the
+// CRI (pkg/kubelet/api/{version}/runtime/api.proto) PortForwardRequest.
 type V4Options struct {
 	Ports []int32
 }
@@ -80,6 +82,11 @@ func NewV4Options(req *http.Request) (*V4Options, error) {
 	return &V4Options{
 		Ports: ports,
 	}, nil
+}
+
+// BuildV4Options returns a V4Options based on the given information.
+func BuildV4Options(ports []int32) (*V4Options, error) {
+	return &V4Options{Ports: ports}, nil
 }
 
 // handleWebSocketStreams handles requests to forward ports to a pod via

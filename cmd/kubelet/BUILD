@@ -22,11 +22,11 @@ go_library(
         "//cmd/kubelet/app:go_default_library",
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
-        "//pkg/util/logs:go_default_library",
         "//pkg/version/prometheus:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
+        "//vendor:k8s.io/apiserver/pkg/util/logs",
     ],
 )
 

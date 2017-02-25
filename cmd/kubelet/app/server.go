@@ -363,7 +363,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps == nil {
-		var kubeClient *clientset.Clientset
+		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
 		var externalKubeClient clientgoclientset.Interface
 		var cloud cloudprovider.Interface
@@ -452,6 +452,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		if s.SystemCgroups != "" && s.CgroupRoot == "" {
 			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 		}
+		if s.CgroupsPerQOS && s.CgroupRoot == "" {
+			glog.Infof("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
+			s.CgroupRoot = "/"
+		}
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
@@ -460,7 +464,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				SystemCgroupsName:     s.SystemCgroups,
 				KubeletCgroupsName:    s.KubeletCgroups,
 				ContainerRuntime:      s.ContainerRuntime,
-				CgroupsPerQOS:         s.ExperimentalCgroupsPerQOS,
+				CgroupsPerQOS:         s.CgroupsPerQOS,
 				CgroupRoot:            s.CgroupRoot,
 				CgroupDriver:          s.CgroupDriver,
 				ProtectKernelDefaults: s.ProtectKernelDefaults,

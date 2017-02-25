@@ -29,12 +29,14 @@ import (
 )
 
 // NewSimpleSecurityContextProvider creates a new SimpleSecurityContextProvider.
-func NewSimpleSecurityContextProvider() SecurityContextProvider {
-	return SimpleSecurityContextProvider{}
+func NewSimpleSecurityContextProvider(securityOptSeparator rune) SecurityContextProvider {
+	return SimpleSecurityContextProvider{securityOptSeparator}
 }
 
 // SimpleSecurityContextProvider is the default implementation of a SecurityContextProvider.
-type SimpleSecurityContextProvider struct{}
+type SimpleSecurityContextProvider struct {
+	securityOptSeparator rune
+}
 
 // ModifyContainerConfig is called before the Docker createContainer call.
 // The security context provider can make changes to the Config with which
@@ -93,25 +95,37 @@ func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *
 	}
 
 	if effectiveSC.SELinuxOptions != nil {
-		hostConfig.SecurityOpt = ModifySecurityOptions(hostConfig.SecurityOpt, effectiveSC.SELinuxOptions)
+		hostConfig.SecurityOpt = ModifySecurityOptions(hostConfig.SecurityOpt, effectiveSC.SELinuxOptions, p.securityOptSeparator)
 	}
 }
 
-// ModifySecurityOptions adds SELinux options to config.
-func ModifySecurityOptions(config []string, selinuxOpts *v1.SELinuxOptions) []string {
-	config = modifySecurityOption(config, DockerLabelUser, selinuxOpts.User)
-	config = modifySecurityOption(config, DockerLabelRole, selinuxOpts.Role)
-	config = modifySecurityOption(config, DockerLabelType, selinuxOpts.Type)
-	config = modifySecurityOption(config, DockerLabelLevel, selinuxOpts.Level)
+// ModifySecurityOptions adds SELinux options to config using the given
+// separator.
+func ModifySecurityOptions(config []string, selinuxOpts *v1.SELinuxOptions, separator rune) []string {
+	// Note, strictly speaking, we are actually mutating the values of these
+	// keys, rather than formatting name and value into a string.  Docker re-
+	// uses the same option name multiple times (it's just 'label') with
+	// different values which are themselves key-value pairs.  For example,
+	// the SELinux type is represented by the security opt:
+	//
+	//   label<separator>type:<selinux_type>
+	//
+	// In Docker API versions before 1.23, the separator was the `:` rune; in
+	// API version 1.23 it changed to the `=` rune.
+	config = modifySecurityOption(config, DockerLabelUser(separator), selinuxOpts.User)
+	config = modifySecurityOption(config, DockerLabelRole(separator), selinuxOpts.Role)
+	config = modifySecurityOption(config, DockerLabelType(separator), selinuxOpts.Type)
+	config = modifySecurityOption(config, DockerLabelLevel(separator), selinuxOpts.Level)
 
 	return config
 }
 
-// modifySecurityOption adds the security option of name to the config array with value in the form
-// of name:value
+// modifySecurityOption adds the security option of name to the config array
+// with value in the form of name:value.
 func modifySecurityOption(config []string, name, value string) []string {
 	if len(value) > 0 {
 		config = append(config, fmt.Sprintf("%s:%s", name, value))
 	}
+
 	return config
 }

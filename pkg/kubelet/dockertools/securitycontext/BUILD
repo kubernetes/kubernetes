@@ -15,6 +15,7 @@ go_library(
         "fake.go",
         "provider.go",
         "types.go",
+        "util.go",
     ],
     tags = ["automanaged"],
     deps = [

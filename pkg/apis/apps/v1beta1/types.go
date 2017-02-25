@@ -21,6 +21,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
+const (
+	// StatefulSetInitAnnotation if present, and set to false, indicates that a Pod's readiness should be ignored.
+	StatefulSetInitAnnotation = "pod.alpha.kubernetes.io/initialized"
+)
+
 // +genclient=true
 
 // StatefulSet represents a set of pods with consistent identities.

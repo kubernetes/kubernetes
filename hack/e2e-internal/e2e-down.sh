@@ -29,26 +29,16 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-if [[ "${FEDERATION:-}" == "true" ]];then
+if [[ "${FEDERATION:-}" == "true" ]]; then
   source "${KUBE_ROOT}/federation/cluster/common.sh"
+
   for zone in ${E2E_ZONES};do
     # bring down an e2e cluster
     (
       set-federation-zone-vars "$zone"
-      cleanup-federation-api-objects || echo "Couldn't cleanup federation api objects"
-
-      # TODO(madhusudancs): This is an arbitrary amount of sleep to give Kubernetes
-      # clusters enough time to delete the underlying cloud provider resources
-      # corresponding to the Kubernetes resources we deleted as part of the test
-      # teardowns. It is shameful that we are doing this, but this is just a bandage
-      # to stop the bleeding. Please don't use this pattern anywhere. Remove this
-      # when proper cloud provider cleanups are implemented in the individual test
-      # `AfterEach` blocks.
-      sleep 2m
-
       test-teardown
     )
-done
+  done
 else
   test-teardown
 fi

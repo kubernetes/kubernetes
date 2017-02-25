@@ -33,7 +33,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kubeadm/app:all-srcs",
-        "//cmd/kubeadm/test:all-srcs",
+        "//cmd/kubeadm/test/cmd:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -19,11 +19,11 @@ package app
 import (
 	"github.com/golang/glog"
 
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"

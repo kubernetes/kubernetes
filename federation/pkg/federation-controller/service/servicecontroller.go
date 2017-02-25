@@ -345,14 +345,14 @@ func (s *ServiceController) removeFinalizerFunc(obj pkgruntime.Object, finalizer
 	return service, nil
 }
 
-// Adds the given finalizer to the given objects ObjectMeta.
+// Adds the given finalizers to the given objects ObjectMeta.
 // Assumes that the given object is a service.
-func (s *ServiceController) addFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+func (s *ServiceController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
 	service := obj.(*v1.Service)
-	service.ObjectMeta.Finalizers = append(service.ObjectMeta.Finalizers, finalizer)
+	service.ObjectMeta.Finalizers = append(service.ObjectMeta.Finalizers, finalizers...)
 	service, err := s.federationClient.Core().Services(service.Namespace).Update(service)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizer %s to service %s: %v", finalizer, service.Name, err)
+		return nil, fmt.Errorf("failed to add finalizers %v to service %s: %v", finalizers, service.Name, err)
 	}
 	return service, nil
 }

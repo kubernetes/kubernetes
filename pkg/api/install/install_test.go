@@ -25,9 +25,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	internal "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestResourceVersioner(t *testing.T) {
+	g, err := internal.Registry.Group(v1.GroupName)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	intf, err := g.DefaultInterfacesFor(v1.SchemeGroupVersion)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	accessor := intf.MetadataAccessor
+
 	pod := internal.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}
 	version, err := accessor.ResourceVersion(&pod)
 	if err != nil {

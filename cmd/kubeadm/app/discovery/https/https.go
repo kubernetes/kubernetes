@@ -22,9 +22,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func Parse(u *url.URL, c *kubeadm.Discovery) error {
+func Parse(u *url.URL, c *kubeadm.Discovery) {
 	c.HTTPS = &kubeadm.HTTPSDiscovery{
 		URL: u.String(),
 	}
-	return nil
 }

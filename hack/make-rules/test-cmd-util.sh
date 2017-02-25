@@ -57,6 +57,7 @@ pods="pods"
 podtemplates="podtemplates"
 replicasets="replicasets"
 replicationcontrollers="replicationcontrollers"
+roles="roles"
 secrets="secrets"
 serviceaccounts="serviceaccounts"
 services="services"
@@ -1612,8 +1613,8 @@ run_recursive_resources_tests() {
   output_message=$(! kubectl autoscale --min=1 --max=2 -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox replication controllers are autoscaled
   # with min. of 1 replica & max of 2 replicas, and since busybox2 is malformed, it should error
-  kube::test::get_object_assert 'hpa busybox0' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 <no value>'
-  kube::test::get_object_assert 'hpa busybox1' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 <no value>'
+  kube::test::get_object_assert 'hpa busybox0' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 80'
+  kube::test::get_object_assert 'hpa busybox1' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 80'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   kubectl delete hpa busybox0 "${kube_flags[@]}"
   kubectl delete hpa busybox1 "${kube_flags[@]}"
@@ -2221,7 +2222,7 @@ run_rc_tests() {
   kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale 2~3 pods, no CPU utilization specified, rc specified by name
   kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
+  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
   kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale without specifying --max should fail
   ! kubectl autoscale rc frontend "${kube_flags[@]}"
@@ -2280,7 +2281,7 @@ run_deployment_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
   # autoscale 2~3 pods, no CPU utilization specified
   kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
+  kube::test::get_object_assert 'hpa nginx-deployment' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
   # Clean up
   # Note that we should delete hpa first, otherwise it may fight with the deployment reaper.
   kubectl delete hpa nginx-deployment "${kube_flags[@]}"
@@ -2471,7 +2472,7 @@ run_rs_tests() {
     kubectl delete hpa frontend "${kube_flags[@]}"
     # autoscale 2~3 pods, no CPU utilization specified, replica set specified by name
     kubectl autoscale rs frontend "${kube_flags[@]}" --min=2 --max=3
-    kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
+    kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 80'
     kubectl delete hpa frontend "${kube_flags[@]}"
     # autoscale without specifying --max should fail
     ! kubectl autoscale rs frontend "${kube_flags[@]}"
@@ -2802,6 +2803,23 @@ runTests() {
     # make sure the server was properly bootstrapped with clusterroles and bindings
     kube::test::get_object_assert clusterroles/cluster-admin "{{.metadata.name}}" 'cluster-admin'
     kube::test::get_object_assert clusterrolebindings/cluster-admin "{{.metadata.name}}" 'cluster-admin'
+
+    # test `kubectl create clusterrole`
+    kubectl create "${kube_flags[@]}" clusterrole pod-admin --verb=* --resource=pods
+    kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
+    kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+    kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+    kubectl create "${kube_flags[@]}" clusterrole resource-reader --verb=get,list --resource=pods,deployments.extensions
+    kube::test::get_object_assert clusterrole/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
+    kube::test::get_object_assert clusterrole/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:deployments:'
+    kube::test::get_object_assert clusterrole/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':extensions:'
+    kubectl create "${kube_flags[@]}" clusterrole resourcename-reader --verb=get,list --resource=pods --resource-name=foo
+    kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
+    kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+    kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+    kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.resourceNames}}{{.}}:{{end}}{{end}}" 'foo:'
+
+    # test `kubectl create clusterrolebinding`
     kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --clusterrole=admin --user=super-admin
     kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
     kubectl create "${kube_flags[@]}" clusterrolebinding super-group --clusterrole=admin --group=the-group
@@ -2817,6 +2835,32 @@ runTests() {
     kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:'
     kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:'
   fi
+  
+  if kube::test::if_supports_resource "${roles}" ; then
+    kubectl create "${kube_flags[@]}" role pod-admin --verb=* --resource=pods
+    kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
+    kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+    kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+    kubectl create "${kube_flags[@]}" role resource-reader --verb=get,list --resource=pods,deployments.extensions
+    kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
+    kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:deployments:'
+    kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':extensions:'
+  	kubectl create "${kube_flags[@]}" role resourcename-reader --verb=get,list --resource=pods --resource-name=foo
+    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
+    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resourceNames}}{{.}}:{{end}}{{end}}" 'foo:'
+  fi
+
+  #########################
+  # Assert short name     #
+  #########################
+
+  kube::log::status "Testing propagation of short names for resources"
+  output_message=$(kubectl get --raw=/api/v1)
+
+  ## test if a short name is exported during discovery
+  kube::test::if_has_string "${output_message}" '{"name":"configmaps","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
 
   ###########################
   # POD creation / deletion #
@@ -3186,7 +3230,7 @@ runTests() {
     kubectl create -f - "${kube_flags[@]}" << __EOF__
 {
   "kind": "StorageClass",
-  "apiVersion": "storage.k8s.io/v1beta1",
+  "apiVersion": "storage.k8s.io/v1",
   "metadata": {
     "name": "storage-class-name"
   },
@@ -3198,6 +3242,7 @@ runTests() {
 }
 __EOF__
     kube::test::get_object_assert storageclass "{{range.items}}{{$id_field}}:{{end}}" 'storage-class-name:'
+    kube::test::get_object_assert sc "{{range.items}}{{$id_field}}:{{end}}" 'storage-class-name:'
     kubectl delete storageclass storage-class-name "${kube_flags[@]}"
     # Post-condition: no storage classes
     kube::test::get_object_assert storageclass "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -3240,7 +3285,8 @@ __EOF__
 
     # check webhook token authentication endpoint, kubectl doesn't actually display the returned object so this isn't super useful
     # but it proves that works
-    kubectl create -f test/fixtures/pkg/kubectl/cmd/create/tokenreview.json --validate=false
+    kubectl create -f test/fixtures/pkg/kubectl/cmd/create/tokenreview-v1beta1.json --validate=false
+    kubectl create -f test/fixtures/pkg/kubectl/cmd/create/tokenreview-v1.json --validate=false
   fi
 
 
@@ -3251,10 +3297,21 @@ __EOF__
   if kube::test::if_supports_resource "${subjectaccessreviews}" ; then
     # check remote authorization endpoint, kubectl doesn't actually display the returned object so this isn't super useful
     # but it proves that works
-    kubectl create -f test/fixtures/pkg/kubectl/cmd/create/sar.json --validate=false
+    kubectl create -f test/fixtures/pkg/kubectl/cmd/create/sar-v1.json --validate=false
+    kubectl create -f test/fixtures/pkg/kubectl/cmd/create/sar-v1beta1.json --validate=false
 
     SAR_RESULT_FILE="${KUBE_TEMP}/sar-result.json"
-    curl -k -H "Content-Type:" http://localhost:8080/apis/authorization.k8s.io/v1beta1/subjectaccessreviews -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar.json > "${SAR_RESULT_FILE}"
+    curl -k -H "Content-Type:" http://localhost:8080/apis/authorization.k8s.io/v1beta1/subjectaccessreviews -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar-v1beta1.json > "${SAR_RESULT_FILE}"
+    if grep -q '"allowed": true' "${SAR_RESULT_FILE}"; then
+      kube::log::status "\"authorization.k8s.io/subjectaccessreviews\" returns as expected: $(cat "${SAR_RESULT_FILE}")"
+    else
+      kube::log::status "\"authorization.k8s.io/subjectaccessreviews\" does not return as expected: $(cat "${SAR_RESULT_FILE}")"
+      exit 1
+    fi
+    rm "${SAR_RESULT_FILE}"
+
+    SAR_RESULT_FILE="${KUBE_TEMP}/sar-result.json"
+    curl -k -H "Content-Type:" http://localhost:8080/apis/authorization.k8s.io/v1/subjectaccessreviews -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar-v1.json > "${SAR_RESULT_FILE}"
     if grep -q '"allowed": true' "${SAR_RESULT_FILE}"; then
       kube::log::status "\"authorization.k8s.io/subjectaccessreviews\" returns as expected: $(cat "${SAR_RESULT_FILE}")"
     else

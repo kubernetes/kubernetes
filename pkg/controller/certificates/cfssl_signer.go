@@ -77,7 +77,7 @@ func NewCFSSLSigner(caFile, caKeyFile string) (*CFSSLSigner, error) {
 	}, nil
 }
 
-func (cs *CFSSLSigner) Sign(csr *certificates.CertificateSigningRequest) ([]byte, error) {
+func (cs *CFSSLSigner) Sign(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
 	var usages []string
 	for _, usage := range csr.Spec.Usages {
 		usages = append(usages, string(usage))
@@ -93,7 +93,13 @@ func (cs *CFSSLSigner) Sign(csr *certificates.CertificateSigningRequest) ([]byte
 	if err != nil {
 		return nil, err
 	}
-	return s.Sign(signer.SignRequest{
+
+	csr.Status.Certificate, err = s.Sign(signer.SignRequest{
 		Request: string(csr.Spec.Request),
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return csr, nil
 }

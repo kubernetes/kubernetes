@@ -71,7 +71,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		framework.BindClusterRole(jig.client.Rbac(), "cluster-admin", f.Namespace.Name,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
-		err := framework.WaitForAuthorizationUpdate(jig.client.Authorization(),
+		err := framework.WaitForAuthorizationUpdate(jig.client.AuthorizationV1beta1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			"", "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
@@ -125,7 +125,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 			}
 		})
 
-		It("shoud create ingress with given static-ip", func() {
+		It("should create ingress with given static-ip", func() {
 			// ip released when the rest of lb resources are deleted in cleanupGCE
 			ip := gceController.createStaticIP(ns)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
@@ -158,7 +158,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 			//	 framework.GetMasterHost(), "glbc", glbcHealthzPort, restartPollInterval, restartTimeout)
 			// restarter.restart()
 			// By("should continue serving on provided static-ip for 30 seconds")
-			// ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", ip), "", 30, 1*time.Second, httpClient))
+			// framework.ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", ip), "", 30, 1*time.Second, httpClient))
 		})
 
 		// TODO: Implement a multizone e2e that verifies traffic reaches each

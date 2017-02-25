@@ -215,7 +215,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	w.resultsManager.Set(w.containerID, result, w.pod)
 
 	if w.probeType == liveness && result == results.Failure {
-		// The container fails a liveness check, it will need to be restared.
+		// The container fails a liveness check, it will need to be restarted.
 		// Stop probing until we see a new container ID. This is to reduce the
 		// chance of hitting #21751, where running `docker exec` when a
 		// container is being stopped may lead to corrupted container state.

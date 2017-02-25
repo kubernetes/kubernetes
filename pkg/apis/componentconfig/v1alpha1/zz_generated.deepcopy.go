@@ -35,8 +35,6 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_AdmissionConfiguration, InType: reflect.TypeOf(&AdmissionConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_AdmissionPluginConfiguration, InType: reflect.TypeOf(&AdmissionPluginConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletAnonymousAuthentication, InType: reflect.TypeOf(&KubeletAnonymousAuthentication{})},
@@ -48,38 +46,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletX509Authentication, InType: reflect.TypeOf(&KubeletX509Authentication{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
 	)
-}
-
-func DeepCopy_v1alpha1_AdmissionConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*AdmissionConfiguration)
-		out := out.(*AdmissionConfiguration)
-		*out = *in
-		if in.Plugins != nil {
-			in, out := &in.Plugins, &out.Plugins
-			*out = make([]AdmissionPluginConfiguration, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1alpha1_AdmissionPluginConfiguration(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1alpha1_AdmissionPluginConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*AdmissionPluginConfiguration)
-		out := out.(*AdmissionPluginConfiguration)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.Configuration); err != nil {
-			return err
-		} else {
-			out.Configuration = *newVal.(*runtime.RawExtension)
-		}
-		return nil
-	}
 }
 
 func DeepCopy_v1alpha1_KubeProxyConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
@@ -219,6 +185,11 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = new(bool)
 			**out = **in
 		}
+		if in.ClusterDNS != nil {
+			in, out := &in.ClusterDNS, &out.ClusterDNS
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		if in.ImageGCHighThresholdPercent != nil {
 			in, out := &in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent
 			*out = new(int32)
@@ -229,8 +200,8 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = new(int32)
 			**out = **in
 		}
-		if in.ExperimentalCgroupsPerQOS != nil {
-			in, out := &in.ExperimentalCgroupsPerQOS, &out.ExperimentalCgroupsPerQOS
+		if in.CgroupsPerQOS != nil {
+			in, out := &in.CgroupsPerQOS, &out.CgroupsPerQOS
 			*out = new(bool)
 			**out = **in
 		}
@@ -328,6 +299,11 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
 			*out = make([]string, len(*in))
 			copy(*out, *in)
+		}
+		if in.EnableCRI != nil {
+			in, out := &in.EnableCRI, &out.EnableCRI
+			*out = new(bool)
+			**out = **in
 		}
 		return nil
 	}

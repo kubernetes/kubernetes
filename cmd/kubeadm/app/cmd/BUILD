@@ -24,7 +24,6 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
-        "//cmd/kubeadm/app/cmd/flags:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/discovery:go_default_library",
         "//cmd/kubeadm/app/master:go_default_library",
@@ -33,9 +32,12 @@ go_library(
         "//cmd/kubeadm/app/phases/apiconfig:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/phases/token:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
-        "//pkg/api:go_default_library",
+        "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/util/token:go_default_library",
+        "//pkg/bootstrap/api:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/util/initsystem:go_default_library",
@@ -48,6 +50,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
+        "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/util/cert",
     ],
 )
@@ -61,7 +64,7 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
     ],
 )
@@ -75,9 +78,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//cmd/kubeadm/app/cmd/flags:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

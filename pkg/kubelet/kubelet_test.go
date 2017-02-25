@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -60,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
@@ -174,13 +176,10 @@ func newTestKubeletWithImageList(
 	kubelet.cadvisor = mockCadvisor
 
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	secretManager, err := secret.NewSimpleSecretManager(kubelet.kubeClient)
-	if err != nil {
-		t.Fatalf("can't create a secret manager: %v", err)
-	}
+	secretManager := secret.NewSimpleSecretManager(kubelet.kubeClient)
 	kubelet.secretManager = secretManager
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager)
-	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
+	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
 	if err != nil {
@@ -262,6 +261,7 @@ func newTestKubeletWithImageList(
 		controllerAttachDetachEnabled,
 		kubelet.nodeName,
 		kubelet.podManager,
+		kubelet.statusManager,
 		fakeKubeClient,
 		kubelet.volumePluginMgr,
 		fakeRuntime,
@@ -402,26 +402,24 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 }
 
 type testNodeLister struct {
-	nodes []v1.Node
+	nodes []*v1.Node
 }
 
 type testNodeInfo struct {
-	nodes []v1.Node
+	nodes []*v1.Node
 }
 
 func (ls testNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 	for _, node := range ls.nodes {
 		if node.Name == id {
-			return &node, nil
+			return node, nil
 		}
 	}
 	return nil, fmt.Errorf("Node with name: %s does not exist", id)
 }
 
-func (ls testNodeLister) List() (v1.NodeList, error) {
-	return v1.NodeList{
-		Items: ls.nodes,
-	}, nil
+func (ls testNodeLister) List(selector labels.Selector) ([]*v1.Node, error) {
+	return ls.nodes, nil
 }
 
 // Tests that we handle port conflicts correctly by setting the failed status in status map.
@@ -433,7 +431,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	kl.nodeLister = testNodeLister{nodes: []v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -443,7 +441,7 @@ func TestHandlePortConflicts(t *testing.T) {
 			},
 		},
 	}}
-	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -479,69 +477,6 @@ func TestHandlePortConflicts(t *testing.T) {
 	require.Equal(t, v1.PodPending, status.Phase)
 }
 
-// Tests that we sort pods based on criticality.
-func TestCriticalPrioritySorting(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	kl := testKubelet.kubelet
-	nodes := []v1.Node{
-		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
-			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
-			}}},
-	}
-	kl.nodeLister = testNodeLister{nodes: nodes}
-	kl.nodeInfo = testNodeInfo{nodes: nodes}
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-
-	spec := v1.PodSpec{NodeName: string(kl.nodeName),
-		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				"memory": resource.MustParse("90"),
-			},
-		}}},
-	}
-	pods := []*v1.Pod{
-		podWithUidNameNsSpec("000000000", "newpod", "foo", spec),
-		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
-		podWithUidNameNsSpec("123456789", "middlepod", "foo", spec),
-	}
-
-	// Pods are not sorted by creation time.
-	startTime := time.Now()
-	pods[0].CreationTimestamp = metav1.NewTime(startTime.Add(10 * time.Second))
-	pods[1].CreationTimestamp = metav1.NewTime(startTime)
-	pods[2].CreationTimestamp = metav1.NewTime(startTime.Add(1 * time.Second))
-
-	// Make the middle and new pod critical, the middle pod should win
-	// even though it comes later in the list
-	critical := map[string]string{kubetypes.CriticalPodAnnotationKey: ""}
-	pods[0].Annotations = critical
-	pods[1].Annotations = map[string]string{}
-	pods[2].Annotations = critical
-
-	// The non-critical pod should be rejected
-	notfittingPods := []*v1.Pod{pods[0], pods[1]}
-	fittingPod := pods[2]
-
-	kl.HandlePodAdditions(pods)
-	// Check pod status stored in the status map.
-	// notfittingPod should be Failed
-	for _, p := range notfittingPods {
-		status, found := kl.statusManager.GetPodStatus(p.UID)
-		require.True(t, found, "Status of pod %q is not found in the status map", p.UID)
-		require.Equal(t, v1.PodFailed, status.Phase)
-	}
-
-	// fittingPod should be Pending
-	status, found := kl.statusManager.GetPodStatus(fittingPod.UID)
-	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
-	require.Equal(t, v1.PodPending, status.Phase)
-}
-
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
 func TestHandleHostNameConflicts(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -551,7 +486,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	kl.nodeLister = testNodeLister{nodes: []v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
@@ -561,7 +496,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 			},
 		},
 	}}
-	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
@@ -599,7 +534,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	nodes := []v1.Node{
+	nodes := []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
 			Status: v1.NodeStatus{
@@ -640,7 +575,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	nodes := []v1.Node{
+	nodes := []*v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
@@ -1216,57 +1151,6 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	kubelet.podManager.SetPods(pods)
 	actual := kubelet.filterOutTerminatedPods(pods)
 	assert.Equal(t, expected, actual)
-}
-
-func TestMakePortMappings(t *testing.T) {
-	port := func(name string, protocol v1.Protocol, containerPort, hostPort int32, ip string) v1.ContainerPort {
-		return v1.ContainerPort{
-			Name:          name,
-			Protocol:      protocol,
-			ContainerPort: containerPort,
-			HostPort:      hostPort,
-			HostIP:        ip,
-		}
-	}
-	portMapping := func(name string, protocol v1.Protocol, containerPort, hostPort int, ip string) kubecontainer.PortMapping {
-		return kubecontainer.PortMapping{
-			Name:          name,
-			Protocol:      protocol,
-			ContainerPort: containerPort,
-			HostPort:      hostPort,
-			HostIP:        ip,
-		}
-	}
-
-	tests := []struct {
-		container            *v1.Container
-		expectedPortMappings []kubecontainer.PortMapping
-	}{
-		{
-			&v1.Container{
-				Name: "fooContainer",
-				Ports: []v1.ContainerPort{
-					port("", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-					port("", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
-					port("foo", v1.ProtocolUDP, 555, 5555, ""),
-					// Duplicated, should be ignored.
-					port("foo", v1.ProtocolUDP, 888, 8888, ""),
-					// Duplicated, should be ignored.
-					port("", v1.ProtocolTCP, 80, 8888, ""),
-				},
-			},
-			[]kubecontainer.PortMapping{
-				portMapping("fooContainer-TCP:80", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-				portMapping("fooContainer-TCP:443", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
-				portMapping("fooContainer-foo", v1.ProtocolUDP, 555, 5555, ""),
-			},
-		},
-	}
-
-	for i, tt := range tests {
-		actual := makePortMappings(tt.container)
-		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
-	}
 }
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
@@ -1938,7 +1822,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	kl.nodeLister = testNodeLister{nodes: []v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -1948,7 +1832,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 			},
 		},
 	}}
-	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{

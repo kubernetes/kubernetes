@@ -75,6 +75,15 @@ func (ds *dockerService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*
 
 		result = append(result, converted)
 	}
+	// Include legacy containers if there are still legacy containers not cleaned up yet.
+	if !ds.legacyCleanup.Done() {
+		legacyContainers, err := ds.ListLegacyContainers(filter)
+		if err != nil {
+			return nil, err
+		}
+		// Legacy containers are always older, so we can safely append them to the end.
+		result = append(result, legacyContainers...)
+	}
 	return result, nil
 }
 
@@ -97,6 +106,12 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	labels[containerLogPathLabelKey] = filepath.Join(sandboxConfig.LogDirectory, config.LogPath)
 	// Write the sandbox ID in the labels.
 	labels[sandboxIDLabelKey] = podSandboxID
+
+	apiVersion, err := ds.getDockerAPIVersion()
+	if err != nil {
+		return "", fmt.Errorf("unable to get the docker API version: %v", err)
+	}
+	securityOptSep := getSecurityOptSeparator(apiVersion)
 
 	image := ""
 	if iSpec := config.GetImage(); iSpec != nil {
@@ -143,7 +158,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 		// Note: ShmSize is handled in kube_docker_client.go
 
 		// Apply security context.
-		applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc)
+		applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc, securityOptSep)
 	}
 
 	// Apply cgroupsParent derived from the sandbox config.
@@ -168,7 +183,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	hc.Resources.Devices = devices
 
 	// Apply appArmor and seccomp options.
-	securityOpts, err := getContainerSecurityOpts(config.Metadata.Name, sandboxConfig, ds.seccompProfileRoot)
+	securityOpts, err := getContainerSecurityOpts(config.Metadata.Name, sandboxConfig, ds.seccompProfileRoot, securityOptSep)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.Name, err)
 	}
@@ -359,6 +374,15 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 	// Convert to unix timestamps.
 	ct, st, ft := createdAt.UnixNano(), startedAt.UnixNano(), finishedAt.UnixNano()
 	exitCode := int32(r.State.ExitCode)
+
+	// If the container has no containerTypeLabelKey label, treat it as a legacy container.
+	if _, ok := r.Config.Labels[containerTypeLabelKey]; !ok {
+		names, labels, err := convertLegacyNameAndLabels([]string{r.Name}, r.Config.Labels)
+		if err != nil {
+			return nil, err
+		}
+		r.Name, r.Config.Labels = names[0], labels
+	}
 
 	metadata, err := parseContainerName(r.Name)
 	if err != nil {

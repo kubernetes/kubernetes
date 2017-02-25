@@ -23,6 +23,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -32,7 +33,8 @@ import (
 )
 
 const (
-	threshold3K  = 100
+	warning3K    = 100
+	threshold3K  = 30
 	threshold30K = 30
 	threshold60K = 30
 )
@@ -44,8 +46,11 @@ func TestSchedule100Node3KPods(t *testing.T) {
 	}
 
 	config := defaultSchedulerBenchmarkConfig(100, 3000)
-	if min := schedulePods(config); min < threshold3K {
-		t.Errorf("Too small pod scheduling throughput for 3k pods. Expected %v got %v", threshold3K, min)
+	min := schedulePods(config)
+	if min < threshold3K {
+		t.Errorf("Failing: Scheduling rate was too low for an interval, we saw rate of %v, which is the allowed minimum of %v ! ", min, threshold3K)
+	} else if min < warning3K {
+		fmt.Printf("Warning: pod scheduling throughput for 3k pods was slow for an interval... Saw a interval with very low (%v) scheduling rate!", min)
 	} else {
 		fmt.Printf("Minimal observed throughput for 3k pod test: %v\n", min)
 	}
@@ -95,7 +100,7 @@ func TestSchedule100Node3KNodeAffinityPods(t *testing.T) {
 								{
 									Key:      nodeAffinityKey,
 									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{string(i)},
+									Values:   []string{fmt.Sprintf("%v", i)},
 								},
 							},
 						},
@@ -205,7 +210,10 @@ func schedulePods(config *testConfig) int32 {
 	// Bake in time for the first pod scheduling event.
 	for {
 		time.Sleep(50 * time.Millisecond)
-		scheduled := config.schedulerSupportFunctions.GetScheduledPodListerIndexer().List()
+		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
+		if err != nil {
+			glog.Fatalf("%v", err)
+		}
 		// 30,000 pods -> wait till @ least 300 are scheduled to start measuring.
 		// TODO Find out why sometimes there may be scheduling blips in the beggining.
 		if len(scheduled) > config.numPods/100 {
@@ -220,7 +228,10 @@ func schedulePods(config *testConfig) int32 {
 		// This can potentially affect performance of scheduler, since List() is done under mutex.
 		// Listing 10000 pods is an expensive operation, so running it frequently may impact scheduler.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled := config.schedulerSupportFunctions.GetScheduledPodListerIndexer().List()
+		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
+		if err != nil {
+			glog.Fatalf("%v", err)
+		}
 
 		// We will be completed when all pods are done being scheduled.
 		// return the worst-case-scenario interval that was seen during this time.

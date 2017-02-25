@@ -36,6 +36,11 @@ func getContextWithTimeout(timeout time.Duration) (context.Context, context.Canc
 	return context.WithTimeout(context.Background(), timeout)
 }
 
+// getContextWithCancel returns a context with cancel.
+func getContextWithCancel() (context.Context, context.CancelFunc) {
+	return context.WithCancel(context.Background())
+}
+
 // verifySandboxStatus verified whether all required fields are set in PodSandboxStatus.
 func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
 	if status.Id == "" {

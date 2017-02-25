@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.
@@ -64,10 +64,10 @@ func TestRecycleSync(t *testing.T) {
 			[]string{"Warning VolumeFailedRecycle"}, noerrors, testSyncVolume,
 		},
 		{
-			// recycle failure - newRecycler returns error
+			// recycle failure - Recycle returns error
 			"6-4 - newRecycler returns error",
 			newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle),
-			withMessage("Failed to create recycler: Mock plugin error: no recycleCalls configured", newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle)),
+			withMessage("Recycle failed: Mock plugin error: no recycleCalls configured", newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
@@ -77,7 +77,7 @@ func TestRecycleSync(t *testing.T) {
 			// recycle failure - recycle returns error
 			"6-5 - recycle returns error",
 			newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle),
-			withMessage("Recycler failed: Mock recycle error", newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle)),
+			withMessage("Recycle failed: Mock recycle error", newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,

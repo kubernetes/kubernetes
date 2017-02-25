@@ -17,7 +17,6 @@ limitations under the License.
 package master
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -26,12 +25,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
+	ext "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/pkg/api/v1"
-	ext "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 var (
@@ -203,9 +202,6 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 						"component": kubeAPIServer,
 						"tier":      "control-plane",
 					},
-					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: getMasterToleration(),
-					},
 				},
 				Spec: v1.PodSpec{
 					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
@@ -222,6 +218,7 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 							Resources:     componentResources("250m"),
 						},
 					},
+					Tolerations: getMasterToleration(),
 				},
 			},
 		},
@@ -256,9 +253,6 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 						"component": kubeControllerManager,
 						"tier":      "control-plane",
 					},
-					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: getMasterToleration(),
-					},
 				},
 				Spec: v1.PodSpec{
 					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
@@ -275,7 +269,8 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 							Env:           getProxyEnvVars(),
 						},
 					},
-					DNSPolicy: v1.DNSDefault,
+					Tolerations: getMasterToleration(),
+					DNSPolicy:   v1.DNSDefault,
 				},
 			},
 		},
@@ -310,9 +305,6 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 						"component": kubeScheduler,
 						"tier":      "control-plane",
 					},
-					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: getMasterToleration(),
-					},
 				},
 				Spec: v1.PodSpec{
 					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
@@ -327,6 +319,7 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 							Env:           getProxyEnvVars(),
 						},
 					},
+					Tolerations: getMasterToleration(),
 				},
 			},
 		},
@@ -335,18 +328,17 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 }
 
 func buildStaticManifestFilepath(name string) string {
-	return path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests", name+".json")
+	return path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests", name+".yaml")
 }
 
-func getMasterToleration() string {
+func getMasterToleration() []v1.Toleration {
 	// Tolerate the master taint we add to our master nodes, as this can and should
 	// run there.
 	// TODO: Duplicated above
-	masterToleration, _ := json.Marshal([]v1.Toleration{{
+	return []v1.Toleration{{
 		Key:      "dedicated",
 		Value:    "master",
 		Operator: v1.TolerationOpEqual,
 		Effect:   v1.TaintEffectNoSchedule,
-	}})
-	return string(masterToleration)
+	}}
 }

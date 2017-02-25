@@ -63,6 +63,16 @@ const (
 	nodeCountPerNamespace = 100
 )
 
+var randomKind = schema.GroupKind{Kind: "Random"}
+
+var knownKinds = []schema.GroupKind{
+	api.Kind("ReplicationController"),
+	extensions.Kind("Deployment"),
+	// TODO: uncomment when Jobs are fixed: #38497
+	//batch.Kind("Job"),
+	extensions.Kind("ReplicaSet"),
+}
+
 // This test suite can take a long time to run, so by default it is added to
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -141,6 +151,8 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
 		// Test with secrets
 		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment"), secretsPerPod: 2},
+		// Special test case which randomizes created resources
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: randomKind},
 	}
 
 	for _, testArg := range loadTests {
@@ -168,11 +180,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			configs, secretConfigs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind, itArg.secretsPerPod)
 			if itArg.services {
 				framework.Logf("Creating services")
-				// If <totalPods> is large, we generate services only for every second
-				// config. Since those are sorted by the size, we will have both small,
-				// medium and large services, but only for half of pods.
-				onlyHalfServices := totalPods > 60000
-				services := generateServicesForConfigs(configs, onlyHalfServices)
+				services := generateServicesForConfigs(configs)
 				for _, service := range services {
 					_, err := clientset.Core().Services(service.Namespace).Create(service)
 					framework.ExpectNoError(err)
@@ -374,7 +382,9 @@ func generateConfigsForGroup(
 ) ([]testutils.RunObjectConfig, []*testutils.SecretConfig) {
 	configs := make([]testutils.RunObjectConfig, 0, count)
 	secretConfigs := make([]*testutils.SecretConfig, 0, count*secretsPerPod)
+	savedKind := kind
 	for i := 1; i <= count; i++ {
+		kind = savedKind
 		namespace := nss[i%len(nss)].Name
 		secretNames := make([]string, 0, secretsPerPod)
 
@@ -404,6 +414,10 @@ func generateConfigsForGroup(
 			SecretNames:    secretNames,
 		}
 
+		if kind == randomKind {
+			kind = knownKinds[rand.Int()%len(knownKinds)]
+		}
+
 		var config testutils.RunObjectConfig
 		switch kind {
 		case api.Kind("ReplicationController"):
@@ -422,12 +436,9 @@ func generateConfigsForGroup(
 	return configs, secretConfigs
 }
 
-func generateServicesForConfigs(configs []testutils.RunObjectConfig, onlyHalfServices bool) []*v1.Service {
+func generateServicesForConfigs(configs []testutils.RunObjectConfig) []*v1.Service {
 	services := make([]*v1.Service, 0, len(configs))
-	for i, config := range configs {
-		if onlyHalfServices && i%2 == 1 {
-			continue
-		}
+	for _, config := range configs {
 		serviceName := config.GetName() + "-svc"
 		labels := map[string]string{"name": config.GetName()}
 		service := &v1.Service{

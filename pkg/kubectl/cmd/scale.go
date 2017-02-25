@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -67,7 +68,7 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		// resize is deprecated
 		Aliases: []string{"resize"},
-		Short:   "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job",
+		Short:   i18n.T("Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"),
 		Long:    scale_long,
 		Example: scale_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -79,7 +80,7 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
-	cmd.Flags().String("resource-version", "", "Precondition for resource version. Requires that the current resource version match this value in order to scale.")
+	cmd.Flags().String("resource-version", "", i18n.T("Precondition for resource version. Requires that the current resource version match this value in order to scale."))
 	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the resource match this value in order to scale.")
 	cmd.Flags().Int("replicas", -1, "The new desired number of replicas. Required.")
 	cmd.MarkFlagRequired("replicas")

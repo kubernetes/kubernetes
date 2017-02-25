@@ -34,6 +34,11 @@ readonly V
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd ${KUBE_ROOT}
 
+if ! git diff --exit-code; then
+    echo "ERROR: $0 cannot be run on a dirty working directory."
+    exit 1
+fi
+
 # Smoke test client-go examples
 go install ./staging/src/k8s.io/client-go/examples/...
 
@@ -57,8 +62,9 @@ fi
 for PACKAGE in apimachinery client-go; do
     PACKAGE_PATH="${TEMP_STAGING_GOPATH}/src/k8s.io/${PACKAGE}"
     echo "Creating a temporary ${PACKAGE} repo with a snapshot of HEAD"
+    rm -rf "${PACKAGE_PATH}"
     mkdir -p "${PACKAGE_PATH}"
-    rsync -ax --delete staging/src/k8s.io/${PACKAGE}/ "${PACKAGE_PATH}/"
+    git archive --format=tar "HEAD:staging/src/k8s.io/${PACKAGE}" | tar -xf - -C "${PACKAGE_PATH}"
     pushd "${PACKAGE_PATH}" >/dev/null
     git init >/dev/null
     git add *

@@ -29,15 +29,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
 	"k8s.io/kubernetes/pkg/util/node"
 )
@@ -50,6 +51,14 @@ const (
 	testLargeClusterThreshold  = 20
 	testUnhealtyThreshold      = float32(0.55)
 )
+
+func alwaysReady() bool { return true }
+
+type nodeController struct {
+	*NodeController
+	nodeInformer      coreinformers.NodeInformer
+	daemonSetInformer extensionsinformers.DaemonSetInformer
+}
 
 func NewNodeControllerFromClient(
 	cloud cloudprovider.Interface,
@@ -65,21 +74,46 @@ func NewNodeControllerFromClient(
 	clusterCIDR *net.IPNet,
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSize int,
-	allocateNodeCIDRs bool) (*NodeController, error) {
+	allocateNodeCIDRs bool) (*nodeController, error) {
 
-	factory := informers.NewSharedInformerFactory(kubeClient, nil, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 
-	nc, err := NewNodeController(factory.Pods(), factory.Nodes(), factory.DaemonSets(), cloud, kubeClient, podEvictionTimeout, evictionLimiterQPS, secondaryEvictionLimiterQPS,
-		largeClusterThreshold, unhealthyZoneThreshold, nodeMonitorGracePeriod, nodeStartupGracePeriod, nodeMonitorPeriod, clusterCIDR,
-		serviceCIDR, nodeCIDRMaskSize, allocateNodeCIDRs)
+	nodeInformer := factory.Core().V1().Nodes()
+	daemonSetInformer := factory.Extensions().V1beta1().DaemonSets()
+
+	nc, err := NewNodeController(
+		factory.Core().V1().Pods(),
+		nodeInformer,
+		daemonSetInformer,
+		cloud,
+		kubeClient,
+		podEvictionTimeout,
+		evictionLimiterQPS,
+		secondaryEvictionLimiterQPS,
+		largeClusterThreshold,
+		unhealthyZoneThreshold,
+		nodeMonitorGracePeriod,
+		nodeStartupGracePeriod,
+		nodeMonitorPeriod,
+		clusterCIDR,
+		serviceCIDR,
+		nodeCIDRMaskSize,
+		allocateNodeCIDRs,
+		false,
+		false,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	return nc, nil
+	nc.podInformerSynced = alwaysReady
+	nc.nodeInformerSynced = alwaysReady
+	nc.daemonSetInformerSynced = alwaysReady
+
+	return &nodeController{nc, nodeInformer, daemonSetInformer}, nil
 }
 
-func syncNodeStore(nc *NodeController, fakeNodeHandler *testutil.FakeNodeHandler) error {
+func syncNodeStore(nc *nodeController, fakeNodeHandler *testutil.FakeNodeHandler) error {
 	nodes, err := fakeNodeHandler.List(metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -88,7 +122,7 @@ func syncNodeStore(nc *NodeController, fakeNodeHandler *testutil.FakeNodeHandler
 	for i := range nodes.Items {
 		newElems = append(newElems, &nodes.Items[i])
 	}
-	return nc.nodeStore.Replace(newElems, "newRV")
+	return nc.nodeInformer.Informer().GetStore().Replace(newElems, "newRV")
 }
 
 func TestMonitorNodeStatusEvictPods(t *testing.T) {
@@ -517,8 +551,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold, testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
+		nodeController.recorder = testutil.NewFakeRecorder()
 		for _, ds := range item.daemonSets {
-			nodeController.daemonSetStore.Add(&ds)
+			nodeController.daemonSetInformer.Informer().GetStore().Add(&ds)
 		}
 		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -539,11 +574,15 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		}
 		zones := testutil.GetZones(item.fakeNodeHandler)
 		for _, zone := range zones {
-			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				nodeUid, _ := value.UID.(string)
-				deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
-				return true, 0
-			})
+			if _, ok := nodeController.zonePodEvictor[zone]; ok {
+				nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+					nodeUid, _ := value.UID.(string)
+					deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetInformer.Lister())
+					return true, 0
+				})
+			} else {
+				t.Fatalf("Zone %v was unitialized!", zone)
+			}
 		}
 
 		podEvicted := false
@@ -661,6 +700,7 @@ func TestPodStatusChange(t *testing.T) {
 			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold, testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
+		nodeController.recorder = testutil.NewFakeRecorder()
 		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1180,6 +1220,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		nodeController.enterPartialDisruptionFunc = func(nodeNum int) float32 {
 			return testRateLimiterQPS
 		}
+		nodeController.recorder = testutil.NewFakeRecorder()
 		nodeController.enterFullDisruptionFunc = func(nodeNum int) float32 {
 			return testRateLimiterQPS
 		}
@@ -1270,6 +1311,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 		testNodeMonitorPeriod, nil, nil, 0, false)
 	nodeController.cloud = &fakecloud.FakeCloud{}
 	nodeController.now = func() metav1.Time { return metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
+	nodeController.recorder = testutil.NewFakeRecorder()
 	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
 		return false, nil
 	}
@@ -1336,6 +1378,22 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							},
 							{
 								Type:               v1.NodeOutOfDisk,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+								LastTransitionTime: fakeNow,
+							},
+							{
+								Type:               v1.NodeMemoryPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+								LastTransitionTime: fakeNow,
+							},
+							{
+								Type:               v1.NodeDiskPressure,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusNeverUpdated",
 								Message:            "Kubelet never posted node status.",
@@ -1451,6 +1509,22 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								LastTransitionTime: metav1.Time{Time: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
 							},
+							{
+								Type:               v1.NodeMemoryPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC), // should default to node creation time if condition was never updated
+								LastTransitionTime: metav1.Time{Time: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodeDiskPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC), // should default to node creation time if condition was never updated
+								LastTransitionTime: metav1.Time{Time: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
+							},
 						},
 						Capacity: v1.ResourceList{
 							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
@@ -1505,6 +1579,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
+		nodeController.recorder = testutil.NewFakeRecorder()
 		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1738,6 +1813,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
+		nodeController.recorder = testutil.NewFakeRecorder()
 		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1910,8 +1986,7 @@ func TestCheckPod(t *testing.T) {
 	}
 
 	nc, _ := NewNodeControllerFromClient(nil, fake.NewSimpleClientset(), 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, 0, false)
-	nc.nodeStore.Store = cache.NewStore(cache.MetaNamespaceKeyFunc)
-	nc.nodeStore.Store.Add(&v1.Node{
+	nc.nodeInformer.Informer().GetStore().Add(&v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "new",
 		},
@@ -1921,7 +1996,7 @@ func TestCheckPod(t *testing.T) {
 			},
 		},
 	})
-	nc.nodeStore.Store.Add(&v1.Node{
+	nc.nodeInformer.Informer().GetStore().Add(&v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "old",
 		},
@@ -1931,7 +2006,7 @@ func TestCheckPod(t *testing.T) {
 			},
 		},
 	})
-	nc.nodeStore.Store.Add(&v1.Node{
+	nc.nodeInformer.Informer().GetStore().Add(&v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "older",
 		},
@@ -1941,7 +2016,7 @@ func TestCheckPod(t *testing.T) {
 			},
 		},
 	})
-	nc.nodeStore.Store.Add(&v1.Node{
+	nc.nodeInformer.Informer().GetStore().Add(&v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "oldest",
 		},

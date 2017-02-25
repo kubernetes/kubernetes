@@ -48,6 +48,9 @@ type ClientCache struct {
 	fedClientSets map[schema.GroupVersion]fedclientset.Interface
 	configs       map[schema.GroupVersion]*restclient.Config
 
+	// noVersionConfig provides a cached config for the case of no required version specified
+	noVersionConfig *restclient.Config
+
 	matchVersion bool
 
 	defaultConfigLock sync.Mutex
@@ -104,8 +107,10 @@ func (c *ClientCache) ClientConfigForVersion(requiredVersion *schema.GroupVersio
 	// before looking up from the cache
 	if requiredVersion != nil {
 		if config, ok := c.configs[*requiredVersion]; ok {
-			return config, nil
+			return copyConfig(config), nil
 		}
+	} else if c.noVersionConfig != nil {
+		return copyConfig(c.noVersionConfig), nil
 	}
 
 	negotiatedVersion, err := discovery.NegotiateVersion(discoveryClient, requiredVersion, api.Registry.EnabledVersions())
@@ -118,15 +123,23 @@ func (c *ClientCache) ClientConfigForVersion(requiredVersion *schema.GroupVersio
 	oldclient.SetKubernetesDefaults(&config)
 
 	if requiredVersion != nil {
-		c.configs[*requiredVersion] = &config
+		c.configs[*requiredVersion] = copyConfig(&config)
+	} else {
+		c.noVersionConfig = copyConfig(&config)
 	}
 
 	// `version` does not necessarily equal `config.Version`.  However, we know that we call this method again with
 	// `config.Version`, we should get the config we've just built.
-	configCopy := config
-	c.configs[*config.GroupVersion] = &configCopy
+	c.configs[*config.GroupVersion] = copyConfig(&config)
 
-	return &config, nil
+	return copyConfig(&config), nil
+}
+
+func copyConfig(in *restclient.Config) *restclient.Config {
+	configCopy := *in
+	copyGroupVersion := *configCopy.GroupVersion
+	configCopy.GroupVersion = &copyGroupVersion
+	return &configCopy
 }
 
 // ClientSetForVersion initializes or reuses a clientset for the specified version, or returns an

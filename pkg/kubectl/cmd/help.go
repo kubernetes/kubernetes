@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var help_long = templates.LongDesc(`
@@ -33,7 +34,7 @@ var help_long = templates.LongDesc(`
 func NewCmdHelp(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "help [command] | STRING_TO_SEARCH",
-		Short: "Help about any command",
+		Short: i18n.T("Help about any command"),
 		Long:  help_long,
 
 		Run: RunHelp,

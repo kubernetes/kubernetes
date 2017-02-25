@@ -28,7 +28,7 @@ func TestAddFlagsFlag(t *testing.T) {
 	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s := NewServerRunOptions()
 	s.AddFlags(f)
-	if s.GenericServerRunOptions.EnableSwaggerUI {
+	if s.Features.EnableSwaggerUI {
 		t.Errorf("Expected s.EnableSwaggerUI to be false by default")
 	}
 
@@ -36,7 +36,7 @@ func TestAddFlagsFlag(t *testing.T) {
 		"--enable-swagger-ui=true",
 	}
 	f.Parse(args)
-	if !s.GenericServerRunOptions.EnableSwaggerUI {
+	if !s.Features.EnableSwaggerUI {
 		t.Errorf("Expected s.EnableSwaggerUI to be true")
 	}
 }

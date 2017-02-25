@@ -189,6 +189,8 @@ const (
 	NamespaceNone string = ""
 	// NamespaceSystem is the system namespace where we place system components.
 	NamespaceSystem string = "kube-system"
+	// NamespacePublic is the namespace where we place public info (ConfigMaps)
+	NamespacePublic string = "kube-public"
 	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )
@@ -1911,6 +1913,9 @@ type PodSpec struct {
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string
+	// If specified, the pod's tolerations.
+	// +optional
+	Tolerations []Toleration
 }
 
 // Sysctl defines a kernel parameter to be set
@@ -2528,6 +2533,10 @@ type NodeSpec struct {
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	// +optional
 	Unschedulable bool
+
+	// If specified, the node's taints.
+	// +optional
+	Taints []Taint
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -2798,10 +2807,10 @@ type NamespaceSpec struct {
 // FinalizerName is the name identifying a finalizer during namespace lifecycle.
 type FinalizerName string
 
-// These are internal finalizer values to Kubernetes, must be qualified name unless defined here
+// These are internal finalizer values to Kubernetes, must be qualified name unless defined here or
+// in metav1.
 const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
-	FinalizerOrphan     string        = "orphan"
 )
 
 // NamespaceStatus is information about the current status of a Namespace.
@@ -3343,9 +3352,6 @@ const (
 	// - Secret.Annotations["kubernetes.io/service-account.uid"] - the UID of the ServiceAccount the token identifies
 	// - Secret.Data["token"] - a token that identifies the service account to the API
 	SecretTypeServiceAccountToken SecretType = "kubernetes.io/service-account-token"
-
-	// SecretTypeBootstrapToken is the key for tokens used by kubeadm to validate cluster info during discovery.
-	SecretTypeBootstrapToken = "bootstrap.kubernetes.io/token"
 
 	// ServiceAccountNameKey is the key of the required annotation for SecretTypeServiceAccountToken secrets
 	ServiceAccountNameKey = "kubernetes.io/service-account.name"

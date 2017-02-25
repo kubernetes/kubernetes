@@ -154,13 +154,13 @@ func TestGenerateService(t *testing.T) {
 		{
 			generator: ServiceGeneratorV2{},
 			params: map[string]interface{}{
-				"selector":                      "foo=bar,baz=blah",
-				"name":                          "test",
-				"port":                          "80",
-				"protocol":                      "UDP",
-				"container-port":                "foobar",
-				"external-ip":                   "1.2.3.4",
-				"create-external-load-balancer": "true",
+				"selector":       "foo=bar,baz=blah",
+				"name":           "test",
+				"port":           "80",
+				"protocol":       "UDP",
+				"container-port": "foobar",
+				"external-ip":    "1.2.3.4",
+				"type":           "LoadBalancer",
 			},
 			expected: api.Service{
 				ObjectMeta: metav1.ObjectMeta{

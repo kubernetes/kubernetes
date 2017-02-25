@@ -76,8 +76,8 @@ cd "${CLIENT_REPO}"
 # save copies code from client-go into the temp folder to make sure we don't lose it by accident
 # TODO this is temporary until everything in certain directories is authoritative
 function save() {
-    mkdir -p "${CLIENT_REPO_TEMP}/$1"
-    cp -r "${CLIENT_REPO}/$1/"* "${CLIENT_REPO_TEMP}/$1"
+    mkdir -p "$(dirname "${CLIENT_REPO_TEMP}/$1")"
+    cp -r "${CLIENT_REPO}/$1"* "${CLIENT_REPO_TEMP}/"
 }
 
 # save everything for which the staging directory is the source of truth
@@ -90,8 +90,8 @@ save "transport"
 save "third_party"
 save "plugin"
 save "util"
-
-
+save "examples"
+save "OWNERS"
 
 # mkcp copies file from the main repo to the client repo, it creates the directory if it doesn't exist in the client repo.
 function mkcp() {
@@ -106,9 +106,16 @@ mkdir -p "${CLIENT_REPO_TEMP}/pkg/version"
 find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT_REPO_TEMP}/pkg/version"
 # need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
+mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/informers/informers_generated"
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
 echo "generating vendor/"
+# client-go depends on some apimachinery packages. Adding staging/ to the GOPATH
+# so that if client-go has new dependencies on apimachinery, `godep save` can
+# find the dependent packages in staging/, instead of failing. Note that all
+# k8s.io/apimachinery dependencies will be updated later by the robot to point
+# to the real k8s.io/apimachinery commit and vendor the real code.
+GOPATH="${GOPATH}:${MAIN_REPO}/staging"
 GO15VENDOREXPERIMENT=1 godep save ./...
 popd > /dev/null
 
@@ -165,6 +172,8 @@ function mvfolder {
 }
 
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
+mvfolder "pkg/client/informers/informers_generated/externalversions" informers
+mvfolder "pkg/client/listers" listers
 if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
     echo "${CLIENT_REPO_TEMP}/pkg/client is expected to be empty"
     exit 1
@@ -186,6 +195,13 @@ find "${CLIENT_REPO_TEMP}" -type f \( \
 
 echo "remove cyclical godep"
 rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/client-go"
+# If godep cannot find dependent packages in the primary GOPATH, it will search
+# in the secondary GOPATH staging/. If successful, godep will wrongly copy the
+# dependents relative to the primary GOPATH (looks like a godep bug), creating
+# the ${CLIENT_REPO_TEMP}/staging dir. These copies will not be recognized by
+# the Go compiler, so we just remove them. Note that the publishing robot will
+# correctly resolve these dependencies later.
+rm -rf "${CLIENT_REPO_TEMP}/staging"
 
 if [ "${FAIL_ON_CHANGES}" = true ]; then
     echo "running FAIL_ON_CHANGES"

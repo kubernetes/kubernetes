@@ -52,10 +52,8 @@ var (
 
 var FederationSuite common.Suite
 
-/*
-cluster keeps track of the assorted objects and state related to each cluster
-in the federation
-*/
+// cluster keeps track of the assorted objects and state related to each cluster
+// in the federation
 type cluster struct {
 	name string
 	*kubeclientset.Clientset
@@ -100,9 +98,9 @@ func clusterIsReadyOrFail(f *fedframework.Framework, context *fedframework.E2ECo
 	framework.Logf("Cluster %s is Ready", context.Name)
 }
 
-// waitForAllClustersReady wait for all clusters defined in e2e context to be created
+// waitForAllRegisteredClusters waits for all clusters defined in e2e context to be created
 // return ClusterList until the listed cluster items equals clusterCount
-func waitForAllClustersReady(f *fedframework.Framework, clusterCount int) *federationapi.ClusterList {
+func waitForAllRegisteredClusters(f *fedframework.Framework, clusterCount int) *federationapi.ClusterList {
 	var clusterList *federationapi.ClusterList
 	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
 		var err error
@@ -187,15 +185,12 @@ func unregisterClusters(clusters map[string]*cluster, f *fedframework.Framework)
 }
 
 // can not be moved to util, as By and Expect must be put in Ginkgo test unit
-func registerClusters(clusters map[string]*cluster, userAgentName, federationName string, f *fedframework.Framework) string {
+func getRegisteredClusters(userAgentName string, f *fedframework.Framework) (map[string]*cluster, string) {
+	clusters := make(map[string]*cluster)
 	contexts := f.GetUnderlyingFederatedContexts()
 
-	for _, context := range contexts {
-		createClusterObjectOrFail(f, &context)
-	}
-
 	By("Obtaining a list of all the clusters")
-	clusterList := waitForAllClustersReady(f, len(contexts))
+	clusterList := waitForAllRegisteredClusters(f, len(contexts))
 
 	framework.Logf("Checking that %d clusters are Ready", len(contexts))
 	for _, context := range contexts {
@@ -210,17 +205,13 @@ func registerClusters(clusters map[string]*cluster, userAgentName, federationNam
 		Expect(framework.TestContext.KubeConfig).ToNot(Equal(""), "KubeConfig must be specified to load clusters' client config")
 		clusters[c.Name] = &cluster{c.Name, createClientsetForCluster(c, i, userAgentName), false, nil}
 	}
-	createNamespaceInClusters(clusters, f)
-	return primaryClusterName
+	return clusters, primaryClusterName
 }
 
-/*
-   waitForServiceOrFail waits until a service is either present or absent in the cluster specified by clientset.
-   If the condition is not met within timout, it fails the calling test.
-*/
+// waitForServiceOrFail waits until a service is either present or absent in the cluster specified by clientset.
+// If the condition is not met within timout, it fails the calling test.
 func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, service *v1.Service, present bool, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated service shard of service %q in namespace %q from cluster", service.Name, namespace))
-	var clusterService *v1.Service
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		clusterService, err := clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
@@ -228,22 +219,19 @@ func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, 
 			return true, nil // Success
 		}
 		if present && err == nil { // We want it present, and the Get succeeded, so we're all good.
-			By(fmt.Sprintf("Success: shard of federated service %q in namespace %q in cluster is present", service.Name, namespace))
-			return true, nil // Success
+			if equivalent(*clusterService, *service) {
+				By(fmt.Sprintf("Success: shard of federated service %q in namespace %q in cluster is present", service.Name, namespace))
+				return true, nil // Success
+			}
+			return false, nil
 		}
 		By(fmt.Sprintf("Service %q in namespace %q in cluster.  Found: %v, waiting for Found: %v, trying again in %s (err=%v)", service.Name, namespace, clusterService != nil && err == nil, present, framework.Poll, err))
 		return false, nil
 	})
 	framework.ExpectNoError(err, "Failed to verify service %q in namespace %q in cluster: Present=%v", service.Name, namespace, present)
-
-	if present && clusterService != nil {
-		Expect(equivalent(*clusterService, *service))
-	}
 }
 
-/*
-   waitForServiceShardsOrFail waits for the service to appear in all clusters
-*/
+// waitForServiceShardsOrFail waits for the service to appear in all clusters
 func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters map[string]*cluster) {
 	framework.Logf("Waiting for service %q in %d clusters", service.Name, len(clusters))
 	for _, c := range clusters {
@@ -469,10 +457,8 @@ func discoverService(f *fedframework.Framework, name string, exists bool, podNam
 	}
 }
 
-/*
-createBackendPodsOrFail creates one pod in each cluster, and returns the created pods (in the same order as clusterClientSets).
-If creation of any pod fails, the test fails (possibly with a partially created set of pods). No retries are attempted.
-*/
+// createBackendPodsOrFail creates one pod in each cluster, and returns the created pods (in the same order as clusterClientSets).
+// If creation of any pod fails, the test fails (possibly with a partially created set of pods). No retries are attempted.
 func createBackendPodsOrFail(clusters map[string]*cluster, namespace string, name string) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -499,10 +485,8 @@ func createBackendPodsOrFail(clusters map[string]*cluster, namespace string, nam
 	}
 }
 
-/*
-deleteOneBackendPodOrFail deletes exactly one backend pod which must not be nil
-The test fails if there are any errors.
-*/
+// deleteOneBackendPodOrFail deletes exactly one backend pod which must not be nil
+// The test fails if there are any errors.
 func deleteOneBackendPodOrFail(c *cluster) {
 	pod := c.backendPod
 	Expect(pod).ToNot(BeNil())
@@ -515,10 +499,8 @@ func deleteOneBackendPodOrFail(c *cluster) {
 	By(fmt.Sprintf("Backend pod %q in namespace %q in cluster %q deleted or does not exist", pod.Name, pod.Namespace, c.name))
 }
 
-/*
-deleteBackendPodsOrFail deletes one pod from each cluster that has one.
-If deletion of any pod fails, the test fails (possibly with a partially deleted set of pods). No retries are attempted.
-*/
+// deleteBackendPodsOrFail deletes one pod from each cluster that has one.
+// If deletion of any pod fails, the test fails (possibly with a partially deleted set of pods). No retries are attempted.
 func deleteBackendPodsOrFail(clusters map[string]*cluster, namespace string) {
 	for name, c := range clusters {
 		if c.backendPod != nil {
@@ -527,5 +509,21 @@ func deleteBackendPodsOrFail(clusters map[string]*cluster, namespace string) {
 		} else {
 			By(fmt.Sprintf("No backend pod to delete for cluster %q", name))
 		}
+	}
+}
+
+// waitForReplicatSetToBeDeletedOrFail waits for the named ReplicaSet in namespace to be deleted.
+// If the deletion fails, the enclosing test fails.
+func waitForReplicaSetToBeDeletedOrFail(clientset *fedclientset.Clientset, namespace string, replicaSet string) {
+	err := wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := clientset.Extensions().ReplicaSets(namespace).Get(replicaSet, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+
+	if err != nil {
+		framework.Failf("Error in deleting replica set %s: %v", replicaSet, err)
 	}
 }

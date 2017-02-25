@@ -34,21 +34,63 @@ func TestConversion(t *testing.T) {
 		"specific user": {
 			old: &v1alpha1.RoleBinding{
 				RoleRef:  v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects: []v1alpha1.Subject{{Kind: "User", Name: "bob"}},
+				Subjects: []v1alpha1.Subject{{Kind: "User", APIVersion: v1alpha1.SchemeGroupVersion.String(), Name: "bob"}},
 			},
 			expected: &rbacapi.RoleBinding{
 				RoleRef:  rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects: []rbacapi.Subject{{Kind: "User", Name: "bob"}},
+				Subjects: []rbacapi.Subject{{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "bob"}},
 			},
 		},
 		"wildcard user matches authenticated": {
 			old: &v1alpha1.RoleBinding{
 				RoleRef:  v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects: []v1alpha1.Subject{{Kind: "User", Name: "*"}},
+				Subjects: []v1alpha1.Subject{{Kind: "User", APIVersion: v1alpha1.SchemeGroupVersion.String(), Name: "*"}},
 			},
 			expected: &rbacapi.RoleBinding{
 				RoleRef:  rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
-				Subjects: []rbacapi.Subject{{Kind: "Group", Name: "system:authenticated"}},
+				Subjects: []rbacapi.Subject{{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "system:authenticated"}},
+			},
+		},
+		"missing api group gets defaulted": {
+			old: &v1alpha1.RoleBinding{
+				RoleRef: v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects: []v1alpha1.Subject{
+					{Kind: "User", Name: "myuser"},
+					{Kind: "Group", Name: "mygroup"},
+					{Kind: "ServiceAccount", Name: "mysa", Namespace: "myns"},
+				},
+			},
+			expected: &rbacapi.RoleBinding{
+				RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects: []rbacapi.Subject{
+					{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "myuser"},
+					{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "mygroup"},
+					{Kind: "ServiceAccount", APIGroup: "", Name: "mysa", Namespace: "myns"},
+				},
+			},
+		},
+		"bad api group gets defaulted": {
+			old: &v1alpha1.RoleBinding{
+				RoleRef: v1alpha1.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects: []v1alpha1.Subject{
+					{Kind: "User", APIVersion: "rbac", Name: "myuser"},
+					{Kind: "Group", APIVersion: "rbac", Name: "mygroup"},
+					{Kind: "ServiceAccount", APIVersion: "rbac", Name: "mysa", Namespace: "myns"},
+					{Kind: "User", APIVersion: "rbac/v8", Name: "myuser"},
+					{Kind: "Group", APIVersion: "rbac/v8", Name: "mygroup"},
+					{Kind: "ServiceAccount", APIVersion: "rbac/v8", Name: "mysa", Namespace: "myns"},
+				},
+			},
+			expected: &rbacapi.RoleBinding{
+				RoleRef: rbacapi.RoleRef{Name: "foo", APIGroup: v1alpha1.GroupName},
+				Subjects: []rbacapi.Subject{
+					{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "myuser"},
+					{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "mygroup"},
+					{Kind: "ServiceAccount", APIGroup: "", Name: "mysa", Namespace: "myns"},
+					{Kind: "User", APIGroup: v1alpha1.GroupName, Name: "myuser"},
+					{Kind: "Group", APIGroup: v1alpha1.GroupName, Name: "mygroup"},
+					{Kind: "ServiceAccount", APIGroup: "", Name: "mysa", Namespace: "myns"},
+				},
 			},
 		},
 	}

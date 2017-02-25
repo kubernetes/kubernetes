@@ -4,23 +4,20 @@
   {% set etcd_protocol = 'https' -%}
   {% set etcd_creds = '--peer-trusted-ca-file /srv/kubernetes/etcd-ca.crt --peer-cert-file /srv/kubernetes/etcd-peer.crt --peer-key-file /srv/kubernetes/etcd-peer.key -peer-client-cert-auth' -%}
 {% endif -%}
-{% set cluster_state = 'new' -%}
 {% set hostname = pillar.get('hostname', '') -%}
+{% set cluster_state = (pillar.get('initial_etcd_cluster_state') or 'new') -%}
 {% set etcd_cluster_array = (pillar.get('initial_etcd_cluster') or hostname).split(',') -%}
 {% set etcd_cluster = '' -%}
 {# We use vars dictionary to pass variables set inside the for loop, because jinja defines new variables inside the for loop that hide variables from the outside. #}
-{% set vars = {'etcd_cluster': '', 'cluster_state': cluster_state} -%}
+{% set vars = {'etcd_cluster': ''} -%}
 {% for host in etcd_cluster_array -%}
   {% if etcd_cluster != '' -%}
-    {% set cluster_state = 'existing' -%}
     {% set etcd_cluster = etcd_cluster ~ ',' -%}
   {% endif -%}
   {% set etcd_cluster = etcd_cluster ~ 'etcd-' ~ host ~ '=' ~ etcd_protocol ~'://' ~ host ~ ':' ~ server_port -%}
-  {% do vars.update({'etcd_cluster': etcd_cluster, 'cluster_state': cluster_state}) -%}
+  {% do vars.update({'etcd_cluster': etcd_cluster}) -%}
 {% endfor -%}
 {% set etcd_cluster = vars.etcd_cluster -%}
-{% set cluster_state = vars.cluster_state -%}
-{% set storage_backend = pillar.get('storage_backend', 'etcd3') -%}
 {% set quota_bytes = '' -%}
 {% if pillar.get('storage_backend', 'etcd3') == 'etcd3' -%}
   {% set quota_bytes = '--quota-backend-bytes=4294967296' -%}
@@ -39,7 +36,7 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "gcr.io/google_containers/etcd:{{ pillar.get('etcd_docker_tag', '3.0.14-alpha.1') }}",
+    "image": "gcr.io/google_containers/etcd:{{ pillar.get('etcd_docker_tag', '3.0.17-alpha.1') }}",
     "resources": {
       "requests": {
         "cpu": {{ cpulimit }}
@@ -52,10 +49,10 @@
             ],
     "env": [
       { "name": "TARGET_STORAGE",
-        "value": "{{ storage_backend }}"
+        "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
       },
       { "name": "TARGET_VERSION",
-        "value": "{{ pillar.get('etcd_version', '3.0.14') }}"
+        "value": "{{ pillar.get('etcd_version', '3.0.17') }}"
       },
       { "name": "DATA_DIRECTORY",
         "value": "/var/etcd/data{{ suffix }}"

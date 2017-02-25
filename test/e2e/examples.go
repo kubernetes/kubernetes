@@ -74,7 +74,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		framework.BindClusterRoleInNamespace(c.Rbac(), "edit", f.Namespace.Name,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
-		err := framework.WaitForAuthorizationUpdate(c.Authorization(),
+		err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			f.Namespace.Name, "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
@@ -264,20 +264,19 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("CassandraStatefulSet", func() {
 		It("should create statefulset", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
+				return filepath.Join("examples/storage/cassandra", file)
 			}
 			serviceYaml := mkpath("cassandra-service.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			// have to change dns prefix because of the dynamic namespace
-			input, err := ioutil.ReadFile(mkpath("cassandra-statefulset.yaml"))
-			Expect(err).NotTo(HaveOccurred())
+			input := generated.ReadOrDie(mkpath("cassandra-statefulset.yaml"))
 
 			output := strings.Replace(string(input), "cassandra-0.cassandra.default.svc.cluster.local", "cassandra-0.cassandra."+ns+".svc.cluster.local", -1)
 
 			statefulsetYaml := "/tmp/cassandra-statefulset.yaml"
 
-			err = ioutil.WriteFile(statefulsetYaml, []byte(output), 0644)
+			err := ioutil.WriteFile(statefulsetYaml, []byte(output), 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Starting the cassandra service")
@@ -330,7 +329,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				}
 			})
 			// using out of statefulset e2e as deleting pvc is a pain
-			deleteAllStatefulSets(c, ns)
+			framework.DeleteAllStatefulSets(c, ns)
 		})
 	})
 
@@ -460,7 +459,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("creating secret and pod")
 			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, secretYaml), nsFlag)
 			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, podYaml), nsFlag)
-			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns, "")
+			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if secret was read correctly")
@@ -482,7 +481,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			By("creating the pod")
 			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, podYaml), nsFlag)
-			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns, "")
+			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if name and namespace were passed correctly")
@@ -544,12 +543,12 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/hazelcast", file)
 			}
 			serviceYaml := mkpath("hazelcast-service.yaml")
-			controllerYaml := mkpath("hazelcast-controller.yaml")
+			deploymentYaml := mkpath("hazelcast-deployment.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("starting hazelcast")
 			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
-			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
+			framework.RunKubectlOrDie("create", "-f", deploymentYaml, nsFlag)
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "hazelcast"}))
 			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())

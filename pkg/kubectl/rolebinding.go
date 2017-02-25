@@ -79,7 +79,7 @@ func (s RoleBindingGeneratorV1) Generate(genericParams map[string]interface{}) (
 			return nil, fmt.Errorf("expected []string, found :%v", fromFileStrings)
 		}
 		delegate.ServiceAccounts = fromLiteralArray
-		delete(genericParams, "serviceaccounts")
+		delete(genericParams, "serviceaccount")
 	}
 	params := map[string]string{}
 	for key, value := range genericParams {
@@ -104,7 +104,6 @@ func (s RoleBindingGeneratorV1) ParamNames() []GeneratorParam {
 		{"user", false},
 		{"group", false},
 		{"serviceaccount", false},
-		{"force", false},
 	}
 }
 
@@ -133,16 +132,16 @@ func (s RoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 
 	for _, user := range s.Users {
 		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
-			Kind:       rbac.UserKind,
-			APIVersion: "rbac.authorization.k8s.io/v1beta1",
-			Name:       user,
+			Kind:     rbac.UserKind,
+			APIGroup: rbac.GroupName,
+			Name:     user,
 		})
 	}
 	for _, group := range s.Groups {
 		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
-			Kind:       rbac.GroupKind,
-			APIVersion: "rbac.authorization.k8s.io/v1beta1",
-			Name:       group,
+			Kind:     rbac.GroupKind,
+			APIGroup: rbac.GroupName,
+			Name:     group,
 		})
 	}
 	for _, sa := range s.ServiceAccounts {
@@ -152,6 +151,7 @@ func (s RoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 		}
 		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
 			Kind:      rbac.ServiceAccountKind,
+			APIGroup:  "",
 			Namespace: tokens[0],
 			Name:      tokens[1],
 		})

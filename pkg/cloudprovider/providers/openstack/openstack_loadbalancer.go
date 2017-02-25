@@ -23,21 +23,21 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/rackspace/gophercloud"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/members"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/monitors"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/pools"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/vips"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers"
-	v2monitors "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors"
-	v2pools "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/security/groups"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/security/rules"
-	neutronports "github.com/rackspace/gophercloud/openstack/networking/v2/ports"
-	"github.com/rackspace/gophercloud/pagination"
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/members"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/monitors"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/pools"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/vips"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers"
+	v2monitors "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors"
+	v2pools "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
+	neutronports "github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
+	"github.com/gophercloud/gophercloud/pagination"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
@@ -221,7 +221,7 @@ func getLoadbalancerByName(client *gophercloud.ServiceClient, name string) (*loa
 	loadbalancerList := make([]loadbalancers.LoadBalancer, 0, 1)
 
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		v, err := loadbalancers.ExtractLoadbalancers(page)
+		v, err := loadbalancers.ExtractLoadBalancers(page)
 		if err != nil {
 			return false, err
 		}
@@ -275,7 +275,7 @@ func getListenersByLoadBalancerID(client *gophercloud.ServiceClient, id string) 
 // get listener for a port or nil if does not exist
 func getListenerForPort(existingListeners []listeners.Listener, port v1.ServicePort) *listeners.Listener {
 	for _, l := range existingListeners {
-		if l.Protocol == string(port.Protocol) && l.ProtocolPort == int(port.Port) {
+		if listeners.Protocol(l.Protocol) == toListenersProtocol(port.Protocol) && l.ProtocolPort == int(port.Port) {
 			return &l
 		}
 	}
@@ -321,7 +321,7 @@ func getPoolByListenerID(client *gophercloud.ServiceClient, loadbalancerID strin
 
 func getMembersByPoolID(client *gophercloud.ServiceClient, id string) ([]v2pools.Member, error) {
 	var members []v2pools.Member
-	err := v2pools.ListAssociateMembers(client, id, v2pools.MemberListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+	err := v2pools.ListMembers(client, id, v2pools.ListMembersOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		membersList, err := v2pools.ExtractMembers(page)
 		if err != nil {
 			return false, err
@@ -477,25 +477,45 @@ func waitLoadbalancerDeleted(client *gophercloud.ServiceClient, loadbalancerID s
 	}
 }
 
-func createNodeSecurityGroup(client *gophercloud.ServiceClient, nodeSecurityGroupID string, port int, protocol string, lbSecGroup string) error {
+func toRuleProtocol(protocol v1.Protocol) rules.RuleProtocol {
+	switch protocol {
+	case v1.ProtocolTCP:
+		return rules.ProtocolTCP
+	case v1.ProtocolUDP:
+		return rules.ProtocolUDP
+	default:
+		return rules.RuleProtocol(strings.ToLower(string(protocol)))
+	}
+}
+
+func toListenersProtocol(protocol v1.Protocol) listeners.Protocol {
+	switch protocol {
+	case v1.ProtocolTCP:
+		return listeners.ProtocolTCP
+	default:
+		return listeners.Protocol(string(protocol))
+	}
+}
+
+func createNodeSecurityGroup(client *gophercloud.ServiceClient, nodeSecurityGroupID string, port int, protocol v1.Protocol, lbSecGroup string) error {
 	v4NodeSecGroupRuleCreateOpts := rules.CreateOpts{
-		Direction:     "ingress",
+		Direction:     rules.DirIngress,
 		PortRangeMax:  port,
 		PortRangeMin:  port,
-		Protocol:      strings.ToLower(protocol),
+		Protocol:      toRuleProtocol(protocol),
 		RemoteGroupID: lbSecGroup,
 		SecGroupID:    nodeSecurityGroupID,
-		EtherType:     "IPv4",
+		EtherType:     rules.EtherType4,
 	}
 
 	v6NodeSecGroupRuleCreateOpts := rules.CreateOpts{
-		Direction:     "ingress",
+		Direction:     rules.DirIngress,
 		PortRangeMax:  port,
 		PortRangeMin:  port,
-		Protocol:      strings.ToLower(protocol),
+		Protocol:      toRuleProtocol(protocol),
 		RemoteGroupID: lbSecGroup,
 		SecGroupID:    nodeSecurityGroupID,
-		EtherType:     "IPv6",
+		EtherType:     rules.EtherType6,
 	}
 
 	_, err := rules.Create(client, v4NodeSecGroupRuleCreateOpts).Extract()
@@ -705,7 +725,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 
 			if !memberExists(members, addr, int(port.NodePort)) {
 				glog.V(4).Infof("Creating member for pool %s", pool.ID)
-				_, err := v2pools.CreateAssociateMember(lbaas.network, pool.ID, v2pools.MemberCreateOpts{
+				_, err := v2pools.CreateMember(lbaas.network, pool.ID, v2pools.CreateMemberOpts{
 					ProtocolPort: int(port.NodePort),
 					Address:      addr,
 					SubnetID:     lbaas.opts.SubnetId,
@@ -848,7 +868,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		for _, port := range ports {
 
 			for _, sourceRange := range sourceRanges.StringSlice() {
-				ethertype := "IPv4"
+				ethertype := rules.EtherType4
 				network, _, err := net.ParseCIDR(sourceRange)
 
 				if err != nil {
@@ -859,14 +879,14 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 				}
 
 				if network.To4() == nil {
-					ethertype = "IPv6"
+					ethertype = rules.EtherType6
 				}
 
 				lbSecGroupRuleCreateOpts := rules.CreateOpts{
-					Direction:      "ingress",
+					Direction:      rules.DirIngress,
 					PortRangeMax:   int(port.Port),
 					PortRangeMin:   int(port.Port),
-					Protocol:       strings.ToLower(string(port.Protocol)),
+					Protocol:       toRuleProtocol(port.Protocol),
 					RemoteIPPrefix: sourceRange,
 					SecGroupID:     lbSecGroup.ID,
 					EtherType:      ethertype,
@@ -881,7 +901,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 				}
 			}
 
-			err := createNodeSecurityGroup(lbaas.network, lbaas.opts.NodeSecurityGroupID, int(port.NodePort), string(port.Protocol), lbSecGroup.ID)
+			err := createNodeSecurityGroup(lbaas.network, lbaas.opts.NodeSecurityGroupID, int(port.NodePort), port.Protocol, lbSecGroup.ID)
 			if err != nil {
 				glog.Errorf("Error occured creating security group for loadbalancer %s:", loadbalancer.ID)
 				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
@@ -890,13 +910,13 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		}
 
 		lbSecGroupRuleCreateOpts := rules.CreateOpts{
-			Direction:      "ingress",
+			Direction:      rules.DirIngress,
 			PortRangeMax:   4, // ICMP: Code -  Values for ICMP  "Destination Unreachable: Fragmentation Needed and Don't Fragment was Set"
 			PortRangeMin:   3, // ICMP: Type
-			Protocol:       "icmp",
+			Protocol:       rules.ProtocolICMP,
 			RemoteIPPrefix: "0.0.0.0/0", // The Fragmentation packet can come from anywhere along the path back to the sourceRange - we need to all this from all
 			SecGroupID:     lbSecGroup.ID,
-			EtherType:      "IPv4",
+			EtherType:      rules.EtherType4,
 		}
 
 		_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
@@ -908,13 +928,13 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		}
 
 		lbSecGroupRuleCreateOpts = rules.CreateOpts{
-			Direction:      "ingress",
+			Direction:      rules.DirIngress,
 			PortRangeMax:   0, // ICMP: Code - Values for ICMP "Packet Too Big"
 			PortRangeMin:   2, // ICMP: Type
-			Protocol:       "icmp",
+			Protocol:       rules.ProtocolICMP,
 			RemoteIPPrefix: "::/0", // The Fragmentation packet can come from anywhere along the path back to the sourceRange - we need to all this from all
 			SecGroupID:     lbSecGroup.ID,
-			EtherType:      "IPv6",
+			EtherType:      rules.EtherType6,
 		}
 
 		_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
@@ -968,7 +988,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 
 	// Get all listeners for this loadbalancer, by "port key".
 	type portKey struct {
-		Protocol string
+		Protocol listeners.Protocol
 		Port     int
 	}
 
@@ -983,7 +1003,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 				// Double check this Listener belongs to the LB we're updating. Neutron's API filtering
 				// can't be counted on in older releases (i.e Liberty).
 				if loadbalancer.ID == lb.ID {
-					key := portKey{Protocol: l.Protocol, Port: l.ProtocolPort}
+					key := portKey{Protocol: listeners.Protocol(l.Protocol), Port: l.ProtocolPort}
 					lbListeners[key] = l
 					break
 				}
@@ -1034,7 +1054,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 	for _, port := range ports {
 		// Get listener associated with this port
 		listener, ok := lbListeners[portKey{
-			Protocol: string(port.Protocol),
+			Protocol: toListenersProtocol(port.Protocol),
 			Port:     int(port.Port),
 		}]
 		if !ok {
@@ -1049,7 +1069,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 
 		// Find existing pool members (by address) for this port
 		members := make(map[string]v2pools.Member)
-		err := v2pools.ListAssociateMembers(lbaas.network, pool.ID, v2pools.MemberListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		err := v2pools.ListMembers(lbaas.network, pool.ID, v2pools.ListMembersOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 			membersList, err := v2pools.ExtractMembers(page)
 			if err != nil {
 				return false, err
@@ -1069,7 +1089,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 				// Already exists, do not create member
 				continue
 			}
-			_, err := v2pools.CreateAssociateMember(lbaas.network, pool.ID, v2pools.MemberCreateOpts{
+			_, err := v2pools.CreateMember(lbaas.network, pool.ID, v2pools.CreateMemberOpts{
 				Address:      addr,
 				ProtocolPort: int(port.NodePort),
 				SubnetID:     lbaas.opts.SubnetId,
@@ -1167,7 +1187,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	// get all members associated with each poolIDs
 	var memberIDs []string
 	for _, poolID := range poolIDs {
-		err := v2pools.ListAssociateMembers(lbaas.network, poolID, v2pools.MemberListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		err := v2pools.ListMembers(lbaas.network, poolID, v2pools.ListMembersOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 			membersList, err := v2pools.ExtractMembers(page)
 			if err != nil {
 				return false, err
@@ -1338,7 +1358,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 		}
 	}
 
-	lbmethod := lb.opts.LBMethod
+	lbmethod := pools.LBMethod(lb.opts.LBMethod)
 	if lbmethod == "" {
 		lbmethod = pools.LBMethodRoundRobin
 	}

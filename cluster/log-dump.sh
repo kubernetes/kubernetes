@@ -34,10 +34,11 @@ else
 fi
 
 readonly master_ssh_supported_providers="gce aws kubemark"
-readonly node_ssh_supported_providers="gce gke aws"
+readonly node_ssh_supported_providers="gce gke aws kubemark"
 
 readonly master_logfiles="kube-apiserver kube-scheduler rescheduler kube-controller-manager etcd etcd-events glbc cluster-autoscaler kube-addon-manager fluentd"
 readonly node_logfiles="kube-proxy fluentd"
+readonly hollow_node_logfiles="kubelet-hollow-node-* kubeproxy-hollow-node-* npd-*"
 readonly aws_logfiles="cloud-init-output"
 readonly gce_logfiles="startupscript"
 readonly kern_logfile="kern"
@@ -128,6 +129,9 @@ function save-logs() {
       case "${KUBERNETES_PROVIDER}" in
         gce|gke|kubemark)
           files="${files} ${gce_logfiles}"
+          if [[ "${KUBERNETES_PROVIDER}" == "kubemark" && "${ENABLE_HOLLOW_NODE_LOGS:-}" == "true" ]]; then
+            files="${files} ${hollow_node_logfiles}"
+          fi
           ;;
         aws)
           files="${files} ${aws_logfiles}"

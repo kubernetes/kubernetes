@@ -50,13 +50,37 @@ var FederatedServiceLabels = map[string]string{
 	"foo": "bar",
 }
 
-var _ = framework.KubeDescribe("[Feature:Federation]", func() {
+var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federated-service")
 	var clusters map[string]*cluster // All clusters, keyed by cluster name
 	var federationName string
 	var primaryClusterName string // The name of the "primary" cluster
 
-	var _ = Describe("Federated Services", func() {
+	var _ = Describe("Without Clusters [NoCluster]", func() {
+		BeforeEach(func() {
+			fedframework.SkipUnlessFederated(f.ClientSet)
+			// Placeholder
+		})
+
+		AfterEach(func() {
+			fedframework.SkipUnlessFederated(f.ClientSet)
+		})
+
+		It("should succeed when a service is created", func() {
+			fedframework.SkipUnlessFederated(f.ClientSet)
+
+			nsName := f.FederationNamespace.Name
+			service := createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
+			By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, nsName))
+
+			// Cleanup
+			err := f.FederationClientset.Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
+			By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
+		})
+	})
+
+	var _ = Describe("with clusters", func() {
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 
@@ -65,15 +89,10 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				federationName = DefaultFederationName
 			}
 
-			clusters = map[string]*cluster{}
-			primaryClusterName = registerClusters(clusters, UserAgentName, federationName, f)
+			clusters, primaryClusterName = getRegisteredClusters(UserAgentName, f)
 		})
 
-		AfterEach(func() {
-			unregisterClusters(clusters, f)
-		})
-
-		Describe("Service creation", func() {
+		Describe("Federated Service", func() {
 			var (
 				service *v1.Service
 				nsName  string
@@ -81,7 +100,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 			BeforeEach(func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-				// Placeholder
+				nsName = f.FederationNamespace.Name
 			})
 
 			AfterEach(func() {
@@ -95,23 +114,8 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				}
 			})
 
-			It("should succeed", func() {
-				fedframework.SkipUnlessFederated(f.ClientSet)
-
-				nsName = f.FederationNamespace.Name
-				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
-				By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, nsName))
-
-				// Cleanup
-				err := f.FederationClientset.Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
-				By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
-			})
-
 			It("should create matching services in underlying clusters", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-
-				nsName = f.FederationNamespace.Name
 				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
 				defer func() { // Cleanup
 					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
@@ -123,7 +127,6 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 			It("should be deleted from underlying clusters when OrphanDependents is false", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
 				orphanDependents := false
 				verifyCascadingDeletionForService(f.FederationClientset, clusters, &orphanDependents, nsName)
 				By(fmt.Sprintf("Verified that services were deleted from underlying clusters"))
@@ -131,7 +134,6 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 			It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
 				orphanDependents := true
 				verifyCascadingDeletionForService(f.FederationClientset, clusters, &orphanDependents, nsName)
 				By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
@@ -139,11 +141,11 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 			It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
 				verifyCascadingDeletionForService(f.FederationClientset, clusters, nil, nsName)
 				By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
 			})
 		})
+
 		var _ = Describe("DNS", func() {
 
 			var (
@@ -155,26 +157,6 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
 
 				nsName := f.FederationNamespace.Name
-				// Create kube-dns configmap for kube-dns to accept federation queries.
-				federationsDomainMap := os.Getenv("FEDERATIONS_DOMAIN_MAP")
-				if federationsDomainMap == "" {
-					framework.Failf("missing required env var FEDERATIONS_DOMAIN_MAP")
-				}
-				kubeDNSConfigMap := v1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      KubeDNSConfigMapName,
-						Namespace: KubeDNSConfigMapNamespace,
-					},
-					Data: map[string]string{
-						"federations": federationsDomainMap,
-					},
-				}
-				// Create this configmap in all clusters.
-				for clusterName, cluster := range clusters {
-					By(fmt.Sprintf("Creating kube dns config map in cluster: %s", clusterName))
-					_, err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Create(&kubeDNSConfigMap)
-					framework.ExpectNoError(err, fmt.Sprintf("Error in creating config map in cluster %s", clusterName))
-				}
 
 				createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 
@@ -229,13 +211,6 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 					serviceShard = nil
 				} else {
 					By("No service shards to delete. `serviceShard` is nil")
-				}
-
-				// Delete the kube-dns config map from all clusters.
-				for clusterName, cluster := range clusters {
-					By(fmt.Sprintf("Deleting kube dns config map from cluster: %s", clusterName))
-					err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Delete(KubeDNSConfigMapName, nil)
-					framework.ExpectNoError(err, fmt.Sprintf("Error in deleting config map from cluster %s", clusterName))
 				}
 			})
 
@@ -356,10 +331,8 @@ func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, cluste
 	}
 }
 
-/*
-   equivalent returns true if the two services are equivalent.  Fields which are expected to differ between
-   federated services and the underlying cluster services (e.g. ClusterIP, LoadBalancerIP etc) are ignored.
-*/
+// equivalent returns true if the two services are equivalent.  Fields which are expected to differ between
+// federated services and the underlying cluster services (e.g. ClusterIP, LoadBalancerIP etc) are ignored.
 func equivalent(federationService, clusterService v1.Service) bool {
 	// TODO: I think that we need a DeepCopy here to avoid clobbering our parameters.
 	clusterService.Spec.ClusterIP = federationService.Spec.ClusterIP

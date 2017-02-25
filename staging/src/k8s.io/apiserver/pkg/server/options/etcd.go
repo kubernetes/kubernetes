@@ -21,29 +21,34 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/server"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-)
-
-const (
-	DefaultEtcdPathPrefix = "/registry"
 )
 
 type EtcdOptions struct {
 	StorageConfig storagebackend.Config
 
 	EtcdServersOverrides []string
+
+	// To enable protobuf as storage format, it is enough
+	// to set it to "application/vnd.kubernetes.protobuf".
+	DefaultStorageMediaType string
+	DeleteCollectionWorkers int
+	EnableGarbageCollection bool
+	EnableWatchCache        bool
 }
 
-func NewEtcdOptions(scheme *runtime.Scheme) *EtcdOptions {
+func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 	return &EtcdOptions{
-		StorageConfig: storagebackend.Config{
-			Prefix: DefaultEtcdPathPrefix,
-			// Default cache size to 0 - if unset, its size will be set based on target
-			// memory usage.
-			DeserializationCacheSize: 0,
-			Copier: scheme,
-		},
+		StorageConfig:           *backendConfig,
+		DefaultStorageMediaType: "application/json",
+		DeleteCollectionWorkers: 1,
+		EnableGarbageCollection: true,
+		EnableWatchCache:        true,
 	}
 }
 
@@ -61,6 +66,20 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
 		"Per-resource etcd servers overrides, comma separated. The individual override "+
 		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
+
+	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
+		"The media type to use to store objects in storage. Defaults to application/json. "+
+		"Some resources may only support a specific media type and will ignore this setting.")
+	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
+		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
+
+	fs.BoolVar(&s.EnableGarbageCollection, "enable-garbage-collector", s.EnableGarbageCollection, ""+
+		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
+		"of the kube-controller-manager.")
+
+	// TODO: enable cache in integration tests.
+	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache,
+		"Enable watch caching in the apiserver")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default), 'etcd2'.")
@@ -85,4 +104,57 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.StorageConfig.Quorum, "etcd-quorum-read", s.StorageConfig.Quorum,
 		"If true, enable quorum read.")
+}
+
+func (s *EtcdOptions) ApplyTo(c *server.Config) error {
+	c.RESTOptionsGetter = &simpleRestOptionsFactory{Options: *s}
+	return nil
+}
+
+func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFactory, c *server.Config) error {
+	c.RESTOptionsGetter = &storageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
+	return nil
+}
+
+type simpleRestOptionsFactory struct {
+	Options EtcdOptions
+}
+
+func (f *simpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+	ret := generic.RESTOptions{
+		StorageConfig:           &f.Options.StorageConfig,
+		Decorator:               generic.UndecoratedStorage,
+		EnableGarbageCollection: f.Options.EnableGarbageCollection,
+		DeleteCollectionWorkers: f.Options.DeleteCollectionWorkers,
+		ResourcePrefix:          f.Options.StorageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
+	}
+	if f.Options.EnableWatchCache {
+		ret.Decorator = genericregistry.StorageWithCacher
+	}
+	return ret, nil
+}
+
+type storageFactoryRestOptionsFactory struct {
+	Options        EtcdOptions
+	StorageFactory serverstorage.StorageFactory
+}
+
+func (f *storageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+	storageConfig, err := f.StorageFactory.NewConfig(resource)
+	if err != nil {
+		return generic.RESTOptions{}, fmt.Errorf("unable to find storage destination for %v, due to %v", resource, err.Error())
+	}
+
+	ret := generic.RESTOptions{
+		StorageConfig:           storageConfig,
+		Decorator:               generic.UndecoratedStorage,
+		DeleteCollectionWorkers: f.Options.DeleteCollectionWorkers,
+		EnableGarbageCollection: f.Options.EnableGarbageCollection,
+		ResourcePrefix:          f.StorageFactory.ResourcePrefix(resource),
+	}
+	if f.Options.EnableWatchCache {
+		ret.Decorator = genericregistry.StorageWithCacher
+	}
+
+	return ret, nil
 }

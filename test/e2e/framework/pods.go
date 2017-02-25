@@ -49,6 +49,16 @@ func (f *Framework) PodClient() *PodClient {
 	}
 }
 
+// Convenience method for getting a pod client interface in an alternative namespace,
+// possibly applying test-suite specific transformations to the pod spec, e.g. for
+// node e2e pod scheduling.
+func (f *Framework) PodClientNS(namespace string) *PodClient {
+	return &PodClient{
+		f:            f,
+		PodInterface: f.ClientSet.Core().Pods(namespace),
+	}
+}
+
 type PodClient struct {
 	f *Framework
 	v1core.PodInterface

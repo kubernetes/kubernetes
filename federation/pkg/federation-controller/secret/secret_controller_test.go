@@ -97,10 +97,9 @@ func TestSecretController(t *testing.T) {
 
 	// Test add federated secret.
 	secretWatch.Add(&secret1)
-	// There should be 2 updates to add both the finalizers.
+	// There should be an update to add both the finalizers.
 	updatedSecret := GetSecretFromChan(secretUpdateChan)
 	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	updatedSecret = GetSecretFromChan(secretUpdateChan)
 	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, metav1.FinalizerOrphan))
 	secret1 = *updatedSecret
 

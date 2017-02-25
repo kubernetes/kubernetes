@@ -103,7 +103,9 @@ func NewCMServer() *CMServer {
 			ConcurrentGCSyncs:        20,
 			ClusterSigningCertFile:   "/etc/kubernetes/ca/ca.pem",
 			ClusterSigningKeyFile:    "/etc/kubernetes/ca/ca.key",
-			ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 5 * time.Second},
+			ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 60 * time.Second},
+			EnableTaintManager:       true,
+			UseTaintBasedEvictions:   false,
 		},
 	}
 	s.LeaderElection.LeaderElect = true
@@ -196,6 +198,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.Float32Var(&s.UnhealthyZoneThreshold, "unhealthy-zone-threshold", 0.55, "Fraction of Nodes in a zone which needs to be not Ready (minimum 3) for zone to be treated as unhealthy. ")
 	fs.BoolVar(&s.DisableAttachDetachReconcilerSync, "disable-attach-detach-reconcile-sync", false, "Disable volume attach detach reconciler sync. Disabling this may cause volumes to be mismatched with pods. Use wisely.")
 	fs.DurationVar(&s.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", s.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
+	fs.BoolVar(&s.EnableTaintManager, "enable-taint-manager", s.EnableTaintManager, "WARNING: Beta feature. If set to true enables NoExecute Taints and will evict all not-tolerating Pod running on Nodes tainted with this kind of Taints.")
+	fs.BoolVar(&s.UseTaintBasedEvictions, "use-taint-based-evictions", s.UseTaintBasedEvictions, "WARNING: Alpha feature. If set to true NodeController will use taints to evict Pods from notReady and unreachable Nodes.")
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 

@@ -51,8 +51,7 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", fun
 
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			clusters = map[string]*cluster{}
-			registerClusters(clusters, UserAgentName, "", f)
+			clusters, _ = getRegisteredClusters(UserAgentName, f)
 		})
 
 		AfterEach(func() {
@@ -60,7 +59,6 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", fun
 			// Delete all daemonsets.
 			nsName := f.FederationNamespace.Name
 			deleteAllDaemonSetsOrFail(f.FederationClientset, nsName)
-			unregisterClusters(clusters, f)
 		})
 
 		It("should be created and deleted successfully", func() {
@@ -192,7 +190,9 @@ func createDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) 
 func deleteDaemonSetOrFail(clientset *fedclientset.Clientset, nsName string, daemonsetName string, orphanDependents *bool) {
 	By(fmt.Sprintf("Deleting daemonset %q in namespace %q", daemonsetName, nsName))
 	err := clientset.Extensions().DaemonSets(nsName).Delete(daemonsetName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
-	framework.ExpectNoError(err, "Error deleting daemonset %q in namespace %q", daemonsetName, nsName)
+	if err != nil && !errors.IsNotFound(err) {
+		framework.ExpectNoError(err, "Error deleting daemonset %q in namespace %q", daemonsetName, nsName)
+	}
 
 	// Wait for the daemonset to be deleted.
 	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {

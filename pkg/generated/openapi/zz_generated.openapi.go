@@ -1039,6 +1039,44 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/api/v1.ConfigMap"},
 		},
+		"k8s.io/kubernetes/pkg/api/v1.ConfigMapProjection": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Adapts a ConfigMap into a projected volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a projected volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. Note that this is identical to a configmap volume source without the default mode.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.KeyToPath"),
+										},
+									},
+								},
+							},
+						},
+						"optional": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Specify whether the ConfigMap or it's keys must be defined",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.KeyToPath"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -1636,6 +1674,30 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions"},
+		},
+		"k8s.io/kubernetes/pkg/api/v1.DownwardAPIProjection": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Represents downward API info for projecting into a projected volume. Note that this is identical to a downwardAPI volume source without the default mode.",
+					Properties: map[string]spec.Schema{
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Items is a list of DownwardAPIVolume file",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeFile"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeFile"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeFile": {
 			Schema: spec.Schema{
@@ -3017,6 +3079,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"portals": {
+							SchemaProps: spec.SchemaProps{
+								Description: "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
 					},
 					Required: []string{"targetPortal", "iqn", "lun"},
 				},
@@ -3811,6 +3887,123 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.LocalSubjectAccessReview": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status is filled in by the server and indicates whether the request is allowed or not",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"),
+							},
+						},
+					},
+					Required: []string{"spec"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.MetricSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "MetricSpec specifies how to scale based on a single metric (only `type` and one other matching field should be set at once).",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "type is the type of metric source.  It should match one of the fields below.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"object": {
+							SchemaProps: spec.SchemaProps{
+								Description: "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricSource"),
+							},
+						},
+						"pods": {
+							SchemaProps: spec.SchemaProps{
+								Description: "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricSource"),
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricSource"),
+							},
+						},
+					},
+					Required: []string{"type"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricSource", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricSource", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricSource"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.MetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "MetricStatus describes the last-read state of a single metric.",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "type is the type of metric source.  It will match one of the fields below.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"object": {
+							SchemaProps: spec.SchemaProps{
+								Description: "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricStatus"),
+							},
+						},
+						"pods": {
+							SchemaProps: spec.SchemaProps{
+								Description: "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricStatus"),
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricStatus"),
+							},
+						},
+					},
+					Required: []string{"type"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricStatus", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricStatus", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricStatus"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -4362,10 +4555,24 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"taints": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If specified, the node's taints.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.Taint"),
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.Taint"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.NodeStatus": {
 			Schema: spec.Schema{
@@ -4570,6 +4777,30 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.NonResourceAttributes": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface",
+					Properties: map[string]spec.Schema{
+						"path": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Path is the URL path of the request",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"verb": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Verb is the standard HTTP verb",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.ObjectFieldSelector": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -4735,6 +4966,68 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+					Properties: map[string]spec.Schema{
+						"target": {
+							SchemaProps: spec.SchemaProps{
+								Description: "target is the described Kubernetes object.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.CrossVersionObjectReference"),
+							},
+						},
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetValue is the target value of the metric (as a quantity).",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"target", "metricName", "targetValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.CrossVersionObjectReference"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ObjectMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+					Properties: map[string]spec.Schema{
+						"target": {
+							SchemaProps: spec.SchemaProps{
+								Description: "target is the described Kubernetes object.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v1.CrossVersionObjectReference"),
+							},
+						},
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentValue is the current value of the metric (as a quantity).",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"target", "metricName", "currentValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/apis/autoscaling/v1.CrossVersionObjectReference"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.ObjectReference": {
 			Schema: spec.Schema{
@@ -5015,6 +5308,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						"volumeName": {
 							SchemaProps: spec.SchemaProps{
 								Description: "VolumeName is the binding reference to the PersistentVolume backing this claim.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"storageClassName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of the StorageClass required by the claim. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -5396,6 +5696,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						"persistentVolumeReclaimPolicy": {
 							SchemaProps: spec.SchemaProps{
 								Description: "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"storageClassName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -6166,6 +6473,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"automountServiceAccountToken": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 						"nodeName": {
 							SchemaProps: spec.SchemaProps{
 								Description: "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements.",
@@ -6240,12 +6554,25 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"tolerations": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If specified, the pod's tolerations.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.Toleration"),
+										},
+									},
+								},
+							},
+						},
 					},
 					Required: []string{"containers"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/v1.Affinity", "k8s.io/kubernetes/pkg/api/v1.Container", "k8s.io/kubernetes/pkg/api/v1.LocalObjectReference", "k8s.io/kubernetes/pkg/api/v1.PodSecurityContext", "k8s.io/kubernetes/pkg/api/v1.Volume"},
+				"k8s.io/kubernetes/pkg/api/v1.Affinity", "k8s.io/kubernetes/pkg/api/v1.Container", "k8s.io/kubernetes/pkg/api/v1.LocalObjectReference", "k8s.io/kubernetes/pkg/api/v1.PodSecurityContext", "k8s.io/kubernetes/pkg/api/v1.Toleration", "k8s.io/kubernetes/pkg/api/v1.Volume"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.PodStatus": {
 			Schema: spec.Schema{
@@ -6487,6 +6814,56 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/api/v1.PodSpec"},
 		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
+					Properties: map[string]spec.Schema{
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"metricName", "targetAverageValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.PodsMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "PodsMetricStatus indicates the current value of a metric describing each pod in the current scale target (for example, transactions-processed-per-second).",
+					Properties: map[string]spec.Schema{
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"metricName", "currentAverageValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
 		"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -6630,6 +7007,38 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/api/v1.ExecAction", "k8s.io/kubernetes/pkg/api/v1.HTTPGetAction", "k8s.io/kubernetes/pkg/api/v1.TCPSocketAction"},
+		},
+		"k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Represents a projected volume source",
+					Properties: map[string]spec.Schema{
+						"sources": {
+							SchemaProps: spec.SchemaProps{
+								Description: "list of volume projections",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.VolumeProjection"),
+										},
+									},
+								},
+							},
+						},
+						"defaultMode": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Mode bits to use on created files by default. Must be a value between 0 and 0777. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+					},
+					Required: []string{"sources"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.VolumeProjection"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource": {
 			Schema: spec.Schema{
@@ -7036,6 +7445,65 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/api/v1.ReplicationControllerCondition"},
 		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.ResourceAttributes": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface",
+					Properties: map[string]spec.Schema{
+						"namespace": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"verb": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"group": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Group is the API Group of the Resource.  \"*\" means all.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"version": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Version is the API Version of the Resource.  \"*\" means all.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Resource is one of the existing resource types.  \"*\" means all.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"subresource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Subresource is one of the existing resource types.  \"\" means none.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.ResourceFieldSelector": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -7063,6 +7531,70 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 					},
 					Required: []string{"resource"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "name is the name of the resource in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetAverageUtilization": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"targetAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageValue is the the target value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type.",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"name"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v1.ResourceMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ResourceMetricStatus indicates the current value of a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "name is the name of the resource in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentAverageUtilization": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.  It will only be present if `targetAverageValue` was set in the corresponding metric specification.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"currentAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageValue is the the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification.",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"name", "currentAverageValue"},
 				},
 			},
 			Dependencies: []string{
@@ -7583,6 +8115,44 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/api/v1.Secret"},
 		},
+		"k8s.io/kubernetes/pkg/api/v1.SecretProjection": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Adapts a secret into a projected volume.\n\nThe contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.KeyToPath"),
+										},
+									},
+								},
+							},
+						},
+						"optional": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Specify whether the Secret or its key must be defined",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.KeyToPath"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -7678,6 +8248,72 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/api/v1.Capabilities", "k8s.io/kubernetes/pkg/api/v1.SELinuxOptions"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.SelfSubjectAccessReview": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec holds information about the request being evaluated.  user and groups must be empty",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SelfSubjectAccessReviewSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status is filled in by the server and indicates whether the request is allowed or not",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"),
+							},
+						},
+					},
+					Required: []string{"spec"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/authorization/v1.SelfSubjectAccessReviewSpec", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.SelfSubjectAccessReviewSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+					Properties: map[string]spec.Schema{
+						"resourceAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "ResourceAuthorizationAttributes describes information for a resource access request",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.ResourceAttributes"),
+							},
+						},
+						"nonResourceAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NonResourceAttributes describes information for a non-resource access request",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.NonResourceAttributes"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/authorization/v1.NonResourceAttributes", "k8s.io/kubernetes/pkg/apis/authorization/v1.ResourceAttributes"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.SerializedReference": {
 			Schema: spec.Schema{
@@ -7827,6 +8463,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 										},
 									},
 								},
+							},
+						},
+						"automountServiceAccountToken": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted. Can be overridden at the pod level.",
+								Type:        []string{"boolean"},
+								Format:      "",
 							},
 						},
 					},
@@ -8282,6 +8925,244 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause"},
 		},
+		"k8s.io/kubernetes/pkg/apis/storage/v1.StorageClass": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "StorageClass describes the parameters for a class of storage for which PersistentVolumes can be dynamically provisioned.\n\nStorageClasses are non-namespaced; the name of the storage class according to etcd is in ObjectMeta.Name.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"provisioner": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Provisioner indicates the type of the provisioner.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"parameters": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Parameters holds the parameters for the provisioner that should create volumes of this storage class.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"provisioner"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+		},
+		"k8s.io/kubernetes/pkg/apis/storage/v1.StorageClassList": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "StorageClassList is a collection of storage classes.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Items is the list of StorageClasses",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/storage/v1.StorageClass"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"items"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/storage/v1.StorageClass"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReview": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SubjectAccessReview checks whether or not a user or group can perform an action.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec holds information about the request being evaluated",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status is filled in by the server and indicates whether the request is allowed or not",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"),
+							},
+						},
+					},
+					Required: []string{"spec"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec", "k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+					Properties: map[string]spec.Schema{
+						"resourceAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "ResourceAuthorizationAttributes describes information for a resource access request",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.ResourceAttributes"),
+							},
+						},
+						"nonResourceAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NonResourceAttributes describes information for a non-resource access request",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authorization/v1.NonResourceAttributes"),
+							},
+						},
+						"user": {
+							SchemaProps: spec.SchemaProps{
+								Description: "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"groups": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Groups is the groups you're testing for.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/authorization/v1.NonResourceAttributes", "k8s.io/kubernetes/pkg/apis/authorization/v1.ResourceAttributes"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReviewStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SubjectAccessReviewStatus",
+					Properties: map[string]spec.Schema{
+						"allowed": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Allowed is required.  True if the action would be allowed, false otherwise.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"reason": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Reason is optional.  It indicates why a request was allowed or denied.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"evaluationError": {
+							SchemaProps: spec.SchemaProps{
+								Description: "EvaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"allowed"},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.Sysctl": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -8474,6 +9355,97 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReview": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "TokenReview attempts to authenticate a token to a known user. Note: TokenReview requests may be cached by the webhook token authenticator plugin in the kube-apiserver.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec holds information about the request being evaluated",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status is filled in by the server and indicates whether the request can be authenticated.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewStatus"),
+							},
+						},
+					},
+					Required: []string{"spec"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewSpec", "k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "TokenReviewSpec is a description of the token authentication request.",
+					Properties: map[string]spec.Schema{
+						"token": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Token is the opaque bearer token.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.TokenReviewStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "TokenReviewStatus is the result of the token authentication request.",
+					Properties: map[string]spec.Schema{
+						"authenticated": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Authenticated indicates that the token was associated with a known user.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"user": {
+							SchemaProps: spec.SchemaProps{
+								Description: "User is the UserInfo associated with the provided token.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/authentication/v1.UserInfo"),
+							},
+						},
+						"error": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Error indicates that the token couldn't be checked",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/authentication/v1.UserInfo"},
+		},
 		"k8s.io/kubernetes/pkg/api/v1.Toleration": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -8536,6 +9508,65 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/authentication/v1.UserInfo": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "UserInfo holds the information about the user needed to implement the user.Info interface.",
+					Properties: map[string]spec.Schema{
+						"username": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The name that uniquely identifies this user among all active users.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"uid": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"groups": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The names of groups this user is a part of.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Any additional information provided by the authenticator.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -8693,12 +9724,18 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource"),
 							},
 						},
+						"projected": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Items for all in one resources secrets, configmaps, and downward API",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource"),
+							},
+						},
 					},
 					Required: []string{"name"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
+				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.VolumeMount": {
 			Schema: spec.Schema{
@@ -8738,6 +9775,35 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/api/v1.VolumeProjection": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Projection that may be projected along with other supported volume types",
+					Properties: map[string]spec.Schema{
+						"secret": {
+							SchemaProps: spec.SchemaProps{
+								Description: "information about the secret data to project",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.SecretProjection"),
+							},
+						},
+						"downwardAPI": {
+							SchemaProps: spec.SchemaProps{
+								Description: "information about the downwardAPI data to project",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.DownwardAPIProjection"),
+							},
+						},
+						"configMap": {
+							SchemaProps: spec.SchemaProps{
+								Description: "information about the configMap data to project",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ConfigMapProjection"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.ConfigMapProjection", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIProjection", "k8s.io/kubernetes/pkg/api/v1.SecretProjection"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.VolumeSource": {
 			Schema: spec.Schema{
@@ -8882,11 +9948,17 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource"),
 							},
 						},
+						"projected": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Items for all in one resources secrets, configmaps, and downward API",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource"),
+							},
+						},
 					},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
+				"k8s.io/kubernetes/pkg/api/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.AzureFileVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CephFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.CinderVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ConfigMapVolumeSource", "k8s.io/kubernetes/pkg/api/v1.DownwardAPIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.EmptyDirVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlexVolumeSource", "k8s.io/kubernetes/pkg/api/v1.FlockerVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GCEPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GitRepoVolumeSource", "k8s.io/kubernetes/pkg/api/v1.GlusterfsVolumeSource", "k8s.io/kubernetes/pkg/api/v1.HostPathVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ISCSIVolumeSource", "k8s.io/kubernetes/pkg/api/v1.NFSVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimVolumeSource", "k8s.io/kubernetes/pkg/api/v1.PhotonPersistentDiskVolumeSource", "k8s.io/kubernetes/pkg/api/v1.ProjectedVolumeSource", "k8s.io/kubernetes/pkg/api/v1.QuobyteVolumeSource", "k8s.io/kubernetes/pkg/api/v1.RBDVolumeSource", "k8s.io/kubernetes/pkg/api/v1.SecretVolumeSource", "k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.VsphereVirtualDiskVolumeSource": {
 			Schema: spec.Schema{
@@ -8970,76 +10042,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{},
-		},
-		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.AdmissionConfiguration": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "AdmissionConfiguration provides versioned configuration for admission controllers.",
-					Properties: map[string]spec.Schema{
-						"kind": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"apiVersion": {
-							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"plugins": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Plugins allows specifying a configuration per admission control plugin.",
-								Type:        []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.AdmissionPluginConfiguration"),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.AdmissionPluginConfiguration"},
-		},
-		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.AdmissionPluginConfiguration": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "AdmissionPluginConfiguration provides the configuration for a single plug-in.",
-					Properties: map[string]spec.Schema{
-						"name": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Name is the name of the admission controller. It must match the registered admission plugin name.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"path": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Path is the path to a configuration file that contains the plugin's configuration",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"configuration": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Configuration is an embedded configuration object to be used as the plugin's configuration. If present, it will be used instead of the path to the configuration file.",
-								Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
-							},
-						},
-					},
-					Required: []string{"name"},
-				},
-			},
-			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/runtime.RawExtension"},
 		},
 		"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1.ClusterRole": {
 			Schema: spec.Schema{
@@ -10034,9 +11036,16 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"clusterDNS": {
 							SchemaProps: spec.SchemaProps{
-								Description: "clusterDNS is the IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers",
-								Type:        []string{"string"},
-								Format:      "",
+								Description: "clusterDNS is a list of IP address for the cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution instead of the host's DNS servers",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
 							},
 						},
 						"streamingConnectionIdleTimeout": {
@@ -10168,7 +11177,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"experimentalCgroupsPerQOS": {
+						"cgroupsPerQOS": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes And all Burstable and BestEffort pods are brought up under their specific top level QoS cgroup.",
 								Type:        []string{"boolean"},
@@ -11021,7 +12030,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"apiVersion": {
 							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion holds the API group and version of the referenced object.",
+								Description: "APIVersion holds the API group and version of the referenced subject. Defaults to \"v1\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io/v1alpha1\" for User and Group subjects.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -11188,7 +12197,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 		"k8s.io/kubernetes/pkg/apis/certificates/v1beta1.CertificateSigningRequestSpec": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
-					Description: "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
+					Description: "This information is immutable after the request is created. Only the Request and Usages fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
 					Properties: map[string]spec.Schema{
 						"request": {
 							SchemaProps: spec.SchemaProps{
@@ -11213,25 +12222,48 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"username": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Information about the requesting user (if relevant) See user.Info interface for details",
+								Description: "Information about the requesting user. See user.Info interface for details.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
 						"uid": {
 							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
+								Description: "UID information about the requesting user. See user.Info interface for details.",
+								Type:        []string{"string"},
+								Format:      "",
 							},
 						},
 						"groups": {
 							SchemaProps: spec.SchemaProps{
-								Type: []string{"array"},
+								Description: "Group information about the requesting user. See user.Info interface for details.",
+								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
 											Type:   []string{"string"},
 											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Extra information about the requesting user. See user.Info interface for details.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
 										},
 									},
 								},
@@ -14638,9 +15670,9 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"apiVersion": {
+						"apiGroup": {
 							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion holds the API group and version of the referenced object.",
+								Description: "APIGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -15329,6 +16361,223 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.Time", "k8s.io/kubernetes/pkg/api/v1.ObjectReference"},
 		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\"",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "API version of the referent",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"kind", "name"},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscaler": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metadata is the standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "spec is the specification for the behaviour of the autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "status is the current information about the autoscaler.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerStatus"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerSpec", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerList": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metadata is the standard list metadata.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "items is the list of horizontal pod autoscaler objects.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscaler"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"items"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscaler"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.",
+					Properties: map[string]spec.Schema{
+						"scaleTargetRef": {
+							SchemaProps: spec.SchemaProps{
+								Description: "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference"),
+							},
+						},
+						"minReplicas": {
+							SchemaProps: spec.SchemaProps{
+								Description: "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down. It defaults to 1 pod.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"maxReplicas": {
+							SchemaProps: spec.SchemaProps{
+								Description: "maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up. It cannot be less that minReplicas.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"metrics": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metrics contains the specifications for which to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricSpec"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"scaleTargetRef", "maxReplicas"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricSpec"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.HorizontalPodAutoscalerStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.",
+					Properties: map[string]spec.Schema{
+						"observedGeneration": {
+							SchemaProps: spec.SchemaProps{
+								Description: "observedGeneration is the most recent generation observed by this autoscaler.",
+								Type:        []string{"integer"},
+								Format:      "int64",
+							},
+						},
+						"lastScaleTime": {
+							SchemaProps: spec.SchemaProps{
+								Description: "lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods, used by the autoscaler to control how often the number of pods is changed.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							},
+						},
+						"currentReplicas": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentReplicas is current number of replicas of pods managed by this autoscaler, as last seen by the autoscaler.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"desiredReplicas": {
+							SchemaProps: spec.SchemaProps{
+								Description: "desiredReplicas is the desired number of replicas of pods managed by this autoscaler, as last calculated by the autoscaler.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"currentMetrics": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentMetrics is the last read state of the metrics used by this autoscaler.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricStatus"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"currentReplicas", "desiredReplicas", "currentMetrics"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Time", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricStatus"},
+		},
 		"k8s.io/kubernetes/pkg/apis/batch/v2alpha1.Job": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -15637,6 +16886,256 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/batch/v2alpha1.JobSpec"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "MetricSpec specifies how to scale based on a single metric (only `type` and one other matching field should be set at once).",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "type is the type of metric source.  It should match one of the fields below.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"object": {
+							SchemaProps: spec.SchemaProps{
+								Description: "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricSource"),
+							},
+						},
+						"pods": {
+							SchemaProps: spec.SchemaProps{
+								Description: "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricSource"),
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricSource"),
+							},
+						},
+					},
+					Required: []string{"type"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricSource", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricSource", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricSource"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.MetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "MetricStatus describes the last-read state of a single metric.",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "type is the type of metric source.  It will match one of the fields below.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"object": {
+							SchemaProps: spec.SchemaProps{
+								Description: "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricStatus"),
+							},
+						},
+						"pods": {
+							SchemaProps: spec.SchemaProps{
+								Description: "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricStatus"),
+							},
+						},
+						"resource": {
+							SchemaProps: spec.SchemaProps{
+								Description: "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricStatus"),
+							},
+						},
+					},
+					Required: []string{"type"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricStatus", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricStatus", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+					Properties: map[string]spec.Schema{
+						"target": {
+							SchemaProps: spec.SchemaProps{
+								Description: "target is the described Kubernetes object.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference"),
+							},
+						},
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetValue is the target value of the metric (as a quantity).",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"target", "metricName", "targetValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+					Properties: map[string]spec.Schema{
+						"target": {
+							SchemaProps: spec.SchemaProps{
+								Description: "target is the described Kubernetes object.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference"),
+							},
+						},
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentValue is the current value of the metric (as a quantity).",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"target", "metricName", "currentValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.CrossVersionObjectReference"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
+					Properties: map[string]spec.Schema{
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"metricName", "targetAverageValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "PodsMetricStatus indicates the current value of a metric describing each pod in the current scale target (for example, transactions-processed-per-second).",
+					Properties: map[string]spec.Schema{
+						"metricName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metricName is the name of the metric in question",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"metricName", "currentAverageValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "name is the name of the resource in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"targetAverageUtilization": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"targetAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "targetAverageValue is the the target value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type.",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"name"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ResourceMetricStatus indicates the current value of a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "name is the name of the resource in question.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"currentAverageUtilization": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.  It will only be present if `targetAverageValue` was set in the corresponding metric specification.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"currentAverageValue": {
+							SchemaProps: spec.SchemaProps{
+								Description: "currentAverageValue is the the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification.",
+								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							},
+						},
+					},
+					Required: []string{"name", "currentAverageValue"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 		},
 		"k8s.io/apimachinery/pkg/version.Info": {
 			Schema: spec.Schema{

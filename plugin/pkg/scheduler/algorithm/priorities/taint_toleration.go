@@ -34,7 +34,7 @@ func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.
 			continue
 		}
 
-		if !v1.TaintToleratedByTolerations(taint, tolerations) {
+		if !v1.TolerationsTolerateTaint(tolerations, taint) {
 			intolerableTaints++
 		}
 	}
@@ -53,11 +53,7 @@ func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationLi
 }
 
 func getTolerationListFromPod(pod *v1.Pod) ([]v1.Toleration, error) {
-	tolerations, err := v1.GetTolerationsFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		return nil, err
-	}
-	return getAllTolerationPreferNoSchedule(tolerations), nil
+	return getAllTolerationPreferNoSchedule(pod.Spec.Tolerations), nil
 }
 
 // ComputeTaintTolerationPriority prepares the priority list for all the nodes based on the number of intolerable taints on the node
@@ -78,13 +74,9 @@ func ComputeTaintTolerationPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *
 		}
 	}
 
-	taints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
-	if err != nil {
-		return schedulerapi.HostPriority{}, err
-	}
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: countIntolerableTaintsPreferNoSchedule(taints, tolerationList),
+		Score: countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, tolerationList),
 	}, nil
 }
 

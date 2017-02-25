@@ -220,14 +220,14 @@ func (secretcontroller *SecretController) removeFinalizerFunc(obj pkgruntime.Obj
 	return secret, nil
 }
 
-// Adds the given finalizer to the given objects ObjectMeta.
+// Adds the given finalizers to the given objects ObjectMeta.
 // Assumes that the given object is a secret.
-func (secretcontroller *SecretController) addFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+func (secretcontroller *SecretController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
 	secret := obj.(*apiv1.Secret)
-	secret.ObjectMeta.Finalizers = append(secret.ObjectMeta.Finalizers, finalizer)
+	secret.ObjectMeta.Finalizers = append(secret.ObjectMeta.Finalizers, finalizers...)
 	secret, err := secretcontroller.federatedApiClient.Core().Secrets(secret.Namespace).Update(secret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizer %s to secret %s: %v", finalizer, secret.Name, err)
+		return nil, fmt.Errorf("failed to add finalizers %v to secret %s: %v", finalizers, secret.Name, err)
 	}
 	return secret, nil
 }

@@ -22,8 +22,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 )
 
 var class1Parameters = map[string]string{
@@ -422,7 +422,7 @@ func TestProvisionMultiSync(t *testing.T) {
 
 // When provisioning is disabled, provisioning a claim should instantly return nil
 func TestDisablingDynamicProvisioner(t *testing.T) {
-	ctrl := newTestController(nil, nil, nil, nil, false)
+	ctrl := newTestController(nil, nil, false)
 	retVal := ctrl.provisionClaim(nil)
 	if retVal != nil {
 		t.Errorf("Expected nil return but got %v", retVal)

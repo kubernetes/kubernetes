@@ -82,10 +82,10 @@ func TestModifyHostConfig(t *testing.T) {
 	}
 	setSELinuxHC := &dockercontainer.HostConfig{
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser, "user"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole, "role"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType, "type"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel, "level"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser('='), "user"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole('='), "role"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType('='), "type"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel('='), "level"),
 		},
 	}
 
@@ -127,7 +127,7 @@ func TestModifyHostConfig(t *testing.T) {
 
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
-		modifyHostConfig(tc.sc, dockerCfg)
+		modifyHostConfig(tc.sc, dockerCfg, '=')
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
@@ -157,7 +157,7 @@ func TestModifyHostConfigWithGroups(t *testing.T) {
 
 	for _, tc := range testCases {
 		dockerCfg := &dockercontainer.HostConfig{}
-		modifyHostConfig(tc.securityContext, dockerCfg)
+		modifyHostConfig(tc.securityContext, dockerCfg, '=')
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
@@ -181,10 +181,10 @@ func TestModifyHostConfigAndNamespaceOptionsForContainer(t *testing.T) {
 	}
 	setSELinuxHC := &dockercontainer.HostConfig{
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser, "user"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole, "role"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType, "type"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel, "level"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser('='), "user"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole('='), "role"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType('='), "type"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel('='), "level"),
 		},
 		IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
 		NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
@@ -218,7 +218,7 @@ func TestModifyHostConfigAndNamespaceOptionsForContainer(t *testing.T) {
 
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
-		modifyHostConfig(tc.sc, dockerCfg)
+		modifyHostConfig(tc.sc, dockerCfg, '=')
 		modifyContainerNamespaceOptions(tc.sc.GetNamespaceOptions(), sandboxID, dockerCfg)
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
@@ -351,10 +351,10 @@ func fullValidHostConfig() *dockercontainer.HostConfig {
 		CapAdd:     []string{"addCapA", "addCapB"},
 		CapDrop:    []string{"dropCapA", "dropCapB"},
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser, "user"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole, "role"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType, "type"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel, "level"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser('='), "user"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole('='), "role"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType('='), "type"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel('='), "level"),
 		},
 	}
 }

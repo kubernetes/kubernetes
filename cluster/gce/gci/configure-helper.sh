@@ -204,24 +204,79 @@ function replace_prefixed_line {
   echo "${prefix}${suffix}" >> "${file}"
 }
 
+function create-node-pki {
+  echo "Creating node pki files"
+
+  local -r pki_dir="/etc/srv/kubernetes/pki"
+  mkdir -p "${pki_dir}"
+
+  if [[ -z "${CA_CERT_BUNDLE:-}" ]]; then
+    CA_CERT_BUNDLE="${CA_CERT}"
+    CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
+    echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
+  fi
+
+  if [[ ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
+    KUBELET_CERT_PATH="${pki_dir}/kubelet.crt"
+    echo "${KUBELET_CERT}" | base64 --decode > "${KUBELET_CERT_PATH}"
+
+    KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
+    echo "${KUBELET_KEY}" | base64 --decode > "${KUBELET_KEY_PATH}"
+  fi
+}
+
+function create-master-pki {
+  echo "Creating master pki files"
+
+  local -r pki_dir="/etc/srv/kubernetes/pki"
+  mkdir -p "${pki_dir}"
+
+  CA_CERT_PATH="${pki_dir}/ca.crt"
+  echo "${CA_CERT}" | base64 --decode > "${CA_CERT_PATH}"
+
+  # this is not true on GKE
+  if [[ ! -z "${CA_KEY:-}" ]]; then
+    CA_KEY_PATH="${pki_dir}/ca.key"
+    echo "${CA_KEY}" | base64 --decode > "${CA_KEY_PATH}"
+  fi
+
+  if [[ -z "${APISERVER_SERVER_CERT:-}" || -z "${APISERVER_SERVER_KEY:-}" ]]; then
+    APISERVER_SERVER_CERT="${MASTER_CERT}"
+    APISERVER_SERVER_CERT_PATH="${pki_dir}/apiserver.crt"
+    echo "${APISERVER_SERVER_CERT}" | base64 --decode > "${APISERVER_SERVER_CERT_PATH}"
+
+    APISERVER_SERVER_KEY="${MASTER_KEY}"
+    APISERVER_SERVER_KEY_PATH="${pki_dir}/apiserver.key"
+    echo "${APISERVER_SERVER_KEY}" | base64 --decode > "${APISERVER_SERVER_KEY_PATH}"
+  fi
+
+  if [[ -z "${APISERVER_CLIENT_CERT:-}" || -z "${APISERVER_CLIENT_KEY:-}" ]]; then
+    APISERVER_CLIENT_CERT="${KUBEAPISERVER_CERT}"
+    APISERVER_CLIENT_CERT_PATH="${pki_dir}/apiserver-client.crt"
+    echo "${APISERVER_CLIENT_CERT}" | base64 --decode > "${APISERVER_CLIENT_CERT_PATH}"
+
+    APISERVER_CLIENT_KEY="${KUBEAPISERVER_KEY}"
+    APISERVER_CLIENT_KEY_PATH="${pki_dir}/apiserver-client.key"
+    echo "${APISERVER_CLIENT_KEY}" | base64 --decode > "${APISERVER_CLIENT_KEY_PATH}"
+  fi
+
+  if [[ -z "${SERVICEACCOUNT_CERT:-}" || -z "${SERVICEACCOUNT_KEY:-}" ]]; then
+    SERVICEACCOUNT_CERT="${MASTER_CERT}"
+    SERVICEACCOUNT_CERT_PATH="${pki_dir}/serviceaccount.crt"
+    echo "${SERVICEACCOUNT_CERT}" | base64 --decode > "${SERVICEACCOUNT_CERT_PATH}"
+
+    SERVICEACCOUNT_KEY="${MASTER_KEY}"
+    SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
+    echo "${SERVICEACCOUNT_KEY}" | base64 --decode > "${SERVICEACCOUNT_KEY_PATH}"
+  fi
+}
+
 # After the first boot and on upgrade, these files exist on the master-pd
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.)
 function create-master-auth {
   echo "Creating master auth files"
   local -r auth_dir="/etc/srv/kubernetes"
-  if [[ ! -e "${auth_dir}/ca.crt" && ! -z "${CA_CERT:-}" && ! -z "${MASTER_CERT:-}" && ! -z "${MASTER_KEY:-}" ]]; then
-    echo "${CA_CERT}" | base64 --decode > "${auth_dir}/ca.crt"
-    echo "${MASTER_CERT}" | base64 --decode > "${auth_dir}/server.cert"
-    echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
-  fi
-  if [[ ! -z "${CA_KEY:-}" ]]; then
-    echo "${CA_KEY}" | base64 --decode > "${auth_dir}/ca.key"
-  fi
-  if [ ! -e "${auth_dir}/kubeapiserver.cert" ] && [[ ! -z "${KUBEAPISERVER_CERT:-}" ]] && [[ ! -z "${KUBEAPISERVER_KEY:-}" ]]; then
-    echo "${KUBEAPISERVER_CERT}" | base64 --decode > "${auth_dir}/kubeapiserver.cert"
-    echo "${KUBEAPISERVER_KEY}" | base64 --decode > "${auth_dir}/kubeapiserver.key"
-  fi
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
@@ -233,11 +288,17 @@ function create-master-auth {
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
   fi
+  if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
+  fi
   if [[ -n "${KUBELET_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "system:node:node-name,uid:kubelet,system:nodes"
   fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
+  fi
+  if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -347,21 +408,18 @@ EOF
 
 function create-kubelet-kubeconfig {
   echo "Creating kubelet kubeconfig file"
-  if [[ -z "${KUBELET_CA_CERT:-}" ]]; then
-    KUBELET_CA_CERT="${CA_CERT}"
-  fi
   cat <<EOF >/var/lib/kubelet/kubeconfig
 apiVersion: v1
 kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: ${KUBELET_CERT}
-    client-key-data: ${KUBELET_KEY}
+    client-certificate: ${KUBELET_CERT_PATH}
+    client-key: ${KUBELET_KEY_PATH}
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${KUBELET_CA_CERT}
+    certificate-authority: ${CA_CERT_BUNDLE_PATH}
 contexts:
 - context:
     cluster: local
@@ -369,12 +427,6 @@ contexts:
   name: service-account-context
 current-context: service-account-context
 EOF
-}
-
-function create-kubelet-auth-ca {
-  if [[ -n "${KUBELET_AUTH_CA_CERT:-}" ]]; then
-    echo "${KUBELET_AUTH_CA_CERT}" | base64 --decode > "/var/lib/kubelet/kubelet_auth_ca.crt"
-  fi
 }
 
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
@@ -388,7 +440,6 @@ function create-master-kubelet-auth {
     REGISTER_MASTER_KUBELET="true"
     create-kubelet-kubeconfig
   fi
-  
 }
 
 function create-kubeproxy-kubeconfig {
@@ -403,7 +454,7 @@ users:
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${CA_CERT}
+    certificate-authority-data: ${CA_CERT_BUNDLE}
 contexts:
 - context:
     cluster: local
@@ -432,6 +483,53 @@ contexts:
 - context:
     cluster: local
     user: kube-controller-manager
+  name: service-account-context
+current-context: service-account-context
+EOF
+}
+
+function create-kubescheduler-kubeconfig {
+  echo "Creating kube-scheduler kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/kube-scheduler
+  cat <<EOF >/etc/srv/kubernetes/kube-scheduler/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: kube-scheduler
+  user:
+    token: ${KUBE_SCHEDULER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: kube-scheduler
+  name: kube-scheduler
+current-context: kube-scheduler
+EOF
+}
+
+function create-node-problem-detector-kubeconfig {
+  echo "Creating node-problem-detector kubeconfig file"
+  mkdir -p /var/lib/node-problem-detector
+  cat <<EOF >/var/lib/node-problem-detector/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: node-problem-detector
+  user:
+    token: ${NODE_PROBLEM_DETECTOR_TOKEN}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+contexts:
+- context:
+    cluster: local
+    user: node-problem-detector
   name: service-account-context
 current-context: service-account-context
 EOF
@@ -556,7 +654,7 @@ function start-kubelet {
   flags+=" --cloud-provider=gce"
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
-  flags+=" --config=/etc/kubernetes/manifests"
+  flags+=" --pod-manifest-path=/etc/kubernetes/manifests"
   flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
 
@@ -582,9 +680,7 @@ function start-kubelet {
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
       flags+=" --hairpin-mode=${HAIRPIN_MODE}"
     fi
-    if [ -n "${KUBELET_AUTH_CA_CERT:-}" ]; then
-      flags+=" --anonymous-auth=false --client-ca-file=/var/lib/kubelet/kubelet_auth_ca.crt"
-    fi
+    flags+=" --anonymous-auth=false --authorization-mode=Webhook --client-ca-file=${CA_CERT_BUNDLE_PATH}"
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
@@ -639,6 +735,37 @@ EOF
   iptables -t nat -F || true
 
   systemctl start kubelet.service
+}
+
+# This function assembles the node problem detector systemd service file and
+# starts it using systemctl.
+function start-node-problem-detector {
+  echo "Start node problem detector"
+  local -r npd_bin="${KUBE_HOME}/bin/node-problem-detector"
+  local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
+  echo "Using node problem detector binary at ${npd_bin}"
+  local flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
+  flags+=" --logtostderr"
+  flags+=" --system-log-monitors=${km_config}"
+  flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
+
+  # Write the systemd service file for node problem detector.
+  cat <<EOF >/etc/systemd/system/node-problem-detector.service
+[Unit]
+Description=Kubernetes node problem detector
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Restart=always
+RestartSec=10
+ExecStart=${npd_bin} ${flags}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl start node-problem-detector.service
 }
 
 # Create the log file and set its properties.
@@ -697,6 +824,9 @@ function prepare-etcd-manifest {
   local etcd_protocol="http"
   local etcd_creds=""
 
+  if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
+    cluster_state="${INITIAL_ETCD_CLUSTER_STATE}"
+  fi
   if [[ -n "${ETCD_CA_KEY:-}" && -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
     etcd_protocol="https"
@@ -706,7 +836,6 @@ function prepare-etcd-manifest {
     etcd_host="etcd-${host}=${etcd_protocol}://${host}:$3"
     if [[ -n "${etcd_cluster}" ]]; then
       etcd_cluster+=","
-      cluster_state="existing"
     fi
     etcd_cluster+="${etcd_host}"
   done
@@ -721,8 +850,16 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *hostname *}}@$host_name@g" "${temp_file}"
   sed -i -e "s@{{ *srv_kube_path *}}@/etc/srv/kubernetes@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
-  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
-  if [[ "${STORAGE_BACKEND:-}" == "etcd3" ]]; then
+  # Get default storage backend from manifest file.
+  local -r default_storage_backend=$(cat "${temp_file}" | \
+    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+    sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
+  if [[ -n "${STORAGE_BACKEND:-}" ]]; then
+    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
+  else
+    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g" "${temp_file}"
+  fi
+  if [[ "${STORAGE_BACKEND:-${default_storage_backend}}" == "etcd3" ]]; then
     sed -i -e "s@{{ *quota_bytes *}}@--quota-backend-bytes=4294967296@g" "${temp_file}"
   else
     sed -i -e "s@{{ *quota_bytes *}}@@g" "${temp_file}"
@@ -817,26 +954,32 @@ function remove-salt-config-comments {
 function start-kube-apiserver {
   echo "Start kubernetes api-server"
   prepare-log-file /var/log/kube-apiserver.log
+  prepare-log-file /var/log/kube-apiserver-audit.log
 
   # Calculate variables and assemble the command line.
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
   params+=" --cloud-provider=gce"
-  params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
+  params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
   params+=" --etcd-servers=http://127.0.0.1:2379"
   params+=" --etcd-servers-overrides=/events#http://127.0.0.1:4002"
   params+=" --secure-port=443"
-  params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
-  params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
-  params+=" --kubelet-client-certificate=/etc/srv/kubernetes/kubeapiserver.cert"
-  params+=" --kubelet-client-key=/etc/srv/kubernetes/kubeapiserver.key"
+  params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
+  params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
+  if [[ -e "${APISERVER_CLIENT_CERT_PATH}" ]] && [[ -e "${APISERVER_CLIENT_KEY_PATH}" ]]; then
+    params+=" --kubelet-client-certificate=${APISERVER_CLIENT_CERT_PATH}"
+    params+=" --kubelet-client-key=${APISERVER_CLIENT_KEY_PATH}"
+  fi
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
   fi
   if [[ -n "${STORAGE_BACKEND:-}" ]]; then
     params+=" --storage-backend=${STORAGE_BACKEND}"
+  fi
+  if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
+    params+=" --storage-media-type=${STORAGE_MEDIA_TYPE}"
   fi
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
     params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
@@ -856,6 +999,21 @@ function start-kube-apiserver {
   fi
   if [[ -n "${ETCD_QUORUM_READ:-}" ]]; then
     params+=" --etcd-quorum-read=${ETCD_QUORUM_READ}"
+  fi
+
+  if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
+    # We currently only support enabling with a fixed path and with built-in log
+    # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
+    # External log rotation should be set up the same as for kube-apiserver.log.
+    params+=" --audit-log-path=/var/log/kube-apiserver-audit.log"
+    params+=" --audit-log-maxage=0"
+    params+=" --audit-log-maxbackup=0"
+    # Lumberjack doesn't offer any way to disable size-based rotation. It also
+    # has an in-memory counter that doesn't notice if you truncate the file.
+    # 2000000000 (in MiB) is a large number that fits in 31 bits. If the log
+    # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
+    # never restarts. Please manually restart apiserver before this time.
+    params+=" --audit-log-maxsize=2000000000"
   fi
 
   local admission_controller_config_mount=""
@@ -921,11 +1079,17 @@ function start-kube-apiserver {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   params+=" --authorization-mode=${authorization_mode}"
 
+  local container_env=""
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+  fi
+
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" ${src_file}
   sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{srv_sshproxy_path}}@/etc/srv/sshproxy@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
@@ -966,8 +1130,8 @@ function start-kube-controller-manager {
   params+=" --use-service-account-credentials"
   params+=" --cloud-provider=gce"
   params+=" --kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig"
-  params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
-  params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
+  params+=" --root-ca-file=${CA_CERT_BUNDLE_PATH}"
+  params+=" --service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}"
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
     params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
   fi
@@ -978,8 +1142,8 @@ function start-kube-controller-manager {
     params+=" --cluster-cidr=${CLUSTER_IP_RANGE}"
   fi
   if [[ -n "${CA_KEY:-}" ]]; then
-    params+=" --cluster-signing-cert-file=/etc/srv/kubernetes/ca.crt"
-    params+=" --cluster-signing-key-file=/etc/srv/kubernetes/ca.key"
+    params+=" --cluster-signing-cert-file=${CA_CERT_PATH}"
+    params+=" --cluster-signing-key-file=${CA_KEY_PATH}"
   fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
@@ -996,6 +1160,10 @@ function start-kube-controller-manager {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
+  local container_env=""
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+  fi
 
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
   remove-salt-config-comments "${src_file}"
@@ -1004,6 +1172,7 @@ function start-kube-controller-manager {
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-controller-manager_docker_tag'\]}}@${kube_rc_docker_tag}@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" ${src_file}
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
@@ -1019,10 +1188,12 @@ function start-kube-controller-manager {
 #   DOCKER_REGISTRY
 function start-kube-scheduler {
   echo "Start kubernetes scheduler"
+  create-kubescheduler-kubeconfig
   prepare-log-file /var/log/kube-scheduler.log
 
   # Calculate variables and set them in the manifest.
   params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
+  params+=" --kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig"
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
@@ -1035,6 +1206,7 @@ function start-kube-scheduler {
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-scheduler.manifest"
   remove-salt-config-comments "${src_file}"
 
+  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
@@ -1099,8 +1271,12 @@ function start-kube-addons {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/addons"
 
+  # TODO(mikedanese): only enable these in e2e
   # prep the additional bindings that are particular to e2e users and groups
   setup-addon-manifests "addons" "e2e-rbac-bindings"
+
+  # prep addition kube-up specific rbac objects
+  setup-addon-manifests "addons" "rbac"
 
   # Set up manifests of other addons.
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
@@ -1192,8 +1368,12 @@ function start-kube-addons {
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
   fi
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "true" ]]; then
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"
+  fi
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+    # Setup role binding for standalone node problem detector.
+    setup-addon-manifests "addons" "node-problem-detector/standalone"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range"
@@ -1329,8 +1509,9 @@ if [[ -n "${KUBE_USER:-}" ]]; then
   fi
 fi
 
-# generate the controller manager token here since its only used on the master.
+# generate the controller manager and scheduler tokens here since they are only used on the master.
 KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+KUBE_SCHEDULER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
 setup-os-params
 config-ip-firewall
@@ -1340,13 +1521,18 @@ ensure-local-ssds
 setup-logrotate
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
+  create-node-pki
+  create-master-pki
   create-master-auth
   create-master-kubelet-auth
   create-master-etcd-auth
 else
+  create-node-pki
   create-kubelet-kubeconfig
-  create-kubelet-auth-ca
   create-kubeproxy-kubeconfig
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+    create-node-problem-detector-kubeconfig
+  fi
 fi
 
 override-kubectl
@@ -1376,6 +1562,9 @@ else
   fi
   if [[ "${PREPULL_E2E_IMAGES:-}" == "true" ]]; then
     start-image-puller
+  fi
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+    start-node-problem-detector
   fi
 fi
 reset-motd

@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"github.com/spf13/pflag"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -95,36 +97,28 @@ func (a *adminConfig) getClientConfig(context, kubeconfigPath string) clientcmd.
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&loadingRules, overrides)
 }
 
-// SubcommandFlags holds the flags required by the subcommands of
+// SubcommandOptions holds the configuration required by the subcommands of
 // `kubefed`.
-type SubcommandFlags struct {
+type SubcommandOptions struct {
 	Name                      string
 	Host                      string
 	FederationSystemNamespace string
 	Kubeconfig                string
 }
 
-// AddSubcommandFlags adds the definition for `kubefed` subcommand
-// flags.
-func AddSubcommandFlags(cmd *cobra.Command) {
-	cmd.Flags().String("kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-	cmd.Flags().String("host-cluster-context", "", "Host cluster context")
-	cmd.Flags().String("federation-system-namespace", DefaultFederationSystemNamespace, "Namespace in the host cluster where the federation system components are installed")
+func (o *SubcommandOptions) Bind(flags *pflag.FlagSet) {
+	flags.StringVar(&o.Kubeconfig, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+	flags.StringVar(&o.Host, "host-cluster-context", "", "Host cluster context")
+	flags.StringVar(&o.FederationSystemNamespace, "federation-system-namespace", DefaultFederationSystemNamespace, "Namespace in the host cluster where the federation system components are installed")
 }
 
-// GetSubcommandFlags retrieves the command line flag values for the
-// `kubefed` subcommands.
-func GetSubcommandFlags(cmd *cobra.Command, args []string) (*SubcommandFlags, error) {
+func (o *SubcommandOptions) SetName(cmd *cobra.Command, args []string) error {
 	name, err := kubectlcmd.NameFromCommandArgs(cmd, args)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &SubcommandFlags{
-		Name: name,
-		Host: cmdutil.GetFlagString(cmd, "host-cluster-context"),
-		FederationSystemNamespace: cmdutil.GetFlagString(cmd, "federation-system-namespace"),
-		Kubeconfig:                cmdutil.GetFlagString(cmd, "kubeconfig"),
-	}, nil
+	o.Name = name
+	return nil
 }
 
 func CreateKubeconfigSecret(clientset *client.Clientset, kubeconfig *clientcmdapi.Config, namespace, name string, dryRun bool) (*api.Secret, error) {

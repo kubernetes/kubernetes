@@ -92,7 +92,7 @@ func TestWriteCertAndKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
-	defer os.Remove(tmpdir)
+	defer os.RemoveAll(tmpdir)
 
 	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -105,5 +105,291 @@ func TestWriteCertAndKey(t *testing.T) {
 			"failed WriteCertAndKey with an error: %v",
 			actual,
 		)
+	}
+}
+
+func TestWriteCert(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	caCert := &x509.Certificate{}
+	actual := WriteCert(tmpdir, "foo", caCert)
+	if actual != nil {
+		t.Errorf(
+			"failed WriteCertAndKey with an error: %v",
+			actual,
+		)
+	}
+}
+
+func TestWriteKey(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Couldn't create rsa Private Key")
+	}
+	actual := WriteKey(tmpdir, "foo", caKey)
+	if actual != nil {
+		t.Errorf(
+			"failed WriteCertAndKey with an error: %v",
+			actual,
+		)
+	}
+}
+
+func TestWritePublicKey(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Couldn't create rsa Private Key")
+	}
+	actual := WritePublicKey(tmpdir, "foo", &caKey.PublicKey)
+	if actual != nil {
+		t.Errorf(
+			"failed WriteCertAndKey with an error: %v",
+			actual,
+		)
+	}
+}
+
+func TestCertOrKeyExist(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Couldn't create rsa Private Key")
+	}
+	caCert := &x509.Certificate{}
+	actual := WriteCertAndKey(tmpdir, "foo", caCert, caKey)
+	if actual != nil {
+		t.Errorf(
+			"failed WriteCertAndKey with an error: %v",
+			actual,
+		)
+	}
+
+	var tests = []struct {
+		path     string
+		name     string
+		expected bool
+	}{
+		{
+			path:     "",
+			name:     "",
+			expected: false,
+		},
+		{
+			path:     tmpdir,
+			name:     "foo",
+			expected: true,
+		},
+	}
+	for _, rt := range tests {
+		actual := CertOrKeyExist(rt.path, rt.name)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed CertOrKeyExist:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
+func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	caCert, caKey, err := NewCertificateAuthority()
+	if err != nil {
+		t.Errorf(
+			"failed to create cert and key with an error: %v",
+			err,
+		)
+	}
+	err = WriteCertAndKey(tmpdir, "foo", caCert, caKey)
+	if err != nil {
+		t.Errorf(
+			"failed to write cert and key with an error: %v",
+			err,
+		)
+	}
+
+	var tests = []struct {
+		path     string
+		name     string
+		expected bool
+	}{
+		{
+			path:     "",
+			name:     "",
+			expected: false,
+		},
+		{
+			path:     tmpdir,
+			name:     "foo",
+			expected: true,
+		},
+	}
+	for _, rt := range tests {
+		_, _, actual := TryLoadCertAndKeyFromDisk(rt.path, rt.name)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(actual == nil),
+			)
+		}
+	}
+}
+
+func TestTryLoadCertFromDisk(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	caCert, _, err := NewCertificateAuthority()
+	if err != nil {
+		t.Errorf(
+			"failed to create cert and key with an error: %v",
+			err,
+		)
+	}
+	err = WriteCert(tmpdir, "foo", caCert)
+	if err != nil {
+		t.Errorf(
+			"failed to write cert and key with an error: %v",
+			err,
+		)
+	}
+
+	var tests = []struct {
+		path     string
+		name     string
+		expected bool
+	}{
+		{
+			path:     "",
+			name:     "",
+			expected: false,
+		},
+		{
+			path:     tmpdir,
+			name:     "foo",
+			expected: true,
+		},
+	}
+	for _, rt := range tests {
+		_, actual := TryLoadCertFromDisk(rt.path, rt.name)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(actual == nil),
+			)
+		}
+	}
+}
+
+func TestTryLoadKeyFromDisk(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	_, caKey, err := NewCertificateAuthority()
+	if err != nil {
+		t.Errorf(
+			"failed to create cert and key with an error: %v",
+			err,
+		)
+	}
+	err = WriteKey(tmpdir, "foo", caKey)
+	if err != nil {
+		t.Errorf(
+			"failed to write cert and key with an error: %v",
+			err,
+		)
+	}
+
+	var tests = []struct {
+		path     string
+		name     string
+		expected bool
+	}{
+		{
+			path:     "",
+			name:     "",
+			expected: false,
+		},
+		{
+			path:     tmpdir,
+			name:     "foo",
+			expected: true,
+		},
+	}
+	for _, rt := range tests {
+		_, actual := TryLoadKeyFromDisk(rt.path, rt.name)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(actual == nil),
+			)
+		}
+	}
+}
+
+func TestPathsForCertAndKey(t *testing.T) {
+	crtPath, keyPath := pathsForCertAndKey("/foo", "bar")
+	if crtPath != "/foo/bar.crt" {
+		t.Errorf("unexpected certificate path: %s", crtPath)
+	}
+	if keyPath != "/foo/bar.key" {
+		t.Errorf("unexpected key path: %s", keyPath)
+	}
+}
+
+func TestPathForCert(t *testing.T) {
+	crtPath := pathForCert("/foo", "bar")
+	if crtPath != "/foo/bar.crt" {
+		t.Errorf("unexpected certificate path: %s", crtPath)
+	}
+}
+
+func TestPathForKey(t *testing.T) {
+	keyPath := pathForKey("/foo", "bar")
+	if keyPath != "/foo/bar.key" {
+		t.Errorf("unexpected certificate path: %s", keyPath)
+	}
+}
+
+func TestPathForPublicKey(t *testing.T) {
+	pubPath := pathForPublicKey("/foo", "bar")
+	if pubPath != "/foo/bar.pub" {
+		t.Errorf("unexpected certificate path: %s", pubPath)
 	}
 }

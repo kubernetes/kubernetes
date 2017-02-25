@@ -19,23 +19,24 @@ package apiserver
 import (
 	"fmt"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 
 	// Install the testgroup API
 	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/install"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -44,17 +45,6 @@ const (
 	InsecurePort = 8081
 	SecurePort   = 6444
 )
-
-func newStorageFactory() genericapiserver.StorageFactory {
-	config := storagebackend.Config{
-		Prefix:     genericoptions.DefaultEtcdPathPrefix,
-		ServerList: []string{"http://127.0.0.1:2379"},
-		Copier:     api.Scheme,
-	}
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, "application/json", api.Codecs, genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), genericapiserver.NewResourceConfig())
-
-	return storageFactory
-}
 
 type ServerRunOptions struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
@@ -68,7 +58,7 @@ type ServerRunOptions struct {
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:            genericoptions.NewEtcdOptions(api.Scheme),
+		Etcd:            genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, api.Scheme, nil)),
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
 		Authentication:  kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
@@ -76,6 +66,7 @@ func NewServerRunOptions() *ServerRunOptions {
 	}
 	s.InsecureServing.BindPort = InsecurePort
 	s.SecureServing.ServingOptions.BindPort = SecurePort
+	s.Etcd.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
 
 	return &s
 }
@@ -104,24 +95,23 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 
 	// create config from options
 	config := genericapiserver.NewConfig().
-		WithSerializer(api.Codecs).
-		ApplyOptions(serverOptions.GenericServerRunOptions).
-		ApplyInsecureServingOptions(serverOptions.InsecureServing)
+		WithSerializer(api.Codecs)
 
-	if _, err := config.ApplySecureServingOptions(serverOptions.SecureServing); err != nil {
+	if err := serverOptions.GenericServerRunOptions.ApplyTo(config); err != nil {
+		return err
+	}
+	if err := serverOptions.InsecureServing.ApplyTo(config); err != nil {
+		return err
+	}
+	if err := serverOptions.SecureServing.ApplyTo(config); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
 	}
-	if err := serverOptions.Authentication.Apply(config); err != nil {
+	if err := serverOptions.Authentication.ApplyTo(config); err != nil {
 		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 
 	config.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	config.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
-
-	s, err := config.Complete().New()
-	if err != nil {
-		return fmt.Errorf("Error in bringing up the server: %v", err)
-	}
 
 	groupVersion := v1.SchemeGroupVersion
 	groupName := groupVersion.Group
@@ -129,10 +119,18 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
-	storageFactory := newStorageFactory()
+	storageFactory := serverstorage.NewDefaultStorageFactory(serverOptions.Etcd.StorageConfig, "application/json", api.Codecs, serverstorage.NewDefaultResourceEncodingConfig(api.Registry), serverstorage.NewResourceConfig())
 	storageConfig, err := storageFactory.NewConfig(schema.GroupResource{Group: groupName, Resource: "testtype"})
 	if err != nil {
 		return fmt.Errorf("Unable to get storage config: %v", err)
+	}
+	if err := serverOptions.Etcd.ApplyWithStorageFactoryTo(storageFactory, config); err != nil {
+		return fmt.Errorf("failed to configure authentication: %s", err)
+	}
+
+	s, err := config.Complete().New()
+	if err != nil {
+		return fmt.Errorf("Error in bringing up the server: %v", err)
 	}
 
 	testTypeOpts := generic.RESTOptions{

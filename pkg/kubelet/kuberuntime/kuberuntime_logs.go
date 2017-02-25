@@ -191,6 +191,7 @@ func ReadLogs(path string, apiOpts *v1.PodLogOptions, stdout, stderr io.Writer) 
 				return nil
 			}
 			glog.Errorf("Failed with err %v when writing log for log file %q: %+v", err, path, msg)
+			return err
 		}
 	}
 }
@@ -299,6 +300,9 @@ type logWriter struct {
 // errMaximumWrite is returned when all bytes have been written.
 var errMaximumWrite = errors.New("maximum write")
 
+// errShortWrite is returned when the message is not fully written.
+var errShortWrite = errors.New("short write")
+
 func newLogWriter(stdout io.Writer, stderr io.Writer, opts *logOptions) *logWriter {
 	w := &logWriter{
 		stdout: stdout,
@@ -341,6 +345,10 @@ func (w *logWriter) write(msg *logMessage) error {
 	w.remain -= int64(n)
 	if err != nil {
 		return err
+	}
+	// If the line has not been fully written, return errShortWrite
+	if n < len(line) {
+		return errShortWrite
 	}
 	// If there are no more bytes left, return errMaximumWrite
 	if w.remain <= 0 {

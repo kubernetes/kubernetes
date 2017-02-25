@@ -30,9 +30,10 @@ type serverRunFunc func(s *Server, args []string) error
 
 // Server describes a server that this binary can morph into.
 type Server struct {
-	SimpleUsage string        // One line description of the server.
-	Long        string        // Longer free form description of the server
-	Run         serverRunFunc // Run the server.  This is not expected to return.
+	SimpleUsage     string        // One line description of the server.
+	Long            string        // Longer free form description of the server
+	Run             serverRunFunc // Run the server.  This is not expected to return.
+	AlternativeName string
 
 	flags *pflag.FlagSet // Flags for the command (and all dependents)
 	name  string

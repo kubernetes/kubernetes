@@ -24,6 +24,7 @@ go_library(
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
+        "//pkg/util/i18n:go_default_library",
         "//pkg/util/interrupt:go_default_library",
         "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",

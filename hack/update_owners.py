@@ -70,21 +70,26 @@ def get_test_names_from_local_files():
 def load_owners(fname):
     owners = {}
     with open(fname) as f:
-        for n, (name, owner, random_assignment) in enumerate(csv.reader(f)):
+        for n, cols in enumerate(csv.reader(f)):
             if n == 0:
                 continue  # header
-            owners[normalize(name)] = (owner, int(random_assignment))
+            if len(cols) == 3:
+                # migrate from previous version without sig
+                (name, owner, random_assignment), sig = cols, ""
+            else:
+                (name, owner, random_assignment, sig) = cols
+            owners[normalize(name)] = (owner, int(random_assignment), sig)
         return owners
 
 
 def write_owners(fname, owners):
     with open(fname, 'w') as f:
         out = csv.writer(f, lineterminator='\n')
-        out.writerow(['name', 'owner', 'auto-assigned'])
+        out.writerow(['name', 'owner', 'auto-assigned', 'sig'])
         sort_key = lambda (k, v): (k != 'DEFAULT', k)  # put 'DEFAULT' first.
         items = sorted(owners.items(), key=sort_key)
-        for name, (owner, random_assignment) in items:
-            out.writerow([name, owner, int(random_assignment)])
+        for name, (owner, random_assignment, sig) in items:
+            out.writerow([name, owner, int(random_assignment), sig])
 
 
 def get_maintainers():
@@ -163,14 +168,14 @@ def main():
     if not options.addonly:
         print '# UNEXPECTED MAINTAINERS ',
         print '(randomly assigned, but not in kubernetes-maintainers)'
-        for name, (owner, random_assignment) in sorted(owners.iteritems()):
+        for name, (owner, random_assignment, _) in sorted(owners.iteritems()):
             if random_assignment and owner not in maintainers:
                 print '%-16s %s' % (owner, name)
                 owners.pop(name)
         print
 
     owner_counts = collections.Counter(
-        owner for name, (owner, random) in owners.iteritems()
+        owner for name, (owner, random, sig) in owners.iteritems()
         if owner in maintainers)
     for test_name in set(test_names) - set(owners):
         random_assignment = True
@@ -180,7 +185,7 @@ def main():
             new_owner = options.user
             random_assignment = False
         owner_counts[new_owner] += 1
-        owners[test_name] = (new_owner, random_assignment)
+        owners[test_name] = (new_owner, random_assignment, "")
 
     if options.user.lower() == 'random':
         print '# Tests per maintainer:'

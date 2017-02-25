@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/api"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
@@ -234,14 +234,6 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 }
 
 const (
-	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
-	// in the Annotations of a Pod.
-	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
-
-	// TaintsAnnotationKey represents the key of taints data (json serialized)
-	// in the Annotations of a Node.
-	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
-
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
@@ -271,63 +263,122 @@ const (
 	// is at-your-own-risk. Pods that attempt to set an unsafe sysctl that is not enabled for a kubelet
 	// will fail to launch.
 	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
+
+	// ObjectTTLAnnotations represents a suggestion for kubelet for how long it can cache
+	// an object (e.g. secret, config map) before fetching it again from apiserver.
+	// This annotation can be attached to node.
+	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 )
 
-// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
-// and converts it to the []Toleration type in api.
-func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
-	var tolerations []Toleration
-	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)
-		if err != nil {
-			return tolerations, err
-		}
-	}
-	return tolerations, nil
-}
-
-// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
-// and converts it to the []Taint type in api.
-func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
-	var taints []Taint
-	if len(annotations) > 0 && annotations[TaintsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TaintsAnnotationKey]), &taints)
-		if err != nil {
-			return []Taint{}, err
-		}
-	}
-	return taints, nil
-}
-
-// TolerationToleratesTaint checks if the toleration tolerates the taint.
-func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
-	if len(toleration.Effect) != 0 && toleration.Effect != taint.Effect {
+// ToleratesTaint checks if the toleration tolerates the taint.
+// The matching follows the rules below:
+// (1) Empty toleration.effect means to match all taint effects,
+//     otherwise taint effect must equal to toleration.effect.
+// (2) If toleration.operator is 'Exists', it means to match all taint values.
+// (3) Empty toleration.key means to match all taint keys.
+//     If toleration.key is empty, toleration.operator must be 'Exists';
+//     this combination means to match all taint values and all taint keys.
+func (t *Toleration) ToleratesTaint(taint *Taint) bool {
+	if len(t.Effect) > 0 && t.Effect != taint.Effect {
 		return false
 	}
 
-	if toleration.Key != taint.Key {
+	if len(t.Key) > 0 && t.Key != taint.Key {
 		return false
 	}
+
 	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
-	if (len(toleration.Operator) == 0 || toleration.Operator == TolerationOpEqual) && toleration.Value == taint.Value {
+	switch t.Operator {
+	// empty operator means Equal
+	case "", TolerationOpEqual:
+		return t.Value == taint.Value
+	case TolerationOpExists:
 		return true
+	default:
+		return false
 	}
-	if toleration.Operator == TolerationOpExists {
-		return true
+}
+
+// TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
+func TolerationsTolerateTaint(tolerations []Toleration, taint *Taint) bool {
+	for i := range tolerations {
+		if tolerations[i].ToleratesTaint(taint) {
+			return true
+		}
 	}
 	return false
 }
 
-// TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.
-func TaintToleratedByTolerations(taint *Taint, tolerations []Toleration) bool {
-	tolerated := false
-	for i := range tolerations {
-		if TolerationToleratesTaint(&tolerations[i], taint) {
-			tolerated = true
-			break
+type taintsFilterFunc func(*Taint) bool
+
+// TolerationsTolerateTaintsWithFilter checks if given tolerations tolerates
+// all the taints that apply to the filter in given taint list.
+func TolerationsTolerateTaintsWithFilter(tolerations []Toleration, taints []Taint, applyFilter taintsFilterFunc) bool {
+	if len(taints) == 0 {
+		return true
+	}
+
+	for i := range taints {
+		if applyFilter != nil && !applyFilter(&taints[i]) {
+			continue
+		}
+
+		if !TolerationsTolerateTaint(tolerations, &taints[i]) {
+			return false
 		}
 	}
-	return tolerated
+
+	return true
+}
+
+// DeleteTaintsByKey removes all the taints that have the same key to given taintKey
+func DeleteTaintsByKey(taints []Taint, taintKey string) ([]Taint, bool) {
+	newTaints := []Taint{}
+	deleted := false
+	for i := range taints {
+		if taintKey == taints[i].Key {
+			deleted = true
+			continue
+		}
+		newTaints = append(newTaints, taints[i])
+	}
+	return newTaints, deleted
+}
+
+// DeleteTaint removes all the the taints that have the same key and effect to given taintToDelete.
+func DeleteTaint(taints []Taint, taintToDelete *Taint) ([]Taint, bool) {
+	newTaints := []Taint{}
+	deleted := false
+	for i := range taints {
+		if taintToDelete.MatchTaint(taints[i]) {
+			deleted = true
+			continue
+		}
+		newTaints = append(newTaints, taints[i])
+	}
+	return newTaints, deleted
+}
+
+// Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
+func GetMatchingTolerations(taints []Taint, tolerations []Toleration) (bool, []Toleration) {
+	if len(tolerations) == 0 && len(taints) > 0 {
+		return false, []Toleration{}
+	}
+	result := []Toleration{}
+	for i := range taints {
+		tolerated := false
+		for j := range tolerations {
+			if tolerations[j].ToleratesTaint(&taints[i]) {
+				result = append(result, tolerations[j])
+				tolerated = true
+				break
+			}
+		}
+		if !tolerated {
+			return false, []Toleration{}
+		}
+	}
+	return true, result
 }
 
 // MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,

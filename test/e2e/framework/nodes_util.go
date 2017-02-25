@@ -30,9 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
-// The following upgrade functions are passed into the framework below and used
-// to do the actual upgrades.
-var MasterUpgrade = func(v string) error {
+func MasterUpgrade(v string) error {
 	switch TestContext.Provider {
 	case "gce":
 		return masterUpgradeGCE(v)
@@ -63,7 +61,7 @@ func masterUpgradeGKE(v string) error {
 	return err
 }
 
-var NodeUpgrade = func(f *Framework, v string, img string) error {
+func NodeUpgrade(f *Framework, v string, img string) error {
 	// Perform the upgrade.
 	var err error
 	switch TestContext.Provider {

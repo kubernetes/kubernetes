@@ -26,14 +26,14 @@ import (
 	// TODO(nikhiljindal): Fix this by ensuring that pkg/api/install and federation/apis/core/install do not conflict with each other.
 	_ "k8s.io/kubernetes/pkg/api/install"
 
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/federation/apis/core"
 	_ "k8s.io/kubernetes/federation/apis/core/install"
 	"k8s.io/kubernetes/federation/apis/core/v1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
 	eventstore "k8s.io/kubernetes/pkg/registry/core/event/storage"
 	namespacestore "k8s.io/kubernetes/pkg/registry/core/namespace/storage"

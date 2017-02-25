@@ -22,6 +22,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//federation/client/clientset_generated/federation_internalclientset/scheme:go_default_library",
         "//pkg/api:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",

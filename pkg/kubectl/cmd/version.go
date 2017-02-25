@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -36,7 +37,7 @@ var (
 func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "version",
-		Short:   "Print the client and server version information",
+		Short:   i18n.T("Print the client and server version information"),
 		Long:    "Print the client and server version information for the current context",
 		Example: version_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -61,12 +62,12 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return nil
 	}
 
-	clientset, err := f.ClientSet()
+	discoveryclient, err := f.DiscoveryClient()
 	if err != nil {
 		return err
 	}
 
-	serverVersion, err := clientset.Discovery().ServerVersion()
+	serverVersion, err := discoveryclient.ServerVersion()
 	if err != nil {
 		return err
 	}

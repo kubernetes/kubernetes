@@ -33,7 +33,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 )
@@ -89,8 +89,7 @@ func TestGetSecurityOpts(t *testing.T) {
 	for i, test := range tests {
 		securityOpts, err := dm.getSecurityOpts(test.pod, containerName)
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
-		opts, err := dm.fmtDockerOpts(securityOpts)
-		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		opts := FmtDockerOpts(securityOpts, '=')
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
 			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
@@ -456,8 +455,9 @@ func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
 	for _, test := range cases {
 		dm, fakeDocker := newTestDockerManager()
 		ctrl := gomock.NewController(t)
-		fnp := mock_network.NewMockNetworkPlugin(ctrl)
-		dm.networkPlugin = fnp
+		defer ctrl.Finish()
+		fnp := nettest.NewMockNetworkPlugin(ctrl)
+		dm.network = network.NewPluginManager(fnp)
 
 		fakeDocker.SetFakeRunningContainers([]*FakeContainer{
 			{

@@ -25,14 +25,18 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
+	authorizationapiv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
 	authorizationapiv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
@@ -41,12 +45,10 @@ import (
 	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	storageapiv1 "k8s.io/kubernetes/pkg/apis/storage/v1"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	corev1client "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
 	"k8s.io/kubernetes/pkg/master/tunneler"
@@ -79,12 +81,10 @@ const (
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
-	APIResourceConfigSource  genericapiserver.APIResourceConfigSource
-	StorageFactory           genericapiserver.StorageFactory
-	EnableWatchCache         bool
+	APIResourceConfigSource  serverstorage.APIResourceConfigSource
+	StorageFactory           serverstorage.StorageFactory
 	EnableCoreControllers    bool
 	EndpointReconcilerConfig EndpointReconcilerConfig
-	DeleteCollectionWorkers  int
 	EventTTL                 time.Duration
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
 
@@ -220,18 +220,6 @@ func (c completedConfig) New() (*Master, error) {
 		GenericAPIServer: s,
 	}
 
-	restOptionsFactory := &restOptionsFactory{
-		deleteCollectionWorkers: c.DeleteCollectionWorkers,
-		enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
-		storageFactory:          c.StorageFactory,
-	}
-
-	if c.EnableWatchCache {
-		restOptionsFactory.storageDecorator = genericregistry.StorageWithCacher
-	} else {
-		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
-	}
-
 	// install legacy rest storage
 	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
@@ -243,7 +231,7 @@ func (c completedConfig) New() (*Master, error) {
 			ServiceNodePortRange: c.ServiceNodePortRange,
 			LoopbackClientConfig: c.GenericConfig.LoopbackClientConfig,
 		}
-		m.InstallLegacyAPI(c.Config, restOptionsFactory, legacyRESTStorageProvider)
+		m.InstallLegacyAPI(c.Config, c.Config.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
 
 	restStorageProviders := []RESTStorageProvider{
@@ -258,7 +246,7 @@ func (c completedConfig) New() (*Master, error) {
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
 		storagerest.RESTStorageProvider{},
 	}
-	m.InstallAPIs(c.Config.APIResourceConfigSource, restOptionsFactory, restStorageProviders...)
+	m.InstallAPIs(c.Config.APIResourceConfigSource, c.Config.GenericConfig.RESTOptionsGetter, restStorageProviders...)
 
 	if c.Tunneler != nil {
 		m.installTunneler(c.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
@@ -298,11 +286,11 @@ func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient core
 // RESTStorageProvider is a factory type for REST storage.
 type RESTStorageProvider interface {
 	GroupName() string
-	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
+	NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) {
+func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {
@@ -338,28 +326,6 @@ func (m *Master) InstallAPIs(apiResourceConfigSource genericapiserver.APIResourc
 	}
 }
 
-type restOptionsFactory struct {
-	deleteCollectionWorkers int
-	enableGarbageCollection bool
-	storageFactory          genericapiserver.StorageFactory
-	storageDecorator        generic.StorageDecorator
-}
-
-func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	storageConfig, err := f.storageFactory.NewConfig(resource)
-	if err != nil {
-		return generic.RESTOptions{}, fmt.Errorf("Unable to find storage destination for %v, due to %v", resource, err.Error())
-	}
-
-	return generic.RESTOptions{
-		StorageConfig:           storageConfig,
-		Decorator:               f.storageDecorator,
-		DeleteCollectionWorkers: f.deleteCollectionWorkers,
-		EnableGarbageCollection: f.enableGarbageCollection,
-		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
-	}, nil
-}
-
 type nodeAddressProvider struct {
 	nodeClient corev1client.NodeInterface
 }
@@ -385,20 +351,23 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	return addrs, nil
 }
 
-func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
-	ret := genericapiserver.NewResourceConfig()
+func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
+	ret := serverstorage.NewResourceConfig()
 	ret.EnableVersions(
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
+		authenticationv1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		appsapi.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
 		rbacapi.SchemeGroupVersion,
+		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1beta1.SchemeGroupVersion,
+		authorizationapiv1.SchemeGroupVersion,
 		authorizationapiv1beta1.SchemeGroupVersion,
 	)
 

@@ -64,6 +64,15 @@ func newClusterRoleBinding(roleName string, subjects ...string) *rbac.ClusterRol
 	for i, subject := range subjects {
 		split := strings.SplitN(subject, ":", 2)
 		r.Subjects[i].Kind, r.Subjects[i].Name = split[0], split[1]
+
+		switch r.Subjects[i].Kind {
+		case rbac.ServiceAccountKind:
+			r.Subjects[i].APIGroup = ""
+		case rbac.UserKind, rbac.GroupKind:
+			r.Subjects[i].APIGroup = rbac.GroupName
+		default:
+			panic(fmt.Errorf("invalid kind %s", r.Subjects[i].Kind))
+		}
 	}
 	return r
 }
@@ -82,6 +91,15 @@ func newRoleBinding(namespace, roleName string, bindType uint16, subjects ...str
 	for i, subject := range subjects {
 		split := strings.SplitN(subject, ":", 2)
 		r.Subjects[i].Kind, r.Subjects[i].Name = split[0], split[1]
+
+		switch r.Subjects[i].Kind {
+		case rbac.ServiceAccountKind:
+			r.Subjects[i].APIGroup = ""
+		case rbac.UserKind, rbac.GroupKind:
+			r.Subjects[i].APIGroup = rbac.GroupName
+		default:
+			panic(fmt.Errorf("invalid kind %s", r.Subjects[i].Kind))
+		}
 	}
 	return r
 }

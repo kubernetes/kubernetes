@@ -17,7 +17,9 @@ limitations under the License.
 package autoscaling
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // Scale represents a scaling request for a resource.
@@ -67,68 +69,237 @@ type CrossVersionObjectReference struct {
 	APIVersion string
 }
 
-// specification of a horizontal pod autoscaler.
+// HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.
 type HorizontalPodAutoscalerSpec struct {
-	// reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption
-	// and will set the desired number of pods by using its Scale subresource.
+	// ScaleTargetRef points to the target resource to scale, and is used to the pods for which metrics
+	// should be collected, as well as to actually change the replica count.
 	ScaleTargetRef CrossVersionObjectReference
-	// lower limit for the number of pods that can be set by the autoscaler, default 1.
+	// MinReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.
+	// It defaults to 1 pod.
 	// +optional
 	MinReplicas *int32
-	// upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.
+	// MaxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
+	// It cannot be less that minReplicas.
 	MaxReplicas int32
-	// target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
-	// if not specified the default autoscaling policy will be used.
+	// Metrics contains the specifications for which to use to calculate the
+	// desired replica count (the maximum replica count across all metrics will
+	// be used).  The desired replica count is calculated multiplying the
+	// ratio between the target value and the current value by the current
+	// number of pods.  Ergo, metrics used must decrease as the pod count is
+	// increased, and vice-versa.  See the individual metric source types for
+	// more information about how each type of metric must respond.
 	// +optional
-	TargetCPUUtilizationPercentage *int32
+	Metrics []MetricSpec
 }
 
-// current status of a horizontal pod autoscaler
+// MetricSourceType indicates the type of metric.
+type MetricSourceType string
+
+var (
+	// ObjectMetricSourceType is a metric describing a kubernetes object
+	// (for example, hits-per-second on an Ingress object).
+	ObjectMetricSourceType MetricSourceType = "Object"
+	// PodsMetricSourceType is a metric describing each pod in the current scale
+	// target (for example, transactions-processed-per-second).  The values
+	// will be averaged together before being compared to the target value.
+	PodsMetricSourceType MetricSourceType = "Pods"
+	// ResourceMetricSourceType is a resource metric known to Kubernetes, as
+	// specified in requests and limits, describing each pod in the current
+	// scale target (e.g. CPU or memory).  Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics (the "pods" source).
+	ResourceMetricSourceType MetricSourceType = "Resource"
+)
+
+// MetricSpec specifies how to scale based on a single metric
+// (only `type` and one other matching field should be set at once).
+type MetricSpec struct {
+	// Type is the type of metric source.  It should match one of the fields below.
+	Type MetricSourceType
+
+	// Object refers to a metric describing a single kubernetes object
+	// (for example, hits-per-second on an Ingress object).
+	// +optional
+	Object *ObjectMetricSource
+	// Pods refers to a metric describing each pod in the current scale target
+	// (for example, transactions-processed-per-second).  The values will be
+	// averaged together before being compared to the target value.
+	// +optional
+	Pods *PodsMetricSource
+	// Resource refers to a resource metric (such as those specified in
+	// requests and limits) known to Kubernetes describing each pod in the
+	// current scale target (e.g. CPU or memory). Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics using the "pods" source.
+	// +optional
+	Resource *ResourceMetricSource
+}
+
+// ObjectMetricSource indicates how to scale on a metric describing a
+// kubernetes object (for example, hits-per-second on an Ingress object).
+type ObjectMetricSource struct {
+	// Target is the described Kubernetes object.
+	Target CrossVersionObjectReference
+
+	// MetricName is the name of the metric in question.
+	MetricName string
+	// TargetValue is the target value of the metric (as a quantity).
+	TargetValue resource.Quantity
+}
+
+// PodsMetricSource indicates how to scale on a metric describing each pod in
+// the current scale target (for example, transactions-processed-per-second).
+// The values will be averaged together before being compared to the target
+// value.
+type PodsMetricSource struct {
+	// MetricName is the name of the metric in question
+	MetricName string
+	// TargetAverageValue is the target value of the average of the
+	// metric across all relevant pods (as a quantity)
+	TargetAverageValue resource.Quantity
+}
+
+// ResourceMetricSource indicates how to scale on a resource metric known to
+// Kubernetes, as specified in requests and limits, describing each pod in the
+// current scale target (e.g. CPU or memory).  The values will be averaged
+// together before being compared to the target.  Such metrics are built in to
+// Kubernetes, and have special scaling options on top of those available to
+// normal per-pod metrics using the "pods" source.  Only one "target" type
+// should be set.
+type ResourceMetricSource struct {
+	// Name is the name of the resource in question.
+	Name api.ResourceName
+	// TargetAverageUtilization is the target value of the average of the
+	// resource metric across all relevant pods, represented as a percentage of
+	// the requested value of the resource for the pods.
+	// +optional
+	TargetAverageUtilization *int32
+	// TargetAverageValue is the the target value of the average of the
+	// resource metric across all relevant pods, as a raw value (instead of as
+	// a percentage of the request), similar to the "pods" metric source type.
+	// +optional
+	TargetAverageValue *resource.Quantity
+}
+
+// HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerStatus struct {
-	// most recent generation observed by this autoscaler.
+	// ObservedGeneration is the most recent generation observed by this autoscaler.
 	// +optional
 	ObservedGeneration *int64
 
-	// last time the HorizontalPodAutoscaler scaled the number of pods;
+	// LastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods,
 	// used by the autoscaler to control how often the number of pods is changed.
 	// +optional
 	LastScaleTime *metav1.Time
 
-	// current number of replicas of pods managed by this autoscaler.
+	// CurrentReplicas is current number of replicas of pods managed by this autoscaler,
+	// as last seen by the autoscaler.
 	CurrentReplicas int32
 
-	// desired number of replicas of pods managed by this autoscaler.
+	// DesiredReplicas is the desired number of replicas of pods managed by this autoscaler,
+	// as last calculated by the autoscaler.
 	DesiredReplicas int32
 
-	// current average CPU utilization over all pods, represented as a percentage of requested CPU,
-	// e.g. 70 means that an average pod is using now 70% of its requested CPU.
+	// CurrentMetrics is the last read state of the metrics used by this autoscaler.
+	CurrentMetrics []MetricStatus
+}
+
+// MetricStatus describes the last-read state of a single metric.
+type MetricStatus struct {
+	// Type is the type of metric source.  It will match one of the fields below.
+	Type MetricSourceType
+
+	// Object refers to a metric describing a single kubernetes object
+	// (for example, hits-per-second on an Ingress object).
 	// +optional
-	CurrentCPUUtilizationPercentage *int32
+	Object *ObjectMetricStatus
+	// Pods refers to a metric describing each pod in the current scale target
+	// (for example, transactions-processed-per-second).  The values will be
+	// averaged together before being compared to the target value.
+	// +optional
+	Pods *PodsMetricStatus
+	// Resource refers to a resource metric (such as those specified in
+	// requests and limits) known to Kubernetes describing each pod in the
+	// current scale target (e.g. CPU or memory). Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics using the "pods" source.
+	// +optional
+	Resource *ResourceMetricStatus
+}
+
+// ObjectMetricStatus indicates the current value of a metric describing a
+// kubernetes object (for example, hits-per-second on an Ingress object).
+type ObjectMetricStatus struct {
+	// Target is the described Kubernetes object.
+	Target CrossVersionObjectReference
+
+	// MetricName is the name of the metric in question.
+	MetricName string
+	// CurrentValue is the current value of the metric (as a quantity).
+	CurrentValue resource.Quantity
+}
+
+// PodsMetricStatus indicates the current value of a metric describing each pod in
+// the current scale target (for example, transactions-processed-per-second).
+type PodsMetricStatus struct {
+	// MetricName is the name of the metric in question
+	MetricName string
+	// CurrentAverageValue is the current value of the average of the
+	// metric across all relevant pods (as a quantity)
+	CurrentAverageValue resource.Quantity
+}
+
+// ResourceMetricStatus indicates the current value of a resource metric known to
+// Kubernetes, as specified in requests and limits, describing each pod in the
+// current scale target (e.g. CPU or memory).  Such metrics are built in to
+// Kubernetes, and have special scaling options on top of those available to
+// normal per-pod metrics using the "pods" source.
+type ResourceMetricStatus struct {
+	// Name is the name of the resource in question.
+	Name api.ResourceName
+	// CurrentAverageUtilization is the current value of the average of the
+	// resource metric across all relevant pods, represented as a percentage of
+	// the requested value of the resource for the pods.  It will only be
+	// present if `targetAverageValue` was set in the corresponding metric
+	// specification.
+	// +optional
+	CurrentAverageUtilization *int32
+	// CurrentAverageValue is the the current value of the average of the
+	// resource metric across all relevant pods, as a raw value (instead of as
+	// a percentage of the request), similar to the "pods" metric source type.
+	// It will always be set, regardless of the corresponding metric specification.
+	CurrentAverageValue resource.Quantity
 }
 
 // +genclient=true
 
-// configuration of a horizontal pod autoscaler.
+// HorizontalPodAutoscaler is the configuration for a horizontal pod
+// autoscaler, which automatically manages the replica count of any resource
+// implementing the scale subresource based on the metrics specified.
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta
+	// Metadata is the standard object metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
-	// behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// Spec is the specification for the behaviour of the autoscaler.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
 	// +optional
 	Spec HorizontalPodAutoscalerSpec
 
-	// current information about the autoscaler.
+	// Status is the current information about the autoscaler.
 	// +optional
 	Status HorizontalPodAutoscalerStatus
 }
 
-// list of horizontal pod autoscaler objects.
+// HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
 	metav1.TypeMeta
+	// Metadata is the standard list metadata.
 	// +optional
 	metav1.ListMeta
 
-	// list of horizontal pod autoscaler objects.
+	// Items is the list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler
 }

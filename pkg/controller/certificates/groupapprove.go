@@ -23,19 +23,16 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 )
 
 // groupApprover implements AutoApprover for signing Kubelet certificates.
 type groupApprover struct {
-	client                        clientcertificates.CertificateSigningRequestInterface
 	approveAllKubeletCSRsForGroup string
 }
 
 // NewGroupApprover creates an approver that accepts any CSR requests where the subject group contains approveAllKubeletCSRsForGroup.
-func NewGroupApprover(client clientcertificates.CertificateSigningRequestInterface, approveAllKubeletCSRsForGroup string) AutoApprover {
+func NewGroupApprover(approveAllKubeletCSRsForGroup string) AutoApprover {
 	return &groupApprover{
-		client: client,
 		approveAllKubeletCSRsForGroup: approveAllKubeletCSRsForGroup,
 	}
 }
@@ -84,7 +81,7 @@ func (cc *groupApprover) AutoApprove(csr *certificates.CertificateSigningRequest
 		Reason:  "AutoApproved",
 		Message: "Auto approving of all kubelet CSRs is enabled on the controller manager",
 	})
-	return cc.client.UpdateApproval(csr)
+	return csr, nil
 }
 
 var kubeletClientUsages = []certificates.KeyUsage{

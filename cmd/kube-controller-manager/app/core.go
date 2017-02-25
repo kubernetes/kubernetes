@@ -40,12 +40,14 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 )
 
 func startEndpointController(ctx ControllerContext) (bool, error) {
 	go endpointcontroller.NewEndpointController(
-		ctx.InformerFactory.Pods().Informer(),
+		ctx.NewInformerFactory.Core().V1().Pods(),
+		ctx.NewInformerFactory.Core().V1().Services(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
 	).Run(int(ctx.Options.ConcurrentEndpointSyncs), ctx.Stop)
 	return true, nil
@@ -53,8 +55,8 @@ func startEndpointController(ctx ControllerContext) (bool, error) {
 
 func startReplicationController(ctx ControllerContext) (bool, error) {
 	go replicationcontroller.NewReplicationManager(
-		ctx.InformerFactory.Pods().Informer(),
-		ctx.InformerFactory.ReplicationControllers().Informer(),
+		ctx.NewInformerFactory.Core().V1().Pods(),
+		ctx.NewInformerFactory.Core().V1().ReplicationControllers(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),
 		replicationcontroller.BurstReplicas,
 		int(ctx.Options.LookupCacheSizeForRC),
@@ -66,7 +68,7 @@ func startReplicationController(ctx ControllerContext) (bool, error) {
 func startPodGCController(ctx ControllerContext) (bool, error) {
 	go podgc.NewPodGC(
 		ctx.ClientBuilder.ClientOrDie("pod-garbage-collector"),
-		ctx.InformerFactory.Pods().Informer(),
+		ctx.NewInformerFactory.Core().V1().Pods(),
 		int(ctx.Options.TerminatedPodGCThreshold),
 	).Run(ctx.Stop)
 	return true, nil
@@ -74,7 +76,7 @@ func startPodGCController(ctx ControllerContext) (bool, error) {
 
 func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
-	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient, ctx.InformerFactory)
+	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient, ctx.NewInformerFactory)
 	groupKindsToReplenish := []schema.GroupKind{
 		api.Kind("Pod"),
 		api.Kind("Service"),
@@ -85,9 +87,10 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		KubeClient:                resourceQuotaControllerClient,
+		ResourceQuotaInformer:     ctx.NewInformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.Options.ResourceQuotaSyncPeriod.Duration),
 		Registry:                  resourceQuotaRegistry,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(ctx.InformerFactory, resourceQuotaControllerClient),
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(ctx.NewInformerFactory),
 		ReplenishmentResyncPeriod: ResyncPeriod(&ctx.Options),
 		GroupKindsToReplenish:     groupKindsToReplenish,
 	}
@@ -124,7 +127,14 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 			return snapshot, nil
 		}
 	}
-	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, discoverResourcesFn, ctx.Options.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
+	namespaceController := namespacecontroller.NewNamespaceController(
+		namespaceKubeClient,
+		namespaceClientPool,
+		discoverResourcesFn,
+		ctx.NewInformerFactory.Core().V1().Namespaces(),
+		ctx.Options.NamespaceSyncPeriod.Duration,
+		v1.FinalizerKubernetes,
+	)
 	go namespaceController.Run(int(ctx.Options.ConcurrentNamespaceSyncs), ctx.Stop)
 
 	return true, nil
@@ -133,11 +143,19 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 
 func startServiceAccountController(ctx ControllerContext) (bool, error) {
 	go serviceaccountcontroller.NewServiceAccountsController(
-		ctx.InformerFactory.ServiceAccounts(),
-		ctx.InformerFactory.Namespaces(),
+		ctx.NewInformerFactory.Core().V1().ServiceAccounts(),
+		ctx.NewInformerFactory.Core().V1().Namespaces(),
 		ctx.ClientBuilder.ClientOrDie("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run(1, ctx.Stop)
+	return true, nil
+}
+
+func startTTLController(ctx ControllerContext) (bool, error) {
+	go ttlcontroller.NewTTLController(
+		ctx.NewInformerFactory.Core().V1().Nodes(),
+		ctx.ClientBuilder.ClientOrDie("ttl-controller"),
+	).Run(5, ctx.Stop)
 	return true, nil
 }
 

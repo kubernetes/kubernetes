@@ -18,7 +18,6 @@ package e2e_federation
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -71,22 +70,16 @@ var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", fu
 	// e2e cases for federated deployment controller
 	Describe("Federated Deployment", func() {
 		var (
-			clusters       map[string]*cluster
-			federationName string
+			clusters map[string]*cluster
 		)
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
-				federationName = DefaultFederationName
-			}
-			clusters = map[string]*cluster{}
-			registerClusters(clusters, UserAgentName, federationName, f)
+			clusters, _ = getRegisteredClusters(UserAgentName, f)
 		})
 
 		AfterEach(func() {
 			nsName := f.FederationNamespace.Name
 			deleteAllDeploymentsOrFail(f.FederationClientset, nsName)
-			unregisterClusters(clusters, f)
 		})
 
 		It("should create and update matching deployments in underlying clusters", func() {
@@ -262,7 +255,9 @@ func updateDeploymentOrFail(clientset *fedclientset.Clientset, namespace string)
 func deleteDeploymentOrFail(clientset *fedclientset.Clientset, nsName string, deploymentName string, orphanDependents *bool) {
 	By(fmt.Sprintf("Deleting deployment %q in namespace %q", deploymentName, nsName))
 	err := clientset.Extensions().Deployments(nsName).Delete(deploymentName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
-	framework.ExpectNoError(err, "Error deleting deployment %q in namespace %q", deploymentName, nsName)
+	if err != nil && !errors.IsNotFound(err) {
+		framework.ExpectNoError(err, "Error deleting deployment %q in namespace %q", deploymentName, nsName)
+	}
 
 	// Wait for the deployment to be deleted.
 	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {

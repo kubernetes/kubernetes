@@ -53,7 +53,6 @@ kind: DaemonSet
 metadata:
   labels:
     k8s-app: kube-proxy
-    kubernetes.io/cluster-service: "true"
   name: kube-proxy
   namespace: kube-system
 spec:
@@ -64,18 +63,15 @@ spec:
     metadata:
       labels:
         k8s-app: kube-proxy
-        kubernetes.io/cluster-service: "true"
-      annotations:
-        # TODO: Move this to the beta tolerations field below as soon as the Tolerations field exists in PodSpec
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated","value":"master","effect":"NoSchedule"}]'
     spec:
       containers:
       - name: kube-proxy
-        image: {{ .ImageRepository }}/kube-proxy-{{ .Arch }}:{{ .Version }}
+        image: {{ .Image }}
         imagePullPolicy: IfNotPresent
         command:
-        - kube-proxy
+        - /usr/local/bin/kube-proxy
         - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
+        {{ .ClusterCIDR }}
         securityContext:
           privileged: true
         volumeMounts:
@@ -83,57 +79,89 @@ spec:
           name: kube-proxy
       hostNetwork: true
       serviceAccountName: kube-proxy
-      # Tolerate running on the master
-      # tolerations:
-      # - key: dedicated
-      #   value: master
-      #   effect: NoSchedule
+      tolerations:
+      - key: dedicated
+        value: master
+        effect: NoSchedule
       volumes:
       - name: kube-proxy
         configMap:
           name: kube-proxy
 `
 
-	KubeDNSVersion = "1.11.0"
+	KubeDNSVersion = "1.13.0"
 
 	KubeDNSDeployment = `
+
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  labels:
-    k8s-app: kube-dns
-    kubernetes.io/cluster-service: "true"
   name: kube-dns
   namespace: kube-system
+  labels:
+    k8s-app: kube-dns
 spec:
-  replicas: {{ .Replicas }}
+  # replicas: not specified here:
+  # 1. In order to make Addon Manager do not reconcile this replicas parameter.
+  # 2. Default is 1.
+  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  strategy:
+    rollingUpdate:
+      maxSurge: 10%
+      maxUnavailable: 0
   selector:
     matchLabels:
       k8s-app: kube-dns
-      kubernetes.io/cluster-service: "true"
-  strategy:
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 1
-    type: RollingUpdate
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        kubernetes.io/cluster-service: "true"
       annotations:
-        # TODO: Move this to the beta tolerations field below as soon as the Tolerations field exists in PodSpec
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated","value":"master","effect":"NoSchedule"}]'
+        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      volumes:
+      - name: kube-dns-config
+        configMap:
+          name: kube-dns
+          optional: true
       containers:
       - name: kubedns
         image: {{ .ImageRepository }}/k8s-dns-kube-dns-{{ .Arch }}:{{ .Version }}
         imagePullPolicy: IfNotPresent
+        resources:
+          # TODO: Set memory limits when we've profiled the container for large
+          # clusters, then set request = limit to keep this container in
+          # guaranteed class. Currently, this container falls into the
+          # "burstable" category so the kubelet doesn't backoff from restarting it.
+          limits:
+            memory: 170Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        livenessProbe:
+          httpGet:
+            path: /healthcheck/kubedns
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 8081
+            scheme: HTTP
+          # we poll on pod startup for the Kubernetes master service and
+          # only setup the /readiness HTTP server once that's available.
+          initialDelaySeconds: 3
+          timeoutSeconds: 5
         args:
-        - --domain={{ .DNSDomain }}
+        - --domain={{ .DNSDomain }}.
         - --dns-port=10053
-        - --config-map=kube-dns
+        - --config-dir=/kube-dns-config
         - --v=2
+        # Do we need to set __PILLAR__FEDERATIONS__DOMAIN__MAP__ here?
         env:
         - name: PROMETHEUS_PORT
           value: "10055"
@@ -147,39 +175,26 @@ spec:
         - containerPort: 10055
           name: metrics
           protocol: TCP
-        livenessProbe:
-          failureThreshold: 5
-          httpGet:
-            path: /healthcheck/kubedns
-            port: 10054
-            scheme: HTTP
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 5
-        readinessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /readiness
-            port: 8081
-            scheme: HTTP
-          initialDelaySeconds: 3
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 5
-        resources:
-          limits:
-            memory: 170Mi
-          requests:
-            cpu: 100m
-            memory: 70Mi
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /kube-dns-config
       - name: dnsmasq
         image: {{ .ImageRepository }}/k8s-dns-dnsmasq-{{ .Arch }}:{{ .Version }}
         imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthcheck/dnsmasq
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
         args:
         - --cache-size=1000
-        - --no-resolv
-        - --server=127.0.0.1#10053
+        - --server=/{{ .DNSDomain }}/127.0.0.1#10053
+        - --server=/in-addr.arpa/127.0.0.1#10053
+        - --server=/ip6.arpa/127.0.0.1#10053
         - --log-facility=-
         ports:
         - containerPort: 53
@@ -188,16 +203,7 @@ spec:
         - containerPort: 53
           name: dns-tcp
           protocol: TCP
-        livenessProbe:
-          failureThreshold: 5
-          httpGet:
-            path: /healthcheck/dnsmasq
-            port: 10054
-            scheme: HTTP
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 5
+        # see: https://github.com/kubernetes/kubernetes/issues/29055 for details
         resources:
           requests:
             cpu: 150m
@@ -205,6 +211,15 @@ spec:
       - name: sidecar
         image: {{ .ImageRepository }}/k8s-dns-sidecar-{{ .Arch }}:{{ .Version }}
         imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
         args:
         - --v=2
         - --logtostderr
@@ -214,26 +229,18 @@ spec:
         - containerPort: 10054
           name: metrics
           protocol: TCP
-        livenessProbe:
-          failureThreshold: 5
-          httpGet:
-            path: /metrics
-            port: 10054
-            scheme: HTTP
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 5
         resources:
           requests:
-            cpu: 10m
             memory: 20Mi
-      dnsPolicy: Default
+            cpu: 10m
+      dnsPolicy: Default  # Don't use cluster DNS.
       serviceAccountName: kube-dns
-      # tolerations:
-      # - key: dedicated
-      #   value: master
-      #   effect: NoSchedule
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
+      - key: "dedicated"
+        value: "master"
+        effect: "NoSchedule"
       # TODO: Remove this affinity field as soon as we are using manifest lists
       affinity:
         nodeAffinity:

@@ -20,6 +20,9 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 type preflightCheckTest struct {
@@ -36,6 +39,54 @@ func (pfct preflightCheckTest) Check() (warning, errors []error) {
 	return
 }
 
+func TestRunInitMasterChecks(t *testing.T) {
+	var tests = []struct {
+		cfg      *kubeadmapi.MasterConfiguration
+		expected bool
+	}{
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadm.API{AdvertiseAddresses: []string{"foo"}},
+			},
+			expected: false,
+		},
+	}
+
+	for _, rt := range tests {
+		actual := RunInitMasterChecks(rt.cfg)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(actual != nil),
+			)
+		}
+	}
+}
+
+func TestRunJoinNodeChecks(t *testing.T) {
+	var tests = []struct {
+		cfg      *kubeadmapi.NodeConfiguration
+		expected bool
+	}{
+		{
+			cfg:      &kubeadmapi.NodeConfiguration{},
+			expected: false,
+		},
+	}
+
+	for _, rt := range tests {
+		actual := RunJoinNodeChecks(rt.cfg)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed RunJoinNodeChecks:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(actual != nil),
+			)
+		}
+	}
+}
+
 func TestRunChecks(t *testing.T) {
 	var tokenTest = []struct {
 		p        []Checker
@@ -46,6 +97,14 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{preflightCheckTest{"warning"}}, true, "[preflight] WARNING: warning\n"}, // should just print warning
 		{[]Checker{preflightCheckTest{"error"}}, false, ""},
 		{[]Checker{preflightCheckTest{"test"}}, false, ""},
+		{[]Checker{DirAvailableCheck{Path: "/does/not/exist"}}, true, ""},
+		{[]Checker{DirAvailableCheck{Path: "/"}}, false, ""},
+		{[]Checker{FileAvailableCheck{Path: "/does/not/exist"}}, true, ""},
+		{[]Checker{FileContentCheck{Path: "/does/not/exist"}}, false, ""},
+		{[]Checker{FileContentCheck{Path: "/"}}, true, ""},
+		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
+		{[]Checker{InPathCheck{executable: "foobarbaz"}}, true, "[preflight] WARNING: foobarbaz not found in system path\n"},
+		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true}}, false, ""},
 	}
 	for _, rt := range tokenTest {
 		buf := new(bytes.Buffer)

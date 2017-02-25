@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -239,10 +238,10 @@ type KubeletConfiguration struct {
 	// masterServiceNamespace is The namespace from which the kubernetes
 	// master services should be injected into pods.
 	MasterServiceNamespace string
-	// clusterDNS is the IP address for a cluster DNS server.  If set, kubelet
-	// will configure all containers to use this for DNS resolution in
-	// addition to the host's DNS servers
-	ClusterDNS string
+	// clusterDNS is a list of IP address for a cluster DNS server.  If set,
+	// kubelet will configure all containers to use this for DNS resolution
+	// instead of the host's DNS servers
+	ClusterDNS []string
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration
@@ -298,7 +297,7 @@ type KubeletConfiguration struct {
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
 	// +optional
-	ExperimentalCgroupsPerQOS bool
+	CgroupsPerQOS bool
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
 	CgroupDriver string
@@ -311,7 +310,7 @@ type KubeletConfiguration struct {
 	// +optional
 	SystemCgroups string
 	// CgroupRoot is the root cgroup to use for pods.
-	// If ExperimentalCgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
+	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	// +optional
 	CgroupRoot string
 	// containerRuntime is the container runtime to use.
@@ -573,6 +572,7 @@ type KubeSchedulerConfiguration struct {
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
 	HardPodAffinitySymmetricWeight int
 	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
+	// DEPRECATED: This is no longer used.
 	FailureDomains string
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection LeaderElectionConfiguration
@@ -791,6 +791,11 @@ type KubeControllerManagerConfiguration struct {
 	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
 	// wait between successive executions. Is set to 5 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration
+	// If set to true enables NoExecute Taints and will evict all not-tolerating
+	// Pod running on Nodes tainted with this kind of Taints.
+	EnableTaintManager bool
+	// If set to true NodeController will use taints to evict Pods from notReady and unreachable Nodes.
+	UseTaintBasedEvictions bool
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume
@@ -839,31 +844,6 @@ type PersistentVolumeRecyclerConfiguration struct {
 	// for a HostPath scrubber pod.  This is for development and testing only and will not work
 	// in a multi-node cluster.
 	IncrementTimeoutHostPath int32
-}
-
-// AdmissionConfiguration provides versioned configuration for admission controllers.
-type AdmissionConfiguration struct {
-	metav1.TypeMeta
-
-	// Plugins allows specifying a configuration per admission control plugin.
-	Plugins []AdmissionPluginConfiguration
-}
-
-// AdmissionPluginConfiguration provides the configuration for a single plug-in.
-type AdmissionPluginConfiguration struct {
-	// Name is the name of the admission controller.
-	// It must match the registered admission plugin name.
-	Name string
-
-	// Path is the path to a configuration file that contains the plugin's
-	// configuration
-	// +optional
-	Path string
-
-	// Configuration is an embedded configuration object to be used as the plugin's
-	// configuration. If present, it will be used instead of the path to the configuration file.
-	// +optional
-	Configuration runtime.Object
 }
 
 type ConfigurationMap map[string]string

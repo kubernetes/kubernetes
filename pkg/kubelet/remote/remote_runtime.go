@@ -74,7 +74,9 @@ func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionRe
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
 func (r *RemoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (string, error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+	// Use 2 times longer timeout for sandbox operation (4 mins by default)
+	// TODO: Make the pod sandbox timeout configurable.
+	ctx, cancel := getContextWithTimeout(r.timeout * 2)
 	defer cancel()
 
 	resp, err := r.runtimeClient.RunPodSandbox(ctx, &runtimeapi.RunPodSandboxRequest{
@@ -281,7 +283,11 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeapi.
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
 func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+	ctx, cancel := getContextWithTimeout(timeout)
+	if timeout == 0 {
+		// Do not set timeout when timeout is 0.
+		ctx, cancel = getContextWithCancel()
+	}
 	defer cancel()
 
 	timeoutSeconds := int64(timeout.Seconds())

@@ -140,9 +140,10 @@ func init() {
 			rbac.NewRule("get", "update").Groups(extensionsGroup).Resources("replicationcontrollers/scale").RuleOrDie(),
 			rbac.NewRule("get", "update").Groups(extensionsGroup).Resources("deployments/scale", "replicasets/scale").RuleOrDie(),
 			rbac.NewRule("list").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			// TODO: fix MetricsClient to no longer require root proxy access
-			// TODO: restrict this to the appropriate namespace
+			// TODO: Remove the root /proxy permission in 1.7; MetricsClient no longer requires root proxy access as of 1.6 (fixed in https://github.com/kubernetes/kubernetes/pull/39636)
 			rbac.NewRule("proxy").Groups(legacyGroup).Resources("services").Names("https:heapster:", "http:heapster:").RuleOrDie(),
+			// TODO: restrict this to the appropriate namespace
+			rbac.NewRule("get").Groups(legacyGroup).Resources("services/proxy").Names("https:heapster:", "http:heapster:").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -166,7 +167,7 @@ func init() {
 	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "node-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "update", "delete").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			rbac.NewRule("get", "list", "update", "delete", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			rbac.NewRule("update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
 			// used for pod eviction
 			rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
@@ -261,6 +262,13 @@ func init() {
 			rbac.NewRule("update").Groups(appsGroup).Resources("statefulsets/status").RuleOrDie(),
 			rbac.NewRule("get", "create", "delete", "update").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("get", "create").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "ttl-controller"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("update", "patch", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			eventsRule(),
 		},
 	})

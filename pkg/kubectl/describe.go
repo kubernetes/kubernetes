@@ -42,8 +42,9 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
+
+	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/events"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -580,7 +581,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		describeVolumes(pod.Spec.Volumes, w, "")
 		w.Write(LEVEL_0, "QoS Class:\t%s\n", pod.Status.QOSClass)
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
-		printTolerationsInAnnotationMultiline(w, "Tolerations", pod.Annotations)
+		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1545,7 +1546,8 @@ func describeSecret(secret *api.Secret) (string, error) {
 		w.Write(LEVEL_0, "Name:\t%s\n", secret.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", secret.Namespace)
 		printLabelsMultiline(w, "Labels", secret.Labels)
-		printLabelsMultiline(w, "Annotations", secret.Annotations)
+		skipAnnotations := sets.NewString(annotations.LastAppliedConfigAnnotation)
+		printLabelsMultilineWithFilter(w, "Annotations", secret.Annotations, skipAnnotations)
 
 		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
 
@@ -1984,7 +1986,7 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
 		w.Write(LEVEL_0, "Role:\t%s\n", findNodeRole(node))
 		printLabelsMultiline(w, "Labels", node.Labels)
-		printTaintsInAnnotationMultiline(w, "Taints", node.Annotations)
+		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Phase:\t%v\n", node.Status.Phase)
 		if len(node.Status.Conditions) > 0 {
@@ -2191,13 +2193,43 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		w.Write(LEVEL_0, "Reference:\t%s/%s\n",
 			hpa.Spec.ScaleTargetRef.Kind,
 			hpa.Spec.ScaleTargetRef.Name)
-		if hpa.Spec.TargetCPUUtilizationPercentage != nil {
-			w.Write(LEVEL_0, "Target CPU utilization:\t%d%%\n", *hpa.Spec.TargetCPUUtilizationPercentage)
-			w.Write(LEVEL_0, "Current CPU utilization:\t")
-			if hpa.Status.CurrentCPUUtilizationPercentage != nil {
-				w.Write(LEVEL_0, "%d%%\n", *hpa.Status.CurrentCPUUtilizationPercentage)
-			} else {
-				w.Write(LEVEL_0, "<unset>\n")
+		w.Write(LEVEL_0, "Metrics:\t( current / target )\n")
+		for i, metric := range hpa.Spec.Metrics {
+			switch metric.Type {
+			case autoscaling.PodsMetricSourceType:
+				current := "<unknown>"
+				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Pods != nil {
+					current = hpa.Status.CurrentMetrics[i].Pods.CurrentAverageValue.String()
+				}
+				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.MetricName, current, metric.Pods.TargetAverageValue.String())
+			case autoscaling.ObjectMetricSourceType:
+				current := "<unknown>"
+				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+					current = hpa.Status.CurrentMetrics[i].Object.CurrentValue.String()
+				}
+				w.Write(LEVEL_1, "%q on %s/%s:\t%s / %s\n", metric.Object.MetricName, metric.Object.Target.Kind, metric.Object.Target.Name, current, metric.Object.TargetValue.String())
+			case autoscaling.ResourceMetricSourceType:
+				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
+				if metric.Resource.TargetAverageValue != nil {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Resource != nil {
+						current = hpa.Status.CurrentMetrics[i].Resource.CurrentAverageValue.String()
+					}
+					w.Write(LEVEL_0, ":\t%s / %s\n", current, metric.Resource.TargetAverageValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Resource != nil && hpa.Status.CurrentMetrics[i].Resource.CurrentAverageUtilization != nil {
+						current = fmt.Sprintf("%d%% (%s)", *hpa.Status.CurrentMetrics[i].Resource.CurrentAverageUtilization, hpa.Status.CurrentMetrics[i].Resource.CurrentAverageValue.String())
+					}
+
+					target := "<auto>"
+					if metric.Resource.TargetAverageUtilization != nil {
+						target = fmt.Sprintf("%d%%", *metric.Resource.TargetAverageUtilization)
+					}
+					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
+				}
+			default:
+				w.Write(LEVEL_1, "<unknown metric type %q>", string(metric.Type))
 			}
 		}
 		minReplicas := "<unset>"
@@ -2776,13 +2808,18 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 	return s, err
 }
 
+// printLabelsMultilineWithFilter prints filtered multiple labels with a proper alignment.
+func printLabelsMultilineWithFilter(w *PrefixWriter, title string, labels map[string]string, skip sets.String) {
+	printLabelsMultilineWithIndent(w, "", title, "\t", labels, skip)
+}
+
 // printLabelsMultiline prints multiple labels with a proper alignment.
 func printLabelsMultiline(w *PrefixWriter, title string, labels map[string]string) {
-	printLabelsMultilineWithIndent(w, "", title, "\t", labels)
+	printLabelsMultilineWithIndent(w, "", title, "\t", labels, sets.NewString())
 }
 
 // printLabelsMultiline prints multiple labels with a user-defined alignment.
-func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string) {
+func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string, skip sets.String) {
 
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
@@ -2794,7 +2831,14 @@ func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, inner
 	// to print labels in the sorted order
 	keys := make([]string, 0, len(labels))
 	for key := range labels {
+		if skip.Has(key) {
+			continue
+		}
 		keys = append(keys, key)
+	}
+	if len(keys) == 0 {
+		w.WriteLine("<none>")
+		return
 	}
 	sort.Strings(keys)
 
@@ -2809,17 +2853,7 @@ func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, inner
 }
 
 // printTaintsMultiline prints multiple taints with a proper alignment.
-func printTaintsInAnnotationMultiline(w *PrefixWriter, title string, annotations map[string]string) {
-	v1Taints, err := v1.GetTaintsFromNodeAnnotations(annotations)
-	if err != nil {
-		v1Taints = []v1.Taint{}
-	}
-	taints := make([]api.Taint, len(v1Taints))
-	for i := range v1Taints {
-		if err := v1.Convert_v1_Taint_To_api_Taint(&v1Taints[i], &taints[i], nil); err != nil {
-			panic(err)
-		}
-	}
+func printNodeTaintsMultiline(w *PrefixWriter, title string, taints []api.Taint) {
 	printTaintsMultilineWithIndent(w, "", title, "\t", taints)
 }
 
@@ -2853,18 +2887,8 @@ func printTaintsMultilineWithIndent(w *PrefixWriter, initialIndent, title, inner
 	}
 }
 
-// printTolerationsMultiline prints multiple tolerations with a proper alignment.
-func printTolerationsInAnnotationMultiline(w *PrefixWriter, title string, annotations map[string]string) {
-	v1Tolerations, err := v1.GetTolerationsFromPodAnnotations(annotations)
-	if err != nil {
-		v1Tolerations = []v1.Toleration{}
-	}
-	tolerations := make([]api.Toleration, len(v1Tolerations))
-	for i := range v1Tolerations {
-		if err := v1.Convert_v1_Toleration_To_api_Toleration(&v1Tolerations[i], &tolerations[i], nil); err != nil {
-			panic(err)
-		}
-	}
+// printPodTolerationsMultiline prints multiple tolerations with a proper alignment.
+func printPodTolerationsMultiline(w *PrefixWriter, title string, tolerations []api.Toleration) {
 	printTolerationsMultilineWithIndent(w, "", title, "\t", tolerations)
 }
 

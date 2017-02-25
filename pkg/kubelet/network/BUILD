@@ -5,7 +5,6 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
-    "go_test",
 )
 
 go_library(
@@ -20,6 +19,7 @@ go_library(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/network/hostport:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -27,17 +27,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["plugins_test.go"],
-    library = ":go_default_library",
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/kubelet/network/testing:go_default_library",
     ],
 )
 
@@ -56,7 +45,6 @@ filegroup(
         "//pkg/kubelet/network/hairpin:all-srcs",
         "//pkg/kubelet/network/hostport:all-srcs",
         "//pkg/kubelet/network/kubenet:all-srcs",
-        "//pkg/kubelet/network/mock_network:all-srcs",
         "//pkg/kubelet/network/testing:all-srcs",
     ],
     tags = ["automanaged"],

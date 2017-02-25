@@ -33,6 +33,7 @@ kube::test::find_dirs() {
     find -L . -not \( \
         \( \
           -path './_artifacts/*' \
+          -o -path './bazel-*/*' \
           -o -path './_output/*' \
           -o -path './_gopath/*' \
           -o -path './cmd/kubeadm/test/*' \
@@ -43,7 +44,6 @@ kube::test::find_dirs() {
           -o -path './test/e2e/*' \
           -o -path './test/e2e_node/*' \
           -o -path './test/integration/*' \
-          -o -path './test/component/scheduler/perf/*' \
           -o -path './third_party/*' \
           -o -path './staging/*' \
           -o -path './vendor/*' \
@@ -67,6 +67,12 @@ kube::test::find_dirs() {
 
     # run tests for apimachinery
     find ./staging/src/k8s.io/apimachinery -name '*_test.go' \
+      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
+
+    find ./staging/src/k8s.io/kube-aggregator -name '*_test.go' \
+      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
+
+    find ./staging/src/k8s.io/sample-apiserver -name '*_test.go' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
   )
 }

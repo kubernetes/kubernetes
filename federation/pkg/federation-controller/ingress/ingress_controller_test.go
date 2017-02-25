@@ -140,10 +140,9 @@ func TestIngressController(t *testing.T) {
 	assert.Equal(t, cluster.ObjectMeta.Annotations[uidAnnotationKey], cfg1.Data[uidKey])
 
 	t.Logf("Checking that appropriate finalizers are added")
-	// There should be 2 updates to add both the finalizers.
+	// There should be an update to add both the finalizers.
 	updatedIngress := GetIngressFromChan(t, fedIngressUpdateChan)
 	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	updatedIngress = GetIngressFromChan(t, fedIngressUpdateChan)
 	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, metav1.FinalizerOrphan), fmt.Sprintf("ingress does not have the orphan finalizer: %v", updatedIngress))
 	fedIngress = *updatedIngress
 

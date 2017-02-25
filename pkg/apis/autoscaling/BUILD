@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "annotations.go",
         "doc.go",
         "register.go",
         "types.go",
@@ -17,6 +18,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -37,6 +40,7 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/autoscaling/install:all-srcs",
         "//pkg/apis/autoscaling/v1:all-srcs",
+        "//pkg/apis/autoscaling/v2alpha1:all-srcs",
         "//pkg/apis/autoscaling/validation:all-srcs",
     ],
     tags = ["automanaged"],

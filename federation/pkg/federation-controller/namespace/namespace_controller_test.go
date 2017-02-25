@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
+	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
@@ -31,7 +33,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
@@ -69,30 +70,8 @@ func TestNamespaceController(t *testing.T) {
 	RegisterFakeList("namespaces", &cluster2Client.Fake, &apiv1.NamespaceList{Items: []apiv1.Namespace{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate("namespaces", &cluster2Client.Fake, cluster2Watch)
 
-	RegisterFakeList("replicasets", &fakeClient.Fake, &extensionsv1.ReplicaSetList{Items: []extensionsv1.ReplicaSet{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-rs",
-				Namespace: ns1.Namespace,
-			}}}})
-	RegisterFakeList("secrets", &fakeClient.Fake, &apiv1.SecretList{Items: []apiv1.Secret{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-secret",
-				Namespace: ns1.Namespace,
-			}}}})
-	RegisterFakeList("services", &fakeClient.Fake, &apiv1.ServiceList{Items: []apiv1.Service{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-service",
-				Namespace: ns1.Namespace,
-			}}}})
 	nsDeleteChan := RegisterDelete(&fakeClient.Fake, "namespaces")
-	rsDeleteChan := RegisterDeleteCollection(&fakeClient.Fake, "replicasets")
-	serviceDeleteChan := RegisterDeleteCollection(&fakeClient.Fake, "services")
-	secretDeleteChan := RegisterDeleteCollection(&fakeClient.Fake, "secrets")
-
-	namespaceController := NewNamespaceController(fakeClient)
+	namespaceController := NewNamespaceController(fakeClient, dynamic.NewDynamicClientPool(&restclient.Config{}))
 	informerClientFactory := func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
@@ -153,10 +132,12 @@ func TestNamespaceController(t *testing.T) {
 	ns1.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	namespaceWatch.Modify(&ns1)
 	assert.Equal(t, ns1.Name, GetStringFromChan(nsDeleteChan))
-	assert.Equal(t, "all", GetStringFromChan(rsDeleteChan))
-	assert.Equal(t, "all", GetStringFromChan(serviceDeleteChan))
-	assert.Equal(t, "all", GetStringFromChan(secretDeleteChan))
-
+	// TODO: Add a test for verifying that resources in the namespace are deleted
+	// when the namespace is deleted.
+	// Need a fake dynamic client to mock list and delete actions to be able to test this.
+	// TODO: Add a fake dynamic client and test this.
+	// In the meantime, e2e test verify that the resources in a namespace are
+	// deleted when the namespace is deleted.
 	close(stop)
 }
 

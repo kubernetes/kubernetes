@@ -51,12 +51,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
-	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -583,7 +583,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.BindClusterRole(f.ClientSet.Rbac(), "view", f.Namespace.Name,
 				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
-			err := framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
+			err := framework.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
 				serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 				f.Namespace.Name, "list", schema.GroupResource{Resource: "pods"}, true)
 			framework.ExpectNoError(err)

@@ -50,8 +50,7 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			clusters = map[string]*cluster{}
-			registerClusters(clusters, UserAgentName, "", f)
+			clusters, _ = getRegisteredClusters(UserAgentName, f)
 		})
 
 		AfterEach(func() {
@@ -59,8 +58,6 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 			// Delete all secrets.
 			nsName := f.FederationNamespace.Name
 			deleteAllSecretsOrFail(f.FederationClientset, nsName)
-			unregisterClusters(clusters, f)
-
 		})
 
 		It("should be created and deleted successfully", func() {
@@ -171,7 +168,9 @@ func createSecretOrFail(clientset *fedclientset.Clientset, nsName string) *v1.Se
 func deleteSecretOrFail(clientset *fedclientset.Clientset, nsName string, secretName string, orphanDependents *bool) {
 	By(fmt.Sprintf("Deleting secret %q in namespace %q", secretName, nsName))
 	err := clientset.Core().Secrets(nsName).Delete(secretName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
-	framework.ExpectNoError(err, "Error deleting secret %q in namespace %q", secretName, nsName)
+	if err != nil && !errors.IsNotFound(err) {
+		framework.ExpectNoError(err, "Error deleting secret %q in namespace %q", secretName, nsName)
+	}
 
 	// Wait for the secret to be deleted.
 	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {

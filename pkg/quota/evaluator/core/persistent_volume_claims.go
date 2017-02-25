@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
@@ -83,7 +83,7 @@ func listPersistentVolumeClaimsByNamespaceFuncUsingClient(kubeClient clientset.I
 func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
 	listFuncByNamespace := listPersistentVolumeClaimsByNamespaceFuncUsingClient(kubeClient)
 	if f != nil {
-		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, schema.GroupResource{Resource: "persistentvolumeclaims"})
+		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, v1.SchemeGroupVersion.WithResource("persistentvolumeclaims"))
 	}
 	return &pvcEvaluator{
 		listFuncByNamespace: listFuncByNamespace,

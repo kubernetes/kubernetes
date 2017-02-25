@@ -56,12 +56,12 @@ func RunApiVersions(f cmdutil.Factory, w io.Writer) error {
 		printDeprecationWarning("api-versions", "apiversions")
 	}
 
-	clientset, err := f.ClientSet()
+	discoveryclient, err := f.DiscoveryClient()
 	if err != nil {
 		return err
 	}
 
-	groupList, err := clientset.Discovery().ServerGroups()
+	groupList, err := discoveryclient.ServerGroups()
 	if err != nil {
 		return fmt.Errorf("Couldn't get available api versions from server: %v\n", err)
 	}

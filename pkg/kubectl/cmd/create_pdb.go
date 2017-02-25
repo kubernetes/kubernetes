@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -46,7 +47,7 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	cmd := &cobra.Command{
 		Use:     "poddisruptionbudget NAME --selector=SELECTOR --min-available=N [--dry-run]",
 		Aliases: []string{"pdb"},
-		Short:   "Create a pod disruption budget with the specified name.",
+		Short:   i18n.T("Create a pod disruption budget with the specified name."),
 		Long:    pdbLong,
 		Example: pdbExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -59,8 +60,8 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.PodDisruptionBudgetV1GeneratorName)
-	cmd.Flags().String("min-available", "1", "The minimum number or percentage of available pods this budget requires.")
-	cmd.Flags().String("selector", "", "A label selector to use for this budget. Only equality-based selector requirements are supported.")
+	cmd.Flags().String("min-available", "1", i18n.T("The minimum number or percentage of available pods this budget requires."))
+	cmd.Flags().String("selector", "", i18n.T("A label selector to use for this budget. Only equality-based selector requirements are supported."))
 	return cmd
 }
 

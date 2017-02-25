@@ -909,6 +909,24 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: externalIP})
 		}
 
+		internalDNS, err := c.metadata.GetMetadata("local-hostname")
+		if err != nil || len(internalDNS) == 0 {
+			//TODO: It would be nice to be able to determine the reason for the failure,
+			// but the AWS client masks all failures with the same error description.
+			glog.V(2).Info("Could not determine private DNS from AWS metadata.")
+		} else {
+			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalDNS, Address: internalDNS})
+		}
+
+		externalDNS, err := c.metadata.GetMetadata("public-hostname")
+		if err != nil || len(externalDNS) == 0 {
+			//TODO: It would be nice to be able to determine the reason for the failure,
+			// but the AWS client masks all failures with the same error description.
+			glog.V(2).Info("Could not determine public DNS from AWS metadata.")
+		} else {
+			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalDNS, Address: externalDNS})
+		}
+
 		return addresses, nil
 	}
 	instance, err := c.getInstanceByNodeName(name)
@@ -938,6 +956,14 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", orEmpty(instance.InstanceId), ipAddress)
 		}
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: ip.String()})
+	}
+
+	if !isNilOrEmpty(instance.PrivateDnsName) {
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalDNS, Address: *instance.PrivateDnsName})
+	}
+
+	if !isNilOrEmpty(instance.PublicDnsName) {
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalDNS, Address: *instance.PublicDnsName})
 	}
 
 	return addresses, nil
@@ -1223,9 +1249,10 @@ func (c *Cloud) getMountDevice(
 	// Find the next unused device name
 	deviceAllocator := c.deviceAllocators[i.nodeName]
 	if deviceAllocator == nil {
-		// we want device names with two significant characters, starting with
-		// /dev/xvdba (leaving xvda - xvdz and xvdaa-xvdaz to the system)
-		deviceAllocator = NewDeviceAllocator(2, "ba")
+		// we want device names with two significant characters, starting with /dev/xvdbb
+		// the allowed range is /dev/xvd[b-c][a-z]
+		// http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
+		deviceAllocator = NewDeviceAllocator(0)
 		c.deviceAllocators[i.nodeName] = deviceAllocator
 	}
 	chosen, err := deviceAllocator.GetNext(deviceMappings)

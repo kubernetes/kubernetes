@@ -85,6 +85,9 @@ func TestDeploymentController(t *testing.T) {
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
 	fakeClient := &fakefedclientset.Clientset{}
+	// Add an update reactor on fake client to return the desired updated object.
+	// This is a hack to workaround https://github.com/kubernetes/kubernetes/issues/40939.
+	AddFakeUpdateReactor("deployments", &fakeClient.Fake)
 	RegisterFakeList("clusters", &fakeClient.Fake, &fedv1.ClusterList{Items: []fedv1.Cluster{*cluster1}})
 	deploymentsWatch := RegisterFakeWatch("deployments", &fakeClient.Fake)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)

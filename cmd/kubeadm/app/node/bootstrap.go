@@ -22,17 +22,15 @@ import (
 	"sync"
 	"time"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/apis/certificates"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 )
 
 // retryTimeout between the subsequent attempts to connect
@@ -64,7 +62,7 @@ func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubead
 	var once sync.Once
 	var wg sync.WaitGroup
 	for _, endpoint := range endpoints {
-		ac, err := createClients(caCert, endpoint, kubeadmutil.BearerToken(c), nodeName)
+		ac, err := createClients(caCert, endpoint, tokenutil.BearerToken(c), nodeName)
 		if err != nil {
 			fmt.Printf("[bootstrap] Warning: %s. Skipping endpoint %s\n", err, endpoint)
 			continue
@@ -100,7 +98,7 @@ func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubead
 
 // creates a set of clients for this endpoint
 func createClients(caCert []byte, endpoint, token string, nodeName types.NodeName) (*apiClient, error) {
-	clientConfig := kubeconfigphase.MakeClientConfigWithToken(
+	clientConfig := kubeconfigutil.CreateWithToken(
 		endpoint,
 		"kubernetes",
 		fmt.Sprintf("kubelet-%s", nodeName),
@@ -122,19 +120,6 @@ func createClients(caCert []byte, endpoint, token string, nodeName types.NodeNam
 		clientConfig: clientConfig,
 	}
 	return ac, nil
-}
-
-// checkForNodeNameDuplicates checks whether there are other nodes in the cluster with identical node names.
-func checkForNodeNameDuplicates(clientSet *clientset.Clientset) error {
-	hostName, err := os.Hostname()
-	if err != nil {
-		return fmt.Errorf("Failed to get node hostname [%v]", err)
-	}
-	_, err = clientSet.Nodes().Get(hostName, metav1.GetOptions{})
-	if err != nil && !apierrs.IsNotFound(err) {
-		return err
-	}
-	return nil
 }
 
 // checks the connection requirements for a specific API endpoint

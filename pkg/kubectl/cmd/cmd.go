@@ -214,7 +214,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
-		Short: "kubectl controls the Kubernetes cluster manager",
+		Short: i18n.T("kubectl controls the Kubernetes cluster manager"),
 		Long: templates.LongDesc(`
       kubectl controls the Kubernetes cluster manager.
 

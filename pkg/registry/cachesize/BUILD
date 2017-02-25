@@ -12,8 +12,8 @@ go_library(
     srcs = ["cachesize.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apiserver/pkg/registry/generic/registry",
     ],
 )
 

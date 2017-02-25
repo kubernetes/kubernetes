@@ -31,14 +31,19 @@ func startCSRController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
 		return false, nil
 	}
-	resyncPeriod := ResyncPeriod(&ctx.Options)()
 	c := ctx.ClientBuilder.ClientOrDie("certificate-controller")
+
+	signer, err := certcontroller.NewCFSSLSigner(ctx.Options.ClusterSigningCertFile, ctx.Options.ClusterSigningKeyFile)
+	if err != nil {
+		glog.Errorf("Failed to start certificate controller: %v", err)
+		return false, nil
+	}
+
 	certController, err := certcontroller.NewCertificateController(
 		c,
-		resyncPeriod,
-		ctx.Options.ClusterSigningCertFile,
-		ctx.Options.ClusterSigningKeyFile,
-		certcontroller.NewGroupApprover(c.Certificates().CertificateSigningRequests(), ctx.Options.ApproveAllKubeletCSRsForGroup),
+		ctx.NewInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+		signer,
+		certcontroller.NewGroupApprover(ctx.Options.ApproveAllKubeletCSRsForGroup),
 	)
 	if err != nil {
 		// TODO this is failing consistently in test-cmd and local-up-cluster.sh.  Fix them and make it consistent with all others which

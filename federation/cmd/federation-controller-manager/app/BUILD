@@ -44,6 +44,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/client-go/discovery",
+        "//vendor:k8s.io/client-go/dynamic",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
     ],

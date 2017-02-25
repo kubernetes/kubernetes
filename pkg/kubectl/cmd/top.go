@@ -20,6 +20,7 @@ import (
 	"io"
 
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -40,7 +41,7 @@ var (
 func NewCmdTop(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "top",
-		Short: "Display Resource (CPU/Memory/Storage) usage.",
+		Short: i18n.T("Display Resource (CPU/Memory/Storage) usage."),
 		Long:  topLong,
 		Run:   cmdutil.DefaultSubCommandRun(errOut),
 	}

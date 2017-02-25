@@ -35,7 +35,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 	var podClient *framework.PodClient
 	const (
 		podCheckInterval     = 1 * time.Second
-		podWaitTimeout       = 2 * time.Minute
+		podWaitTimeout       = 3 * time.Minute
 		postStartWaitTimeout = 2 * time.Minute
 		preStopWaitTimeout   = 30 * time.Second
 	)

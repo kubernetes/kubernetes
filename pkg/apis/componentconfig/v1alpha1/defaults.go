@@ -204,9 +204,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CertDirectory == "" {
 		obj.CertDirectory = "/var/run/kubernetes"
 	}
-	if obj.ExperimentalCgroupsPerQOS == nil {
-		obj.ExperimentalCgroupsPerQOS = boolVar(false)
-	}
 	if obj.ContainerRuntime == "" {
 		obj.ContainerRuntime = "docker"
 	}
@@ -394,22 +391,18 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := int32(defaultIPTablesDropBit)
 		obj.IPTablesDropBit = &temp
 	}
-	if obj.ExperimentalCgroupsPerQOS == nil {
+	if obj.CgroupsPerQOS == nil {
+		// disabled pending merge of https://github.com/kubernetes/kubernetes/pull/41753
+		// as enabling the new hierarchy without setting /Burstable/cpu.shares may cause
+		// regression.
 		temp := false
-		obj.ExperimentalCgroupsPerQOS = &temp
+		obj.CgroupsPerQOS = &temp
 	}
 	if obj.CgroupDriver == "" {
 		obj.CgroupDriver = "cgroupfs"
 	}
-	// NOTE: this is for backwards compatibility with earlier releases where cgroup-root was optional.
-	// if cgroups per qos is not enabled, and cgroup-root is not specified, we need to default to the
-	// container runtime default and not default to the root cgroup.
-	if obj.ExperimentalCgroupsPerQOS != nil {
-		if *obj.ExperimentalCgroupsPerQOS {
-			if obj.CgroupRoot == "" {
-				obj.CgroupRoot = "/"
-			}
-		}
+	if obj.EnableCRI == nil {
+		obj.EnableCRI = boolVar(true)
 	}
 }
 

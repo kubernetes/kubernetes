@@ -302,7 +302,7 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 		return
 	}
 
-	portForwardOptions, err := portforward.NewV4Options(req.Request)
+	portForwardOptions, err := portforward.BuildV4Options(pf.Port)
 	if err != nil {
 		resp.WriteError(http.StatusBadRequest, err)
 		return

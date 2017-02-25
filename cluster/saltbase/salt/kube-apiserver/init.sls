@@ -31,6 +31,12 @@
     - group: root
     - mode: 644
 
+/var/log/kube-apiserver-audit.log:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: 644
+
 # Copy kube-apiserver manifest to manifests folder for kubelet.
 # Current containervm image by default has both docker and kubelet
 # running. But during cluster creation stage, docker and kubelet

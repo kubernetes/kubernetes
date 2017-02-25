@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
 )
 
 const (
@@ -40,6 +42,7 @@ type CheckpointStore interface {
 	// Write persists a checkpoint with key
 	Write(key string, data []byte) error
 	// Read retrieves a checkpoint with key
+	// Read must return CheckpointNotFoundError if checkpoint is not found
 	Read(key string) ([]byte, error)
 	// Delete deletes a checkpoint with key
 	// Delete must not return error if checkpoint does not exist
@@ -54,15 +57,19 @@ type FileStore struct {
 	path string
 }
 
+func NewFileStore(path string) (CheckpointStore, error) {
+	if err := ensurePath(path); err != nil {
+		return nil, err
+	}
+	return &FileStore{path: path}, nil
+}
+
 func (fstore *FileStore) Write(key string, data []byte) error {
 	if err := validateKey(key); err != nil {
 		return err
 	}
-	if _, err := os.Stat(fstore.path); err != nil {
-		// if directory already exists, proceed
-		if err = os.MkdirAll(fstore.path, 0755); err != nil && !os.IsExist(err) {
-			return err
-		}
+	if err := ensurePath(fstore.path); err != nil {
+		return err
 	}
 	tmpfile := filepath.Join(fstore.path, fmt.Sprintf("%s%s%s", tmpPrefix, key, tmpSuffix))
 	if err := ioutil.WriteFile(tmpfile, data, 0644); err != nil {
@@ -75,7 +82,11 @@ func (fstore *FileStore) Read(key string) ([]byte, error) {
 	if err := validateKey(key); err != nil {
 		return nil, err
 	}
-	return ioutil.ReadFile(fstore.getCheckpointPath(key))
+	bytes, err := ioutil.ReadFile(fstore.getCheckpointPath(key))
+	if os.IsNotExist(err) {
+		return bytes, errors.CheckpointNotFoundError
+	}
+	return bytes, err
 }
 
 func (fstore *FileStore) Delete(key string) error {
@@ -104,6 +115,15 @@ func (fstore *FileStore) List() ([]string, error) {
 
 func (fstore *FileStore) getCheckpointPath(key string) string {
 	return filepath.Join(fstore.path, key)
+}
+
+// ensurePath creates input directory if it does not exist
+func ensurePath(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		// MkdirAll returns nil if directory already exists
+		return os.MkdirAll(path, 0755)
+	}
+	return nil
 }
 
 func validateKey(key string) error {

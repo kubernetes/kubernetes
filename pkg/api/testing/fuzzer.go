@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmfuzzer "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -266,6 +266,16 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 			c.Fuzz(&mode)
 			mode &= 0777
 			d.DefaultMode = &mode
+		},
+		func(s *api.ProjectedVolumeSource, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+
+			// DefaultMode should always be set, it has a default
+			// value and it is expected to be between 0 and 0777
+			var mode int32
+			c.Fuzz(&mode)
+			mode &= 0777
+			s.DefaultMode = &mode
 		},
 		func(k *api.KeyToPath, c fuzz.Continue) {
 			c.FuzzNoCustom(k) // fuzz self without calling this function again
@@ -546,8 +556,59 @@ func autoscalingFuncs(t apitesting.TestingCommon) []interface{} {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 			minReplicas := int32(c.Rand.Int31())
 			s.MinReplicas = &minReplicas
-			targetCpu := int32(c.RandUint64())
-			s.TargetCPUUtilizationPercentage = &targetCpu
+
+			randomQuantity := func() resource.Quantity {
+				var q resource.Quantity
+				c.Fuzz(&q)
+				// precalc the string for benchmarking purposes
+				_ = q.String()
+				return q
+			}
+
+			targetUtilization := int32(c.RandUint64())
+			s.Metrics = []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.PodsMetricSourceType,
+					Pods: &autoscaling.PodsMetricSource{
+						MetricName:         c.RandString(),
+						TargetAverageValue: randomQuantity(),
+					},
+				},
+				{
+					Type: autoscaling.ResourceMetricSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+						TargetAverageUtilization: &targetUtilization,
+					},
+				},
+			}
+		},
+		func(s *autoscaling.HorizontalPodAutoscalerStatus, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			randomQuantity := func() resource.Quantity {
+				var q resource.Quantity
+				c.Fuzz(&q)
+				// precalc the string for benchmarking purposes
+				_ = q.String()
+				return q
+			}
+			currentUtilization := int32(c.RandUint64())
+			s.CurrentMetrics = []autoscaling.MetricStatus{
+				{
+					Type: autoscaling.PodsMetricSourceType,
+					Pods: &autoscaling.PodsMetricStatus{
+						MetricName:          c.RandString(),
+						CurrentAverageValue: randomQuantity(),
+					},
+				},
+				{
+					Type: autoscaling.ResourceMetricSourceType,
+					Resource: &autoscaling.ResourceMetricStatus{
+						Name: api.ResourceCPU,
+						CurrentAverageUtilization: &currentUtilization,
+					},
+				},
+			}
 		},
 	}
 }
@@ -562,19 +623,22 @@ func rbacFuncs(t apitesting.TestingCommon) []interface{} {
 				r.APIGroup = rbac.GroupName
 			}
 		},
-	}
-}
-
-func kubeAdmFuncs(t apitesting.TestingCommon) []interface{} {
-	return []interface{}{
-		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
-			obj.KubernetesVersion = "v10"
-			obj.API.Port = 20
-			obj.Networking.ServiceSubnet = "foo"
-			obj.Networking.DNSDomain = "foo"
-			obj.AuthorizationMode = "foo"
-			obj.Discovery.Token = &kubeadm.TokenDiscovery{}
+		func(r *rbac.Subject, c fuzz.Continue) {
+			switch c.Int31n(3) {
+			case 0:
+				r.Kind = rbac.ServiceAccountKind
+				r.APIGroup = ""
+				c.FuzzNoCustom(&r.Name)
+				c.FuzzNoCustom(&r.Namespace)
+			case 1:
+				r.Kind = rbac.UserKind
+				r.APIGroup = rbac.GroupName
+				c.FuzzNoCustom(&r.Name)
+			case 2:
+				r.Kind = rbac.GroupKind
+				r.APIGroup = rbac.GroupName
+				c.FuzzNoCustom(&r.Name)
+			}
 		},
 	}
 }
@@ -606,7 +670,7 @@ func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFacto
 		batchFuncs(t),
 		autoscalingFuncs(t),
 		rbacFuncs(t),
-		kubeAdmFuncs(t),
+		kubeadmfuzzer.KubeadmFuzzerFuncs(t),
 		policyFuncs(t),
 		certificateFuncs(t),
 	)

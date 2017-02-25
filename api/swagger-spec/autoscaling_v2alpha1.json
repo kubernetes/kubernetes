@@ -1,0 +1,104 @@
+{
+  "swaggerVersion": "1.2",
+  "apiVersion": "autoscaling/v2alpha1",
+  "basePath": "https://10.10.10.10:6443",
+  "resourcePath": "/apis/autoscaling/v2alpha1",
+  "info": {
+   "title": "",
+   "description": ""
+  },
+  "apis": [
+   {
+    "path": "/apis/autoscaling/v2alpha1",
+    "description": "API at /apis/autoscaling/v2alpha1",
+    "operations": [
+     {
+      "type": "v1.APIResourceList",
+      "method": "GET",
+      "summary": "get available resources",
+      "nickname": "getAPIResources",
+      "parameters": [],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ]
+     }
+    ]
+   }
+  ],
+  "models": {
+   "v1.APIResourceList": {
+    "id": "v1.APIResourceList",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "required": [
+     "groupVersion",
+     "resources"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "groupVersion": {
+      "type": "string",
+      "description": "groupVersion is the group and version this APIResourceList is for."
+     },
+     "resources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.APIResource"
+      },
+      "description": "resources contains the name of the resources and if they are namespaced."
+     }
+    }
+   },
+   "v1.APIResource": {
+    "id": "v1.APIResource",
+    "description": "APIResource specifies the name of a resource and whether it is namespaced.",
+    "required": [
+     "name",
+     "namespaced",
+     "kind",
+     "verbs"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name is the name of the resource."
+     },
+     "namespaced": {
+      "type": "boolean",
+      "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')"
+     },
+     "verbs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     },
+     "shortNames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "shortNames is a list of suggested short names of the resource."
+     }
+    }
+   }
+  }
+ }

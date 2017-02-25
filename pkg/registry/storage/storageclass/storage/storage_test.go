@@ -23,10 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/registry/generic"
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
@@ -144,4 +144,12 @@ func TestWatch(t *testing.T) {
 			{"metadata.name": "bar"},
 		},
 	)
+}
+
+func TestShortNames(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"sc"}
+	registrytest.AssertShortNames(t, storage, expected)
 }

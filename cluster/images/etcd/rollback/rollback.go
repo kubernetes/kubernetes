@@ -26,7 +26,10 @@ import (
 	"strings"
 	"time"
 
-	wal237 "k8s.io/kubernetes/third_party/forked/etcd237/wal"
+	// Uncomment when you want to rollback to 2.2.1 version.
+	oldwal "k8s.io/kubernetes/third_party/forked/etcd221/wal"
+	// Uncomment when you want to rollback to 2.3.7 version.
+	// oldwal "k8s.io/kubernetes/third_party/forked/etcd237/wal"
 
 	"github.com/coreos/etcd/etcdserver"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
@@ -118,7 +121,7 @@ func main() {
 	}
 	walDir := path.Join(*migrateDatadir, "member", "wal")
 
-	w, err := wal237.Create(walDir, metadata)
+	w, err := oldwal.Create(walDir, metadata)
 	if err != nil {
 		glog.Fatal(err)
 	}

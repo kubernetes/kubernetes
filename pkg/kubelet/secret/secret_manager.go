@@ -18,18 +18,23 @@ package secret
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
+	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	storageetcd "k8s.io/kubernetes/pkg/storage/etcd"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/clock"
+)
+
+const (
+	defaultTTL = time.Minute
 )
 
 type Manager interface {
@@ -53,8 +58,8 @@ type simpleSecretManager struct {
 	kubeClient clientset.Interface
 }
 
-func NewSimpleSecretManager(kubeClient clientset.Interface) (Manager, error) {
-	return &simpleSecretManager{kubeClient: kubeClient}, nil
+func NewSimpleSecretManager(kubeClient clientset.Interface) Manager {
+	return &simpleSecretManager{kubeClient: kubeClient}
 }
 
 func (s *simpleSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
@@ -66,6 +71,8 @@ func (s *simpleSecretManager) RegisterPod(pod *v1.Pod) {
 
 func (s *simpleSecretManager) UnregisterPod(pod *v1.Pod) {
 }
+
+type GetObjectTTLFunc func() (time.Duration, bool)
 
 type objectKey struct {
 	namespace string
@@ -93,19 +100,25 @@ type secretStore struct {
 
 	lock  sync.Mutex
 	items map[objectKey]*secretStoreItem
-	ttl   time.Duration
+
+	defaultTTL time.Duration
+	getTTL     GetObjectTTLFunc
 }
 
-func newSecretStore(kubeClient clientset.Interface, clock clock.Clock, ttl time.Duration) *secretStore {
+func newSecretStore(kubeClient clientset.Interface, clock clock.Clock, getTTL GetObjectTTLFunc, ttl time.Duration) *secretStore {
 	return &secretStore{
 		kubeClient: kubeClient,
 		clock:      clock,
 		items:      make(map[objectKey]*secretStoreItem),
-		ttl:        ttl,
+		defaultTTL: ttl,
+		getTTL:     getTTL,
 	}
 }
 
 func isSecretOlder(newSecret, oldSecret *v1.Secret) bool {
+	if newSecret == nil || oldSecret == nil {
+		return false
+	}
 	newVersion, _ := storageetcd.Versioner.ObjectResourceVersion(newSecret)
 	oldVersion, _ := storageetcd.Versioner.ObjectResourceVersion(oldSecret)
 	return newVersion < oldVersion
@@ -146,6 +159,31 @@ func (s *secretStore) Delete(namespace, name string) {
 	}
 }
 
+func GetObjectTTLFromNodeFunc(getNode func() (*v1.Node, error)) GetObjectTTLFunc {
+	return func() (time.Duration, bool) {
+		node, err := getNode()
+		if err != nil {
+			return time.Duration(0), false
+		}
+		if node != nil && node.Annotations != nil {
+			if value, ok := node.Annotations[v1.ObjectTTLAnnotationKey]; ok {
+				if intValue, err := strconv.Atoi(value); err == nil {
+					return time.Duration(intValue) * time.Second, true
+				}
+			}
+		}
+		return time.Duration(0), false
+	}
+}
+
+func (s *secretStore) isSecretFresh(data *secretData) bool {
+	secretTTL := s.defaultTTL
+	if ttl, ok := s.getTTL(); ok {
+		secretTTL = ttl
+	}
+	return s.clock.Now().Before(data.lastUpdateTime.Add(secretTTL))
+}
+
 func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	key := objectKey{namespace: namespace, name: name}
 
@@ -169,7 +207,7 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	// needed and return data.
 	data.Lock()
 	defer data.Unlock()
-	if data.err != nil || !s.clock.Now().Before(data.lastUpdateTime.Add(s.ttl)) {
+	if data.err != nil || !s.isSecretFresh(data) {
 		opts := metav1.GetOptions{}
 		if data.secret != nil && data.err == nil {
 			// This is just a periodic refresh of a secret we successfully fetched previously.
@@ -178,17 +216,18 @@ func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 			util.FromApiserverCache(&opts)
 		}
 		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, opts)
-		// Update state, unless we got error different than "not-found".
-		if err == nil || apierrors.IsNotFound(err) {
-			// Ignore the update to the older version of a secret.
-			if data.secret == nil || secret == nil || !isSecretOlder(secret, data.secret) {
-				data.secret = secret
-				data.err = err
-				data.lastUpdateTime = s.clock.Now()
-			}
-		} else if data.secret == nil && data.err == nil {
-			// We have unitialized secretData - return current result.
+		if err != nil && !apierrors.IsNotFound(err) && data.secret == nil && data.err == nil {
+			// Couldn't fetch the latest secret, but there is no cached data to return.
+			// Return the fetch result instead.
 			return secret, err
+		}
+		if (err == nil && !isSecretOlder(secret, data.secret)) || apierrors.IsNotFound(err) {
+			// If the fetch succeeded with a newer version of the secret, or if the
+			// secret could not be found in the apiserver, update the cached data to
+			// reflect the current status.
+			data.secret = secret
+			data.err = err
+			data.lastUpdateTime = s.clock.Now()
 		}
 	}
 	return data.secret, data.err
@@ -208,12 +247,12 @@ type cachingSecretManager struct {
 	registeredPods map[objectKey]*v1.Pod
 }
 
-func NewCachingSecretManager(kubeClient clientset.Interface) (Manager, error) {
+func NewCachingSecretManager(kubeClient clientset.Interface, getTTL GetObjectTTLFunc) Manager {
 	csm := &cachingSecretManager{
-		secretStore:    newSecretStore(kubeClient, clock.RealClock{}, time.Minute),
+		secretStore:    newSecretStore(kubeClient, clock.RealClock{}, getTTL, defaultTTL),
 		registeredPods: make(map[objectKey]*v1.Pod),
 	}
-	return csm, nil
+	return csm
 }
 
 func (c *cachingSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
@@ -240,6 +279,12 @@ func getSecretNames(pod *v1.Pod) sets.String {
 	for i := range pod.Spec.Volumes {
 		if source := pod.Spec.Volumes[i].Secret; source != nil {
 			result.Insert(source.SecretName)
+		} else if source := pod.Spec.Volumes[i].Projected; source != nil {
+			for j := range source.Sources {
+				if secretVolumeSource := source.Sources[j].Secret; secretVolumeSource != nil {
+					result.Insert(secretVolumeSource.Name)
+				}
+			}
 		}
 	}
 	return result

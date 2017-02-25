@@ -26,6 +26,8 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	// Need to make sure the componentconfig api is installed so defaulting funcs work
+	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 
@@ -49,8 +51,7 @@ type KubeletServer struct {
 
 	// If true, an invalid KubeConfig will result in the Kubelet exiting with an error.
 	RequireKubeConfig bool
-	AuthPath          flag.StringFlag // Deprecated -- use KubeConfig instead
-	APIServerList     []string        // Deprecated -- use KubeConfig instead
+	APIServerList     []string // Deprecated -- use KubeConfig instead
 
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
@@ -87,14 +88,10 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.RequireKubeConfig, "require-kubeconfig", s.RequireKubeConfig, "If true the Kubelet will exit if there are configuration errors, and will ignore the value of --api-servers in favor of the server defined in the kubeconfig file.")
 
 	// DEPRECATED: Remove these flags at the beginning of 1.5.
-	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
-	fs.MarkDeprecated("auth-path", "will be removed in a future version")
 	fs.StringSliceVar(&s.APIServerList, "api-servers", []string{}, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.MarkDeprecated("api-servers", "Use --kubeconfig instead. Will be removed in a future version.")
 
-	fs.StringVar(&s.PodManifestPath, "config", s.PodManifestPath, "Path to to the directory containing pod manifest files to run, or the path to a single pod manifest file.")
-	fs.MarkDeprecated("config", "Use --pod-manifest-path instead. Will be removed in a future version.")
-	fs.StringVar(&s.PodManifestPath, "pod-manifest-path", s.PodManifestPath, "Path to to the directory containing pod manifest files to run, or the path to a single pod manifest file.")
+	fs.StringVar(&s.PodManifestPath, "pod-manifest-path", s.PodManifestPath, "Path to to the directory containing pod manifest files to run, or the path to a single pod manifest file. Files starting with dots will be ignored.")
 	fs.DurationVar(&s.SyncFrequency.Duration, "sync-frequency", s.SyncFrequency.Duration, "Max period between synchronizing running containers and config")
 	fs.DurationVar(&s.FileCheckFrequency.Duration, "file-check-frequency", s.FileCheckFrequency.Duration, "Duration between checking config files for new data")
 	fs.DurationVar(&s.HTTPCheckFrequency.Duration, "http-check-frequency", s.HTTPCheckFrequency.Duration, "Duration between checking http for new data")
@@ -166,7 +163,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.RegisterNode, "register-node", s.RegisterNode, "Register the node with the apiserver (defaults to true if --api-servers is set)")
 	fs.StringVar(&s.ClusterDomain, "cluster-domain", s.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
-	fs.StringVar(&s.ClusterDNS, "cluster-dns", s.ClusterDNS, "IP address for a cluster DNS server.  This value is used for containers' DNS server in case of Pods with \"dnsPolicy=ClusterFirst\"")
+	fs.StringSliceVar(&s.ClusterDNS, "cluster-dns", s.ClusterDNS, "Comma-separated list of DNS server IP address.  This value is used for containers DNS server in case of Pods with \"dnsPolicy=ClusterFirst\". Note: all DNS servers appearing in the list MUST serve the same set of records otherwise name resolution within the cluster may not work correctly. There is no guarantee as to which DNS server may be contacted for name resolution.")
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout.Duration, "streaming-connection-idle-timeout", s.StreamingConnectionIdleTimeout.Duration, "Maximum time a streaming connection can be idle before the connection is automatically closed. 0 indicates no timeout. Example: '5m'")
 	fs.DurationVar(&s.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", s.NodeStatusUpdateFrequency.Duration, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s")
 	s.NodeLabels = make(map[string]string)
@@ -188,15 +185,10 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.FeatureGates, "feature-gates", s.FeatureGates, "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 
-	fs.StringVar(&s.KubeletCgroups, "resource-container", s.KubeletCgroups, "Optional absolute name of the resource-only container to create and run the Kubelet in.")
-	fs.MarkDeprecated("resource-container", "Use --kubelet-cgroups instead. Will be removed in a future version.")
 	fs.StringVar(&s.KubeletCgroups, "kubelet-cgroups", s.KubeletCgroups, "Optional absolute name of cgroups to create and run the Kubelet in.")
-
-	fs.StringVar(&s.SystemCgroups, "system-container", s.SystemCgroups, "Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
-	fs.MarkDeprecated("system-container", "Use --system-cgroups instead. Will be removed in a future version.")
 	fs.StringVar(&s.SystemCgroups, "system-cgroups", s.SystemCgroups, "Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under `/`. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
 
-	fs.BoolVar(&s.ExperimentalCgroupsPerQOS, "experimental-cgroups-per-qos", s.ExperimentalCgroupsPerQOS, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
+	fs.BoolVar(&s.CgroupsPerQOS, "cgroups-per-qos", s.CgroupsPerQOS, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 	fs.StringVar(&s.CgroupDriver, "cgroup-driver", s.CgroupDriver, "Driver that the kubelet uses to manipulate cgroups on the host.  Possible values: 'cgroupfs', 'systemd'")
 	fs.StringVar(&s.CgroupRoot, "cgroup-root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
@@ -257,9 +249,17 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", s.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 
 	// CRI flags.
-	fs.BoolVar(&s.EnableCRI, "experimental-cri", s.EnableCRI, "[Experimental] Enable the Container Runtime Interface (CRI) integration. If --container-runtime is set to \"remote\", Kubelet will communicate with the runtime/image CRI server listening on the endpoint specified by --remote-runtime-endpoint/--remote-image-endpoint. If --container-runtime is set to \"docker\", Kubelet will launch a in-process CRI server on behalf of docker, and communicate over a default endpoint.")
-	fs.StringVar(&s.RemoteRuntimeEndpoint, "container-runtime-endpoint", s.RemoteRuntimeEndpoint, "[Experimental] The unix socket endpoint of remote runtime service. The endpoint is used only when CRI integration is enabled (--experimental-cri)")
-	fs.StringVar(&s.RemoteImageEndpoint, "image-service-endpoint", s.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. The endpoint is used only when CRI integration is enabled (--experimental-cri)")
+	// TODO: Remove experimental-cri in kubernetes 1.7.
+	fs.BoolVar(&s.EnableCRI, "experimental-cri", s.EnableCRI, "Same as --enable-cri. [default=true]")
+	fs.MarkDeprecated("experimental-cri", "Please use --enable-cri instead.")
+	fs.MarkHidden("experimental-cri")
+	// TODO: Remove enable-cri once we stop supporting the non-cri
+	// implementation.
+	fs.BoolVar(&s.EnableCRI, "enable-cri", s.EnableCRI, "Enable the Container Runtime Interface (CRI) integration. If --container-runtime is set to \"remote\", Kubelet will communicate with the runtime/image CRI server listening on the endpoint specified by --remote-runtime-endpoint/--remote-image-endpoint. If --container-runtime is set to \"docker\", Kubelet will launch a in-process CRI server on behalf of docker, and communicate over a default endpoint. If --container-runtime is \"rkt\", the flag will be ignored because rkt integration doesn't support CRI yet. [default=true]")
+	fs.MarkDeprecated("enable-cri", "The non-CRI implementation will be deprecated and removed in a future version.")
+
+	fs.StringVar(&s.RemoteRuntimeEndpoint, "container-runtime-endpoint", s.RemoteRuntimeEndpoint, "[Experimental] The unix socket endpoint of remote runtime service. The endpoint is used only when CRI integration is enabled (--enable-cri)")
+	fs.StringVar(&s.RemoteImageEndpoint, "image-service-endpoint", s.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. The endpoint is used only when CRI integration is enabled (--enable-cri)")
 
 	fs.BoolVar(&s.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", s.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required componenets (binaries, etc.) before performing the mount")
 }

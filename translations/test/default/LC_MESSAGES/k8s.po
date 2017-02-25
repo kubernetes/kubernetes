@@ -19,12 +19,10 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Language: en\n"
 
-msgctxt "test_string"
-msgid "test_string"
-msgstr "foo"
-
-msgctxt "test_plural"
 msgid "test_plural"
 msgid_plural "test_plural"
 msgstr[0] "there was %d item"
 msgstr[1] "there were %d items"
+
+msgid "test_string"
+msgstr "foo"

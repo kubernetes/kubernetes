@@ -23,9 +23,9 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
+	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	api "k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestWriteStaticPodManifests(t *testing.T) {
@@ -372,7 +372,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--insecure-bind-address=127.0.0.1",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				"--service-cluster-ip-range=bar",
-				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
 				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
 				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.crt",
 				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
@@ -383,6 +383,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--allow-privileged",
 				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+				"--requestheader-username-headers=X-Remote-User",
+				"--requestheader-group-headers=X-Remote-Group",
+				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
+				"--requestheader-client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/front-proxy-ca.crt",
+				"--requestheader-allowed-names=front-proxy-client",
+				"--authorization-mode=RBAC",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
 		},
@@ -396,7 +402,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--insecure-bind-address=127.0.0.1",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				"--service-cluster-ip-range=bar",
-				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
 				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
 				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.crt",
 				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
@@ -407,6 +413,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--allow-privileged",
 				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+				"--requestheader-username-headers=X-Remote-User",
+				"--requestheader-group-headers=X-Remote-Group",
+				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
+				"--requestheader-client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/front-proxy-ca.crt",
+				"--requestheader-allowed-names=front-proxy-client",
+				"--authorization-mode=RBAC",
 				"--advertise-address=foo",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
@@ -422,7 +434,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--insecure-bind-address=127.0.0.1",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				"--service-cluster-ip-range=bar",
-				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
 				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
 				"--tls-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.crt",
 				"--tls-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
@@ -433,6 +445,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--allow-privileged",
 				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+				"--requestheader-username-headers=X-Remote-User",
+				"--requestheader-group-headers=X-Remote-Group",
+				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
+				"--requestheader-client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/front-proxy-ca.crt",
+				"--requestheader-allowed-names=front-proxy-client",
+				"--authorization-mode=RBAC",
 				"--etcd-servers=http://127.0.0.1:2379",
 				"--etcd-certfile=fiz",
 				"--etcd-keyfile=faz",
@@ -466,12 +484,12 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--address=127.0.0.1",
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
-				"--cluster-name=" + DefaultClusterName,
 				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
-				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.key",
 				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
 				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.key",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
+				"--use-service-account-credentials",
 			},
 		},
 		{
@@ -481,12 +499,12 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--address=127.0.0.1",
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
-				"--cluster-name=" + DefaultClusterName,
 				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
-				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.key",
 				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
 				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.key",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
+				"--use-service-account-credentials",
 				"--cloud-provider=foo",
 			},
 		},
@@ -497,12 +515,12 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--address=127.0.0.1",
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
-				"--cluster-name=" + DefaultClusterName,
 				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
-				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver.key",
+				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.key",
 				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
 				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.key",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
+				"--use-service-account-credentials",
 				"--allocate-node-cidrs=true",
 				"--cluster-cidr=bar",
 			},
@@ -553,30 +571,57 @@ func TestGetSchedulerCommand(t *testing.T) {
 	}
 }
 
-func TestGetProxyCommand(t *testing.T) {
+func TestGetAuthzParameters(t *testing.T) {
 	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
+		authMode string
 		expected []string
 	}{
 		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				Networking: kubeadm.Networking{
-					PodSubnet: "bar",
-				},
-			},
+			authMode: "",
 			expected: []string{
-				"kube-proxy",
-				"--cluster-cidr=bar",
+				"--authorization-mode=RBAC",
+			},
+		},
+		{
+			authMode: "RBAC",
+			expected: []string{
+				"--authorization-mode=RBAC",
+			},
+		},
+		{
+			authMode: "AlwaysAllow",
+			expected: []string{
+				"--authorization-mode=RBAC,AlwaysAllow",
+			},
+		},
+		{
+			authMode: "AlwaysDeny",
+			expected: []string{
+				"--authorization-mode=RBAC,AlwaysDeny",
+			},
+		},
+		{
+			authMode: "ABAC",
+			expected: []string{
+				"--authorization-mode=RBAC,ABAC",
+				"--authorization-policy-file=/etc/kubernetes/abac_policy.json",
+			},
+		},
+		{
+			authMode: "Webhook",
+			expected: []string{
+				"--authorization-mode=RBAC,Webhook",
+				"--authorization-webhook-config-file=/etc/kubernetes/webhook_authz.conf",
 			},
 		},
 	}
 
 	for _, rt := range tests {
-		actual := getProxyCommand(rt.cfg)
+		actual := getAuthzParameters(rt.authMode)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(
-					"failed getProxyCommand:\n\texpected: %s\n\t  actual: %s",
+					"failed getAuthzParameters:\n\texpected: %s\n\t  actual: %s",
 					rt.expected[i],
 					actual[i],
 				)

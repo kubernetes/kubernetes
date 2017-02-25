@@ -28,11 +28,13 @@ import (
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
+	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,6 +46,7 @@ func TestConfigMapController(t *testing.T) {
 	RegisterFakeList("clusters", &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
 	RegisterFakeList("configmaps", &fakeClient.Fake, &apiv1.ConfigMapList{Items: []apiv1.ConfigMap{}})
 	configmapWatch := RegisterFakeWatch("configmaps", &fakeClient.Fake)
+	configmapUpdateChan := RegisterFakeCopyOnUpdate("configmaps", &fakeClient.Fake, configmapWatch)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
 	cluster1Client := &fakekubeclientset.Clientset{}
@@ -92,6 +95,12 @@ func TestConfigMapController(t *testing.T) {
 
 	// Test add federated configmap.
 	configmapWatch.Add(configmap1)
+	// There should be 2 updates to add both the finalizers.
+	updatedConfigMap := GetConfigMapFromChan(configmapUpdateChan)
+	assert.True(t, configmapController.hasFinalizerFunc(updatedConfigMap, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
+	assert.True(t, configmapController.hasFinalizerFunc(updatedConfigMap, metav1.FinalizerOrphan))
+
+	// Verify that the configmap is created in underlying cluster1.
 	createdConfigMap := GetConfigMapFromChan(cluster1CreateChan)
 	assert.NotNil(t, createdConfigMap)
 	assert.Equal(t, configmap1.Namespace, createdConfigMap.Namespace)
@@ -109,22 +118,30 @@ func TestConfigMapController(t *testing.T) {
 		"A": "B",
 	}
 	configmapWatch.Modify(configmap1)
-	updatedConfigMap := GetConfigMapFromChan(cluster1UpdateChan)
+	updatedConfigMap = GetConfigMapFromChan(cluster1UpdateChan)
 	assert.NotNil(t, updatedConfigMap)
 	assert.Equal(t, configmap1.Name, updatedConfigMap.Name)
 	assert.Equal(t, configmap1.Namespace, updatedConfigMap.Namespace)
 	assert.True(t, util.ConfigMapEquivalent(configmap1, updatedConfigMap))
 
+	// Wait for the configmap to appear in the informer store
+	err = WaitForConfigMapStoreUpdate(
+		configmapController.configmapFederatedInformer.GetTargetStore(),
+		cluster1.Name, types.NamespacedName{Namespace: configmap1.Namespace, Name: configmap1.Name}.String(),
+		configmap1, wait.ForeverTestTimeout)
+	assert.Nil(t, err, "configmap should have appeared in the informer store")
+
 	// Test update federated configmap.
 	configmap1.Data = map[string]string{
 		"config": "myconfigurationfile",
 	}
+
 	configmapWatch.Modify(configmap1)
-	updatedConfigMap2 := GetConfigMapFromChan(cluster1UpdateChan)
+	updatedConfigMap = GetConfigMapFromChan(cluster1UpdateChan)
 	assert.NotNil(t, updatedConfigMap)
 	assert.Equal(t, configmap1.Name, updatedConfigMap.Name)
 	assert.Equal(t, configmap1.Namespace, updatedConfigMap.Namespace)
-	assert.True(t, util.ConfigMapEquivalent(configmap1, updatedConfigMap2))
+	assert.True(t, util.ConfigMapEquivalent(configmap1, updatedConfigMap))
 
 	// Test add cluster
 	clusterWatch.Add(cluster2)
@@ -140,4 +157,22 @@ func TestConfigMapController(t *testing.T) {
 func GetConfigMapFromChan(c chan runtime.Object) *apiv1.ConfigMap {
 	configmap := GetObjectFromChan(c).(*apiv1.ConfigMap)
 	return configmap
+}
+
+// Wait till the store is updated with latest configmap.
+func WaitForConfigMapStoreUpdate(store util.FederatedReadOnlyStore, clusterName, key string, desiredConfigMap *apiv1.ConfigMap, timeout time.Duration) error {
+	retryInterval := 200 * time.Millisecond
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		obj, found, err := store.GetByKey(clusterName, key)
+		if !found || err != nil {
+			glog.Infof("%s is not in the store", key)
+			return false, err
+		}
+		equal := util.ConfigMapEquivalent(obj.(*apiv1.ConfigMap), desiredConfigMap)
+		if !equal {
+			glog.Infof("wrong content in the store expected:\n%v\nactual:\n%v\n", *desiredConfigMap, *obj.(*apiv1.ConfigMap))
+		}
+		return equal, err
+	})
+	return err
 }

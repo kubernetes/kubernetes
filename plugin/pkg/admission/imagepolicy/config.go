@@ -76,7 +76,7 @@ func normalizeConfigDuration(name string, scale, value, min, max, defaultValue t
 		return time.Duration(0), nil
 	}
 
-	// use defualt with 0 sentinel
+	// use default with 0 sentinel
 	if value == useDefault {
 		glog.V(2).Infof("image policy webhook %s using default value", name)
 		return defaultValue, nil

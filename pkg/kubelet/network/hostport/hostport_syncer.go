@@ -21,24 +21,15 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/v1"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-)
-
-const (
-	// the hostport chain
-	kubeHostportsChain utiliptables.Chain = "KUBE-HOSTPORTS"
-	// prefix for hostport chains
-	kubeHostportChainPrefix string = "KUBE-HP-"
 )
 
 // HostportSyncer takes a list of PodPortMappings and implements hostport all at once
@@ -51,26 +42,6 @@ type HostportSyncer interface {
 	// 'newPortMapping' must also be present in 'activePodPortMappings'.
 	OpenPodHostportsAndSync(newPortMapping *PodPortMapping, natInterfaceName string, activePodPortMappings []*PodPortMapping) error
 }
-
-// PortMapping represents a network port in a container
-type PortMapping struct {
-	Name          string
-	HostPort      int32
-	ContainerPort int32
-	Protocol      v1.Protocol
-	HostIP        string
-}
-
-// PodPortMapping represents a pod's network state and associated container port mappings
-type PodPortMapping struct {
-	Namespace    string
-	Name         string
-	PortMappings []*PortMapping
-	HostNetwork  bool
-	IP           net.IP
-}
-
-type hostportOpener func(*hostport) (closeable, error)
 
 type hostportSyncer struct {
 	hostPortMap map[hostport]closeable
@@ -85,15 +56,6 @@ func NewHostportSyncer() HostportSyncer {
 		iptables:    iptInterface,
 		portOpener:  openLocalPort,
 	}
-}
-
-type closeable interface {
-	Close() error
-}
-
-type hostport struct {
-	port     int32
-	protocol string
 }
 
 type targetPod struct {
@@ -120,7 +82,7 @@ func (h *hostportSyncer) openHostports(podHostportMapping *PodPortMapping) error
 		}
 		socket, err := h.portOpener(&hp)
 		if err != nil {
-			retErr = fmt.Errorf("Cannot open hostport %d for pod %s: %v", port.HostPort, getPodFullName(podHostportMapping), err)
+			retErr = fmt.Errorf("cannot open hostport %d for pod %s: %v", port.HostPort, getPodFullName(podHostportMapping), err)
 			break
 		}
 		ports[hp] = socket
@@ -222,31 +184,8 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 		return err
 	}
 
-	glog.V(4).Info("Ensuring kubelet hostport chains")
-	// Ensure kubeHostportChain
-	if _, err := h.iptables.EnsureChain(utiliptables.TableNAT, kubeHostportsChain); err != nil {
-		return fmt.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubeHostportsChain, err)
-	}
-	tableChainsNeedJumpServices := []struct {
-		table utiliptables.Table
-		chain utiliptables.Chain
-	}{
-		{utiliptables.TableNAT, utiliptables.ChainOutput},
-		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
-	}
-	args := []string{"-m", "comment", "--comment", "kube hostport portals",
-		"-m", "addrtype", "--dst-type", "LOCAL",
-		"-j", string(kubeHostportsChain)}
-	for _, tc := range tableChainsNeedJumpServices {
-		if _, err := h.iptables.EnsureRule(utiliptables.Prepend, tc.table, tc.chain, args...); err != nil {
-			return fmt.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", tc.table, tc.chain, kubeHostportsChain, err)
-		}
-	}
-	// Need to SNAT traffic from localhost
-	args = []string{"-m", "comment", "--comment", "SNAT for localhost access to hostports", "-o", natInterfaceName, "-s", "127.0.0.0/8", "-j", "MASQUERADE"}
-	if _, err := h.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
-		return fmt.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
-	}
+	// Ensure KUBE-HOSTPORTS chains
+	ensureKubeHostportChains(h.iptables, natInterfaceName)
 
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
@@ -339,44 +278,6 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 
 	h.cleanupHostportMap(hostportPodMap)
 	return nil
-}
-
-func openLocalPort(hp *hostport) (closeable, error) {
-	// For ports on node IPs, open the actual port and hold it, even though we
-	// use iptables to redirect traffic.
-	// This ensures a) that it's safe to use that port and b) that (a) stays
-	// true.  The risk is that some process on the node (e.g. sshd or kubelet)
-	// is using a port and we give that same port out to a Service.  That would
-	// be bad because iptables would silently claim the traffic but the process
-	// would never know.
-	// NOTE: We should not need to have a real listen()ing socket - bind()
-	// should be enough, but I can't figure out a way to e2e test without
-	// it.  Tools like 'ss' and 'netstat' do not show sockets that are
-	// bind()ed but not listen()ed, and at least the default debian netcat
-	// has no way to avoid about 10 seconds of retries.
-	var socket closeable
-	switch hp.protocol {
-	case "tcp":
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", hp.port))
-		if err != nil {
-			return nil, err
-		}
-		socket = listener
-	case "udp":
-		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", hp.port))
-		if err != nil {
-			return nil, err
-		}
-		conn, err := net.ListenUDP("udp", addr)
-		if err != nil {
-			return nil, err
-		}
-		socket = conn
-	default:
-		return nil, fmt.Errorf("unknown protocol %q", hp.protocol)
-	}
-	glog.V(3).Infof("Opened local port %s", hp.String())
-	return socket, nil
 }
 
 // cleanupHostportMap closes obsolete hostports

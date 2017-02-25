@@ -30,8 +30,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/pkg/api/validation"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/test/e2e_node/system"
@@ -186,6 +186,19 @@ func (fac FileAvailableCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
+// FileExistingCheck checks that the given file does not already exist.
+type FileExistingCheck struct {
+	Path string
+}
+
+func (fac FileExistingCheck) Check() (warnings, errors []error) {
+	errors = []error{}
+	if _, err := os.Stat(fac.Path); err != nil {
+		errors = append(errors, fmt.Errorf("%s doesn't exist", fac.Path))
+	}
+	return nil, errors
+}
+
 // FileContentCheck checks that the given file contains the string Content.
 type FileContentCheck struct {
 	Path    string
@@ -239,18 +252,19 @@ type HostnameCheck struct{}
 
 func (hc HostnameCheck) Check() (warnings, errors []error) {
 	errors = []error{}
+	warnings = []error{}
 	hostname := node.GetHostname("")
 	for _, msg := range validation.ValidateNodeName(hostname, false) {
 		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, msg))
 	}
 	addr, err := net.LookupHost(hostname)
 	if addr == nil {
-		errors = append(errors, fmt.Errorf("hostname \"%s\" could not be reached", hostname))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hostname))
 	}
 	if err != nil {
-		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, err))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" %s", hostname, err))
 	}
-	return nil, errors
+	return warnings, errors
 }
 
 // HTTPProxyCheck checks if https connection to specific host is going
@@ -348,6 +362,14 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		)
 	}
 
+	// Check the config for authorization mode
+	switch cfg.AuthorizationMode {
+	case authzmodes.ModeABAC:
+		checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationPolicyPath})
+	case authzmodes.ModeWebhook:
+		checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationWebhookConfigPath})
+	}
+
 	return RunChecks(checks, os.Stderr)
 }
 
@@ -361,8 +383,8 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
-		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.CACertName)},
-		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.KubeletKubeConfigFileName)},
+		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)},
+		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},

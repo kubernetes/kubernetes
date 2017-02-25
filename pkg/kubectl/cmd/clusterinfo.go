@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/daviddengcn/go-colortext"
 	"github.com/spf13/cobra"
@@ -47,7 +48,7 @@ func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "cluster-info",
 		// clusterinfo is deprecated.
 		Aliases: []string{"clusterinfo"},
-		Short:   "Display cluster info",
+		Short:   i18n.T("Display cluster info"),
 		Long:    longDescr,
 		Example: clusterinfo_example,
 		Run: func(cmd *cobra.Command, args []string) {

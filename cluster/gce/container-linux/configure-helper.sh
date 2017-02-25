@@ -163,6 +163,9 @@ function create-master-auth {
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
   fi
+  if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
+  fi
   if [[ -n "${KUBELET_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "system:node:node-name,uid:kubelet,system:nodes"
   fi
@@ -360,6 +363,30 @@ current-context: service-account-context
 EOF
 }
 
+function create-kubescheduler-kubeconfig {
+  echo "Creating kube-scheduler kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/kube-scheduler
+  cat <<EOF >/etc/srv/kubernetes/kube-scheduler/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: kube-scheduler
+  user:
+    token: ${KUBE_SCHEDULER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: kube-scheduler
+  name: kube-scheduler
+current-context: kube-scheduler
+EOF
+}
+
 function create-master-etcd-auth {
   if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     local -r auth_dir="/etc/srv/kubernetes"
@@ -477,7 +504,7 @@ function start-kubelet {
   flags+=" --cloud-provider=gce"
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
-  flags+=" --config=/etc/kubernetes/manifests"
+  flags+=" --pod-manifest-path=/etc/kubernetes/manifests"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
@@ -655,8 +682,16 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *hostname *}}@$host_name@g" "${temp_file}"
   sed -i -e "s@{{ *srv_kube_path *}}@/etc/srv/kubernetes@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
-  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
-  if [[ "${STORAGE_BACKEND:-}" == "etcd3" ]]; then
+  # Get default storage backend from manifest file.
+  local -r default_storage_backend=$(cat "${temp_file}" | \
+    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+    sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
+  if [[ -n "${STORAGE_BACKEND:-}" ]]; then
+    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
+  else
+    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g" "${temp_file}"
+  fi
+  if [[ "${STORAGE_BACKEND:-${default_storage_backend}}" == "etcd3" ]]; then
     sed -i -e "s@{{ *quota_bytes *}}@--quota-backend-bytes=4294967296@g" "${temp_file}"
   else
     sed -i -e "s@{{ *quota_bytes *}}@@g" "${temp_file}"
@@ -752,6 +787,7 @@ function remove-salt-config-comments {
 function start-kube-apiserver {
   echo "Start kubernetes api-server"
   prepare-log-file /var/log/kube-apiserver.log
+  prepare-log-file /var/log/kube-apiserver-audit.log
 
   # Calculate variables and assemble the command line.
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
@@ -771,6 +807,9 @@ function start-kube-apiserver {
   if [[ -n "${STORAGE_BACKEND:-}" ]]; then
     params+=" --storage-backend=${STORAGE_BACKEND}"
   fi
+  if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
+    params+=" --storage-media-type=${STORAGE_MEDIA_TYPE}"
+  fi
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
     params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
   fi
@@ -789,6 +828,21 @@ function start-kube-apiserver {
   fi
   if [[ -n "${ETCD_QUORUM_READ:-}" ]]; then
     params+=" --etcd-quorum-read=${ETCD_QUORUM_READ}"
+  fi
+
+  if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
+    # We currently only support enabling with a fixed path and with built-in log
+    # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
+    # External log rotation should be set up the same as for kube-apiserver.log.
+    params+=" --audit-log-path=/var/log/kube-apiserver-audit.log"
+    params+=" --audit-log-maxage=0"
+    params+=" --audit-log-maxbackup=0"
+    # Lumberjack doesn't offer any way to disable size-based rotation. It also
+    # has an in-memory counter that doesn't notice if you truncate the file.
+    # 2000000000 (in MiB) is a large number that fits in 31 bits. If the log
+    # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
+    # never restarts. Please manually restart apiserver before this time.
+    params+=" --audit-log-maxsize=2000000000"
   fi
 
   local admission_controller_config_mount=""
@@ -849,12 +903,18 @@ function start-kube-apiserver {
   fi
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   params+=" --authorization-mode=${authorization_mode}"
-  
+
+  local container_env=""
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+  fi
+
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag=$(cat /opt/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{srv_sshproxy_path}}@/etc/srv/sshproxy@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
@@ -921,6 +981,10 @@ function start-kube-controller-manager {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   local -r kube_rc_docker_tag=$(cat /opt/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
+  local container_env=""
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+  fi
 
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
   remove-salt-config-comments "${src_file}"
@@ -929,6 +993,7 @@ function start-kube-controller-manager {
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-controller-manager_docker_tag'\]}}@${kube_rc_docker_tag}@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
@@ -944,10 +1009,12 @@ function start-kube-controller-manager {
 #   DOCKER_REGISTRY
 function start-kube-scheduler {
   echo "Start kubernetes scheduler"
+  create-kubescheduler-kubeconfig
   prepare-log-file /var/log/kube-scheduler.log
 
   # Calculate variables and set them in the manifest.
   params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
+  params+=" --kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig"
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
@@ -960,6 +1027,7 @@ function start-kube-scheduler {
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-scheduler.manifest"
   remove-salt-config-comments "${src_file}"
 
+  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
@@ -1117,7 +1185,7 @@ function start-kube-addons {
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
   fi
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "true" ]]; then
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
@@ -1262,8 +1330,9 @@ if [[ -n "${KUBE_USER:-}" ]]; then
   fi
 fi
 
-# generate the controller manager token here since its only used on the master.
+# generate the controller manager and scheduler tokens here since they are only used on the master.
 KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+KUBE_SCHEDULER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
 # KUBERNETES_CONTAINER_RUNTIME is set by the `kube-env` file, but it's a bit of a mouthful
 if [[ "${CONTAINER_RUNTIME:-}" == "" ]]; then

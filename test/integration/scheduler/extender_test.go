@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -239,7 +240,18 @@ func TestSchedulerExtender(t *testing.T) {
 	}
 	policy.APIVersion = api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()
 
-	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+	schedulerConfigFactory := factory.NewConfigFactory(
+		v1.DefaultSchedulerName,
+		clientSet,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Core().V1().Services(),
+		v1.DefaultHardPodAffinitySymmetricWeight,
+	)
 	schedulerConfig, err := schedulerConfigFactory.CreateFromConfig(policy)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
@@ -247,7 +259,9 @@ func TestSchedulerExtender(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientSet.Core().RESTClient()).Events("")})
-	scheduler.New(schedulerConfig).Run()
+	scheduler := scheduler.New(schedulerConfig)
+	informerFactory.Start(schedulerConfig.StopEverything)
+	scheduler.Run()
 
 	defer close(schedulerConfig.StopEverything)
 

@@ -26,7 +26,8 @@ var (
 	ReadWrite = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 	Read      = []string{"get", "list", "watch"}
 
-	Label = map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}
+	Label      = map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}
+	Annotation = map[string]string{rbac.AutoUpdateAnnotationKey: "true"}
 )
 
 const (
@@ -51,6 +52,13 @@ func addClusterRoleLabel(roles []rbac.ClusterRole) {
 		for k, v := range Label {
 			roles[i].ObjectMeta.Labels[k] = v
 		}
+
+		if roles[i].ObjectMeta.Annotations == nil {
+			roles[i].ObjectMeta.Annotations = make(map[string]string)
+		}
+		for k, v := range Annotation {
+			roles[i].ObjectMeta.Annotations[k] = v
+		}
 	}
 	return
 }
@@ -62,6 +70,13 @@ func addClusterRoleBindingLabel(rolebindings []rbac.ClusterRoleBinding) {
 		}
 		for k, v := range Label {
 			rolebindings[i].ObjectMeta.Labels[k] = v
+		}
+
+		if rolebindings[i].ObjectMeta.Annotations == nil {
+			rolebindings[i].ObjectMeta.Annotations = make(map[string]string)
+		}
+		for k, v := range Annotation {
+			rolebindings[i].ObjectMeta.Annotations[k] = v
 		}
 	}
 	return
@@ -79,10 +94,10 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
-			// a role which provides just enough power to discovery API versions for negotiation
+			// a role which provides just enough power to determine if the server is ready and discover API versions for negotiation
 			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbac.PolicyRule{
-				rbac.NewRule("get").URLs("/version", "/swaggerapi", "/swaggerapi/*", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
+				rbac.NewRule("get").URLs("/healthz", "/version", "/swaggerapi", "/swaggerapi/*", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
 			},
 		},
 		{
@@ -192,6 +207,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 				// TODO: restrict to the bound node once supported
 				rbac.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+				rbac.NewRule("update", "patch", "delete").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
 				// TODO: restrict to the bound node as creator once supported
 				rbac.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
@@ -217,6 +233,9 @@ func ClusterRoles() []rbac.ClusterRole {
 				// TODO: change glusterfs to use DNS lookup so this isn't needed?
 				// Needed for glusterfs volumes
 				rbac.NewRule("get").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+				// Used to create a certificatesigningrequest for a node-specific client certificate, and watch
+				// for it to be signed. This allows the kubelet to rotate it's own certificate.
+				rbac.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 			},
 		},
 		{
@@ -244,8 +263,6 @@ func ClusterRoles() []rbac.ClusterRole {
 			// a role to use for bootstrapping a node's client certificates
 			ObjectMeta: metav1.ObjectMeta{Name: "system:node-bootstrapper"},
 			Rules: []rbac.PolicyRule{
-				// used to check if the node already exists
-				rbac.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 				// used to create a certificatesigningrequest for a node-specific client certificate, and watch for it to be signed
 				rbac.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 			},
@@ -277,11 +294,63 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 				rbac.NewRule("get").Groups(legacyGroup).Resources("endpoints", "namespaces", "serviceaccounts").RuleOrDie(),
 				rbac.NewRule("update").Groups(legacyGroup).Resources("endpoints", "serviceaccounts").RuleOrDie(),
+				// Needed to check API access.  These creates are non-mutating
+				rbac.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
 
-				rbac.NewRule("list", "watch").Groups("*").Resources("namespaces", "nodes", "persistentvolumeclaims",
-					"persistentvolumes", "pods", "secrets", "serviceaccounts", "replicationcontrollers").RuleOrDie(),
-				rbac.NewRule("list", "watch").Groups(extensionsGroup).Resources("daemonsets", "deployments", "replicasets").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources(
+					"configmaps",
+					"namespaces",
+					"nodes",
+					"persistentvolumeclaims",
+					"persistentvolumes",
+					"pods",
+					"replicationcontrollers",
+					"resourcequotas",
+					"secrets",
+					"services",
+					"serviceaccounts",
+				).RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(extensionsGroup).Resources(
+					"daemonsets",
+					"deployments",
+					"podsecuritypolicies",
+					"replicasets",
+				).RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+			},
+		},
+		{
+			// a role to use for the kube-scheduler
+			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-scheduler"},
+			Rules: []rbac.PolicyRule{
+				eventsRule(),
+
+				// this is for leaderlease access
+				// TODO: scope this to the kube-system namespace
+				rbac.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+				rbac.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
+
+				// fundamental resources
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("nodes", "pods").RuleOrDie(),
+				rbac.NewRule("create").Groups(legacyGroup).Resources("pods/binding", "bindings").RuleOrDie(),
+				rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+				// things that select pods
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("services", "replicationcontrollers").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
+				// things that pods use
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
+			},
+		},
+		{
+			// a role to use for the kube-dns pod
+			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-dns"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("endpoints", "services").RuleOrDie(),
 			},
 		},
 		{
@@ -313,6 +382,8 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 		rbac.NewClusterBinding("system:node").Groups(user.NodesGroup).BindingOrDie(),
 		rbac.NewClusterBinding("system:node-proxier").Users(user.KubeProxy).BindingOrDie(),
 		rbac.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
+		rbac.NewClusterBinding("system:kube-dns").SAs("kube-system", "kube-dns").BindingOrDie(),
+		rbac.NewClusterBinding("system:kube-scheduler").Users(user.KubeScheduler).BindingOrDie(),
 	}
 	addClusterRoleBindingLabel(rolebindings)
 	return rolebindings

@@ -23,8 +23,10 @@ import (
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 const apiCallRetryInterval = 500 * time.Millisecond
@@ -51,15 +53,27 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 		return err
 	}
 
+	oldData, err := json.Marshal(n)
+	if err != nil {
+		return err
+	}
+
 	// TODO: Switch to the new master label defined in https://github.com/kubernetes/kubernetes/pull/39112
 	n.ObjectMeta.Labels[metav1.NodeLabelKubeadmAlphaRole] = metav1.NodeLabelRoleMaster
 
-	// TODO: Use the Taints beta field on the NodeSpec now
-	taintsAnnotation, _ := json.Marshal([]v1.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
-	n.ObjectMeta.Annotations[v1.TaintsAnnotationKey] = string(taintsAnnotation)
+	n.Spec.Taints = []v1.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}}
 
-	// TODO: Use a patch instead of an Update
-	if _, err := client.Nodes().Update(n); err != nil {
+	newData, err := json.Marshal(n)
+	if err != nil {
+		return err
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+	if err != nil {
+		return err
+	}
+
+	if _, err := client.Nodes().Patch(n.Name, types.StrategicMergePatchType, patchBytes); err != nil {
 		if apierrs.IsConflict(err) {
 			fmt.Println("[apiclient] Temporarily unable to update master node metadata due to conflict (will retry)")
 			time.Sleep(apiCallRetryInterval)

@@ -30,11 +30,10 @@ import (
 // informer registration
 type factoryInterfaceGenerator struct {
 	generator.DefaultGen
-	outputPackage             string
-	imports                   namer.ImportTracker
-	internalClientSetPackage  string
-	versionedClientSetPackage string
-	filtered                  bool
+	outputPackage    string
+	imports          namer.ImportTracker
+	clientSetPackage string
+	filtered         bool
 }
 
 var _ generator.Generator = &factoryInterfaceGenerator{}
@@ -64,11 +63,10 @@ func (g *factoryInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 	glog.V(5).Infof("processing type %v", t)
 
 	m := map[string]interface{}{
-		"cacheSharedIndexInformer":    c.Universe.Type(cacheSharedIndexInformer),
-		"internalClientSetInterface":  c.Universe.Type(types.Name{Package: g.internalClientSetPackage, Name: "Interface"}),
-		"runtimeObject":               c.Universe.Type(runtimeObject),
-		"timeDuration":                c.Universe.Type(timeDuration),
-		"versionedClientSetInterface": c.Universe.Type(types.Name{Package: g.versionedClientSetPackage, Name: "Interface"}),
+		"cacheSharedIndexInformer": c.Universe.Type(cacheSharedIndexInformer),
+		"clientSetPackage":         c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
+		"runtimeObject":            c.Universe.Type(runtimeObject),
+		"timeDuration":             c.Universe.Type(timeDuration),
 	}
 
 	sw.Do(externalSharedInformerFactoryInterface, m)
@@ -77,13 +75,11 @@ func (g *factoryInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 }
 
 var externalSharedInformerFactoryInterface = `
-type NewInternalInformerFunc func({{.internalClientSetInterface|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
-type NewVersionedInformerFunc func({{.versionedClientSetInterface|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
+type NewInformerFunc func({{.clientSetPackage|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {
 	Start(stopCh <-chan struct{})
-	InternalInformerFor(obj {{.runtimeObject|raw}}, newFunc NewInternalInformerFunc) {{.cacheSharedIndexInformer|raw}}
-	VersionedInformerFor(obj {{.runtimeObject|raw}}, newFunc NewVersionedInformerFunc) {{.cacheSharedIndexInformer|raw}}
+	InformerFor(obj {{.runtimeObject|raw}}, newFunc NewInformerFunc) {{.cacheSharedIndexInformer|raw}}
 }
 `

@@ -1,0 +1,12 @@
+apiVersion: apiregistration.k8s.io/v1alpha1
+kind: APIService
+metadata:
+  name: RESOURCE_NAME
+spec:
+  group: API_GROUP
+  version: API_VERSION
+  service:
+    namespace: SERVICE_NAMESPACE
+    name: SERVICE_NAME
+  caBundle: CA_BUNDLE
+  priority: 100

@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 const defaultBoilerPlate = `
@@ -94,7 +95,7 @@ func NewCmdCompletion(f cmdutil.Factory, out io.Writer, boilerPlate string) *cob
 
 	cmd := &cobra.Command{
 		Use:     "completion SHELL",
-		Short:   "Output shell completion code for the specified shell (bash or zsh)",
+		Short:   i18n.T("Output shell completion code for the specified shell (bash or zsh)"),
 		Long:    completion_long,
 		Example: completion_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -270,6 +271,7 @@ fi
 __kubectl_convert_bash_to_zsh() {
 	sed \
 	-e 's/declare -F/whence -w/' \
+	-e 's/_get_comp_words_by_ref "\$@"/_get_comp_words_by_ref "\$*"/' \
 	-e 's/local \([a-zA-Z0-9_]*\)=/local \1; \1=/' \
 	-e 's/flags+=("\(--.*\)=")/flags+=("\1"); two_word_flags+=("\1")/' \
 	-e 's/must_have_one_flag+=("\(--.*\)=")/must_have_one_flag+=("\1")/' \

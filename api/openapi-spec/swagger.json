@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Kubernetes",
-   "version": "v1.6.0"
+   "version": "v1.7.0"
   },
   "paths": {
    "/api/": {
@@ -9717,6 +9717,33 @@
       }
      }
     },
+    "patch": {
+     "description": "proxy PATCH requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1PATCHNamespacedPod",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
     "parameters": [
      {
       "uniqueItems": true,
@@ -9887,6 +9914,33 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1HEADNamespacedPodWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "proxy PATCH requests to Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1PATCHNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10089,6 +10143,33 @@
       }
      }
     },
+    "patch": {
+     "description": "proxy PATCH requests to Service",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1PATCHNamespacedService",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
     "parameters": [
      {
       "uniqueItems": true,
@@ -10259,6 +10340,33 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1HEADNamespacedServiceWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "proxy PATCH requests to Service",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1PATCHNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10461,6 +10569,33 @@
       }
      }
     },
+    "patch": {
+     "description": "proxy PATCH requests to Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1PATCHNode",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
     "parameters": [
      {
       "uniqueItems": true,
@@ -10623,6 +10758,33 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1HEADNodeWithPath",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "type": "string"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "proxy PATCH requests to Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "*/*"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "proxyCoreV1PATCHNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -15582,6 +15744,89 @@
      }
     }
    },
+   "/apis/authentication.k8s.io/v1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authentication_v1"
+     ],
+     "operationId": "getAuthenticationV1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
+   "/apis/authentication.k8s.io/v1/tokenreviews": {
+    "post": {
+     "description": "create a TokenReview",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authentication_v1"
+     ],
+     "operationId": "createAuthenticationV1TokenReview",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReview"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReview"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/authentication.k8s.io/v1beta1/": {
     "get": {
      "description": "get available resources",
@@ -15697,6 +15942,197 @@
       }
      }
     }
+   },
+   "/apis/authorization.k8s.io/v1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authorization_v1"
+     ],
+     "operationId": "getAuthorizationV1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
+   "/apis/authorization.k8s.io/v1/namespaces/{namespace}/localsubjectaccessreviews": {
+    "post": {
+     "description": "create a LocalSubjectAccessReview",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authorization_v1"
+     ],
+     "operationId": "createAuthorizationV1NamespacedLocalSubjectAccessReview",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.LocalSubjectAccessReview"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.LocalSubjectAccessReview"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews": {
+    "post": {
+     "description": "create a SelfSubjectAccessReview",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authorization_v1"
+     ],
+     "operationId": "createAuthorizationV1SelfSubjectAccessReview",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SelfSubjectAccessReview"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SelfSubjectAccessReview"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/authorization.k8s.io/v1/subjectaccessreviews": {
+    "post": {
+     "description": "create a SubjectAccessReview",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "authorization_v1"
+     ],
+     "operationId": "createAuthorizationV1SubjectAccessReview",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReview"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReview"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
    },
    "/apis/authorization.k8s.io/v1beta1/": {
     "get": {
@@ -16747,6 +17183,904 @@
       "autoscaling_v1"
      ],
      "operationId": "watchAutoscalingV1NamespacedHorizontalPodAutoscaler",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the HorizontalPodAutoscaler",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "getAutoscalingV2alpha1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
+   "/apis/autoscaling/v2alpha1/horizontalpodautoscalers": {
+    "get": {
+     "description": "list or watch objects of kind HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "listAutoscalingV2alpha1HorizontalPodAutoscalerForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers": {
+    "get": {
+     "description": "list or watch objects of kind HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "listAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "createAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "deleteAutoscalingV2alpha1CollectionNamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
+    "get": {
+     "description": "read the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "readAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "replaceAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "deleteAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "patchAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the HorizontalPodAutoscaler",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status": {
+    "get": {
+     "description": "read status of the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "readAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace status of the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "replaceAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified HorizontalPodAutoscaler",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "patchAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the HorizontalPodAutoscaler",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/watch/horizontalpodautoscalers": {
+    "get": {
+     "description": "watch individual changes to a list of HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "watchAutoscalingV2alpha1HorizontalPodAutoscalerListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/watch/namespaces/{namespace}/horizontalpodautoscalers": {
+    "get": {
+     "description": "watch individual changes to a list of HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "watchAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/autoscaling/v2alpha1/watch/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind HorizontalPodAutoscaler",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "watchAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
      "responses": {
       "200": {
        "description": "OK",
@@ -32942,6 +34276,582 @@
      }
     }
    },
+   "/apis/storage.k8s.io/v1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "getStorageV1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
+   "/apis/storage.k8s.io/v1/storageclasses": {
+    "get": {
+     "description": "list or watch objects of kind StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "listStorageV1StorageClass",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClassList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "createStorageV1StorageClass",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "deleteStorageV1CollectionStorageClass",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/storage.k8s.io/v1/storageclasses/{name}": {
+    "get": {
+     "description": "read the specified StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "readStorageV1StorageClass",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "replaceStorageV1StorageClass",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "deleteStorageV1StorageClass",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified StorageClass",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "patchStorageV1StorageClass",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the StorageClass",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/storage.k8s.io/v1/watch/storageclasses": {
+    "get": {
+     "description": "watch individual changes to a list of StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "watchStorageV1StorageClassList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/storage.k8s.io/v1/watch/storageclasses/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "watchStorageV1StorageClass",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the StorageClass",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/storage.k8s.io/v1beta1/": {
     "get": {
      "description": "get available resources",
@@ -34557,6 +36467,26 @@
      }
     ]
    },
+   "io.k8s.kubernetes.pkg.api.v1.ConfigMapProjection": {
+    "description": "Adapts a ConfigMap into a projected volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a projected volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. Note that this is identical to a configmap volume source without the default mode.",
+    "properties": {
+     "items": {
+      "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.KeyToPath"
+      }
+     },
+     "name": {
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+      "type": "string"
+     },
+     "optional": {
+      "description": "Specify whether the ConfigMap or it's keys must be defined",
+      "type": "boolean"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.ConfigMapVolumeSource": {
     "description": "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
     "properties": {
@@ -34870,6 +36800,18 @@
       "description": "Port number of the given endpoint.",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.DownwardAPIProjection": {
+    "description": "Represents downward API info for projecting into a projected volume. Note that this is identical to a downwardAPI volume source without the default mode.",
+    "properties": {
+     "items": {
+      "description": "Items is a list of DownwardAPIVolume file",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.DownwardAPIVolumeFile"
+      }
      }
     }
    },
@@ -35482,6 +37424,13 @@
       "type": "integer",
       "format": "int32"
      },
+     "portals": {
+      "description": "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "readOnly": {
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
       "type": "boolean"
@@ -36000,6 +37949,13 @@
       "description": "ID of the node assigned by the cloud provider in the format: \u003cProviderName\u003e://\u003cProviderSpecificNodeID\u003e",
       "type": "string"
      },
+     "taints": {
+      "description": "If specified, the node's taints.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Taint"
+      }
+     },
      "unschedulable": {
       "description": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration",
       "type": "boolean"
@@ -36294,6 +38250,10 @@
       "description": "A label query over volumes to consider for binding.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
+     "storageClassName": {
+      "description": "Name of the StorageClass required by the claim. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1",
+      "type": "string"
+     },
      "volumeName": {
       "description": "VolumeName is the binding reference to the PersistentVolume backing this claim.",
       "type": "string"
@@ -36461,6 +38421,10 @@
      "rbd": {
       "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RBDVolumeSource"
+     },
+     "storageClassName": {
+      "description": "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
+      "type": "string"
      },
      "vsphereVolume": {
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
@@ -36707,6 +38671,10 @@
       "description": "If specified, the pod's scheduling constraints",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Affinity"
      },
+     "automountServiceAccountToken": {
+      "description": "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.",
+      "type": "boolean"
+     },
      "containers": {
       "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
       "type": "array",
@@ -36787,6 +38755,13 @@
       "description": "Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.",
       "type": "integer",
       "format": "int64"
+     },
+     "tolerations": {
+      "description": "If specified, the pod's tolerations.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Toleration"
+      }
      },
      "volumes": {
       "description": "List of volumes that can be mounted by containers belonging to the pod. More info: http://kubernetes.io/docs/user-guide/volumes",
@@ -36983,6 +38958,26 @@
       "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.ProjectedVolumeSource": {
+    "description": "Represents a projected volume source",
+    "required": [
+     "sources"
+    ],
+    "properties": {
+     "defaultMode": {
+      "description": "Mode bits to use on created files by default. Must be a value between 0 and 0777. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "sources": {
+      "description": "list of volume projections",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.VolumeProjection"
+      }
      }
     }
    },
@@ -37494,6 +39489,26 @@
      }
     ]
    },
+   "io.k8s.kubernetes.pkg.api.v1.SecretProjection": {
+    "description": "Adapts a secret into a projected volume.\n\nThe contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.",
+    "properties": {
+     "items": {
+      "description": "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.KeyToPath"
+      }
+     },
+     "name": {
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+      "type": "string"
+     },
+     "optional": {
+      "description": "Specify whether the Secret or its key must be defined",
+      "type": "boolean"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.SecretVolumeSource": {
     "description": "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
     "properties": {
@@ -37587,6 +39602,10 @@
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
       "type": "string"
+     },
+     "automountServiceAccountToken": {
+      "description": "AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted. Can be overridden at the pod level.",
+      "type": "boolean"
      },
      "imagePullSecrets": {
       "description": "ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images in pods that reference this ServiceAccount. ImagePullSecrets are distinct from Secrets because Secrets can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet. More info: http://kubernetes.io/docs/user-guide/secrets#manually-specifying-an-imagepullsecret",
@@ -37798,6 +39817,57 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.Taint": {
+    "description": "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
+    "required": [
+     "key",
+     "effect"
+    ],
+    "properties": {
+     "effect": {
+      "description": "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule and NoExecute.",
+      "type": "string"
+     },
+     "key": {
+      "description": "Required. The taint key to be applied to a node.",
+      "type": "string"
+     },
+     "timeAdded": {
+      "description": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "value": {
+      "description": "Required. The taint value corresponding to the taint key.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.Toleration": {
+    "description": "The pod this Toleration is attached to tolerates any taint that matches the triple \u003ckey,value,effect\u003e using the matching operator \u003coperator\u003e.",
+    "properties": {
+     "effect": {
+      "description": "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.",
+      "type": "string"
+     },
+     "key": {
+      "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.",
+      "type": "string"
+     },
+     "operator": {
+      "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+      "type": "string"
+     },
+     "tolerationSeconds": {
+      "description": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "value": {
+      "description": "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.Volume": {
     "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
     "required": [
@@ -37884,6 +39954,10 @@
       "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PhotonPersistentDiskVolumeSource"
      },
+     "projected": {
+      "description": "Items for all in one resources secrets, configmaps, and downward API",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ProjectedVolumeSource"
+     },
      "quobyte": {
       "description": "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.QuobyteVolumeSource"
@@ -37924,6 +39998,23 @@
      "subPath": {
       "description": "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
       "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.VolumeProjection": {
+    "description": "Projection that may be projected along with other supported volume types",
+    "properties": {
+     "configMap": {
+      "description": "information about the configMap data to project",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ConfigMapProjection"
+     },
+     "downwardAPI": {
+      "description": "information about the downwardAPI data to project",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.DownwardAPIProjection"
+     },
+     "secret": {
+      "description": "information about the secret data to project",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SecretProjection"
      }
     }
    },
@@ -38075,6 +40166,96 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReview": {
+    "description": "TokenReview attempts to authenticate a token to a known user. Note: TokenReview requests may be cached by the webhook token authenticator plugin in the kube-apiserver.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec holds information about the request being evaluated",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReviewSpec"
+     },
+     "status": {
+      "description": "Status is filled in by the server and indicates whether the request can be authenticated.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReviewStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "authentication.k8s.io",
+      "Version": "v1",
+      "Kind": "TokenReview"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReviewSpec": {
+    "description": "TokenReviewSpec is a description of the token authentication request.",
+    "properties": {
+     "token": {
+      "description": "Token is the opaque bearer token.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authentication.v1.TokenReviewStatus": {
+    "description": "TokenReviewStatus is the result of the token authentication request.",
+    "properties": {
+     "authenticated": {
+      "description": "Authenticated indicates that the token was associated with a known user.",
+      "type": "boolean"
+     },
+     "error": {
+      "description": "Error indicates that the token couldn't be checked",
+      "type": "string"
+     },
+     "user": {
+      "description": "User is the UserInfo associated with the provided token.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authentication.v1.UserInfo"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authentication.v1.UserInfo": {
+    "description": "UserInfo holds the information about the user needed to implement the user.Info interface.",
+    "properties": {
+     "extra": {
+      "description": "Any additional information provided by the authenticator.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "groups": {
+      "description": "The names of groups this user is a part of.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "uid": {
+      "description": "A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
+      "type": "string"
+     },
+     "username": {
+      "description": "The name that uniquely identifies this user among all active users.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.apis.authentication.v1beta1.TokenReview": {
     "description": "TokenReview attempts to authenticate a token to a known user. Note: TokenReview requests may be cached by the webhook token authenticator plugin in the kube-apiserver.",
     "required": [
@@ -38161,6 +40342,221 @@
      },
      "username": {
       "description": "The name that uniquely identifies this user among all active users.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.LocalSubjectAccessReview": {
+    "description": "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewSpec"
+     },
+     "status": {
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "authorization.k8s.io",
+      "Version": "v1",
+      "Kind": "LocalSubjectAccessReview"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.NonResourceAttributes": {
+    "description": "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface",
+    "properties": {
+     "path": {
+      "description": "Path is the URL path of the request",
+      "type": "string"
+     },
+     "verb": {
+      "description": "Verb is the standard HTTP verb",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.ResourceAttributes": {
+    "description": "ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface",
+    "properties": {
+     "group": {
+      "description": "Group is the API Group of the Resource.  \"*\" means all.",
+      "type": "string"
+     },
+     "name": {
+      "description": "Name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
+      "type": "string"
+     },
+     "namespace": {
+      "description": "Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview",
+      "type": "string"
+     },
+     "resource": {
+      "description": "Resource is one of the existing resource types.  \"*\" means all.",
+      "type": "string"
+     },
+     "subresource": {
+      "description": "Subresource is one of the existing resource types.  \"\" means none.",
+      "type": "string"
+     },
+     "verb": {
+      "description": "Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
+      "type": "string"
+     },
+     "version": {
+      "description": "Version is the API Version of the Resource.  \"*\" means all.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.SelfSubjectAccessReview": {
+    "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec holds information about the request being evaluated.  user and groups must be empty",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SelfSubjectAccessReviewSpec"
+     },
+     "status": {
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "authorization.k8s.io",
+      "Version": "v1",
+      "Kind": "SelfSubjectAccessReview"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.SelfSubjectAccessReviewSpec": {
+    "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+    "properties": {
+     "nonResourceAttributes": {
+      "description": "NonResourceAttributes describes information for a non-resource access request",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.NonResourceAttributes"
+     },
+     "resourceAttributes": {
+      "description": "ResourceAuthorizationAttributes describes information for a resource access request",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.ResourceAttributes"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReview": {
+    "description": "SubjectAccessReview checks whether or not a user or group can perform an action.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec holds information about the request being evaluated",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewSpec"
+     },
+     "status": {
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "authorization.k8s.io",
+      "Version": "v1",
+      "Kind": "SubjectAccessReview"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewSpec": {
+    "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+    "properties": {
+     "extra": {
+      "description": "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "groups": {
+      "description": "Groups is the groups you're testing for.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "nonResourceAttributes": {
+      "description": "NonResourceAttributes describes information for a non-resource access request",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.NonResourceAttributes"
+     },
+     "resourceAttributes": {
+      "description": "ResourceAuthorizationAttributes describes information for a resource access request",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.authorization.v1.ResourceAttributes"
+     },
+     "user": {
+      "description": "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewStatus": {
+    "description": "SubjectAccessReviewStatus",
+    "required": [
+     "allowed"
+    ],
+    "properties": {
+     "allowed": {
+      "description": "Allowed is required.  True if the action would be allowed, false otherwise.",
+      "type": "boolean"
+     },
+     "evaluationError": {
+      "description": "EvaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "Reason is optional.  It indicates why a request was allowed or denied.",
       "type": "string"
      }
     }
@@ -38583,6 +40979,328 @@
      },
      "selector": {
       "description": "label query over pods that should match the replicas count. This is same as the label selector but in the string format to avoid introspection by clients. The string will be in the same format as the query-param syntax. More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.CrossVersionObjectReference": {
+    "description": "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
+    "required": [
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "API version of the referent",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\"",
+      "type": "string"
+     },
+     "name": {
+      "description": "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler": {
+    "description": "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "metadata is the standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "spec is the specification for the behaviour of the autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerSpec"
+     },
+     "status": {
+      "description": "status is the current information about the autoscaler.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscaler"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerList": {
+    "description": "HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "description": "items is the list of horizontal pod autoscaler objects.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "metadata is the standard list metadata.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "autoscaling",
+      "Version": "v2alpha1",
+      "Kind": "HorizontalPodAutoscalerList"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerSpec": {
+    "description": "HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.",
+    "required": [
+     "scaleTargetRef",
+     "maxReplicas"
+    ],
+    "properties": {
+     "maxReplicas": {
+      "description": "maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up. It cannot be less that minReplicas.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "metrics": {
+      "description": "metrics contains the specifications for which to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.MetricSpec"
+      }
+     },
+     "minReplicas": {
+      "description": "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down. It defaults to 1 pod.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "scaleTargetRef": {
+      "description": "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.CrossVersionObjectReference"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerStatus": {
+    "description": "HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.",
+    "required": [
+     "currentReplicas",
+     "desiredReplicas",
+     "currentMetrics"
+    ],
+    "properties": {
+     "currentMetrics": {
+      "description": "currentMetrics is the last read state of the metrics used by this autoscaler.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.MetricStatus"
+      }
+     },
+     "currentReplicas": {
+      "description": "currentReplicas is current number of replicas of pods managed by this autoscaler, as last seen by the autoscaler.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "desiredReplicas": {
+      "description": "desiredReplicas is the desired number of replicas of pods managed by this autoscaler, as last calculated by the autoscaler.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "lastScaleTime": {
+      "description": "lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods, used by the autoscaler to control how often the number of pods is changed.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "observedGeneration": {
+      "description": "observedGeneration is the most recent generation observed by this autoscaler.",
+      "type": "integer",
+      "format": "int64"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.MetricSpec": {
+    "description": "MetricSpec specifies how to scale based on a single metric (only `type` and one other matching field should be set at once).",
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "object": {
+      "description": "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ObjectMetricSource"
+     },
+     "pods": {
+      "description": "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.PodsMetricSource"
+     },
+     "resource": {
+      "description": "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ResourceMetricSource"
+     },
+     "type": {
+      "description": "type is the type of metric source.  It should match one of the fields below.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.MetricStatus": {
+    "description": "MetricStatus describes the last-read state of a single metric.",
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "object": {
+      "description": "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ObjectMetricStatus"
+     },
+     "pods": {
+      "description": "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.PodsMetricStatus"
+     },
+     "resource": {
+      "description": "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ResourceMetricStatus"
+     },
+     "type": {
+      "description": "type is the type of metric source.  It will match one of the fields below.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ObjectMetricSource": {
+    "description": "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+    "required": [
+     "target",
+     "metricName",
+     "targetValue"
+    ],
+    "properties": {
+     "metricName": {
+      "description": "metricName is the name of the metric in question.",
+      "type": "string"
+     },
+     "target": {
+      "description": "target is the described Kubernetes object.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.CrossVersionObjectReference"
+     },
+     "targetValue": {
+      "description": "targetValue is the target value of the metric (as a quantity).",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ObjectMetricStatus": {
+    "description": "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+    "required": [
+     "target",
+     "metricName",
+     "currentValue"
+    ],
+    "properties": {
+     "currentValue": {
+      "description": "currentValue is the current value of the metric (as a quantity).",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+     },
+     "metricName": {
+      "description": "metricName is the name of the metric in question.",
+      "type": "string"
+     },
+     "target": {
+      "description": "target is the described Kubernetes object.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.CrossVersionObjectReference"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.PodsMetricSource": {
+    "description": "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
+    "required": [
+     "metricName",
+     "targetAverageValue"
+    ],
+    "properties": {
+     "metricName": {
+      "description": "metricName is the name of the metric in question",
+      "type": "string"
+     },
+     "targetAverageValue": {
+      "description": "targetAverageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.PodsMetricStatus": {
+    "description": "PodsMetricStatus indicates the current value of a metric describing each pod in the current scale target (for example, transactions-processed-per-second).",
+    "required": [
+     "metricName",
+     "currentAverageValue"
+    ],
+    "properties": {
+     "currentAverageValue": {
+      "description": "currentAverageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+     },
+     "metricName": {
+      "description": "metricName is the name of the metric in question",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ResourceMetricSource": {
+    "description": "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "description": "name is the name of the resource in question.",
+      "type": "string"
+     },
+     "targetAverageUtilization": {
+      "description": "targetAverageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "targetAverageValue": {
+      "description": "targetAverageValue is the the target value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ResourceMetricStatus": {
+    "description": "ResourceMetricStatus indicates the current value of a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+    "required": [
+     "name",
+     "currentAverageValue"
+    ],
+    "properties": {
+     "currentAverageUtilization": {
+      "description": "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.  It will only be present if `targetAverageValue` was set in the corresponding metric specification.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "currentAverageValue": {
+      "description": "currentAverageValue is the the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+     },
+     "name": {
+      "description": "name is the name of the resource in question.",
       "type": "string"
      }
     }
@@ -39146,12 +41864,23 @@
     ]
    },
    "io.k8s.kubernetes.pkg.apis.certificates.v1beta1.CertificateSigningRequestSpec": {
-    "description": "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
+    "description": "This information is immutable after the request is created. Only the Request and Usages fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
     "required": [
      "request"
     ],
     "properties": {
+     "extra": {
+      "description": "Extra information about the requesting user. See user.Info interface for details.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
      "groups": {
+      "description": "Group information about the requesting user. See user.Info interface for details.",
       "type": "array",
       "items": {
        "type": "string"
@@ -39163,6 +41892,7 @@
       "format": "byte"
      },
      "uid": {
+      "description": "UID information about the requesting user. See user.Info interface for details.",
       "type": "string"
      },
      "usages": {
@@ -39173,7 +41903,7 @@
       }
      },
      "username": {
-      "description": "Information about the requesting user (if relevant) See user.Info interface for details",
+      "description": "Information about the requesting user. See user.Info interface for details.",
       "type": "string"
      }
     }
@@ -40925,7 +43655,7 @@
     ],
     "properties": {
      "apiVersion": {
-      "description": "APIVersion holds the API group and version of the referenced object.",
+      "description": "APIVersion holds the API group and version of the referenced subject. Defaults to \"v1\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io/v1alpha1\" for User and Group subjects.",
       "type": "string"
      },
      "kind": {
@@ -41296,8 +44026,8 @@
      "name"
     ],
     "properties": {
-     "apiVersion": {
-      "description": "APIVersion holds the API group and version of the referenced object.",
+     "apiGroup": {
+      "description": "APIGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects.",
       "type": "string"
      },
      "kind": {
@@ -41313,6 +44043,78 @@
       "type": "string"
      }
     }
+   },
+   "io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass": {
+    "description": "StorageClass describes the parameters for a class of storage for which PersistentVolumes can be dynamically provisioned.\n\nStorageClasses are non-namespaced; the name of the storage class according to etcd is in ObjectMeta.Name.",
+    "required": [
+     "provisioner"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "parameters": {
+      "description": "Parameters holds the parameters for the provisioner that should create volumes of this storage class.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "provisioner": {
+      "description": "Provisioner indicates the type of the provisioner.",
+      "type": "string"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.storage.v1.StorageClassList": {
+    "description": "StorageClassList is a collection of storage classes.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "description": "Items is the list of StorageClasses",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClassList"
+     }
+    ]
    },
    "io.k8s.kubernetes.pkg.apis.storage.v1beta1.StorageClass": {
     "description": "StorageClass describes the parameters for a class of storage for which PersistentVolumes can be dynamically provisioned.\n\nStorageClasses are non-namespaced; the name of the storage class according to etcd is in ObjectMeta.Name.",

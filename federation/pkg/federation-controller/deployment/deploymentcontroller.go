@@ -256,14 +256,14 @@ func (fdc *DeploymentController) removeFinalizerFunc(obj runtime.Object, finaliz
 	return deployment, nil
 }
 
-// Adds the given finalizer to the given objects ObjectMeta.
+// Adds the given finalizers to the given objects ObjectMeta.
 // Assumes that the given object is a deployment.
-func (fdc *DeploymentController) addFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
+func (fdc *DeploymentController) addFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
 	deployment := obj.(*extensionsv1.Deployment)
-	deployment.ObjectMeta.Finalizers = append(deployment.ObjectMeta.Finalizers, finalizer)
+	deployment.ObjectMeta.Finalizers = append(deployment.ObjectMeta.Finalizers, finalizers...)
 	deployment, err := fdc.fedClient.Extensions().Deployments(deployment.Namespace).Update(deployment)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizer %s to deployment %s: %v", finalizer, deployment.Name, err)
+		return nil, fmt.Errorf("failed to add finalizers %v to deployment %s: %v", finalizers, deployment.Name, err)
 	}
 	return deployment, nil
 }
@@ -420,8 +420,10 @@ func (fdc *DeploymentController) schedule(fd *extensionsv1.Deployment, clusters 
 	if fdPref != nil { // create a new planner if user specified a preference
 		plannerToBeUsed = planner.NewPlanner(fdPref)
 	}
-
-	replicas := int64(*fd.Spec.Replicas)
+	replicas := int64(0)
+	if fd.Spec.Replicas != nil {
+		replicas = int64(*fd.Spec.Replicas)
+	}
 	var clusterNames []string
 	for _, cluster := range clusters {
 		clusterNames = append(clusterNames, cluster.Name)

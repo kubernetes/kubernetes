@@ -1,0 +1,11 @@
+{
+	"spec": {
+		"clusterIP": "10.0.0.10",
+		"ports": [
+			{
+				"port": 82,
+				"protocol": "VHF"
+			}
+		]
+	}
+}

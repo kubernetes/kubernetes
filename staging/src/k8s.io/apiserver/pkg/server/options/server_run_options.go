@@ -23,8 +23,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 
 	// add the generic feature gates
 	_ "k8s.io/apiserver/pkg/features"
@@ -38,43 +38,36 @@ type ServerRunOptions struct {
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
 
-	CorsAllowedOriginList []string
-	// To enable protobuf as storage format, it is enough
-	// to set it to "application/vnd.kubernetes.protobuf".
-	DefaultStorageMediaType     string
-	DeleteCollectionWorkers     int
-	AuditLogPath                string
-	AuditLogMaxAge              int
-	AuditLogMaxBackups          int
-	AuditLogMaxSize             int
-	EnableGarbageCollection     bool
-	EnableProfiling             bool
-	EnableContentionProfiling   bool
-	EnableSwaggerUI             bool
-	EnableWatchCache            bool
+	CorsAllowedOriginList       []string
 	ExternalHost                string
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
 	MinRequestTimeout           int
-	RuntimeConfig               utilflag.ConfigurationMap
 	TargetRAMMB                 int
 	WatchCacheSizes             []string
 }
 
 func NewServerRunOptions() *ServerRunOptions {
+	defaults := server.NewConfig()
+
 	return &ServerRunOptions{
 		AdmissionControl:            "AlwaysAdmit",
-		DefaultStorageMediaType:     "application/json",
-		DeleteCollectionWorkers:     1,
-		EnableGarbageCollection:     true,
-		EnableProfiling:             true,
-		EnableContentionProfiling:   false,
-		EnableWatchCache:            true,
-		MaxRequestsInFlight:         400,
-		MaxMutatingRequestsInFlight: 200,
-		MinRequestTimeout:           1800,
-		RuntimeConfig:               make(utilflag.ConfigurationMap),
+		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
+		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
+		MinRequestTimeout:           defaults.MinRequestTimeout,
 	}
+}
+
+// ApplyOptions applies the run options to the method receiver and returns self
+func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
+	c.CorsAllowedOriginList = s.CorsAllowedOriginList
+	c.ExternalAddress = s.ExternalHost
+	c.MaxRequestsInFlight = s.MaxRequestsInFlight
+	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
+	c.MinRequestTimeout = s.MinRequestTimeout
+	c.PublicAddress = s.AdvertiseAddress
+
+	return nil
 }
 
 // DefaultAdvertiseAddress sets the field AdvertiseAddress if
@@ -127,38 +120,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"List of allowed origins for CORS, comma separated.  An allowed origin can be a regular "+
 		"expression to support subdomain matching. If this list is empty CORS will not be enabled.")
 
-	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
-		"The media type to use to store objects in storage. Defaults to application/json. "+
-		"Some resources may only support a specific media type and will ignore this setting.")
-
-	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
-		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
-
-	fs.StringVar(&s.AuditLogPath, "audit-log-path", s.AuditLogPath,
-		"If set, all requests coming to the apiserver will be logged to this file.")
-	fs.IntVar(&s.AuditLogMaxAge, "audit-log-maxage", s.AuditLogMaxBackups,
-		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename.")
-	fs.IntVar(&s.AuditLogMaxBackups, "audit-log-maxbackup", s.AuditLogMaxBackups,
-		"The maximum number of old audit log files to retain.")
-	fs.IntVar(&s.AuditLogMaxSize, "audit-log-maxsize", s.AuditLogMaxSize,
-		"The maximum size in megabytes of the audit log file before it gets rotated. Defaults to 100MB.")
-
-	fs.BoolVar(&s.EnableGarbageCollection, "enable-garbage-collector", s.EnableGarbageCollection, ""+
-		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
-		"of the kube-controller-manager.")
-
-	fs.BoolVar(&s.EnableProfiling, "profiling", s.EnableProfiling,
-		"Enable profiling via web interface host:port/debug/pprof/")
-	fs.BoolVar(&s.EnableContentionProfiling, "contention-profiling", s.EnableContentionProfiling,
-		"Enable contention profiling. Requires --profiling to be set to work.")
-
-	fs.BoolVar(&s.EnableSwaggerUI, "enable-swagger-ui", s.EnableSwaggerUI,
-		"Enables swagger ui on the apiserver at /swagger-ui")
-
-	// TODO: enable cache in integration tests.
-	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache,
-		"Enable watch caching in the apiserver")
-
 	fs.IntVar(&s.TargetRAMMB, "target-ram-mb", s.TargetRAMMB,
 		"Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
 
@@ -188,12 +149,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"a request open before timing it out. Currently only honored by the watch request "+
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
-
-	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
-		"A set of key=value pairs that describe runtime configuration that may be passed "+
-		"to apiserver. apis/<groupVersion> key can be used to turn on/off specific api versions. "+
-		"apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and "+
-		"api/legacy are special keys to control all and legacy api versions respectively.")
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+

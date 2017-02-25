@@ -18,9 +18,8 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/legacylisters:go_default_library",
-        "//pkg/controller:go_default_library",
-        "//pkg/controller/informers:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
+        "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -39,7 +38,11 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/controller/node/testutil:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",

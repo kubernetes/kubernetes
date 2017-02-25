@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Generic API Server",
-   "version": "v1.6.0"
+   "version": "v1.7.0"
   },
   "paths": {
    "/api/": {
@@ -4815,6 +4815,39 @@
       "in": "query"
      }
     ]
+   },
+   "/apis/autoscaling/v2alpha1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "autoscaling_v2alpha1"
+     ],
+     "operationId": "getAutoscalingV2alpha1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
    },
    "/apis/batch/": {
     "get": {
@@ -11374,6 +11407,26 @@
      }
     ]
    },
+   "io.k8s.kubernetes.pkg.api.v1.ConfigMapProjection": {
+    "description": "Adapts a ConfigMap into a projected volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a projected volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. Note that this is identical to a configmap volume source without the default mode.",
+    "properties": {
+     "items": {
+      "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.KeyToPath"
+      }
+     },
+     "name": {
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+      "type": "string"
+     },
+     "optional": {
+      "description": "Specify whether the ConfigMap or it's keys must be defined",
+      "type": "boolean"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.ConfigMapVolumeSource": {
     "description": "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
     "properties": {
@@ -11532,6 +11585,18 @@
      "protocol": {
       "description": "Protocol for port. Must be UDP or TCP. Defaults to \"TCP\".",
       "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.DownwardAPIProjection": {
+    "description": "Represents downward API info for projecting into a projected volume. Note that this is identical to a downwardAPI volume source without the default mode.",
+    "properties": {
+     "items": {
+      "description": "Items is a list of DownwardAPIVolume file",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.DownwardAPIVolumeFile"
+      }
      }
     }
    },
@@ -12005,6 +12070,13 @@
       "type": "integer",
       "format": "int32"
      },
+     "portals": {
+      "description": "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "readOnly": {
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
       "type": "boolean"
@@ -12450,6 +12522,10 @@
       "description": "If specified, the pod's scheduling constraints",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Affinity"
      },
+     "automountServiceAccountToken": {
+      "description": "AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.",
+      "type": "boolean"
+     },
      "containers": {
       "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
       "type": "array",
@@ -12531,6 +12607,13 @@
       "type": "integer",
       "format": "int64"
      },
+     "tolerations": {
+      "description": "If specified, the pod's tolerations.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Toleration"
+      }
+     },
      "volumes": {
       "description": "List of volumes that can be mounted by containers belonging to the pod. More info: http://kubernetes.io/docs/user-guide/volumes",
       "type": "array",
@@ -12610,6 +12693,26 @@
       "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.ProjectedVolumeSource": {
+    "description": "Represents a projected volume source",
+    "required": [
+     "sources"
+    ],
+    "properties": {
+     "defaultMode": {
+      "description": "Mode bits to use on created files by default. Must be a value between 0 and 0777. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "sources": {
+      "description": "list of volume projections",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.VolumeProjection"
+      }
      }
     }
    },
@@ -12856,6 +12959,26 @@
      }
     ]
    },
+   "io.k8s.kubernetes.pkg.api.v1.SecretProjection": {
+    "description": "Adapts a secret into a projected volume.\n\nThe contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.",
+    "properties": {
+     "items": {
+      "description": "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.KeyToPath"
+      }
+     },
+     "name": {
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+      "type": "string"
+     },
+     "optional": {
+      "description": "Specify whether the Secret or its key must be defined",
+      "type": "boolean"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.SecretVolumeSource": {
     "description": "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
     "properties": {
@@ -13088,6 +13211,32 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.Toleration": {
+    "description": "The pod this Toleration is attached to tolerates any taint that matches the triple \u003ckey,value,effect\u003e using the matching operator \u003coperator\u003e.",
+    "properties": {
+     "effect": {
+      "description": "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.",
+      "type": "string"
+     },
+     "key": {
+      "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.",
+      "type": "string"
+     },
+     "operator": {
+      "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+      "type": "string"
+     },
+     "tolerationSeconds": {
+      "description": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "value": {
+      "description": "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.Volume": {
     "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
     "required": [
@@ -13174,6 +13323,10 @@
       "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PhotonPersistentDiskVolumeSource"
      },
+     "projected": {
+      "description": "Items for all in one resources secrets, configmaps, and downward API",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ProjectedVolumeSource"
+     },
      "quobyte": {
       "description": "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.QuobyteVolumeSource"
@@ -13214,6 +13367,23 @@
      "subPath": {
       "description": "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
       "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.VolumeProjection": {
+    "description": "Projection that may be projected along with other supported volume types",
+    "properties": {
+     "configMap": {
+      "description": "information about the configMap data to project",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ConfigMapProjection"
+     },
+     "downwardAPI": {
+      "description": "information about the downwardAPI data to project",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.DownwardAPIProjection"
+     },
+     "secret": {
+      "description": "information about the secret data to project",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SecretProjection"
      }
     }
    },

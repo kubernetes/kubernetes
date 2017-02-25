@@ -53,6 +53,27 @@ ensure-packages() {
   :
 }
 
+function create-node-pki {
+  echo "Creating node pki files"
+
+  local -r pki_dir="/etc/kubernetes/pki"
+  mkdir -p "${pki_dir}"
+
+  if [[ -z "${CA_CERT_BUNDLE:-}" ]]; then
+    CA_CERT_BUNDLE="${CA_CERT}"
+    CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
+    echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
+  fi
+
+  if [[ ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
+    KUBELET_CERT_PATH="${pki_dir}/kubelet.crt"
+    echo "${KUBELET_CERT}" | base64 --decode > "${KUBELET_CERT_PATH}"
+
+    KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
+    echo "${KUBELET_KEY}" | base64 --decode > "${KUBELET_KEY_PATH}"
+  fi
+}
+
 # A hookpoint for setting up local devices
 ensure-local-disks() {
  for ssd in /dev/disk/by-id/google-local-ssd-*; do
@@ -475,13 +496,19 @@ num_nodes: $(echo "${NUM_NODES:-}" | sed -e "s/'/''/g")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
 initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
-
+initial_etcd_cluster_state: '$(echo "${INITIAL_ETCD_CLUSTER_STATE:-}" | sed -e "s/'/''/g")'
+ca_cert_bundle_path: '$(echo "${CA_CERT_BUNDLE_PATH:-}" | sed -e "s/'/''/g")'
 hostname: $(hostname -s)
 enable_default_storage_class: '$(echo "$ENABLE_DEFAULT_STORAGE_CLASS" | sed -e "s/'/''/g")'
 EOF
     if [ -n "${STORAGE_BACKEND:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 storage_backend: '$(echo "$STORAGE_BACKEND" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${STORAGE_MEDIA_TYPE:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+storage_media_type: '$(echo "$STORAGE_MEDIA_TYPE" | sed -e "s/'/''/g")'
 EOF
     fi
     if [ -n "${ADMISSION_CONTROL:-}" ] && [ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]; then
@@ -632,11 +659,6 @@ EOF
 scheduling_algorithm_provider: '$(echo "${SCHEDULING_ALGORITHM_PROVIDER}" | sed -e "s/'/''/g")'
 EOF
     fi
-    if [ -n "${KUBELET_AUTH_CA_CERT:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-kubelet_auth_ca_cert: /var/lib/kubelet/kubelet_auth_ca.crt
-EOF
-    fi
 }
 
 # The job of this function is simple, but the basic regular expression syntax makes
@@ -726,11 +748,6 @@ function create-salt-master-kubelet-auth() {
 function create-salt-kubelet-auth() {
   local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
   if [ ! -e "${kubelet_kubeconfig_file}" ]; then
-    # If there isn't a CA certificate set specifically for the kubelet, use
-    # the cluster CA certificate.
-    if [[ -z "${KUBELET_CA_CERT:-}" ]]; then
-      KUBELET_CA_CERT="${CA_CERT}"
-    fi
     mkdir -p /srv/salt-overlay/salt/kubelet
     (umask 077;
       cat > "${kubelet_kubeconfig_file}" <<EOF
@@ -739,13 +756,13 @@ kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: ${KUBELET_CERT}
-    client-key-data: ${KUBELET_KEY}
+    client-certificate: ${KUBELET_CERT_PATH}
+    client-key: ${KUBELET_KEY_PATH}
 clusters:
 - name: local
   cluster:
     server: https://kubernetes-master
-    certificate-authority-data: ${KUBELET_CA_CERT}
+    certificate-authority: ${CA_CERT_BUNDLE_PATH}
 contexts:
 - context:
     cluster: local
@@ -754,11 +771,6 @@ contexts:
 current-context: service-account-context
 EOF
 )
-  fi
-  local -r kubelet_auth_ca_file="/srv/salt-overlay/salt/kubelet/kubelet_auth_ca.crt"
-  if [ ! -e "${kubelet_auth_ca_file}" ] && [[ ! -z "${KUBELET_AUTH_CA_CERT:-}" ]]; then
-    (umask 077;
-      echo "${KUBELET_AUTH_CA_CERT}" | base64 --decode > "${kubelet_auth_ca_file}")
   fi
 }
 
@@ -781,7 +793,7 @@ users:
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${CA_CERT}
+    certificate-authority-data: ${CA_CERT_BUNDLE}
 contexts:
 - context:
     cluster: local
@@ -1130,6 +1142,7 @@ if [[ -z "${is_push}" ]]; then
   set-kube-env
   auto-upgrade
   ensure-local-disks
+  create-node-pki
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then

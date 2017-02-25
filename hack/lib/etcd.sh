@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.0.14}
+ETCD_VERSION=${ETCD_VERSION:-3.0.17}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 
@@ -28,8 +28,8 @@ kube::etcd::validate() {
   }
 
   # validate it is not running
-  if pgrep etcd >/dev/null 2>&1; then
-    kube::log::usage "etcd appears to already be running on this machine (`pgrep -l etcd`) (or its a zombie and you need to kill its parent)."
+  if pgrep -x etcd >/dev/null 2>&1; then
+    kube::log::usage "etcd appears to already be running on this machine (`pgrep -xl etcd`) (or its a zombie and you need to kill its parent)."
     kube::log::usage "retry after you resolve this etcd error."
     exit 1
   fi

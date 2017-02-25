@@ -76,7 +76,6 @@ func makeContainerName(s *runtimeapi.PodSandboxConfig, c *runtimeapi.ContainerCo
 		s.Metadata.Uid,                        // 4  sandbox uid
 		fmt.Sprintf("%d", c.Metadata.Attempt), // 5
 	}, nameDelimiter)
-
 }
 
 // randomizeName randomizes the container name. This should only be used when we hit the

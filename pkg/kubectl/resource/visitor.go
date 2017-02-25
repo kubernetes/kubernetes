@@ -695,3 +695,13 @@ func FilterBySelector(s labels.Selector) FilterFunc {
 		return true, nil
 	}
 }
+
+type InfoListVisitor []*Info
+
+func (infos InfoListVisitor) Visit(fn VisitorFunc) error {
+	var err error
+	for _, i := range infos {
+		err = fn(i, err)
+	}
+	return err
+}

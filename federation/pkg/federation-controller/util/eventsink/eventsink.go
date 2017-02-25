@@ -26,7 +26,6 @@ import (
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/pkg/api"
 	kubev1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -54,7 +53,7 @@ func init() {
 		&kubev1.Event{},
 	)
 	if err := scheme.AddConversionFuncs(
-		api.Convert_unversioned_Time_To_unversioned_Time,
+		metav1.Convert_unversioned_Time_To_unversioned_Time,
 	); err != nil {
 		panic(err)
 	}

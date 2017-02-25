@@ -31,6 +31,11 @@ import (
 
 var upgradeTests = []upgrades.Test{
 	&upgrades.ServiceUpgradeTest{},
+	&upgrades.SecretUpgradeTest{},
+	&upgrades.StatefulSetUpgradeTest{},
+	&upgrades.DeploymentUpgradeTest{},
+	&upgrades.ConfigMapUpgradeTest{},
+	&upgrades.HPAUpgradeTest{},
 }
 
 var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {

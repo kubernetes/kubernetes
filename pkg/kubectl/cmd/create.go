@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type CreateOptions struct {
@@ -59,7 +60,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "create -f FILENAME",
-		Short:   "Create a resource by filename or stdin",
+		Short:   i18n.T("Create a resource by filename or stdin"),
 		Long:    create_long,
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -94,7 +95,9 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateServiceAccount(f, out))
 	cmd.AddCommand(NewCmdCreateService(f, out, errOut))
 	cmd.AddCommand(NewCmdCreateDeployment(f, out))
+	cmd.AddCommand(NewCmdCreateClusterRole(f, out))
 	cmd.AddCommand(NewCmdCreateClusterRoleBinding(f, out))
+	cmd.AddCommand(NewCmdCreateRole(f, out))
 	cmd.AddCommand(NewCmdCreateRoleBinding(f, out))
 	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, out))
 	return cmd
@@ -251,9 +254,11 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 	if err != nil {
 		return err
 	}
-	if err := kubectl.UpdateApplyAnnotation(info, f.JSONEncoder()); err != nil {
+	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
 		return err
 	}
+	obj = info.Object
+
 	if !options.DryRun {
 		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
 		if err != nil {

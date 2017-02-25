@@ -28,7 +28,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/util/initsystem"
@@ -124,7 +123,7 @@ func (r *Reset) Run(out io.Writer) error {
 
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
 	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
-	etcdManifestPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests/etcd.json")
+	etcdManifestPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests/etcd.yaml")
 	if _, err := os.Stat(etcdManifestPath); err == nil {
 		dirsToClean = append(dirsToClean, "/var/lib/etcd")
 	} else {
@@ -151,7 +150,7 @@ func drainAndRemoveNode(removeNode bool) error {
 	hostname = strings.ToLower(hostname)
 
 	// TODO: Use the "native" k8s client for this once we're confident the versioned is working
-	kubeConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.KubeletKubeConfigFileName)
+	kubeConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
 
 	getNodesCmd := fmt.Sprintf("kubectl --kubeconfig %s get nodes | grep %s", kubeConfigPath, hostname)
 	output, err := exec.Command("sh", "-c", getNodesCmd).Output()
@@ -222,9 +221,8 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	}
 
 	filesToClean := []string{
-		filepath.Join(configPathDir, kubeconfig.AdminKubeConfigFileName),
-		filepath.Join(configPathDir, kubeconfig.KubeletKubeConfigFileName),
-		filepath.Join(configPathDir, kubeadmconstants.CACertName),
+		filepath.Join(configPathDir, kubeadmconstants.AdminKubeConfigFileName),
+		filepath.Join(configPathDir, kubeadmconstants.KubeletKubeConfigFileName),
 	}
 	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {

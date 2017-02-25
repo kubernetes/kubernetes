@@ -27,6 +27,7 @@ type Clock interface {
 	Now() time.Time
 	Since(time.Time) time.Duration
 	After(d time.Duration) <-chan time.Time
+	NewTimer(d time.Duration) Timer
 	Sleep(d time.Duration)
 	Tick(d time.Duration) <-chan time.Time
 }
@@ -55,6 +56,12 @@ func (RealClock) After(d time.Duration) <-chan time.Time {
 	return time.After(d)
 }
 
+func (RealClock) NewTimer(d time.Duration) Timer {
+	return &realTimer{
+		timer: time.NewTimer(d),
+	}
+}
+
 func (RealClock) Tick(d time.Duration) <-chan time.Time {
 	return time.Tick(d)
 }
@@ -76,7 +83,8 @@ type fakeClockWaiter struct {
 	targetTime    time.Time
 	stepInterval  time.Duration
 	skipIfBlocked bool
-	destChan      chan<- time.Time
+	destChan      chan time.Time
+	fired         bool
 }
 
 func NewFakeClock(t time.Time) *FakeClock {
@@ -112,6 +120,23 @@ func (f *FakeClock) After(d time.Duration) <-chan time.Time {
 	return ch
 }
 
+// Fake version of time.NewTimer(d).
+func (f *FakeClock) NewTimer(d time.Duration) Timer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	stopTime := f.time.Add(d)
+	ch := make(chan time.Time, 1) // Don't block!
+	timer := &fakeTimer{
+		fakeClock: f,
+		waiter: fakeClockWaiter{
+			targetTime: stopTime,
+			destChan:   ch,
+		},
+	}
+	f.waiters = append(f.waiters, timer.waiter)
+	return timer
+}
+
 func (f *FakeClock) Tick(d time.Duration) <-chan time.Time {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -127,7 +152,7 @@ func (f *FakeClock) Tick(d time.Duration) <-chan time.Time {
 	return ch
 }
 
-// Move clock by Duration, notify anyone that's called After or Tick
+// Move clock by Duration, notify anyone that's called After, Tick, or NewTimer
 func (f *FakeClock) Step(d time.Duration) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -152,10 +177,12 @@ func (f *FakeClock) setTimeLocked(t time.Time) {
 			if w.skipIfBlocked {
 				select {
 				case w.destChan <- t:
+					w.fired = true
 				default:
 				}
 			} else {
 				w.destChan <- t
+				w.fired = true
 			}
 
 			if w.stepInterval > 0 {
@@ -209,10 +236,92 @@ func (*IntervalClock) After(d time.Duration) <-chan time.Time {
 
 // Unimplemented, will panic.
 // TODO: make interval clock use FakeClock so this can be implemented.
+func (*IntervalClock) NewTimer(d time.Duration) Timer {
+	panic("IntervalClock doesn't implement NewTimer")
+}
+
+// Unimplemented, will panic.
+// TODO: make interval clock use FakeClock so this can be implemented.
 func (*IntervalClock) Tick(d time.Duration) <-chan time.Time {
 	panic("IntervalClock doesn't implement Tick")
 }
 
 func (*IntervalClock) Sleep(d time.Duration) {
 	panic("IntervalClock doesn't implement Sleep")
+}
+
+// Timer allows for injecting fake or real timers into code that
+// needs to do arbitrary things based on time.
+type Timer interface {
+	C() <-chan time.Time
+	Stop() bool
+	Reset(d time.Duration) bool
+}
+
+var (
+	_ = Timer(&realTimer{})
+	_ = Timer(&fakeTimer{})
+)
+
+// realTimer is backed by an actual time.Timer.
+type realTimer struct {
+	timer *time.Timer
+}
+
+// C returns the underlying timer's channel.
+func (r *realTimer) C() <-chan time.Time {
+	return r.timer.C
+}
+
+// Stop calls Stop() on the underlying timer.
+func (r *realTimer) Stop() bool {
+	return r.timer.Stop()
+}
+
+// Reset calls Reset() on the underlying timer.
+func (r *realTimer) Reset(d time.Duration) bool {
+	return r.timer.Reset(d)
+}
+
+// fakeTimer implements Timer based on a FakeClock.
+type fakeTimer struct {
+	fakeClock *FakeClock
+	waiter    fakeClockWaiter
+}
+
+// C returns the channel that notifies when this timer has fired.
+func (f *fakeTimer) C() <-chan time.Time {
+	return f.waiter.destChan
+}
+
+// Stop stops the timer and returns true if the timer has not yet fired, or false otherwise.
+func (f *fakeTimer) Stop() bool {
+	f.fakeClock.lock.Lock()
+	defer f.fakeClock.lock.Unlock()
+
+	newWaiters := make([]fakeClockWaiter, 0, len(f.fakeClock.waiters))
+	for i := range f.fakeClock.waiters {
+		w := &f.fakeClock.waiters[i]
+		if w != &f.waiter {
+			newWaiters = append(newWaiters, *w)
+		}
+	}
+
+	f.fakeClock.waiters = newWaiters
+
+	return !f.waiter.fired
+}
+
+// Reset resets the timer to the fake clock's "now" + d. It returns true if the timer has not yet
+// fired, or false otherwise.
+func (f *fakeTimer) Reset(d time.Duration) bool {
+	f.fakeClock.lock.Lock()
+	defer f.fakeClock.lock.Unlock()
+
+	active := !f.waiter.fired
+
+	f.waiter.fired = false
+	f.waiter.targetTime = f.fakeClock.time.Add(d)
+
+	return active
 }

@@ -24,7 +24,6 @@ go_library(
         "//federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/client-go/discovery",
-        "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
@@ -42,6 +41,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//federation/client/clientset_generated/federation_clientset/fake:all-srcs",
+        "//federation/client/clientset_generated/federation_clientset/scheme:all-srcs",
         "//federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1:all-srcs",
         "//federation/client/clientset_generated/federation_clientset/typed/batch/v1:all-srcs",
         "//federation/client/clientset_generated/federation_clientset/typed/core/v1:all-srcs",

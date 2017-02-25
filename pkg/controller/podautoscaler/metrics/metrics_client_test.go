@@ -64,9 +64,8 @@ type metricPoint struct {
 }
 
 type testCase struct {
-	desiredResourceValues PodResourceInfo
-	desiredMetricValues   PodMetricsInfo
-	desiredError          error
+	desiredMetricValues PodMetricsInfo
+	desiredError        error
 
 	replicas              int
 	targetTimestamp       int
@@ -190,7 +189,7 @@ func buildPod(namespace, podName string, podLabels map[string]string, phase v1.P
 	}
 }
 
-func (tc *testCase) verifyResults(t *testing.T, metrics interface{}, timestamp time.Time, err error) {
+func (tc *testCase) verifyResults(t *testing.T, metrics PodMetricsInfo, timestamp time.Time, err error) {
 	if tc.desiredError != nil {
 		assert.Error(t, err, "there should be an error retrieving the metrics")
 		assert.Contains(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError), "the error message should be eas expected")
@@ -199,13 +198,7 @@ func (tc *testCase) verifyResults(t *testing.T, metrics interface{}, timestamp t
 	assert.NoError(t, err, "there should be no error retrieving the metrics")
 	assert.NotNil(t, metrics, "there should be metrics returned")
 
-	if metricsInfo, wasRaw := metrics.(PodMetricsInfo); wasRaw {
-		assert.Equal(t, tc.desiredMetricValues, metricsInfo, "the raw metrics values should be as expected")
-	} else if resourceInfo, wasResource := metrics.(PodResourceInfo); wasResource {
-		assert.Equal(t, tc.desiredResourceValues, resourceInfo, "the resource metrics values be been as expected")
-	} else {
-		assert.False(t, true, "should return either resource metrics info or raw metrics info")
-	}
+	assert.Equal(t, tc.desiredMetricValues, metrics, "the metrics values should be as expected")
 
 	targetTimestamp := fixedTimestamp.Add(time.Duration(tc.targetTimestamp) * time.Minute)
 	assert.True(t, targetTimestamp.Equal(timestamp), fmt.Sprintf("the timestamp should be as expected (%s) but was %s", targetTimestamp, timestamp))
@@ -227,7 +220,7 @@ func (tc *testCase) runTest(t *testing.T) {
 func TestCPU(t *testing.T) {
 	tc := testCase{
 		replicas: 3,
-		desiredResourceValues: PodResourceInfo{
+		desiredMetricValues: PodMetricsInfo{
 			"test-pod-0": 5000, "test-pod-1": 5000, "test-pod-2": 5000,
 		},
 		resourceName:       v1.ResourceCPU,
@@ -241,7 +234,7 @@ func TestQPS(t *testing.T) {
 	tc := testCase{
 		replicas: 3,
 		desiredMetricValues: PodMetricsInfo{
-			"test-pod-0": 10, "test-pod-1": 20, "test-pod-2": 10,
+			"test-pod-0": 10000, "test-pod-1": 20000, "test-pod-2": 10000,
 		},
 		metricName:            "qps",
 		targetTimestamp:       1,
@@ -266,7 +259,7 @@ func TestQpsSumEqualZero(t *testing.T) {
 func TestCPUMoreMetrics(t *testing.T) {
 	tc := testCase{
 		replicas: 5,
-		desiredResourceValues: PodResourceInfo{
+		desiredMetricValues: PodMetricsInfo{
 			"test-pod-0": 5000, "test-pod-1": 5000, "test-pod-2": 5000,
 			"test-pod-3": 5000, "test-pod-4": 5000,
 		},
@@ -280,7 +273,7 @@ func TestCPUMoreMetrics(t *testing.T) {
 func TestCPUMissingMetrics(t *testing.T) {
 	tc := testCase{
 		replicas: 3,
-		desiredResourceValues: PodResourceInfo{
+		desiredMetricValues: PodMetricsInfo{
 			"test-pod-0": 4000,
 		},
 		resourceName:       v1.ResourceCPU,
@@ -326,7 +319,7 @@ func TestQpsEmptyEntries(t *testing.T) {
 		replicas:   3,
 		metricName: "qps",
 		desiredMetricValues: PodMetricsInfo{
-			"test-pod-0": 4000, "test-pod-2": 2000,
+			"test-pod-0": 4000000, "test-pod-2": 2000000,
 		},
 		targetTimestamp:       4,
 		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}, {}, {{2000, 4}}},
@@ -348,7 +341,7 @@ func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 	tc := testCase{
 		replicas:     3,
 		resourceName: v1.ResourceCPU,
-		desiredResourceValues: PodResourceInfo{
+		desiredMetricValues: PodMetricsInfo{
 			"test-pod-0": 100, "test-pod-1": 700,
 		},
 		reportedPodMetrics: [][]int64{{100}, {300, 400}, {}},

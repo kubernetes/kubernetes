@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/spf13/cobra"
 )
@@ -64,7 +65,7 @@ func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "convert -f FILENAME",
-		Short:   "Convert config files between different API versions",
+		Short:   i18n.T("Convert config files between different API versions"),
 		Long:    convert_long,
 		Example: convert_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -79,8 +80,9 @@ func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddNonDeprecatedPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&options.local, "local", true, "If true, convert will NOT try to contact api-server but run locally.")
+	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
@@ -99,9 +101,24 @@ type ConvertOptions struct {
 	outputVersion schema.GroupVersion
 }
 
+// outputVersion returns the preferred output version for generic content (JSON, YAML, or templates)
+// defaultVersion is never mutated.  Nil simply allows clean passing in common usage from client.Config
+func outputVersion(cmd *cobra.Command, defaultVersion *schema.GroupVersion) (schema.GroupVersion, error) {
+	outputVersionString := cmdutil.GetFlagString(cmd, "output-version")
+	if len(outputVersionString) == 0 {
+		if defaultVersion == nil {
+			return schema.GroupVersion{}, nil
+		}
+
+		return *defaultVersion, nil
+	}
+
+	return schema.ParseGroupVersion(outputVersionString)
+}
+
 // Complete collects information required to run Convert command from command line.
 func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
-	o.outputVersion, err = cmdutil.OutputVersion(cmd, &api.Registry.EnabledVersionsForGroup(api.GroupName)[0])
+	o.outputVersion, err = outputVersion(cmd, &api.Registry.EnabledVersionsForGroup(api.GroupName)[0])
 	if err != nil {
 		return err
 	}

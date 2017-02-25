@@ -21,7 +21,7 @@ package mount
 import (
 	"bufio"
 	"fmt"
-	"hash/adler32"
+	"hash/fnv"
 	"io"
 	"os"
 	"os/exec"
@@ -282,7 +282,7 @@ func readProcMounts(mountFilePath string, out *[]MountPoint) (uint32, error) {
 }
 
 func readProcMountsFrom(file io.Reader, out *[]MountPoint) (uint32, error) {
-	hash := adler32.New()
+	hash := fnv.New32a()
 	scanner := bufio.NewReader(file)
 	for {
 		line, err := scanner.ReadString('\n')
@@ -347,17 +347,22 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 	// Try to mount the disk
 	glog.V(4).Infof("Attempting to mount disk: %s %s %s", fstype, source, target)
-	err = mounter.Interface.Mount(source, target, fstype, options)
-	if err != nil {
-		// It is possible that this disk is not formatted. Double check using diskLooksUnformatted
-		notFormatted, err := mounter.diskLooksUnformatted(source)
-		if err == nil && notFormatted {
-			args = []string{source}
+	mountErr := mounter.Interface.Mount(source, target, fstype, options)
+	if mountErr != nil {
+		// Mount failed. This indicates either that the disk is unformatted or
+		// it contains an unexpected filesystem.
+		existingFormat, err := mounter.getDiskFormat(source)
+		if err != nil {
+			return err
+		}
+		if existingFormat == "" {
 			// Disk is unformatted so format it.
+			args = []string{source}
 			// Use 'ext4' as the default
 			if len(fstype) == 0 {
 				fstype = "ext4"
 			}
+
 			if fstype == "ext4" || fstype == "ext3" {
 				args = []string{"-F", source}
 			}
@@ -371,13 +376,22 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			}
 			glog.Errorf("format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", source, fstype, target, options, err)
 			return err
+		} else {
+			// Disk is already formatted and failed to mount
+			if len(fstype) == 0 || fstype == existingFormat {
+				// This is mount error
+				return mountErr
+			} else {
+				// Block device is formatted with unexpected filesystem, let the user know
+				return fmt.Errorf("failed to mount the volume as %q, it's already formatted with %q. Mount error: %v", fstype, existingFormat, mountErr)
+			}
 		}
 	}
-	return err
+	return mountErr
 }
 
 // diskLooksUnformatted uses 'lsblk' to see if the given disk is unformated
-func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
+func (mounter *SafeFormatAndMount) getDiskFormat(disk string) (string, error) {
 	args := []string{"-nd", "-o", "FSTYPE", disk}
 	cmd := mounter.Runner.Command("lsblk", args...)
 	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
@@ -389,8 +403,8 @@ func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, erro
 
 	if err != nil {
 		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
-		return false, err
+		return "", err
 	}
 
-	return output == "", nil
+	return strings.TrimSpace(output), nil
 }

@@ -29,14 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-const (
-	// Annotation key used to identify mirror pods.
-	mirrorAnnotationKey = "kubernetes.io/config.mirror"
-
-	// Value used to identify mirror pods from pre-v1.1 kubelet.
-	mirrorAnnotationValue_1_0 = "mirror"
-)
-
 // This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are
 // converted the most in the cluster.
 // TODO: generate one of these for every external API group - this is to prove the impact
@@ -279,7 +271,7 @@ func Convert_v1_ReplicationController_to_extensions_ReplicaSet(in *ReplicationCo
 func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *ReplicationControllerSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
 	out.Replicas = *in.Replicas
 	if in.Selector != nil {
-		api.Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
+		metav1.Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
 	}
 	if in.Template != nil {
 		if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, &out.Template, s); err != nil {
@@ -322,7 +314,7 @@ func Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(in *exten
 	out.MinReadySeconds = in.MinReadySeconds
 	var invalidErr error
 	if in.Selector != nil {
-		invalidErr = api.Convert_unversioned_LabelSelector_to_map(in.Selector, &out.Selector, s)
+		invalidErr = metav1.Convert_unversioned_LabelSelector_to_map(in.Selector, &out.Selector, s)
 	}
 	out.Template = new(PodTemplateSpec)
 	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, out.Template, s); err != nil {
@@ -587,17 +579,6 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 		out.Annotations[PodInitContainerStatusesBetaAnnotationKey] = string(value)
 	}
 
-	// We need to reset certain fields for mirror pods from pre-v1.1 kubelet
-	// (#15960).
-	// TODO: Remove this code after we drop support for v1.0 kubelets.
-	if value, ok := in.Annotations[mirrorAnnotationKey]; ok && value == mirrorAnnotationValue_1_0 {
-		// Reset the TerminationGracePeriodSeconds.
-		out.Spec.TerminationGracePeriodSeconds = nil
-		// Reset the resource requests.
-		for i := range out.Spec.Containers {
-			out.Spec.Containers[i].Resources.Requests = nil
-		}
-	}
 	return nil
 }
 

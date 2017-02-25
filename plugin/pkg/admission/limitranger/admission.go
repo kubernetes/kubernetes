@@ -34,8 +34,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	coreinternallisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -54,7 +54,7 @@ type limitRanger struct {
 	*admission.Handler
 	client  internalclientset.Interface
 	actions LimitRangerActions
-	lister  coreinternallisters.LimitRangeLister
+	lister  corelisters.LimitRangeLister
 
 	// liveLookups holds the last few live lookups we've done to help ammortize cost on repeated lookup failures.
 	// This let's us handle the case of latent caches, by looking up actual results for a namespace on cache miss/no results.
@@ -69,9 +69,9 @@ type liveLookupEntry struct {
 }
 
 func (l *limitRanger) SetInformerFactory(f informers.SharedInformerFactory) {
-	limitRangeInformer := f.InternalLimitRanges().Informer()
-	l.SetReadyFunc(limitRangeInformer.HasSynced)
-	l.lister = f.InternalLimitRanges().Lister()
+	limitRangeInformer := f.Core().InternalVersion().LimitRanges()
+	l.SetReadyFunc(limitRangeInformer.Informer().HasSynced)
+	l.lister = limitRangeInformer.Lister()
 }
 
 func (l *limitRanger) Validate() error {
@@ -167,6 +167,7 @@ func NewLimitRanger(actions LimitRangerActions) (admission.Interface, error) {
 	}, nil
 }
 
+var _ = kubeapiserveradmission.WantsInformerFactory(&limitRanger{})
 var _ = kubeapiserveradmission.WantsInternalClientSet(&limitRanger{})
 
 func (a *limitRanger) SetInternalClientSet(client internalclientset.Interface) {

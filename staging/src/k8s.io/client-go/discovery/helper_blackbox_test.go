@@ -118,9 +118,9 @@ func TestNegotiateVersion(t *testing.T) {
 			statusCode:      http.StatusNotFound,
 		},
 		{
-			name:       "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, no fallback GroupVersion",
-			expectErr:  func(err error) bool { return strings.Contains(err.Error(), "failed to negotiate an api version;") },
-			statusCode: http.StatusForbidden,
+			name:            "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, fallback to empty GroupVersion",
+			expectedVersion: &schema.GroupVersion{},
+			statusCode:      http.StatusForbidden,
 		},
 	}
 

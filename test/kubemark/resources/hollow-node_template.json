@@ -35,12 +35,6 @@
 					{
 						"name": "logs-volume",
 						"hostPath": {
-							"path": "/var/logs"
-						}
-					},
-					{
-						"name": "kernellog-volume",
-						"hostPath": {
 							"path": "/var/log"
 						}
 					},
@@ -52,7 +46,7 @@
 				"containers": [
 				{
 					"name": "hollow-kubelet",
-					"image": "gcr.io/{{project}}/kubemark:latest",
+					"image": "{{registry}}/{{project}}/kubemark:latest",
 					"ports": [
 						{"containerPort": 4194},
 						{"containerPort": 10250},
@@ -80,7 +74,7 @@
 					"command": [
 						"/bin/sh",
 						"-c",
-						"./kubemark.sh --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/logs/kubelet_$(NODE_NAME).log 2>&1"
+						"./kubemark.sh --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
@@ -90,7 +84,7 @@
 						},
 						{
 							"name": "logs-volume",
-							"mountPath": "/var/logs"
+							"mountPath": "/var/log"
 						}
 					],
 					"resources": {
@@ -106,7 +100,7 @@
 				},
 				{
 					"name": "hollow-proxy",
-					"image": "gcr.io/{{project}}/kubemark:latest",
+					"image": "{{registry}}/{{project}}/kubemark:latest",
 					"env": [
 						{
 							"name": "CONTENT_TYPE",
@@ -129,7 +123,7 @@
 					"command": [
 						"/bin/sh",
 						"-c",
-						"./kubemark.sh --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/logs/kubeproxy_$(NODE_NAME).log 2>&1"
+						"./kubemark.sh --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
@@ -139,13 +133,13 @@
 						},
 						{
 							"name": "logs-volume",
-							"mountPath": "/var/logs"
+							"mountPath": "/var/log"
 						}
 					],
 					"resources": {
 						"requests": {
-							"cpu": "20m",
-							"memory": "100M"
+							"cpu": "{{HOLLOW_PROXY_CPU}}m",
+							"memory": "{{HOLLOW_PROXY_MEM}}Ki"
 						}
 					}
 				},
@@ -163,11 +157,9 @@
 						}
 					],
 					"command": [
-						"/node-problem-detector",
-						"--kernel-monitor=/config/kernel.monitor",
-						"--apiserver-override=https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig",
-						"--alsologtostderr",
-						"1>>/var/logs/npd_$(NODE_NAME).log 2>&1"
+						"/bin/sh",
+						"-c",
+						"/node-problem-detector --kernel-monitor=/config/kernel.monitor --apiserver-override=\"https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig\" --alsologtostderr 1>>/var/log/npd-$(NODE_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
@@ -181,18 +173,13 @@
 							"readOnly": true
 						},
 						{
-							"name": "kernellog-volume",
-							"mountPath": "/log",
-							"readOnly": true
-						},
-						{
 							"name": "no-serviceaccount-access-to-real-master",
 							"mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
 							"readOnly": true
 						},
 						{
 							"name": "logs-volume",
-							"mountPath": "/var/logs"
+							"mountPath": "/var/log"
 						}
 					],
 					"resources": {

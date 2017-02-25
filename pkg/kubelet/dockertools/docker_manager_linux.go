@@ -52,8 +52,13 @@ func getContainerIP(container *dockertypes.ContainerJSON) string {
 func getNetworkingMode() string { return "" }
 
 // Returns true if the container name matches the infrastructure's container name
-func containerProvidesPodIP(name *KubeletContainerName) bool {
-	return name.ContainerName == PodInfraContainerName
+func containerProvidesPodIP(containerName string) bool {
+	return containerName == PodInfraContainerName
+}
+
+// Only the infrastructure container needs network setup/teardown
+func containerIsNetworked(containerName string) bool {
+	return containerName == PodInfraContainerName
 }
 
 // Returns Seccomp and AppArmor Security options

@@ -12,8 +12,8 @@ go_test(
     srcs = ["openshift_test.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/server:go_default_library",
         "//pkg/master:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/server",
     ],
 )
 

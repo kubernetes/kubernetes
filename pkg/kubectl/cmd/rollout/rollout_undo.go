@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/spf13/cobra"
 )
@@ -68,7 +69,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "undo (TYPE NAME | TYPE/NAME) [flags]",
-		Short:   "Undo a previous rollout",
+		Short:   i18n.T("Undo a previous rollout"),
 		Long:    undo_long,
 		Example: undo_example,
 		Run: func(cmd *cobra.Command, args []string) {

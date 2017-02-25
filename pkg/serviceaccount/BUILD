@@ -23,6 +23,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/serviceaccount",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 
@@ -38,6 +39,7 @@ go_test(
         "//pkg/serviceaccount:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apiserver/pkg/authentication/serviceaccount",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

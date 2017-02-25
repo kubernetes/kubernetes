@@ -226,6 +226,18 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *Watch
 	return objChan
 }
 
+// Adds an update reactor to the given fake client.
+// The reactor just returns the object passed to update action.
+// This is used as a hack to workaround https://github.com/kubernetes/kubernetes/issues/40939.
+// Without this, all update actions using fake client return empty objects.
+func AddFakeUpdateReactor(resource string, client *core.Fake) {
+	client.AddReactor("update", resource, func(action core.Action) (bool, runtime.Object, error) {
+		updateAction := action.(core.UpdateAction)
+		originalObj := updateAction.GetObject()
+		return true, originalObj, nil
+	})
+}
+
 // GetObjectFromChan tries to get an api object from the given channel
 // within a reasonable time.
 func GetObjectFromChan(c chan runtime.Object) runtime.Object {

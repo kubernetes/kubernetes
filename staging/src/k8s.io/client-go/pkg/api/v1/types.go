@@ -2107,10 +2107,9 @@ type PodSpec struct {
 	// of that value or the sum of the normal containers. Limits are applied to init containers
 	// in a similar fashion.
 	// Init containers cannot currently be added or removed.
-	// Init containers are in alpha state and may change without notice.
 	// Cannot be updated.
 	// More info: http://kubernetes.io/docs/user-guide/containers
-	InitContainers []Container `json:"-"  patchStrategy:"merge" patchMergeKey:"name"`
+	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
 	// List of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
 	// There must be at least one container in a Pod.
@@ -2204,6 +2203,9 @@ type PodSpec struct {
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string `json:"schedulername,omitempty" protobuf:"bytes,19,opt,name=schedulername"`
+	// If specified, the pod's tolerations.
+	// +optional
+	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,21,opt,name=tolerations"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -2297,9 +2299,9 @@ type PodStatus struct {
 	// The list has one entry per init container in the manifest. The most recent successful
 	// init container will have ready = true, the most recently started container will have
 	// startTime set.
-	// Init containers are in alpha state and may change without notice.
 	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
-	InitContainerStatuses []ContainerStatus `json:"-"`
+	InitContainerStatuses []ContainerStatus `json:"initContainerStatuses,omitempty" protobuf:"bytes,10,rep,name=initContainerStatuses"`
+
 	// The list has one entry per container in the manifest. Each entry is currently the output
 	// of `docker inspect`.
 	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
@@ -2935,6 +2937,9 @@ type NodeSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration
 	// +optional
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
+	// If specified, the node's taints.
+	// +optional
+	Taints []Taint `json:"taints,omitempty"  protobuf:"bytes,5,opt,name=taints"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -3220,7 +3225,8 @@ type NodeList struct {
 // FinalizerName is the name identifying a finalizer during namespace lifecycle.
 type FinalizerName string
 
-// These are internal finalizer values to Kubernetes, must be qualified name unless defined here
+// These are internal finalizer values to Kubernetes, must be qualified name unless defined here or
+// in metav1.
 const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
 )

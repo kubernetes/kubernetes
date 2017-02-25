@@ -45,7 +45,8 @@ var _ = framework.KubeDescribe("Pods Extended", func() {
 		BeforeEach(func() {
 			podClient = f.PodClient()
 		})
-		It("should be submitted and removed [Conformance]", func() {
+		// Flaky issue #36821.
+		It("should be submitted and removed [Conformance] [Flaky]", func() {
 			By("creating the pod")
 			name := "pod-submit-remove-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
@@ -164,7 +165,7 @@ var _ = framework.KubeDescribe("Pods Extended", func() {
 			deleted := false
 			timeout := false
 			var lastPod *v1.Pod
-			timer := time.After(30 * time.Second)
+			timer := time.After(1 * time.Minute)
 			for !deleted && !timeout {
 				select {
 				case event, _ := <-w.ResultChan():

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var patchTypes = map[string]types.PatchType{"json": types.JSONPatchType, "merge": types.MergePatchType, "strategic": types.StrategicMergePatchType}
@@ -91,7 +92,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "patch (-f FILENAME | TYPE NAME) -p PATCH",
-		Short:   "Update field(s) of a resource using strategic merge patch",
+		Short:   i18n.T("Update field(s) of a resource using strategic merge patch"),
 		Long:    patch_long,
 		Example: patch_example,
 		Run: func(cmd *cobra.Command, args []string) {

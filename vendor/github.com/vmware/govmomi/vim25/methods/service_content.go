@@ -17,21 +17,21 @@ limitations under the License.
 package methods
 
 import (
+	"context"
 	"time"
 
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
-var serviceInstance = types.ManagedObjectReference{
+var ServiceInstance = types.ManagedObjectReference{
 	Type:  "ServiceInstance",
 	Value: "ServiceInstance",
 }
 
 func GetServiceContent(ctx context.Context, r soap.RoundTripper) (types.ServiceContent, error) {
 	req := types.RetrieveServiceContent{
-		This: serviceInstance,
+		This: ServiceInstance,
 	}
 
 	res, err := RetrieveServiceContent(ctx, r, &req)
@@ -44,7 +44,7 @@ func GetServiceContent(ctx context.Context, r soap.RoundTripper) (types.ServiceC
 
 func GetCurrentTime(ctx context.Context, r soap.RoundTripper) (*time.Time, error) {
 	req := types.CurrentTime{
-		This: serviceInstance,
+		This: ServiceInstance,
 	}
 
 	res, err := CurrentTime(ctx, r, &req)

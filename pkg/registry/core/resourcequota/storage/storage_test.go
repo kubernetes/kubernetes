@@ -26,11 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
@@ -201,4 +201,12 @@ func TestUpdateStatus(t *testing.T) {
 	if !apiequality.Semantic.DeepEqual(resourcequotaIn.Status, rqOut.Status) {
 		t.Errorf("unexpected object: %s", diff.ObjectDiff(resourcequotaIn, rqOut))
 	}
+}
+
+func TestShortNames(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"quota"}
+	registrytest.AssertShortNames(t, storage, expected)
 }

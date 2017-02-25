@@ -21,6 +21,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -99,6 +100,10 @@ func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction)
 		response.ResponseWriter = rw
 
 		routeFunc(request, response)
+
+		if verb == "LIST" && strings.ToLower(request.QueryParameter("watch")) == "true" {
+			verb = "WATCH"
+		}
 		Monitor(&verb, &resource, utilnet.GetHTTPClient(request.Request), rw.Header().Get("Content-Type"), delegate.status, now)
 	})
 }

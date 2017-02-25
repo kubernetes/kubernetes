@@ -58,8 +58,8 @@ fi
 # containervm. If you are updating the containervm version, update this
 # variable. Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-CVM_VERSION=${CVM_VERSION:-container-vm-v20170201}
-GCI_VERSION=${KUBE_GCI_VERSION:-gci-dev-56-8977-0-0}
+CVM_VERSION=${CVM_VERSION:-container-vm-v20170214}
+GCI_VERSION=${KUBE_GCI_VERSION:-gci-stable-56-9000-84-2}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
@@ -123,7 +123,7 @@ fi
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 # Optional: set feature gates
-FEATURE_GATES="${KUBE_FEATURE_GATES:-}"
+FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
@@ -143,7 +143,16 @@ CLUSTER_REGISTRY_DISK_TYPE_GCE="${CLUSTER_REGISTRY_DISK_TYPE_GCE:-pd-standard}"
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Optional: Install node problem detector.
-ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-true}"
+#   none           - Not run node problem detector.
+#   daemonset      - Run node problem detector as daemonset.
+#   standalone     - Run node problem detector as standalone system daemon.
+if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+  # Enable standalone mode by default for gci.
+  # TODO: Consider upgrade test.
+  ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-standalone}"
+else
+  ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-daemonset}"
+fi
 
 # Optional: Create autoscaler for cluster's nodes.
 ENABLE_CLUSTER_AUTOSCALER="${KUBE_ENABLE_CLUSTER_AUTOSCALER:-false}"

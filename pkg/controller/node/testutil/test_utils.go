@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api"
@@ -36,6 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
+
+	"github.com/golang/glog"
 )
 
 // FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface. It
@@ -227,6 +230,7 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 
 // FakeRecorder is used as a fake during testing.
 type FakeRecorder struct {
+	sync.Mutex
 	source clientv1.EventSource
 	Events []*clientv1.Event
 	clock  clock.Clock
@@ -247,20 +251,21 @@ func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eve
 }
 
 func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
-	ref, err := v1.GetReference(api.Scheme, obj)
+	f.Lock()
+	defer f.Unlock()
+	ref, err := clientv1.GetReference(api.Scheme, obj)
 	if err != nil {
+		glog.Errorf("Encoutered error while getting reference: %v", err)
 		return
 	}
 	event := f.makeEvent(ref, eventtype, reason, message)
 	event.Source = f.source
 	if f.Events != nil {
-		fmt.Println("write event")
 		f.Events = append(f.Events, event)
 	}
 }
 
-func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, message string) *clientv1.Event {
-	fmt.Println("make event")
+func (f *FakeRecorder) makeEvent(ref *clientv1.ObjectReference, eventtype, reason, message string) *clientv1.Event {
 	t := metav1.Time{Time: f.clock.Now()}
 	namespace := ref.Namespace
 	if namespace == "" {

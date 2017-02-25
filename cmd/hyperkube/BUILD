@@ -32,6 +32,7 @@ go_library(
         "federation-apiserver.go",
         "federation-controller-manager.go",
         "hyperkube.go",
+        "kube-aggregator.go",
         "kube-apiserver.go",
         "kube-controller-manager.go",
         "kube-proxy.go",
@@ -59,7 +60,6 @@ go_library(
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/util:go_default_library",
-        "//pkg/util/logs:go_default_library",
         "//pkg/version/prometheus:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//plugin/cmd/kube-scheduler/app:go_default_library",
@@ -67,6 +67,8 @@ go_library(
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
+        "//vendor:k8s.io/apiserver/pkg/util/logs",
+        "//vendor:k8s.io/kube-aggregator/pkg/cmd/server",
     ],
 )
 

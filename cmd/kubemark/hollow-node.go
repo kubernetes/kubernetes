@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/flag"
+	clientgoclientset "k8s.io/client-go/kubernetes"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -140,7 +141,21 @@ func main() {
 		endpointsConfig := proxyconfig.NewEndpointsConfig()
 		endpointsConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
-		hollowProxy := kubemark.NewHollowProxyOrDie(config.NodeName, internalClientset, endpointsConfig, serviceConfig, iptInterface, eventBroadcaster, recorder)
+		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
+		if err != nil {
+			glog.Fatalf("Failed to create API Server client: %v", err)
+		}
+
+		hollowProxy := kubemark.NewHollowProxyOrDie(
+			config.NodeName,
+			internalClientset,
+			eventClient,
+			endpointsConfig,
+			serviceConfig,
+			iptInterface,
+			eventBroadcaster,
+			recorder,
+		)
 		hollowProxy.Run()
 	}
 }

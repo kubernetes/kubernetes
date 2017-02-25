@@ -1,0 +1,7 @@
+apiVersion: serviceinjection.k8s.io/v1alpha1
+kind: ServiceInjection
+metadata:
+  name: injector
+  namespace: kube-system
+  labels:
+    sample-label: foo

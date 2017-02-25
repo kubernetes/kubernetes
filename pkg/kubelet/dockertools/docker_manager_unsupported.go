@@ -42,8 +42,12 @@ func getNetworkingMode() string {
 	return ""
 }
 
-func containerProvidesPodIP(name *KubeletContainerName) bool {
+func containerProvidesPodIP(containerName string) bool {
 	return false
+}
+
+func containerIsNetworked(containerName string) bool {
+	return containerName == PodInfraContainerName
 }
 
 // Returns nil as both Seccomp and AppArmor security options are not valid on Windows

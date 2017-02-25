@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/spf13/cobra"
 )
@@ -34,7 +35,7 @@ var (
 func NewCmdOptions(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "options",
-		Short:   "Print the list of flags inherited by all commands",
+		Short:   i18n.T("Print the list of flags inherited by all commands"),
 		Long:    "Print the list of flags inherited by all commands",
 		Example: options_example,
 		Run: func(cmd *cobra.Command, args []string) {

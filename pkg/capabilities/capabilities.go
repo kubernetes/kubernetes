@@ -68,7 +68,7 @@ func Setup(allowPrivileged bool, privilegedSources PrivilegedSources, perConnect
 	})
 }
 
-// SetCapabilitiesForTests.  Convenience method for testing.  This should only be called from tests.
+// SetForTests sets capabilities for tests.  Convenience method for testing.  This should only be called from tests.
 func SetForTests(c Capabilities) {
 	lock.Lock()
 	defer lock.Unlock()

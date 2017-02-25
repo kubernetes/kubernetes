@@ -71,6 +71,7 @@ user = user
 password = password
 insecure-flag = true
 datacenter = us-west
+vm-uuid = 1234
 `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -86,6 +87,10 @@ datacenter = us-west
 
 	if cfg.Global.Datacenter != "us-west" {
 		t.Errorf("incorrect datacenter: %s", cfg.Global.Datacenter)
+	}
+
+	if cfg.Global.VMUUID != "1234" {
+		t.Errorf("incorrect vm-uuid: %s", cfg.Global.VMUUID)
 	}
 }
 

@@ -47,7 +47,7 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			    and one node (where your workloads, like Pods and ReplicaSets run).
 
 			    ┌──────────────────────────────────────────────────────────┐
-			    │  On the first machine                                    │
+			    │ On the first machine                                     │
 			    ├──────────────────────────────────────────────────────────┤
 			    │ master# kubeadm init                                     │
 			    └──────────────────────────────────────────────────────────┘

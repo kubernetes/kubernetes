@@ -205,6 +205,10 @@ func (d *fakeCachedDiscoveryClient) Fresh() bool {
 func (d *fakeCachedDiscoveryClient) Invalidate() {
 }
 
+func (d *fakeCachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
+	return []*metav1.APIResourceList{}, nil
+}
+
 type TestFactory struct {
 	Mapper             meta.RESTMapper
 	Typer              runtime.ObjectTyper
@@ -216,6 +220,10 @@ type TestFactory struct {
 	Namespace          string
 	ClientConfig       *restclient.Config
 	Err                error
+	Command            string
+
+	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 }
 
 type FakeFactory struct {
@@ -267,7 +275,9 @@ func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper
 	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
 
-	return cmdutil.NewShortcutExpander(mapper, nil), typer, nil
+	fakeDs := &fakeCachedDiscoveryClient{}
+	expander, err := cmdutil.NewShortcutExpander(mapper, fakeDs)
+	return expander, typer, err
 }
 
 func (f *FakeFactory) Decoder(bool) runtime.Decoder {
@@ -294,7 +304,10 @@ func (f *FakeFactory) BareClientConfig() (*restclient.Config, error) {
 	return f.tf.ClientConfig, f.tf.Err
 }
 
-func (f *FakeFactory) ClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+func (f *FakeFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	if f.tf.ClientForMappingFunc != nil {
+		return f.tf.ClientForMappingFunc(mapping)
+	}
 	return f.tf.Client, f.tf.Err
 }
 
@@ -311,7 +324,10 @@ func (f *FakeFactory) ClientConfigForVersion(requiredVersion *schema.GroupVersio
 	return nil, nil
 }
 
-func (f *FakeFactory) UnstructuredClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+func (f *FakeFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	if f.tf.UnstructuredClientForMappingFunc != nil {
+		return f.tf.UnstructuredClientForMappingFunc(mapping)
+	}
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
@@ -422,7 +438,7 @@ func (f *FakeFactory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writ
 }
 
 func (f *FakeFactory) Command() string {
-	return ""
+	return f.tf.Command
 }
 
 func (f *FakeFactory) BindFlags(flags *pflag.FlagSet) {
@@ -481,6 +497,9 @@ func (f *fakeMixedFactory) ClientForMapping(m *meta.RESTMapping) (resource.RESTC
 	if m.ObjectConvertor == api.Scheme {
 		return f.apiClient, f.tf.Err
 	}
+	if f.tf.ClientForMappingFunc != nil {
+		return f.tf.ClientForMappingFunc(m)
+	}
 	return f.tf.Client, f.tf.Err
 }
 
@@ -506,8 +525,9 @@ func (f *fakeAPIFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTy
 	groupResources := testDynamicResources()
 	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
-
-	return cmdutil.NewShortcutExpander(mapper, nil), typer, nil
+	fakeDs := &fakeCachedDiscoveryClient{}
+	expander, err := cmdutil.NewShortcutExpander(mapper, fakeDs)
+	return expander, typer, err
 }
 
 func (f *fakeAPIFactory) Decoder(bool) runtime.Decoder {
@@ -553,11 +573,17 @@ func (f *fakeAPIFactory) ClientConfig() (*restclient.Config, error) {
 	return f.tf.ClientConfig, f.tf.Err
 }
 
-func (f *fakeAPIFactory) ClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+func (f *fakeAPIFactory) ClientForMapping(m *meta.RESTMapping) (resource.RESTClient, error) {
+	if f.tf.ClientForMappingFunc != nil {
+		return f.tf.ClientForMappingFunc(m)
+	}
 	return f.tf.Client, f.tf.Err
 }
 
-func (f *fakeAPIFactory) UnstructuredClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (resource.RESTClient, error) {
+	if f.tf.UnstructuredClientForMappingFunc != nil {
+		return f.tf.UnstructuredClientForMappingFunc(m)
+	}
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
@@ -591,12 +617,29 @@ func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restcli
 	}
 }
 
+func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object) (*api.Pod, error) {
+	switch t := object.(type) {
+	case *api.Pod:
+		return t, nil
+	default:
+		gvks, _, err := api.Scheme.ObjectKinds(object)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
+	}
+}
+
 func (f *fakeAPIFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
 	return f.tf.Validator, f.tf.Err
 }
 
 func (f *fakeAPIFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
+}
+
+func (f *fakeAPIFactory) Command() string {
+	return f.tf.Command
 }
 
 func (f *fakeAPIFactory) Generators(cmdName string) map[string]kubectl.Generator {
@@ -680,6 +723,39 @@ func testDynamicResources() []*discovery.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1beta1": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "storage.k8s.io",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta1"},
+					{Version: "v0"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1beta1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1beta1": {
+					{Name: "storageclasses", Namespaced: false, Kind: "StorageClass"},
+				},
+				// bogus version of a known group/version/resource to make sure kubectl falls back to generic object mode
+				"v0": {
+					{Name: "storageclasses", Namespaced: false, Kind: "StorageClass"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "company.com",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1": {
+					{Name: "bars", Namespaced: true, Kind: "Bar"},
 				},
 			},
 		},

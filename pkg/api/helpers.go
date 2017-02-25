@@ -429,14 +429,6 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 }
 
 const (
-	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
-	// in the Annotations of a Pod.
-	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
-
-	// TaintsAnnotationKey represents the key of taints data (json serialized)
-	// in the Annotations of a Node.
-	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
-
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
@@ -466,6 +458,11 @@ const (
 	// is at-your-own-risk. Pods that attempt to set an unsafe sysctl that is not enabled for a kubelet
 	// will fail to launch.
 	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
+
+	// ObjectTTLAnnotations represents a suggestion for kubelet for how long it can cache
+	// an object (e.g. secret, config map) before fetching it again from apiserver.
+	// This annotation can be attached to node.
+	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 )
 
 // TolerationToleratesTaint checks if the toleration tolerates the taint.

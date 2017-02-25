@@ -7,8 +7,10 @@ reviewers:
   - madhusudancs
   - rmmh
   - smarterclayton
+  - spiffxp
   - spxtr
   - sttts
+  - soltysh
 approvers:
   - deads2k
   - fejta
@@ -17,6 +19,12 @@ approvers:
   - liggitt
   - madhusudancs
   - smarterclayton
+  - spiffxp
   - spxtr
   - sttts
   - mikedanese
+  - janetkuo
+  - kargakis
+  - gmarek
+  - soltysh
+  - pwittrock # for test/e2e/kubectl.go

@@ -31,8 +31,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
@@ -70,7 +70,7 @@ func DefaultServiceAccountsControllerOptions() ServiceAccountsControllerOptions 
 }
 
 // NewServiceAccountsController returns a new *ServiceAccountsController.
-func NewServiceAccountsController(saInformer informers.ServiceAccountInformer, nsInformer informers.NamespaceInformer, cl clientset.Interface, options ServiceAccountsControllerOptions) *ServiceAccountsController {
+func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, options ServiceAccountsControllerOptions) *ServiceAccountsController {
 	e := &ServiceAccountsController{
 		client:                  cl,
 		serviceAccountsToEnsure: options.ServiceAccounts,
@@ -83,15 +83,15 @@ func NewServiceAccountsController(saInformer informers.ServiceAccountInformer, n
 	saInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.serviceAccountDeleted,
 	})
+	e.saLister = saInformer.Lister()
+	e.saListerSynced = saInformer.Informer().HasSynced
+
 	nsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
 	})
-
-	e.saSynced = saInformer.Informer().HasSynced
-	e.saLister = saInformer.Lister()
-	e.nsSynced = nsInformer.Informer().HasSynced
 	e.nsLister = nsInformer.Lister()
+	e.nsListerSynced = nsInformer.Informer().HasSynced
 
 	e.syncHandler = e.syncNamespace
 
@@ -106,11 +106,11 @@ type ServiceAccountsController struct {
 	// To allow injection for testing.
 	syncHandler func(key string) error
 
-	saLister *listers.StoreToServiceAccountLister
-	nsLister *listers.IndexerToNamespaceLister
+	saLister       corelisters.ServiceAccountLister
+	saListerSynced cache.InformerSynced
 
-	saSynced cache.InformerSynced
-	nsSynced cache.InformerSynced
+	nsLister       corelisters.NamespaceLister
+	nsListerSynced cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
 }
@@ -121,7 +121,8 @@ func (c *ServiceAccountsController) Run(workers int, stopCh <-chan struct{}) {
 
 	glog.Infof("Starting ServiceAccount controller")
 
-	if !cache.WaitForCacheSync(stopCh, c.saSynced) {
+	if !cache.WaitForCacheSync(stopCh, c.saListerSynced, c.nsListerSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
 

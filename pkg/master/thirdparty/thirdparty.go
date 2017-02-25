@@ -27,15 +27,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	genericapi "k8s.io/apiserver/pkg/endpoints"
+	genericapihandlers "k8s.io/apiserver/pkg/endpoints/handlers"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	serverstorgage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	genericapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints"
-	genericapihandlers "k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	thirdpartyresourcedatastore "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/storage"
@@ -70,7 +71,7 @@ type ThirdPartyResourceServer struct {
 	disableThirdPartyControllerForTesting bool
 }
 
-func NewThirdPartyResourceServer(genericAPIServer *genericapiserver.GenericAPIServer, storageFactory genericapiserver.StorageFactory) *ThirdPartyResourceServer {
+func NewThirdPartyResourceServer(genericAPIServer *genericapiserver.GenericAPIServer, storageFactory serverstorgage.StorageFactory) *ThirdPartyResourceServer {
 	ret := &ThirdPartyResourceServer{
 		genericAPIServer:    genericAPIServer,
 		thirdPartyResources: map[string]*thirdPartyEntry{},

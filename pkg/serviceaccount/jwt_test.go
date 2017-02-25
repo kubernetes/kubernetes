@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -106,7 +107,7 @@ X2i8uIp/C/ASqiIGUeeKQtX0/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 -----END PUBLIC KEY-----`
 
 func getPrivateKey(data string) interface{} {
-	key, _ := serviceaccount.ReadPrivateKeyFromPEM([]byte(data))
+	key, _ := cert.ParsePrivateKeyPEM([]byte(data))
 	return key
 }
 

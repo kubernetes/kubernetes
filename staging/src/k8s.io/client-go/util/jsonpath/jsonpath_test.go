@@ -113,13 +113,14 @@ func (b book) String() string {
 type bicycle struct {
 	Color string
 	Price float32
+	IsNew bool
 }
 
 type empName string
 type job string
 type store struct {
 	Book      []book
-	Bicycle   bicycle
+	Bicycle   []bicycle
 	Name      string
 	Labels    map[string]int
 	Employees map[empName]job
@@ -134,7 +135,10 @@ func TestStructInput(t *testing.T) {
 			{"fiction", "Evelyn Waugh", "Sword of Honour", 12.99},
 			{"fiction", "Herman Melville", "Moby Dick", 8.99},
 		},
-		Bicycle: bicycle{"red", 19.95},
+		Bicycle: []bicycle{
+			{"red", 19.95, true},
+			{"green", 20.01, false},
+		},
 		Labels: map[string]int{
 			"engieer":  10,
 			"web/html": 15,
@@ -158,14 +162,15 @@ func TestStructInput(t *testing.T) {
 		{"dict/", "{$.Employees.jason}", storeData, "manager"},
 		{"dict/", "{$.Employees.dan}", storeData, "clerk"},
 		{"dict-", "{.Labels.k8s-app}", storeData, "20"},
-		{"nest", "{.Bicycle.Color}", storeData, "red"},
+		{"nest", "{.Bicycle[*].Color}", storeData, "red green"},
 		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville"},
-		{"allfileds", "{.Bicycle.*}", storeData, "red 19.95"},
-		{"recurfileds", "{..Price}", storeData, "8.95 12.99 8.99 19.95"},
+		{"allfileds", "{.Bicycle.*}", storeData, "{red 19.95 true} {green 20.01 false}"},
+		{"recurfileds", "{..Price}", storeData, "8.95 12.99 8.99 19.95 20.01"},
 		{"lastarray", "{.Book[-1:]}", storeData,
 			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
 		{"recurarray", "{..Book[2]}", storeData,
 			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
+		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, "{red 19.95 true}"},
 	}
 	testJSONPath(storeTests, false, t)
 
@@ -220,6 +225,7 @@ func TestKubernetes(t *testing.T) {
 		  },
 		  "status":{
 			"capacity":{"cpu":"4"},
+			"ready": true,
 			"addresses":[{"type": "LegacyHostIP", "address":"127.0.0.1"}]
 		  }
 		},
@@ -233,6 +239,7 @@ func TestKubernetes(t *testing.T) {
 		  },
 		  "status":{
 			"capacity":{"cpu":"8"},
+			"ready": false,
 			"addresses":[
 			  {"type": "LegacyHostIP", "address":"127.0.0.2"},
 			  {"type": "another", "address":"127.0.0.3"}
@@ -272,6 +279,7 @@ func TestKubernetes(t *testing.T) {
 		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret"},
 		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1"},
 		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None"},
+		{"bool item", `{.items[?(@..ready==true)].metadata.name}`, &nodesData, "127.0.0.1"},
 	}
 	testJSONPath(nodesTests, false, t)
 

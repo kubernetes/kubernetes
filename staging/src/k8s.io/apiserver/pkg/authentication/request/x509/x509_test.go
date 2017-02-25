@@ -17,24 +17,24 @@ limitations under the License.
 package x509
 
 import (
-    "crypto/tls"
-    "crypto/x509"
-    "encoding/pem"
-    "errors"
-    "io/ioutil"
-    "net/http"
-    "reflect"
-    "sort"
-    "testing"
-    "time"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
+	"io/ioutil"
+	"net/http"
+	"reflect"
+	"sort"
+	"testing"
+	"time"
 
-    "k8s.io/apimachinery/pkg/util/sets"
-    "k8s.io/apiserver/pkg/authentication/authenticator"
-    "k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 const (
-    rootCACert = `-----BEGIN CERTIFICATE-----
+	rootCACert = `-----BEGIN CERTIFICATE-----
 MIIDOTCCAqKgAwIBAgIJAOoObf5kuGgZMA0GCSqGSIb3DQEBBQUAMGcxCzAJBgNV
 BAYTAlVTMREwDwYDVQQIEwhNeSBTdGF0ZTEQMA4GA1UEBxMHTXkgQ2l0eTEPMA0G
 A1UEChMGTXkgT3JnMRAwDgYDVQQLEwdNeSBVbml0MRAwDgYDVQQDEwdST09UIENB
@@ -56,7 +56,7 @@ H9oc7u5zhTGXeV8WPg==
 -----END CERTIFICATE-----
 `
 
-    selfSignedCert = `-----BEGIN CERTIFICATE-----
+	selfSignedCert = `-----BEGIN CERTIFICATE-----
 MIIDEzCCAnygAwIBAgIJAMaPaFbGgJN+MA0GCSqGSIb3DQEBBQUAMGUxCzAJBgNV
 BAYTAlVTMREwDwYDVQQIEwhNeSBTdGF0ZTEQMA4GA1UEBxMHTXkgQ2l0eTEPMA0G
 A1UEChMGTXkgT3JnMRAwDgYDVQQLEwdNeSBVbml0MQ4wDAYDVQQDEwVzZWxmMTAe
@@ -77,7 +77,7 @@ ze3kOoP+iWSmTySHMSKVMppp0Xnls6t38mrsXtPuY8fGD2GS6VllaizMqc3wShNK
 -----END CERTIFICATE-----
 `
 
-    clientCNCert = `Certificate:
+	clientCNCert = `Certificate:
     Data:
         Version: 3 (0x2)
         Serial Number: 1 (0x1)
@@ -151,7 +151,7 @@ AjARBglghkgBhvhCAQEEBAMCB4AwDQYJKoZIhvcNAQELBQADgYEACLy0gKU7vpp4
 i5fmaPPBNzzBFCaQoN3TAjrpwp5Z0kQ=
 -----END CERTIFICATE-----`
 
-    clientDNSCert = `Certificate:
+	clientDNSCert = `Certificate:
     Data:
         Version: 3 (0x2)
         Serial Number: 4 (0x4)
@@ -224,7 +224,7 @@ gGolrD3igQXkiStVY5otSto7xJdeGulvg7gFSty9q7CgddAetcWN8/aS8VLSgWf8
 b3TuSTdzCLz1JoZn9YIE/9tan/lr3y/1dWHypZELBVZb6NE211Z67X3lXyoIh8JI
 -----END CERTIFICATE-----`
 
-    clientEmailCert = `Certificate:
+	clientEmailCert = `Certificate:
     Data:
         Version: 3 (0x2)
         Serial Number: 2 (0x2)
@@ -299,7 +299,7 @@ BIaMiQ==
 -----END CERTIFICATE-----
 `
 
-    serverCert = `Certificate:
+	serverCert = `Certificate:
     Data:
         Version: 3 (0x2)
         Serial Number: 7 (0x7)
@@ -374,17 +374,17 @@ mFlG6tStAWz3TmydciZNdiEbeqHw5uaIYWj1zC5AdvFXBFue0ojIrJ5JtbTWccH9
 -----END CERTIFICATE-----
 `
 
-    /*
-       openssl genrsa -out ca.key 4096
-       openssl req -new -x509 -days 36500 \
-           -sha256 -key ca.key -extensions v3_ca \
-           -out ca.crt \
-           -subj "/C=US/ST=My State/L=My City/O=My Org/O=My Org 1/O=My Org 2/CN=ROOT CA WITH GROUPS"
-       openssl x509 -in ca.crt -text
-    */
+	/*
+	   openssl genrsa -out ca.key 4096
+	   openssl req -new -x509 -days 36500 \
+	       -sha256 -key ca.key -extensions v3_ca \
+	       -out ca.crt \
+	       -subj "/C=US/ST=My State/L=My City/O=My Org/O=My Org 1/O=My Org 2/CN=ROOT CA WITH GROUPS"
+	   openssl x509 -in ca.crt -text
+	*/
 
-    // A certificate with multiple organizations.
-    caWithGroups = `Certificate:
+	// A certificate with multiple organizations.
+	caWithGroups = `Certificate:
     Data:
         Version: 3 (0x2)
         Serial Number:
@@ -510,424 +510,424 @@ PKJQCs0CM0zkesktuLi/gFpuB0nEwyOgLg==
 )
 
 func TestX509(t *testing.T) {
-    multilevelOpts := DefaultVerifyOptions()
-    multilevelOpts.Roots = x509.NewCertPool()
-    multilevelOpts.Roots.AddCert(getCertsFromFile(t, "root")[0])
+	multilevelOpts := DefaultVerifyOptions()
+	multilevelOpts.Roots = x509.NewCertPool()
+	multilevelOpts.Roots.AddCert(getCertsFromFile(t, "root")[0])
 
-    testCases := map[string]struct {
-        Insecure bool
-        Certs    []*x509.Certificate
+	testCases := map[string]struct {
+		Insecure bool
+		Certs    []*x509.Certificate
 
-        Opts x509.VerifyOptions
-        User UserConversion
+		Opts x509.VerifyOptions
+		User UserConversion
 
-        ExpectUserName string
-        ExpectGroups   []string
-        ExpectOK       bool
-        ExpectErr      bool
-    }{
-        "non-tls": {
-            Insecure: true,
+		ExpectUserName string
+		ExpectGroups   []string
+		ExpectOK       bool
+		ExpectErr      bool
+	}{
+		"non-tls": {
+			Insecure: true,
 
-            ExpectOK:  false,
-            ExpectErr: false,
-        },
+			ExpectOK:  false,
+			ExpectErr: false,
+		},
 
-        "tls, no certs": {
-            ExpectOK:  false,
-            ExpectErr: false,
-        },
+		"tls, no certs": {
+			ExpectOK:  false,
+			ExpectErr: false,
+		},
 
-        "self signed": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, selfSignedCert),
-            User:  CommonNameUserConversion,
+		"self signed": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, selfSignedCert),
+			User:  CommonNameUserConversion,
 
-            ExpectErr: true,
-        },
+			ExpectErr: true,
+		},
 
-        "server cert": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, serverCert),
-            User:  CommonNameUserConversion,
+		"server cert": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, serverCert),
+			User:  CommonNameUserConversion,
 
-            ExpectErr: true,
-        },
-        "server cert allowing non-client cert usages": {
-            Opts:  x509.VerifyOptions{Roots: getRootCertPool(t)},
-            Certs: getCerts(t, serverCert),
-            User:  CommonNameUserConversion,
+			ExpectErr: true,
+		},
+		"server cert allowing non-client cert usages": {
+			Opts:  x509.VerifyOptions{Roots: getRootCertPool(t)},
+			Certs: getCerts(t, serverCert),
+			User:  CommonNameUserConversion,
 
-            ExpectUserName: "127.0.0.1",
-            ExpectGroups:   []string{"My Org"},
-            ExpectOK:       true,
-            ExpectErr:      false,
-        },
+			ExpectUserName: "127.0.0.1",
+			ExpectGroups:   []string{"My Org"},
+			ExpectOK:       true,
+			ExpectErr:      false,
+		},
 
-        "common name": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, clientCNCert),
-            User:  CommonNameUserConversion,
+		"common name": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, clientCNCert),
+			User:  CommonNameUserConversion,
 
-            ExpectUserName: "client_cn",
-            ExpectGroups:   []string{"My Org"},
-            ExpectOK:       true,
-            ExpectErr:      false,
-        },
-        "ca with multiple organizations": {
-            Opts: x509.VerifyOptions{
-                Roots: getRootCertPoolFor(t, caWithGroups),
-            },
-            Certs: getCerts(t, caWithGroups),
-            User:  CommonNameUserConversion,
+			ExpectUserName: "client_cn",
+			ExpectGroups:   []string{"My Org"},
+			ExpectOK:       true,
+			ExpectErr:      false,
+		},
+		"ca with multiple organizations": {
+			Opts: x509.VerifyOptions{
+				Roots: getRootCertPoolFor(t, caWithGroups),
+			},
+			Certs: getCerts(t, caWithGroups),
+			User:  CommonNameUserConversion,
 
-            ExpectUserName: "ROOT CA WITH GROUPS",
-            ExpectGroups:   []string{"My Org", "My Org 1", "My Org 2"},
-            ExpectOK:       true,
-            ExpectErr:      false,
-        },
-        "empty dns": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, clientCNCert),
-            User:  DNSNameUserConversion,
+			ExpectUserName: "ROOT CA WITH GROUPS",
+			ExpectGroups:   []string{"My Org", "My Org 1", "My Org 2"},
+			ExpectOK:       true,
+			ExpectErr:      false,
+		},
+		"empty dns": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, clientCNCert),
+			User:  DNSNameUserConversion,
 
-            ExpectOK:  false,
-            ExpectErr: false,
-        },
-        "dns": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, clientDNSCert),
-            User:  DNSNameUserConversion,
+			ExpectOK:  false,
+			ExpectErr: false,
+		},
+		"dns": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, clientDNSCert),
+			User:  DNSNameUserConversion,
 
-            ExpectUserName: "client_dns.example.com",
-            ExpectOK:       true,
-            ExpectErr:      false,
-        },
+			ExpectUserName: "client_dns.example.com",
+			ExpectOK:       true,
+			ExpectErr:      false,
+		},
 
-        "empty email": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, clientCNCert),
-            User:  EmailAddressUserConversion,
+		"empty email": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, clientCNCert),
+			User:  EmailAddressUserConversion,
 
-            ExpectOK:  false,
-            ExpectErr: false,
-        },
-        "email": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, clientEmailCert),
-            User:  EmailAddressUserConversion,
+			ExpectOK:  false,
+			ExpectErr: false,
+		},
+		"email": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, clientEmailCert),
+			User:  EmailAddressUserConversion,
 
-            ExpectUserName: "client_email@example.com",
-            ExpectOK:       true,
-            ExpectErr:      false,
-        },
+			ExpectUserName: "client_email@example.com",
+			ExpectOK:       true,
+			ExpectErr:      false,
+		},
 
-        "custom conversion error": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, clientCNCert),
-            User: UserConversionFunc(func(chain []*x509.Certificate) (user.Info, bool, error) {
-                return nil, false, errors.New("custom error")
-            }),
+		"custom conversion error": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, clientCNCert),
+			User: UserConversionFunc(func(chain []*x509.Certificate) (user.Info, bool, error) {
+				return nil, false, errors.New("custom error")
+			}),
 
-            ExpectOK:  false,
-            ExpectErr: true,
-        },
-        "custom conversion success": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, clientCNCert),
-            User: UserConversionFunc(func(chain []*x509.Certificate) (user.Info, bool, error) {
-                return &user.DefaultInfo{Name: "custom"}, true, nil
-            }),
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
+		"custom conversion success": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, clientCNCert),
+			User: UserConversionFunc(func(chain []*x509.Certificate) (user.Info, bool, error) {
+				return &user.DefaultInfo{Name: "custom"}, true, nil
+			}),
 
-            ExpectUserName: "custom",
-            ExpectOK:       true,
-            ExpectErr:      false,
-        },
+			ExpectUserName: "custom",
+			ExpectOK:       true,
+			ExpectErr:      false,
+		},
 
-        "future cert": {
-            Opts: x509.VerifyOptions{
-                CurrentTime: time.Now().Add(time.Duration(-100 * time.Hour * 24 * 365)),
-                Roots:       getRootCertPool(t),
-            },
-            Certs: getCerts(t, clientCNCert),
-            User:  CommonNameUserConversion,
+		"future cert": {
+			Opts: x509.VerifyOptions{
+				CurrentTime: time.Now().Add(time.Duration(-100 * time.Hour * 24 * 365)),
+				Roots:       getRootCertPool(t),
+			},
+			Certs: getCerts(t, clientCNCert),
+			User:  CommonNameUserConversion,
 
-            ExpectOK:  false,
-            ExpectErr: true,
-        },
-        "expired cert": {
-            Opts: x509.VerifyOptions{
-                CurrentTime: time.Now().Add(time.Duration(100 * time.Hour * 24 * 365)),
-                Roots:       getRootCertPool(t),
-            },
-            Certs: getCerts(t, clientCNCert),
-            User:  CommonNameUserConversion,
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
+		"expired cert": {
+			Opts: x509.VerifyOptions{
+				CurrentTime: time.Now().Add(time.Duration(100 * time.Hour * 24 * 365)),
+				Roots:       getRootCertPool(t),
+			},
+			Certs: getCerts(t, clientCNCert),
+			User:  CommonNameUserConversion,
 
-            ExpectOK:  false,
-            ExpectErr: true,
-        },
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
 
-        "multi-level, valid": {
-            Opts:  multilevelOpts,
-            Certs: getCertsFromFile(t, "client-valid", "intermediate"),
-            User:  CommonNameUserConversion,
+		"multi-level, valid": {
+			Opts:  multilevelOpts,
+			Certs: getCertsFromFile(t, "client-valid", "intermediate"),
+			User:  CommonNameUserConversion,
 
-            ExpectUserName: "My Client",
-            ExpectOK:       true,
-            ExpectErr:      false,
-        },
-        "multi-level, expired": {
-            Opts:  multilevelOpts,
-            Certs: getCertsFromFile(t, "client-expired", "intermediate"),
-            User:  CommonNameUserConversion,
+			ExpectUserName: "My Client",
+			ExpectOK:       true,
+			ExpectErr:      false,
+		},
+		"multi-level, expired": {
+			Opts:  multilevelOpts,
+			Certs: getCertsFromFile(t, "client-expired", "intermediate"),
+			User:  CommonNameUserConversion,
 
-            ExpectOK:  false,
-            ExpectErr: true,
-        },
-    }
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
+	}
 
-    for k, testCase := range testCases {
-        req, _ := http.NewRequest("GET", "/", nil)
-        if !testCase.Insecure {
-            req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
-        }
+	for k, testCase := range testCases {
+		req, _ := http.NewRequest("GET", "/", nil)
+		if !testCase.Insecure {
+			req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
+		}
 
-        a := New(testCase.Opts, testCase.User)
+		a := New(testCase.Opts, testCase.User)
 
-        user, ok, err := a.AuthenticateRequest(req)
+		user, ok, err := a.AuthenticateRequest(req)
 
-        if testCase.ExpectErr && err == nil {
-            t.Errorf("%s: Expected error, got none", k)
-            continue
-        }
-        if !testCase.ExpectErr && err != nil {
-            t.Errorf("%s: Got unexpected error: %v", k, err)
-            continue
-        }
+		if testCase.ExpectErr && err == nil {
+			t.Errorf("%s: Expected error, got none", k)
+			continue
+		}
+		if !testCase.ExpectErr && err != nil {
+			t.Errorf("%s: Got unexpected error: %v", k, err)
+			continue
+		}
 
-        if testCase.ExpectOK != ok {
-            t.Errorf("%s: Expected ok=%v, got %v", k, testCase.ExpectOK, ok)
-            continue
-        }
+		if testCase.ExpectOK != ok {
+			t.Errorf("%s: Expected ok=%v, got %v", k, testCase.ExpectOK, ok)
+			continue
+		}
 
-        if testCase.ExpectOK {
-            if testCase.ExpectUserName != user.GetName() {
-                t.Errorf("%s: Expected user.name=%v, got %v", k, testCase.ExpectUserName, user.GetName())
-            }
+		if testCase.ExpectOK {
+			if testCase.ExpectUserName != user.GetName() {
+				t.Errorf("%s: Expected user.name=%v, got %v", k, testCase.ExpectUserName, user.GetName())
+			}
 
-            groups := user.GetGroups()
-            sort.Strings(testCase.ExpectGroups)
-            sort.Strings(groups)
-            if !reflect.DeepEqual(testCase.ExpectGroups, groups) {
-                t.Errorf("%s: Expected user.groups=%v, got %v", k, testCase.ExpectGroups, groups)
-            }
-        }
-    }
+			groups := user.GetGroups()
+			sort.Strings(testCase.ExpectGroups)
+			sort.Strings(groups)
+			if !reflect.DeepEqual(testCase.ExpectGroups, groups) {
+				t.Errorf("%s: Expected user.groups=%v, got %v", k, testCase.ExpectGroups, groups)
+			}
+		}
+	}
 }
 
 func TestX509Verifier(t *testing.T) {
-    multilevelOpts := DefaultVerifyOptions()
-    multilevelOpts.Roots = x509.NewCertPool()
-    multilevelOpts.Roots.AddCert(getCertsFromFile(t, "root")[0])
+	multilevelOpts := DefaultVerifyOptions()
+	multilevelOpts.Roots = x509.NewCertPool()
+	multilevelOpts.Roots.AddCert(getCertsFromFile(t, "root")[0])
 
-    testCases := map[string]struct {
-        Insecure bool
-        Certs    []*x509.Certificate
+	testCases := map[string]struct {
+		Insecure bool
+		Certs    []*x509.Certificate
 
-        Opts x509.VerifyOptions
+		Opts x509.VerifyOptions
 
-        AllowedCNs sets.String
+		AllowedCNs sets.String
 
-        ExpectOK  bool
-        ExpectErr bool
-    }{
-        "non-tls": {
-            Insecure: true,
+		ExpectOK  bool
+		ExpectErr bool
+	}{
+		"non-tls": {
+			Insecure: true,
 
-            ExpectOK:  false,
-            ExpectErr: false,
-        },
+			ExpectOK:  false,
+			ExpectErr: false,
+		},
 
-        "tls, no certs": {
-            ExpectOK:  false,
-            ExpectErr: false,
-        },
+		"tls, no certs": {
+			ExpectOK:  false,
+			ExpectErr: false,
+		},
 
-        "self signed": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, selfSignedCert),
+		"self signed": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, selfSignedCert),
 
-            ExpectErr: true,
-        },
+			ExpectErr: true,
+		},
 
-        "server cert disallowed": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, serverCert),
+		"server cert disallowed": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, serverCert),
 
-            ExpectErr: true,
-        },
-        "server cert allowing non-client cert usages": {
-            Opts:  x509.VerifyOptions{Roots: getRootCertPool(t)},
-            Certs: getCerts(t, serverCert),
+			ExpectErr: true,
+		},
+		"server cert allowing non-client cert usages": {
+			Opts:  x509.VerifyOptions{Roots: getRootCertPool(t)},
+			Certs: getCerts(t, serverCert),
 
-            ExpectOK:  true,
-            ExpectErr: false,
-        },
+			ExpectOK:  true,
+			ExpectErr: false,
+		},
 
-        "valid client cert": {
-            Opts:  getDefaultVerifyOptions(t),
-            Certs: getCerts(t, clientCNCert),
+		"valid client cert": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, clientCNCert),
 
-            ExpectOK:  true,
-            ExpectErr: false,
-        },
-        "valid client cert with wrong CN": {
-            Opts:       getDefaultVerifyOptions(t),
-            AllowedCNs: sets.NewString("foo", "bar"),
-            Certs:      getCerts(t, clientCNCert),
+			ExpectOK:  true,
+			ExpectErr: false,
+		},
+		"valid client cert with wrong CN": {
+			Opts:       getDefaultVerifyOptions(t),
+			AllowedCNs: sets.NewString("foo", "bar"),
+			Certs:      getCerts(t, clientCNCert),
 
-            ExpectOK:  false,
-            ExpectErr: true,
-        },
-        "valid client cert with right CN": {
-            Opts:       getDefaultVerifyOptions(t),
-            AllowedCNs: sets.NewString("client_cn"),
-            Certs:      getCerts(t, clientCNCert),
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
+		"valid client cert with right CN": {
+			Opts:       getDefaultVerifyOptions(t),
+			AllowedCNs: sets.NewString("client_cn"),
+			Certs:      getCerts(t, clientCNCert),
 
-            ExpectOK:  true,
-            ExpectErr: false,
-        },
+			ExpectOK:  true,
+			ExpectErr: false,
+		},
 
-        "future cert": {
-            Opts: x509.VerifyOptions{
-                CurrentTime: time.Now().Add(-100 * time.Hour * 24 * 365),
-                Roots:       getRootCertPool(t),
-            },
-            Certs: getCerts(t, clientCNCert),
+		"future cert": {
+			Opts: x509.VerifyOptions{
+				CurrentTime: time.Now().Add(-100 * time.Hour * 24 * 365),
+				Roots:       getRootCertPool(t),
+			},
+			Certs: getCerts(t, clientCNCert),
 
-            ExpectOK:  false,
-            ExpectErr: true,
-        },
-        "expired cert": {
-            Opts: x509.VerifyOptions{
-                CurrentTime: time.Now().Add(100 * time.Hour * 24 * 365),
-                Roots:       getRootCertPool(t),
-            },
-            Certs: getCerts(t, clientCNCert),
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
+		"expired cert": {
+			Opts: x509.VerifyOptions{
+				CurrentTime: time.Now().Add(100 * time.Hour * 24 * 365),
+				Roots:       getRootCertPool(t),
+			},
+			Certs: getCerts(t, clientCNCert),
 
-            ExpectOK:  false,
-            ExpectErr: true,
-        },
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
 
-        "multi-level, valid": {
-            Opts:  multilevelOpts,
-            Certs: getCertsFromFile(t, "client-valid", "intermediate"),
+		"multi-level, valid": {
+			Opts:  multilevelOpts,
+			Certs: getCertsFromFile(t, "client-valid", "intermediate"),
 
-            ExpectOK:  true,
-            ExpectErr: false,
-        },
-        "multi-level, expired": {
-            Opts:  multilevelOpts,
-            Certs: getCertsFromFile(t, "client-expired", "intermediate"),
+			ExpectOK:  true,
+			ExpectErr: false,
+		},
+		"multi-level, expired": {
+			Opts:  multilevelOpts,
+			Certs: getCertsFromFile(t, "client-expired", "intermediate"),
 
-            ExpectOK:  false,
-            ExpectErr: true,
-        },
-    }
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
+	}
 
-    for k, testCase := range testCases {
-        req, _ := http.NewRequest("GET", "/", nil)
-        if !testCase.Insecure {
-            req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
-        }
+	for k, testCase := range testCases {
+		req, _ := http.NewRequest("GET", "/", nil)
+		if !testCase.Insecure {
+			req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
+		}
 
-        authCall := false
-        auth := authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
-            authCall = true
-            return &user.DefaultInfo{Name: "innerauth"}, true, nil
-        })
+		authCall := false
+		auth := authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+			authCall = true
+			return &user.DefaultInfo{Name: "innerauth"}, true, nil
+		})
 
-        a := NewVerifier(testCase.Opts, auth, testCase.AllowedCNs)
+		a := NewVerifier(testCase.Opts, auth, testCase.AllowedCNs)
 
-        user, ok, err := a.AuthenticateRequest(req)
+		user, ok, err := a.AuthenticateRequest(req)
 
-        if testCase.ExpectErr && err == nil {
-            t.Errorf("%s: Expected error, got none", k)
-            continue
-        }
-        if !testCase.ExpectErr && err != nil {
-            t.Errorf("%s: Got unexpected error: %v", k, err)
-            continue
-        }
+		if testCase.ExpectErr && err == nil {
+			t.Errorf("%s: Expected error, got none", k)
+			continue
+		}
+		if !testCase.ExpectErr && err != nil {
+			t.Errorf("%s: Got unexpected error: %v", k, err)
+			continue
+		}
 
-        if testCase.ExpectOK != ok {
-            t.Errorf("%s: Expected ok=%v, got %v", k, testCase.ExpectOK, ok)
-            continue
-        }
+		if testCase.ExpectOK != ok {
+			t.Errorf("%s: Expected ok=%v, got %v", k, testCase.ExpectOK, ok)
+			continue
+		}
 
-        if testCase.ExpectOK {
-            if !authCall {
-                t.Errorf("%s: Expected inner auth called, wasn't", k)
-                continue
-            }
-            if "innerauth" != user.GetName() {
-                t.Errorf("%s: Expected user.name=%v, got %v", k, "innerauth", user.GetName())
-                continue
-            }
-        } else {
-            if authCall {
-                t.Errorf("%s: Expected inner auth not to be called, was", k)
-                continue
-            }
-        }
-    }
+		if testCase.ExpectOK {
+			if !authCall {
+				t.Errorf("%s: Expected inner auth called, wasn't", k)
+				continue
+			}
+			if "innerauth" != user.GetName() {
+				t.Errorf("%s: Expected user.name=%v, got %v", k, "innerauth", user.GetName())
+				continue
+			}
+		} else {
+			if authCall {
+				t.Errorf("%s: Expected inner auth not to be called, was", k)
+				continue
+			}
+		}
+	}
 }
 
 func getDefaultVerifyOptions(t *testing.T) x509.VerifyOptions {
-    options := DefaultVerifyOptions()
-    options.Roots = getRootCertPool(t)
-    return options
+	options := DefaultVerifyOptions()
+	options.Roots = getRootCertPool(t)
+	return options
 }
 
 func getRootCertPool(t *testing.T) *x509.CertPool {
-    return getRootCertPoolFor(t, rootCACert)
+	return getRootCertPoolFor(t, rootCACert)
 }
 
 func getRootCertPoolFor(t *testing.T, certs ...string) *x509.CertPool {
-    pool := x509.NewCertPool()
-    for _, cert := range certs {
-        pool.AddCert(getCert(t, cert))
-    }
-    return pool
+	pool := x509.NewCertPool()
+	for _, cert := range certs {
+		pool.AddCert(getCert(t, cert))
+	}
+	return pool
 }
 
 func getCertsFromFile(t *testing.T, names ...string) []*x509.Certificate {
-    certs := []*x509.Certificate{}
-    for _, name := range names {
-        filename := "testdata/" + name + ".pem"
-        data, err := ioutil.ReadFile(filename)
-        if err != nil {
-            t.Fatalf("error reading %s: %v", filename, err)
-        }
-        certs = append(certs, getCert(t, string(data)))
-    }
-    return certs
+	certs := []*x509.Certificate{}
+	for _, name := range names {
+		filename := "testdata/" + name + ".pem"
+		data, err := ioutil.ReadFile(filename)
+		if err != nil {
+			t.Fatalf("error reading %s: %v", filename, err)
+		}
+		certs = append(certs, getCert(t, string(data)))
+	}
+	return certs
 }
 
 func getCert(t *testing.T, pemData string) *x509.Certificate {
-    pemBlock, _ := pem.Decode([]byte(pemData))
-    cert, err := x509.ParseCertificate(pemBlock.Bytes)
-    if err != nil {
-        t.Fatalf("Error parsing cert: %v", err)
-        return nil
-    }
-    return cert
+	pemBlock, _ := pem.Decode([]byte(pemData))
+	cert, err := x509.ParseCertificate(pemBlock.Bytes)
+	if err != nil {
+		t.Fatalf("Error parsing cert: %v", err)
+		return nil
+	}
+	return cert
 }
 
 func getCerts(t *testing.T, pemData ...string) []*x509.Certificate {
-    certs := []*x509.Certificate{}
-    for _, pemData := range pemData {
-        certs = append(certs, getCert(t, pemData))
-    }
-    return certs
+	certs := []*x509.Certificate{}
+	for _, pemData := range pemData {
+		certs = append(certs, getCert(t, pemData))
+	}
+	return certs
 }

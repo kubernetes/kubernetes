@@ -28,9 +28,11 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -146,14 +148,13 @@ const createProvisionedPVInterval = 10 * time.Second
 // cache.Controllers that watch PersistentVolume and PersistentVolumeClaim
 // changes.
 type PersistentVolumeController struct {
-	volumeController          cache.Controller
-	volumeInformer            cache.Indexer
-	volumeSource              cache.ListerWatcher
-	claimController           cache.Controller
-	claimInformer             cache.Store
-	claimSource               cache.ListerWatcher
-	classReflector            *cache.Reflector
-	classSource               cache.ListerWatcher
+	volumeLister       corelisters.PersistentVolumeLister
+	volumeListerSynced cache.InformerSynced
+	claimLister        corelisters.PersistentVolumeClaimLister
+	claimListerSynced  cache.InformerSynced
+	classLister        storagelisters.StorageClassLister
+	classListerSynced  cache.InformerSynced
+
 	kubeClient                clientset.Interface
 	eventRecorder             record.EventRecorder
 	cloud                     cloudprovider.Interface
@@ -182,7 +183,6 @@ type PersistentVolumeController struct {
 	// have been already written.
 	volumes persistentVolumeOrderedIndex
 	claims  cache.Store
-	classes cache.Store
 
 	// Work queues of claims and volumes to process. Every queue should have
 	// exactly one worker thread, especially syncClaim() is not reentrant.
@@ -1017,23 +1017,10 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 
 	// Plugin found
 	recorder := ctrl.newRecyclerEventRecorder(volume)
-	recycler, err := plugin.NewRecycler(volume.Name, spec, recorder)
-	if err != nil {
-		// Cannot create recycler
-		strerr := fmt.Sprintf("Failed to create recycler: %v", err)
-		if _, err = ctrl.updateVolumePhaseWithEvent(volume, v1.VolumeFailed, v1.EventTypeWarning, "VolumeFailedRecycle", strerr); err != nil {
-			glog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
-			// Save failed, retry on the next deletion attempt
-			return
-		}
-		// Despite the volume being Failed, the controller will retry recycling
-		// the volume in every syncVolume() call.
-		return
-	}
 
-	if err = recycler.Recycle(); err != nil {
+	if err = plugin.Recycle(volume.Name, spec, recorder); err != nil {
 		// Recycler failed
-		strerr := fmt.Sprintf("Recycler failed: %s", err)
+		strerr := fmt.Sprintf("Recycle failed: %s", err)
 		if _, err = ctrl.updateVolumePhaseWithEvent(volume, v1.VolumeFailed, v1.EventTypeWarning, "VolumeFailedRecycle", strerr); err != nil {
 			glog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
 			// Save failed, retry on the next deletion attempt
@@ -1430,7 +1417,7 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 		if goroutinemap.IsAlreadyExists(err) {
 			glog.V(4).Infof("operation %q is already running, skipping", operationName)
 		} else {
-			glog.Errorf("error scheduling operaion %q: %v", operationName, err)
+			glog.Errorf("error scheduling operation %q: %v", operationName, err)
 		}
 	}
 }
@@ -1464,16 +1451,9 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.Persis
 	// provisionClaim() which leads here is never called with claimClass=="", we
 	// can save some checks.
 	claimClass := storageutil.GetClaimStorageClass(claim)
-	classObj, found, err := ctrl.classes.GetByKey(claimClass)
+	class, err := ctrl.classLister.Get(claimClass)
 	if err != nil {
 		return nil, nil, err
-	}
-	if !found {
-		return nil, nil, fmt.Errorf("StorageClass %q not found", claimClass)
-	}
-	class, ok := classObj.(*storage.StorageClass)
-	if !ok {
-		return nil, nil, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
 	}
 
 	// Find a plugin for the class

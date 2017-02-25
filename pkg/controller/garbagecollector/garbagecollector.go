@@ -460,7 +460,7 @@ func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource)
 			apiResource := metav1.APIResource{Name: resource.Resource}
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
 				Resource(&apiResource, metav1.NamespaceAll).
-				List(&options)
+				List(options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			// APIResource.Kind is not used by the dynamic client, so
@@ -470,7 +470,7 @@ func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource)
 			apiResource := metav1.APIResource{Name: resource.Resource}
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
 				Resource(&apiResource, metav1.NamespaceAll).
-				Watch(&options)
+				Watch(options)
 		},
 	}
 }
@@ -533,9 +533,13 @@ var ignoredResources = map[schema.GroupVersionResource]struct{}{
 	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                                  {},
 	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                             {},
 	schema.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:             {},
+	schema.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1", Resource: "tokenreviews"}:                  {},
 	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
 	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
 	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
+	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1", Resource: "subjectaccessreviews"}:           {},
+	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1", Resource: "selfsubjectaccessreviews"}:       {},
+	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1", Resource: "localsubjectaccessreviews"}:      {},
 }
 
 func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, deletableResources map[schema.GroupVersionResource]struct{}) (*GarbageCollector, error) {

@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	Describe("QOS containers", func() {
 		Context("On enabling QOS cgroup hierarchy", func() {
 			It("Top level QoS containers should have been created", func() {
-				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
 				cgroupsToVerify := []cm.CgroupName{cm.CgroupName(v1.PodQOSBurstable), cm.CgroupName(v1.PodQOSBestEffort)}
@@ -158,7 +158,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	Describe("Pod containers", func() {
 		Context("On scheduling a Guaranteed Pod", func() {
 			It("Pod containers should have been created under the cgroup-root", func() {
-				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
 				var (
@@ -202,7 +202,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		})
 		Context("On scheduling a BestEffort Pod", func() {
 			It("Pod containers should have been created under the BestEffort cgroup", func() {
-				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
 				var (
@@ -246,7 +246,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		})
 		Context("On scheduling a Burstable Pod", func() {
 			It("Pod containers should have been created under the Burstable cgroup", func() {
-				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
+				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
 				var (

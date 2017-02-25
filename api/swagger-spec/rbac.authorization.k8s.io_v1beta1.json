@@ -2922,9 +2922,9 @@
       "type": "string",
       "description": "Kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error."
      },
-     "apiVersion": {
+     "apiGroup": {
       "type": "string",
-      "description": "APIVersion holds the API group and version of the referenced object."
+      "description": "APIGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects."
      },
      "name": {
       "type": "string",

@@ -1,0 +1,10 @@
+{
+	"data": {
+		"new-data3": "newivalue"
+	},
+	"metadata": {
+		"annotations": {
+			"kubernetes.io/change-cause": "edit test cmd invocation"
+		}
+	}
+}

@@ -23,8 +23,8 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset"
-	internalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
-	fakeinternalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion/fake"
+	testgroupinternalversion "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
+	faketestgroupinternalversion "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion/fake"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -62,6 +62,6 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // Testgroup retrieves the TestgroupClient
-func (c *Clientset) Testgroup() internalversiontestgroup.TestgroupInterface {
-	return &fakeinternalversiontestgroup.FakeTestgroup{Fake: &c.Fake}
+func (c *Clientset) Testgroup() testgroupinternalversion.TestgroupInterface {
+	return &faketestgroupinternalversion.FakeTestgroup{Fake: &c.Fake}
 }

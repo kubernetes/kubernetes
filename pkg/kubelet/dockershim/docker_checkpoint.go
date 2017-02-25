@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
@@ -33,8 +34,6 @@ const (
 	protocolUDP          = Protocol("udp")
 	schemaVersion        = "v1"
 )
-
-var CorruptCheckpointError = fmt.Errorf("checkpoint is corrupted.")
 
 type Protocol string
 
@@ -85,8 +84,12 @@ type PersistentCheckpointHandler struct {
 	store CheckpointStore
 }
 
-func NewPersistentCheckpointHandler() CheckpointHandler {
-	return &PersistentCheckpointHandler{store: &FileStore{path: filepath.Join(dockershimRootDir, sandboxCheckpointDir)}}
+func NewPersistentCheckpointHandler() (CheckpointHandler, error) {
+	fstore, err := NewFileStore(filepath.Join(dockershimRootDir, sandboxCheckpointDir))
+	if err != nil {
+		return nil, err
+	}
+	return &PersistentCheckpointHandler{store: fstore}, nil
 }
 
 func (handler *PersistentCheckpointHandler) CreateCheckpoint(podSandboxID string, checkpoint *PodSandboxCheckpoint) error {
@@ -108,11 +111,11 @@ func (handler *PersistentCheckpointHandler) GetCheckpoint(podSandboxID string) (
 	err = json.Unmarshal(blob, &checkpoint)
 	if err != nil {
 		glog.Errorf("Failed to unmarshal checkpoint %q. Checkpoint content: %q. ErrMsg: %v", podSandboxID, string(blob), err)
-		return &checkpoint, CorruptCheckpointError
+		return &checkpoint, errors.CorruptCheckpointError
 	}
 	if checkpoint.CheckSum != calculateChecksum(checkpoint) {
 		glog.Errorf("Checksum of checkpoint %q is not valid", podSandboxID)
-		return &checkpoint, CorruptCheckpointError
+		return &checkpoint, errors.CorruptCheckpointError
 	}
 	return &checkpoint, nil
 }

@@ -26,6 +26,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-openapi/spec"
+	"github.com/pborman/uuid"
+
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +42,9 @@ import (
 	authauthorizer "k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/options"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -52,23 +58,20 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/generated/openapi"
-	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
-
-	"github.com/go-openapi/spec"
-	"github.com/pborman/uuid"
 )
 
 const (
@@ -120,11 +123,13 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	// TODO: caesarxuchao: remove this client when the refactoring of client libraray is done.
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}, QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
-	controllerManager := replicationcontroller.NewReplicationManagerFromClient(clientset, controller.NoResyncPeriodFunc, c.Burst, 4096)
+	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	controllerManager := replicationcontroller.NewReplicationManager(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().ReplicationControllers(), clientset, c.Burst, 4096, false)
 
 	// TODO: Support events once we can cleanly shutdown an event recorder.
 	controllerManager.SetEventRecorder(&record.FakeRecorder{})
 	if c.StartReplicationManager {
+		informerFactory.Start(rcStopCh)
 		go controllerManager.Run(goruntime.NumCPU(), rcStopCh)
 	}
 	return &MasterComponents{
@@ -305,53 +310,50 @@ func GetEtcdURLFromEnv() string {
 
 // Returns a basic master config.
 func NewMasterConfig() *master.Config {
-	config := storagebackend.Config{
-		ServerList: []string{GetEtcdURLFromEnv()},
-		// This causes the integration tests to exercise the etcd
-		// prefix code, so please don't change without ensuring
-		// sufficient coverage in other ways.
-		Prefix: uuid.New(),
-		Copier: api.Scheme,
-	}
+	// This causes the integration tests to exercise the etcd
+	// prefix code, so please don't change without ensuring
+	// sufficient coverage in other ways.
+	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), api.Scheme, nil))
+	etcdOptions.StorageConfig.ServerList = []string{GetEtcdURLFromEnv()}
 
 	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(api.Scheme, info)
 
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, ns, genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), master.DefaultAPIResourceConfigSource())
+	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, serverstorage.NewDefaultResourceEncodingConfig(api.Registry), master.DefaultAPIResourceConfigSource())
 	storageFactory.SetSerializer(
-		schema.GroupResource{Group: v1.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: v1.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		schema.GroupResource{Group: autoscaling.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: autoscaling.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		schema.GroupResource{Group: batch.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: batch.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		schema.GroupResource{Group: apps.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: apps.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		schema.GroupResource{Group: extensions.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: extensions.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		schema.GroupResource{Group: policy.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: policy.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		schema.GroupResource{Group: rbac.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: rbac.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		schema.GroupResource{Group: certificates.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: certificates.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		schema.GroupResource{Group: storage.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: storage.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 
@@ -362,12 +364,16 @@ func NewMasterConfig() *master.Config {
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
 	genericConfig.EnableMetrics = true
 
+	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
+	if err != nil {
+		panic(err)
+	}
+
 	return &master.Config{
 		GenericConfig:           genericConfig,
 		APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 		StorageFactory:          storageFactory,
 		EnableCoreControllers:   true,
-		EnableWatchCache:        true,
 		KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
 		APIServerServicePort:    443,
 		MasterCount:             1,

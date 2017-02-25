@@ -105,9 +105,6 @@ func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList
 
 func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if annotations[api.TolerationsAnnotationKey] != "" {
-		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
-	}
 
 	// TODO: remove these after we EOL the annotations.
 	if hostname, exists := annotations[utilpod.PodHostnameAnnotation]; exists {
@@ -518,6 +515,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		numVolumes++
 		allErrs = append(allErrs, validateAzureDisk(source.AzureDisk, fldPath.Child("azureDisk"))...)
 	}
+	if source.Projected != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("projected"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateProjectedVolumeSource(source.Projected, fldPath.Child("projected"))...)
+		}
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -723,6 +728,30 @@ var validDownwardAPIFieldPathExpressions = sets.NewString(
 	"metadata.labels",
 	"metadata.annotations")
 
+func validateDownwardAPIVolumeFile(file *api.DownwardAPIVolumeFile, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(file.Path) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+	}
+	allErrs = append(allErrs, validateLocalNonReservedPath(file.Path, fldPath.Child("path"))...)
+	if file.FieldRef != nil {
+		allErrs = append(allErrs, validateObjectFieldSelector(file.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
+		if file.ResourceFieldRef != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef and resourceFieldRef can not be specified simultaneously"))
+		}
+	} else if file.ResourceFieldRef != nil {
+		allErrs = append(allErrs, validateContainerResourceFieldSelector(file.ResourceFieldRef, &validContainerResourceFieldPathExpressions, fldPath.Child("resourceFieldRef"), true)...)
+	} else {
+		allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef and resourceFieldRef is required"))
+	}
+	if file.Mode != nil && (*file.Mode > 0777 || *file.Mode < 0) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *file.Mode, volumeModeErrorMsg))
+	}
+
+	return allErrs
+}
+
 func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -732,24 +761,96 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 	}
 
 	for _, file := range downwardAPIVolume.Items {
-		if len(file.Path) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
-		}
-		allErrs = append(allErrs, validateLocalNonReservedPath(file.Path, fldPath.Child("path"))...)
-		if file.FieldRef != nil {
-			allErrs = append(allErrs, validateObjectFieldSelector(file.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
-			if file.ResourceFieldRef != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef and resourceFieldRef can not be specified simultaneously"))
+		allErrs = append(allErrs, validateDownwardAPIVolumeFile(&file, fldPath)...)
+	}
+	return allErrs
+}
+
+func validateProjectionSources(projection *api.ProjectedVolumeSource, projectionMode *int32, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allPaths := sets.String{}
+
+	for _, source := range projection.Sources {
+		numSources := 0
+		if source.Secret != nil {
+			if numSources > 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("secret"), "may not specify more than 1 volume type"))
+			} else {
+				numSources++
+				if len(source.Secret.Name) == 0 {
+					allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+				}
+				itemsPath := fldPath.Child("items")
+				for i, kp := range source.Secret.Items {
+					itemPath := itemsPath.Index(i)
+					allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
+					if len(kp.Path) > 0 {
+						curPath := kp.Path
+						if !allPaths.Has(curPath) {
+							allPaths.Insert(curPath)
+						} else {
+							allErrs = append(allErrs, field.Invalid(fldPath, source.Secret.Name, "conflicting duplicate paths"))
+						}
+					}
+				}
 			}
-		} else if file.ResourceFieldRef != nil {
-			allErrs = append(allErrs, validateContainerResourceFieldSelector(file.ResourceFieldRef, &validContainerResourceFieldPathExpressions, fldPath.Child("resourceFieldRef"), true)...)
-		} else {
-			allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef and resourceFieldRef is required"))
 		}
-		if file.Mode != nil && (*file.Mode > 0777 || *file.Mode < 0) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *file.Mode, volumeModeErrorMsg))
+		if source.ConfigMap != nil {
+			if numSources > 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("configMap"), "may not specify more than 1 volume type"))
+			} else {
+				numSources++
+				if len(source.ConfigMap.Name) == 0 {
+					allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+				}
+				itemsPath := fldPath.Child("items")
+				for i, kp := range source.ConfigMap.Items {
+					itemPath := itemsPath.Index(i)
+					allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
+					if len(kp.Path) > 0 {
+						curPath := kp.Path
+						if !allPaths.Has(curPath) {
+							allPaths.Insert(curPath)
+						} else {
+							allErrs = append(allErrs, field.Invalid(fldPath, source.ConfigMap.Name, "conflicting duplicate paths"))
+						}
+
+					}
+				}
+			}
+		}
+		if source.DownwardAPI != nil {
+			if numSources > 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("downwardAPI"), "may not specify more than 1 volume type"))
+			} else {
+				numSources++
+				for _, file := range source.DownwardAPI.Items {
+					allErrs = append(allErrs, validateDownwardAPIVolumeFile(&file, fldPath.Child("downwardAPI"))...)
+					if len(file.Path) > 0 {
+						curPath := file.Path
+						if !allPaths.Has(curPath) {
+							allPaths.Insert(curPath)
+						} else {
+							allErrs = append(allErrs, field.Invalid(fldPath, curPath, "conflicting duplicate paths"))
+						}
+
+					}
+				}
+			}
 		}
 	}
+	return allErrs
+}
+
+func validateProjectedVolumeSource(projection *api.ProjectedVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	projectionMode := projection.DefaultMode
+	if projectionMode != nil && (*projectionMode > 0777 || *projectionMode < 0) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *projectionMode, volumeModeErrorMsg))
+	}
+
+	allErrs = append(allErrs, validateProjectionSources(projection, projectionMode, fldPath)...)
 	return allErrs
 }
 
@@ -1421,7 +1522,7 @@ func AccumulateUniqueHostPorts(containers []api.Container, accumulator *sets.Str
 			if port == 0 {
 				continue
 			}
-			str := fmt.Sprintf("%d/%s", port, ctr.Ports[pi].Protocol)
+			str := fmt.Sprintf("%s/%s/%d", ctr.Ports[pi].Protocol, ctr.Ports[pi].HostIP, port)
 			if accumulator.Has(str) {
 				allErrs = append(allErrs, field.Duplicate(idxPath.Child("hostPort"), str))
 			} else {
@@ -1844,6 +1945,10 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, ValidateDNS1123Label(spec.Subdomain, fldPath.Child("subdomain"))...)
 	}
 
+	if len(spec.Tolerations) > 0 {
+		allErrs = append(allErrs, validateTolerations(spec.Tolerations, fldPath.Child("tolerations"))...)
+	}
+
 	return allErrs
 }
 
@@ -2032,29 +2137,6 @@ func validatePodAffinity(podAffinity *api.PodAffinity, fldPath *field.Path) fiel
 		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution, false,
 			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
 	}
-	return allErrs
-}
-
-// ValidateTolerationsInPodAnnotations tests that the serialized tolerations in Pod.Annotations has valid data
-func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	v1Tolerations, err := v1.GetTolerationsFromPodAnnotations(annotations)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, api.TolerationsAnnotationKey, err.Error()))
-		return allErrs
-	}
-	tolerations := make([]api.Toleration, len(v1Tolerations))
-	for i := range v1Tolerations {
-		if err := v1.Convert_v1_Toleration_To_api_Toleration(&v1Tolerations[i], &tolerations[i], nil); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, api.TolerationsAnnotationKey, err.Error()))
-			return allErrs
-		}
-	}
-	if len(tolerations) > 0 {
-		allErrs = append(allErrs, validateTolerations(tolerations, fldPath.Child(api.TolerationsAnnotationKey))...)
-	}
-
 	return allErrs
 }
 
@@ -2709,8 +2791,8 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume, fldPath *field.Path) 
 	return allErrs
 }
 
-// validateTaints tests if given taints have valid data.
-func validateTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
+// validateNodeTaints tests if given taints have valid data.
+func validateNodeTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 
 	uniqueTaints := map[api.TaintEffect]sets.String{}
@@ -2743,36 +2825,10 @@ func validateTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
 	return allErrors
 }
 
-// ValidateTaintsInNodeAnnotations tests that the serialized taints in Node.Annotations has valid data
-func ValidateTaintsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	v1Taints, err := v1.GetTaintsFromNodeAnnotations(annotations)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, api.TaintsAnnotationKey, err.Error()))
-		return allErrs
-	}
-	taints := make([]api.Taint, len(v1Taints))
-	for i := range v1Taints {
-		if err := v1.Convert_v1_Taint_To_api_Taint(&v1Taints[i], &taints[i], nil); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, api.TaintsAnnotationKey, err.Error()))
-			return allErrs
-		}
-	}
-	if len(taints) > 0 {
-		allErrs = append(allErrs, validateTaints(taints, fldPath.Child(api.TaintsAnnotationKey))...)
-	}
-
-	return allErrs
-}
-
 func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if annotations[api.PreferAvoidPodsAnnotationKey] != "" {
 		allErrs = append(allErrs, ValidateAvoidPodsInNodeAnnotations(annotations, fldPath)...)
-	}
-	if annotations[api.TaintsAnnotationKey] != "" {
-		allErrs = append(allErrs, ValidateTaintsInNodeAnnotations(annotations, fldPath)...)
 	}
 	return allErrs
 }
@@ -2782,6 +2838,9 @@ func ValidateNode(node *api.Node) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, fldPath)
 	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
+	if len(node.Spec.Taints) > 0 {
+		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
+	}
 
 	// Only validate spec. All status fields are optional and can be updated later.
 
@@ -2844,10 +2903,16 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	// Clear status
 	oldNode.Status = node.Status
 
+	// update taints
+	if len(node.Spec.Taints) > 0 {
+		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
+	}
+	oldNode.Spec.Taints = node.Spec.Taints
+
 	// TODO: Add a 'real' error type for this error and provide print actual diffs.
 	if !apiequality.Semantic.DeepEqual(oldNode, node) {
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
-		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels or capacity"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints or capacity"))
 	}
 
 	return allErrs
@@ -3338,7 +3403,7 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *api.Resourc
 		oldScopes.Insert(string(scope))
 	}
 	if !oldScopes.Equal(newScopes) {
-		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, "field is immutable"))
+		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, fieldImmutableErrorMsg))
 	}
 
 	newResourceQuota.Status = oldResourceQuota.Status

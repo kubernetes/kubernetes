@@ -52,6 +52,52 @@ const (
 	nonExist = "NonExist"
 )
 
+func removePtr(replicas *int32) int32 {
+	if replicas == nil {
+		return 0
+	}
+	return *replicas
+}
+
+func WaitUntilPodIsScheduled(c clientset.Interface, name, namespace string, timeout time.Duration) (*v1.Pod, error) {
+	// Wait until it's scheduled
+	p, err := c.Core().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
+	if err == nil && p.Spec.NodeName != "" {
+		return p, nil
+	}
+	pollingPeriod := 200 * time.Millisecond
+	startTime := time.Now()
+	for startTime.Add(timeout).After(time.Now()) {
+		time.Sleep(pollingPeriod)
+		p, err := c.Core().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
+		if err == nil && p.Spec.NodeName != "" {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("Timed out after %v when waiting for pod %v/%v to start.", timeout, namespace, name)
+}
+
+func RunPodAndGetNodeName(c clientset.Interface, pod *v1.Pod, timeout time.Duration) (string, error) {
+	name := pod.Name
+	namespace := pod.Namespace
+	var err error
+	// Create a Pod
+	for i := 0; i < retries; i++ {
+		_, err = c.Core().Pods(namespace).Create(pod)
+		if err == nil || apierrs.IsAlreadyExists(err) {
+			break
+		}
+	}
+	if err != nil && !apierrs.IsAlreadyExists(err) {
+		return "", err
+	}
+	p, err := WaitUntilPodIsScheduled(c, name, namespace, timeout)
+	if err != nil {
+		return "", err
+	}
+	return p.Spec.NodeName, nil
+}
+
 type RunObjectConfig interface {
 	Run() error
 	GetName() string
@@ -267,7 +313,7 @@ func (config *DeploymentConfig) create() error {
 	if err != nil {
 		return fmt.Errorf("Error creating deployment: %v", err)
 	}
-	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, deployment.Spec.Replicas)
+	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, removePtr(deployment.Spec.Replicas))
 	return nil
 }
 
@@ -331,7 +377,7 @@ func (config *ReplicaSetConfig) create() error {
 	if err != nil {
 		return fmt.Errorf("Error creating replica set: %v", err)
 	}
-	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, rs.Spec.Replicas)
+	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, removePtr(rs.Spec.Replicas))
 	return nil
 }
 
@@ -488,7 +534,7 @@ func (config *RCConfig) create() error {
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
-	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, rc.Spec.Replicas)
+	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, removePtr(rc.Spec.Replicas))
 	return nil
 }
 

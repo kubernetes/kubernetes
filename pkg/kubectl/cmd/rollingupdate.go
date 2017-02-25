@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -81,7 +82,7 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
 		// rollingupdate is deprecated.
 		Aliases: []string{"rollingupdate"},
-		Short:   "Perform a rolling update of the given ReplicationController",
+		Short:   i18n.T("Perform a rolling update of the given ReplicationController"),
 		Long:    rollingUpdate_long,
 		Example: rollingUpdate_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -95,11 +96,11 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename or URL to file to use to create the new replication controller."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.MarkFlagRequired("filename")
-	cmd.Flags().String("image", "", "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f")
+	cmd.Flags().String("image", "", i18n.T("Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"))
 	cmd.MarkFlagRequired("image")
-	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
-	cmd.Flags().String("container", "", "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod")
-	cmd.Flags().String("image-pull-policy", "", "Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise.")
+	cmd.Flags().String("deployment-label-key", "deployment", i18n.T("The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise"))
+	cmd.Flags().String("container", "", i18n.T("Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"))
+	cmd.Flags().String("image-pull-policy", "", i18n.T("Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise."))
 	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddValidateFlags(cmd)

@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 )
 
 type Resource string

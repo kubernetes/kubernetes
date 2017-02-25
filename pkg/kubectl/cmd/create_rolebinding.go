@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -40,7 +41,7 @@ var (
 func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rolebinding NAME --clusterrole=NAME|--role=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
-		Short:   "Create a RoleBinding for a particular Role or ClusterRole",
+		Short:   i18n.T("Create a RoleBinding for a particular Role or ClusterRole"),
 		Long:    roleBindingLong,
 		Example: roleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -52,8 +53,8 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.RoleBindingV1GeneratorName)
-	cmd.Flags().String("clusterrole", "", "ClusterRole this RoleBinding should reference")
-	cmd.Flags().String("role", "", "Role this RoleBinding should reference")
+	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this RoleBinding should reference"))
+	cmd.Flags().String("role", "", i18n.T("Role this RoleBinding should reference"))
 	cmd.Flags().StringSlice("user", []string{}, "usernames to bind to the role")
 	cmd.Flags().StringSlice("group", []string{}, "groups to bind to the role")
 	cmd.Flags().StringSlice("serviceaccount", []string{}, "service accounts to bind to the role")

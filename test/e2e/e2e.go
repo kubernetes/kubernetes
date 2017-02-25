@@ -108,10 +108,16 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		glog.Fatal("Error loading client: ", err)
 	}
 
-	// Delete any namespaces except default and kube-system. This ensures no
+	// Delete any namespaces except those created by the system. This ensures no
 	// lingering resources are left over from a previous test run.
 	if framework.TestContext.CleanStart {
-		deleted, err := framework.DeleteNamespaces(c, nil /* deleteFilter */, []string{metav1.NamespaceSystem, metav1.NamespaceDefault, federationapi.FederationNamespaceSystem})
+		deleted, err := framework.DeleteNamespaces(c, nil, /* deleteFilter */
+			[]string{
+				metav1.NamespaceSystem,
+				metav1.NamespaceDefault,
+				metav1.NamespacePublic,
+				federationapi.FederationNamespaceSystem,
+			})
 		if err != nil {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
 		}
@@ -131,7 +137,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
 	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
-	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout, framework.ImagePullerLabels, true); err != nil {
+	// TODO: In large clusters, we often observe a non-starting pods due to
+	// #41007. To avoid those pods preventing the whole test runs (and just
+	// wasting the whole run), we allow for some not-ready pods (with the
+	// number equal to the number of allowed not-ready nodes).
+	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, framework.ImagePullerLabels, true); err != nil {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		framework.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
@@ -217,9 +227,11 @@ func RunCleanupActions() {
 // and then the function that only runs on the first Ginkgo node.
 var _ = ginkgo.SynchronizedAfterSuite(func() {
 	// Run on all Ginkgo nodes
+	framework.Logf("Running AfterSuite actions on all node")
 	RunCleanupActions()
 }, func() {
 	// Run only Ginkgo on node 1
+	framework.Logf("Running AfterSuite actions on node 1")
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
 	}
