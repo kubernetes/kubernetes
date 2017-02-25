@@ -27,6 +27,8 @@ import (
 
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
+	// install the componentconfig api so we get its defaulting and conversion functions
+	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 
 	"github.com/spf13/pflag"
 )
