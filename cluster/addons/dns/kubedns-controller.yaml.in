@@ -25,6 +25,7 @@ metadata:
   labels:
     k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 spec:
   # replicas: not specified here:
   # 1. In order to make Addon Manager do not reconcile this replicas parameter.

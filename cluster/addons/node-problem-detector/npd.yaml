@@ -5,6 +5,7 @@ metadata:
   namespace: kube-system
   labels:
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 ---
 apiVersion: rbac.authorization.k8s.io/v1alpha1
 kind: ClusterRoleBinding
@@ -12,6 +13,7 @@ metadata:
   name: npd-binding
   labels:
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -30,6 +32,7 @@ metadata:
     k8s-app: node-problem-detector
     version: v0.3.0-alpha.1
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 spec:
   template:
     metadata:
