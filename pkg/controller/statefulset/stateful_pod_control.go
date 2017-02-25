@@ -218,11 +218,11 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 		_, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
 		switch {
 		case apierrors.IsNotFound(err):
-			created, err := spc.createPersistentVolumeClaim(set, &claim)
-			if err != nil {
+			_, err := spc.client.Core().PersistentVolumeClaims(claim.Namespace).Create(&claim)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				errs = append(errs, fmt.Errorf("Failed to create PVC %s: %s", claim.Name, err))
 			}
-			if created || err != nil {
+			if err == nil || !apierrors.IsAlreadyExists(err) {
 				spc.recordClaimEvent("create", set, pod, &claim, err)
 			}
 		case err != nil:
@@ -232,18 +232,6 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 		// TODO: Check resource requirements and accessmodes, update if necessary
 	}
 	return errorutils.NewAggregate(errs)
-}
-
-func (spc *realStatefulPodControl) createPersistentVolumeClaim(set *apps.StatefulSet, claim *v1.PersistentVolumeClaim) (bool, error) {
-	_, err := spc.client.Core().PersistentVolumeClaims(claim.Namespace).Create(claim)
-	switch {
-	case apierrors.IsAlreadyExists(err):
-		// Don't treat an already-exists error as a real error
-		return false, nil
-	case err != nil:
-		return false, err
-	}
-	return true, nil
 }
 
 var _ StatefulPodControlInterface = &realStatefulPodControl{}

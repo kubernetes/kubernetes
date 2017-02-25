@@ -575,6 +575,7 @@ function start_kubelet {
       fi
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
+        --enable-cri=false \
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
