@@ -26,6 +26,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -35,126 +36,156 @@ import (
 
 // TODO: it would probably be slightly better to build up the objects
 // in the code and then serialize to yaml.
-var addon_controller_v1 = `
+var reconcile_addon_controller = `
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: addon-test-v1
+  name: addon-reconcile-test
   namespace: %s
   labels:
-    k8s-app: addon-test
-    version: v1
+    k8s-app: addon-reconcile-test
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 spec:
   replicas: 2
   selector:
-    k8s-app: addon-test
-    version: v1
+    k8s-app: addon-reconcile-test
   template:
     metadata:
       labels:
-        k8s-app: addon-test
-        version: v1
-        kubernetes.io/cluster-service: "true"
+        k8s-app: addon-reconcile-test
     spec:
       containers:
       - image: gcr.io/google_containers/serve_hostname:v1.4
-        name: addon-test
+        name: addon-reconcile-test
         ports:
         - containerPort: 9376
           protocol: TCP
 `
 
-var addon_controller_v2 = `
+// Should update "reconcile" class addon.
+var reconcile_addon_controller_updated = `
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: addon-test-v2
+  name: addon-reconcile-test
   namespace: %s
   labels:
-    k8s-app: addon-test
-    version: v2
+    k8s-app: addon-reconcile-test
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    newLabel: addon-reconcile-test
 spec:
   replicas: 2
   selector:
-    k8s-app: addon-test
-    version: v2
+    k8s-app: addon-reconcile-test
   template:
     metadata:
       labels:
-        k8s-app: addon-test
-        version: v2
-        kubernetes.io/cluster-service: "true"
+        k8s-app: addon-reconcile-test
     spec:
       containers:
       - image: gcr.io/google_containers/serve_hostname:v1.4
-        name: addon-test
+        name: addon-reconcile-test
         ports:
         - containerPort: 9376
           protocol: TCP
 `
 
-var addon_service_v1 = `
+var ensure_exists_addon_service = `
 apiVersion: v1
 kind: Service
 metadata:
-  name: addon-test
+  name: addon-ensure-exists-test
   namespace: %s
   labels:
-    k8s-app: addon-test
-    kubernetes.io/cluster-service: "true"
-    kubernetes.io/name: addon-test
+    k8s-app: addon-ensure-exists-test
+    addonmanager.kubernetes.io/mode: EnsureExists
 spec:
   ports:
   - port: 9376
     protocol: TCP
     targetPort: 9376
   selector:
-    k8s-app: addon-test
+    k8s-app: addon-ensure-exists-test
 `
 
-var addon_service_v2 = `
+// Should create but don't update "ensure exist" class addon.
+var ensure_exists_addon_service_updated = `
 apiVersion: v1
 kind: Service
 metadata:
-  name: addon-test-updated
+  name: addon-ensure-exists-test
   namespace: %s
   labels:
-    k8s-app: addon-test
-    kubernetes.io/cluster-service: "true"
-    kubernetes.io/name: addon-test
-    newLabel: newValue
+    k8s-app: addon-ensure-exists-test
+    addonmanager.kubernetes.io/mode: EnsureExists
+    newLabel: addon-ensure-exists-test
 spec:
   ports:
   - port: 9376
     protocol: TCP
     targetPort: 9376
   selector:
-    k8s-app: addon-test
+    k8s-app: addon-ensure-exists-test
 `
 
-// Wrong label case
-var invalid_addon_controller_v1 = `
+var deprecated_label_addon_service = `
+apiVersion: v1
+kind: Service
+metadata:
+  name: addon-deprecated-label-test
+  namespace: %s
+  labels:
+    k8s-app: addon-deprecated-label-test
+    kubernetes.io/cluster-service: "true"
+spec:
+  ports:
+  - port: 9376
+    protocol: TCP
+    targetPort: 9376
+  selector:
+    k8s-app: addon-deprecated-label-test
+`
+
+// Should update addon with label "kubernetes.io/cluster-service=true".
+var deprecated_label_addon_service_updated = `
+apiVersion: v1
+kind: Service
+metadata:
+  name: addon-deprecated-label-test
+  namespace: %s
+  labels:
+    k8s-app: addon-deprecated-label-test
+    kubernetes.io/cluster-service: "true"
+    newLabel: addon-deprecated-label-test
+spec:
+  ports:
+  - port: 9376
+    protocol: TCP
+    targetPort: 9376
+  selector:
+    k8s-app: addon-deprecated-label-test
+`
+
+// Should not create addon without valid label.
+var invalid_addon_controller = `
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: invalid-addon-test-v1
+  name: invalid-addon-test
   namespace: %s
   labels:
     k8s-app: invalid-addon-test
-    version: v1
+    addonmanager.kubernetes.io/mode: NotMatch
 spec:
   replicas: 2
   selector:
     k8s-app: invalid-addon-test
-    version: v1
   template:
     metadata:
       labels:
         k8s-app: invalid-addon-test
-        version: v1
-        kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - image: gcr.io/google_containers/serve_hostname:v1.4
@@ -164,49 +195,10 @@ spec:
           protocol: TCP
 `
 
-// Wrong label case
-var invalid_addon_service_v1 = `
-apiVersion: v1
-kind: Service
-metadata:
-  name: ivalid-addon-test
-  namespace: %s
-  labels:
-    k8s-app: invalid-addon-test
-    kubernetes.io/name: invalid-addon-test
-spec:
-  ports:
-  - port: 9377
-    protocol: TCP
-    targetPort: 9376
-  selector:
-    k8s-app: invalid-addon-test
-`
-
-// Wrong namespace case
-var invalid_addon_service_v2 = `
-apiVersion: v1
-kind: Service
-metadata:
-  name: ivalid-addon-test-v2
-  namespace: %s
-  labels:
-    k8s-app: invalid-addon-test-v2
-    kubernetes.io/cluster-service: "true"
-spec:
-  ports:
-  - port: 9377
-    protocol: TCP
-    targetPort: 9376
-  selector:
-    k8s-app: invalid-addon-test
-`
-
 const (
 	addonTestPollInterval = 3 * time.Second
 	addonTestPollTimeout  = 5 * time.Minute
-	defaultNsName         = metav1.NamespaceDefault
-	addonNsName           = "kube-system"
+	addonNsName           = metav1.NamespaceSystem
 )
 
 type stringPair struct {
@@ -257,23 +249,23 @@ var _ = framework.KubeDescribe("Addon update", func() {
 		defer sshExec(sshClient, fmt.Sprintf("rm -rf %s", temporaryRemotePathPrefix)) // ignore the result in cleanup
 		sshExecAndVerify(sshClient, fmt.Sprintf("mkdir -p %s", temporaryRemotePath))
 
-		rcv1 := "addon-controller-v1.yaml"
-		rcv2 := "addon-controller-v2.yaml"
-		rcInvalid := "invalid-addon-controller-v1.yaml"
+		rcAddonReconcile := "addon-reconcile-controller.yaml"
+		rcAddonReconcileUpdated := "addon-reconcile-controller-Updated.yaml"
+		rcInvalid := "invalid-addon-controller.yaml"
 
-		svcv1 := "addon-service-v1.yaml"
-		svcv2 := "addon-service-v2.yaml"
-		svcInvalid := "invalid-addon-service-v1.yaml"
-		svcInvalidv2 := "invalid-addon-service-v2.yaml"
+		svcAddonDeprecatedLabel := "addon-deprecated-label-service.yaml"
+		svcAddonDeprecatedLabelUpdated := "addon-deprecated-label-service-updated.yaml"
+		svcAddonEnsureExists := "addon-ensure-exists-service.yaml"
+		svcAddonEnsureExistsUpdated := "addon-ensure-exists-service-updated.yaml"
 
 		var remoteFiles []stringPair = []stringPair{
-			{fmt.Sprintf(addon_controller_v1, addonNsName), rcv1},
-			{fmt.Sprintf(addon_controller_v2, addonNsName), rcv2},
-			{fmt.Sprintf(addon_service_v1, addonNsName), svcv1},
-			{fmt.Sprintf(addon_service_v2, addonNsName), svcv2},
-			{fmt.Sprintf(invalid_addon_controller_v1, addonNsName), rcInvalid},
-			{fmt.Sprintf(invalid_addon_service_v1, addonNsName), svcInvalid},
-			{fmt.Sprintf(invalid_addon_service_v2, defaultNsName), svcInvalidv2},
+			{fmt.Sprintf(reconcile_addon_controller, addonNsName), rcAddonReconcile},
+			{fmt.Sprintf(reconcile_addon_controller_updated, addonNsName), rcAddonReconcileUpdated},
+			{fmt.Sprintf(deprecated_label_addon_service, addonNsName), svcAddonDeprecatedLabel},
+			{fmt.Sprintf(deprecated_label_addon_service_updated, addonNsName), svcAddonDeprecatedLabelUpdated},
+			{fmt.Sprintf(ensure_exists_addon_service, addonNsName), svcAddonEnsureExists},
+			{fmt.Sprintf(ensure_exists_addon_service_updated, addonNsName), svcAddonEnsureExistsUpdated},
+			{fmt.Sprintf(invalid_addon_controller, addonNsName), rcInvalid},
 		}
 
 		for _, p := range remoteFiles {
@@ -292,51 +284,54 @@ var _ = framework.KubeDescribe("Addon update", func() {
 		defer sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix)) // ignore result in cleanup
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo mkdir -p %s", destinationDir))
 
-		By("copy invalid manifests to the destination dir (without kubernetes.io/cluster-service label)")
+		By("copy invalid manifests to the destination dir")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcInvalid, destinationDir, rcInvalid))
-		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcInvalid, destinationDir, svcInvalid))
 		// we will verify at the end of the test that the objects weren't created from the invalid manifests
 
 		By("copy new manifests")
-		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcv1, destinationDir, rcv1))
-		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcv1, destinationDir, svcv1))
+		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcAddonReconcile, destinationDir, rcAddonReconcile))
+		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonDeprecatedLabel, destinationDir, svcAddonDeprecatedLabel))
+		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonEnsureExists, destinationDir, svcAddonEnsureExists))
+		// Delete the "ensure exist class" addon at the end.
+		defer func() {
+			framework.Logf("Cleaning up ensure exist class addon.")
+			Expect(f.ClientSet.Core().Services(addonNsName).Delete("addon-ensure-exists-test", nil)).NotTo(HaveOccurred())
+		}()
 
-		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-test", true)
-		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-test-v1", true)
+		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-reconcile-test", true)
+		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-deprecated-label-test", true)
+		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-ensure-exists-test", true)
 
+		// Replace the manifests with new contents.
 		By("update manifests")
-		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcv2, destinationDir, rcv2))
-		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcv2, destinationDir, svcv2))
-		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, rcv1))
-		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, svcv1))
-		/**
-		 * Note that we have a small race condition here - the kube-addon-updater
-		 * May notice that a new rc/service file appeared, while the old one will still be there.
-		 * But it is ok - as long as we don't have rolling update, the result will be the same
-		 */
+		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcAddonReconcileUpdated, destinationDir, rcAddonReconcile))
+		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonDeprecatedLabelUpdated, destinationDir, svcAddonDeprecatedLabel))
+		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonEnsureExistsUpdated, destinationDir, svcAddonEnsureExists))
 
-		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-test-updated", true)
-		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-test-v2", true)
-
-		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-test", false)
-		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-test-v1", false)
+		// Wait for updated addons to have the new added label.
+		reconcileSelector := labels.SelectorFromSet(labels.Set(map[string]string{"newLabel": "addon-reconcile-test"}))
+		waitForReplicationControllerwithSelectorInAddonTest(f.ClientSet, addonNsName, true, reconcileSelector)
+		deprecatedLabelSelector := labels.SelectorFromSet(labels.Set(map[string]string{"newLabel": "addon-deprecated-label-test"}))
+		waitForServicewithSelectorInAddonTest(f.ClientSet, addonNsName, true, deprecatedLabelSelector)
+		// "Ensure exist class" addon should not be updated.
+		ensureExistSelector := labels.SelectorFromSet(labels.Set(map[string]string{"newLabel": "addon-ensure-exists-test"}))
+		waitForServicewithSelectorInAddonTest(f.ClientSet, addonNsName, false, ensureExistSelector)
 
 		By("remove manifests")
-		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, rcv2))
-		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, svcv2))
+		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, rcAddonReconcile))
+		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, svcAddonDeprecatedLabel))
+		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, svcAddonEnsureExists))
 
-		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-test-updated", false)
-		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-test-v2", false)
+		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-reconcile-test", false)
+		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-deprecated-label-test", false)
+		// "Ensure exist class" addon will not be deleted when manifest is removed.
+		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-ensure-exists-test", true)
 
-		By("verify invalid API addons weren't created")
-		_, err = f.ClientSet.Core().ReplicationControllers(addonNsName).Get("invalid-addon-test-v1", metav1.GetOptions{})
-		Expect(err).To(HaveOccurred())
-		_, err = f.ClientSet.Core().Services(addonNsName).Get("ivalid-addon-test", metav1.GetOptions{})
-		Expect(err).To(HaveOccurred())
-		_, err = f.ClientSet.Core().Services(defaultNsName).Get("ivalid-addon-test-v2", metav1.GetOptions{})
+		By("verify invalid addons weren't created")
+		_, err = f.ClientSet.Core().ReplicationControllers(addonNsName).Get("invalid-addon-test", metav1.GetOptions{})
 		Expect(err).To(HaveOccurred())
 
-		// invalid addons will be deleted by the deferred function
+		// Invalid addon manifests and the "ensure exist class" addon will be deleted by the deferred function.
 	})
 })
 
@@ -346,6 +341,15 @@ func waitForServiceInAddonTest(c clientset.Interface, addonNamespace, name strin
 
 func waitForReplicationControllerInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {
 	framework.ExpectNoError(framework.WaitForReplicationController(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
+}
+
+func waitForServicewithSelectorInAddonTest(c clientset.Interface, addonNamespace string, exist bool, selector labels.Selector) {
+	framework.ExpectNoError(framework.WaitForServiceWithSelector(c, addonNamespace, selector, exist, addonTestPollInterval, addonTestPollTimeout))
+}
+
+func waitForReplicationControllerwithSelectorInAddonTest(c clientset.Interface, addonNamespace string, exist bool, selector labels.Selector) {
+	framework.ExpectNoError(framework.WaitForReplicationControllerwithSelector(c, addonNamespace, selector, exist, addonTestPollInterval,
+		addonTestPollTimeout))
 }
 
 // TODO use the framework.SSH code, either adding an SCP to it or copying files
