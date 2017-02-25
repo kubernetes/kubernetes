@@ -388,17 +388,22 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/controller-manager.lock"}
 	}
 
-	command = append(getComponentBaseCommand(controllerManager),
-		"--address=127.0.0.1",
-		"--leader-elect",
-		"--master=127.0.0.1:8080",
-		"--root-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--service-account-private-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
-		"--cluster-signing-cert-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--cluster-signing-key-file="+getCertFilePath(kubeadmconstants.CAKeyName),
-		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+kubeadmconstants.CSVTokenBootstrapGroup,
-		"--use-service-account-credentials",
-	)
+	defaultArguments := map[string]string{
+		"address":                                                  "127.0.0.1",
+		"leader-elect":                                             "true",
+		"master":                                                   "127.0.0.1:8080",
+		"root-ca-file":                                             getCertFilePath(kubeadmconstants.CACertName),
+		"service-account-private-key-file":                         getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
+		"cluster-signing-cert-file":                                getCertFilePath(kubeadmconstants.CACertName),
+		"cluster-signing-key-file":                                 getCertFilePath(kubeadmconstants.CAKeyName),
+		"insecure-experimental-approve-all-kubelet-csrs-for-group": kubeadmconstants.CSVTokenBootstrapGroup,
+		"use-service-account-credentials":                          "true",
+	}
+
+	command = getComponentBaseCommand(controllerManager)
+	for k, v := range defaultArguments {
+		command = append(command, fmt.Sprintf("--%s=%s", k, v))
+	}
 
 	if cfg.CloudProvider != "" {
 		command = append(command, "--cloud-provider="+cfg.CloudProvider)
@@ -426,11 +431,16 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	command = append(getComponentBaseCommand(scheduler),
-		"--address=127.0.0.1",
-		"--leader-elect",
-		"--master=127.0.0.1:8080",
-	)
+	defaultArguments := map[string]string{
+		"address":      "127.0.0.1",
+		"leader-elect": "true",
+		"master":       "127.0.0.1:8080",
+	}
+
+	command = getComponentBaseCommand(scheduler)
+	for k, v := range defaultArguments {
+		command = append(command, fmt.Sprintf("--%s=%s", k, v))
+	}
 
 	return command
 }
