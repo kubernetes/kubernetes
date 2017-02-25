@@ -292,8 +292,8 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	if status.AvailableReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
 	}
-	if status.ReadyReplicas > status.AvailableReplicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), status.ReadyReplicas, "cannot be greater than availableReplicas"))
+	if status.AvailableReplicas > status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
 	}
 	return allErrs
 }
@@ -528,8 +528,8 @@ func ValidateReplicaSetStatusUpdate(rs, oldRs *extensions.ReplicaSet) field.Erro
 	if rs.Status.AvailableReplicas > rs.Status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), rs.Status.AvailableReplicas, msg))
 	}
-	if rs.Status.ReadyReplicas > rs.Status.AvailableReplicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), rs.Status.ReadyReplicas, "cannot be greater than availableReplicas"))
+	if rs.Status.AvailableReplicas > rs.Status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), rs.Status.AvailableReplicas, "cannot be greater than readyReplicas"))
 	}
 	return allErrs
 }
