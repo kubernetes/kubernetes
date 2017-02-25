@@ -219,7 +219,7 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 		switch {
 		case apierrors.IsNotFound(err):
 			_, err := spc.client.Core().PersistentVolumeClaims(claim.Namespace).Create(&claim)
-			if err != nil && !apierrors.IsAlreadyExists(err) {
+			if err != nil {
 				errs = append(errs, fmt.Errorf("Failed to create PVC %s: %s", claim.Name, err))
 			}
 			if err == nil || !apierrors.IsAlreadyExists(err) {
