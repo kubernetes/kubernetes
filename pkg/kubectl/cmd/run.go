@@ -585,7 +585,7 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 		return nil, "", nil, nil, err
 	}
 	if cmdutil.GetRecordFlag(cmd) || len(annotations[kubectl.ChangeCauseAnnotation]) > 0 {
-		if err := cmdutil.RecordChangeCause(obj, f.Command()); err != nil {
+		if err := cmdutil.RecordChangeCause(obj, f.Command(cmd, false)); err != nil {
 			return nil, "", nil, nil, err
 		}
 	}

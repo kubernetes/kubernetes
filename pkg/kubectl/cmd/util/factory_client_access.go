@@ -330,14 +330,35 @@ func (f *ring0Factory) FlagSet() *pflag.FlagSet {
 	return f.flags
 }
 
-// TODO: We need to filter out stuff like secrets.
-func (f *ring0Factory) Command() string {
+// Set showSecrets false to filter out stuff like secrets.
+func (f *ring0Factory) Command(cmd *cobra.Command, showSecrets bool) string {
 	if len(os.Args) == 0 {
 		return ""
 	}
+
+	flags := ""
+	parseFunc := func(flag *pflag.Flag, value string) error {
+		flags = flags + " --" + flag.Name
+		if set, ok := flag.Annotations["classified"]; showSecrets || !ok || len(set) == 0 {
+			flags = flags + "=" + value
+		} else {
+			flags = flags + "=CLASSIFIED"
+		}
+		return nil
+	}
+	var err error
+	err = cmd.Flags().ParseAll(os.Args[1:], parseFunc)
+	if err != nil || !cmd.Flags().Parsed() {
+		return ""
+	}
+
+	args := ""
+	if arguments := cmd.Flags().Args(); len(arguments) > 0 {
+		args = " " + strings.Join(arguments, " ")
+	}
+
 	base := filepath.Base(os.Args[0])
-	args := append([]string{base}, os.Args[1:]...)
-	return strings.Join(args, " ")
+	return base + args + flags
 }
 
 func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {

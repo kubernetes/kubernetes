@@ -258,7 +258,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+				if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
 			}
@@ -313,7 +313,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				if patch, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command()); err == nil {
+				if patch, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command(cmd, true)); err == nil {
 					if _, err = helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
 						glog.V(4).Infof("error recording reason: %v", err)
 					}
