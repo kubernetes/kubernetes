@@ -50,7 +50,9 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		if cfg.KubernetesVersion != kubeadmapiext.DefaultKubernetesVersion {
 			return err
 		} else {
-			ver = kubeadmapiext.DefaultKubernetesFallbackVersion
+			// Cann't get the real control plane version
+			ver = "v" + kubeadmconstants.MinimumControlPlaneVersion
+			fmt.Printf("[init] WARNING: cann't parse the control plane version '%s', using MinimumControlPlaneVersion\n", cfg.KubernetesVersion)
 		}
 	}
 	cfg.KubernetesVersion = ver
