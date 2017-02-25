@@ -569,9 +569,6 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	// modify them, you need to copy it first.
 	filteredPods, err := cm.ClaimPods(pods)
 	if err != nil {
-		// Something went wrong with adoption or release.
-		// Requeue and try again so we don't leave orphans sitting around.
-		rsc.queue.Add(key)
 		return err
 	}
 
