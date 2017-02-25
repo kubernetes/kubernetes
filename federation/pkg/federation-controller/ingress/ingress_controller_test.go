@@ -142,11 +142,9 @@ func TestIngressController(t *testing.T) {
 
 	t.Log("Adding cluster 2")
 	clusterWatch.Add(cluster2)
-	// First check that the original values are not equal - see above comment
 	cluster2ConfigMapWatch.Add(cfg2)
 
 	t.Log("Checking that a configmap updates are propagated prior to Federated Ingress")
-
 	referenceUid := cfg1.Data[uidKey]
 	uid1, providerId1 := GetConfigMapUidAndProviderId(t, cluster1ConfigMapUpdateChan)
 	uid2, providerId2 := GetConfigMapUidAndProviderId(t, cluster2ConfigMapUpdateChan)
@@ -154,11 +152,6 @@ func TestIngressController(t *testing.T) {
 	assert.True(t, referenceUid == uid1, "Expected cluster1 configmap uid %q to be equal to referenceUid %q", uid1, referenceUid)
 	assert.True(t, referenceUid == uid2, "Expected cluster2 configmap uid %q to be equal to referenceUid %q", uid2, referenceUid)
 	assert.True(t, providerId1 != providerId2, "Expected cluster1 providerUid %q to be unique and different from cluster2 providerUid %q", providerId1, providerId2)
-
-	t.Log("Deleting cluster2 and watch objects")
-
-	cluster2ConfigMapWatch.Delete(cfg2)
-	clusterWatch.Delete(cluster2)
 
 	// Test add federated ingress.
 	t.Log("Adding Federated Ingress")
