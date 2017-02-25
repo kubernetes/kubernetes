@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -401,26 +402,24 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 }
 
 type testNodeLister struct {
-	nodes []v1.Node
+	nodes []*v1.Node
 }
 
 type testNodeInfo struct {
-	nodes []v1.Node
+	nodes []*v1.Node
 }
 
 func (ls testNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 	for _, node := range ls.nodes {
 		if node.Name == id {
-			return &node, nil
+			return node, nil
 		}
 	}
 	return nil, fmt.Errorf("Node with name: %s does not exist", id)
 }
 
-func (ls testNodeLister) List() (v1.NodeList, error) {
-	return v1.NodeList{
-		Items: ls.nodes,
-	}, nil
+func (ls testNodeLister) List(selector labels.Selector) ([]*v1.Node, error) {
+	return ls.nodes, nil
 }
 
 // Tests that we handle port conflicts correctly by setting the failed status in status map.
@@ -432,7 +431,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	kl.nodeLister = testNodeLister{nodes: []v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -442,7 +441,7 @@ func TestHandlePortConflicts(t *testing.T) {
 			},
 		},
 	}}
-	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -487,7 +486,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	kl.nodeLister = testNodeLister{nodes: []v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
@@ -497,7 +496,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 			},
 		},
 	}}
-	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
@@ -535,7 +534,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	nodes := []v1.Node{
+	nodes := []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
 			Status: v1.NodeStatus{
@@ -576,7 +575,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	nodes := []v1.Node{
+	nodes := []*v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
@@ -1823,7 +1822,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	kl.nodeLister = testNodeLister{nodes: []v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -1833,7 +1832,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 			},
 		},
 	}}
-	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
