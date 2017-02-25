@@ -166,7 +166,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		glog.Fatalf("Could not find resources from API Server: %v", err)
 	}
 
-	go clustercontroller.NewclusterController(ccClientset, s.ClusterMonitorPeriod.Duration).Run()
+	go clustercontroller.NewClusterController(ccClientset, s.ClusterMonitorPeriod.Duration).Run()
 
 	if controllerEnabled(s.Controllers, serverResources, servicecontroller.ControllerName, servicecontroller.RequiredResources, true) {
 		dns, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.DnsConfigFile)
