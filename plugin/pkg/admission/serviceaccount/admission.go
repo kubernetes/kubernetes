@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -149,10 +150,13 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		if len(pod.Spec.ServiceAccountName) != 0 {
 			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference service accounts"))
 		}
-		for _, volume := range pod.Spec.Volumes {
-			if volume.VolumeSource.Secret != nil {
-				return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference secrets"))
-			}
+		hasSecrets := false
+		podutil.VisitPodSecretNames(pod, func(name string) bool {
+			hasSecrets = true
+			return false
+		})
+		if hasSecrets {
+			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference secrets"))
 		}
 		return nil
 	}
