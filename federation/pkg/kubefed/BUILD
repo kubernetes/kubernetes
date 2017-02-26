@@ -20,6 +20,7 @@ go_library(
         "//federation/apis/federation:go_default_library",
         "//federation/pkg/kubefed/init:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",

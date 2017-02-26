@@ -17,8 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"github.com/spf13/pflag"
+	"net/url"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -29,6 +30,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 const (
@@ -143,4 +145,13 @@ func CreateKubeconfigSecret(clientset *client.Clientset, kubeconfig *clientcmdap
 		return clientset.Core().Secrets(namespace).Create(secret)
 	}
 	return secret, nil
+}
+
+// isNotFound checks if the given error is a NotFound status error.
+func IsNotFound(err error) bool {
+	statusErr := err
+	if urlErr, ok := err.(*url.Error); ok {
+		statusErr = urlErr.Err
+	}
+	return errors.IsNotFound(statusErr)
 }

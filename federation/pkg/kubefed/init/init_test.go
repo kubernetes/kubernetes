@@ -94,6 +94,7 @@ func TestInitFederation(t *testing.T) {
 		dryRun                string
 		apiserverArgOverrides string
 		cmArgOverrides        string
+		failureTest           string
 	}{
 		{
 			federation:            "union",
@@ -186,6 +187,22 @@ func TestInitFederation(t *testing.T) {
 			storageBackend:       "etcd3",
 			dryRun:               "",
 		},
+		{
+			federation:           "union",
+			kubeconfigGlobal:     fakeKubeFiles[0],
+			kubeconfigExplicit:   "",
+			dnsZoneName:          "example.test.",
+			apiserverServiceType: v1.ServiceTypeNodePort,
+			advertiseAddress:     nodeIP,
+			image:                "example.test/foo:bar",
+			etcdPVCapacity:       "5Gi",
+			etcdPersistence:      "true",
+			expectedErr:          "Unable to connect to the server: Internal error occurred: Internal Error",
+			dnsProvider:          "test-dns-provider",
+			storageBackend:       "etcd3",
+			dryRun:               "",
+			failureTest:          "fail",
+		},
 	}
 
 	//TODO: implement a negative case for dry run
@@ -200,7 +217,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend, tc.apiserverArgOverrides, tc.cmArgOverrides)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend, tc.apiserverArgOverrides, tc.cmArgOverrides, tc.failureTest)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -565,7 +582,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider, apiserverOverrideArg, cmOverrideArg string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider, apiserverOverrideArg, cmOverrideArg, failureTest string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -1016,6 +1033,21 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, fmt.Errorf("Unexpected namespace object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, namespace))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &namespace)}, nil
+			case p == fmt.Sprintf("/api/v1/namespaces/%s", namespaceName):
+				if failureTest != "fail" {
+					return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
+				}
+				switch m {
+				case http.MethodDelete:
+					status := metav1.Status{
+						Status: "Success",
+					}
+					return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
+				case http.MethodGet:
+					return nil, errors.NewNotFound(api.Resource("namespace"), namespaceName)
+				default:
+					return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
+				}
 			case p == svcUrlPrefix && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
@@ -1041,6 +1073,9 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				}
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &svcWithLB)}, nil
 			case p == "/api/v1/namespaces/federation-system/secrets" && m == http.MethodPost:
+				if failureTest == "fail" {
+					return nil, errors.NewInternalError(fmt.Errorf("Internal Error"))
+				}
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
 					return nil, err
