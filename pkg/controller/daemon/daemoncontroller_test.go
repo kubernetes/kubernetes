@@ -50,6 +50,20 @@ var (
 	noScheduleTaints      = []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}
 )
 
+var (
+	nodeNotReady = []v1.Taint{{
+		Key:       metav1.TaintNodeNotReady,
+		Effect:    v1.TaintEffectNoExecute,
+		TimeAdded: metav1.Now(),
+	}}
+
+	nodeUnreachable = []v1.Taint{{
+		Key:       metav1.TaintNodeUnreachable,
+		Effect:    v1.TaintEffectNoExecute,
+		TimeAdded: metav1.Now(),
+	}}
+)
+
 func getKey(ds *extensions.DaemonSet, t *testing.T) string {
 	if key, err := controller.KeyFunc(ds); err != nil {
 		t.Errorf("Unexpected error getting key for ds %v: %v", ds.Name, err)
@@ -737,6 +751,40 @@ func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
 
 	ds := newDaemonSet("tolerate")
 	setDaemonSetToleration(ds, noScheduleTolerations)
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSet should launch a pod on a not ready node with taint notReady:NoExecute.
+func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("tainted", nil)
+	setNodeTaint(node, nodeNotReady)
+	node.Status.Conditions = []v1.NodeCondition{
+		{Type: v1.NodeReady, Status: v1.ConditionFalse},
+	}
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("simple")
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSet should launch a pod on an unreachable node with taint unreachable:NoExecute.
+func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("tainted", nil)
+	setNodeTaint(node, nodeUnreachable)
+	node.Status.Conditions = []v1.NodeCondition{
+		{Type: v1.NodeReady, Status: v1.ConditionUnknown},
+	}
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("simple")
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
