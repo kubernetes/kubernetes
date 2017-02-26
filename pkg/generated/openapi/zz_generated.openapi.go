@@ -16226,6 +16226,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.JobTemplateSpec"),
 							},
 						},
+						"successfulJobsHistoryLimit": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"failedJobsHistoryLimit": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
 					},
 					Required: []string{"schedule", "jobTemplate"},
 				},
