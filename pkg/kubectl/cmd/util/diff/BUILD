@@ -9,27 +9,17 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["editoptions.go"],
+    srcs = ["diffoptions.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
-        "//pkg/kubectl/util/crlf:go_default_library",
-        "//pkg/printers:go_default_library",
-        "//vendor/github.com/evanphx/json-patch:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
     ],
 )
 

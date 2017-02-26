@@ -181,6 +181,11 @@ type ClientAccessFactory interface {
 	// of their choice.
 	EditorEnvs() []string
 
+	// DiffEnvs returns a group of environment variables that the diff command
+	// can range over in order to determine if the user has specified an diff tool
+	// of their choice.
+	DiffEnvs() []string
+
 	// PrintObjectSpecificMessage prints object-specific messages on the provided writer
 	PrintObjectSpecificMessage(obj runtime.Object, out io.Writer)
 }

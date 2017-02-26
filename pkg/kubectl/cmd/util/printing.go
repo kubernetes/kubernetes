@@ -61,6 +61,16 @@ func AddOutputVarFlagsForMutation(cmd *cobra.Command, output *string) {
 	cmd.Flags().StringVarP(output, "output", "o", "", "Output mode. Use \"-o name\" for shorter output (resource/name).")
 }
 
+// AddOutputFlagsForJsonYaml adds output related flags to a command. But only support json or yaml format.
+func AddOutputFlagsForJsonYaml(cmd *cobra.Command, defaultOutput string) {
+	cmd.Flags().StringP("output", "o", defaultOutput, "Output format. One of: yaml|json.")
+}
+
+// AddOutputVarFlagsForJsonYaml adds output related flags to a command. But only support json or yaml format.
+func AddOutputVarFlagsForJsonYaml(cmd *cobra.Command, output *string, defaultOutput string) {
+	cmd.Flags().StringVarP(output, "output", "o", defaultOutput, "Output format. One of: yaml|json.")
+}
+
 // AddOutputFlags adds output related flags to a command.
 func AddOutputFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")

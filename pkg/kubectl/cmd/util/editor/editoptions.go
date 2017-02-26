@@ -92,7 +92,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 	}
 	if o.Output != "" {
 		if o.Output != "yaml" && o.Output != "json" {
-			return fmt.Errorf("invalid output format %s, only yaml|json supported", o.Output)
+			return fmt.Errorf("invalid output format %q, only yaml|json supported", o.Output)
 		}
 	}
 	o.editPrinterOptions = getPrinter(o.Output)
@@ -156,7 +156,7 @@ func (o *EditOptions) Validate() error {
 }
 
 func (o *EditOptions) Run() error {
-	edit := NewDefaultEditor(o.f.EditorEnvs())
+	edit := cmdutil.NewDefaultCmdTool(cmdutil.EditorCmd, o.f.EditorEnvs())
 	// editFn is invoked for each edit session (once with a list for normal edit, once for each individual resource in a edit-on-create invocation)
 	editFn := func(infos []*resource.Info) error {
 		var (
@@ -214,7 +214,7 @@ func (o *EditOptions) Run() error {
 
 			// launch the editor
 			editedDiff := edited
-			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), o.editPrinterOptions.ext, buf)
+			edited, file, err = edit.LaunchTempFile(cmdutil.TempFile{Prefix: "edit-", Suffix: o.editPrinterOptions.ext, Buffer: buf})
 			if err != nil {
 				return preservedFile(err, results.file, o.ErrOut)
 			}

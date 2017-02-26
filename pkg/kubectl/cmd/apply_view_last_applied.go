@@ -71,8 +71,7 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Co
 			cmdutil.CheckErr(options.RunApplyViewLastApplied())
 		},
 	}
-
-	cmd.Flags().StringP("output", "o", "", "Output format. Must be one of yaml|json")
+	cmdutil.AddOutputFlagsForJsonYaml(cmd, "yaml")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
 	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
 	usage := "that contains the last-applied-configuration annotations"
@@ -137,12 +136,12 @@ func (o *ViewLastAppliedOptions) RunApplyViewLastApplied() error {
 	for _, str := range o.LastAppliedConfigurationList {
 		switch o.OutputFormat {
 		case "json":
-			jsonBuffer := &bytes.Buffer{}
-			err := json.Indent(jsonBuffer, []byte(str), "", "  ")
+			var prettyJSON bytes.Buffer
+			err := json.Indent(&prettyJSON, []byte(str), "", "  ")
 			if err != nil {
 				return err
 			}
-			fmt.Fprint(o.Out, string(jsonBuffer.Bytes()))
+			fmt.Fprint(o.Out, string(prettyJSON.Bytes()))
 		case "yaml":
 			yamlOutput, err := yaml.JSONToYAML([]byte(str))
 			if err != nil {
@@ -162,7 +161,7 @@ func (o *ViewLastAppliedOptions) ValidateOutputArgs(cmd *cobra.Command) error {
 		o.OutputFormat = "json"
 		return nil
 	// If flag -o is not specified, use yaml as default
-	case "yaml", "":
+	case "yaml":
 		o.OutputFormat = "yaml"
 		return nil
 	default:
