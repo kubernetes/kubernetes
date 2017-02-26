@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package v1
 
 import (
 	"fmt"
@@ -22,16 +22,14 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utillabels "k8s.io/client-go/pkg/util/labels"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) error {
+func AddConversionFuncs(scheme *runtime.Scheme) error {
 	return scheme.AddConversionFuncs(
 		Convert_v1_TypeMeta_To_v1_TypeMeta,
 
@@ -157,7 +155,7 @@ func Convert_bool_To_Pointer_bool(in *bool, out **bool, s conversion.Scope) erro
 }
 
 // +k8s:conversion-fn=drop
-func Convert_v1_TypeMeta_To_v1_TypeMeta(in, out *metav1.TypeMeta, s conversion.Scope) error {
+func Convert_v1_TypeMeta_To_v1_TypeMeta(in, out *TypeMeta, s conversion.Scope) error {
 	// These values are explicitly not copied
 	//out.APIVersion = in.APIVersion
 	//out.Kind = in.Kind
@@ -165,7 +163,7 @@ func Convert_v1_TypeMeta_To_v1_TypeMeta(in, out *metav1.TypeMeta, s conversion.S
 }
 
 // +k8s:conversion-fn=copy-only
-func Convert_unversioned_ListMeta_To_unversioned_ListMeta(in, out *metav1.ListMeta, s conversion.Scope) error {
+func Convert_unversioned_ListMeta_To_unversioned_ListMeta(in, out *ListMeta, s conversion.Scope) error {
 	*out = *in
 	return nil
 }
@@ -177,14 +175,14 @@ func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrStrin
 }
 
 // +k8s:conversion-fn=copy-only
-func Convert_unversioned_Time_To_unversioned_Time(in *metav1.Time, out *metav1.Time, s conversion.Scope) error {
+func Convert_unversioned_Time_To_unversioned_Time(in *Time, out *Time, s conversion.Scope) error {
 	// Cannot deep copy these, because time.Time has unexported fields.
 	*out = *in
 	return nil
 }
 
 // Convert_Slice_string_To_unversioned_Time allows converting a URL query parameter value
-func Convert_Slice_string_To_unversioned_Time(input *[]string, out *metav1.Time, s conversion.Scope) error {
+func Convert_Slice_string_To_unversioned_Time(input *[]string, out *Time, s conversion.Scope) error {
 	str := ""
 	if len(*input) > 0 {
 		str = (*input)[0]
@@ -232,20 +230,20 @@ func Convert_resource_Quantity_To_resource_Quantity(in *resource.Quantity, out *
 	return nil
 }
 
-func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *metav1.LabelSelector, s conversion.Scope) error {
+func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *LabelSelector, s conversion.Scope) error {
 	if in == nil {
 		return nil
 	}
-	out = new(metav1.LabelSelector)
+	out = new(LabelSelector)
 	for labelKey, labelValue := range *in {
-		utillabels.AddLabelToSelector(out, labelKey, labelValue)
+		AddLabelToSelector(out, labelKey, labelValue)
 	}
 	return nil
 }
 
-func Convert_unversioned_LabelSelector_to_map(in *metav1.LabelSelector, out *map[string]string, s conversion.Scope) error {
+func Convert_unversioned_LabelSelector_to_map(in *LabelSelector, out *map[string]string, s conversion.Scope) error {
 	var err error
-	*out, err = metav1.LabelSelectorAsMap(in)
+	*out, err = LabelSelectorAsMap(in)
 	return err
 }
 

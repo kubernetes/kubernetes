@@ -19,10 +19,13 @@ set -o nounset
 set -o pipefail
 
 V=""
-while getopts ":v" opt; do
+while getopts ":vi" opt; do
   case $opt in
     v) # increase verbosity
       V="-v"
+      ;;
+    i) # in-place
+      USE_TEMP_DIR=0
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -78,5 +81,5 @@ export GOPATH="${TEMP_STAGING_GOPATH}"
 godep restore ${V} 2>&1 | sed 's/^/  /'
 
 echo "Testing staging/copy.sh"
-staging/copy.sh -d 2>&1 | sed 's/^/  /'
+staging/copy.sh -d -f 2>&1 | sed 's/^/  /'
 popd
