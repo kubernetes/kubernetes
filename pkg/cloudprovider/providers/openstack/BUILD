@@ -54,6 +54,8 @@ go_library(
         "//vendor:gopkg.in/gcfg.v1",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 
