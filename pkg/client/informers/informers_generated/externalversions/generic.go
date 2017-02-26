@@ -33,7 +33,6 @@ import (
 	policy_v1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbac_v1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
-	storage_v1 "k8s.io/kubernetes/pkg/apis/storage/v1"
 	storage_v1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 )
 
@@ -160,10 +159,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1beta1().Roles().Informer()}, nil
 	case rbac_v1beta1.SchemeGroupVersion.WithResource("rolebindings"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1beta1().RoleBindings().Informer()}, nil
-
-		// Group=Storage, Version=V1
-	case storage_v1.SchemeGroupVersion.WithResource("storageclasses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1().StorageClasses().Informer()}, nil
 
 		// Group=Storage, Version=V1beta1
 	case storage_v1beta1.SchemeGroupVersion.WithResource("storageclasses"):
