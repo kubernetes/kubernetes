@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/storage/names"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -78,6 +79,7 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 	return &extensions.DaemonSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
 		ObjectMeta: metav1.ObjectMeta{
+			UID:       uuid.NewUUID(),
 			Name:      name,
 			Namespace: metav1.NamespaceDefault,
 		},
@@ -128,7 +130,7 @@ func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]
 	}
 }
 
-func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
+func newPod(podName string, nodeName string, label map[string]string, ds *extensions.DaemonSet) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{
@@ -150,18 +152,21 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 		},
 	}
 	pod.Name = names.SimpleNameGenerator.GenerateName(podName)
+	if ds != nil {
+		pod.OwnerReferences = []metav1.OwnerReference{*newControllerRef(ds)}
+	}
 	return pod
 }
 
-func addPods(podStore cache.Store, nodeName string, label map[string]string, number int) {
+func addPods(podStore cache.Store, nodeName string, label map[string]string, ds *extensions.DaemonSet, number int) {
 	for i := 0; i < number; i++ {
-		podStore.Add(newPod(fmt.Sprintf("%s-", nodeName), nodeName, label))
+		podStore.Add(newPod(fmt.Sprintf("%s-", nodeName), nodeName, label, ds))
 	}
 }
 
-func addFailedPods(podStore cache.Store, nodeName string, label map[string]string, number int) {
+func addFailedPods(podStore cache.Store, nodeName string, label map[string]string, ds *extensions.DaemonSet, number int) {
 	for i := 0; i < number; i++ {
-		pod := newPod(fmt.Sprintf("%s-", nodeName), nodeName, label)
+		pod := newPod(fmt.Sprintf("%s-", nodeName), nodeName, label, ds)
 		pod.Status = v1.PodStatus{Phase: v1.PodFailed}
 		podStore.Add(pod)
 	}
@@ -600,13 +605,13 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 // Controller should not create pods on nodes which have daemon pods, and should remove excess pods from nodes that have extra pods.
 func TestDealsWithExistingPods(t *testing.T) {
 	manager, podControl, _ := newTestController()
-	addNodes(manager.nodeStore, 0, 5, nil)
-	addPods(manager.podStore, "node-1", simpleDaemonSetLabel, 1)
-	addPods(manager.podStore, "node-2", simpleDaemonSetLabel, 2)
-	addPods(manager.podStore, "node-3", simpleDaemonSetLabel, 5)
-	addPods(manager.podStore, "node-4", simpleDaemonSetLabel2, 2)
 	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
+	addPods(manager.podStore, "node-1", simpleDaemonSetLabel, ds, 1)
+	addPods(manager.podStore, "node-2", simpleDaemonSetLabel, ds, 2)
+	addPods(manager.podStore, "node-3", simpleDaemonSetLabel, ds, 5)
+	addPods(manager.podStore, "node-4", simpleDaemonSetLabel2, ds, 2)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 2, 5)
 }
 
@@ -624,34 +629,34 @@ func TestSelectorDaemonLaunchesPods(t *testing.T) {
 // Daemon with node selector should delete pods from nodes that do not satisfy selector.
 func TestSelectorDaemonDeletesUnselectedPods(t *testing.T) {
 	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	manager.dsStore.Add(ds)
 	addNodes(manager.nodeStore, 0, 5, nil)
 	addNodes(manager.nodeStore, 5, 5, simpleNodeLabel)
-	addPods(manager.podStore, "node-0", simpleDaemonSetLabel2, 2)
-	addPods(manager.podStore, "node-1", simpleDaemonSetLabel, 3)
-	addPods(manager.podStore, "node-1", simpleDaemonSetLabel2, 1)
-	addPods(manager.podStore, "node-4", simpleDaemonSetLabel, 1)
-	daemon := newDaemonSet("foo")
-	daemon.Spec.Template.Spec.NodeSelector = simpleNodeLabel
-	manager.dsStore.Add(daemon)
-	syncAndValidateDaemonSets(t, manager, daemon, podControl, 5, 4)
+	addPods(manager.podStore, "node-0", simpleDaemonSetLabel2, ds, 2)
+	addPods(manager.podStore, "node-1", simpleDaemonSetLabel, ds, 3)
+	addPods(manager.podStore, "node-1", simpleDaemonSetLabel2, ds, 1)
+	addPods(manager.podStore, "node-4", simpleDaemonSetLabel, ds, 1)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 4)
 }
 
 // DaemonSet with node selector should launch pods on nodes matching selector, but also deal with existing pods on nodes.
 func TestSelectorDaemonDealsWithExistingPods(t *testing.T) {
 	manager, podControl, _ := newTestController()
-	addNodes(manager.nodeStore, 0, 5, nil)
-	addNodes(manager.nodeStore, 5, 5, simpleNodeLabel)
-	addPods(manager.podStore, "node-0", simpleDaemonSetLabel, 1)
-	addPods(manager.podStore, "node-1", simpleDaemonSetLabel, 3)
-	addPods(manager.podStore, "node-1", simpleDaemonSetLabel2, 2)
-	addPods(manager.podStore, "node-2", simpleDaemonSetLabel, 4)
-	addPods(manager.podStore, "node-6", simpleDaemonSetLabel, 13)
-	addPods(manager.podStore, "node-7", simpleDaemonSetLabel2, 4)
-	addPods(manager.podStore, "node-9", simpleDaemonSetLabel, 1)
-	addPods(manager.podStore, "node-9", simpleDaemonSetLabel2, 1)
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
 	manager.dsStore.Add(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
+	addNodes(manager.nodeStore, 5, 5, simpleNodeLabel)
+	addPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, 1)
+	addPods(manager.podStore, "node-1", simpleDaemonSetLabel, ds, 3)
+	addPods(manager.podStore, "node-1", simpleDaemonSetLabel2, ds, 2)
+	addPods(manager.podStore, "node-2", simpleDaemonSetLabel, ds, 4)
+	addPods(manager.podStore, "node-6", simpleDaemonSetLabel, ds, 13)
+	addPods(manager.podStore, "node-7", simpleDaemonSetLabel2, ds, 4)
+	addPods(manager.podStore, "node-9", simpleDaemonSetLabel, ds, 1)
+	addPods(manager.podStore, "node-9", simpleDaemonSetLabel2, ds, 1)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 3, 20)
 }
 
@@ -738,7 +743,7 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 }
 
 func TestNumberReadyStatus(t *testing.T) {
-	daemon := newDaemonSet("foo")
+	ds := newDaemonSet("foo")
 	manager, podControl, clientset := newTestController()
 	var updated *extensions.DaemonSet
 	clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -751,31 +756,31 @@ func TestNumberReadyStatus(t *testing.T) {
 		return false, nil, nil
 	})
 	addNodes(manager.nodeStore, 0, 2, simpleNodeLabel)
-	addPods(manager.podStore, "node-0", simpleDaemonSetLabel, 1)
-	addPods(manager.podStore, "node-1", simpleDaemonSetLabel, 1)
-	manager.dsStore.Add(daemon)
+	addPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, 1)
+	addPods(manager.podStore, "node-1", simpleDaemonSetLabel, ds, 1)
+	manager.dsStore.Add(ds)
 
-	syncAndValidateDaemonSets(t, manager, daemon, podControl, 0, 0)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 	if updated.Status.NumberReady != 0 {
 		t.Errorf("Wrong daemon %s status: %v", updated.Name, updated.Status)
 	}
 
-	selector, _ := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
-	daemonPods, _ := manager.podLister.Pods(daemon.Namespace).List(selector)
+	selector, _ := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	daemonPods, _ := manager.podLister.Pods(ds.Namespace).List(selector)
 	for _, pod := range daemonPods {
 		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 		pod.Status.Conditions = append(pod.Status.Conditions, condition)
 	}
 
-	syncAndValidateDaemonSets(t, manager, daemon, podControl, 0, 0)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 	if updated.Status.NumberReady != 2 {
 		t.Errorf("Wrong daemon %s status: %v", updated.Name, updated.Status)
 	}
 }
 
 func TestObservedGeneration(t *testing.T) {
-	daemon := newDaemonSet("foo")
-	daemon.Generation = 1
+	ds := newDaemonSet("foo")
+	ds.Generation = 1
 	manager, podControl, clientset := newTestController()
 	var updated *extensions.DaemonSet
 	clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -789,12 +794,12 @@ func TestObservedGeneration(t *testing.T) {
 	})
 
 	addNodes(manager.nodeStore, 0, 1, simpleNodeLabel)
-	addPods(manager.podStore, "node-0", simpleDaemonSetLabel, 1)
-	manager.dsStore.Add(daemon)
+	addPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, 1)
+	manager.dsStore.Add(ds)
 
-	syncAndValidateDaemonSets(t, manager, daemon, podControl, 0, 0)
-	if updated.Status.ObservedGeneration != daemon.Generation {
-		t.Errorf("Wrong ObservedGeneration for daemon %s in status. Expected %d, got %d", updated.Name, daemon.Generation, updated.Status.ObservedGeneration)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	if updated.Status.ObservedGeneration != ds.Generation {
+		t.Errorf("Wrong ObservedGeneration for daemon %s in status. Expected %d, got %d", updated.Name, ds.Generation, updated.Status.ObservedGeneration)
 	}
 }
 
@@ -814,11 +819,11 @@ func TestDaemonKillFailedPods(t *testing.T) {
 	for _, test := range tests {
 		t.Logf("test case: %s\n", test.test)
 		manager, podControl, _ := newTestController()
-		addNodes(manager.nodeStore, 0, 1, nil)
-		addFailedPods(manager.podStore, "node-0", simpleDaemonSetLabel, test.numFailedPods)
-		addPods(manager.podStore, "node-0", simpleDaemonSetLabel, test.numNormalPods)
 		ds := newDaemonSet("foo")
 		manager.dsStore.Add(ds)
+		addNodes(manager.nodeStore, 0, 1, nil)
+		addFailedPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, test.numFailedPods)
+		addPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, test.numNormalPods)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, test.expectedCreates, test.expectedDeletes)
 	}
 }
@@ -1021,5 +1026,61 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 		if err != c.err {
 			t.Errorf("[%v] expected err: %v, got: %v", i, c.err, err)
 		}
+	}
+}
+
+func TestGetNodesToDaemonPods(t *testing.T) {
+	manager, _, _ := newTestController()
+	ds := newDaemonSet("foo")
+	ds2 := newDaemonSet("foo2")
+	manager.dsStore.Add(ds)
+	manager.dsStore.Add(ds2)
+	addNodes(manager.nodeStore, 0, 2, nil)
+
+	// These pods should be returned.
+	wantedPods := []*v1.Pod{
+		newPod("matching-owned-0-", "node-0", simpleDaemonSetLabel, ds),
+		newPod("matching-orphan-0-", "node-0", simpleDaemonSetLabel, nil),
+		newPod("matching-owned-1-", "node-1", simpleDaemonSetLabel, ds),
+		newPod("matching-orphan-1-", "node-1", simpleDaemonSetLabel, nil),
+	}
+	failedPod := newPod("matching-owned-failed-pod-1-", "node-1", simpleDaemonSetLabel, ds)
+	failedPod.Status = v1.PodStatus{Phase: v1.PodFailed}
+	wantedPods = append(wantedPods, failedPod)
+	for _, pod := range wantedPods {
+		manager.podStore.Add(pod)
+	}
+
+	// These pods should be ignored.
+	ignoredPods := []*v1.Pod{
+		newPod("non-matching-owned-0-", "node-0", simpleDaemonSetLabel2, ds),
+		newPod("non-matching-orphan-1-", "node-1", simpleDaemonSetLabel2, nil),
+		newPod("matching-owned-by-other-0-", "node-0", simpleDaemonSetLabel, ds2),
+	}
+	for _, pod := range ignoredPods {
+		manager.podStore.Add(pod)
+	}
+
+	nodesToDaemonPods, err := manager.getNodesToDaemonPods(ds)
+	if err != nil {
+		t.Fatalf("getNodesToDaemonPods() error: %v", err)
+	}
+	gotPods := map[string]bool{}
+	for node, pods := range nodesToDaemonPods {
+		for _, pod := range pods {
+			if pod.Spec.NodeName != node {
+				t.Errorf("pod %v grouped into %v but belongs in %v", pod.Name, node, pod.Spec.NodeName)
+			}
+			gotPods[pod.Name] = true
+		}
+	}
+	for _, pod := range wantedPods {
+		if !gotPods[pod.Name] {
+			t.Errorf("expected pod %v but didn't get it", pod.Name)
+		}
+		delete(gotPods, pod.Name)
+	}
+	for podName := range gotPods {
+		t.Errorf("unexpected pod %v was returned", podName)
 	}
 }
