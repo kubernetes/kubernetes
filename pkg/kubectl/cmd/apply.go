@@ -132,6 +132,7 @@ func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	// apply subcommands
 	cmd.AddCommand(NewCmdApplyViewLastApplied(f, out, errOut))
 	cmd.AddCommand(NewCmdApplySetLastApplied(f, out, errOut))
+	cmd.AddCommand(NewCmdApplyEditLastApplied(f, out, errOut))
 
 	return cmd
 }

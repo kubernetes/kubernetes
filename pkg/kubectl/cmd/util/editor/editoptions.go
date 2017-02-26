@@ -35,11 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	apijson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -59,6 +61,7 @@ type EditOptions struct {
 	Mapper         meta.RESTMapper
 	ResourceMapper *resource.Mapper
 	OriginalResult *resource.Result
+	Codec          runtime.Encoder
 
 	EditMode EditMode
 
@@ -72,6 +75,7 @@ type EditOptions struct {
 	ErrOut io.Writer
 
 	f                   cmdutil.Factory
+	file                string
 	editPrinterOptions  *editPrinterOptions
 	updatedResultGetter func(data []byte) *resource.Result
 }
@@ -84,7 +88,7 @@ type editPrinterOptions struct {
 
 // Complete completes all the required options
 func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string) error {
-	if o.EditMode != NormalEditMode && o.EditMode != EditBeforeCreateMode {
+	if o.EditMode != NormalEditMode && o.EditMode != EditBeforeCreateMode && o.EditMode != ApplyEditMode {
 		return fmt.Errorf("unsupported edit mode %q", o.EditMode)
 	}
 	if o.Output != "" {
@@ -98,12 +102,14 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 	if err != nil {
 		return err
 	}
+	o.Codec = f.JSONEncoder()
+
 	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {
 		return err
 	}
 	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
-	if o.EditMode == NormalEditMode {
+	if o.EditMode == NormalEditMode || o.EditMode == ApplyEditMode {
 		// when do normal edit we need to always retrieve the latest resource from server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
 	}
@@ -153,11 +159,28 @@ func (o *EditOptions) Run() error {
 			results  = editResults{}
 			original = []byte{}
 			edited   = []byte{}
-			file     string
 			err      error
 		)
 
 		containsError := false
+
+		if o.EditMode == ApplyEditMode {
+			for i := range infos {
+				data, err := kubectl.GetOriginalConfiguration(infos[i].Mapping, infos[i].Object)
+				if err != nil {
+					return err
+				}
+				if data == nil {
+					return fmt.Errorf("no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation")
+				}
+
+				annotationInfos, err := o.updatedResultGetter(data).Infos()
+				if err != nil {
+					return err
+				}
+				infos[i] = annotationInfos[0]
+			}
+		}
 
 		// loop until we succeed or cancel editing
 		for {
@@ -188,7 +211,7 @@ func (o *EditOptions) Run() error {
 			}
 
 			if o.editPrinterOptions.addHeader {
-				results.header.writeTo(w)
+				results.header.writeTo(w, o.EditMode)
 			}
 
 			if !containsError {
@@ -205,13 +228,13 @@ func (o *EditOptions) Run() error {
 
 			// launch the editor
 			editedDiff := edited
-			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), o.editPrinterOptions.ext, buf)
+			edited, o.file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), o.editPrinterOptions.ext, buf)
 			if err != nil {
 				return preservedFile(err, results.file, o.ErrOut)
 			}
 			// If we're retrying the loop because of an error, and no change was made in the file, short-circuit
 			if containsError && bytes.Equal(cmdutil.StripComments(editedDiff), cmdutil.StripComments(edited)) {
-				return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), file, o.ErrOut)
+				return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), o.file, o.ErrOut)
 			}
 			// cleanup any file from the previous pass
 			if len(results.file) > 0 {
@@ -222,12 +245,12 @@ func (o *EditOptions) Run() error {
 			// Apply validation
 			schema, err := o.f.Validator(o.EnableValidation, o.SchemaCacheDir)
 			if err != nil {
-				return preservedFile(err, file, o.ErrOut)
+				return preservedFile(err, o.file, o.ErrOut)
 			}
 			err = schema.ValidateBytes(cmdutil.StripComments(edited))
 			if err != nil {
 				results = editResults{
-					file: file,
+					file: o.file,
 				}
 				containsError = true
 				fmt.Fprintln(o.ErrOut, results.addError(errors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), infos[0]))
@@ -236,23 +259,23 @@ func (o *EditOptions) Run() error {
 
 			// Compare content without comments
 			if bytes.Equal(cmdutil.StripComments(original), cmdutil.StripComments(edited)) {
-				os.Remove(file)
+				os.Remove(o.file)
 				fmt.Fprintln(o.ErrOut, "Edit cancelled, no changes made.")
 				return nil
 			}
 
 			lines, err := hasLines(bytes.NewBuffer(edited))
 			if err != nil {
-				return preservedFile(err, file, o.ErrOut)
+				return preservedFile(err, o.file, o.ErrOut)
 			}
 			if !lines {
-				os.Remove(file)
+				os.Remove(o.file)
 				fmt.Fprintln(o.ErrOut, "Edit cancelled, saved file was empty.")
 				return nil
 			}
 
 			results = editResults{
-				file: file,
+				file: o.file,
 			}
 
 			// parse the edited file
@@ -265,21 +288,27 @@ func (o *EditOptions) Run() error {
 			}
 			// not a syntax error as it turns out...
 			containsError = false
-			updatedVisitor := resource.InfoListVisitor(updatedInfos)
 
-			// need to make sure the original namespace wasn't changed while editing
-			if err := updatedVisitor.Visit(resource.RequireNamespace(o.CmdNamespace)); err != nil {
-				return preservedFile(err, file, o.ErrOut)
-			}
+			var updatedVisitor resource.Visitor
+			if o.EditMode != ApplyEditMode {
+				updatedVisitor = resource.InfoListVisitor(updatedInfos)
 
-			// iterate through all items to apply annotations
-			if err := visitAnnotation(o.ApplyAnnotation, o.Record, o.ChangeCause, updatedVisitor, encoder); err != nil {
-				return preservedFile(err, file, o.ErrOut)
+				// need to make sure the original namespace wasn't changed while editing
+				if err := updatedVisitor.Visit(resource.RequireNamespace(o.CmdNamespace)); err != nil {
+					return preservedFile(err, o.file, o.ErrOut)
+				}
+
+				// iterate through all items to apply annotations
+				if err := visitAnnotation(o.ApplyAnnotation, o.Record, o.ChangeCause, updatedVisitor, encoder); err != nil {
+					return preservedFile(err, o.file, o.ErrOut)
+				}
 			}
 
 			switch o.EditMode {
 			case NormalEditMode:
 				err = visitToPatch(infos, updatedVisitor, o.Mapper, encoder, o.Out, o.ErrOut, &results)
+			case ApplyEditMode:
+				err = o.applyEditPatch(infos, updatedInfos)
 			case EditBeforeCreateMode:
 				err = visitToCreate(updatedVisitor, o.Mapper, o.Out)
 			default:
@@ -295,19 +324,19 @@ func (o *EditOptions) Run() error {
 			// 2. notfound: indicate the location of the saved configuration of the deleted resource
 			// 3. invalid: retry those on the spot by looping ie. reloading the editor
 			if results.retryable > 0 {
-				fmt.Fprintf(o.ErrOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file)
+				fmt.Fprintf(o.ErrOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), o.file)
 				return cmdutil.ErrExit
 			}
 			if results.notfound > 0 {
-				fmt.Fprintf(o.ErrOut, "The edits you made on deleted resources have been saved to %q\n", file)
+				fmt.Fprintf(o.ErrOut, "The edits you made on deleted resources have been saved to %q\n", o.file)
 				return cmdutil.ErrExit
 			}
 
 			if len(results.edit) == 0 {
 				if results.notfound == 0 {
-					os.Remove(file)
+					os.Remove(o.file)
 				} else {
-					fmt.Fprintf(o.Out, "The edits you made on deleted resources have been saved to %q\n", file)
+					fmt.Fprintf(o.Out, "The edits you made on deleted resources have been saved to %q\n", o.file)
 				}
 				return nil
 			}
@@ -320,7 +349,7 @@ func (o *EditOptions) Run() error {
 
 	switch o.EditMode {
 	// If doing normal edit we cannot use Visit because we need to edit a list for convenience. Ref: #20519
-	case NormalEditMode:
+	case NormalEditMode, ApplyEditMode:
 		infos, err := o.OriginalResult.Infos()
 		if err != nil {
 			return err
@@ -334,6 +363,93 @@ func (o *EditOptions) Run() error {
 	default:
 		return fmt.Errorf("unsupported edit mode %q", o.EditMode)
 	}
+}
+
+func (o *EditOptions) applyEditPatch(oringalInfos, infos []*resource.Info) error {
+	for ix := range infos {
+		updatedInfo := infos[ix]
+		originalJS, editedJS, err := SerializationConvert(o.Codec, oringalInfos[ix].Object, updatedInfo.Object)
+		if err != nil {
+			return err
+		}
+
+		if reflect.DeepEqual(originalJS, editedJS) {
+			cmdutil.PrintSuccess(o.Mapper, false, o.Out, updatedInfo.Mapping.Resource, updatedInfo.Name, false, "skipped")
+		} else {
+			o.annotationPatch(updatedInfo)
+			cmdutil.PrintSuccess(o.Mapper, false, o.Out, updatedInfo.Mapping.Resource, updatedInfo.Name, false, "edited")
+		}
+	}
+	return nil
+}
+
+func (o *EditOptions) annotationPatch(update *resource.Info) error {
+	patch, _, err := GetApplyPatch(update, o.Codec, false)
+	if err != nil {
+		return err
+	}
+	mapping := update.ResourceMapping()
+	client, err := o.f.UnstructuredClientForMapping(mapping)
+	if err != nil {
+		return err
+	}
+	helper := resource.NewHelper(client, mapping)
+	_, err = helper.Patch(o.CmdNamespace, update.Name, types.MergePatchType, patch)
+	if err != nil {
+		return preservedFile(err, o.file, o.ErrOut)
+	}
+	return nil
+}
+
+func GetApplyPatch(info *resource.Info, codec runtime.Encoder, isLocal bool) ([]byte, []byte, error) {
+	wrapper := func(data []byte) ([]byte, []byte, error) {
+		objMap := map[string]map[string]map[string]string{}
+		metadataMap := map[string]map[string]string{}
+		annotationsMap := map[string]string{}
+		annotationsMap[annotations.LastAppliedConfigAnnotation] = string(data)
+		metadataMap["annotations"] = annotationsMap
+		objMap["metadata"] = metadataMap
+		jsonString, err := apijson.Marshal(objMap)
+		return jsonString, data, err
+	}
+
+	if info == nil {
+		return wrapper([]byte(""))
+	}
+	var obj runtime.Object
+	if isLocal {
+		obj = info.VersionedObject
+	} else {
+		obj = info.Object
+	}
+	data, err := runtime.Encode(codec, obj)
+	if err != nil {
+		return nil, data, err
+	}
+	return wrapper(data)
+}
+
+func SerializationConvert(codec runtime.Encoder, original, updated runtime.Object) ([]byte, []byte, error) {
+	originalSerialization, err := runtime.Encode(codec, original)
+	if err != nil {
+		return nil, nil, err
+	}
+	editedSerialization, err := runtime.Encode(codec, updated)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// compute the patch on a per-item basis
+	// use strategic merge to create a patch
+	originalJS, err := yaml.ToJSON(originalSerialization)
+	if err != nil {
+		return nil, nil, err
+	}
+	editedJS, err := yaml.ToJSON(editedSerialization)
+	if err != nil {
+		return nil, nil, err
+	}
+	return originalJS, editedJS, nil
 }
 
 func getPrinter(format string) *editPrinterOptions {
@@ -389,22 +505,7 @@ func visitToPatch(
 			return fmt.Errorf("no original object found for %#v", info.Object)
 		}
 
-		originalSerialization, err := runtime.Encode(encoder, originalInfo.Object)
-		if err != nil {
-			return err
-		}
-		editedSerialization, err := runtime.Encode(encoder, info.Object)
-		if err != nil {
-			return err
-		}
-
-		// compute the patch on a per-item basis
-		// use strategic merge to create a patch
-		originalJS, err := yaml.ToJSON(originalSerialization)
-		if err != nil {
-			return err
-		}
-		editedJS, err := yaml.ToJSON(editedSerialization)
+		originalJS, editedJS, err := SerializationConvert(encoder, originalInfo.Object, info.Object)
 		if err != nil {
 			return err
 		}
@@ -504,6 +605,7 @@ type EditMode string
 const (
 	NormalEditMode       EditMode = "normal_mode"
 	EditBeforeCreateMode EditMode = "edit_before_create_mode"
+	ApplyEditMode        EditMode = "apply_mode"
 )
 
 // editReason preserves a message about the reason this file must be edited again
@@ -518,12 +620,20 @@ type editHeader struct {
 }
 
 // writeTo outputs the current header information into a stream
-func (h *editHeader) writeTo(w io.Writer) error {
-	fmt.Fprint(w, `# Please edit the object below. Lines beginning with a '#' will be ignored,
+func (h *editHeader) writeTo(w io.Writer, editMode EditMode) error {
+	if editMode == ApplyEditMode {
+		fmt.Fprint(w, `# Please edit the 'last-applied-configuration' annotations below.
+#Lines beginning with a '#' will be ignored, and an empty file will abort the edit.
+#
+`)
+	} else {
+		fmt.Fprint(w, `# Please edit the object below. Lines beginning with a '#' will be ignored,
 # and an empty file will abort the edit. If an error occurs while saving this file will be
 # reopened with the relevant failures.
 #
 `)
+	}
+
 	for _, r := range h.reasons {
 		if len(r.other) > 0 {
 			fmt.Fprintf(w, "# %s:\n", r.head)
