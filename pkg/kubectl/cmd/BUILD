@@ -14,6 +14,7 @@ go_library(
         "annotate.go",
         "apiversions.go",
         "apply.go",
+        "apply_edit_last_applied.go",
         "apply_set_last_applied.go",
         "apply_view_last_applied.go",
         "attach.go",
