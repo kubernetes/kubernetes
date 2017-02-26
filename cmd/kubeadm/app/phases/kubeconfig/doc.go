@@ -27,7 +27,7 @@ package kubeconfig
 			The PKIPath is required for knowing where all certificates should be stored
 
 	OUTPUTS:
-		Files to KubernetesDir (default /etc/kubernetes):
+		Files to KubernetesDir (/etc/kubernetes):
 		 - admin.conf
 		 - kubelet.conf
 */

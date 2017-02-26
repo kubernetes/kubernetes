@@ -123,7 +123,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		staticPodSpecs[etcd] = etcdPod
 	}
 
-	manifestsPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")
+	manifestsPath := path.Join(kubeadmconstants.KubernetesDir, "manifests")
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
 		return fmt.Errorf("failed to create directory %q [%v]", manifestsPath, err)
 	}
@@ -228,7 +228,7 @@ func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{
 		Name: "k8s",
 		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
+			HostPath: &api.HostPathVolumeSource{Path: kubeadmconstants.KubernetesDir},
 		},
 	}
 }

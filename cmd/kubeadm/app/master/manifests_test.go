@@ -26,6 +26,7 @@ import (
 	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestWriteStaticPodManifests(t *testing.T) {
@@ -37,7 +38,6 @@ func TestWriteStaticPodManifests(t *testing.T) {
 
 	// set up tmp GlobalEnvParams values for testing
 	oldEnv := kubeadmapi.GlobalEnvParams
-	kubeadmapi.GlobalEnvParams.KubernetesDir = fmt.Sprintf("%s/etc/kubernetes", tmpdir)
 	defer func() { kubeadmapi.GlobalEnvParams = oldEnv }()
 
 	var tests = []struct {
@@ -204,7 +204,7 @@ func TestK8sVolume(t *testing.T) {
 				Name: "k8s",
 				VolumeSource: api.VolumeSource{
 					HostPath: &api.HostPathVolumeSource{
-						Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
+						Path: kubeadmconstants.KubernetesDir},
 				}},
 		},
 	}
