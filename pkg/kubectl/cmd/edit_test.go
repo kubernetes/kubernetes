@@ -238,6 +238,8 @@ func TestEdit(t *testing.T) {
 		case "create":
 			cmd = NewCmdCreate(f, buf, errBuf)
 			cmd.Flags().Set("edit", "true")
+		case "edit-last-applied":
+			cmd = NewCmdApplyEditLastApplied(f, buf, errBuf)
 		default:
 			t.Errorf("%s: unexpected mode %s", name, testcase.Mode)
 			continue
