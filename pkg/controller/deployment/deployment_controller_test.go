@@ -19,7 +19,6 @@ package deployment
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 var (
@@ -111,9 +109,11 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 func newReplicaSet(d *extensions.Deployment, name string, replicas int) *extensions.ReplicaSet {
 	return &extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: metav1.NamespaceDefault,
-			Labels:    d.Spec.Selector.MatchLabels,
+			Name:            name,
+			UID:             uuid.NewUUID(),
+			Namespace:       metav1.NamespaceDefault,
+			Labels:          d.Spec.Selector.MatchLabels,
+			OwnerReferences: []metav1.OwnerReference{*newControllerRef(d)},
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Selector: d.Spec.Selector,
@@ -293,195 +293,6 @@ func filterInformerActions(actions []core.Action) []core.Action {
 	return ret
 }
 
-// TestOverlappingDeployment ensures that an overlapping deployment will not be synced by
-// the controller.
-func TestOverlappingDeployment(t *testing.T) {
-	f := newFixture(t)
-	now := metav1.Now()
-	later := metav1.Time{Time: now.Add(time.Minute)}
-
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.CreationTimestamp = now
-	bar := newDeployment("bar", 1, nil, nil, nil, map[string]string{"foo": "bar", "app": "baz"})
-	bar.CreationTimestamp = later
-
-	f.dLister = append(f.dLister, foo, bar)
-	f.objects = append(f.objects, foo, bar)
-
-	f.expectUpdateDeploymentStatusAction(bar)
-	f.run(getKey(bar, t))
-
-	for _, a := range filterInformerActions(f.client.Actions()) {
-		action, ok := a.(core.UpdateAction)
-		if !ok {
-			continue
-		}
-		d, ok := action.GetObject().(*extensions.Deployment)
-		if !ok {
-			continue
-		}
-		if d.Name == "bar" && d.Annotations[util.OverlapAnnotation] != "foo" {
-			t.Errorf("annotations weren't updated for the overlapping deployment: %v", d.Annotations)
-		}
-	}
-}
-
-// TestSyncOverlappedDeployment ensures that from two overlapping deployments, the older
-// one will be synced and the newer will be marked as overlapping. Note that in reality it's
-// not always the older deployment that is the one that works vs the rest but the one which
-// has the selector unchanged for longer time.
-func TestSyncOverlappedDeployment(t *testing.T) {
-	f := newFixture(t)
-	now := metav1.Now()
-	later := metav1.Time{Time: now.Add(time.Minute)}
-
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.CreationTimestamp = now
-	bar := newDeployment("bar", 1, nil, nil, nil, map[string]string{"foo": "bar", "app": "baz"})
-	bar.CreationTimestamp = later
-
-	f.dLister = append(f.dLister, foo, bar)
-	f.objects = append(f.objects, foo, bar)
-
-	f.expectUpdateDeploymentStatusAction(bar)
-	f.expectCreateRSAction(newReplicaSet(foo, "foo-rs", 1))
-	f.expectUpdateDeploymentStatusAction(foo)
-	f.expectUpdateDeploymentStatusAction(foo)
-	f.run(getKey(foo, t))
-
-	for _, a := range filterInformerActions(f.client.Actions()) {
-		action, ok := a.(core.UpdateAction)
-		if !ok {
-			continue
-		}
-		d, ok := action.GetObject().(*extensions.Deployment)
-		if !ok {
-			continue
-		}
-		if d.Name == "bar" && d.Annotations[util.OverlapAnnotation] != "foo" {
-			t.Errorf("annotations weren't updated for the overlapping deployment: %v", d.Annotations)
-		}
-	}
-}
-
-// TestSelectorUpdate ensures that from two overlapping deployments, the one that is working won't
-// be marked as overlapping if its selector is updated but still overlaps with the other one.
-func TestSelectorUpdate(t *testing.T) {
-	f := newFixture(t)
-	now := metav1.Now()
-	later := metav1.Time{Time: now.Add(time.Minute)}
-	selectorUpdated := metav1.Time{Time: later.Add(time.Minute)}
-
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.CreationTimestamp = now
-	foo.Annotations = map[string]string{util.SelectorUpdateAnnotation: selectorUpdated.Format(time.RFC3339)}
-	bar := newDeployment("bar", 1, nil, nil, nil, map[string]string{"foo": "bar", "app": "baz"})
-	bar.CreationTimestamp = later
-	bar.Annotations = map[string]string{util.OverlapAnnotation: "foo"}
-
-	f.dLister = append(f.dLister, foo, bar)
-	f.objects = append(f.objects, foo, bar)
-
-	f.expectCreateRSAction(newReplicaSet(foo, "foo-rs", 1))
-	f.expectUpdateDeploymentStatusAction(foo)
-	f.expectUpdateDeploymentStatusAction(foo)
-	f.run(getKey(foo, t))
-
-	for _, a := range filterInformerActions(f.client.Actions()) {
-		action, ok := a.(core.UpdateAction)
-		if !ok {
-			continue
-		}
-		d, ok := action.GetObject().(*extensions.Deployment)
-		if !ok {
-			continue
-		}
-
-		if d.Name == "foo" && len(d.Annotations[util.OverlapAnnotation]) > 0 {
-			t.Errorf("deployment %q should not have the overlapping annotation", d.Name)
-		}
-		if d.Name == "bar" && len(d.Annotations[util.OverlapAnnotation]) == 0 {
-			t.Errorf("deployment %q should have the overlapping annotation", d.Name)
-		}
-	}
-}
-
-// TestDeletedDeploymentShouldCleanupOverlaps ensures that the deletion of a deployment
-// will cleanup any deployments that overlap with it.
-func TestDeletedDeploymentShouldCleanupOverlaps(t *testing.T) {
-	f := newFixture(t)
-	now := metav1.Now()
-	earlier := metav1.Time{Time: now.Add(-time.Minute)}
-	later := metav1.Time{Time: now.Add(time.Minute)}
-
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.CreationTimestamp = earlier
-	foo.DeletionTimestamp = &now
-	bar := newDeployment("bar", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	bar.CreationTimestamp = later
-	bar.Annotations = map[string]string{util.OverlapAnnotation: "foo"}
-
-	f.dLister = append(f.dLister, foo, bar)
-	f.objects = append(f.objects, foo, bar)
-
-	f.expectUpdateDeploymentStatusAction(bar)
-	f.expectUpdateDeploymentStatusAction(foo)
-	f.run(getKey(foo, t))
-
-	for _, a := range filterInformerActions(f.client.Actions()) {
-		action, ok := a.(core.UpdateAction)
-		if !ok {
-			continue
-		}
-		d := action.GetObject().(*extensions.Deployment)
-		if d.Name != "bar" {
-			continue
-		}
-
-		if len(d.Annotations[util.OverlapAnnotation]) > 0 {
-			t.Errorf("annotations weren't cleaned up for the overlapping deployment: %v", d.Annotations)
-		}
-	}
-}
-
-// TestDeletedDeploymentShouldNotCleanupOtherOverlaps ensures that the deletion of
-// a deployment will not cleanup deployments that overlap with another deployment.
-func TestDeletedDeploymentShouldNotCleanupOtherOverlaps(t *testing.T) {
-	f := newFixture(t)
-	now := metav1.Now()
-	earlier := metav1.Time{Time: now.Add(-time.Minute)}
-	later := metav1.Time{Time: now.Add(time.Minute)}
-
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.CreationTimestamp = earlier
-	foo.DeletionTimestamp = &now
-	bar := newDeployment("bar", 1, nil, nil, nil, map[string]string{"bla": "bla"})
-	bar.CreationTimestamp = later
-	// Notice this deployment is overlapping with another deployment
-	bar.Annotations = map[string]string{util.OverlapAnnotation: "baz"}
-
-	f.dLister = append(f.dLister, foo, bar)
-	f.objects = append(f.objects, foo, bar)
-
-	f.expectUpdateDeploymentStatusAction(foo)
-	f.run(getKey(foo, t))
-
-	for _, a := range filterInformerActions(f.client.Actions()) {
-		action, ok := a.(core.UpdateAction)
-		if !ok {
-			continue
-		}
-		d := action.GetObject().(*extensions.Deployment)
-		if d.Name != "bar" {
-			continue
-		}
-
-		if len(d.Annotations[util.OverlapAnnotation]) == 0 {
-			t.Errorf("overlapping annotation should not be cleaned up for bar: %v", d.Annotations)
-		}
-	}
-}
-
 // TestPodDeletionEnqueuesRecreateDeployment ensures that the deletion of a pod
 // will requeue a Recreate deployment iff there is no other pod returned from the
 // client.
@@ -541,6 +352,180 @@ func TestPodDeletionDoesntEnqueueRecreateDeployment(t *testing.T) {
 
 	if enqueued {
 		t.Errorf("expected deployment %q not to be queued after pod deletion", foo.Name)
+	}
+}
+
+func TestGetReplicaSetsForDeployment(t *testing.T) {
+	f := newFixture(t)
+
+	// Two Deployments with same labels.
+	d1 := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := newDeployment("bar", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	// Two ReplicaSets that match labels for both Deployments,
+	// but have ControllerRefs to make ownership explicit.
+	rs1 := newReplicaSet(d1, "rs1", 1)
+	rs2 := newReplicaSet(d2, "rs2", 1)
+
+	f.dLister = append(f.dLister, d1, d2)
+	f.rsLister = append(f.rsLister, rs1, rs2)
+	f.objects = append(f.objects, d1, d2, rs1, rs2)
+
+	// Start the fixture.
+	c, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	rsList, err := c.getReplicaSetsForDeployment(d1)
+	if err != nil {
+		t.Fatalf("getReplicaSetsForDeployment() error: %v", err)
+	}
+	rsNames := []string{}
+	for _, rs := range rsList {
+		rsNames = append(rsNames, rs.Name)
+	}
+	if len(rsNames) != 1 || rsNames[0] != rs1.Name {
+		t.Errorf("getReplicaSetsForDeployment() = %v, want [%v]", rsNames, rs1.Name)
+	}
+
+	rsList, err = c.getReplicaSetsForDeployment(d2)
+	if err != nil {
+		t.Fatalf("getReplicaSetsForDeployment() error: %v", err)
+	}
+	rsNames = []string{}
+	for _, rs := range rsList {
+		rsNames = append(rsNames, rs.Name)
+	}
+	if len(rsNames) != 1 || rsNames[0] != rs2.Name {
+		t.Errorf("getReplicaSetsForDeployment() = %v, want [%v]", rsNames, rs2.Name)
+	}
+}
+
+func TestGetReplicaSetsForDeploymentAdopt(t *testing.T) {
+	f := newFixture(t)
+
+	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	// RS with matching labels, but orphaned. Should be adopted and returned.
+	rs := newReplicaSet(d, "rs", 1)
+	rs.OwnerReferences = nil
+
+	f.dLister = append(f.dLister, d)
+	f.rsLister = append(f.rsLister, rs)
+	f.objects = append(f.objects, d, rs)
+
+	// Start the fixture.
+	c, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	rsList, err := c.getReplicaSetsForDeployment(d)
+	if err != nil {
+		t.Fatalf("getReplicaSetsForDeployment() error: %v", err)
+	}
+	rsNames := []string{}
+	for _, rs := range rsList {
+		rsNames = append(rsNames, rs.Name)
+	}
+	if len(rsNames) != 1 || rsNames[0] != rs.Name {
+		t.Errorf("getReplicaSetsForDeployment() = %v, want [%v]", rsNames, rs.Name)
+	}
+}
+
+func TestGetReplicaSetsForDeploymentRelease(t *testing.T) {
+	f := newFixture(t)
+
+	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	// RS with matching ControllerRef, but wrong labels. Should be released.
+	rs := newReplicaSet(d, "rs", 1)
+	rs.Labels = map[string]string{"foo": "notbar"}
+
+	f.dLister = append(f.dLister, d)
+	f.rsLister = append(f.rsLister, rs)
+	f.objects = append(f.objects, d, rs)
+
+	// Start the fixture.
+	c, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	rsList, err := c.getReplicaSetsForDeployment(d)
+	if err != nil {
+		t.Fatalf("getReplicaSetsForDeployment() error: %v", err)
+	}
+	rsNames := []string{}
+	for _, rs := range rsList {
+		rsNames = append(rsNames, rs.Name)
+	}
+	if len(rsNames) != 0 {
+		t.Errorf("getReplicaSetsForDeployment() = %v, want []", rsNames)
+	}
+}
+
+func TestGetPodMapForReplicaSets(t *testing.T) {
+	f := newFixture(t)
+
+	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	// Two ReplicaSets that match labels for both Deployments,
+	// but have ControllerRefs to make ownership explicit.
+	rs1 := newReplicaSet(d, "rs1", 1)
+	rs2 := newReplicaSet(d, "rs2", 1)
+
+	// Add a Pod for each ReplicaSet.
+	pod1 := generatePodFromRS(rs1)
+	pod2 := generatePodFromRS(rs2)
+	// Add a Pod that has matching labels, but no ControllerRef.
+	pod3 := generatePodFromRS(rs1)
+	pod3.Name = "pod3"
+	pod3.OwnerReferences = nil
+	// Add a Pod that has matching labels and ControllerRef, but is inactive.
+	pod4 := generatePodFromRS(rs1)
+	pod4.Name = "pod4"
+	pod4.Status.Phase = v1.PodFailed
+
+	f.dLister = append(f.dLister, d)
+	f.rsLister = append(f.rsLister, rs1, rs2)
+	f.podLister = append(f.podLister, pod1, pod2, pod3, pod4)
+	f.objects = append(f.objects, d, rs1, rs2, pod1, pod2, pod3, pod4)
+
+	// Start the fixture.
+	c, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	podCount, err := c.getPodCountForReplicaSets(d.Namespace, f.rsLister)
+	if err != nil {
+		t.Fatalf("getPodCountForReplicaSets() error: %v", err)
+	}
+	if got, want := podCount, 2; got != want {
+		t.Errorf("getPodCountForReplicaSets() = %v, want %v", got, want)
+	}
+
+	podMap, err := c.getPodMapForReplicaSets(d.Namespace, f.rsLister)
+	if err != nil {
+		t.Fatalf("getPodMapForReplicaSets() error: %v", err)
+	}
+
+	if got, want := len(podMap), 2; got != want {
+		t.Errorf("len(podMap) = %v, want %v", got, want)
+	}
+	if got, want := len(podMap[rs1.UID].Items), 1; got != want {
+		t.Errorf("len(podMap[rs1]) = %v, want %v", got, want)
+	}
+	if got, want := podMap[rs1.UID].Items[0].Name, "rs1-pod"; got != want {
+		t.Errorf("podMap[rs1] = [%v], want [%v]", got, want)
+	}
+	if got, want := len(podMap[rs2.UID].Items), 1; got != want {
+		t.Errorf("len(podMap[rs2]) = %v, want %v", got, want)
+	}
+	if got, want := podMap[rs2.UID].Items[0].Name, "rs2-pod"; got != want {
+		t.Errorf("podMap[rs2] = [%v], want [%v]", got, want)
 	}
 }
 
