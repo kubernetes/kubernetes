@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -36,6 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
+
+	"github.com/reconquest/loreley"
 )
 
 // GetOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -430,7 +433,8 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	// use the default printer for each object
 	printer = nil
 	var lastMapping *meta.RESTMapping
-	w := kubectl.GetNewTabWriter(out)
+	buff := &bytes.Buffer{}
+	w := kubectl.GetNewTabWriter(buff)
 	filteredResourceCount := 0
 
 	if resource.MultipleTypesRequested(args) || cmdutil.MustPrintWithKinds(objs, infos, sorter) {
@@ -522,6 +526,18 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 	}
 	w.Flush()
+	loreley.DelimLeft = "<"
+	loreley.DelimRight = ">"
+
+	result, err := loreley.CompileAndExecuteToString(
+		buff.String(),
+		nil,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	out.Write([]byte(result))
 	if printer != nil && lastMapping != nil {
 		cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, filterOpts)
 	}

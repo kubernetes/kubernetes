@@ -2167,6 +2167,10 @@
 			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
+			"ImportPath": "github.com/reconquest/loreley",
+			"Rev": "2ab6b7470a54bfa9b5b0289f9b4e8fc4839838f7"
+		},
+		{
 			"ImportPath": "github.com/renstrom/dedent",
 			"Comment": "v1.0.0-3-g020d11c",
 			"Rev": "020d11c3b9c0c7a3c2efcc8e5cf5b9ef7bcea21f"

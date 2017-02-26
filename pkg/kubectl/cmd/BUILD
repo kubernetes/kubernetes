@@ -104,6 +104,7 @@ go_library(
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/jonboulle/clockwork",
+        "//vendor:github.com/reconquest/loreley",
         "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",

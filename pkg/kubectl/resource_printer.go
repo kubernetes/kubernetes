@@ -55,6 +55,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
+	"github.com/reconquest/loreley"
 )
 
 const (
@@ -62,7 +63,7 @@ const (
 	tabwriterWidth    = 4
 	tabwriterPadding  = 3
 	tabwriterPadChar  = ' '
-	tabwriterFlags    = 0
+	tabwriterFlags    = tabwriter.FilterHTML
 	loadBalancerWidth = 16
 )
 
@@ -373,6 +374,7 @@ type PrintOptions struct {
 	AbsoluteTimestamps bool
 	Kind               string
 	ColumnLabels       []string
+	Color              bool
 }
 
 // HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide
@@ -786,8 +788,17 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 			return err
 		}
 	}
+
+	podColor := "<fg 2>" // green
+	if readyContainers != totalContainers {
+		podColor = "<fg 11>" // yellow
+	}
+	if readyContainers == 0 {
+		podColor = "<fg 1>" // red
+	}
+
 	if _, err := fmt.Fprintf(w, "%s\t%d/%d\t%s\t%d\t%s",
-		name,
+		maybeColor(name, podColor, options),
 		readyContainers,
 		totalContainers,
 		reason,
@@ -819,6 +830,13 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 	}
 
 	return nil
+}
+
+func maybeColor(str, color string, opts PrintOptions) string {
+	if !opts.Color {
+		return str
+	}
+	return fmt.Sprintf("%s%s<reset>", color, str)
 }
 
 func printPodTemplate(pod *api.PodTemplate, w io.Writer, options PrintOptions) error {
@@ -2503,6 +2521,9 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 			h.printHeader(headers, w)
 			h.lastType = t
 		}
+
+		loreley.DelimLeft = "<"
+		loreley.DelimRight = ">"
 
 		// we don't recognize this type, but we can still attempt to print some reasonable information about.
 		unstructured, ok := obj.(runtime.Unstructured)

@@ -47,6 +47,7 @@ func AddNonDeprecatedPrinterFlags(cmd *cobra.Command) {
 	cmd.MarkFlagFilename("template")
 	cmd.Flags().String("sort-by", "", "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
 	cmd.Flags().BoolP("show-all", "a", false, "When printing, show all resources (default hide terminated pods.)")
+	cmd.Flags().Bool("color", false, "If true, use colored output")
 }
 
 // AddOutputFlagsForMutation adds output related flags to a command. Used by mutations only.
