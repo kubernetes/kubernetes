@@ -20,14 +20,15 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 // Rolling back to a revision; no-op if the toRevision is deployment's current revision
-func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRevision *int64) (*extensions.Deployment, error) {
-	newRS, allOldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, true)
+func (dc *DeploymentController) rollback(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList, toRevision *int64) (*extensions.Deployment, error) {
+	newRS, allOldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, rsList, podMap, true)
 	if err != nil {
 		return nil, err
 	}
