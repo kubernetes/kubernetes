@@ -84,7 +84,7 @@ FLANNEL_OTHER_NET_CONFIG=${FLANNEL_OTHER_NET_CONFIG:-""}
 # for release >= 1.4.0; see that doc for the recommended settings for
 # earlier releases.
 
-export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
+export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds
 
 # Path to the pod manifest file or directory of files of kubelet
 export KUBELET_POD_MANIFEST_PATH=${KUBELET_POD_MANIFEST_PATH:-""}
