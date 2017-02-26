@@ -286,14 +286,17 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
 	msg := "cannot be greater than status.replicas"
+	if status.UpdatedReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("updatedReplicas"), status.UpdatedReplicas, msg))
+	}
 	if status.ReadyReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), status.ReadyReplicas, msg))
 	}
 	if status.AvailableReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
 	}
-	if status.ReadyReplicas > status.AvailableReplicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), status.ReadyReplicas, "cannot be greater than availableReplicas"))
+	if status.AvailableReplicas > status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
 	}
 	return allErrs
 }
@@ -511,25 +514,30 @@ func ValidateReplicaSetUpdate(rs, oldRs *extensions.ReplicaSet) field.ErrorList 
 // ValidateReplicaSetStatusUpdate tests if required fields in the ReplicaSet are set.
 func ValidateReplicaSetStatusUpdate(rs, oldRs *extensions.ReplicaSet) field.ErrorList {
 	allErrs := field.ErrorList{}
-	fldPath := field.NewPath("status")
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.Replicas), fldPath.Child("replicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.FullyLabeledReplicas), fldPath.Child("fullyLabeledReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.ObservedGeneration), fldPath.Child("observedGeneration"))...)
+	allErrs = append(allErrs, ValidateReplicaSetStatus(rs.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+func ValidateReplicaSetStatus(status extensions.ReplicaSetStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.FullyLabeledReplicas), fldPath.Child("fullyLabeledReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ObservedGeneration), fldPath.Child("observedGeneration"))...)
 	msg := "cannot be greater than status.replicas"
-	if rs.Status.FullyLabeledReplicas > rs.Status.Replicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("fullyLabeledReplicas"), rs.Status.FullyLabeledReplicas, msg))
+	if status.FullyLabeledReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("fullyLabeledReplicas"), status.FullyLabeledReplicas, msg))
 	}
-	if rs.Status.ReadyReplicas > rs.Status.Replicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), rs.Status.ReadyReplicas, msg))
+	if status.ReadyReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), status.ReadyReplicas, msg))
 	}
-	if rs.Status.AvailableReplicas > rs.Status.Replicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), rs.Status.AvailableReplicas, msg))
+	if status.AvailableReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
 	}
-	if rs.Status.ReadyReplicas > rs.Status.AvailableReplicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), rs.Status.ReadyReplicas, "cannot be greater than availableReplicas"))
+	if status.AvailableReplicas > status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
 	}
 	return allErrs
 }
