@@ -17123,3 +17123,12 @@ go_test(
     library = ":k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "vbom.ml/util/sortorder",
+    srcs = [
+        "vbom.ml/util/sortorder/doc.go",
+        "vbom.ml/util/sortorder/natsort.go",
+    ],
+    tags = ["automanaged"],
+)
