@@ -392,7 +392,7 @@ type CloudConfig struct {
 		// The AWS VPC flag enables the possibility to run the master components
 		// on a different aws account, on a different cloud provider or on-premise.
 		// If the flag is set also the KubernetesClusterTag must be provided
-		VPCID string
+		VPC string
 
 		KubernetesClusterTag string
 
@@ -818,24 +818,22 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
 
-	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
-	if err != nil && (cfg.Global.VPCID == "" || cfg.Global.KubernetesClusterTag == "") {
-		return nil, err
-	} else if err != nil {
-		// When the master is running on a different cloud provider or on-premise
-		// build up and dummy instance and use the vpcID from the nodes account
-		glog.Warningf("Cannot detect an AWS Instance")
-		selfAWSInstance = &awsInstance{
+	if cfg.Global.VPC != "" && cfg.Global.KubernetesClusterTag != "" {
+		// When the master is running on a different AWS account, cloud provider or on-premise
+		// build up a dummy instance and use the VPC from the nodes account
+		glog.Info("Master is configured to run on a AWS account, different cloud provider or on-premise")
+		awsCloud.selfAWSInstance = &awsInstance{
 			nodeName: "master-dummy",
-			vpcID:    cfg.Global.VPCID,
+			vpcID:    cfg.Global.VPC,
 		}
-	}
-	awsCloud.selfAWSInstance = selfAWSInstance
-	awsCloud.vpcID = selfAWSInstance.vpcID
+	} else {
+		selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
+		if err != nil {
+			return nil, err
+		}
+		awsCloud.selfAWSInstance = selfAWSInstance
+		awsCloud.vpcID = selfAWSInstance.vpcID
 
-	if cfg.Global.VPCID != "" {
-		// When the master is running on a different AWS account use the vpcID from the nodes account
-		awsCloud.vpcID = cfg.Global.VPCID
 	}
 
 	filterTags := map[string]string{}
@@ -843,7 +841,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		filterTags[TagNameKubernetesCluster] = cfg.Global.KubernetesClusterTag
 	} else {
 		// TODO: Clean up double-API query
-		info, err := selfAWSInstance.describeInstance()
+		info, err := awsCloud.selfAWSInstance.describeInstance()
 		if err != nil {
 			return nil, err
 		}
