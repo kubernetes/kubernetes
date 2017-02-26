@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
 
@@ -55,6 +56,7 @@ const (
 	FedReplicaSetPreferencesAnnotation = "federation.kubernetes.io/replica-set-preferences"
 	allClustersKey                     = "THE_ALL_CLUSTER_KEY"
 	UserAgentName                      = "Federation-replicaset-Controller"
+	FedReplicaSetPuppetAnnotation      = "federation.kubernetes.io/is-puppet"
 )
 
 var (
@@ -503,17 +505,20 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		return statusAllOk, nil
 	}
 
-	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for replicaset: %s",
-		frs.Name)
-	// Add the required finalizers before creating a replicaset in underlying clusters.
-	updatedRsObj, err := frsc.deletionHelper.EnsureFinalizers(frs)
-	if err != nil {
-		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in replicaset %s: %v",
-			frs.Name, err)
-		frsc.deliverReplicaSetByKey(key, 0, false)
-		return statusError, err
+	if !isPuppet(frs) {
+		// No finalizers are added to puppets.
+		glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for replicaset: %s",
+			frs.Name)
+		// Add the required finalizers before creating a replicaset in underlying clusters.
+		updatedRsObj, err := frsc.deletionHelper.EnsureFinalizers(frs)
+		if err != nil {
+			glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in replicaset %s: %v",
+				frs.Name, err)
+			frsc.deliverReplicaSetByKey(key, 0, false)
+			return statusError, err
+		}
+		frs = updatedRsObj.(*extensionsv1.ReplicaSet)
 	}
-	frs = updatedRsObj.(*extensionsv1.ReplicaSet)
 
 	glog.V(3).Infof("Syncing replicaset %s in underlying clusters", frs.Name)
 
@@ -551,6 +556,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 
 	fedStatus := extensionsv1.ReplicaSetStatus{ObservedGeneration: frs.Generation}
 	operations := make([]fedutil.FederatedOperation, 0)
+	localSpecReplicaSum := int32(0)
 	for clusterName, replicas := range scheduleResult {
 
 		lrsObj, exists, err := frsc.fedReplicaSetInformer.GetTargetStore().GetByKey(clusterName, key)
@@ -567,7 +573,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		lrs.Spec.Replicas = &specReplicas
 
 		if !exists {
-			if replicas > 0 {
+			if replicas > 0 && !isPuppet(frs) {
 				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "CreateInCluster",
 					"Creating replicaset in cluster %s", clusterName)
 
@@ -580,24 +586,40 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		} else {
 			currentLrs := lrsObj.(*extensionsv1.ReplicaSet)
 			// Update existing replica set, if needed.
-			if !fedutil.ObjectMetaAndSpecEquivalent(lrs, currentLrs) {
-				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "UpdateInCluster",
-					"Updating replicaset in cluster %s", clusterName)
+			if !isPuppet(frs) {
+				if !fedutil.ObjectMetaAndSpecEquivalent(lrs, currentLrs) {
+					frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "UpdateInCluster",
+						"Updating replicaset in cluster %s", clusterName)
 
-				operations = append(operations, fedutil.FederatedOperation{
-					Type:        fedutil.OperationTypeUpdate,
-					Obj:         lrs,
-					ClusterName: clusterName,
-				})
+					operations = append(operations, fedutil.FederatedOperation{
+						Type:        fedutil.OperationTypeUpdate,
+						Obj:         lrs,
+						ClusterName: clusterName,
+					})
+				}
 			}
-			fedStatus.Replicas += currentLrs.Status.Replicas
-			fedStatus.FullyLabeledReplicas += currentLrs.Status.FullyLabeledReplicas
-			fedStatus.ReadyReplicas += currentLrs.Status.ReadyReplicas
-			fedStatus.AvailableReplicas += currentLrs.Status.AvailableReplicas
+
+			// If selector and pod template matches the spec then include it in the stats.
+			if reflect.DeepEqual(frs.Spec.Selector, currentLrs.Spec.Selector) &&
+				reflect.DeepEqual(frs.Spec.Template, currentLrs.Spec.Template) {
+
+				// This sum is only applied on puppets.
+				localSpecReplicaSum += *currentLrs.Spec.Replicas
+				updateStatus(&fedStatus, &currentLrs.Status)
+			}
 		}
 	}
-	if fedStatus.Replicas != frs.Status.Replicas || fedStatus.FullyLabeledReplicas != frs.Status.FullyLabeledReplicas ||
-		fedStatus.ReadyReplicas != frs.Status.ReadyReplicas || fedStatus.AvailableReplicas != frs.Status.AvailableReplicas {
+
+	if isPuppet(frs) && *frs.Spec.Replicas != localSpecReplicaSum {
+		frs.Spec.Replicas = &localSpecReplicaSum
+		frs, err = frsc.fedClient.Extensions().ReplicaSets(frs.Namespace).Update(frs)
+		if err != nil {
+			return statusError, err
+		}
+	}
+
+	if hasStatusChanged(&frs.Status, &fedStatus) {
+		fedStatus.ObservedGeneration = frs.Generation
 		frs.Status = fedStatus
 		_, err = frsc.fedClient.Extensions().ReplicaSets(frs.Namespace).UpdateStatus(frs)
 		if err != nil {
@@ -620,6 +642,20 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 
 	// Some operations were made, reconcile after a while.
 	return statusNeedRecheck, nil
+}
+
+func updateStatus(fedStatus, localStatus *extensionsv1.ReplicaSetStatus) {
+	fedStatus.Replicas += localStatus.Replicas
+	fedStatus.FullyLabeledReplicas += localStatus.FullyLabeledReplicas
+	fedStatus.ReadyReplicas += localStatus.ReadyReplicas
+	fedStatus.AvailableReplicas += localStatus.AvailableReplicas
+}
+
+func hasStatusChanged(oldStatus, newStatus *extensionsv1.ReplicaSetStatus) bool {
+	return oldStatus.Replicas != newStatus.Replicas ||
+		oldStatus.FullyLabeledReplicas != newStatus.FullyLabeledReplicas ||
+		oldStatus.ReadyReplicas != newStatus.ReadyReplicas ||
+		oldStatus.AvailableReplicas != newStatus.AvailableReplicas
 }
 
 func (frsc *ReplicaSetController) reconcileReplicaSetsOnClusterChange() {
@@ -651,4 +687,14 @@ func (frsc *ReplicaSetController) delete(replicaset *extensionsv1.ReplicaSet) er
 		}
 	}
 	return nil
+}
+
+func isPuppet(frs *extensionsv1.ReplicaSet) bool {
+	if frs.Annotations == nil {
+		return false
+	}
+	if annotation, found := frs.Annotations[FedReplicaSetPuppetAnnotation]; found && annotation == "true" {
+		return true
+	}
+	return false
 }
