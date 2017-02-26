@@ -103,13 +103,11 @@ type DaemonSetsController struct {
 	// Added as a member to the struct to allow injection for testing.
 	nodeStoreSynced cache.InformerSynced
 
-	lookupCache *controller.MatchingCache
-
 	// DaemonSet keys that need to be synced.
 	queue workqueue.RateLimitingInterface
 }
 
-func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface, lookupCacheSize int) *DaemonSetsController {
+func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface) *DaemonSetsController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -139,21 +137,6 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 		UpdateFunc: func(old, cur interface{}) {
 			oldDS := old.(*extensions.DaemonSet)
 			curDS := cur.(*extensions.DaemonSet)
-			// We should invalidate the whole lookup cache if a DS's selector has been updated.
-			//
-			// Imagine that you have two RSs:
-			// * old DS1
-			// * new DS2
-			// You also have a pod that is attached to DS2 (because it doesn't match DS1 selector).
-			// Now imagine that you are changing DS1 selector so that it is now matching that pod,
-			// in such case we must invalidate the whole cache so that pod could be adopted by DS1
-			//
-			// This makes the lookup cache less helpful, but selector update does not happen often,
-			// so it's not a big problem
-			if !reflect.DeepEqual(oldDS.Spec.Selector, curDS.Spec.Selector) {
-				dsc.lookupCache.InvalidateAll()
-			}
-
 			glog.V(4).Infof("Updating daemon set %s", oldDS.Name)
 			dsc.enqueueDaemonSet(curDS)
 		},
@@ -181,7 +164,6 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 	dsc.nodeLister = nodeInformer.Lister()
 
 	dsc.syncHandler = dsc.syncDaemonSet
-	dsc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
 	return dsc
 }
 
@@ -270,77 +252,61 @@ func (dsc *DaemonSetsController) enqueueDaemonSetAfter(obj interface{}, after ti
 	dsc.queue.AddAfter(key, after)
 }
 
-func (dsc *DaemonSetsController) getPodDaemonSet(pod *v1.Pod) *extensions.DaemonSet {
-	// look up in the cache, if cached and the cache is valid, just return cached value
-	if obj, cached := dsc.lookupCache.GetMatchingObject(pod); cached {
-		ds, ok := obj.(*extensions.DaemonSet)
-		if !ok {
-			// This should not happen
-			utilruntime.HandleError(fmt.Errorf("lookup cache does not return a DaemonSet object"))
-			return nil
-		}
-		if dsc.isCacheValid(pod, ds) {
-			return ds
-		}
-	}
+// getPodDaemonSets returns a list of DaemonSets that potentially match the pod.
+func (dsc *DaemonSetsController) getPodDaemonSets(pod *v1.Pod) []*extensions.DaemonSet {
 	sets, err := dsc.dsLister.GetPodDaemonSets(pod)
 	if err != nil {
 		glog.V(4).Infof("No daemon sets found for pod %v, daemon set controller will avoid syncing", pod.Name)
 		return nil
 	}
 	if len(sets) > 1 {
-		// More than two items in this list indicates user error. If two daemon
-		// sets overlap, sort by creation timestamp, subsort by name, then pick
-		// the first.
+		// ControllerRef will ensure we don't do anythign crazy, but more than one
+		// item in this list nevertheless constitutes user error.
 		utilruntime.HandleError(fmt.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels))
-		sort.Sort(byCreationTimestamp(sets))
 	}
-
-	// update lookup cache
-	dsc.lookupCache.Update(pod, sets[0])
-
-	return sets[0]
-}
-
-// isCacheValid check if the cache is valid
-func (dsc *DaemonSetsController) isCacheValid(pod *v1.Pod, cachedDS *extensions.DaemonSet) bool {
-	_, err := dsc.dsLister.DaemonSets(cachedDS.Namespace).Get(cachedDS.Name)
-	// ds has been deleted or updated, cache is invalid
-	if err != nil || !isDaemonSetMatch(pod, cachedDS) {
-		return false
-	}
-	return true
-}
-
-// isDaemonSetMatch take a Pod and DaemonSet, return whether the Pod and DaemonSet are matching
-// TODO(mqliang): This logic is a copy from GetPodDaemonSets(), remove the duplication
-func isDaemonSetMatch(pod *v1.Pod, ds *extensions.DaemonSet) bool {
-	if ds.Namespace != pod.Namespace {
-		return false
-	}
-	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
-	if err != nil {
-		err = fmt.Errorf("invalid selector: %v", err)
-		return false
-	}
-
-	// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.
-	if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
-		return false
-	}
-	return true
+	return sets
 }
 
 func (dsc *DaemonSetsController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	glog.V(4).Infof("Pod %s added.", pod.Name)
-	if ds := dsc.getPodDaemonSet(pod); ds != nil {
+
+	if pod.DeletionTimestamp != nil {
+		// on a restart of the controller manager, it's possible a new pod shows up in a state that
+		// is already pending deletion. Prevent the pod from being a creation observation.
+		dsc.deletePod(pod)
+		return
+	}
+
+	// If it has a ControllerRef, that's all that matters.
+	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
+		if controllerRef.Kind != ControllerKind.Kind {
+			// It's controlled by a different type of controller.
+			return
+		}
+		ds, err := dsc.dsLister.DaemonSets(pod.Namespace).Get(controllerRef.Name)
+		if err != nil {
+			// Don't log NotFound. That just means the GC will soon delete the Pod.
+			if !errors.IsNotFound(err) {
+				utilruntime.HandleError(fmt.Errorf("couldn't get DaemonSet %q in namespace %q: %v", controllerRef.Name, pod.Namespace, err))
+			}
+			return
+		}
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
+			utilruntime.HandleError(fmt.Errorf("couldn't get key for DaemonSet %#v: %v", ds, err))
 			return
 		}
 		dsc.expectations.CreationObserved(dsKey)
+		dsc.enqueueDaemonSet(ds)
+		return
+	}
+
+	// Otherwise, it's an orphan. Get a list of all matching DaemonSets and sync
+	// them to see if anyone wants to adopt it.
+	// DO NOT observe creation because no controller should be waiting for an
+	// orphan.
+	for _, ds := range dsc.getPodDaemonSets(pod) {
 		dsc.enqueueDaemonSet(ds)
 	}
 }
@@ -358,22 +324,52 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 	}
 	glog.V(4).Infof("Pod %s updated.", curPod.Name)
 	changedToReady := !v1.IsPodReady(oldPod) && v1.IsPodReady(curPod)
-	if curDS := dsc.getPodDaemonSet(curPod); curDS != nil {
-		dsc.enqueueDaemonSet(curDS)
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 
-		// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
-		if changedToReady && curDS.Spec.MinReadySeconds > 0 {
-			dsc.enqueueDaemonSetAfter(curDS, time.Duration(curDS.Spec.MinReadySeconds)*time.Second)
+	curControllerRef := controller.GetControllerOf(curPod)
+	oldControllerRef := controller.GetControllerOf(oldPod)
+	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
+	if controllerRefChanged &&
+		oldControllerRef != nil && oldControllerRef.Kind == ControllerKind.Kind {
+		// The ControllerRef was changed. Sync the old controller, if any.
+		ds, err := dsc.dsLister.DaemonSets(oldPod.Namespace).Get(oldControllerRef.Name)
+		if err != nil {
+			// Don't log NotFound. That just means the GC will soon delete the Pod.
+			if !errors.IsNotFound(err) {
+				utilruntime.HandleError(fmt.Errorf("couldn't get DaemonSet %q in namespace %q: %v", oldControllerRef.Name, oldPod.Namespace, err))
+			}
+		} else {
+			dsc.enqueueDaemonSet(ds)
 		}
 	}
-	// If the labels have not changed, then the daemon set responsible for
-	// the pod is the same as it was before. In that case we have enqueued the daemon
-	// set above, and do not have to enqueue the set again.
-	if !reflect.DeepEqual(curPod.Labels, oldPod.Labels) {
-		// It's ok if both oldDS and curDS are the same, because curDS will set
-		// the expectations on its run so oldDS will have no effect.
-		if oldDS := dsc.getPodDaemonSet(oldPod); oldDS != nil {
-			dsc.enqueueDaemonSet(oldDS)
+
+	// If it has a ControllerRef, that's all that matters.
+	if curControllerRef != nil {
+		if curControllerRef.Kind != ControllerKind.Kind {
+			// It's controlled by a different type of controller.
+			return
+		}
+		ds, err := dsc.dsLister.DaemonSets(curPod.Namespace).Get(curControllerRef.Name)
+		if err != nil {
+			// Don't log NotFound. That just means the GC will soon delete the Pod.
+			if !errors.IsNotFound(err) {
+				utilruntime.HandleError(fmt.Errorf("couldn't get DaemonSet %q in namespace %q: %v", curControllerRef.Name, curPod.Namespace, err))
+			}
+			return
+		}
+		dsc.enqueueDaemonSet(ds)
+		// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
+		if changedToReady && ds.Spec.MinReadySeconds > 0 {
+			dsc.enqueueDaemonSetAfter(ds, time.Duration(ds.Spec.MinReadySeconds)*time.Second)
+		}
+		return
+	}
+
+	// Otherwise, it's an orphan. If anything changed, sync matching controllers
+	// to see if anyone wants to adopt it now.
+	if labelChanged || controllerRefChanged {
+		for _, ds := range dsc.getPodDaemonSets(curPod) {
+			dsc.enqueueDaemonSet(ds)
 		}
 	}
 }
@@ -388,25 +384,42 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a pod %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
 			return
 		}
 	}
 	glog.V(4).Infof("Pod %s deleted.", pod.Name)
-	if ds := dsc.getPodDaemonSet(pod); ds != nil {
-		dsKey, err := controller.KeyFunc(ds)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
-			return
-		}
-		dsc.expectations.DeletionObserved(dsKey)
-		dsc.enqueueDaemonSet(ds)
+
+	controllerRef := controller.GetControllerOf(pod)
+	if controllerRef == nil {
+		// No controller should care about orphans being deleted.
+		return
 	}
+	if controllerRef.Kind != ControllerKind.Kind {
+		// It's controlled by a different type of controller.
+		return
+	}
+
+	ds, err := dsc.dsLister.DaemonSets(pod.Namespace).Get(controllerRef.Name)
+	if err != nil {
+		// Don't log NotFound. That just means the GC will soon delete the Pod.
+		if !errors.IsNotFound(err) {
+			utilruntime.HandleError(fmt.Errorf("couldn't get DaemonSet %q in namespace %q: %v", controllerRef.Name, pod.Namespace, err))
+		}
+		return
+	}
+	dsKey, err := controller.KeyFunc(ds)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for DaemonSet %#v: %v", ds, err))
+		return
+	}
+	dsc.expectations.DeletionObserved(dsKey)
+	dsc.enqueueDaemonSet(ds)
 }
 
 func (dsc *DaemonSetsController) addNode(obj interface{}) {
@@ -857,7 +870,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		}
 		// ignore pods that belong to the daemonset when taking into account whether
 		// a daemonset should bind to a node.
-		if pds := dsc.getPodDaemonSet(pod); pds != nil && ds.Name == pds.Name {
+		if controllerRef := controller.GetControllerOf(pod); controllerRef != nil && controllerRef.UID == ds.UID {
 			continue
 		}
 		pods = append(pods, pod)
