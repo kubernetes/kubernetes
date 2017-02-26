@@ -211,7 +211,7 @@ if [ "${FAIL_ON_CHANGES}" = true ]; then
       cleanup
       exit 0
     else
-      echo "${CLIENT_REPO} is out of date. Please run hack/update-client-go.sh"
+      echo "${CLIENT_REPO} is out of date. Please run hack/update-staging-client-go.sh"
       cleanup
       exit 1
     fi
