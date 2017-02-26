@@ -186,7 +186,7 @@ func runTest(f *framework.Framework) error {
 		return err
 	}
 	if len(nodeList.Items) != 1 {
-		return fmt.Errorf("Unexpected number of node objects for node e2e. Expects only one node: %+V", nodeList)
+		return fmt.Errorf("Unexpected number of node objects for node e2e. Expects only one node: %+v", nodeList)
 	}
 	node := nodeList.Items[0]
 	capacity := node.Status.Capacity

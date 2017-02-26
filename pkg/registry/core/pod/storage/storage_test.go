@@ -210,7 +210,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 		t.Fatalf("expect the DeletionGracePeriodSeconds to be set")
 	}
 	if *deletedPod.DeletionGracePeriodSeconds != 0 {
-		t.Errorf("expect the DeletionGracePeriodSeconds to be 0, got %d", *deletedPod.DeletionTimestamp)
+		t.Errorf("expect the DeletionGracePeriodSeconds to be 0, got %v", *deletedPod.DeletionTimestamp)
 	}
 }
 
