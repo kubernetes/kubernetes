@@ -90,6 +90,6 @@ func (s *storage) UpdateController(ctx genericapirequest.Context, controller *ap
 }
 
 func (s *storage) DeleteController(ctx genericapirequest.Context, controllerID string) error {
-	_, err := s.Delete(ctx, controllerID, nil)
+	_, _, err := s.Delete(ctx, controllerID, nil)
 	return err
 }

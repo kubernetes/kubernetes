@@ -79,7 +79,7 @@ func (s *storage) GetRole(ctx genericapirequest.Context, name string, options *m
 }
 
 func (s *storage) DeleteRole(ctx genericapirequest.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }
 

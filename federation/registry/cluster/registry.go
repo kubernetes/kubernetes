@@ -78,6 +78,6 @@ func (s *storage) UpdateCluster(ctx genericapirequest.Context, cluster *federati
 }
 
 func (s *storage) DeleteCluster(ctx genericapirequest.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }
