@@ -20,6 +20,8 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -54,7 +56,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 
 func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
+	allErrs = append(allErrs, ValidateDiscovery(c, field.NewPath("discovery"))...)
 
 	if !path.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("ca-cert-path"), nil, "the ca certificate path must be an absolute path"))
@@ -71,29 +73,16 @@ func ValidateAuthorizationMode(authzMode string, fldPath *field.Path) field.Erro
 
 func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateArgSelection(c, fldPath)...)
-	var count int
-	if len(c.DiscoveryToken) != 0 {
-		allErrs = append(allErrs, ValidateDiscoveryToken(c, fldPath)...)
-		count++
-	}
-	if len(c.DiscoveryFile) != 0 {
-		allErrs = append(allErrs, ValidateDiscoveryFile(c, fldPath)...)
-		count++
-	}
-	if len(c.DiscoveryURL) != 0 {
-		allErrs = append(allErrs, ValidateDiscoveryURL(c, fldPath)...)
-		count++
-	}
-	allErrs = append(allErrs, ValidateTLSBootstrapToken(c, fldPath)...)
+	allErrs = append(allErrs, ValidateAndSetArgSelection(c, fldPath)...)
+	allErrs = append(allErrs, ValidateToken(c.Token, fldPath)...)
+	allErrs = append(allErrs, ValidateDiscoveryFile(c, fldPath)...)
+	allErrs = append(allErrs, ValidateDiscoveryURL(c, fldPath)...)
+	allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, fldPath)...)
 	allErrs = append(allErrs, ValidateJoinMastersArgs(c, fldPath)...)
-	if count > 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one discovery strategy can be provided"))
-	}
 	return allErrs
 }
 
-func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateAndSetArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateTokenArg(cfg, field.NewPath("discovery"))...)
 	allErrs = append(allErrs, ValidateDiscoveryTokenArg(cfg, field.NewPath("discovery"))...)
@@ -116,7 +105,7 @@ func ValidateTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field
 				field.Invalid(
 					fldPath,
 					nil,
-					"--token is mutually exclusive with --tls-bootstrap-token, --discovery-token, --discovery-file, and --discovery-url",
+					"--token is mutually exclusive with TLSBootstrapToken, --discovery-token, --discovery-file, and --discovery-url",
 				),
 			)
 		}
@@ -163,7 +152,7 @@ func ValidateDiscoveryTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Pa
 				field.Invalid(
 					fldPath,
 					nil,
-					"--discovery-token must also specificy --tls-bootstrap-token",
+					"--discovery-token must also specificy TLSBootstrapToken",
 				),
 			)
 		}
@@ -180,7 +169,7 @@ func ValidateTLSBootstrapTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field
 				field.Invalid(
 					fldPath,
 					nil,
-					"--tls-bootstrap-token is mutually exclusive with --token, --discovery-file, and --discovery-url",
+					"TLSBootstrapToken is mutually exclusive with --token, --discovery-file, and --discovery-url",
 				),
 			)
 		}
@@ -190,7 +179,7 @@ func ValidateTLSBootstrapTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field
 				field.Invalid(
 					fldPath,
 					nil,
-					"--tls-bootstrap-token must also specificy --masters",
+					"TLSBootstrapToken must also specificy --masters",
 				),
 			)
 		}
@@ -200,7 +189,7 @@ func ValidateTLSBootstrapTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field
 				field.Invalid(
 					fldPath,
 					nil,
-					"--tls-bootstrap-token must also specificy --discovery-token",
+					"TLSBootstrapToken must also specificy --discovery-token",
 				),
 			)
 		}
@@ -237,7 +226,7 @@ func ValidateDiscoveryFileArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Pat
 				field.Invalid(
 					fldPath,
 					nil,
-					"--discovery-file must also specificy --tls-bootstrap-token",
+					"--discovery-file must also specificy TLSBootstrapToken",
 				),
 			)
 		}
@@ -274,7 +263,7 @@ func ValidateDiscoveryURLArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path
 				field.Invalid(
 					fldPath,
 					nil,
-					"--discovery-url must also specificy --tls-bootstrap-token",
+					"--discovery-url must also specificy TLSBootstrapToken",
 				),
 			)
 		}
@@ -282,23 +271,14 @@ func ValidateDiscoveryURLArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path
 	return allErrs
 }
 
-func ValidateTLSBootstrapToken(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	id, secret, err := tokenutil.ParseToken(c.TLSBootstrapToken)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
-	}
-
-	if len(id) == 0 || len(secret) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "token must be specific as <ID>:<Secret>"))
-	}
-
-	return allErrs
-}
-
 func ValidateJoinMastersArgs(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
-	// TODO have masters arg parsing verified
 	allErrs := field.ErrorList{}
+	for _, m := range c.Masters {
+		_, _, err := net.SplitHostPort(m)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
+		}
+	}
 	return allErrs
 }
 
@@ -323,10 +303,10 @@ func ValidateDiscoveryURL(c *kubeadm.NodeConfiguration, fldPath *field.Path) fie
 	return allErrs
 }
 
-func ValidateDiscoveryToken(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateToken(t string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	id, secret, err := tokenutil.ParseToken(c.DiscoveryToken)
+	id, secret, err := tokenutil.ParseToken(t)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, err.Error()))
 	}

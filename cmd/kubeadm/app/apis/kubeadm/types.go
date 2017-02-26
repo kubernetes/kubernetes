@@ -94,7 +94,8 @@ type NodeConfiguration struct {
 	DiscoveryToken    string
 	TLSBootstrapToken string
 	Token             string
-	Masters           []string
+	//Currently we only pay attention to one api server but hope to support >1 in the future
+	Masters []string
 }
 
 // ClusterInfo TODO add description
