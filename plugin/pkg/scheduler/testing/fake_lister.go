@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package algorithm
+package testing
 
 import (
 	"fmt"
@@ -23,14 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	. "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
-// NodeLister interface represents anything that can list nodes for a scheduler.
-type NodeLister interface {
-	// We explicitly return []*v1.Node, instead of v1.NodeList, to avoid
-	// performing expensive copies that are unneeded.
-	List() ([]*v1.Node, error)
-}
+var _ NodeLister = &FakeNodeLister{}
 
 // FakeNodeLister implements NodeLister on a []string for test purposes.
 type FakeNodeLister []*v1.Node
@@ -40,12 +36,7 @@ func (f FakeNodeLister) List() ([]*v1.Node, error) {
 	return f, nil
 }
 
-// PodLister interface represents anything that can list pods for a scheduler.
-type PodLister interface {
-	// We explicitly return []*v1.Pod, instead of v1.PodList, to avoid
-	// performing expensive copies that are unneeded.
-	List(labels.Selector) ([]*v1.Pod, error)
-}
+var _ PodLister = &FakePodLister{}
 
 // FakePodLister implements PodLister on an []v1.Pods for test purposes.
 type FakePodLister []*v1.Pod
@@ -60,13 +51,7 @@ func (f FakePodLister) List(s labels.Selector) (selected []*v1.Pod, err error) {
 	return selected, nil
 }
 
-// ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.
-type ServiceLister interface {
-	// Lists all the services
-	List(labels.Selector) ([]*v1.Service, error)
-	// Gets the services for the given pod
-	GetPodServices(*v1.Pod) ([]*v1.Service, error)
-}
+var _ ServiceLister = &FakeServiceLister{}
 
 // FakeServiceLister implements ServiceLister on []v1.Service for test purposes.
 type FakeServiceLister []*v1.Service
@@ -94,26 +79,7 @@ func (f FakeServiceLister) GetPodServices(pod *v1.Pod) (services []*v1.Service, 
 	return
 }
 
-// ControllerLister interface represents anything that can produce a list of ReplicationController; the list is consumed by a scheduler.
-type ControllerLister interface {
-	// Lists all the replication controllers
-	List(labels.Selector) ([]*v1.ReplicationController, error)
-	// Gets the services for the given pod
-	GetPodControllers(*v1.Pod) ([]*v1.ReplicationController, error)
-}
-
-// EmptyControllerLister implements ControllerLister on []v1.ReplicationController returning empty data
-type EmptyControllerLister struct{}
-
-// List returns nil
-func (f EmptyControllerLister) List(labels.Selector) ([]*v1.ReplicationController, error) {
-	return nil, nil
-}
-
-// GetPodControllers returns nil
-func (f EmptyControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.ReplicationController, err error) {
-	return nil, nil
-}
+var _ ControllerLister = &FakeControllerLister{}
 
 // FakeControllerLister implements ControllerLister on []v1.ReplicationController for test purposes.
 type FakeControllerLister []*v1.ReplicationController
@@ -144,19 +110,7 @@ func (f FakeControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.
 	return
 }
 
-// ReplicaSetLister interface represents anything that can produce a list of ReplicaSet; the list is consumed by a scheduler.
-type ReplicaSetLister interface {
-	// Gets the replicasets for the given pod
-	GetPodReplicaSets(*v1.Pod) ([]*extensions.ReplicaSet, error)
-}
-
-// EmptyReplicaSetLister implements ReplicaSetLister on []extensions.ReplicaSet returning empty data
-type EmptyReplicaSetLister struct{}
-
-// GetPodReplicaSets returns nil
-func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.ReplicaSet, err error) {
-	return nil, nil
-}
+var _ ReplicaSetLister = &FakeReplicaSetLister{}
 
 // FakeReplicaSetLister implements ControllerLister on []extensions.ReplicaSet for test purposes.
 type FakeReplicaSetLister []*extensions.ReplicaSet
