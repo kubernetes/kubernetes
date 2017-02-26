@@ -1106,7 +1106,8 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 
 	// Mark the pod as critical
 	pods[0].Annotations = map[string]string{
-		kubelettypes.CriticalPodAnnotationKey: "",
+		kubelettypes.CriticalPodAnnotationKey:  "",
+		kubelettypes.ConfigSourceAnnotationKey: kubelettypes.FileSource,
 	}
 	pods[0].Namespace = kubeapi.NamespaceSystem
 
