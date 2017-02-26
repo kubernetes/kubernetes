@@ -67,6 +67,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	"k8s.io/kubernetes/pkg/kubelet/gpu"
 	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
@@ -450,7 +451,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		writer:            kubeDeps.Writer,
 		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
 		maxPods:           int(kubeCfg.MaxPods),
-		enableNvidiaGPU:   kubeCfg.EnableNvidiaGPU,
 		podsPerCore:       int(kubeCfg.PodsPerCore),
 		syncLoopMonitor:   atomic.Value{},
 		resolverConfig:    kubeCfg.ResolverConfig,
@@ -787,7 +787,11 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	klet.appArmorValidator = apparmor.NewValidator(kubeCfg.ContainerRuntime)
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
-
+	if kubeCfg.ExperimentalEnableNvidiaGPU {
+		klet.gpuManager = nvidia.NewNvidiaGPUManager(klet, klet.dockerClient)
+	} else {
+		klet.gpuManager = gpu.NewGPUManagerStub()
+	}
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
@@ -982,9 +986,6 @@ type Kubelet struct {
 	// Maximum Number of Pods which can be run by this Kubelet
 	maxPods int
 
-	// Enable experimental Nvidia GPU
-	enableExperimentalNvidiaGPU bool
-
 	// Monitor Kubelet's sync loop
 	syncLoopMonitor atomic.Value
 
@@ -1091,8 +1092,8 @@ type Kubelet struct {
 	// experimental behavior is desired.
 	experimentalHostUserNamespaceDefaulting bool
 
-	// NVIDIA GPU Manager
-	nvidiaGPUManager nvidia.NvidiaGPUManager
+	// GPU Manager
+	gpuManager gpu.GPUManager
 }
 
 // setupDataDirs creates:
@@ -1186,11 +1187,8 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
 
-	// Step 7: Init Nvidia Manager. Do not need to return err until we use NVML instead.
-	// Only works when user give true to EnableExperimentalNvidiaGPU
-	if kl.enableExperimentalNvidiaGPU {
-		kl.nvidiaGPUManager.Init(kl.dockerClient)
-	}
+	// Step 7: Initialize GPUs
+	kl.gpuManager.Start()
 
 	// Step 8: Start resource analyzer
 	kl.resourceAnalyzer.Start()

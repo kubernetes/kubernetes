@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1709,39 +1708,6 @@ func TestGetHostPortConflicts(t *testing.T) {
 	// The new pod should cause conflict and be reported.
 	pods = append(pods, expected)
 	assert.True(t, hasHostPortConflicts(pods), "Should have port conflicts")
-}
-
-func TestMakeDevices(t *testing.T) {
-	testCases := []struct {
-		container *v1.Container
-		devices   []kubecontainer.DeviceInfo
-		test      string
-	}{
-		{
-			test:      "no device",
-			container: &v1.Container{},
-			devices:   nil,
-		},
-		{
-			test: "gpu",
-			container: &v1.Container{
-				Resources: v1.ResourceRequirements{
-					Limits: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceNvidiaGPU: resource.MustParse("1000"),
-					},
-				},
-			},
-			devices: []kubecontainer.DeviceInfo{
-				{PathOnHost: "/dev/nvidia0", PathInContainer: "/dev/nvidia0", Permissions: "mrw"},
-				{PathOnHost: "/dev/nvidiactl", PathInContainer: "/dev/nvidiactl", Permissions: "mrw"},
-				{PathOnHost: "/dev/nvidia-uvm", PathInContainer: "/dev/nvidia-uvm", Permissions: "mrw"},
-			},
-		},
-	}
-
-	for _, test := range testCases {
-		assert.Equal(t, test.devices, makeDevices(test.container), "[test %q]", test.test)
-	}
 }
 
 func TestHasHostMountPVC(t *testing.T) {

@@ -87,28 +87,33 @@ func (kl *Kubelet) getActivePods() []*v1.Pod {
 
 // makeDevices determines the devices for the given container.
 // Experimental.
-func (kl *Kubelet) makeDevices(container *v1.Container) []kubecontainer.DeviceInfo {
-	if !kl.enableExperimentalNvidiaGPU {
-		return nil
+func (kl *Kubelet) makeDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
+	if container.Resources.Limits.NvidiaGPU().IsZero() {
+		return nil, nil
 	}
 
-	nvidiaGPULimit := container.Resources.Limits.NvidiaGPU()
-
-	if nvidiaGPULimit.Value() != 0 {
-		if nvidiaGPUPaths, err := kl.nvidiaGPUManager.AllocateGPUs(int(nvidiaGPULimit.Value())); err == nil {
-			devices := []kubecontainer.DeviceInfo{{PathOnHost: nvidia.NvidiaCtlDevice, PathInContainer: nvidia.NvidiaCtlDevice, Permissions: "mrw"},
-				{PathOnHost: nvidia.NvidiaUVMDevice, PathInContainer: nvidia.NvidiaUVMDevice, Permissions: "mrw"}}
-
-			for i, path := range nvidiaGPUPaths {
-				devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: "/dev/nvidia" + strconv.Itoa(i), Permissions: "mrw"})
-			}
-
-			return devices
-
-		}
+	nvidiaGPUPaths, err := kl.gpuManager.AllocateGPU(pod, container)
+	if err != nil {
+		return nil, err
+	}
+	devices := []kubecontainer.DeviceInfo{
+		{
+			PathOnHost:      nvidia.NvidiaCtlDevice,
+			PathInContainer: nvidia.NvidiaCtlDevice,
+			Permissions:     "mrw",
+		},
+		{
+			PathOnHost:      nvidia.NvidiaUVMDevice,
+			PathInContainer: nvidia.NvidiaUVMDevice,
+			Permissions:     "mrw",
+		},
 	}
 
-	return nil
+	for i, path := range nvidiaGPUPaths {
+		devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: "/dev/nvidia" + strconv.Itoa(i), Permissions: "mrw"})
+	}
+
+	return devices, nil
 }
 
 // makeMounts determines the mount points for the given container.
@@ -296,7 +301,10 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
 	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
-	opts.Devices = kl.makeDevices(container)
+	opts.Devices, err = kl.makeDevices(pod, container)
+	if err != nil {
+		return nil, err
+	}
 
 	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
 	if err != nil {
