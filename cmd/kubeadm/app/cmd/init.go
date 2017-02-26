@@ -190,7 +190,7 @@ func (i *Init) Run(out io.Writer) error {
 	// so we'll pick the first one, there is much of chance to have an empty
 	// slice by the time this gets called
 	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
-	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmapi.GlobalEnvParams.KubernetesDir)
+	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.KubernetesDir)
 	if err != nil {
 		return err
 	}
@@ -208,7 +208,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	client, err := kubemaster.CreateClientAndWaitForAPI(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName))
+	client, err := kubemaster.CreateClientAndWaitForAPI(path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName))
 	if err != nil {
 		return err
 	}
@@ -256,7 +256,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(out, initDoneMsgf, path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), generateJoinArgs(i.cfg))
+	fmt.Fprintf(out, initDoneMsgf, path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), generateJoinArgs(i.cfg))
 	return nil
 }
 

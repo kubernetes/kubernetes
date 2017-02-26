@@ -123,7 +123,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		staticPodSpecs[etcd] = etcdPod
 	}
 
-	manifestsPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")
+	manifestsPath := path.Join(kubeadmconstants.KubernetesDir, "manifests")
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
 		return fmt.Errorf("failed to create directory %q [%v]", manifestsPath, err)
 	}
@@ -228,7 +228,7 @@ func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{
 		Name: "k8s",
 		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
+			HostPath: &api.HostPathVolumeSource{Path: kubeadmconstants.KubernetesDir},
 		},
 	}
 }
@@ -378,7 +378,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 	defaultArguments := map[string]string{
 		"address":                                                  "127.0.0.1",
 		"leader-elect":                                             "true",
-		"kubeconfig":                                               path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
+		"kubeconfig":                                               path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
 		"root-ca-file":                                             getCertFilePath(kubeadmconstants.CACertName),
 		"service-account-private-key-file":                         getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
 		"cluster-signing-cert-file":                                getCertFilePath(kubeadmconstants.CACertName),
@@ -419,7 +419,7 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 	defaultArguments := map[string]string{
 		"address":      "127.0.0.1",
 		"leader-elect": "true",
-		"kubeconfig":   path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+		"kubeconfig":   path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}
 
 	command = getComponentBaseCommand(scheduler)

@@ -328,5 +328,5 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 }
 
 func buildStaticManifestFilepath(name string) string {
-	return path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests", name+".yaml")
+	return path.Join(kubeadmconstants.KubernetesDir, "manifests", name+".yaml")
 }

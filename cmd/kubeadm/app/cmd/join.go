@@ -178,7 +178,7 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	kubeconfigFile := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
+	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
 	if err := kubeconfigutil.WriteToDisk(kubeconfigFile, cfg); err != nil {
 		return err
 	}

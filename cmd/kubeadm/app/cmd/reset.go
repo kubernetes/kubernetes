@@ -123,7 +123,7 @@ func (r *Reset) Run(out io.Writer) error {
 
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
 	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
-	etcdManifestPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests/etcd.yaml")
+	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, "manifests/etcd.yaml")
 	if _, err := os.Stat(etcdManifestPath); err == nil {
 		dirsToClean = append(dirsToClean, "/var/lib/etcd")
 	} else {
@@ -137,7 +137,7 @@ func (r *Reset) Run(out io.Writer) error {
 	}
 
 	// Remove contents from the config and pki directories
-	resetConfigDir(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmapi.GlobalEnvParams.HostPKIPath)
+	resetConfigDir(kubeadmconstants.KubernetesDir, kubeadmapi.GlobalEnvParams.HostPKIPath)
 
 	return nil
 }
@@ -150,7 +150,7 @@ func drainAndRemoveNode(removeNode bool) error {
 	hostname = strings.ToLower(hostname)
 
 	// TODO: Use the "native" k8s client for this once we're confident the versioned is working
-	kubeConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
+	kubeConfigPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
 
 	getNodesCmd := fmt.Sprintf("kubectl --kubeconfig %s get nodes | grep %s", kubeConfigPath, hostname)
 	output, err := exec.Command("sh", "-c", getNodesCmd).Output()
