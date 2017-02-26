@@ -37,6 +37,8 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion/fake:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion/fake:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/settings/internalversion:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/settings/internalversion/fake:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/storage/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/storage/internalversion/fake:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
