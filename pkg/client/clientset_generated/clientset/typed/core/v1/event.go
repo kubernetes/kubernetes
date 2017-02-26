@@ -132,8 +132,8 @@ func (c *events) List(opts meta_v1.ListOptions) (result *v1.EventList, err error
 
 // Watch returns a watch.Interface that watches the requested events.
 func (c *events) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
 	return c.client.Get().
+		Prefix("watch").
 		Namespace(c.ns).
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).

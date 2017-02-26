@@ -140,8 +140,8 @@ func (c *aPIServices) List(opts v1.ListOptions) (result *v1alpha1.APIServiceList
 
 // Watch returns a watch.Interface that watches the requested aPIServices.
 func (c *aPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
 	return c.client.Get().
+		Prefix("watch").
 		Resource("apiservices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()

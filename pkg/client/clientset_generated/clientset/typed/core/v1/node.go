@@ -140,8 +140,8 @@ func (c *nodes) List(opts meta_v1.ListOptions) (result *v1.NodeList, err error) 
 
 // Watch returns a watch.Interface that watches the requested nodes.
 func (c *nodes) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
 	return c.client.Get().
+		Prefix("watch").
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()

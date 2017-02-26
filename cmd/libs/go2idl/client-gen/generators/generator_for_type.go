@@ -322,8 +322,8 @@ func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (resu
 var watchTemplate = `
 // Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
 func (c *$.type|privatePlural$) Watch(opts $.ListOptions|raw$) ($.watchInterface|raw$, error) {
-	opts.Watch = true
 	return c.client.Get().
+		Prefix("watch").
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).

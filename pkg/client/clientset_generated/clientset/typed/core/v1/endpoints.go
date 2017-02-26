@@ -132,8 +132,8 @@ func (c *endpoints) List(opts meta_v1.ListOptions) (result *v1.EndpointsList, er
 
 // Watch returns a watch.Interface that watches the requested endpoints.
 func (c *endpoints) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
 	return c.client.Get().
+		Prefix("watch").
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).

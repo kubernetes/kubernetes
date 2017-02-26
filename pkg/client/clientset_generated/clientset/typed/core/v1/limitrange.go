@@ -132,8 +132,8 @@ func (c *limitRanges) List(opts meta_v1.ListOptions) (result *v1.LimitRangeList,
 
 // Watch returns a watch.Interface that watches the requested limitRanges.
 func (c *limitRanges) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
 	return c.client.Get().
+		Prefix("watch").
 		Namespace(c.ns).
 		Resource("limitranges").
 		VersionedParams(&opts, scheme.ParameterCodec).
