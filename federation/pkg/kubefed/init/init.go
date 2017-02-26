@@ -79,7 +79,8 @@ const (
 	legacyAPIGroup = ""
 
 	lbAddrRetryInterval = 5 * time.Second
-	podWaitInterval     = 2 * time.Second
+	waitInterval        = 2 * time.Second
+	failureTimeout      = 1 * time.Minute
 
 	apiserverServiceTypeFlag      = "api-server-service-type"
 	apiserverAdvertiseAddressFlag = "api-server-advertise-address"
@@ -245,24 +246,24 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	// 2. Expose a network endpoint for the federation API server
 	svc, ips, hostnames, err := createService(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.apiServerAdvertiseAddress, i.options.apiServerServiceType, i.options.dryRun)
 	if err != nil {
-		return err
+		return cleanupObjects(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun, err)
 	}
 
 	// 3. Generate TLS certificates and credentials
 	entKeyPairs, err := genCerts(i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, HostClusterLocalDNSZoneName, ips, hostnames)
 	if err != nil {
-		return err
+		return cleanupObjects(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun, err)
 	}
 
 	_, err = createAPIServerCredentialsSecret(hostClientset, i.commonOptions.FederationSystemNamespace, serverCredName, entKeyPairs, i.options.dryRun)
 	if err != nil {
-		return err
+		return cleanupObjects(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun, err)
 	}
 
 	// 4. Create a kubeconfig secret
 	_, err = createControllerManagerKubeconfigSecret(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmKubeconfigName, entKeyPairs, i.options.dryRun)
 	if err != nil {
-		return err
+		return cleanupObjects(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun, err)
 	}
 
 	// 5. Create a persistent volume and a claim to store the federation
@@ -272,7 +273,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	if i.options.etcdPersistentStorage {
 		pvc, err = createPVC(hostClientset, i.commonOptions.FederationSystemNamespace, svc.Name, i.options.etcdPVCapacity, i.options.dryRun)
 		if err != nil {
-			return err
+			return cleanupObjects(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun, err)
 		}
 	}
 
@@ -287,7 +288,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	// 6. Create federation API server
 	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.image, serverCredName, advertiseAddress, i.options.storageBackend, i.options.apiServerOverrides, pvc, i.options.dryRun)
 	if err != nil {
-		return err
+		return cleanupObjects(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun, err)
 	}
 
 	// 7. Create federation controller manager
@@ -295,20 +296,20 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	// controller manager.
 	sa, err := createControllerManagerSA(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
 	if err != nil {
-		return err
+		return cleanupObjects(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun, err)
 	}
 
 	// 7b. Create RBAC role and role binding for federation controller
 	// manager service account.
 	_, _, err = createRoleBindings(hostClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.options.dryRun)
 	if err != nil {
-		return err
+		return cleanupObjects(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun, err)
 	}
 
 	// 7c. Create federation controller manager deployment.
 	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.image, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, sa.Name, i.options.controllerManagerOverrides, i.options.dryRun)
 	if err != nil {
-		return err
+		return cleanupObjects(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun, err)
 	}
 
 	// Pick the first ip/hostname to update the api server endpoint in kubeconfig and also to give information to user
@@ -328,7 +329,11 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	// and context to kubeconfig
 	err = updateKubeconfig(config, i.commonOptions.Name, endpoint, i.commonOptions.Kubeconfig, entKeyPairs, i.options.dryRun)
 	if err != nil {
-		return err
+		errKubeConfig := cleanupKubeconfig(config, i.commonOptions.Name, i.commonOptions.Kubeconfig, i.options.dryRun)
+		if errKubeConfig != nil {
+			fmt.Fprintf(cmdOut, "Error cleaning up federation control plane info from kubeconfig, %v", errKubeConfig)
+		}
+		return cleanupObjects(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun, err)
 	}
 
 	if !i.options.dryRun {
@@ -836,7 +841,7 @@ func argMapsToArgStrings(argsMap, overrides map[string]string) []string {
 }
 
 func waitForPods(clientset *client.Clientset, fedPods []string, namespace string) error {
-	err := wait.PollInfinite(podWaitInterval, func() (bool, error) {
+	err := wait.PollInfinite(waitInterval, func() (bool, error) {
 		podCheck := len(fedPods)
 		podList, err := clientset.Core().Pods(namespace).List(metav1.ListOptions{})
 		if err != nil {
@@ -864,7 +869,7 @@ func waitSrvHealthy(config util.AdminConfig, context, kubeconfig string) error {
 		return err
 	}
 	fedDiscoveryClient := fedClientSet.Discovery()
-	err = wait.PollInfinite(podWaitInterval, func() (bool, error) {
+	err = wait.PollInfinite(waitInterval, func() (bool, error) {
 		body, err := fedDiscoveryClient.RESTClient().Get().AbsPath("/healthz").Do().Raw()
 		if err != nil {
 			return false, nil
@@ -933,4 +938,56 @@ func updateKubeconfig(config util.AdminConfig, name, endpoint, kubeConfigPath st
 	}
 
 	return nil
+}
+
+func cleanupKubeconfig(config util.AdminConfig, name, kubeConfigPath string, dryRun bool) error {
+	po := config.PathOptions()
+	po.LoadingRules.ExplicitPath = kubeConfigPath
+	kubeconfig, err := po.GetStartingConfig()
+	if err != nil {
+		return err
+	}
+
+	delete(kubeconfig.Clusters, name)
+	delete(kubeconfig.AuthInfos, name)
+	delete(kubeconfig.Contexts, name)
+
+	if !dryRun {
+		// remove the details from kubeconfig.
+		if err = clientcmd.ModifyConfig(po, *kubeconfig, true); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// cleanupObjects clean up all the federation control plane objects from the host cluster
+// TODO: the load balancer resource might be outside the scope of namespace deletion on some clouds
+// to be checked and updated appropriately
+func cleanupObjects(clientset *client.Clientset, namespace string, dryRun bool, onErr error) error {
+	if dryRun {
+		return onErr
+	}
+
+	// Deleting the namespace in which federation control plane components are
+	// deployed cleans up all the objects
+	err := clientset.Core().Namespaces().Delete(namespace, &metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("On error: %v, clean up federation deployment also failed: %v", onErr, err)
+	}
+
+	// Wait until the namespace disappears
+	err = wait.PollImmediate(waitInterval, failureTimeout, func() (bool, error) {
+		_, err := clientset.Core().Namespaces().Get(namespace, metav1.GetOptions{})
+		if util.IsNotFound(err) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("On error: %v, timed out waiting to clean up federation deployment: %v", err)
+	}
+
+	return onErr
 }

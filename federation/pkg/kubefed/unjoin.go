@@ -19,9 +19,7 @@ package kubefed
 import (
 	"fmt"
 	"io"
-	"net/url"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
@@ -88,7 +86,7 @@ func (u *unjoinFederation) Run(f cmdutil.Factory, cmdOut, cmdErr io.Writer, conf
 	// federation host cluster. See join_federation.go for details.
 	hostFactory := config.HostFactory(u.commonOptions.Host, u.commonOptions.Kubeconfig)
 	err = deleteSecret(hostFactory, cluster.Spec.SecretRef.Name, u.commonOptions.FederationSystemNamespace)
-	if isNotFound(err) {
+	if util.IsNotFound(err) {
 		fmt.Fprintf(cmdErr, "WARNING: secret %q not found in the host cluster, so it couldn't be deleted", cluster.Spec.SecretRef.Name)
 	} else if err != nil {
 		return err
@@ -119,7 +117,7 @@ func popCluster(f cmdutil.Factory, name string) (*federationapi.Cluster, error) 
 	rh := resource.NewHelper(client, mapping)
 	obj, err := rh.Get("", name, false)
 
-	if isNotFound(err) {
+	if util.IsNotFound(err) {
 		// Cluster isn't registered, there isn't anything to be done here.
 		return nil, nil
 	} else if err != nil {
@@ -143,13 +141,4 @@ func deleteSecret(hostFactory cmdutil.Factory, name, namespace string) error {
 		return err
 	}
 	return clientset.Core().Secrets(namespace).Delete(name, &metav1.DeleteOptions{})
-}
-
-// isNotFound checks if the given error is a NotFound status error.
-func isNotFound(err error) bool {
-	statusErr := err
-	if urlErr, ok := err.(*url.Error); ok {
-		statusErr = urlErr.Err
-	}
-	return errors.IsNotFound(statusErr)
 }

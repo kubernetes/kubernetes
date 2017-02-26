@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic"
@@ -62,6 +63,7 @@ func TestJoinFederation(t *testing.T) {
 		kubeconfigExplicit string
 		expectedServer     string
 		expectedErr        string
+		testFailure        string
 	}{
 		{
 			cluster:            "syndicate",
@@ -108,6 +110,18 @@ func TestJoinFederation(t *testing.T) {
 			expectedErr:        "",
 		},
 		{
+			cluster:            "associate",
+			clusterCtx:         "confederate",
+			secret:             "confidential",
+			server:             "10.8.8.8",
+			token:              "totem",
+			kubeconfigGlobal:   fakeKubeFiles[1],
+			kubeconfigExplicit: fakeKubeFiles[2],
+			expectedServer:     "https://10.8.8.8",
+			expectedErr:        "Unable to connect to the server: Internal error occurred: Internal Error",
+			testFailure:        "fail",
+		},
+		{
 			cluster:            "affiliate",
 			clusterCtx:         "",
 			secret:             "",
@@ -122,10 +136,10 @@ func TestJoinFederation(t *testing.T) {
 
 	for i, tc := range testCases {
 		cmdErrMsg = ""
-		f := testJoinFederationFactory(tc.cluster, tc.secret, tc.expectedServer)
+		f := testJoinFederationFactory(tc.cluster, tc.secret, tc.expectedServer, tc.testFailure)
 		buf := bytes.NewBuffer([]byte{})
 
-		hostFactory, err := fakeJoinHostFactory(tc.cluster, tc.clusterCtx, tc.secret, tc.server, tc.token)
+		hostFactory, err := fakeJoinHostFactory(tc.cluster, tc.clusterCtx, tc.secret, tc.server, tc.token, tc.testFailure)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -166,7 +180,7 @@ func TestJoinFederation(t *testing.T) {
 	}
 }
 
-func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.Factory {
+func testJoinFederationFactory(clusterName, secretName, server, testFailure string) cmdutil.Factory {
 	if secretName == "" {
 		secretName = clusterName
 	}
@@ -181,6 +195,9 @@ func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.F
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/clusters" && m == http.MethodPost:
+				if testFailure == "fail" {
+					return nil, errors.NewInternalError(fmt.Errorf("Internal Error"))
+				}
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
 					return nil, err
@@ -203,7 +220,7 @@ func testJoinFederationFactory(clusterName, secretName, server string) cmdutil.F
 	return f
 }
 
-func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token string) (cmdutil.Factory, error) {
+func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token, testFailure string) (cmdutil.Factory, error) {
 	if clusterCtx == "" {
 		clusterCtx = clusterName
 	}
@@ -270,6 +287,14 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, secretObject))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &secretObject)}, nil
+			case p == "/api/v1/namespaces/federation-system/secrets/"+secretName && m == http.MethodDelete:
+				if testFailure != "fail" {
+					return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
+				}
+				status := metav1.Status{
+					Status: "Success",
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}

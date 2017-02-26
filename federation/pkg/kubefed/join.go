@@ -21,9 +21,12 @@ import (
 	"io"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -139,7 +142,11 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	glog.V(2).Infof("Created cluster generator: %#v", generator)
 
 	hostFactory := config.HostFactory(j.commonOptions.Host, j.commonOptions.Kubeconfig)
-
+	clientset, err := hostFactory.ClientSet()
+	if err != nil {
+		glog.V(2).Infof("Failed to serialize the kubeconfig for the given context %q: %v", j.options.clusterContext, err)
+		return err
+	}
 	// We are not using the `kubectl create secret` machinery through
 	// `RunCreateSubcommand` as we do to the cluster resource below
 	// because we have a bunch of requirements that the machinery does
@@ -155,19 +162,28 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	//    don't have to print the created secret in the default case.
 	// Having said that, secret generation machinery could be altered to
 	// suit our needs, but it is far less invasive and readable this way.
-	_, err = createSecret(hostFactory, clientConfig, j.commonOptions.FederationSystemNamespace, j.options.clusterContext, j.options.secretName, j.options.dryRun)
+	_, err = createSecret(clientset, clientConfig, j.commonOptions.FederationSystemNamespace, j.options.clusterContext, j.options.secretName, j.options.dryRun)
 	if err != nil {
 		glog.V(2).Infof("Failed creating the cluster credentials secret: %v", err)
 		return err
 	}
 	glog.V(2).Infof("Cluster credentials secret created")
 
-	return kubectlcmd.RunCreateSubcommand(f, cmd, cmdOut, &kubectlcmd.CreateSubcommandOptions{
+	err = kubectlcmd.RunCreateSubcommand(f, cmd, cmdOut, &kubectlcmd.CreateSubcommandOptions{
 		Name:                j.commonOptions.Name,
 		StructuredGenerator: generator,
 		DryRun:              j.options.dryRun,
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
 	})
+	if !errors.IsAlreadyExists(err) && !j.options.dryRun {
+		// Ensure to delete the secret from base cluster before exiting
+		delErr := clientset.Core().Secrets(j.commonOptions.FederationSystemNamespace).Delete(j.options.secretName, &metav1.DeleteOptions{})
+		if delErr != nil {
+			return fmt.Errorf("%v, Cleanup failed after failed join:%v", err, delErr)
+		}
+	}
+
+	return err
 }
 
 // minifyConfig is a wrapper around `clientcmdapi.MinifyConfig()` that
@@ -189,7 +205,7 @@ func minifyConfig(clientConfig *clientcmdapi.Config, context string) (*clientcmd
 
 // createSecret extracts the kubeconfig for a given cluster and populates
 // a secret with that kubeconfig.
-func createSecret(hostFactory cmdutil.Factory, clientConfig *clientcmdapi.Config, namespace, contextName, secretName string, dryRun bool) (runtime.Object, error) {
+func createSecret(clientset *internalclientset.Clientset, clientConfig *clientcmdapi.Config, namespace, contextName, secretName string, dryRun bool) (runtime.Object, error) {
 	// Minify the kubeconfig to ensure that there is only information
 	// relevant to the cluster we are registering.
 	newClientConfig, err := minifyConfig(clientConfig, contextName)
@@ -203,13 +219,6 @@ func createSecret(hostFactory cmdutil.Factory, clientConfig *clientcmdapi.Config
 	err = clientcmdapi.FlattenConfig(newClientConfig)
 	if err != nil {
 		glog.V(2).Infof("Failed to flatten the kubeconfig for the given context %q: %v", contextName, err)
-		return nil, err
-	}
-
-	// Boilerplate to create the secret in the host cluster.
-	clientset, err := hostFactory.ClientSet()
-	if err != nil {
-		glog.V(2).Infof("Failed to serialize the kubeconfig for the given context %q: %v", contextName, err)
 		return nil, err
 	}
 
