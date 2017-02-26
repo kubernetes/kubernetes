@@ -261,16 +261,7 @@ func (f *FakeFactory) FlagSet() *pflag.FlagSet {
 }
 
 func (f *FakeFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	priorityRESTMapper := meta.PriorityRESTMapper{
-		Delegate: f.tf.Mapper,
-		ResourcePriority: []schema.GroupVersionResource{
-			{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
-		},
-		KindPriority: []schema.GroupVersionKind{
-			{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
-		},
-	}
-	return priorityRESTMapper, f.tf.Typer
+	return api.Registry.RESTMapper(), f.tf.Typer
 }
 
 func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
