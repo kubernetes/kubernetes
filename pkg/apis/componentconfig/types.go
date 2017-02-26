@@ -363,7 +363,7 @@ type KubeletConfiguration struct {
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32
 	// Enable experimental Nvidia GPU
-	EnableExperimentalNvidiaGPU bool
+	ExperimentalEnableNvidiaGPU bool
 	// dockerExecHandlerName is the handler to use when executing a command
 	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
 	// 'native'.
