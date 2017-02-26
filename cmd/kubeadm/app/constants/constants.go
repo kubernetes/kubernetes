@@ -94,6 +94,9 @@ const (
 	CSVTokenBootstrapGroup = "kubeadm:kubelet-bootstrap"
 	// The file name of the tokens file that can be used for bootstrapping
 	CSVTokenFileName = "tokens.csv"
+
+	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
+	MinExternalEtcdVersion = "3.0.14"
 )
 
 var (
