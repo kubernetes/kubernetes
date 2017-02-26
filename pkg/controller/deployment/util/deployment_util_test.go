@@ -105,11 +105,23 @@ func newPod(now time.Time, ready bool, beforeSec int) v1.Pod {
 	}
 }
 
+func newRSControllerRef(rs *extensions.ReplicaSet) *metav1.OwnerReference {
+	isController := true
+	return &metav1.OwnerReference{
+		APIVersion: "extensions/v1beta1",
+		Kind:       "ReplicaSet",
+		Name:       rs.GetName(),
+		UID:        rs.GetUID(),
+		Controller: &isController,
+	}
+}
+
 // generatePodFromRS creates a pod, with the input ReplicaSet's selector and its template
 func generatePodFromRS(rs extensions.ReplicaSet) v1.Pod {
 	return v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: rs.Labels,
+			Labels:          rs.Labels,
+			OwnerReferences: []metav1.OwnerReference{*newRSControllerRef(&rs)},
 		},
 		Spec: rs.Spec.Template.Spec,
 	}
@@ -161,14 +173,26 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 	}
 }
 
+func newDControllerRef(d *extensions.Deployment) *metav1.OwnerReference {
+	isController := true
+	return &metav1.OwnerReference{
+		APIVersion: "extensions/v1beta1",
+		Kind:       "Deployment",
+		Name:       d.GetName(),
+		UID:        d.GetUID(),
+		Controller: &isController,
+	}
+}
+
 // generateRS creates a replica set, with the input deployment's template as its template
 func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 	template := GetNewReplicaSetTemplate(&deployment)
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
-			UID:    randomUID(),
-			Name:   v1.SimpleNameGenerator.GenerateName("replicaset"),
-			Labels: template.Labels,
+			UID:             randomUID(),
+			Name:            v1.SimpleNameGenerator.GenerateName("replicaset"),
+			Labels:          template.Labels,
+			OwnerReferences: []metav1.OwnerReference{*newDControllerRef(&deployment)},
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: func() *int32 { i := int32(0); return &i }(),
@@ -291,7 +315,8 @@ func TestGetOldRCs(t *testing.T) {
 	oldRS2.Status.FullyLabeledReplicas = *(oldRS2.Spec.Replicas)
 	oldPod2 := generatePodFromRS(oldRS2)
 
-	// create 1 ReplicaSet that existed before the deployment, with the same labels as the deployment
+	// create 1 ReplicaSet that existed before the deployment,
+	// with the same labels as the deployment, but no ControllerRef.
 	existedPod := generatePod(newDeployment.Spec.Template.Labels, "foo")
 	existedRS := generateRSWithLabel(newDeployment.Spec.Template.Labels, "foo")
 	existedRS.Status.FullyLabeledReplicas = *(existedRS.Spec.Replicas)
@@ -345,7 +370,7 @@ func TestGetOldRCs(t *testing.T) {
 					},
 				},
 			},
-			[]*extensions.ReplicaSet{&oldRS, &oldRS2, &existedRS},
+			[]*extensions.ReplicaSet{&oldRS, &oldRS2},
 		},
 	}
 
