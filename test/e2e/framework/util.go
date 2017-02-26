@@ -3499,7 +3499,22 @@ func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, r
 
 func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deployment) {
 	minReadySeconds := deployment.Spec.MinReadySeconds
-	podList, err := deploymentutil.ListPods(deployment,
+	rsList, err := deploymentutil.ListReplicaSets(deployment,
+		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
+			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
+			if err != nil {
+				return nil, err
+			}
+			ret := make([]*extensions.ReplicaSet, 0, len(rsList.Items))
+			for i := range rsList.Items {
+				ret = append(ret, &rsList.Items[i])
+			}
+			return ret, nil
+		})
+	if err != nil {
+		Logf("Failed to list ReplicaSets of Deployment %s: %v", deployment.Name, err)
+	}
+	podList, err := deploymentutil.ListPods(deployment, rsList,
 		func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
 			return c.Core().Pods(namespace).List(options)
 		})
