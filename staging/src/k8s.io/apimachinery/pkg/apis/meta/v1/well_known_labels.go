@@ -46,7 +46,7 @@ const (
 	TaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
 )
 
-// Role labels are applied to Nodes to mark their purpose.  In particular, we
+// Node Role labels are applied to Nodes to mark their purpose.  In particular, we
 // usually want to distinguish the master, so that we can isolate privileged
 // pods and operations.
 //
@@ -63,9 +63,27 @@ const (
 //
 // So that we can recognize master nodes in consequent places though (such as
 // kubectl get nodes), we encourage installations to use the well-known labels.
-// We define NodeLabelRole, which is the preferred form, but we will also recognize
-// other forms that are known to be in widespread use (NodeLabelKubeadmAlphaRole).
+//
+// We define LabelNodeRoleMaster and LabelNodeRoleNode, which are the preferred
+// form, but we will also recognize other forms that are known to be in
+// widespread use (NodeLabelKubeadmAlphaRole, NodeLabelRole, etc) .
 
+const (
+	// LabelNodeRoleMaster is set to the value "true" indicating a master node.
+	// A master node typically runs kubernetes system components and will not typically run user workloads.
+	// When set to any value other than "true" it is ignored.
+	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+
+	// LabelNodeRoleNode is set to the value "true" indicating a "normal" node.
+	// When set to any value other than "true" it is ignored.
+	LabelNodeRoleNode = "node-role.kubernetes.io/node"
+)
+
+// NodeLabelRole and NodeLabelKubeadmAlphaRole are in-use but
+// LabelNodeRoleMaster and LabelNodeRoleNode are preferred. NodeLabelRole
+// worked but did not allow Nodes to take on multiple roles. For example, a
+// single-node minikube cluster will have a node that is both a "master role"
+// and "node role".
 const (
 	// NodeLabelRole is the preferred label applied to a Node as a hint that it has a particular purpose (defined by the value).
 	NodeLabelRole = "kubernetes.io/role"
