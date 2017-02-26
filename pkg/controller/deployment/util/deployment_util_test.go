@@ -705,7 +705,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
-			expectError:       "invalid value for IntOrString: invalid value \"oops\": strconv.ParseInt: parsing \"oops\": invalid syntax",
+			expectError:       "invalid value for IntOrString: invalid value \"oops\": strconv.Atoi: parsing \"oops\": invalid syntax",
 		},
 		{
 			maxSurge:          "55%",
@@ -713,7 +713,7 @@ func TestResolveFenceposts(t *testing.T) {
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
-			expectError:       "invalid value for IntOrString: invalid value \"urg\": strconv.ParseInt: parsing \"urg\": invalid syntax",
+			expectError:       "invalid value for IntOrString: invalid value \"urg\": strconv.Atoi: parsing \"urg\": invalid syntax",
 		},
 	}
 
