@@ -223,6 +223,8 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	filesToClean := []string{
 		filepath.Join(configPathDir, kubeadmconstants.AdminKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.KubeletKubeConfigFileName),
+		filepath.Join(configPathDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
+		filepath.Join(configPathDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}
 	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {
