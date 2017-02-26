@@ -165,6 +165,10 @@ dump-logs-on-failure
 duration-sec
 e2e-output-dir
 e2e-verify-service-account
+etcd-metrics-scrape-uri
+etcd-upgrade-storage
+etcd-upgrade-version
+etcd-version-scrape-uri
 enable-controller-attach-detach
 enable-cri
 enable-custom-metrics
