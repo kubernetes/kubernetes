@@ -1,4 +1,3 @@
-# please keep this file synchronized with cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
