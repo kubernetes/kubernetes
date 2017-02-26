@@ -164,6 +164,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 		)
 
 		containsError := false
+		readOnly := false
 
 		// loop until we succeed or cancel editing
 		for {
@@ -207,11 +208,12 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 				// Remove the comments (header) from it since we already
 				// have included the latest header in the buffer above.
 				buf.Write(manualStrip(edited))
+				readOnly = true
 			}
 
 			// launch the editor
 			editedDiff := edited
-			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), o.ext, buf)
+			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), o.ext, buf, readOnly)
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
