@@ -208,6 +208,7 @@ go_library(
         "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/transport",
         "//vendor:k8s.io/client-go/util/flowcontrol",
+        "//vendor:k8s.io/client-go/util/integer",
         "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
