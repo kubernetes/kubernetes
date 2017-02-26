@@ -34,7 +34,7 @@ const (
 var (
 	tokenIDRegexpString = "^([a-z0-9]{6})$"
 	tokenIDRegexp       = regexp.MustCompile(tokenIDRegexpString)
-	tokenRegexpString   = "^([a-z0-9]{6})\\:([a-z0-9]{16})$"
+	tokenRegexpString   = "^([a-z0-9]{6})\\.([a-z0-9]{16})$"
 	tokenRegexp         = regexp.MustCompile(tokenRegexpString)
 )
 
