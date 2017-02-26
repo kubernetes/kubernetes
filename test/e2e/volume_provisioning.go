@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -111,9 +111,8 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 			By("creating a StorageClass")
 			class := newStorageClass("", "internal")
-			// TODO change to StorageV1 once it's enabled in GKE
-			_, err := c.StorageV1beta1().StorageClasses().Create(class)
-			defer c.StorageV1beta1().StorageClasses().Delete(class.Name, nil)
+			_, err := c.Storage().StorageClasses().Create(class)
+			defer c.Storage().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating a claim with a dynamic provisioning annotation")
@@ -171,9 +170,8 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			sc := newStorageClass("kubernetes.io/gce-pd", suffix)
 			// Set an unmanaged zone.
 			sc.Parameters = map[string]string{"zone": unmanagedZone}
-			// TODO change to StorageV1 once it's enabled in GKE
-			sc, err = c.StorageV1beta1().StorageClasses().Create(sc)
-			defer Expect(c.StorageV1beta1().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
+			sc, err = c.Storage().StorageClasses().Create(sc)
+			defer Expect(c.Storage().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Creating a claim and expecting it to timeout")
@@ -227,9 +225,8 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 			By("creating a StorageClass")
 			class := newStorageClass(externalPluginName, "external")
-			// TODO change to StorageV1 once it's enabled in GKE
-			_, err = c.StorageV1beta1().StorageClasses().Create(class)
-			defer c.StorageV1beta1().StorageClasses().Delete(class.Name, nil)
+			_, err = c.Storage().StorageClasses().Create(class)
+			defer c.Storage().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating a claim with a dynamic provisioning annotation")
