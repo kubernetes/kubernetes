@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -191,7 +192,7 @@ func (r *EvictionREST) getPodDisruptionBudgets(ctx genericapirequest.Context, po
 		if pdb.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
+		selector, err := selectors.LabelSelectorAsSelector(pdb.Spec.Selector)
 		if err != nil {
 			continue
 		}

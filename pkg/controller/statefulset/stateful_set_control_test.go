@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -161,7 +162,7 @@ func TestStatefulSetControlReplacesPods(t *testing.T) {
 	if set.Status.Replicas != 5 {
 		t.Error("Failed to scale statefulset to 5 replicas")
 	}
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
 	}
@@ -221,7 +222,7 @@ func TestDefaultStatefulSetControlRecreatesFailedPod(t *testing.T) {
 	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewDefaultStatefulSetControl(spc)
 	set := newStatefulSet(3)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
 	}
@@ -273,7 +274,7 @@ func TestDefaultStatefulSetControlInitAnnotation(t *testing.T) {
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 	)
 
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
 	}
@@ -455,7 +456,7 @@ func TestDefaultStatefulSetControlPodRecreateDeleteError(t *testing.T) {
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 	)
 
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
 	}
@@ -608,7 +609,7 @@ func (spc *fakeStatefulPodControl) SetUpdateStatefulSetStatusError(err error, af
 }
 
 func (spc *fakeStatefulPodControl) setPodPending(set *apps.StatefulSet, ordinal int) ([]*v1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -628,7 +629,7 @@ func (spc *fakeStatefulPodControl) setPodPending(set *apps.StatefulSet, ordinal 
 }
 
 func (spc *fakeStatefulPodControl) setPodRunning(set *apps.StatefulSet, ordinal int) ([]*v1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -648,7 +649,7 @@ func (spc *fakeStatefulPodControl) setPodRunning(set *apps.StatefulSet, ordinal 
 }
 
 func (spc *fakeStatefulPodControl) setPodReady(set *apps.StatefulSet, ordinal int) ([]*v1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -669,7 +670,7 @@ func (spc *fakeStatefulPodControl) setPodReady(set *apps.StatefulSet, ordinal in
 }
 
 func (spc *fakeStatefulPodControl) setPodInitStatus(set *apps.StatefulSet, ordinal int, init bool) ([]*v1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -701,7 +702,7 @@ func (spc *fakeStatefulPodControl) addTerminatedPod(set *apps.StatefulSet, ordin
 	fakeResourceVersion(pod)
 	v1.UpdatePodCondition(&pod.Status, &condition)
 	spc.podsIndexer.Update(pod)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -714,7 +715,7 @@ func (spc *fakeStatefulPodControl) setPodTerminated(set *apps.StatefulSet, ordin
 	pod.DeletionTimestamp = &deleted
 	fakeResourceVersion(pod)
 	spc.podsIndexer.Update(pod)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -785,7 +786,7 @@ func (spc *fakeStatefulPodControl) UpdateStatefulSetReplicas(set *apps.StatefulS
 var _ StatefulPodControlInterface = &fakeStatefulPodControl{}
 
 func assertInvariants(set *apps.StatefulSet, spc *fakeStatefulPodControl) error {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}
@@ -840,7 +841,7 @@ func fakeResourceVersion(object interface{}) {
 }
 
 func scaleUpStatefulSetControl(set *apps.StatefulSet, ssc StatefulSetControlInterface, spc *fakeStatefulPodControl) error {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}
@@ -890,7 +891,7 @@ func scaleUpStatefulSetControl(set *apps.StatefulSet, ssc StatefulSetControlInte
 }
 
 func scaleDownStatefulSetControl(set *apps.StatefulSet, ssc StatefulSetControlInterface, spc *fakeStatefulPodControl) error {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}

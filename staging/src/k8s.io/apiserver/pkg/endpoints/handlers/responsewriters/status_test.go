@@ -18,6 +18,7 @@ package responsewriters
 
 import (
 	stderrs "errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -61,6 +62,20 @@ func TestAPIStatus(t *testing.T) {
 				Kind:  "foos",
 				Name:  "bar",
 			},
+		},
+		errors.NewBadRequest("Explanation of the problem"): {
+			Status:  "Failure",
+			Code:    400,
+			Reason:  "BadRequest",
+			Message: "Explanation of the problem",
+			Details: nil,
+		},
+		fmt.Errorf("Generic non-status error"): {
+			Status:  metav1.StatusFailure,
+			Code:    http.StatusInternalServerError,
+			Reason:  metav1.StatusReasonUnknown,
+			Message: "Generic non-status error",
+			Details: nil,
 		},
 	}
 	for k, v := range cases {

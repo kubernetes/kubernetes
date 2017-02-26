@@ -19,8 +19,8 @@ package v1beta1
 import (
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
@@ -56,7 +56,7 @@ func (s *daemonSetLister) GetPodDaemonSets(pod *v1.Pod) ([]*v1beta1.DaemonSet, e
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = metav1.LabelSelectorAsSelector(daemonSet.Spec.Selector)
+		selector, err = selectors.LabelSelectorAsSelector(daemonSet.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err

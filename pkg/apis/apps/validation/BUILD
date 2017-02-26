@@ -16,9 +16,9 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/apps:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/validation",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/selectors",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )

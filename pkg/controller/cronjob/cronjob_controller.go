@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -240,7 +241,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 				}
 			}
 			// remove all pods...
-			selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
+			selector, _ := selectors.LabelSelectorAsSelector(job.Spec.Selector)
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			podList, err := pc.ListPods(job.Namespace, options)
 			if err != nil {
