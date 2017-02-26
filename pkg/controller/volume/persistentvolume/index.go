@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes

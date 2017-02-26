@@ -108,10 +108,10 @@ func invokeTest(client clientset.Interface, namespace string, nodeName string, n
 
 	By("Creating Storage Class With DiskFormat")
 	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters)
-	storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
+	storageclass, err := client.StorageV1beta1().StorageClasses().Create(storageClassSpec)
 	Expect(err).NotTo(HaveOccurred())
 
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1beta1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
 	pvclaimSpec := getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass)
