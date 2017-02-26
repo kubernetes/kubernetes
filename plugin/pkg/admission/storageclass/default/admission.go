@@ -96,7 +96,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
-	if storageutil.HasStorageClassAnnotation(pvc.ObjectMeta) {
+	if api.PersistentVolumeClaimHasClass(pvc) {
 		// The user asked for a class.
 		return nil
 	}
@@ -116,7 +116,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 	if pvc.ObjectMeta.Annotations == nil {
 		pvc.ObjectMeta.Annotations = map[string]string{}
 	}
-	pvc.Annotations[storageutil.StorageClassAnnotation] = def.Name
+	pvc.Annotations[api.BetaStorageClassAnnotation] = def.Name
 	return nil
 }
 

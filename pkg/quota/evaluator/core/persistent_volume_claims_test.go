@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/storage/util"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/quota"
 )
@@ -74,7 +74,7 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 		},
 	})
 	validClaimGoldStorageClass.Annotations = map[string]string{
-		util.StorageClassAnnotation: "gold",
+		v1.BetaStorageClassAnnotation: "gold",
 	}
 
 	validClaimBronzeStorageClass := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
@@ -97,7 +97,7 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 		},
 	})
 	validClaimBronzeStorageClass.Annotations = map[string]string{
-		util.StorageClassAnnotation: "bronze",
+		v1.BetaStorageClassAnnotation: "bronze",
 	}
 
 	missingStorage := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
@@ -136,7 +136,7 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 		},
 	})
 	missingGoldStorage.Annotations = map[string]string{
-		util.StorageClassAnnotation: "gold",
+		v1.BetaStorageClassAnnotation: "gold",
 	}
 
 	testCases := map[string]struct {
@@ -240,7 +240,7 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 	})
 	storageClassName := "gold"
 	validClaimByStorageClass.Annotations = map[string]string{
-		util.StorageClassAnnotation: storageClassName,
+		v1.BetaStorageClassAnnotation: storageClassName,
 	}
 
 	kubeClient := fake.NewSimpleClientset()
