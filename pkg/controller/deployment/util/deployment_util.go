@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -507,7 +508,7 @@ func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	podList, err := listPods(deployment, c)
+	podList, err := listPods(deployment, rsList, c)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -529,7 +530,7 @@ func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 	if err != nil {
 		return nil, nil, err
 	}
-	podList, err := listPods(deployment, c)
+	podList, err := listPods(deployment, rsList, c)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -563,8 +564,8 @@ func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) (
 }
 
 // listReplicaSets lists all Pods the given deployment targets with the given client interface.
-func listPods(deployment *extensions.Deployment, c clientset.Interface) (*v1.PodList, error) {
-	return ListPods(deployment,
+func listPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, c clientset.Interface) (*v1.PodList, error) {
+	return ListPods(deployment, rsList,
 		func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
 			return c.Core().Pods(namespace).List(options)
 		})
@@ -575,28 +576,65 @@ type rsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, erro
 type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
 
 // ListReplicaSets returns a slice of RSes the given deployment targets.
+// Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),
+// because only the controller itself should do that.
+// However, it does filter out anything whose ControllerRef doesn't match.
 func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
 	// TODO: Right now we list replica sets by their labels. We should list them by selector, i.e. the replica set's selector
-	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830;
-	//       or use controllerRef, see https://github.com/kubernetes/kubernetes/issues/2210
+	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830.
 	namespace := deployment.Namespace
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	return getRSList(namespace, options)
+	all, err := getRSList(namespace, options)
+	if err != nil {
+		return all, err
+	}
+	// Only include those whose ControllerRef matches the Deployment.
+	owned := make([]*extensions.ReplicaSet, 0, len(all))
+	for _, rs := range all {
+		controllerRef := controller.GetControllerOf(rs)
+		if controllerRef != nil && controllerRef.UID == deployment.UID {
+			owned = append(owned, rs)
+		}
+	}
+	return owned, nil
 }
 
 // ListPods returns a list of pods the given deployment targets.
-func ListPods(deployment *extensions.Deployment, getPodList podListFunc) (*v1.PodList, error) {
+// This needs a list of ReplicaSets for the Deployment,
+// which can be found with ListReplicaSets().
+// Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),
+// because only the controller itself should do that.
+// However, it does filter out anything whose ControllerRef doesn't match.
+func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, getPodList podListFunc) (*v1.PodList, error) {
 	namespace := deployment.Namespace
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	return getPodList(namespace, options)
+	all, err := getPodList(namespace, options)
+	if err != nil {
+		return all, err
+	}
+	// Only include those whose ControllerRef points to a ReplicaSet that is in
+	// turn owned by this Deployment.
+	rsMap := make(map[types.UID]bool, len(rsList))
+	for _, rs := range rsList {
+		rsMap[rs.UID] = true
+	}
+	owned := &v1.PodList{Items: make([]v1.Pod, 0, len(all.Items))}
+	for i := range all.Items {
+		pod := &all.Items[i]
+		controllerRef := controller.GetControllerOf(pod)
+		if controllerRef != nil && rsMap[controllerRef.UID] {
+			owned.Items = append(owned.Items, *pod)
+		}
+	}
+	return owned, nil
 }
 
 // EqualIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
