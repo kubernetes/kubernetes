@@ -36,7 +36,6 @@ import (
 	policyv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1beta1"
-	storagev1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/storage/v1"
 	storagev1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/storage/v1beta1"
 )
 
@@ -78,9 +77,8 @@ type Interface interface {
 	Rbac() rbacv1beta1.RbacV1beta1Interface
 	RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface
 	StorageV1beta1() storagev1beta1.StorageV1beta1Interface
-	StorageV1() storagev1.StorageV1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Storage() storagev1.StorageV1Interface
+	Storage() storagev1beta1.StorageV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -103,7 +101,6 @@ type Clientset struct {
 	*rbacv1beta1.RbacV1beta1Client
 	*rbacv1alpha1.RbacV1alpha1Client
 	*storagev1beta1.StorageV1beta1Client
-	*storagev1.StorageV1Client
 }
 
 // CoreV1 retrieves the CoreV1Client
@@ -324,21 +321,13 @@ func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
 	return c.StorageV1beta1Client
 }
 
-// StorageV1 retrieves the StorageV1Client
-func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
-	if c == nil {
-		return nil
-	}
-	return c.StorageV1Client
-}
-
 // Deprecated: Storage retrieves the default version of StorageClient.
 // Please explicitly pick a version.
-func (c *Clientset) Storage() storagev1.StorageV1Interface {
+func (c *Clientset) Storage() storagev1beta1.StorageV1beta1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.StorageV1Client
+	return c.StorageV1beta1Client
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -421,10 +410,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.StorageV1Client, err = storagev1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -454,7 +439,6 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.RbacV1beta1Client = rbacv1beta1.NewForConfigOrDie(c)
 	cs.RbacV1alpha1Client = rbacv1alpha1.NewForConfigOrDie(c)
 	cs.StorageV1beta1Client = storagev1beta1.NewForConfigOrDie(c)
-	cs.StorageV1Client = storagev1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -479,7 +463,6 @@ func New(c rest.Interface) *Clientset {
 	cs.RbacV1beta1Client = rbacv1beta1.New(c)
 	cs.RbacV1alpha1Client = rbacv1alpha1.New(c)
 	cs.StorageV1beta1Client = storagev1beta1.New(c)
-	cs.StorageV1Client = storagev1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
