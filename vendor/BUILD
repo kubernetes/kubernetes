@@ -17116,3 +17116,10 @@ go_library(
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/install",
     ],
 )
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured_test",
+    srcs = ["k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructured_test.go"],
+    library = ":k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+    tags = ["automanaged"],
+)

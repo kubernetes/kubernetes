@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 const (
@@ -33,18 +32,6 @@ const (
 
 type NamespaceInfo struct {
 	Namespace string
-}
-
-func listOfImages(spec *api.PodSpec) []string {
-	images := make([]string, 0, len(spec.Containers))
-	for _, container := range spec.Containers {
-		images = append(images, container.Image)
-	}
-	return images
-}
-
-func makeImageList(spec *api.PodSpec) string {
-	return strings.Join(listOfImages(spec), ",")
 }
 
 // ResourceShortcuts represents a structure that holds the information how to
