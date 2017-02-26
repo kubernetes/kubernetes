@@ -139,11 +139,11 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 		if err != nil {
 			return nil, err
 		}
-		psList, err := c.Apps().StatefulSets(metav1.NamespaceSystem).List(options)
+		ssList, err := c.Apps().StatefulSets(metav1.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}
-		if (len(rcList.Items) + len(deploymentList.Items) + len(psList.Items)) != 1 {
+		if (len(rcList.Items) + len(deploymentList.Items) + len(ssList.Items)) != 1 {
 			return nil, fmt.Errorf("expected to find one replica for RC or deployment with label %s but got %d",
 				rcLabel, len(rcList.Items))
 		}
@@ -177,8 +177,8 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 				expectedPods = append(expectedPods, string(pod.UID))
 			}
 		}
-		// And for pet sets.
-		for _, ps := range psList.Items {
+		// And for stateful sets.
+		for _, ps := range ssList.Items {
 			selector := labels.Set(ps.Spec.Selector.MatchLabels).AsSelector()
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			podList, err := c.Core().Pods(metav1.NamespaceSystem).List(options)
