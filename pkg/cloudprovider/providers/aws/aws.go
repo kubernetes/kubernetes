@@ -1222,9 +1222,10 @@ func (c *Cloud) getMountDevice(i *awsInstance, volumeID awsVolumeID, assign bool
 	// Find the next unused device name
 	deviceAllocator := c.deviceAllocators[i.nodeName]
 	if deviceAllocator == nil {
-		// we want device names with two significant characters, starting with
-		// /dev/xvdba (leaving xvda - xvdz and xvdaa-xvdaz to the system)
-		deviceAllocator = NewDeviceAllocator(2, "ba")
+		// we want device names with two significant characters, starting with /dev/xvdbb
+		// the allowed range is /dev/xvd[b-c][a-z]
+		// http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
+		deviceAllocator = NewDeviceAllocator(0)
 		c.deviceAllocators[i.nodeName] = deviceAllocator
 	}
 	chosen, err := deviceAllocator.GetNext(deviceMappings)
