@@ -2698,24 +2698,29 @@ func ValidateReplicationControllerUpdate(controller, oldController *api.Replicat
 // ValidateReplicationControllerStatusUpdate tests if required fields in the replication controller are set.
 func ValidateReplicationControllerStatusUpdate(controller, oldController *api.ReplicationController) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
-	statusPath := field.NewPath("status")
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.Replicas), statusPath.Child("replicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.FullyLabeledReplicas), statusPath.Child("fullyLabeledReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.ReadyReplicas), statusPath.Child("readyReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.AvailableReplicas), statusPath.Child("availableReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
+	allErrs = append(allErrs, ValidateReplicationControllerStatus(controller.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+func ValidateReplicationControllerStatus(status api.ReplicationControllerStatus, statusPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.Replicas), statusPath.Child("replicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.FullyLabeledReplicas), statusPath.Child("fullyLabeledReplicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.ReadyReplicas), statusPath.Child("readyReplicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.AvailableReplicas), statusPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
 	msg := "cannot be greater than status.replicas"
-	if controller.Status.FullyLabeledReplicas > controller.Status.Replicas {
-		allErrs = append(allErrs, field.Invalid(statusPath.Child("fullyLabeledReplicas"), controller.Status.FullyLabeledReplicas, msg))
+	if status.FullyLabeledReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("fullyLabeledReplicas"), status.FullyLabeledReplicas, msg))
 	}
-	if controller.Status.ReadyReplicas > controller.Status.Replicas {
-		allErrs = append(allErrs, field.Invalid(statusPath.Child("readyReplicas"), controller.Status.ReadyReplicas, msg))
+	if status.ReadyReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("readyReplicas"), status.ReadyReplicas, msg))
 	}
-	if controller.Status.AvailableReplicas > controller.Status.Replicas {
-		allErrs = append(allErrs, field.Invalid(statusPath.Child("availableReplicas"), controller.Status.AvailableReplicas, msg))
+	if status.AvailableReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("availableReplicas"), status.AvailableReplicas, msg))
 	}
-	if controller.Status.ReadyReplicas > controller.Status.AvailableReplicas {
-		allErrs = append(allErrs, field.Invalid(statusPath.Child("readyReplicas"), controller.Status.ReadyReplicas, "cannot be greater than availableReplicas"))
+	if status.AvailableReplicas > status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
 	}
 	return allErrs
 }
