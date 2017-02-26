@@ -914,6 +914,12 @@ start_kube_addons() {
     sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
   fi
+  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]]; then
+    pv_yaml="${dst_dir}/${file_dir}/influxdb-pv.yaml"
+    pd_name="${INSTANCE_PREFIX}-influxdb-pd"
+    remove-salt-config-comments "${pv_yaml}"
+    sed -i -e "s@{{ *pd_name *}}@${pd_name}@g" "${pv_yaml}"
+  fi
   if [ "${ENABLE_L7_LOADBALANCING:-}" = "glbc" ]; then
     setup_addon_manifests "addons" "cluster-loadbalancing/glbc"
     glbc_yaml="${addon_dst_dir}/cluster-loadbalancing/glbc/glbc.yaml"
