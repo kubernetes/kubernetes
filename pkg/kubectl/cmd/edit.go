@@ -443,22 +443,7 @@ func visitToPatch(
 			return fmt.Errorf("no original object found for %#v", info.Object)
 		}
 
-		originalSerialization, err := runtime.Encode(encoder, originalInfo.Object)
-		if err != nil {
-			return err
-		}
-		editedSerialization, err := runtime.Encode(encoder, info.Object)
-		if err != nil {
-			return err
-		}
-
-		// compute the patch on a per-item basis
-		// use strategic merge to create a patch
-		originalJS, err := yaml.ToJSON(originalSerialization)
-		if err != nil {
-			return err
-		}
-		editedJS, err := yaml.ToJSON(editedSerialization)
+		originalJS, editedJS, err := SerializationConvert(encoder, originalInfo.Object, info.Object)
 		if err != nil {
 			return err
 		}
@@ -692,4 +677,27 @@ func manualStrip(file []byte) []byte {
 		}
 	}
 	return stripped
+}
+
+func SerializationConvert(codec runtime.Encoder, original, updated runtime.Object) ([]byte, []byte, error) {
+	originalSerialization, err := runtime.Encode(codec, original)
+	if err != nil {
+		return nil, nil, err
+	}
+	editedSerialization, err := runtime.Encode(codec, updated)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// compute the patch on a per-item basis
+	// use strategic merge to create a patch
+	originalJS, err := yaml.ToJSON(originalSerialization)
+	if err != nil {
+		return nil, nil, err
+	}
+	editedJS, err := yaml.ToJSON(editedSerialization)
+	if err != nil {
+		return nil, nil, err
+	}
+	return originalJS, editedJS, nil
 }
