@@ -17,6 +17,8 @@ limitations under the License.
 package cronjob
 
 import (
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -75,6 +77,14 @@ func justBeforeThePriorHour() time.Time {
 
 func justAfterThePriorHour() time.Time {
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T09:01:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
+func startTimeStringToTime(startTime string) time.Time {
+	T1, err := time.Parse(time.RFC3339, startTime)
 	if err != nil {
 		panic("test setup error")
 	}
@@ -270,7 +280,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		pc := &fakePodControl{}
 		recorder := record.NewFakeRecorder(10)
 
-		SyncOne(sj, js, tc.now, jc, sjc, pc, recorder)
+		syncOne(&sj, js, tc.now, jc, sjc, pc, recorder)
 		expectedCreates := 0
 		if tc.expectCreate {
 			expectedCreates = 1
@@ -320,10 +330,237 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 	}
 }
 
+type CleanupJobSpec struct {
+	StartTime           string
+	IsFinished          bool
+	IsSuccessful        bool
+	ExpectDelete        bool
+	IsStillInActiveList bool // only when IsFinished is set
+}
+
+func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
+	limitThree := int32(3)
+	limitTwo := int32(2)
+	limitOne := int32(1)
+	limitZero := int32(0)
+
+	// Starting times are assumed to be sorted by increasing start time
+	// in all the test cases
+	testCases := map[string]struct {
+		jobSpecs                   []CleanupJobSpec
+		now                        time.Time
+		successfulJobsHistoryLimit *int32
+		failedJobsHistoryLimit     *int32
+		expectActive               int
+	}{
+		"success. job limit reached": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, T, T, F},
+				{"2016-05-19T05:00:00Z", T, T, T, F},
+				{"2016-05-19T06:00:00Z", T, T, F, F},
+				{"2016-05-19T07:00:00Z", T, T, F, F},
+				{"2016-05-19T08:00:00Z", F, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, F, F},
+			}, justBeforeTheHour(), &limitTwo, &limitOne, 1},
+
+		"success. jobs not processed by Sync yet": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, T, T, F},
+				{"2016-05-19T05:00:00Z", T, T, T, T},
+				{"2016-05-19T06:00:00Z", T, T, F, T},
+				{"2016-05-19T07:00:00Z", T, T, F, T},
+				{"2016-05-19T08:00:00Z", F, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, F, T},
+			}, justBeforeTheHour(), &limitTwo, &limitOne, 4},
+
+		"failed job limit reached": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, F, T, F},
+				{"2016-05-19T05:00:00Z", T, F, T, F},
+				{"2016-05-19T06:00:00Z", T, T, F, F},
+				{"2016-05-19T07:00:00Z", T, T, F, F},
+				{"2016-05-19T08:00:00Z", T, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, F, F},
+			}, justBeforeTheHour(), &limitTwo, &limitTwo, 0},
+
+		"success. job limit set to zero": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, T, T, F},
+				{"2016-05-19T05:00:00Z", T, F, T, F},
+				{"2016-05-19T06:00:00Z", T, T, T, F},
+				{"2016-05-19T07:00:00Z", T, T, T, F},
+				{"2016-05-19T08:00:00Z", F, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, F, F},
+			}, justBeforeTheHour(), &limitZero, &limitOne, 1},
+
+		"failed job limit set to zero": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, T, F, F},
+				{"2016-05-19T05:00:00Z", T, F, T, F},
+				{"2016-05-19T06:00:00Z", T, T, F, F},
+				{"2016-05-19T07:00:00Z", T, T, F, F},
+				{"2016-05-19T08:00:00Z", F, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, T, F},
+			}, justBeforeTheHour(), &limitThree, &limitZero, 1},
+
+		"no limits reached": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, T, F, F},
+				{"2016-05-19T05:00:00Z", T, F, F, F},
+				{"2016-05-19T06:00:00Z", T, T, F, F},
+				{"2016-05-19T07:00:00Z", T, T, F, F},
+				{"2016-05-19T08:00:00Z", T, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, F, F},
+			}, justBeforeTheHour(), &limitThree, &limitThree, 0},
+
+		// This test case should trigger the short-circuit
+		"limits disabled": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, T, F, F},
+				{"2016-05-19T05:00:00Z", T, F, F, F},
+				{"2016-05-19T06:00:00Z", T, T, F, F},
+				{"2016-05-19T07:00:00Z", T, T, F, F},
+				{"2016-05-19T08:00:00Z", T, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, F, F},
+			}, justBeforeTheHour(), nil, nil, 0},
+
+		"success limit disabled": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, T, F, F},
+				{"2016-05-19T05:00:00Z", T, F, F, F},
+				{"2016-05-19T06:00:00Z", T, T, F, F},
+				{"2016-05-19T07:00:00Z", T, T, F, F},
+				{"2016-05-19T08:00:00Z", T, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, F, F},
+			}, justBeforeTheHour(), nil, &limitThree, 0},
+
+		"failure limit disabled": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, T, F, F},
+				{"2016-05-19T05:00:00Z", T, F, F, F},
+				{"2016-05-19T06:00:00Z", T, T, F, F},
+				{"2016-05-19T07:00:00Z", T, T, F, F},
+				{"2016-05-19T08:00:00Z", T, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, F, F},
+			}, justBeforeTheHour(), &limitThree, nil, 0},
+
+		"no limits reached because still active": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", F, F, F, F},
+				{"2016-05-19T05:00:00Z", F, F, F, F},
+				{"2016-05-19T06:00:00Z", F, F, F, F},
+				{"2016-05-19T07:00:00Z", F, F, F, F},
+				{"2016-05-19T08:00:00Z", F, F, F, F},
+				{"2016-05-19T09:00:00Z", F, F, F, F},
+			}, justBeforeTheHour(), &limitZero, &limitZero, 6},
+	}
+
+	for name, tc := range testCases {
+		sj := cronJob()
+		suspend := false
+		sj.Spec.ConcurrencyPolicy = f
+		sj.Spec.Suspend = &suspend
+		sj.Spec.Schedule = onTheHour
+
+		sj.Spec.SuccessfulJobsHistoryLimit = tc.successfulJobsHistoryLimit
+		sj.Spec.FailedJobsHistoryLimit = tc.failedJobsHistoryLimit
+
+		var (
+			job *batch.Job
+			err error
+		)
+
+		// Set consistent timestamps for the CronJob
+		if len(tc.jobSpecs) != 0 {
+			firstTime := startTimeStringToTime(tc.jobSpecs[0].StartTime)
+			lastTime := startTimeStringToTime(tc.jobSpecs[len(tc.jobSpecs)-1].StartTime)
+			sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: firstTime}
+			sj.Status.LastScheduleTime = &metav1.Time{Time: lastTime}
+		} else {
+			sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
+		}
+
+		// Create jobs
+		js := []batch.Job{}
+		jobsToDelete := []string{}
+		sj.Status.Active = []v1.ObjectReference{}
+
+		for i, spec := range tc.jobSpecs {
+			job, err = getJobFromTemplate(&sj, startTimeStringToTime(spec.StartTime))
+			if err != nil {
+				t.Fatalf("%s: unexpected error creating a job from template: %v", name, err)
+			}
+
+			job.UID = types.UID(strconv.Itoa(i))
+			job.Namespace = ""
+
+			if spec.IsFinished {
+				var conditionType batch.JobConditionType
+				if spec.IsSuccessful {
+					conditionType = batch.JobComplete
+				} else {
+					conditionType = batch.JobFailed
+				}
+				condition := batch.JobCondition{Type: conditionType, Status: v1.ConditionTrue}
+				job.Status.Conditions = append(job.Status.Conditions, condition)
+
+				if spec.IsStillInActiveList {
+					sj.Status.Active = append(sj.Status.Active, v1.ObjectReference{UID: job.UID})
+				}
+			} else {
+				if spec.IsSuccessful || spec.IsStillInActiveList {
+					t.Errorf("%s: test setup error: this case makes no sense", name)
+				}
+				sj.Status.Active = append(sj.Status.Active, v1.ObjectReference{UID: job.UID})
+			}
+
+			js = append(js, *job)
+			if spec.ExpectDelete {
+				jobsToDelete = append(jobsToDelete, job.Name)
+			}
+		}
+
+		jc := &fakeJobControl{Job: job}
+		pc := &fakePodControl{}
+		sjc := &fakeSJControl{}
+		recorder := record.NewFakeRecorder(10)
+
+		cleanupFinishedJobs(&sj, js, jc, sjc, pc, recorder)
+
+		// Check we have actually deleted the correct jobs
+		if len(jc.DeleteJobName) != len(jobsToDelete) {
+			t.Errorf("%s: expected %d job deleted, actually %d", name, len(jobsToDelete), len(jc.DeleteJobName))
+		} else {
+			sort.Strings(jobsToDelete)
+			sort.Strings(jc.DeleteJobName)
+			for i, expectedJobName := range jobsToDelete {
+				if expectedJobName != jc.DeleteJobName[i] {
+					t.Errorf("%s: expected job %s deleted, actually %v -- %v vs %v", name, expectedJobName, jc.DeleteJobName[i], jc.DeleteJobName, jobsToDelete)
+				}
+			}
+		}
+
+		// Check for events
+		expectedEvents := len(jobsToDelete)
+		if len(recorder.Events) != expectedEvents {
+			t.Errorf("%s: expected %d event, actually %v", name, expectedEvents, len(recorder.Events))
+		}
+
+		// Check for jobs still in active list
+		numActive := 0
+		if len(sjc.Updates) != 0 {
+			numActive = len(sjc.Updates[len(sjc.Updates)-1].Status.Active)
+		}
+		if tc.expectActive != numActive {
+			t.Errorf("%s: expected Active size %d, got %d", name, tc.expectActive, numActive)
+		}
+	}
+}
+
 // TODO: simulation where the controller randomly doesn't run, and randomly has errors starting jobs or deleting jobs,
 // but over time, all jobs run as expected (assuming Allow and no deadline).
 
-// TestSyncOne_Status tests sj.UpdateStatus in SyncOne
+// TestSyncOne_Status tests sj.UpdateStatus in syncOne
 func TestSyncOne_Status(t *testing.T) {
 	finishedJob := newJob("1")
 	finishedJob.Status.Conditions = append(finishedJob.Status.Conditions, batch.JobCondition{Type: batch.JobComplete, Status: v1.ConditionTrue})
@@ -443,7 +680,7 @@ func TestSyncOne_Status(t *testing.T) {
 		recorder := record.NewFakeRecorder(10)
 
 		// Run the code
-		SyncOne(sj, jobs, tc.now, jc, sjc, pc, recorder)
+		syncOne(&sj, jobs, tc.now, jc, sjc, pc, recorder)
 
 		// Status update happens once when ranging through job list, and another one if create jobs.
 		expectUpdates := 1
