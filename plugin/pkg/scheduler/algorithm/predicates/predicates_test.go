@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
 )
 
 type FakeNodeInfo v1.Node
@@ -116,7 +117,7 @@ func newResourceInitPod(pod *v1.Pod, usage ...schedulercache.Resource) *v1.Pod {
 }
 
 func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) interface{} {
-	pm := PredicateMetadataFactory{algorithm.FakePodLister{p}}
+	pm := PredicateMetadataFactory{schedulertesting.FakePodLister{p}}
 	return pm.GetMetadata(p, nodeInfo)
 }
 
@@ -1500,7 +1501,7 @@ func TestServiceAffinity(t *testing.T) {
 			nodeInfo.SetNode(test.node)
 			nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
 			// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
-			predicate, precompute := NewServiceAffinityPredicate(algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
+			predicate, precompute := NewServiceAffinityPredicate(schedulertesting.FakePodLister(test.pods), schedulertesting.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
 			// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
 			RegisterPredicatePrecomputation("checkServiceAffinity-unitTestPredicate", func(pm *predicateMetadata) {
 				if !skipPrecompute {
@@ -2572,7 +2573,7 @@ func TestInterPodAffinity(t *testing.T) {
 
 		fit := PodAffinityChecker{
 			info:      FakeNodeInfo(*node),
-			podLister: algorithm.FakePodLister(test.pods),
+			podLister: schedulertesting.FakePodLister(test.pods),
 		}
 		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 		nodeInfo.SetNode(test.node)
@@ -2901,7 +2902,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 
 			testFit := PodAffinityChecker{
 				info:      nodeListInfo,
-				podLister: algorithm.FakePodLister(test.pods),
+				podLister: schedulertesting.FakePodLister(test.pods),
 			}
 			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(&node)
@@ -4427,7 +4428,7 @@ func TestInterPodAffinityAnnotations(t *testing.T) {
 
 		fit := PodAffinityChecker{
 			info:      FakeNodeInfo(*node),
-			podLister: algorithm.FakePodLister(test.pods),
+			podLister: schedulertesting.FakePodLister(test.pods),
 		}
 		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 		nodeInfo.SetNode(test.node)
@@ -4673,7 +4674,7 @@ func TestInterPodAffinityAnnotationsWithMultipleNodes(t *testing.T) {
 
 			testFit := PodAffinityChecker{
 				info:      nodeListInfo,
-				podLister: algorithm.FakePodLister(test.pods),
+				podLister: schedulertesting.FakePodLister(test.pods),
 			}
 			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(&node)
