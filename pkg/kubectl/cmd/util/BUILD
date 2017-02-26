@@ -38,6 +38,8 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",

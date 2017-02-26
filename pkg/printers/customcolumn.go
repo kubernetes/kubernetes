@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package printers
 
 import (
 	"bufio"
@@ -41,14 +41,14 @@ const (
 
 var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
 
-// MassageJSONPath attempts to be flexible with JSONPath expressions, it accepts:
+// RelaxedJSONPathExpression attempts to be flexible with JSONPath expressions, it accepts:
 //   * metadata.name (no leading '.' or curly brances '{...}'
 //   * {metadata.name} (no leading '.')
 //   * .metadata.name (no curly braces '{...}')
 //   * {.metadata.name} (complete expression)
-// And transforms them all into a valid jsonpat expression:
+// And transforms them all into a valid jsonpath expression:
 //   {.metadata.name}
-func massageJSONPath(pathExpression string) (string, error) {
+func RelaxedJSONPathExpression(pathExpression string) (string, error) {
 	if len(pathExpression) == 0 {
 		return pathExpression, nil
 	}
@@ -84,7 +84,7 @@ func NewCustomColumnsPrinterFromSpec(spec string, decoder runtime.Decoder, noHea
 		if len(colSpec) != 2 {
 			return nil, fmt.Errorf("unexpected custom-columns spec: %s, expected <header>:<json-path-expr>", parts[ix])
 		}
-		spec, err := massageJSONPath(colSpec[1])
+		spec, err := RelaxedJSONPathExpression(colSpec[1])
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +126,7 @@ func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader, decoder runti
 
 	columns := make([]Column, len(headers))
 	for ix := range headers {
-		spec, err := massageJSONPath(specs[ix])
+		spec, err := RelaxedJSONPathExpression(specs[ix])
 		if err != nil {
 			return nil, err
 		}

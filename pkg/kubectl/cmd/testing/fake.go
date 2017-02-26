@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 type InternalType struct {
@@ -214,13 +215,15 @@ type TestFactory struct {
 	Typer              runtime.ObjectTyper
 	Client             kubectl.RESTClient
 	UnstructuredClient kubectl.RESTClient
-	Describer          kubectl.Describer
-	Printer            kubectl.ResourcePrinter
+	Describer          printers.Describer
+	Printer            printers.ResourcePrinter
+	CommandPrinter     printers.ResourcePrinter
 	Validator          validation.Schema
 	Namespace          string
 	ClientConfig       *restclient.Config
 	Err                error
 	Command            string
+	GenericPrinter     bool
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -331,11 +334,15 @@ func (f *FakeFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
-func (f *FakeFactory) Describer(*meta.RESTMapping) (kubectl.Describer, error) {
+func (f *FakeFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
 }
 
-func (f *FakeFactory) Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
+func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
+	return f.tf.CommandPrinter, f.tf.GenericPrinter, f.tf.Err
+}
+
+func (f *FakeFactory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -451,7 +458,7 @@ func (f *FakeFactory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, ob
 	return nil
 }
 
-func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
+func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -459,8 +466,8 @@ func (f *FakeFactory) NewBuilder() *resource.Builder {
 	return nil
 }
 
-func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions {
-	return &kubectl.PrintOptions{}
+func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
+	return &printers.PrintOptions{}
 }
 
 func (f *FakeFactory) DefaultResourceFilterFunc() kubectl.Filters {
@@ -587,11 +594,15 @@ func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (reso
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
-func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (kubectl.Describer, error) {
+func (f *fakeAPIFactory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
+	return f.tf.CommandPrinter, f.tf.GenericPrinter, f.tf.Err
+}
+
+func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
 }
 
-func (f *fakeAPIFactory) Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
+func (f *fakeAPIFactory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -664,7 +675,7 @@ func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper,
 	return printer.PrintObj(obj, out)
 }
 
-func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
+func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
