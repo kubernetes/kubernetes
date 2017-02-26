@@ -18,6 +18,7 @@ package daemon
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -248,7 +249,6 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		clientset,
-		0,
 	)
 	manager.eventRecorder = record.NewFakeRecorder(100)
 
@@ -542,16 +542,17 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 	manager, podControl, _ := newTestController()
 	node := newNode("port-conflict", nil)
 	manager.nodeStore.Add(node)
-	manager.podStore.Add(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:    simpleDaemonSetLabel,
-			Namespace: metav1.NamespaceDefault,
-		},
-		Spec: podSpec,
-	})
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec = podSpec
 	manager.dsStore.Add(ds)
+	manager.podStore.Add(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:          simpleDaemonSetLabel,
+			Namespace:       metav1.NamespaceDefault,
+			OwnerReferences: []metav1.OwnerReference{*newControllerRef(ds)},
+		},
+		Spec: podSpec,
+	})
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
@@ -1243,4 +1244,207 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 	for podName := range gotPods {
 		t.Errorf("unexpected pod %v was returned", podName)
 	}
+}
+
+func TestAddPod(t *testing.T) {
+	manager, _, _ := newTestController()
+	ds1 := newDaemonSet("foo1")
+	ds2 := newDaemonSet("foo2")
+	manager.dsStore.Add(ds1)
+	manager.dsStore.Add(ds2)
+
+	pod1 := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
+	manager.addPod(pod1)
+	if got, want := manager.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done := manager.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
+	}
+	expectedKey, _ := controller.KeyFunc(ds1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+
+	pod2 := newPod("pod2-", "node-0", simpleDaemonSetLabel, ds2)
+	manager.addPod(pod2)
+	if got, want := manager.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done = manager.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
+	}
+	expectedKey, _ = controller.KeyFunc(ds2)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+}
+
+func TestAddPodOrphan(t *testing.T) {
+	manager, _, _ := newTestController()
+	ds1 := newDaemonSet("foo1")
+	ds2 := newDaemonSet("foo2")
+	ds3 := newDaemonSet("foo3")
+	ds3.Spec.Selector.MatchLabels = simpleDaemonSetLabel2
+	manager.dsStore.Add(ds1)
+	manager.dsStore.Add(ds2)
+	manager.dsStore.Add(ds3)
+
+	// Make pod an orphan. Expect matching sets to be queued.
+	pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, nil)
+	manager.addPod(pod)
+	if got, want := manager.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdatePod(t *testing.T) {
+	manager, _, _ := newTestController()
+	ds1 := newDaemonSet("foo1")
+	ds2 := newDaemonSet("foo2")
+	manager.dsStore.Add(ds1)
+	manager.dsStore.Add(ds2)
+
+	pod1 := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
+	prev := *pod1
+	bumpResourceVersion(pod1)
+	manager.updatePod(&prev, pod1)
+	if got, want := manager.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done := manager.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
+	}
+	expectedKey, _ := controller.KeyFunc(ds1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+
+	pod2 := newPod("pod2-", "node-0", simpleDaemonSetLabel, ds2)
+	prev = *pod2
+	bumpResourceVersion(pod2)
+	manager.updatePod(&prev, pod2)
+	if got, want := manager.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done = manager.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
+	}
+	expectedKey, _ = controller.KeyFunc(ds2)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
+	manager, _, _ := newTestController()
+	ds1 := newDaemonSet("foo1")
+	ds2 := newDaemonSet("foo2")
+	manager.dsStore.Add(ds1)
+	manager.dsStore.Add(ds2)
+
+	pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, nil)
+	prev := *pod
+	prev.Labels = map[string]string{"foo2": "bar2"}
+	bumpResourceVersion(pod)
+	manager.updatePod(&prev, pod)
+	if got, want := manager.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdatePodChangeControllerRef(t *testing.T) {
+	manager, _, _ := newTestController()
+	ds1 := newDaemonSet("foo1")
+	ds2 := newDaemonSet("foo2")
+	manager.dsStore.Add(ds1)
+	manager.dsStore.Add(ds2)
+
+	pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
+	prev := *pod
+	prev.OwnerReferences = []metav1.OwnerReference{*newControllerRef(ds2)}
+	bumpResourceVersion(pod)
+	manager.updatePod(&prev, pod)
+	if got, want := manager.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdatePodRelease(t *testing.T) {
+	manager, _, _ := newTestController()
+	ds1 := newDaemonSet("foo1")
+	ds2 := newDaemonSet("foo2")
+	manager.dsStore.Add(ds1)
+	manager.dsStore.Add(ds2)
+
+	pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
+	prev := *pod
+	pod.OwnerReferences = nil
+	bumpResourceVersion(pod)
+	manager.updatePod(&prev, pod)
+	if got, want := manager.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestDeletePod(t *testing.T) {
+	manager, _, _ := newTestController()
+	ds1 := newDaemonSet("foo1")
+	ds2 := newDaemonSet("foo2")
+	manager.dsStore.Add(ds1)
+	manager.dsStore.Add(ds2)
+
+	pod1 := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
+	manager.deletePod(pod1)
+	if got, want := manager.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done := manager.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
+	}
+	expectedKey, _ := controller.KeyFunc(ds1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+
+	pod2 := newPod("pod2-", "node-0", simpleDaemonSetLabel, ds2)
+	manager.deletePod(pod2)
+	if got, want := manager.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done = manager.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
+	}
+	expectedKey, _ = controller.KeyFunc(ds2)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+}
+
+func TestDeletePodOrphan(t *testing.T) {
+	manager, _, _ := newTestController()
+	ds1 := newDaemonSet("foo1")
+	ds2 := newDaemonSet("foo2")
+	ds3 := newDaemonSet("foo3")
+	ds3.Spec.Selector.MatchLabels = simpleDaemonSetLabel2
+	manager.dsStore.Add(ds1)
+	manager.dsStore.Add(ds2)
+	manager.dsStore.Add(ds3)
+
+	pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, nil)
+	manager.deletePod(pod)
+	if got, want := manager.queue.Len(), 0; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func bumpResourceVersion(obj metav1.Object) {
+	ver, _ := strconv.ParseInt(obj.GetResourceVersion(), 10, 32)
+	obj.SetResourceVersion(strconv.FormatInt(ver+1, 10))
 }
