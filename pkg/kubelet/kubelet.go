@@ -342,11 +342,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		LowThresholdPercent:  int(kubeCfg.ImageGCLowThresholdPercent),
 	}
 
-	diskSpacePolicy := DiskSpacePolicy{
-		DockerFreeDiskMB: int(kubeCfg.LowDiskSpaceThresholdMB),
-		RootFreeDiskMB:   int(kubeCfg.LowDiskSpaceThresholdMB),
-	}
-
 	thresholds, err := eviction.ParseThresholdConfig(kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
 	if err != nil {
 		return nil, err
@@ -399,11 +394,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		UID:       types.UID(nodeName),
 		Namespace: "",
 	}
-
-	diskSpaceManager, err := newDiskSpaceManager(kubeDeps.CAdvisorInterface, diskSpacePolicy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
-	}
 	containerRefManager := kubecontainer.NewRefManager()
 
 	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)
@@ -440,30 +430,28 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		streamingConnectionIdleTimeout: kubeCfg.StreamingConnectionIdleTimeout.Duration,
 		recorder:                       kubeDeps.Recorder,
 		cadvisor:                       kubeDeps.CAdvisorInterface,
-		diskSpaceManager:               diskSpaceManager,
 		cloud:                          kubeDeps.Cloud,
 		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
 		nodeRef:                   nodeRef,
 		nodeLabels:                kubeCfg.NodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
-		os:                kubeDeps.OSInterface,
-		oomWatcher:        oomWatcher,
-		cgroupsPerQOS:     kubeCfg.CgroupsPerQOS,
-		cgroupRoot:        kubeCfg.CgroupRoot,
-		mounter:           kubeDeps.Mounter,
-		writer:            kubeDeps.Writer,
-		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
-		maxPods:           int(kubeCfg.MaxPods),
-		podsPerCore:       int(kubeCfg.PodsPerCore),
-		nvidiaGPUs:        int(kubeCfg.NvidiaGPUs),
-		syncLoopMonitor:   atomic.Value{},
-		resolverConfig:    kubeCfg.ResolverConfig,
-		cpuCFSQuota:       kubeCfg.CPUCFSQuota,
-		daemonEndpoints:   daemonEndpoints,
-		containerManager:  kubeDeps.ContainerManager,
-		nodeIP:            net.ParseIP(kubeCfg.NodeIP),
-		clock:             clock.RealClock{},
-		outOfDiskTransitionFrequency:            kubeCfg.OutOfDiskTransitionFrequency.Duration,
+		os:                                      kubeDeps.OSInterface,
+		oomWatcher:                              oomWatcher,
+		cgroupsPerQOS:                           kubeCfg.CgroupsPerQOS,
+		cgroupRoot:                              kubeCfg.CgroupRoot,
+		mounter:                                 kubeDeps.Mounter,
+		writer:                                  kubeDeps.Writer,
+		nonMasqueradeCIDR:                       kubeCfg.NonMasqueradeCIDR,
+		maxPods:                                 int(kubeCfg.MaxPods),
+		podsPerCore:                             int(kubeCfg.PodsPerCore),
+		nvidiaGPUs:                              int(kubeCfg.NvidiaGPUs),
+		syncLoopMonitor:                         atomic.Value{},
+		resolverConfig:                          kubeCfg.ResolverConfig,
+		cpuCFSQuota:                             kubeCfg.CPUCFSQuota,
+		daemonEndpoints:                         daemonEndpoints,
+		containerManager:                        kubeDeps.ContainerManager,
+		nodeIP:                                  net.ParseIP(kubeCfg.NodeIP),
+		clock:                                   clock.RealClock{},
 		reservation:                             *reservation,
 		enableCustomMetrics:                     kubeCfg.EnableCustomMetrics,
 		babysitDaemons:                          kubeCfg.BabysitDaemons,
@@ -905,9 +893,6 @@ type Kubelet struct {
 	// Manager for image garbage collection.
 	imageManager images.ImageGCManager
 
-	// Diskspace manager.
-	diskSpaceManager diskSpaceManager
-
 	// Secret manager.
 	secretManager secret.Manager
 
@@ -1025,12 +1010,6 @@ type Kubelet struct {
 	// clock is an interface that provides time related functionality in a way that makes it
 	// easy to test the code.
 	clock clock.Clock
-
-	// outOfDiskTransitionFrequency specifies the amount of time the kubelet has to be actually
-	// not out of disk before it can transition the node condition status from out-of-disk to
-	// not-out-of-disk. This prevents a pod that causes out-of-disk condition from repeatedly
-	// getting rescheduled onto the node.
-	outOfDiskTransitionFrequency time.Duration
 
 	// reservation specifies resources which are reserved for non-pod usage, including kubernetes and
 	// non-kubernetes system processes.
@@ -1622,27 +1601,6 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 	return nil
 }
 
-// isOutOfDisk detects if pods can't fit due to lack of disk space.
-func (kl *Kubelet) isOutOfDisk() bool {
-	// Check disk space once globally and reject or accept all new pods.
-	withinBounds, err := kl.diskSpaceManager.IsRuntimeDiskSpaceAvailable()
-	// Assume enough space in case of errors.
-	if err != nil {
-		glog.Errorf("Failed to check if disk space is available for the runtime: %v", err)
-	} else if !withinBounds {
-		return true
-	}
-
-	withinBounds, err = kl.diskSpaceManager.IsRootDiskSpaceAvailable()
-	// Assume enough space in case of errors.
-	if err != nil {
-		glog.Errorf("Failed to check if disk space is available on the root partition: %v", err)
-	} else if !withinBounds {
-		return true
-	}
-	return false
-}
-
 // rejectPod records an event about the pod with the given reason and message,
 // and updates the pod to the failed phase in the status manage.
 func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
@@ -1661,7 +1619,6 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
-	// TODO: move out of disk check into a pod admitter
 	// TODO: out of resource eviction should have a pod admitter call-out
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: pods}
 	for _, podAdmitHandler := range kl.admitHandlers {
@@ -1669,13 +1626,6 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 			return false, result.Reason, result.Message
 		}
 	}
-	// TODO: When disk space scheduling is implemented (#11976), remove the out-of-disk check here and
-	// add the disk space predicate to predicates.GeneralPredicates.
-	if kl.isOutOfDisk() {
-		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), "predicate fails due to OutOfDisk")
-		return false, "OutOfDisk", "cannot be started due to lack of disk space."
-	}
-
 	return true, "", ""
 }
 

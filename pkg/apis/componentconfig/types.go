@@ -259,10 +259,6 @@ type KubeletConfiguration struct {
 	// image garbage collection is never run. Lowest disk usage to garbage
 	// collect to.
 	ImageGCLowThresholdPercent int32
-	// lowDiskSpaceThresholdMB is the absolute free disk space, in MB, to
-	// maintain. When disk space falls below this threshold, new pods would
-	// be rejected.
-	LowDiskSpaceThresholdMB int32
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod metav1.Duration
 	// networkPluginName is the name of the network plugin to be invoked for
@@ -401,10 +397,6 @@ type KubeletConfiguration struct {
 	// run docker daemon with version  < 1.9 or an Aufs storage backend.
 	// Issue #10959 has more details.
 	SerializeImagePulls bool
-	// outOfDiskTransitionFrequency is duration for which the kubelet has to
-	// wait before transitioning out of out-of-disk node condition status.
-	// +optional
-	OutOfDiskTransitionFrequency metav1.Duration
 	// nodeIP is IP address of the node. If set, kubelet will use this IP
 	// address for the node.
 	// +optional

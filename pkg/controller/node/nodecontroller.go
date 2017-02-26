@@ -967,7 +967,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 		}
 
 		// remaining node conditions should also be set to Unknown
-		remainingNodeConditionTypes := []v1.NodeConditionType{v1.NodeOutOfDisk, v1.NodeMemoryPressure, v1.NodeDiskPressure}
+		remainingNodeConditionTypes := []v1.NodeConditionType{v1.NodeMemoryPressure, v1.NodeDiskPressure}
 		nowTimestamp := nc.now()
 		for _, nodeConditionType := range remainingNodeConditionTypes {
 			_, currentCondition := v1.GetNodeCondition(&node.Status, nodeConditionType)

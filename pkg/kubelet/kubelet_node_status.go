@@ -50,6 +50,9 @@ const (
 	// maxNamesPerImageInNodeStatus is max number of names per image stored in
 	// the node status.
 	maxNamesPerImageInNodeStatus = 5
+
+	// mb is used to easily convert an int to an mb
+	mb = 1024 * 1024
 )
 
 // registerWithApiServer registers the node with the cluster master. It is safe
@@ -793,70 +796,6 @@ func (kl *Kubelet) setNodeDiskPressureCondition(node *v1.Node) {
 	}
 }
 
-// Set OODCondition for the node.
-func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
-	currentTime := metav1.NewTime(kl.clock.Now())
-	var nodeOODCondition *v1.NodeCondition
-
-	// Check if NodeOutOfDisk condition already exists and if it does, just pick it up for update.
-	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == v1.NodeOutOfDisk {
-			nodeOODCondition = &node.Status.Conditions[i]
-		}
-	}
-
-	newOODCondition := false
-	// If the NodeOutOfDisk condition doesn't exist, create one.
-	if nodeOODCondition == nil {
-		nodeOODCondition = &v1.NodeCondition{
-			Type:   v1.NodeOutOfDisk,
-			Status: v1.ConditionUnknown,
-		}
-		// nodeOODCondition cannot be appended to node.Status.Conditions here because it gets
-		// copied to the slice. So if we append nodeOODCondition to the slice here none of the
-		// updates we make to nodeOODCondition below are reflected in the slice.
-		newOODCondition = true
-	}
-
-	// Update the heartbeat time irrespective of all the conditions.
-	nodeOODCondition.LastHeartbeatTime = currentTime
-
-	// Note: The conditions below take care of the case when a new NodeOutOfDisk condition is
-	// created and as well as the case when the condition already exists. When a new condition
-	// is created its status is set to v1.ConditionUnknown which matches either
-	// nodeOODCondition.Status != v1.ConditionTrue or
-	// nodeOODCondition.Status != v1.ConditionFalse in the conditions below depending on whether
-	// the kubelet is out of disk or not.
-	if kl.isOutOfDisk() {
-		if nodeOODCondition.Status != v1.ConditionTrue {
-			nodeOODCondition.Status = v1.ConditionTrue
-			nodeOODCondition.Reason = "KubeletOutOfDisk"
-			nodeOODCondition.Message = "out of disk space"
-			nodeOODCondition.LastTransitionTime = currentTime
-			kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeOutOfDisk")
-		}
-	} else {
-		if nodeOODCondition.Status != v1.ConditionFalse {
-			// Update the out of disk condition when the condition status is unknown even if we
-			// are within the outOfDiskTransitionFrequency duration. We do this to set the
-			// condition status correctly at kubelet startup.
-			if nodeOODCondition.Status == v1.ConditionUnknown || kl.clock.Since(nodeOODCondition.LastTransitionTime.Time) >= kl.outOfDiskTransitionFrequency {
-				nodeOODCondition.Status = v1.ConditionFalse
-				nodeOODCondition.Reason = "KubeletHasSufficientDisk"
-				nodeOODCondition.Message = "kubelet has sufficient disk space available"
-				nodeOODCondition.LastTransitionTime = currentTime
-				kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasSufficientDisk")
-			} else {
-				glog.Infof("Node condition status for OutOfDisk is false, but last transition time is less than %s", kl.outOfDiskTransitionFrequency)
-			}
-		}
-	}
-
-	if newOODCondition {
-		node.Status.Conditions = append(node.Status.Conditions, *nodeOODCondition)
-	}
-}
-
 // Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
 // TODO: why is this a package var?
 var oldNodeUnschedulable bool
@@ -907,7 +846,6 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	return []func(*v1.Node) error{
 		kl.setNodeAddress,
 		withoutError(kl.setNodeStatusInfo),
-		withoutError(kl.setNodeOODCondition),
 		withoutError(kl.setNodeMemoryPressureCondition),
 		withoutError(kl.setNodeDiskPressureCondition),
 		withoutError(kl.setNodeReadyCondition),

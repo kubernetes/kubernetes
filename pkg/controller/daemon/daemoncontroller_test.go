@@ -257,17 +257,6 @@ func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
-// DaemonSets should not place onto OutOfDisk nodes
-func TestOutOfDiskNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	manager, podControl, _ := newTestController()
-	node := newNode("not-enough-disk", nil)
-	node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
-	manager.nodeStore.Add(node)
-	ds := newDaemonSet("foo")
-	manager.dsStore.Add(ds)
-	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
-}
-
 func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
 	return v1.PodSpec{
 		NodeName: nodeName,

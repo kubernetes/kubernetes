@@ -739,16 +739,6 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		return false, false, false, nil
 	}
 
-	// TODO: Move it to the predicates
-	for _, c := range node.Status.Conditions {
-		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
-			// the kubelet will evict this pod if it needs to. Let kubelet
-			// decide whether to continue running this pod so leave shouldContinueRunning
-			// set to true
-			shouldSchedule = false
-		}
-	}
-
 	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
 	newPod.Namespace = ds.Namespace
 	newPod.Spec.NodeName = node.Name

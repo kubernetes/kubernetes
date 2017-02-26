@@ -270,9 +270,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := int32(80)
 		obj.ImageGCLowThresholdPercent = &temp
 	}
-	if obj.LowDiskSpaceThresholdMB == 0 {
-		obj.LowDiskSpaceThresholdMB = 256
-	}
 	if obj.MasterServiceNamespace == "" {
 		obj.MasterServiceNamespace = metav1.NamespaceDefault
 	}
@@ -357,9 +354,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.KubeAPIBurst == 0 {
 		obj.KubeAPIBurst = 10
-	}
-	if obj.OutOfDiskTransitionFrequency == zeroDuration {
-		obj.OutOfDiskTransitionFrequency = metav1.Duration{Duration: 5 * time.Minute}
 	}
 	if string(obj.HairpinMode) == "" {
 		obj.HairpinMode = PromiscuousBridge

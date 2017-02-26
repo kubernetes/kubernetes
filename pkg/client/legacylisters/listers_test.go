@@ -61,7 +61,7 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 						Status: v1.ConditionTrue,
 					},
 					{
-						Type:   v1.NodeOutOfDisk,
+						Type:   v1.NodeDiskPressure,
 						Status: v1.ConditionFalse,
 					},
 				},
@@ -72,7 +72,7 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 			Status: v1.NodeStatus{
 				Conditions: []v1.NodeCondition{
 					{
-						Type:   v1.NodeOutOfDisk,
+						Type:   v1.NodeDiskPressure,
 						Status: v1.ConditionTrue,
 					},
 				},
@@ -87,7 +87,7 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 						Status: v1.ConditionFalse,
 					},
 					{
-						Type:   v1.NodeOutOfDisk,
+						Type:   v1.NodeDiskPressure,
 						Status: v1.ConditionUnknown,
 					},
 				},
@@ -100,7 +100,7 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 
 	predicate := func(node *v1.Node) bool {
 		for _, cond := range node.Status.Conditions {
-			if cond.Type == v1.NodeOutOfDisk && cond.Status == v1.ConditionTrue {
+			if cond.Type == v1.NodeDiskPressure && cond.Status == v1.ConditionTrue {
 				return false
 			}
 		}
