@@ -1467,6 +1467,24 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			}
 			checkOutput(output, requiredStrings)
 
+			noExecuteTaint := v1.Taint{
+				Key:    testTaint.Key,
+				Value:  "testing-taint-value-no-execute",
+				Effect: v1.TaintEffectNoExecute,
+			}
+			By("adding NoExecute taint " + noExecuteTaint.ToString() + " to the node")
+			runKubectlRetryOrDie("taint", "nodes", nodeName, noExecuteTaint.ToString())
+			defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, noExecuteTaint)
+
+			By("verifying the node has the taint " + noExecuteTaint.ToString())
+			output = runKubectlRetryOrDie("describe", "node", nodeName)
+			requiredStrings = [][]string{
+				{"Name:", nodeName},
+				{"Taints:"},
+				{noExecuteTaint.ToString()},
+			}
+			checkOutput(output, requiredStrings)
+
 			By("removing all taints that have the same key " + testTaint.Key + " of the node")
 			runKubectlRetryOrDie("taint", "nodes", nodeName, testTaint.Key+"-")
 			By("verifying the node doesn't have the taints that have the same key " + testTaint.Key)
