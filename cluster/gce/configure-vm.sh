@@ -736,7 +736,7 @@ function create-salt-master-kubelet-auth() {
   # Only configure the kubelet on the master if the required variables are
   # set in the environment.
   if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-    create-salt-kubelet-auth
+    create-salt-kubelet-auth ${KUBELET_APISERVER}
   fi
 }
 
@@ -762,7 +762,7 @@ users:
 clusters:
 - name: local
   cluster:
-    server: https://kubernetes-master
+    server: https://${1}:443
     certificate-authority: ${CA_CERT_BUNDLE_PATH}
 contexts:
 - context:
@@ -1152,7 +1152,7 @@ if [[ -z "${is_push}" ]]; then
     create-salt-master-etcd-auth
     create-salt-master-kubelet-auth
   else
-    create-salt-kubelet-auth
+    create-salt-kubelet-auth ${KUBERNETES_MASTER_NAME}
     create-salt-kubeproxy-auth
   fi
   download-release
