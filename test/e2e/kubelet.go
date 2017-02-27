@@ -134,9 +134,9 @@ func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRem
 // ip address.
 // Note: startVolumeServer() waits for the nfs-server pod to be Running and sleeps some
 //   so that the nfs server can start up.
-func createNfsServerPod(c clientset.Interface, config VolumeTestConfig) (*v1.Pod, string) {
+func createNfsServerPod(c clientset.Interface, config framework.VolumeTestConfig) (*v1.Pod, string) {
 
-	pod := startVolumeServer(c, config)
+	pod := framework.StartVolumeServer(c, config)
 	Expect(pod).NotTo(BeNil())
 	ip := pod.Status.PodIP
 	Expect(len(ip)).NotTo(BeZero())
@@ -387,7 +387,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			var (
 				nfsServerPod *v1.Pod
 				nfsIP        string
-				NFSconfig    VolumeTestConfig
+				NFSconfig    framework.VolumeTestConfig
 				pod          *v1.Pod // client pod
 			)
 
@@ -404,12 +404,12 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			}
 
 			BeforeEach(func() {
-				NFSconfig = VolumeTestConfig{
-					namespace:   ns,
-					prefix:      "nfs",
-					serverImage: NfsServerImage,
-					serverPorts: []int{2049},
-					serverArgs:  []string{"-G", "777", "/exports"},
+				NFSconfig = framework.VolumeTestConfig{
+					Namespace:   ns,
+					Prefix:      "nfs",
+					ServerImage: framework.NfsServerImage,
+					ServerPorts: []int{2049},
+					ServerArgs:  []string{"-G", "777", "/exports"},
 				}
 				nfsServerPod, nfsIP = createNfsServerPod(c, NFSconfig)
 			})
