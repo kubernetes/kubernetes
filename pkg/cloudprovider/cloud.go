@@ -125,6 +125,10 @@ type Instances interface {
 	// CurrentNodeName returns the name of the node we are currently running on
 	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
 	CurrentNodeName(hostname string) (types.NodeName, error)
+	// NodeLabels returns a list of labels associated with this machine.
+	// These are often called "Tags" in other clouds (GCE, Azure, AWS), but we use "Labels"
+	// for consistency with Kubernetes nomenclature
+	NodeLabels(name types.NodeName) (map[string]string, error)
 }
 
 // Route is a representation of an advanced routing rule.

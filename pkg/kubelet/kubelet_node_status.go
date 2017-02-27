@@ -273,6 +273,23 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			glog.Infof("Adding node label from cloud provider: %s=%s", metav1.LabelInstanceType, instanceType)
 			node.ObjectMeta.Labels[metav1.LabelInstanceType] = instanceType
 		}
+
+		labels, err :+ instances.NodeLabels(kl.nodeName)
+		if err != nil {
+			return nil, err
+		}
+		if labels != nil {
+			prefix = "cloud.alpha.kubernetes.io/"
+			for name, value := range labels {
+				key := prefix + name
+				if len(key) > 63 {
+					glog.Warningf("Key: %s is too long, skipping", key)
+					continue
+				}
+				node.ObjectMeta.Labels[key] = value
+			}
+		}
+
 		// If the cloud has zone information, label the node with the zone information
 		zones, ok := kl.cloud.Zones()
 		if ok {
