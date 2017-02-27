@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cmd.go",
+        "completion.go",
         "defaults.go",
         "init.go",
         "join.go",
@@ -41,6 +42,7 @@ go_library(
         "//pkg/bootstrap/api:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/printers:go_default_library",
+        "//pkg/util/i18n:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/blang/semver",
