@@ -99,6 +99,7 @@ func NewNodeControllerFromClient(
 		serviceCIDR,
 		nodeCIDRMaskSize,
 		allocateNodeCIDRs,
+		RangeAllocatorType,
 		false,
 		false,
 	)
@@ -547,9 +548,21 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler,
-			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold, testNodeMonitorGracePeriod,
-			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+		nodeController, _ := NewNodeControllerFromClient(
+			nil,
+			item.fakeNodeHandler,
+			evictionTimeout,
+			testRateLimiterQPS,
+			testRateLimiterQPS,
+			testLargeClusterThreshold,
+			testUnhealtyThreshold,
+			testNodeMonitorGracePeriod,
+			testNodeStartupGracePeriod,
+			testNodeMonitorPeriod,
+			nil,
+			nil,
+			0,
+			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
 		for _, ds := range item.daemonSets {
