@@ -53,7 +53,8 @@ func newMetricsCache(maxCacheEntries int) *metricsCache {
 }
 
 func (c *metricsCache) recordDeletePod(ds *v1beta1.DaemonSet, pod *v1.Pod, deleteTime time.Time) {
-	if ds.Namespace != pod.Namespace || len(pod.Spec.NodeName) == 0 {
+	if ds.Namespace != pod.Namespace || len(pod.Spec.NodeName) == 0 ||
+		ds.Spec.UpdateStrategy.Type != v1beta1.RollingUpdateDaemonSetStrategyType {
 		return
 	}
 	c.Add(daemonSetNode{namespace: ds.Namespace, daemonSetName: ds.Name, nodeName: pod.Spec.NodeName},
@@ -61,42 +62,48 @@ func (c *metricsCache) recordDeletePod(ds *v1beta1.DaemonSet, pod *v1.Pod, delet
 }
 
 func (c *metricsCache) recordRecreatePod(ds *v1beta1.DaemonSet, pod *v1.Pod, recreateTime time.Time) {
-	if ds.Namespace != pod.Namespace || len(pod.Spec.NodeName) == 0 {
+	if ds.Namespace != pod.Namespace || len(pod.Spec.NodeName) == 0 ||
+		ds.Spec.UpdateStrategy.Type != v1beta1.RollingUpdateDaemonSetStrategyType {
 		return
 	}
 	dsNode := daemonSetNode{namespace: ds.Namespace, daemonSetName: ds.Name, nodeName: pod.Spec.NodeName}
 	if obj, cached := c.Get(dsNode); cached {
 		m, ok := obj.(podMetrics)
-		if !ok || !validForRecreate(m, recreateTime) {
+		if !ok || !validForRecreate(m) {
 			return
 		}
+		podKillCreateLatency.Observe(subInMilliseconds(m.deleteTime, recreateTime))
+		// Update pod metrics
 		m.recreatePodName = pod.Name
 		m.recreateTime = recreateTime
 		c.Update(dsNode, m)
-		podKillCreateLatency.Observe(subInMilliseconds(m.deleteTime, recreateTime))
 	}
 }
 
-func validForRecreate(metrics podMetrics, recreateTime time.Time) bool {
+func validForRecreate(metrics podMetrics) bool {
 	return !metrics.deleteTime.IsZero() && len(metrics.deletedPodName) > 0
 }
 
-func (c *metricsCache) RecordRunningPod(ds *v1beta1.DaemonSet, pod *v1.Pod, runningTime time.Time) {
-	if ds.Namespace != pod.Namespace || len(pod.Spec.NodeName) == 0 {
+func (c *metricsCache) recordReadyPod(ds *v1beta1.DaemonSet, pod *v1.Pod, readyTime time.Time) {
+	if ds.Namespace != pod.Namespace || len(pod.Spec.NodeName) == 0 ||
+		ds.Spec.UpdateStrategy.Type != v1beta1.RollingUpdateDaemonSetStrategyType {
 		return
 	}
 	dsNode := daemonSetNode{namespace: ds.Namespace, daemonSetName: ds.Name, nodeName: pod.Spec.NodeName}
 	if obj, cached := c.Get(dsNode); cached {
 		m, ok := obj.(podMetrics)
-		if !ok || !validForRunning(m, runningTime) {
+		if !ok || !validForReady(m) {
 			return
 		}
-		podKillRunningLatency.Observe(subInMilliseconds(m.deleteTime, runningTime))
+		podKillReadyLatency.Observe(subInMilliseconds(m.deleteTime, readyTime))
+		// Clean up this pod metrics
+		m = podMetrics{}
+		c.Update(dsNode, m)
 	}
 }
 
-func validForRunning(metrics podMetrics, runningTime time.Time) bool {
-	return !metrics.recreateTime.IsZero() && len(metrics.recreatePodName) > 0 && validForRecreate(metrics, metrics.recreateTime)
+func validForReady(metrics podMetrics) bool {
+	return !metrics.recreateTime.IsZero() && len(metrics.recreatePodName) > 0 && validForRecreate(metrics)
 }
 
 // Add will add matching information to the cache.

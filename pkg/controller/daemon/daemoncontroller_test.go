@@ -128,11 +128,11 @@ func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]
 	}
 }
 
-func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
+func newPod(podGenerateName string, nodeName string, label map[string]string) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: podName,
+			GenerateName: podGenerateName,
 			Labels:       label,
 			Namespace:    metav1.NamespaceDefault,
 		},
@@ -149,7 +149,7 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 			DNSPolicy: v1.DNSDefault,
 		},
 	}
-	pod.Name = names.SimpleNameGenerator.GenerateName(podName)
+	pod.Name = names.SimpleNameGenerator.GenerateName(podGenerateName)
 	return pod
 }
 

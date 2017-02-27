@@ -340,6 +340,7 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	glog.V(4).Infof("Pod %s added.", pod.Name)
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
+		dsc.metricsCache.recordRecreatePod(ds, pod, time.Now())
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
@@ -366,9 +367,12 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 	if curDS := dsc.getPodDaemonSet(curPod); curDS != nil {
 		dsc.enqueueDaemonSet(curDS)
 
-		// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
-		if changedToReady && curDS.Spec.MinReadySeconds > 0 {
-			dsc.enqueueDaemonSetAfter(curDS, time.Duration(curDS.Spec.MinReadySeconds)*time.Second)
+		if changedToReady {
+			dsc.metricsCache.recordReadyPod(curDS, curPod, time.Now())
+			// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
+			if curDS.Spec.MinReadySeconds > 0 {
+				dsc.enqueueDaemonSetAfter(curDS, time.Duration(curDS.Spec.MinReadySeconds)*time.Second)
+			}
 		}
 	}
 	// If the labels have not changed, then the daemon set responsible for

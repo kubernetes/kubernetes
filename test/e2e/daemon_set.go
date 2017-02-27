@@ -288,6 +288,8 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
+
+		gatherMetrics(f)
 	})
 
 })
