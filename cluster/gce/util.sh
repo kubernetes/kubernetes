@@ -475,20 +475,36 @@ function create-node-template() {
     fi
   fi
 
-  local attempt=1
+  local gcloud="gcloud"
+
   local preemptible_minions=""
   if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
     preemptible_minions="--preemptible --maintenance-policy TERMINATE"
   fi
+
   local local_ssds=""
   if [ ! -z ${NODE_LOCAL_SSDS+x} ]; then
       for i in $(seq ${NODE_LOCAL_SSDS}); do
           local_ssds="$local_ssds--local-ssd=interface=SCSI "
       done
   fi
+
+  local network="--network ${NETWORK} --can-ip-forward"
+  if [[ ${ENABLE_IP_ALIASES} = "true" ]]; then
+    gcloud="gcloud alpha"
+    local network="--network-interface network=${NETWORK}"
+    # if address is omitted, instance will not receive an external IP.
+    network="${network},address="
+    network="${network},subnet=${IP_ALIAS_SUBNETWORK}"
+    network="${network},aliases=pods-default:${IP_ALIAS_SIZE}"
+    network="${network} --no-can-ip-forward"
+  fi
+
+  local attempt=1
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
-    if ! gcloud compute instance-templates create "$template_name" \
+    if ! ${gcloud} compute instance-templates create \
+      "$template_name" \
       --project "${PROJECT}" \
       --machine-type "${NODE_SIZE}" \
       --boot-disk-type "${NODE_DISK_TYPE}" \
@@ -496,11 +512,11 @@ function create-node-template() {
       --image-project="${NODE_IMAGE_PROJECT}" \
       --image "${NODE_IMAGE}" \
       --tags "${NODE_TAG}" \
-      --network "${NETWORK}" \
       ${local_ssds} \
+      --region "${REGION}" \
+      ${network} \
       ${preemptible_minions} \
       $2 \
-      --can-ip-forward \
       --metadata-from-file $(echo ${@:3} | tr ' ' ',') >&2; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template $template_name ${color_norm}" >&2
@@ -597,6 +613,7 @@ function kube-up() {
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     detect-master
     parse-master-env
+    create-subnetwork
     create-nodes
   elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
     if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "debian" ]]; then
@@ -612,6 +629,7 @@ function kube-up() {
   else
     check-existing
     create-network
+    create-subnetwork
     write-cluster-name
     create-autoscaler-config
     create-master
@@ -680,6 +698,43 @@ function create-network() {
   fi
 }
 
+function create-subnetwork() {
+  case ${ENABLE_IP_ALIASES} in
+    true) ;;
+    false) return;;
+    *) echo "${color_red}Invalid argument to ENABLE_IP_ALIASES${color_norm}"
+       exit 1;;
+  esac
+
+  # Look for the subnet, it must exist and have a secondary range
+  # configured.
+  local subnet=$(gcloud alpha compute networks subnets describe \
+    --region ${REGION} ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
+  if [[ -z ${subnet} ]]; then
+    # Only allow auto-creation for default subnets
+    if [[ ${IP_ALIAS_SUBNETWORK} != ${INSTANCE_PREFIX}-subnet-default ]]; then
+      echo "${color_red}Subnetwork ${NETWORK}:${IP_ALIAS_SUBNETWORK} does not exist${color_norm}"
+      exit 1
+    fi
+
+    echo "Creating subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
+    gcloud alpha compute networks subnets create \
+      ${IP_ALIAS_SUBNETWORK} \
+      --description "Automatically generated subnet for ${INSTANCE_PREFIX} cluster. This will be removed on cluster teardown." \
+      --network ${NETWORK} \
+      --region ${REGION} \
+      --range ${NODE_IP_RANGE} \
+      --secondary-range "name=pods-default,range=${CLUSTER_IP_RANGE}"
+
+    echo "Created subnetwork ${IP_ALIAS_SUBNETWORK}"
+  else
+    if ! echo ${subnet} | grep --quiet secondaryIpRanges ${subnet}; then
+      echo "${color_red}Subnet ${IP_ALIAS_SUBNETWORK} does not have a secondary range${color_norm}"
+      exit 1
+    fi
+  fi
+}
+
 function delete-firewall-rules() {
   for fw in $@; do
     if [[ -n $(gcloud compute firewall-rules --project "${PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
@@ -698,6 +753,28 @@ function delete-network() {
       gcloud compute firewall-rules --project "${PROJECT}" list --filter="network=${NETWORK}"
       return 1
     fi
+  fi
+}
+
+function delete-subnetwork() {
+  if [[ -z "${ENABLE_IP_ALIASES+x}" ]]; then
+    return
+  fi
+
+  if [[ ${ENABLE_IP_ALIASES} != "true" ]]; then
+    return
+  fi
+
+  # Only delete automatically created subnets.
+  if [[ ${IP_ALIAS_SUBNETWORK} != ${INSTANCE_PREFIX}-subnet-default ]]; then
+    return
+  fi
+
+  echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
+  if [[ -n $(gcloud alpha compute networks subnets describe \
+        --region ${REGION} ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
+    gcloud alpha compute networks subnets delete \
+      --region ${REGION} ${IP_ALIAS_SUBNETWORK}
   fi
 }
 
@@ -1414,6 +1491,9 @@ function kube-down() {
       "${CLUSTER_NAME}-default-internal-node" \
       "${NETWORK}-default-ssh" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
+
+    delete-subnetwork
+
     if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
       delete-network || true  # might fail if there are leaked firewall rules
     fi
