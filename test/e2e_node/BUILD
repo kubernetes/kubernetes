@@ -14,6 +14,7 @@ go_library(
         "benchmark_util.go",
         "container.go",
         "doc.go",
+        "gpus.go",
         "image_list.go",
         "resource_collector.go",
         "simple_mount.go",
@@ -37,12 +38,14 @@ go_library(
         "//vendor:github.com/onsi/gomega",
         "//vendor:github.com/opencontainers/runc/libcontainer/cgroups",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/pkg/api",
     ],
 )
 
