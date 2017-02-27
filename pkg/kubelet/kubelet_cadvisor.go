@@ -78,15 +78,15 @@ func (kl *Kubelet) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
 	if subcontainers {
 		return kl.cadvisor.SubcontainerInfo(containerName, req)
-	} else {
-		containerInfo, err := kl.cadvisor.ContainerInfo(containerName, req)
-		if err != nil {
-			return nil, err
-		}
-		return map[string]*cadvisorapi.ContainerInfo{
-			containerInfo.Name: containerInfo,
-		}, nil
 	}
+	containerInfo, err := kl.cadvisor.ContainerInfo(containerName, req)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]*cadvisorapi.ContainerInfo{
+		containerInfo.Name: containerInfo,
+	}, nil
+
 }
 
 // GetCachedMachineInfo assumes that the machine info can't change without a reboot
