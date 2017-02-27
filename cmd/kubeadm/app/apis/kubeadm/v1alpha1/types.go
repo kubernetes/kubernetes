@@ -37,9 +37,11 @@ type MasterConfiguration struct {
 }
 
 type API struct {
-	AdvertiseAddresses []string `json:"advertiseAddresses"`
-	ExternalDNSNames   []string `json:"externalDNSNames"`
-	Port               int32    `json:"port"`
+	// The address for the API server to listen on. This will be where the API server serves a TLS secured endpoint.
+	// The default of 0.0.0.0 says "listen on the default interface's address"
+	BindAddress      string   `json:"bindAddress"`
+	ExternalDNSNames []string `json:"externalDNSNames"`
+	BindPort         int32    `json:"bindPort"`
 }
 
 type Discovery struct {

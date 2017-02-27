@@ -47,9 +47,9 @@ type MasterConfiguration struct {
 }
 
 type API struct {
-	AdvertiseAddresses []string
-	ExternalDNSNames   []string
-	Port               int32
+	BindAddress      string
+	ExternalDNSNames []string
+	BindPort         int32
 }
 
 type Discovery struct {

@@ -24,6 +24,7 @@ const (
 	DefaultKubernetesVersion = "latest"
 	// This is only for clusters without internet, were the latest stable version can't be determined
 	DefaultKubernetesFallbackVersion = "v1.6.0-alpha.1"
+	DefaultAPIBindAddress            = "0.0.0.0"
 	DefaultAPIBindPort               = 6443
 	DefaultDiscoveryBindPort         = 9898
 	DefaultAuthorizationMode         = "RBAC"
@@ -43,8 +44,12 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.KubernetesVersion = DefaultKubernetesVersion
 	}
 
-	if obj.API.Port == 0 {
-		obj.API.Port = DefaultAPIBindPort
+	if obj.API.BindPort == 0 {
+		obj.API.BindPort = DefaultAPIBindPort
+	}
+
+	if obj.API.BindAddress == "" {
+		obj.API.BindAddress = DefaultAPIBindAddress
 	}
 
 	if obj.Networking.ServiceSubnet == "" {
