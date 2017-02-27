@@ -85,8 +85,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=Batch, Version=V2alpha1
 	case batch_v2alpha1.SchemeGroupVersion.WithResource("cronjobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V2alpha1().CronJobs().Informer()}, nil
-	case batch_v2alpha1.SchemeGroupVersion.WithResource("jobs"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V2alpha1().Jobs().Informer()}, nil
 
 		// Group=Certificates, Version=V1beta1
 	case certificates_v1beta1.SchemeGroupVersion.WithResource("certificatesigningrequests"):

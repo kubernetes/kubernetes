@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "fake_batch_client.go",
         "fake_cronjob.go",
-        "fake_job.go",
     ],
     tags = ["automanaged"],
     deps = [
