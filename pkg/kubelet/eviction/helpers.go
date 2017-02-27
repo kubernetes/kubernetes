@@ -845,7 +845,7 @@ func hasThreshold(inputs []evictionapi.Threshold, item evictionapi.Threshold) bo
 	return false
 }
 
-// compareevictionapi.ThresholdValue returns true if the two thresholdValue objects are logically the same
+// compareThresholdValue returns true if the two thresholdValue objects are logically the same
 func compareThresholdValue(a evictionapi.ThresholdValue, b evictionapi.ThresholdValue) bool {
 	if a.Quantity != nil {
 		if b.Quantity == nil {
