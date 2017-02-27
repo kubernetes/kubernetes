@@ -28,8 +28,6 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // fakeRktInterface mocks the rktapi.PublicAPIClient interface for testing purpose.
@@ -149,40 +147,6 @@ func (f *fakeSystemd) ResetFailedUnit(name string) error {
 	f.called = append(f.called, "ResetFailedUnit")
 	f.resetFailedUnits = append(f.resetFailedUnits, name)
 	return f.err
-}
-
-// fakeRuntimeHelper implementes kubecontainer.RuntimeHelper interfaces for testing purpose.
-// TODO(random-liu): Move this into pkg/kubelet/container/testing
-type fakeRuntimeHelper struct {
-	dnsServers  []string
-	dnsSearches []string
-	hostName    string
-	hostDomain  string
-	err         error
-}
-
-func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
-	return nil, fmt.Errorf("Not implemented")
-}
-
-func (f *fakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
-	return "", ""
-}
-
-func (f *fakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
-	return f.dnsServers, f.dnsSearches, f.err
-}
-
-func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
-	return f.hostName, f.hostDomain, nil
-}
-
-func (f *fakeRuntimeHelper) GetPodDir(podUID types.UID) string {
-	return "/poddir/" + string(podUID)
-}
-
-func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
-	return nil
 }
 
 type fakeRktCli struct {
