@@ -5166,6 +5166,7 @@ go_library(
         "//vendor:github.com/onsi/ginkgo/ginkgo/testrunner",
         "//vendor:github.com/onsi/ginkgo/ginkgo/testsuite",
         "//vendor:github.com/onsi/ginkgo/ginkgo/watch",
+        "//vendor:github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable",
         "//vendor:github.com/onsi/ginkgo/types",
     ],
 )
@@ -5391,7 +5392,10 @@ go_library(
         "github.com/onsi/ginkgo/reporters/stenographer/stenographer.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/onsi/ginkgo/types"],
+    deps = [
+        "//vendor:github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable",
+        "//vendor:github.com/onsi/ginkgo/types",
+    ],
 )
 
 go_library(
@@ -6483,6 +6487,7 @@ go_library(
     name = "github.com/spf13/pflag",
     srcs = [
         "github.com/spf13/pflag/bool.go",
+        "github.com/spf13/pflag/bool_slice.go",
         "github.com/spf13/pflag/count.go",
         "github.com/spf13/pflag/duration.go",
         "github.com/spf13/pflag/flag.go",
@@ -6495,6 +6500,7 @@ go_library(
         "github.com/spf13/pflag/int8.go",
         "github.com/spf13/pflag/int_slice.go",
         "github.com/spf13/pflag/ip.go",
+        "github.com/spf13/pflag/ip_slice.go",
         "github.com/spf13/pflag/ipmask.go",
         "github.com/spf13/pflag/ipnet.go",
         "github.com/spf13/pflag/string.go",
@@ -6505,6 +6511,7 @@ go_library(
         "github.com/spf13/pflag/uint32.go",
         "github.com/spf13/pflag/uint64.go",
         "github.com/spf13/pflag/uint8.go",
+        "github.com/spf13/pflag/uint_slice.go",
     ],
     tags = ["automanaged"],
 )
@@ -8539,6 +8546,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/json",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
     ],
 )
 
@@ -9900,6 +9908,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/internalversion",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion/unstructured",
         "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
@@ -17115,4 +17124,29 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration/install",
     ],
+)
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured_test",
+    srcs = ["k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructured_test.go"],
+    library = ":k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable",
+    srcs = [
+        "github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable/colorable_others.go",
+        "github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable/noncolorable.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty",
+    srcs = [
+        "github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty/doc.go",
+        "github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty/isatty_linux.go",
+    ],
+    tags = ["automanaged"],
 )

@@ -82,6 +82,6 @@ func (s *storage) UpdateDeployment(ctx genericapirequest.Context, deployment *ex
 }
 
 func (s *storage) DeleteDeployment(ctx genericapirequest.Context, deploymentID string) error {
-	_, err := s.Delete(ctx, deploymentID, nil)
+	_, _, err := s.Delete(ctx, deploymentID, nil)
 	return err
 }

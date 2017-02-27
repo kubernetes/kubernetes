@@ -376,14 +376,14 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 			}
 		}
 
-		// Open any hostports the pod's containers want
-		activePodPortMapping, err := plugin.getPodPortMapping()
+		// Open any hostport the pod's containers want
+		activePodPortMappings, err := plugin.getPodPortMappings()
 		if err != nil {
 			return err
 		}
 
 		newPodPortMapping := constructPodPortMapping(pod, ip4)
-		if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMapping); err != nil {
+		if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMappings); err != nil {
 			return err
 		}
 	} else {
@@ -486,7 +486,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	// The host can choose to not support "legacy" features. The remote
 	// shim doesn't support it (#35457), but the kubelet does.
 	if plugin.host.SupportsLegacyFeatures() {
-		activePodPortMapping, err := plugin.getPodPortMapping()
+		activePodPortMapping, err := plugin.getPodPortMappings()
 		if err == nil {
 			err = plugin.hostportSyncer.SyncHostports(BridgeName, activePodPortMapping)
 		}
@@ -618,7 +618,7 @@ func (plugin *kubenetNetworkPlugin) getNonExitedPods() ([]*kubecontainer.Pod, er
 	return ret, nil
 }
 
-func (plugin *kubenetNetworkPlugin) getPodPortMapping() ([]*hostport.PodPortMapping, error) {
+func (plugin *kubenetNetworkPlugin) getPodPortMappings() ([]*hostport.PodPortMapping, error) {
 	pods, err := plugin.getNonExitedPods()
 	if err != nil {
 		return nil, err

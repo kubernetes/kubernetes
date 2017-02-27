@@ -19,13 +19,24 @@ package preflight
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
+
+	"crypto/tls"
+	"crypto/x509"
+
+	"github.com/PuerkitoBio/purell"
+	"github.com/blang/semver"
+
+	"net/url"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -37,7 +48,16 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
-const bridgenf string = "/proc/sys/net/bridge/bridge-nf-call-iptables"
+const (
+	bridgenf                    = "/proc/sys/net/bridge/bridge-nf-call-iptables"
+	externalEtcdRequestTimeout  = time.Duration(10 * time.Second)
+	externalEtcdRequestRetries  = 3
+	externalEtcdRequestInterval = time.Duration(5 * time.Second)
+)
+
+var (
+	minExternalEtcdVersion = semver.MustParse(kubeadmconstants.MinExternalEtcdVersion)
+)
 
 type Error struct {
 	Msg string
@@ -326,6 +346,139 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+type etcdVersionResponse struct {
+	Etcdserver  string `json:"etcdserver"`
+	Etcdcluster string `json:"etcdcluster"`
+}
+
+// ExternalEtcdVersionCheck checks if version of external etcd meets the demand of kubeadm
+type ExternalEtcdVersionCheck struct {
+	Etcd kubeadmapi.Etcd
+}
+
+func (evc ExternalEtcdVersionCheck) Check() (warnings, errors []error) {
+	var config *tls.Config
+	var err error
+	if config, err = evc.configRootCAs(config); err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+	if config, err = evc.configCertAndKey(config); err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+
+	client := evc.getHTTPClient(config)
+	for _, endpoint := range evc.Etcd.Endpoints {
+		if _, err := url.Parse(endpoint); err != nil {
+			errors = append(errors, fmt.Errorf("failed to parse external etcd endpoint %s : %v", endpoint, err))
+			continue
+		}
+		resp := etcdVersionResponse{}
+		var err error
+		versionURL := fmt.Sprintf("%s/%s", endpoint, "version")
+		if tmpVersionURL, err := purell.NormalizeURLString(versionURL, purell.FlagRemoveDuplicateSlashes); err != nil {
+			errors = append(errors, fmt.Errorf("failed to normalize external etcd version url %s : %v", versionURL, err))
+			continue
+		} else {
+			versionURL = tmpVersionURL
+		}
+		if err = getEtcdVersionResponse(client, versionURL, &resp); err != nil {
+			errors = append(errors, err)
+			continue
+		}
+
+		etcdVersion, err := semver.Parse(resp.Etcdserver)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("couldn't parse external etcd version %q: %v", resp.Etcdserver, err))
+			continue
+		}
+		if etcdVersion.LT(minExternalEtcdVersion) {
+			errors = append(errors, fmt.Errorf("this version of kubeadm only supports external etcd version >= %s. Current version: %s", kubeadmconstants.MinExternalEtcdVersion, resp.Etcdserver))
+			continue
+		}
+	}
+
+	return nil, errors
+}
+
+// configRootCAs configures and returns a reference to tls.Config instance if CAFile is provided
+func (evc ExternalEtcdVersionCheck) configRootCAs(config *tls.Config) (*tls.Config, error) {
+	var CACertPool *x509.CertPool
+	if evc.Etcd.CAFile != "" {
+		CACert, err := ioutil.ReadFile(evc.Etcd.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't load external etcd's server certificate %s: %v", evc.Etcd.CAFile, err)
+		}
+		CACertPool = x509.NewCertPool()
+		CACertPool.AppendCertsFromPEM(CACert)
+	}
+	if CACertPool != nil {
+		if config == nil {
+			config = &tls.Config{}
+		}
+		config.RootCAs = CACertPool
+	}
+	return config, nil
+}
+
+// configCertAndKey configures and returns a reference to tls.Config instance if CertFile and KeyFile pair is provided
+func (evc ExternalEtcdVersionCheck) configCertAndKey(config *tls.Config) (*tls.Config, error) {
+	var cert tls.Certificate
+	if evc.Etcd.CertFile != "" && evc.Etcd.KeyFile != "" {
+		var err error
+		cert, err = tls.LoadX509KeyPair(evc.Etcd.CertFile, evc.Etcd.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't load external etcd's certificate and key pair %s, %s: %v", evc.Etcd.CertFile, evc.Etcd.KeyFile, err)
+		}
+		if config == nil {
+			config = &tls.Config{}
+		}
+		config.Certificates = []tls.Certificate{cert}
+	}
+	return config, nil
+}
+func (evc ExternalEtcdVersionCheck) getHTTPClient(config *tls.Config) *http.Client {
+	if config != nil {
+		transport := &http.Transport{
+			TLSClientConfig: config,
+		}
+		return &http.Client{
+			Transport: transport,
+			Timeout:   externalEtcdRequestTimeout,
+		}
+	}
+	return &http.Client{Timeout: externalEtcdRequestTimeout}
+}
+func getEtcdVersionResponse(client *http.Client, url string, target interface{}) error {
+	loopCount := externalEtcdRequestRetries + 1
+	var err error
+	var stopRetry bool
+	for loopCount > 0 {
+		if loopCount <= externalEtcdRequestRetries {
+			time.Sleep(externalEtcdRequestInterval)
+		}
+		stopRetry, err = func() (stopRetry bool, err error) {
+			r, err := client.Get(url)
+			if err != nil {
+				loopCount--
+				return false, nil
+			}
+			defer r.Body.Close()
+
+			if r != nil && r.StatusCode >= 500 && r.StatusCode <= 599 {
+				loopCount--
+				return false, nil
+			}
+			return true, json.NewDecoder(r.Body).Decode(target)
+
+		}()
+		if stopRetry {
+			break
+		}
+	}
+	return err
+}
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	checks := []Checker{
 		SystemVerificationCheck{},
@@ -359,6 +512,11 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		checks = append(checks,
 			PortOpenCheck{port: 2379},
 			DirAvailableCheck{Path: "/var/lib/etcd"},
+		)
+	} else {
+		// Only check etcd version when external endpoints are specified
+		checks = append(checks,
+			ExternalEtcdVersionCheck{Etcd: cfg.Etcd},
 		)
 	}
 

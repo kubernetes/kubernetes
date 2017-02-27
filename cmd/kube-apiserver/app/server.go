@@ -22,6 +22,7 @@ package app
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -128,6 +129,12 @@ func Run(s *options.ServerRunOptions) error {
 	if err := s.Features.ApplyTo(genericConfig); err != nil {
 		return err
 	}
+
+	// Use protobufs for self-communication.
+	// Since not every generic apiserver has to support protobufs, we
+	// cannot default to it in generic apiserver and need to explicitly
+	// set it in kube-apiserver.
+	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
 
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
@@ -327,8 +334,25 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
+	clientCA, err := readCAorNil(s.Authentication.ClientCert.ClientCA)
+	if err != nil {
+		return err
+	}
+	requestHeaderProxyCA, err := readCAorNil(s.Authentication.RequestHeader.ClientCAFile)
+	if err != nil {
+		return err
+	}
 	config := &master.Config{
 		GenericConfig: genericConfig,
+
+		ClientCARegistrationHook: master.ClientCARegistrationHook{
+			ClientCA:                         clientCA,
+			RequestHeaderUsernameHeaders:     s.Authentication.RequestHeader.UsernameHeaders,
+			RequestHeaderGroupHeaders:        s.Authentication.RequestHeader.GroupHeaders,
+			RequestHeaderExtraHeaderPrefixes: s.Authentication.RequestHeader.ExtraHeaderPrefixes,
+			RequestHeaderCA:                  requestHeaderProxyCA,
+			RequestHeaderAllowedNames:        s.Authentication.RequestHeader.AllowedNames,
+		},
 
 		APIResourceConfigSource: storageFactory.APIResourceConfigSource,
 		StorageFactory:          storageFactory,
@@ -365,6 +389,13 @@ func Run(s *options.ServerRunOptions) error {
 	sharedInformers.Start(wait.NeverStop)
 	m.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
 	return nil
+}
+
+func readCAorNil(file string) ([]byte, error) {
+	if len(file) == 0 {
+		return nil, nil
+	}
+	return ioutil.ReadFile(file)
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility

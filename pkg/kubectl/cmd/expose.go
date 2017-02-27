@@ -248,7 +248,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(object, f.Command(cmd, false)); err != nil {
 				return err
 			}
 		}

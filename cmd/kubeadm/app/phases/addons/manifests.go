@@ -79,10 +79,10 @@ spec:
           name: kube-proxy
       hostNetwork: true
       serviceAccountName: kube-proxy
-      tolerations:
-      - key: dedicated
-        value: master
-        effect: NoSchedule
+      # TODO: Why doesn't the Decoder recognize this new field and decode it properly? Right now it's ignored
+      # tolerations:
+      # - key: {{ .MasterTaintKey }}
+      #   effect: NoSchedule
       volumes:
       - name: kube-proxy
         configMap:
@@ -235,12 +235,12 @@ spec:
             cpu: 10m
       dnsPolicy: Default  # Don't use cluster DNS.
       serviceAccountName: kube-dns
-      tolerations:
-      - key: "CriticalAddonsOnly"
-        operator: "Exists"
-      - key: "dedicated"
-        value: "master"
-        effect: "NoSchedule"
+      # TODO: Why doesn't the Decoder recognize this new field and decode it properly? Right now it's ignored
+      # tolerations:
+      # - key: CriticalAddonsOnly
+      #   operator: Exists
+      # - key: {{ .MasterTaintKey }}
+      #   effect: NoSchedule
       # TODO: Remove this affinity field as soon as we are using manifest lists
       affinity:
         nodeAffinity:

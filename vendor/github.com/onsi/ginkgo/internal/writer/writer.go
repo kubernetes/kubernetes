@@ -12,6 +12,7 @@ type WriterInterface interface {
 	Truncate()
 	DumpOut()
 	DumpOutWithHeader(header string)
+	Bytes() []byte
 }
 
 type Writer struct {
@@ -40,11 +41,11 @@ func (w *Writer) Write(b []byte) (n int, err error) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
+	n, err = w.buffer.Write(b)
 	if w.stream {
 		return w.outWriter.Write(b)
-	} else {
-		return w.buffer.Write(b)
 	}
+	return n, err
 }
 
 func (w *Writer) Truncate() {
@@ -59,6 +60,15 @@ func (w *Writer) DumpOut() {
 	if !w.stream {
 		w.buffer.WriteTo(w.outWriter)
 	}
+}
+
+func (w *Writer) Bytes() []byte {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	b := w.buffer.Bytes()
+	copied := make([]byte, len(b))
+	copy(copied, b)
+	return copied
 }
 
 func (w *Writer) DumpOutWithHeader(header string) {

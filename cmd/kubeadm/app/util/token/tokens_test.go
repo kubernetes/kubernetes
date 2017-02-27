@@ -28,14 +28,14 @@ func TestTokenParse(t *testing.T) {
 		expected bool
 	}{
 		{token: "1234567890123456789012", expected: false},   // invalid parcel size
-		{token: "12345:1234567890123456", expected: false},   // invalid parcel size
+		{token: "12345.1234567890123456", expected: false},   // invalid parcel size
 		{token: ".1234567890123456", expected: false},        // invalid parcel size
 		{token: "123456:1234567890.123456", expected: false}, // invalid separation
-		{token: "abcdef.1234567890123456", expected: false},  // invalid separation
-		{token: "Abcdef:1234567890123456", expected: false},  // invalid token id
-		{token: "123456:AABBCCDDEEFFGGHH", expected: false},  // invalid token secret
-		{token: "abcdef:1234567890123456", expected: true},
-		{token: "123456:aabbccddeeffgghh", expected: true},
+		{token: "abcdef:1234567890123456", expected: false},  // invalid separation
+		{token: "Abcdef.1234567890123456", expected: false},  // invalid token id
+		{token: "123456.AABBCCDDEEFFGGHH", expected: false},  // invalid token secret
+		{token: "abcdef.1234567890123456", expected: true},
+		{token: "123456.aabbccddeeffgghh", expected: true},
 	}
 
 	for _, rt := range tests {
@@ -154,7 +154,7 @@ func TestBearerToken(t *testing.T) {
 		token    *kubeadmapi.TokenDiscovery
 		expected string
 	}{
-		{token: &kubeadmapi.TokenDiscovery{ID: "foo", Secret: "bar"}, expected: "foo:bar"}, // should use default
+		{token: &kubeadmapi.TokenDiscovery{ID: "foo", Secret: "bar"}, expected: "foo.bar"}, // should use default
 	}
 	for _, rt := range tests {
 		actual := BearerToken(rt.token)

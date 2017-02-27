@@ -33,6 +33,7 @@ import (
 	externalextensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	sliceutil "k8s.io/kubernetes/pkg/util/slice"
 )
 
@@ -170,7 +171,7 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 		}
-		DescribePodTemplate(internalTemplate, buf)
+		printersinternal.DescribePodTemplate(internalTemplate, buf)
 		return buf.String(), nil
 	}
 
@@ -188,6 +189,6 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 	}
-	DescribePodTemplate(internalTemplate, buf)
+	printersinternal.DescribePodTemplate(internalTemplate, buf)
 	return buf.String(), nil
 }

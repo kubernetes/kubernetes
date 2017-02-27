@@ -27,10 +27,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
+	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -58,7 +62,7 @@ func TestUnjoinFederation(t *testing.T) {
 	}{
 		// Tests that the contexts and credentials are read from the
 		// global, default kubeconfig and the correct cluster resource
-		// is deregisterd.
+		// is deregisterd and configmap kube-dns is removed from that cluster.
 		{
 			cluster:            "syndicate",
 			wantCluster:        "syndicate",
@@ -70,8 +74,8 @@ func TestUnjoinFederation(t *testing.T) {
 		},
 		// Tests that the contexts and credentials are read from the
 		// explicit kubeconfig file specified and the correct cluster
-		// resource is deregisterd. kubeconfig contains a single
-		// cluster and context.
+		// resource is deregisterd and configmap kube-dns is removed from that cluster.
+		// kubeconfig contains a single cluster and context.
 		{
 			cluster:            "ally",
 			wantCluster:        "ally",
@@ -83,8 +87,8 @@ func TestUnjoinFederation(t *testing.T) {
 		},
 		// Tests that the contexts and credentials are read from the
 		// explicit kubeconfig file specified and the correct cluster
-		// resource is deregisterd. kubeconfig consists of multiple
-		// clusters and contexts.
+		// resource is deregisterd and configmap kube-dns is removed from that
+		// cluster. kubeconfig consists of multiple clusters and contexts.
 		{
 			cluster:            "confederate",
 			wantCluster:        "confederate",
@@ -117,6 +121,11 @@ func TestUnjoinFederation(t *testing.T) {
 			expectedServer:     "https://10.20.30.40",
 			expectedErr:        fmt.Sprintf("WARNING: secret %q not found in the host cluster, so it couldn't be deleted", "noexist"),
 		},
+		// TODO: Figure out a way to test the scenarios of configmap deletion
+		// As of now we delete the config map after deriving the clientset using
+		// the cluster object we retrieved from the federation server and the
+		// secret object retrieved from the base cluster.
+		// Still to find out a way to introduce some fakes and unit test this path.
 	}
 
 	for i, tc := range testCases {
@@ -126,7 +135,7 @@ func TestUnjoinFederation(t *testing.T) {
 		errBuf := bytes.NewBuffer([]byte{})
 
 		hostFactory := fakeUnjoinHostFactory(tc.cluster)
-		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
+		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, nil, "", tc.kubeconfigGlobal)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -147,6 +156,9 @@ func TestUnjoinFederation(t *testing.T) {
 					t.Errorf("[%d] unexpected error message: %s", i, cmdErrMsg)
 				}
 			}
+			// TODO: There are warnings posted on errBuf, which we ignore as of now
+			// and we should be able to test out these warnings also in future.
+			// This is linked to the previous todo comment.
 		} else {
 			if errMsg := errBuf.String(); errMsg != tc.expectedErr {
 				t.Errorf("[%d] expected warning: %s, got: %s, output: %s", i, tc.expectedErr, errMsg, buf.String())
@@ -202,6 +214,23 @@ func testUnjoinFederationFactory(name, server, secret string) cmdutil.Factory {
 
 func fakeUnjoinHostFactory(name string) cmdutil.Factory {
 	urlPrefix := "/api/v1/namespaces/federation-system/secrets/"
+
+	// Using dummy bytes for now
+	configBytes, _ := clientcmd.Write(clientcmdapi.Config{})
+	secretObject := v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: util.DefaultFederationSystemNamespace,
+		},
+		Data: map[string][]byte{
+			"kubeconfig": configBytes,
+		},
+	}
+
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
@@ -210,15 +239,26 @@ func fakeUnjoinHostFactory(name string) cmdutil.Factory {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, urlPrefix) && m == http.MethodDelete:
-				got := strings.TrimPrefix(p, urlPrefix)
-				if got != name {
-					return nil, errors.NewNotFound(api.Resource("secrets"), got)
+			case strings.HasPrefix(p, urlPrefix):
+				switch m {
+				case http.MethodDelete:
+					got := strings.TrimPrefix(p, urlPrefix)
+					if got != name {
+						return nil, errors.NewNotFound(api.Resource("secrets"), got)
+					}
+					status := metav1.Status{
+						Status: "Success",
+					}
+					return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
+				case http.MethodGet:
+					got := strings.TrimPrefix(p, urlPrefix)
+					if got != name {
+						return nil, errors.NewNotFound(api.Resource("secrets"), got)
+					}
+					return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &secretObject)}, nil
+				default:
+					return nil, fmt.Errorf("unexpected request method: %#v\n%#v", req.URL, req)
 				}
-				status := metav1.Status{
-					Status: "Success",
-				}
-				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}

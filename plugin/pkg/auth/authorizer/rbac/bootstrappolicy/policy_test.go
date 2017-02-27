@@ -151,6 +151,28 @@ func TestEditViewRelationship(t *testing.T) {
 	}
 }
 
+func TestBootstrapNamespaceRoles(t *testing.T) {
+	list := &api.List{}
+	names := sets.NewString()
+	roles := map[string]runtime.Object{}
+
+	namespaceRoles := bootstrappolicy.NamespaceRoles()
+	for _, namespace := range sets.StringKeySet(namespaceRoles).List() {
+		bootstrapRoles := namespaceRoles[namespace]
+		for i := range bootstrapRoles {
+			role := bootstrapRoles[i]
+			names.Insert(role.Name)
+			roles[role.Name] = &role
+		}
+
+		for _, name := range names.List() {
+			list.Items = append(list.Items, roles[name])
+		}
+	}
+
+	testObjects(t, list, "namespace-roles.yaml")
+}
+
 func TestBootstrapClusterRoles(t *testing.T) {
 	list := &api.List{}
 	names := sets.NewString()

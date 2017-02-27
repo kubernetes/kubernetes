@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cmd.go",
+        "completion.go",
         "defaults.go",
         "init.go",
         "join.go",
@@ -24,6 +25,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
+        "//cmd/kubeadm/app/cmd/phases:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/discovery:go_default_library",
         "//cmd/kubeadm/app/master:go_default_library",
@@ -38,8 +40,9 @@ go_library(
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util/token:go_default_library",
         "//pkg/bootstrap/api:go_default_library",
-        "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/util/i18n:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/blang/semver",
@@ -78,6 +81,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/cmd/phases:all-srcs",
+    ],
     tags = ["automanaged"],
 )

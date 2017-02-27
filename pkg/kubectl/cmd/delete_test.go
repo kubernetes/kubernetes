@@ -18,6 +18,9 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
@@ -81,6 +84,68 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	buf, errBuf = bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 	cmd = NewCmdDelete(f, buf, errBuf)
 	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{"secrets/mysecret"})
+	if buf.String() != "secret/mysecret\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func hasExpectedOrphanDependents(body io.ReadCloser, expectedOrphanDependents *bool) bool {
+	if body == nil || expectedOrphanDependents == nil {
+		return body == nil && expectedOrphanDependents == nil
+	}
+	var parsedBody metav1.DeleteOptions
+	rawBody, _ := ioutil.ReadAll(body)
+	json.Unmarshal(rawBody, &parsedBody)
+	if parsedBody.OrphanDependents == nil {
+		return false
+	}
+	return *expectedOrphanDependents == *parsedBody.OrphanDependents
+}
+
+// Tests that DeleteOptions.OrphanDependents is appropriately set while deleting objects.
+func TestOrphanDependentsInDeleteObject(t *testing.T) {
+	initTestErrorHandler(t)
+	_, _, rc := testData()
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	var expectedOrphanDependents *bool
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m, b := req.URL.Path, req.Method, req.Body; {
+
+			case p == "/namespaces/test/secrets/mysecret" && m == "DELETE" && hasExpectedOrphanDependents(b, expectedOrphanDependents):
+
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+			default:
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+
+	// DeleteOptions.OrphanDependents should be false, when cascade is true (default).
+	falseVar := false
+	expectedOrphanDependents = &falseVar
+	buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+	cmd := NewCmdDelete(f, buf, errBuf)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{"secrets/mysecret"})
+	if buf.String() != "secret/mysecret\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+
+	// Test that delete options should be nil when cascade is false.
+	expectedOrphanDependents = nil
+	buf, errBuf = bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+	cmd = NewCmdDelete(f, buf, errBuf)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"secrets/mysecret"})
 	if buf.String() != "secret/mysecret\n" {

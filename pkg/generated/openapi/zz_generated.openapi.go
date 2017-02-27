@@ -8925,104 +8925,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause"},
 		},
-		"k8s.io/kubernetes/pkg/apis/storage/v1.StorageClass": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "StorageClass describes the parameters for a class of storage for which PersistentVolumes can be dynamically provisioned.\n\nStorageClasses are non-namespaced; the name of the storage class according to etcd is in ObjectMeta.Name.",
-					Properties: map[string]spec.Schema{
-						"kind": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"apiVersion": {
-							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"metadata": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-							},
-						},
-						"provisioner": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Provisioner indicates the type of the provisioner.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"parameters": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Parameters holds the parameters for the provisioner that should create volumes of this storage class.",
-								Type:        []string{"object"},
-								AdditionalProperties: &spec.SchemaOrBool{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Type:   []string{"string"},
-											Format: "",
-										},
-									},
-								},
-							},
-						},
-					},
-					Required: []string{"provisioner"},
-				},
-			},
-			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
-		},
-		"k8s.io/kubernetes/pkg/apis/storage/v1.StorageClassList": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Description: "StorageClassList is a collection of storage classes.",
-					Properties: map[string]spec.Schema{
-						"kind": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"apiVersion": {
-							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"metadata": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
-							},
-						},
-						"items": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Items is the list of StorageClasses",
-								Type:        []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Ref: ref("k8s.io/kubernetes/pkg/apis/storage/v1.StorageClass"),
-										},
-									},
-								},
-							},
-						},
-					},
-					Required: []string{"items"},
-				},
-			},
-			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/storage/v1.StorageClass"},
-		},
 		"k8s.io/kubernetes/pkg/apis/authorization/v1.SubjectAccessReview": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -12924,12 +12826,32 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec"),
 							},
 						},
+						"updateStrategy": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UpdateStrategy to replace existing DaemonSet pods with new pods.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetUpdateStrategy"),
+							},
+						},
+						"minReadySeconds": {
+							SchemaProps: spec.SchemaProps{
+								Description: "MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"templateGeneration": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
+								Type:        []string{"integer"},
+								Format:      "int64",
+							},
+						},
 					},
 					Required: []string{"template"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector", "k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec"},
+				"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector", "k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetUpdateStrategy"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetStatus": {
 			Schema: spec.Schema{
@@ -12971,11 +12893,55 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "int64",
 							},
 						},
+						"updatedNumberScheduled": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"numberAvailable": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NumberAvailable is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least minReadySeconds)",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"numberUnavailable": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NumberUnavailable is the number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least minReadySeconds)",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
 					},
 					Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled", "numberReady"},
 				},
 			},
 			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetUpdateStrategy": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"rollingUpdate": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDaemonSet"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDaemonSet"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Deployment": {
 			Schema: spec.Schema{
@@ -15129,6 +15095,23 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDaemonSet": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Spec to control the desired behavior of daemon set rolling update.",
+					Properties: map[string]spec.Schema{
+						"maxUnavailable": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+								Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDeployment": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -16322,6 +16305,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							SchemaProps: spec.SchemaProps{
 								Description: "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.JobTemplateSpec"),
+							},
+						},
+						"successfulJobsHistoryLimit": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"failedJobsHistoryLimit": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+								Type:        []string{"integer"},
+								Format:      "int32",
 							},
 						},
 					},
