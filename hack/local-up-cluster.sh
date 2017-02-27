@@ -673,19 +673,19 @@ function start_kubeproxy {
 function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         echo "Creating kube-system namespace"
-        sed -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.in" >| kubedns-deployment.yaml
+        sed -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.in" >| kubedns-controller.yaml
         if [[ "${FEDERATION:-}" == "true" ]]; then
           FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
           if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
             FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
           fi
           if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
-            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" kubedns-deployment.yaml
+            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" kubedns-controller.yaml
           else
-            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-deployment.yaml
+            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-controller.yaml
           fi
         else
-          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-deployment.yaml
+          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-controller.yaml
         fi
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.in" >| kubedns-svc.yaml
         
@@ -693,10 +693,10 @@ function start_kubedns {
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
         # use kubectl to create kubedns deployment and service
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f ${KUBE_ROOT}/cluster/addons/dns/kubedns-sa.yaml
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-controller.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
         echo "Kube-dns deployment and service successfully deployed."
-        rm  kubedns-deployment.yaml kubedns-svc.yaml
+        rm  kubedns-controller.yaml kubedns-svc.yaml
     fi
 }
 
