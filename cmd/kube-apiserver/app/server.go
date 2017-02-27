@@ -284,7 +284,10 @@ func BuildMasterConfig(s *options.ServerRunOptions) (*master.Config, informers.S
 		}
 	}
 
-	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
+	authenticatorConfig, err := s.Authentication.ToAuthenticationConfig()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error in authentication configuration: %v", err)
+	}
 	if s.Authentication.ServiceAccounts.Lookup {
 		// If we need to look up service accounts and tokens,
 		// go directly to etcd to avoid recursive auth insanity
@@ -367,9 +370,12 @@ func BuildMasterConfig(s *options.ServerRunOptions) (*master.Config, informers.S
 		return nil, nil, err
 	}
 
-	clientCA, err := readCAorNil(s.Authentication.ClientCert.ClientCA)
-	if err != nil {
-		return nil, nil, err
+	clientCA := s.Authentication.ClientCert.ClientCAData
+	if len(s.Authentication.ClientCert.ClientCAFile) > 0 {
+		clientCA, err = ioutil.ReadFile(s.Authentication.ClientCert.ClientCAFile)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	requestHeaderProxyCA, err := readCAorNil(s.Authentication.RequestHeader.ClientCAFile)
 	if err != nil {

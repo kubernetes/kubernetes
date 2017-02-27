@@ -21,6 +21,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	goruntime "runtime"
@@ -253,20 +254,29 @@ func DefaultSwaggerConfig() *swagger.Config {
 	}
 }
 
-func (c *Config) ApplyClientCert(clientCAFile string) (*Config, error) {
-	if c.SecureServingInfo != nil {
-		if len(clientCAFile) > 0 {
-			clientCAs, err := certutil.CertsFromFile(clientCAFile)
-			if err != nil {
-				return nil, fmt.Errorf("unable to load client CA file: %v", err)
-			}
-			if c.SecureServingInfo.ClientCA == nil {
-				c.SecureServingInfo.ClientCA = x509.NewCertPool()
-			}
-			for _, cert := range clientCAs {
-				c.SecureServingInfo.ClientCA.AddCert(cert)
-			}
+func (c *Config) ApplyClientCert(clientCAData []byte) (*Config, error) {
+	if c.SecureServingInfo != nil && len(clientCAData) > 0 {
+		clientCAs, err := certutil.ParseCertsPEM(clientCAData)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read client CA data: %v", err)
 		}
+		if c.SecureServingInfo.ClientCA == nil {
+			c.SecureServingInfo.ClientCA = x509.NewCertPool()
+		}
+		for _, cert := range clientCAs {
+			c.SecureServingInfo.ClientCA.AddCert(cert)
+		}
+	}
+	return c, nil
+}
+
+func (c *Config) ApplyClientCertFile(clientCAFile string) (*Config, error) {
+	if len(clientCAFile) > 0 {
+		clientCAData, err := ioutil.ReadFile(clientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load client CA file: %v", err)
+		}
+		return c.ApplyClientCert(clientCAData)
 	}
 
 	return c, nil
