@@ -112,8 +112,9 @@ type Instances interface {
 	// returns the address of the calling instance. We should do a rename to
 	// make this clearer.
 	NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error)
-	// ExternalID returns the cloud provider ID of the node with the specified NodeName.
-	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
+	// ExternalID returns the cloud provider ID of the node with the
+	// specified NodeName.  Note that if the instance does not exist or is
+	// no longer running, we must return ("", cloudprovider.InstanceNotFound)
 	ExternalID(nodeName types.NodeName) (string, error)
 	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
 	InstanceID(nodeName types.NodeName) (string, error)

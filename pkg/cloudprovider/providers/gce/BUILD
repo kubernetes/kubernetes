@@ -27,6 +27,7 @@ go_library(
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:golang.org/x/oauth2",
         "//vendor:golang.org/x/oauth2/google",
+        "//vendor:google.golang.org/api/compute/v0.alpha",
         "//vendor:google.golang.org/api/compute/v1",
         "//vendor:google.golang.org/api/container/v1",
         "//vendor:google.golang.org/api/googleapi",

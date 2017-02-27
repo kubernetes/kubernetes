@@ -46,6 +46,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	computeAlpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
 	"google.golang.org/api/googleapi"
@@ -87,6 +88,7 @@ const (
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service                  *compute.Service
+	serviceAlpha             *computeAlpha.Service
 	containerService         *container.Service
 	projectID                string
 	region                   string
@@ -310,14 +312,88 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 		}
 	}
 
-	return CreateGCECloud(projectID, region, zone, managedZones, networkURL, nodeTags, nodeInstancePrefix, tokenSource, true /* useMetadataServer */)
+	return CreateGCECloud(
+		projectID,
+		region,
+		zone,
+		managedZones,
+		networkURL,
+		nodeTags,
+		nodeInstancePrefix,
+		tokenSource,
+		true /* useMetadataServer */)
 }
 
 // Creates a GCECloud object using the specified parameters.
 // If no networkUrl is specified, loads networkName via rest call.
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
-func CreateGCECloud(projectID, region, zone string, managedZones []string, networkURL string, nodeTags []string, nodeInstancePrefix string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
+func CreateGCECloud(
+	projectID, region, zone string,
+	managedZones []string,
+	networkURL string,
+	nodeTags []string,
+	nodeInstancePrefix string,
+	tokenSource oauth2.TokenSource,
+	useMetadataServer bool) (*GCECloud, error) {
+
+	client, err := newOauthClient(tokenSource)
+	if err != nil {
+		return nil, err
+	}
+
+	service, err := compute.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceAlpha, err := computeAlpha.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	containerSvc, err := container.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	if networkURL == "" {
+		networkName, err := getNetworkNameViaAPICall(service, projectID)
+		if err != nil {
+			return nil, err
+		}
+		networkURL = gceNetworkURL(projectID, networkName)
+	}
+
+	if len(managedZones) == 0 {
+		managedZones, err = getZonesForRegion(service, projectID, region)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(managedZones) != 1 {
+		glog.Infof("managing multiple zones: %v", managedZones)
+	}
+
+	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
+
+	return &GCECloud{
+		service:                  service,
+		serviceAlpha:             serviceAlpha,
+		containerService:         containerSvc,
+		projectID:                projectID,
+		region:                   region,
+		localZone:                zone,
+		managedZones:             managedZones,
+		networkURL:               networkURL,
+		nodeTags:                 nodeTags,
+		nodeInstancePrefix:       nodeInstancePrefix,
+		useMetadataServer:        useMetadataServer,
+		operationPollRateLimiter: operationPollRateLimiter,
+	}, nil
+}
+
+func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 	if tokenSource == nil {
 		var err error
 		tokenSource, err = google.DefaultTokenSource(
@@ -342,50 +418,7 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		return nil, err
 	}
 
-	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
-	svc, err := compute.New(client)
-	if err != nil {
-		return nil, err
-	}
-
-	containerSvc, err := container.New(client)
-	if err != nil {
-		return nil, err
-	}
-
-	if networkURL == "" {
-		networkName, err := getNetworkNameViaAPICall(svc, projectID)
-		if err != nil {
-			return nil, err
-		}
-		networkURL = gceNetworkURL(projectID, networkName)
-	}
-
-	if len(managedZones) == 0 {
-		managedZones, err = getZonesForRegion(svc, projectID, region)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if len(managedZones) != 1 {
-		glog.Infof("managing multiple zones: %v", managedZones)
-	}
-
-	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
-
-	return &GCECloud{
-		service:                  svc,
-		containerService:         containerSvc,
-		projectID:                projectID,
-		region:                   region,
-		localZone:                zone,
-		managedZones:             managedZones,
-		networkURL:               networkURL,
-		nodeTags:                 nodeTags,
-		nodeInstancePrefix:       nodeInstancePrefix,
-		useMetadataServer:        useMetadataServer,
-		operationPollRateLimiter: operationPollRateLimiter,
-	}, nil
+	return oauth2.NewClient(oauth2.NoContext, tokenSource), nil
 }
 
 func (gce *GCECloud) Clusters() (cloudprovider.Clusters, bool) {
@@ -2178,6 +2211,30 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 		glog.Infof("Successfully added sshKey to project metadata")
 		return true, nil
 	})
+}
+
+// PodCIDRs returns a list of CIDR ranges that are assigned to the `node` for
+// allocation to pods. Returns a list of the form "<ip>/<netmask>".
+func (gce *GCECloud) PodCIDRs(nodeName types.NodeName) (cidrs []string, err error) {
+	var instance *gceInstance
+	instance, err = gce.getInstanceByName(mapNodeNameToInstanceName(nodeName))
+	if err != nil {
+		return
+	}
+
+	var res *computeAlpha.Instance
+	res, err = gce.serviceAlpha.Instances.Get(
+		gce.projectID, instance.Zone, instance.Name).Do()
+	if err != nil {
+		return
+	}
+
+	for _, networkInterface := range res.NetworkInterfaces {
+		for _, aliasIpRange := range networkInterface.AliasIpRanges {
+			cidrs = append(cidrs, aliasIpRange.IpCidrRange)
+		}
+	}
+	return
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
