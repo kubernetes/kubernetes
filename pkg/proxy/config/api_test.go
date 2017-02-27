@@ -17,6 +17,9 @@ limitations under the License.
 package config
 
 import (
+	"reflect"
+	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -225,4 +228,85 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	if !apiequality.Semantic.DeepEqual(expected, got) {
 		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
+}
+
+type svcHandler struct {
+	t        *testing.T
+	expected []api.Service
+	done     func()
+}
+
+func newSvcHandler(t *testing.T, svcs []api.Service, done func()) *svcHandler {
+	return &svcHandler{t: t, expected: svcs, done: done}
+}
+
+func (s *svcHandler) OnServiceUpdate(services []api.Service) {
+	defer s.done()
+	sort.Sort(sortedServices(services))
+	if !reflect.DeepEqual(s.expected, services) {
+		s.t.Errorf("Unexpected services: %#v, expected: %#v", services, s.expected)
+	}
+}
+
+type epsHandler struct {
+	t        *testing.T
+	expected []api.Endpoints
+	done     func()
+}
+
+func newEpsHandler(t *testing.T, eps []api.Endpoints, done func()) *epsHandler {
+	return &epsHandler{t: t, expected: eps, done: done}
+}
+
+func (e *epsHandler) OnEndpointsUpdate(endpoints []api.Endpoints) {
+	defer e.done()
+	sort.Sort(sortedEndpoints(endpoints))
+	if !reflect.DeepEqual(e.expected, endpoints) {
+		e.t.Errorf("Unexpected endpoints: %#v, expected: %#v", endpoints, e.expected)
+	}
+}
+
+func TestInitialSync(t *testing.T) {
+	svc1 := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+	}
+	svc2 := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+	}
+	eps1 := &api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+	}
+	eps2 := &api.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+	}
+
+	var wg sync.WaitGroup
+	// Wait for both services and endpoints handler.
+	wg.Add(2)
+
+	svcConfig := NewServiceConfig()
+	epsConfig := NewEndpointsConfig()
+	svcHandler := newSvcHandler(t, []api.Service{*svc2, *svc1}, wg.Done)
+	svcConfig.RegisterHandler(svcHandler)
+	epsHandler := newEpsHandler(t, []api.Endpoints{*eps2, *eps1}, wg.Done)
+	epsConfig.RegisterHandler(epsHandler)
+
+	// Setup fake api client.
+	fakeSvcWatch := watch.NewFake()
+	svcLW := fakeLW{
+		listResp:  &api.ServiceList{Items: []api.Service{*svc1, *svc2}},
+		watchResp: fakeSvcWatch,
+	}
+	fakeEpsWatch := watch.NewFake()
+	epsLW := fakeLW{
+		listResp:  &api.EndpointsList{Items: []api.Endpoints{*eps2, *eps1}},
+		watchResp: fakeEpsWatch,
+	}
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	newSourceAPI(svcLW, epsLW, time.Minute, svcConfig.Channel("one"), epsConfig.Channel("two"), stopCh)
+	wg.Wait()
 }

@@ -34,6 +34,7 @@ const (
 	ADD Operation = iota
 	UPDATE
 	REMOVE
+	INITIAL_SYNC_DONE
 )
 
 // ServiceUpdate describes an operation of services, sent on the channel.
@@ -113,6 +114,7 @@ func (c *EndpointsConfig) Config() []api.Endpoints {
 type endpointsStore struct {
 	endpointLock sync.RWMutex
 	endpoints    map[string]map[types.NamespacedName]*api.Endpoints
+	synced       bool
 	updates      chan<- struct{}
 }
 
@@ -132,18 +134,15 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 		glog.V(5).Infof("Removing an endpoint %s", spew.Sdump(update.Endpoints))
 		name := types.NamespacedName{Namespace: update.Endpoints.Namespace, Name: update.Endpoints.Name}
 		delete(endpoints, name)
+	case INITIAL_SYNC_DONE:
+		s.synced = true
 	default:
 		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
 	}
 	s.endpoints[source] = endpoints
+	synced := s.synced
 	s.endpointLock.Unlock()
-	if s.updates != nil {
-		// TODO: We should not broadcase the signal, until the state is fully
-		// populated (i.e. until initial LIST of the underlying reflector is
-		// propagated here).
-		//
-		// Since we record the snapshot before sending this signal, it's
-		// possible that the consumer ends up performing an extra update.
+	if s.updates != nil && synced {
 		select {
 		case s.updates <- struct{}{}:
 		default:
@@ -213,6 +212,7 @@ func (c *ServiceConfig) Config() []api.Service {
 type serviceStore struct {
 	serviceLock sync.RWMutex
 	services    map[string]map[types.NamespacedName]*api.Service
+	synced      bool
 	updates     chan<- struct{}
 }
 
@@ -232,18 +232,15 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 		glog.V(5).Infof("Removing a service %s", spew.Sdump(update.Service))
 		name := types.NamespacedName{Namespace: update.Service.Namespace, Name: update.Service.Name}
 		delete(services, name)
+	case INITIAL_SYNC_DONE:
+		s.synced = true
 	default:
 		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
 	}
 	s.services[source] = services
+	synced := s.synced
 	s.serviceLock.Unlock()
-	if s.updates != nil {
-		// TODO: We should not broadcase the signal, until the state is fully
-		// populated (i.e. until initial LIST of the underlying reflector is
-		// propagated here).
-		//
-		// Since we record the snapshot before sending this signal, it's
-		// possible that the consumer ends up performing an extra update.
+	if s.updates != nil && synced {
 		select {
 		case s.updates <- struct{}{}:
 		default:
