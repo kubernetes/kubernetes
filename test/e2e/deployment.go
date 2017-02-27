@@ -95,8 +95,7 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	It("overlapping deployment should not fight with each other", func() {
 		testOverlappingDeployment(f)
 	})
-	// Flaky issue #39785.
-	It("lack of progress should be reported in the deployment status [Flaky]", func() {
+	It("lack of progress should be reported in the deployment status", func() {
 		testFailedDeployment(f)
 	})
 	It("iterative rollouts should eventually progress", func() {
