@@ -96,6 +96,7 @@ filegroup(
         "//pkg/util/taints:all-srcs",
         "//pkg/util/term:all-srcs",
         "//pkg/util/threading:all-srcs",
+        "//pkg/util/tolerations:all-srcs",
         "//pkg/util/uuid:all-srcs",
         "//pkg/util/validation:all-srcs",
         "//pkg/util/version:all-srcs",
