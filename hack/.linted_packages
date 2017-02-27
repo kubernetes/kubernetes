@@ -265,6 +265,8 @@ plugin/pkg/admission/gc
 plugin/pkg/admission/imagepolicy
 plugin/pkg/admission/namespace/autoprovision
 plugin/pkg/admission/namespace/exists
+plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/install
+plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/validation
 plugin/pkg/admission/resourcequota/apis/resourcequota/install
 plugin/pkg/admission/resourcequota/apis/resourcequota/validation
 plugin/pkg/admission/securitycontext/scdeny
