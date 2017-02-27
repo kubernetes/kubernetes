@@ -14,7 +14,7 @@
 
 # build the cassandra image.
 
-VERSION=v11
+VERSION=v12
 PROJECT_ID=google_samples
 PROJECT=gcr.io/${PROJECT_ID}
 
