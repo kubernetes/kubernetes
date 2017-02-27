@@ -75,88 +75,54 @@ func ValidateAuthorizationMode(authzMode string, fldPath *field.Path) field.Erro
 func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateArgSelection(c, fldPath)...)
+	allErrs = append(allErrs, ValidateTLSBootstrapTokenArg(c, fldPath)...)
 	allErrs = append(allErrs, ValidateToken(c.Token, fldPath)...)
 	allErrs = append(allErrs, ValidateDiscoveryFile(c, fldPath)...)
 	allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, fldPath)...)
-	allErrs = append(allErrs, ValidateJoinDiscoveryTokenAPIServersArgs(c, fldPath)...)
+	allErrs = append(allErrs, ValidateJoinDiscoveryTokenAPIServer(c, fldPath)...)
 	return allErrs
 }
 
 func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateTokenArg(cfg, field.NewPath("discovery"))...)
-	allErrs = append(allErrs, ValidateDiscoveryTokenArg(cfg, field.NewPath("discovery"))...)
-	allErrs = append(allErrs, ValidateTLSBootstrapTokenArg(cfg, field.NewPath("discovery"))...)
-	allErrs = append(allErrs, ValidateDiscoveryFileArg(cfg, field.NewPath("discovery"))...)
-	return allErrs
-}
-
-func ValidateTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(cfg.Token) != 0 {
-		if len(cfg.TLSBootstrapToken) != 0 || len(cfg.DiscoveryToken) != 0 || len(cfg.DiscoveryFile) != 0 {
+	if len(cfg.DiscoveryToken) != 0 && len(cfg.DiscoveryFile) != 0 {
+		allErrs = append(
+			allErrs,
+			field.Invalid(
+				fldPath,
+				nil,
+				"DiscoveryToken and DiscoveryFile cannot both be set",
+			),
+		)
+	}
+	if len(cfg.DiscoveryFile) == 0 {
+		if len(cfg.DiscoveryToken) == 0 {
+			cfg.DiscoveryToken = cfg.Token
+		}
+		if len(cfg.DiscoveryToken) == 0 {
 			allErrs = append(
 				allErrs,
 				field.Invalid(
 					fldPath,
 					nil,
-					"Token is mutually exclusive with TLSBootstrapToken, DiscoveryToken, and DiscoveryFile",
+					"Token value not found in DiscoveryToken or Token",
 				),
 			)
-		}
-		if len(cfg.DiscoveryTokenAPIServers) < 1 {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath,
-					nil,
-					"Token must also specificy DiscoveryTokenAPIServers",
-				),
-			)
-		}
-		if len(cfg.DiscoveryTokenAPIServers) > 1 {
-			fmt.Println("[WARN] we don't support multiple api servers yet")
 		}
 	}
-	return allErrs
-}
-
-func ValidateDiscoveryTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(cfg.DiscoveryToken) != 0 {
-		if len(cfg.Token) != 0 || len(cfg.DiscoveryFile) != 0 {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath,
-					nil,
-					"DiscoveryToken is mutually exclusive with Token and DiscoveryFile",
-				),
-			)
-		}
-		if len(cfg.DiscoveryTokenAPIServers) < 1 {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath,
-					nil,
-					"DiscoveryToken must also specificy DiscoveryTokenAPIServers",
-				),
-			)
-		}
-		if len(cfg.DiscoveryTokenAPIServers) > 1 {
-			fmt.Println("[WARN] we don't support multiple api servers yet")
-		}
-		if len(cfg.TLSBootstrapToken) != 0 {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath,
-					nil,
-					"DiscoveryToken must also specificy TLSBootstrapToken",
-				),
-			)
-		}
+	if len(cfg.DiscoveryTokenAPIServers) < 1 {
+		allErrs = append(
+			allErrs,
+			field.Invalid(
+				fldPath,
+				nil,
+				"DiscoveryTokenAPIServers not set",
+			),
+		)
+	}
+	// TODO remove once we support multiple api servers
+	if len(cfg.DiscoveryTokenAPIServers) > 1 {
+		fmt.Println("[WARN] we don't support multiple api servers yet")
 	}
 	return allErrs
 }
@@ -164,33 +130,13 @@ func ValidateDiscoveryTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Pa
 func ValidateTLSBootstrapTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cfg.TLSBootstrapToken) != 0 {
-		if len(cfg.Token) != 0 || len(cfg.DiscoveryFile) != 0 {
+		if len(cfg.Token) != 0 {
 			allErrs = append(
 				allErrs,
 				field.Invalid(
 					fldPath,
 					nil,
-					"TLSBootstrapToken is mutually exclusive with Token, and DiscoveryFile",
-				),
-			)
-		}
-		if len(cfg.DiscoveryTokenAPIServers) < 1 {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath,
-					nil,
-					"TLSBootstrapToken must also specificy DiscoveryTokenAPIServers",
-				),
-			)
-		}
-		if len(cfg.DiscoveryToken) != 0 {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath,
-					nil,
-					"TLSBootstrapToken must also specificy DiscoveryToken",
+					"TLSBootstrapToken or Token must be set",
 				),
 			)
 		}
@@ -198,44 +144,7 @@ func ValidateTLSBootstrapTokenArg(cfg *kubeadm.NodeConfiguration, fldPath *field
 	return allErrs
 }
 
-func ValidateDiscoveryFileArg(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(cfg.DiscoveryFile) != 0 {
-		if len(cfg.Token) != 0 || len(cfg.DiscoveryToken) != 0 {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath,
-					nil,
-					"DiscoveryFile is mutually exclusive with Token, and DiscoveryToken",
-				),
-			)
-		}
-		if len(cfg.DiscoveryTokenAPIServers) != 0 {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath,
-					nil,
-					"DiscoveryFile must not specificy DiscoveryTokenAPIServers",
-				),
-			)
-		}
-		if len(cfg.TLSBootstrapToken) != 0 {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath,
-					nil,
-					"DiscoveryFile must also specificy TLSBootstrapToken",
-				),
-			)
-		}
-	}
-	return allErrs
-}
-
-func ValidateJoinDiscoveryTokenAPIServersArgs(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateJoinDiscoveryTokenAPIServer(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, m := range c.DiscoveryTokenAPIServers {
 		_, _, err := net.SplitHostPort(m)
