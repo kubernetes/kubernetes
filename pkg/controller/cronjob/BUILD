@@ -24,6 +24,7 @@ go_library(
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/robfig/cron:go_default_library",
