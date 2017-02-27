@@ -18,6 +18,7 @@ package job
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -598,7 +599,8 @@ func TestJobPodLookup(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job)
-		if job := manager.getPodJob(tc.pod); job != nil {
+		if jobs := manager.getPodJobs(tc.pod); len(jobs) > 0 {
+			job := jobs[0]
 			if tc.expectedName != job.Name {
 				t.Errorf("Got job %+v expected %+v", job.Name, tc.expectedName)
 			}
@@ -717,6 +719,279 @@ func TestGetPodsForJobRelease(t *testing.T) {
 	}
 	if got, want := pods[0].Name, "pod1"; got != want {
 		t.Errorf("pod.Name = %v, want %v", got, want)
+	}
+}
+
+func TestAddPod(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	job2 := newJob(1, 1)
+	job2.Name = "job2"
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+
+	pod1 := newPod("pod1", job1)
+	pod2 := newPod("pod2", job2)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+
+	jm.addPod(pod1)
+	if got, want := jm.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done := jm.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
+	}
+	expectedKey, _ := controller.KeyFunc(job1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+
+	jm.addPod(pod2)
+	if got, want := jm.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done = jm.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
+	}
+	expectedKey, _ = controller.KeyFunc(job2)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+}
+
+func TestAddPodOrphan(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	job2 := newJob(1, 1)
+	job2.Name = "job2"
+	job3 := newJob(1, 1)
+	job3.Name = "job3"
+	job3.Spec.Selector.MatchLabels = map[string]string{"other": "labels"}
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job3)
+
+	pod1 := newPod("pod1", job1)
+	// Make pod an orphan. Expect all matching controllers to be queued.
+	pod1.OwnerReferences = nil
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+
+	jm.addPod(pod1)
+	if got, want := jm.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdatePod(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	job2 := newJob(1, 1)
+	job2.Name = "job2"
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+
+	pod1 := newPod("pod1", job1)
+	pod2 := newPod("pod2", job2)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+
+	prev := *pod1
+	bumpResourceVersion(pod1)
+	jm.updatePod(&prev, pod1)
+	if got, want := jm.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done := jm.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
+	}
+	expectedKey, _ := controller.KeyFunc(job1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+
+	prev = *pod2
+	bumpResourceVersion(pod2)
+	jm.updatePod(&prev, pod2)
+	if got, want := jm.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done = jm.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
+	}
+	expectedKey, _ = controller.KeyFunc(job2)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	job2 := newJob(1, 1)
+	job2.Name = "job2"
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+
+	pod1 := newPod("pod1", job1)
+	pod1.OwnerReferences = nil
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+
+	// Labels changed on orphan. Expect newly matching controllers to queue.
+	prev := *pod1
+	prev.Labels = map[string]string{"foo2": "bar2"}
+	bumpResourceVersion(pod1)
+	jm.updatePod(&prev, pod1)
+	if got, want := jm.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdatePodChangeControllerRef(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	job2 := newJob(1, 1)
+	job2.Name = "job2"
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+
+	pod1 := newPod("pod1", job1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+
+	// Changed ControllerRef. Expect both old and new to queue.
+	prev := *pod1
+	prev.OwnerReferences = []metav1.OwnerReference{*newControllerRef(job2)}
+	bumpResourceVersion(pod1)
+	jm.updatePod(&prev, pod1)
+	if got, want := jm.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdatePodRelease(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	job2 := newJob(1, 1)
+	job2.Name = "job2"
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+
+	pod1 := newPod("pod1", job1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+
+	// Remove ControllerRef. Expect all matching to queue for adoption.
+	prev := *pod1
+	pod1.OwnerReferences = nil
+	bumpResourceVersion(pod1)
+	jm.updatePod(&prev, pod1)
+	if got, want := jm.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestDeletePod(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	job2 := newJob(1, 1)
+	job2.Name = "job2"
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+
+	pod1 := newPod("pod1", job1)
+	pod2 := newPod("pod2", job2)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+
+	jm.deletePod(pod1)
+	if got, want := jm.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done := jm.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
+	}
+	expectedKey, _ := controller.KeyFunc(job1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+
+	jm.deletePod(pod2)
+	if got, want := jm.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done = jm.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
+	}
+	expectedKey, _ = controller.KeyFunc(job2)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+}
+
+func TestDeletePodOrphan(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	job2 := newJob(1, 1)
+	job2.Name = "job2"
+	job3 := newJob(1, 1)
+	job3.Name = "job3"
+	job3.Spec.Selector.MatchLabels = map[string]string{"other": "labels"}
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job3)
+
+	pod1 := newPod("pod1", job1)
+	pod1.OwnerReferences = nil
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+
+	jm.deletePod(pod1)
+	if got, want := jm.queue.Len(), 0; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
 }
 
@@ -854,4 +1129,9 @@ func TestWatchPods(t *testing.T) {
 
 	t.Log("Waiting for pod to reach syncHandler")
 	<-received
+}
+
+func bumpResourceVersion(obj metav1.Object) {
+	ver, _ := strconv.ParseInt(obj.GetResourceVersion(), 10, 32)
+	obj.SetResourceVersion(strconv.FormatInt(ver+1, 10))
 }

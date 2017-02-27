@@ -143,18 +143,23 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Shutting down Job Manager")
 }
 
-// getPodJob returns the job managing the given pod.
-func (jm *JobController) getPodJob(pod *v1.Pod) *batch.Job {
+// getPodJobs returns a list of Jobs that potentially match a Pod.
+func (jm *JobController) getPodJobs(pod *v1.Pod) []*batch.Job {
 	jobs, err := jm.jobLister.GetPodJobs(pod)
 	if err != nil {
 		glog.V(4).Infof("No jobs found for pod %v, job controller will avoid syncing", pod.Name)
 		return nil
 	}
 	if len(jobs) > 1 {
+		// ControllerRef will ensure we don't do anything crazy, but more than one
+		// item in this list nevertheless constitutes user error.
 		utilruntime.HandleError(fmt.Errorf("user error! more than one job is selecting pods with labels: %+v", pod.Labels))
-		sort.Sort(byCreationTimestamp(jobs))
 	}
-	return &jobs[0]
+	ret := make([]*batch.Job, 0, len(jobs))
+	for i := range jobs {
+		ret = append(ret, &jobs[i])
+	}
+	return ret
 }
 
 // When a pod is created, enqueue the controller that manages it and update it's expectations.
@@ -166,13 +171,36 @@ func (jm *JobController) addPod(obj interface{}) {
 		jm.deletePod(pod)
 		return
 	}
-	if job := jm.getPodJob(pod); job != nil {
+
+	// If it has a ControllerRef, that's all that matters.
+	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
+		if controllerRef.Kind != ControllerKind.Kind {
+			// It's controlled by a different type of controller.
+			return
+		}
+		job, err := jm.jobLister.Jobs(pod.Namespace).Get(controllerRef.Name)
+		if err != nil {
+			// Don't log NotFound. That just means the GC will soon delete the Pod.
+			if !errors.IsNotFound(err) {
+				utilruntime.HandleError(fmt.Errorf("couldn't get Job %q in namespace %q: %v", controllerRef.Name, pod.Namespace, err))
+			}
+			return
+		}
 		jobKey, err := controller.KeyFunc(job)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
+			utilruntime.HandleError(fmt.Errorf("couldn't get key for Job %#v: %v", job, err))
 			return
 		}
 		jm.expectations.CreationObserved(jobKey)
+		jm.enqueueController(job)
+		return
+	}
+
+	// Otherwise, it's an orphan. Get a list of all matching controllers and sync
+	// them to see if anyone wants to adopt it.
+	// DO NOT observe creation because no controller should be waiting for an
+	// orphan.
+	for _, job := range jm.getPodJobs(pod) {
 		jm.enqueueController(job)
 	}
 }
@@ -196,15 +224,49 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 		jm.deletePod(curPod)
 		return
 	}
-	if job := jm.getPodJob(curPod); job != nil {
-		jm.enqueueController(job)
+
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
+
+	curControllerRef := controller.GetControllerOf(curPod)
+	oldControllerRef := controller.GetControllerOf(oldPod)
+	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
+	if controllerRefChanged &&
+		oldControllerRef != nil && oldControllerRef.Kind == ControllerKind.Kind {
+		// The ControllerRef was changed. Sync the old controller, if any.
+		job, err := jm.jobLister.Jobs(oldPod.Namespace).Get(oldControllerRef.Name)
+		if err != nil {
+			// Don't log NotFound. That just means the GC will soon delete the Pod.
+			if !errors.IsNotFound(err) {
+				utilruntime.HandleError(fmt.Errorf("couldn't get Job %q in namespace %q: %v", oldControllerRef.Name, oldPod.Namespace, err))
+			}
+		} else {
+			jm.enqueueController(job)
+		}
 	}
-	// Only need to get the old job if the labels changed.
-	if !reflect.DeepEqual(curPod.Labels, oldPod.Labels) {
-		// If the old and new job are the same, the first one that syncs
-		// will set expectations preventing any damage from the second.
-		if oldJob := jm.getPodJob(oldPod); oldJob != nil {
-			jm.enqueueController(oldJob)
+
+	// If it has a ControllerRef, that's all that matters.
+	if curControllerRef != nil {
+		if curControllerRef.Kind != ControllerKind.Kind {
+			// It's controlled by a different type of controller.
+			return
+		}
+		job, err := jm.jobLister.Jobs(curPod.Namespace).Get(curControllerRef.Name)
+		if err != nil {
+			// Don't log NotFound. That just means the GC will soon delete the Pod.
+			if !errors.IsNotFound(err) {
+				utilruntime.HandleError(fmt.Errorf("couldn't get Job %q in namespace %q: %v", curControllerRef.Name, curPod.Namespace, err))
+			}
+			return
+		}
+		jm.enqueueController(job)
+		return
+	}
+
+	// Otherwise, it's an orphan. If anything changed, sync matching controllers
+	// to see if anyone wants to adopt it now.
+	if labelChanged || controllerRefChanged {
+		for _, job := range jm.getPodJobs(curPod) {
+			jm.enqueueController(job)
 		}
 	}
 }
@@ -221,24 +283,41 @@ func (jm *JobController) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a pod %+v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %+v", obj))
 			return
 		}
 	}
-	if job := jm.getPodJob(pod); job != nil {
-		jobKey, err := controller.KeyFunc(job)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
-			return
-		}
-		jm.expectations.DeletionObserved(jobKey)
-		jm.enqueueController(job)
+
+	controllerRef := controller.GetControllerOf(pod)
+	if controllerRef == nil {
+		// No controller should care about orphans being deleted.
+		return
 	}
+	if controllerRef.Kind != ControllerKind.Kind {
+		// It's controlled by a different type of controller.
+		return
+	}
+
+	job, err := jm.jobLister.Jobs(pod.Namespace).Get(controllerRef.Name)
+	if err != nil {
+		// Don't log NotFound. That just means the GC will soon delete the Pod.
+		if !errors.IsNotFound(err) {
+			utilruntime.HandleError(fmt.Errorf("couldn't get Job %q in namespace %q: %v", controllerRef.Name, pod.Namespace, err))
+		}
+		return
+	}
+	jobKey, err := controller.KeyFunc(job)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for Job %#v: %v", job, err))
+		return
+	}
+	jm.expectations.DeletionObserved(jobKey)
+	jm.enqueueController(job)
 }
 
 // obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item.
