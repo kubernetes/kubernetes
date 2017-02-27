@@ -371,6 +371,8 @@ func TestSchedulerExtender(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		// enable node controller to set NoSchedule taint
+		true,
 	)
 	schedulerConfig, err := schedulerConfigFactory.CreateFromConfig(policy)
 	if err != nil {

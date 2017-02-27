@@ -65,6 +65,8 @@ func TestCreate(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		// enable node controller to set NoSchedule taint
+		true,
 	)
 	factory.Create()
 }
@@ -97,6 +99,8 @@ func TestCreateFromConfig(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		// enable node controller to set NoSchedule taint
+		true,
 	)
 
 	// Pre-register some predicate and priority functions
@@ -156,6 +160,8 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		// enable node controller to set NoSchedule taint
+		true,
 	)
 
 	// Pre-register some predicate and priority functions
@@ -216,6 +222,8 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		// enable node controller to set NoSchedule taint
+		true,
 	)
 
 	configData = []byte(`{}`)
@@ -273,6 +281,8 @@ func TestDefaultErrorFunc(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		// enable node controller to set NoSchedule taint
+		true,
 	)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
@@ -386,6 +396,8 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		// enable node controller to set NoSchedule taint
+		true,
 	)
 	// factory of "foo-scheduler"
 	factoryFooScheduler := NewConfigFactory(
@@ -401,6 +413,8 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		// enable node controller to set NoSchedule taint
+		true,
 	)
 	// scheduler annotations to be tested
 	schedulerFitsDefault := "default-scheduler"
@@ -471,6 +485,8 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		-1,
 		enableEquivalenceCache,
+		// enable node controller to set NoSchedule taint
+		true,
 	)
 	_, err := factory.Create()
 	if err == nil {
@@ -517,6 +533,8 @@ func TestInvalidFactoryArgs(t *testing.T) {
 			informerFactory.Core().V1().Services(),
 			test.hardPodAffinitySymmetricWeight,
 			enableEquivalenceCache,
+			// enable node controller to set NoSchedule taint
+			true,
 		)
 		_, err := factory.Create()
 		if err == nil {
@@ -527,7 +545,8 @@ func TestInvalidFactoryArgs(t *testing.T) {
 }
 
 func TestNodeConditionPredicate(t *testing.T) {
-	nodeFunc := getNodeConditionPredicate()
+	// disable node controller to set NoExecute taint
+	nodeFunc := getNodeConditionPredicate(false)
 	nodeList := &v1.NodeList{
 		Items: []v1.Node{
 			// node1 considered

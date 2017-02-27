@@ -435,6 +435,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			informerFactory.Core().V1().Services(),
 			v1.DefaultHardPodAffinitySymmetricWeight,
 			enableEquivalenceCache,
+			// enable node controller to set NoSchedule taint
+			true,
 		).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
