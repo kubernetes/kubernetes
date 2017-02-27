@@ -22,6 +22,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
@@ -29,6 +30,7 @@ import (
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // libcontainerCgroupManagerType defines how to interface with libcontainer
@@ -237,6 +239,11 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 
 // Destroy destroys the specified cgroup
 func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
+	start := time.Now()
+	defer func() {
+		metrics.CgroupManagerLatency.WithLabelValues("destroy").Observe(metrics.SinceInMicroseconds(start))
+	}()
+
 	cgroupPaths := m.buildCgroupPaths(cgroupConfig.Name)
 
 	// we take the location in traditional cgroupfs format.
@@ -329,6 +336,11 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 
 // Update updates the cgroup with the specified Cgroup Configuration
 func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
+	start := time.Now()
+	defer func() {
+		metrics.CgroupManagerLatency.WithLabelValues("update").Observe(metrics.SinceInMicroseconds(start))
+	}()
+
 	// Extract the cgroup resource parameters
 	resourceConfig := cgroupConfig.ResourceParameters
 	resources := m.toResources(resourceConfig)
@@ -364,6 +376,10 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 
 // Create creates the specified cgroup
 func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
+	start := time.Now()
+	defer func() {
+		metrics.CgroupManagerLatency.WithLabelValues("create").Observe(metrics.SinceInMicroseconds(start))
+	}()
 
 	// we take the location in traditional cgroupfs format.
 	abstractCgroupFsName := string(cgroupConfig.Name)
