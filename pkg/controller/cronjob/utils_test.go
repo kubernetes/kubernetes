@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestGetJobFromTemplate(t *testing.T) {
@@ -366,5 +367,30 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 			t.Errorf("unexpected error")
 		}
 	}
+}
 
+func TestAdoptJobs(t *testing.T) {
+	sj := cronJob()
+	jc := &fakeJobControl{}
+	jobs := []batchv1.Job{newJob("uid0"), newJob("uid1")}
+	jobs[0].OwnerReferences = nil
+	jobs[0].Name = "job0"
+	jobs[1].OwnerReferences = []metav1.OwnerReference{*newControllerRef(&sj)}
+	jobs[1].Name = "job1"
+
+	if err := adoptJobs(&sj, jobs, jc); err != nil {
+		t.Errorf("adoptJobs() error: %v", err)
+	}
+	for i := range jobs {
+		controllerRef := controller.GetControllerOf(&jobs[i])
+		if controllerRef == nil {
+			t.Errorf("Job should have ControllerRef: %#v", jobs[i])
+		}
+	}
+	if got, want := len(jc.UpdateJobName), 1; got != want {
+		t.Errorf("len(UpdateJobName) = %v, want %v", got, want)
+	}
+	if got, want := jc.UpdateJobName[0], "job0"; got != want {
+		t.Errorf("UpdateJobName = %v, want %v", got, want)
+	}
 }
