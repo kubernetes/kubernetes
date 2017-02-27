@@ -46,11 +46,10 @@ const (
 var (
 	CronJobGroupVersionResource      = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
 	ScheduledJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}
-	BatchV2Alpha1GroupVersion        = schema.GroupVersion{Group: batchv2alpha1.GroupName, Version: "v2alpha1"}
 )
 
 var _ = framework.KubeDescribe("CronJob", func() {
-	f := framework.NewDefaultGroupVersionFramework("cronjob", BatchV2Alpha1GroupVersion)
+	f := framework.NewDefaultFramework("cronjob")
 
 	sleepCommand := []string{"sleep", "300"}
 
