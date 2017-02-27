@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -121,7 +121,7 @@ type ServiceController struct {
 	serviceCache *serviceCache
 	clusterCache *clusterClientCache
 	// A store of services, populated by the serviceController
-	serviceStore listers.StoreToServiceLister
+	serviceStore corelisters.ServiceLister
 	// Watches changes to all services
 	serviceController cache.Controller
 	federatedInformer fedutil.FederatedInformer
@@ -180,7 +180,8 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		knownClusterSet:  make(sets.String),
 	}
 	s.clusterDeliverer = util.NewDelayingDeliverer()
-	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
+	var serviceIndexer cache.Indexer
+	serviceIndexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
 				return s.federationClient.Core().Services(metav1.NamespaceAll).List(options)
@@ -203,6 +204,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 		},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
+	s.serviceStore = corelisters.NewServiceLister(serviceIndexer)
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
@@ -938,44 +940,40 @@ func (s *ServiceController) syncService(key string) error {
 	defer func() {
 		glog.V(4).Infof("Finished syncing service %q (%v)", key, time.Now().Sub(startTime))
 	}()
-	// obj holds the latest service info from apiserver
-	objFromStore, exists, err := s.serviceStore.Indexer.GetByKey(key)
+
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		glog.Errorf("Unable to retrieve service %v from store: %v", key, err)
 		s.queue.Add(key)
 		return err
 	}
-	if !exists {
+
+	service, err := s.serviceStore.Services(namespace).Get(name)
+	switch {
+	case errors.IsNotFound(err):
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		glog.Infof("Service has been deleted %v", key)
 		err, retryDelay = s.processServiceDeletion(key)
-	}
-	// Create a copy before modifying the obj to prevent race condition with
-	// other readers of obj from store.
-	obj, err := conversion.NewCloner().DeepCopy(objFromStore)
-	if err != nil {
-		glog.Errorf("Error in deep copying service %v retrieved from store: %v", key, err)
+	case err != nil:
+		glog.Errorf("Unable to retrieve service %v from store: %v", key, err)
 		s.queue.Add(key)
 		return err
-	}
-
-	if exists {
-		service, ok := obj.(*v1.Service)
-		if ok {
-			cachedService = s.serviceCache.getOrCreate(key)
-			err, retryDelay = s.processServiceUpdate(cachedService, service, key)
-		} else {
-			tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-			if !ok {
-				return fmt.Errorf("Object contained wasn't a service or a deleted key: %+v", obj)
-			}
-			glog.Infof("Found tombstone for %v", key)
-			err, retryDelay = s.processServiceDeletion(tombstone.Key)
+	default:
+		// Create a copy before modifying the obj to prevent race condition with
+		// other readers of obj from store.
+		copy, err := conversion.NewCloner().DeepCopy(service)
+		if err != nil {
+			glog.Errorf("Error in deep copying service %v retrieved from store: %v", key, err)
+			s.queue.Add(key)
+			return err
 		}
+		service := copy.(*v1.Service)
+		cachedService = s.serviceCache.getOrCreate(key)
+		err, retryDelay = s.processServiceUpdate(cachedService, service, key)
 	}
 
 	if retryDelay != 0 {
-		s.enqueueService(obj)
+		s.enqueueService(service)
 	} else if err != nil {
 		runtime.HandleError(fmt.Errorf("Failed to process service. Not retrying: %v", err))
 	}
