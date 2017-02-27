@@ -471,23 +471,6 @@ func (f *ConfigFactory) ResponsibleForPod(pod *v1.Pod) bool {
 
 func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 	return func(node *v1.Node) bool {
-		for i := range node.Status.Conditions {
-			cond := &node.Status.Conditions[i]
-			// We consider the node for scheduling only when its:
-			// - NodeReady condition status is ConditionTrue,
-			// - NodeOutOfDisk condition status is ConditionFalse,
-			// - NodeNetworkUnavailable condition status is ConditionFalse.
-			if cond.Type == v1.NodeReady && cond.Status != v1.ConditionTrue {
-				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
-			} else if cond.Type == v1.NodeOutOfDisk && cond.Status != v1.ConditionFalse {
-				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
-			} else if cond.Type == v1.NodeNetworkUnavailable && cond.Status != v1.ConditionFalse {
-				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
-			}
-		}
 		// Ignore nodes that are marked unschedulable
 		if node.Spec.Unschedulable {
 			glog.V(4).Infof("Ignoring node %v since it is unschedulable", node.Name)

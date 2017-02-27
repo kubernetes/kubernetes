@@ -448,31 +448,16 @@ func TestInvalidFactoryArgs(t *testing.T) {
 func TestNodeConditionPredicate(t *testing.T) {
 	nodeFunc := getNodeConditionPredicate()
 	nodeList := &v1.NodeList{
+		// we only filter out node with Unschedulable=true in spec
 		Items: []v1.Node{
 			// node1 considered
 			{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
-			// node2 ignored - node not Ready
-			{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}},
-			// node3 ignored - node out of disk
-			{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			// node2 ignored - node unschedulable
+			{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Spec: v1.NodeSpec{Unschedulable: true}},
+			// node3 considered
+			{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Spec: v1.NodeSpec{Unschedulable: false}},
 			// node4 considered
-			{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-
-			// node5 ignored - node out of disk
-			{ObjectMeta: metav1.ObjectMeta{Name: "node5"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			// node6 considered
-			{ObjectMeta: metav1.ObjectMeta{Name: "node6"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-			// node7 ignored - node out of disk, node not Ready
-			{ObjectMeta: metav1.ObjectMeta{Name: "node7"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			// node8 ignored - node not Ready
-			{ObjectMeta: metav1.ObjectMeta{Name: "node8"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-
-			// node9 ignored - node unschedulable
-			{ObjectMeta: metav1.ObjectMeta{Name: "node9"}, Spec: v1.NodeSpec{Unschedulable: true}},
-			// node10 considered
-			{ObjectMeta: metav1.ObjectMeta{Name: "node10"}, Spec: v1.NodeSpec{Unschedulable: false}},
-			// node11 considered
-			{ObjectMeta: metav1.ObjectMeta{Name: "node11"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node4"}},
 		},
 	}
 
@@ -482,7 +467,7 @@ func TestNodeConditionPredicate(t *testing.T) {
 			nodeNames = append(nodeNames, node.Name)
 		}
 	}
-	expectedNodes := []string{"node1", "node4", "node6", "node10", "node11"}
+	expectedNodes := []string{"node1", "node3", "node4"}
 	if !reflect.DeepEqual(expectedNodes, nodeNames) {
 		t.Errorf("expected: %v, got %v", expectedNodes, nodeNames)
 	}
