@@ -787,7 +787,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	klet.appArmorValidator = apparmor.NewValidator(kubeCfg.ContainerRuntime)
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
-	if kubeCfg.ExperimentalEnableNvidiaGPU {
+	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
 		klet.gpuManager = nvidia.NewNvidiaGPUManager(klet, klet.dockerClient)
 	} else {
 		klet.gpuManager = gpu.NewGPUManagerStub()
