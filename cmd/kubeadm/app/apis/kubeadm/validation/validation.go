@@ -86,43 +86,17 @@ func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.
 func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cfg.DiscoveryToken) != 0 && len(cfg.DiscoveryFile) != 0 {
-		allErrs = append(
-			allErrs,
-			field.Invalid(
-				fldPath,
-				nil,
-				"DiscoveryToken and DiscoveryFile cannot both be set",
-			),
-		)
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "DiscoveryToken and DiscoveryFile cannot both be set"))
 	}
-	if len(cfg.DiscoveryFile) == 0 {
-		if len(cfg.DiscoveryToken) == 0 {
-			cfg.DiscoveryToken = cfg.Token
-		}
-		if len(cfg.DiscoveryToken) == 0 {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath,
-					nil,
-					"Token value not found in DiscoveryToken or Token",
-				),
-			)
-		}
+	if len(cfg.DiscoveryToken) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "Token value not found in DiscoveryToken or Token"))
 	}
 	if len(cfg.DiscoveryTokenAPIServers) < 1 {
-		allErrs = append(
-			allErrs,
-			field.Invalid(
-				fldPath,
-				nil,
-				"DiscoveryTokenAPIServers not set",
-			),
-		)
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "DiscoveryTokenAPIServers not set"))
 	}
 	// TODO remove once we support multiple api servers
 	if len(cfg.DiscoveryTokenAPIServers) > 1 {
-		fmt.Println("[WARN] we don't support multiple api servers yet")
+		fmt.Println("[validation] WARNING: kubeadm doesn't fully support multiple API Servers yet")
 	}
 	return allErrs
 }
@@ -157,23 +131,16 @@ func ValidateJoinDiscoveryTokenAPIServer(c *kubeadm.NodeConfiguration, fldPath *
 
 func ValidateDiscoveryFile(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	isURL := true
-	// Check if it is a URL
 	u, err := url.Parse(c.DiscoveryFile)
 	if err != nil {
-		isURL = false
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "invalid URL"))
-	}
-
-	if isURL {
+		// Ok, something without a URI scheme is passed, assume a file
+		if _, err := os.Stat(c.DiscoveryFile); os.IsNotExist(err) {
+			allErrs = append(allErrs, field.Invalid(fldPath, nil, "not a valid HTTPS URL or a file on disk"))
+		}
+	} else {
+		// Parsable URL, but require HTTPS
 		if u.Scheme != "https" {
 			allErrs = append(allErrs, field.Invalid(fldPath, nil, "must be https"))
-		}
-	}
-	// Check if its a file path
-	if !isURL {
-		if _, err := os.Stat(c.DiscoveryFile); os.IsNotExist(err) {
-			allErrs = append(allErrs, field.Invalid(fldPath, nil, "file does not exist"))
 		}
 	}
 

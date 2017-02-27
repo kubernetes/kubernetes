@@ -46,10 +46,7 @@ func For(d *kubeadmapi.NodeConfiguration) (*clientcmdapi.Config, error) {
 
 func isURL(s string) bool {
 	_, err := url.Parse(s)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 // runFileDiscovery executes file-based discovery.
