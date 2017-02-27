@@ -117,7 +117,8 @@ func printPodList(podList *api.PodList, w io.Writer, options printers.PrintOptio
 }
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
-func AddHandlers(h *printers.HumanReadablePrinter) {
+// TODO: handle errors from Handler
+func AddHandlers(h printers.PrintHandler) {
 	h.Handler(podColumns, podWideColumns, printPodList)
 	h.Handler(podColumns, podWideColumns, printPod)
 	h.Handler(podTemplateColumns, nil, printPodTemplate)
