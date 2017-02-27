@@ -584,7 +584,6 @@ function start_kubelet {
         --cloud-provider="${CLOUD_PROVIDER}" \
         --cloud-config="${CLOUD_CONFIG}" \
         --address="${KUBELET_HOST}" \
-        --require-kubeconfig \
         --kubeconfig "$CERT_DIR"/kubelet.kubeconfig \
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
@@ -605,11 +604,11 @@ function start_kubelet {
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
       # Quick check that kubelet is running.
-      if ps -p $KUBELET_PID > /dev/null ; then 
+      if ps -p $KUBELET_PID > /dev/null ; then
 	echo "kubelet ( $KUBELET_PID ) is running."
       else
 	cat ${KUBELET_LOG} ; exit 1
-      fi	
+      fi
     else
       # Docker won't run a container with a cidfile (container id file)
       # unless that file does not already exist; clean up an existing
@@ -644,7 +643,7 @@ function start_kubelet {
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --pod-manifest-path="${POD_MANIFEST_PATH}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --require-kubeconfig --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --api-servers="https://${API_HOST}:${API_SECURE_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
+        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --pod-manifest-path="${POD_MANIFEST_PATH}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --require-kubeconfig --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
     fi
 }
 
@@ -684,7 +683,7 @@ function start_kubedns {
           sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-deployment.yaml
         fi
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.in" >| kubedns-svc.yaml
-        
+
         # TODO update to dns role once we have one.
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
         # use kubectl to create kubedns deployment and service
