@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -158,6 +159,9 @@ type Store struct {
 	// ExportStrategy implements resource-specific behavior during export,
 	// optional. Exported objects are not decorated.
 	ExportStrategy rest.RESTExportStrategy
+	// TableConvertor is an optional interface for transforming items or lists
+	// of items into tabular output. If unset, the default will be used.
+	TableConvertor rest.TableConvertor
 
 	// Storage is the interface for the underlying storage for the resource.
 	Storage storage.Interface
@@ -172,6 +176,7 @@ type Store struct {
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
 var _ rest.StandardStorage = &Store{}
 var _ rest.Exporter = &Store{}
+var _ rest.TableConvertor = &Store{}
 
 const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
 
@@ -1144,4 +1149,11 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	}
 
 	return nil
+}
+
+func (e *Store) ConvertToTableList(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.TableList, error) {
+	if e.TableConvertor != nil {
+		return e.TableConvertor.ConvertToTableList(ctx, object, tableOptions)
+	}
+	return rest.DefaultTableConvertor.ConvertToTableList(ctx, object, tableOptions)
 }

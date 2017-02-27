@@ -374,6 +374,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		shortNames = shortNamesProvider.ShortNames()
 	}
 
+	tableProvider, ok := storage.(rest.TableConvertor)
+	if !ok {
+		tableProvider = rest.DefaultTableConvertor
+	}
+
 	var apiResource metav1.APIResource
 	// Get the list of actions for the given scope.
 	switch scope.Name() {
@@ -526,7 +531,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		UnsafeConvertor: a.group.UnsafeConvertor,
 
 		// TODO: Check for the interface on storage
-		TableConvertor: rest.DefaultTableConvertor,
+		TableConvertor: tableProvider,
 
 		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
 		Resource:    a.group.GroupVersion.WithResource(resource),
