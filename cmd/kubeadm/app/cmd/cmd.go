@@ -78,6 +78,7 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.ResetFlags()
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
+	cmds.AddCommand(NewCmdCompletion(out, ""))
 	cmds.AddCommand(NewCmdInit(out))
 	cmds.AddCommand(NewCmdJoin(out))
 	cmds.AddCommand(NewCmdReset(out))
