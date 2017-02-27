@@ -32,7 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	azStorage "github.com/Azure/azure-sdk-for-go/storage"
+	azstorage "github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/golang/glog"
 	"github.com/rubiojr/go-vhd/vhd"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -302,7 +302,7 @@ func (c *blobDiskController) CreateDataDisk(dataDiskName string, storageAccountT
 
 	headerBytes := vhdBytes[:vhd.VHD_HEADER_SIZE]
 
-	if err = blobSvc.PutPage(defaultContainerName, vhdName, sizeBytes, totalVhdSize-1, azStorage.PageWriteTypeUpdate, headerBytes, nil); err != nil {
+	if err = blobSvc.PutPage(defaultContainerName, vhdName, sizeBytes, totalVhdSize-1, azstorage.PageWriteTypeUpdate, headerBytes, nil); err != nil {
 		_, _ = blobSvc.DeleteBlobIfExists(defaultContainerName, vhdName, nil)
 		glog.Infof("azureDisk - failed to put header page for data disk %s on account %s error was %s\n", storageAccountName, dataDiskName, err.Error())
 		return "", err
@@ -515,16 +515,16 @@ func (c *blobDiskController) getStorageAccountKey(SAName string) (string, error)
 	return "", fmt.Errorf("couldn't find key named key1 in storage account:%s keys", SAName)
 }
 
-func (c *blobDiskController) getBlobSvcClient(SAName string) (azStorage.BlobStorageClient, error) {
+func (c *blobDiskController) getBlobSvcClient(SAName string) (azstorage.BlobStorageClient, error) {
 	key := ""
-	var client azStorage.Client
-	var blobSvc azStorage.BlobStorageClient
+	var client azstorage.Client
+	var blobSvc azstorage.BlobStorageClient
 	var err error
 	if key, err = c.getStorageAccountKey(SAName); err != nil {
 		return blobSvc, err
 	}
 
-	if client, err = azStorage.NewBasicClient(SAName, key); err != nil {
+	if client, err = azstorage.NewBasicClient(SAName, key); err != nil {
 		return blobSvc, err
 	}
 
@@ -537,7 +537,7 @@ func (c *blobDiskController) ensureDefaultContainer(storageAccountName string) e
 	var bExist bool
 	var provisionState string
 	var err error
-	var blobSvc azStorage.BlobStorageClient
+	var blobSvc azstorage.BlobStorageClient
 
 	// short circut the check via local cache
 	// we are forgiving the fact that account may not be in cache yet
@@ -609,7 +609,7 @@ func (c *blobDiskController) ensureDefaultContainer(storageAccountName string) e
 		return err
 	}
 
-	if bCreated, err := blobSvc.CreateContainerIfNotExists(defaultContainerName, azStorage.ContainerAccessType("")); err != nil {
+	if bCreated, err := blobSvc.CreateContainerIfNotExists(defaultContainerName, azstorage.ContainerAccessType("")); err != nil {
 		return err
 	} else {
 		if bCreated {
@@ -631,7 +631,7 @@ func (c *blobDiskController) getDiskCount(SAName string) (int, error) {
 	}
 
 	var err error
-	var blobSvc azStorage.BlobStorageClient
+	var blobSvc azstorage.BlobStorageClient
 
 	if err = c.ensureDefaultContainer(SAName); err != nil {
 		return 0, err
@@ -640,7 +640,7 @@ func (c *blobDiskController) getDiskCount(SAName string) (int, error) {
 	if blobSvc, err = c.getBlobSvcClient(SAName); err != nil {
 		return 0, err
 	}
-	params := azStorage.ListBlobsParameters{}
+	params := azstorage.ListBlobsParameters{}
 
 	if response, err := blobSvc.ListBlobs(defaultContainerName, params); err != nil {
 		return 0, err
@@ -890,7 +890,7 @@ func (c *blobDiskController) findSANameForDisk(storageAccountType string) (strin
 func (c *blobDiskController) getNextAccountNum() int {
 	max := 0
 
-	for k, _ := range c.accounts {
+	for k := range c.accounts {
 		// filter out accounts that are for standalone
 		if strings.Index(k, storageAccountNameMatch) != 0 {
 			continue
@@ -1034,7 +1034,7 @@ func getAccountNameForNum(num int) string {
 
 func getAccountNumFromName(accountName string) int {
 	nameLen := len(accountName)
-	num, _ := strconv.Atoi(accountName[nameLen-3 : len(accountName)])
+	num, _ := strconv.Atoi(accountName[nameLen-3:])
 
 	return num
 

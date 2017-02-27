@@ -75,7 +75,7 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 
 	if len(p.options.PVC.Spec.AccessModes) == 1 {
 		if p.options.PVC.Spec.AccessModes[0] != supportedModes[0] {
-			return nil, fmt.Errorf("AzureDisk - mode % is not supporetd by AzureDisk plugin supported mode is %s", p.options.PVC.Spec.AccessModes[0], supportedModes)
+			return nil, fmt.Errorf("AzureDisk - mode %s is not supporetd by AzureDisk plugin supported mode is %s", p.options.PVC.Spec.AccessModes[0], supportedModes)
 		}
 	}
 
