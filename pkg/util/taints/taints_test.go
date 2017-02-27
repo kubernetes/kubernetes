@@ -47,6 +47,10 @@ func TestTaintsVar(t *testing.T) {
 				{Key: "bing", Value: "bang", Effect: api.TaintEffectPreferNoSchedule},
 			},
 		},
+		{
+			f: "--t=dedicated-for=user1:NoExecute",
+			t: []api.Taint{{Key: "dedicated-for", Value: "user1", Effect: "NoExecute"}},
+		},
 	}
 
 	for i, c := range cases {
