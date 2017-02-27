@@ -18,6 +18,7 @@ package deployment
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -471,8 +472,6 @@ func TestGetPodMapForReplicaSets(t *testing.T) {
 
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
 
-	// Two ReplicaSets that match labels for both Deployments,
-	// but have ControllerRefs to make ownership explicit.
 	rs1 := newReplicaSet(d, "rs1", 1)
 	rs2 := newReplicaSet(d, "rs2", 1)
 
@@ -526,6 +525,298 @@ func TestGetPodMapForReplicaSets(t *testing.T) {
 	if got, want := podMap[rs2.UID].Items[0].Name, "rs2-pod"; got != want {
 		t.Errorf("podMap[rs2] = [%v], want [%v]", got, want)
 	}
+}
+
+func TestAddReplicaSet(t *testing.T) {
+	f := newFixture(t)
+
+	d1 := newDeployment("d1", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := newDeployment("d2", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	// Two ReplicaSets that match labels for both Deployments,
+	// but have ControllerRefs to make ownership explicit.
+	rs1 := newReplicaSet(d1, "rs1", 1)
+	rs2 := newReplicaSet(d2, "rs2", 1)
+
+	f.dLister = append(f.dLister, d1, d2)
+	f.objects = append(f.objects, d1, d2, rs1, rs2)
+
+	// Start the fixture.
+	dc, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	dc.addReplicaSet(rs1)
+	if got, want := dc.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done := dc.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for rs %v", rs1.Name)
+	}
+	expectedKey, _ := controller.KeyFunc(d1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+
+	dc.addReplicaSet(rs2)
+	if got, want := dc.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done = dc.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for rs %v", rs2.Name)
+	}
+	expectedKey, _ = controller.KeyFunc(d2)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+}
+
+func TestAddReplicaSetOrphan(t *testing.T) {
+	f := newFixture(t)
+
+	// 2 will match the RS, 1 won't.
+	d1 := newDeployment("d1", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := newDeployment("d2", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d3 := newDeployment("d3", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d3.Spec.Selector.MatchLabels = map[string]string{"foo": "notbar"}
+
+	// Make the RS an orphan. Expect matching Deployments to be queued.
+	rs := newReplicaSet(d1, "rs1", 1)
+	rs.OwnerReferences = nil
+
+	f.dLister = append(f.dLister, d1, d2, d3)
+	f.objects = append(f.objects, d1, d2, d3)
+
+	// Start the fixture.
+	dc, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	dc.addReplicaSet(rs)
+	if got, want := dc.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdateReplicaSet(t *testing.T) {
+	f := newFixture(t)
+
+	d1 := newDeployment("d1", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := newDeployment("d2", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	// Two ReplicaSets that match labels for both Deployments,
+	// but have ControllerRefs to make ownership explicit.
+	rs1 := newReplicaSet(d1, "rs1", 1)
+	rs2 := newReplicaSet(d2, "rs2", 1)
+
+	f.dLister = append(f.dLister, d1, d2)
+	f.rsLister = append(f.rsLister, rs1, rs2)
+	f.objects = append(f.objects, d1, d2, rs1, rs2)
+
+	// Start the fixture.
+	dc, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	prev := *rs1
+	bumpResourceVersion(rs1)
+	dc.updateReplicaSet(&prev, rs1)
+	if got, want := dc.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done := dc.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for rs %v", rs1.Name)
+	}
+	expectedKey, _ := controller.KeyFunc(d1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+
+	prev = *rs2
+	bumpResourceVersion(rs2)
+	dc.updateReplicaSet(&prev, rs2)
+	if got, want := dc.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done = dc.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for rs %v", rs2.Name)
+	}
+	expectedKey, _ = controller.KeyFunc(d2)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdateReplicaSetOrphanWithNewLabels(t *testing.T) {
+	f := newFixture(t)
+
+	d1 := newDeployment("d1", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := newDeployment("d2", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	// RS matches both, but is an orphan.
+	rs := newReplicaSet(d1, "rs1", 1)
+	rs.OwnerReferences = nil
+
+	f.dLister = append(f.dLister, d1, d2)
+	f.rsLister = append(f.rsLister, rs)
+	f.objects = append(f.objects, d1, d2, rs)
+
+	// Start the fixture.
+	dc, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	// Change labels and expect all matching controllers to queue.
+	prev := *rs
+	prev.Labels = map[string]string{"foo": "notbar"}
+	bumpResourceVersion(rs)
+	dc.updateReplicaSet(&prev, rs)
+	if got, want := dc.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdateReplicaSetChangeControllerRef(t *testing.T) {
+	f := newFixture(t)
+
+	d1 := newDeployment("d1", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := newDeployment("d2", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	rs := newReplicaSet(d1, "rs1", 1)
+
+	f.dLister = append(f.dLister, d1, d2)
+	f.rsLister = append(f.rsLister, rs)
+	f.objects = append(f.objects, d1, d2, rs)
+
+	// Start the fixture.
+	dc, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	// Change ControllerRef and expect both old and new to queue.
+	prev := *rs
+	prev.OwnerReferences = []metav1.OwnerReference{*newControllerRef(d2)}
+	bumpResourceVersion(rs)
+	dc.updateReplicaSet(&prev, rs)
+	if got, want := dc.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestUpdateReplicaSetRelease(t *testing.T) {
+	f := newFixture(t)
+
+	d1 := newDeployment("d1", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := newDeployment("d2", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	rs := newReplicaSet(d1, "rs1", 1)
+
+	f.dLister = append(f.dLister, d1, d2)
+	f.rsLister = append(f.rsLister, rs)
+	f.objects = append(f.objects, d1, d2, rs)
+
+	// Start the fixture.
+	dc, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	// Remove ControllerRef and expect all matching controller to sync orphan.
+	prev := *rs
+	rs.OwnerReferences = nil
+	bumpResourceVersion(rs)
+	dc.updateReplicaSet(&prev, rs)
+	if got, want := dc.queue.Len(), 2; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestDeleteReplicaSet(t *testing.T) {
+	f := newFixture(t)
+
+	d1 := newDeployment("d1", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := newDeployment("d2", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	// Two ReplicaSets that match labels for both Deployments,
+	// but have ControllerRefs to make ownership explicit.
+	rs1 := newReplicaSet(d1, "rs1", 1)
+	rs2 := newReplicaSet(d2, "rs2", 1)
+
+	f.dLister = append(f.dLister, d1, d2)
+	f.rsLister = append(f.rsLister, rs1, rs2)
+	f.objects = append(f.objects, d1, d2, rs1, rs2)
+
+	// Start the fixture.
+	dc, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	dc.deleteReplicaSet(rs1)
+	if got, want := dc.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done := dc.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for rs %v", rs1.Name)
+	}
+	expectedKey, _ := controller.KeyFunc(d1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+
+	dc.deleteReplicaSet(rs2)
+	if got, want := dc.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done = dc.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for rs %v", rs2.Name)
+	}
+	expectedKey, _ = controller.KeyFunc(d2)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+}
+
+func TestDeleteReplicaSetOrphan(t *testing.T) {
+	f := newFixture(t)
+
+	d1 := newDeployment("d1", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := newDeployment("d2", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	// Make the RS an orphan. Expect matching Deployments to be queued.
+	rs := newReplicaSet(d1, "rs1", 1)
+	rs.OwnerReferences = nil
+
+	f.dLister = append(f.dLister, d1, d2)
+	f.rsLister = append(f.rsLister, rs)
+	f.objects = append(f.objects, d1, d2, rs)
+
+	// Start the fixture.
+	dc, informers := f.newController()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+
+	dc.deleteReplicaSet(rs)
+	if got, want := dc.queue.Len(), 0; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func bumpResourceVersion(obj metav1.Object) {
+	ver, _ := strconv.ParseInt(obj.GetResourceVersion(), 10, 32)
+	obj.SetResourceVersion(strconv.FormatInt(ver+1, 10))
 }
 
 // generatePodFromRS creates a pod, with the input ReplicaSet's selector and its template

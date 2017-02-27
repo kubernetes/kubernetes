@@ -33,7 +33,6 @@ go_library(
         "//pkg/util/labels:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
