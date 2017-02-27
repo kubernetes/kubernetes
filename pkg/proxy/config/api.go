@@ -30,19 +30,30 @@ import (
 
 // NewSourceAPI creates config source that watches for changes to the services and endpoints.
 func NewSourceAPI(c cache.Getter, period time.Duration, servicesChan chan<- ServiceUpdate, endpointsChan chan<- EndpointsUpdate) {
-	stopCh := wait.NeverStop
-
 	servicesLW := cache.NewListWatchFromClient(c, "services", metav1.NamespaceAll, fields.Everything())
+	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", metav1.NamespaceAll, fields.Everything())
+	newSourceAPI(servicesLW, endpointsLW, period, servicesChan, endpointsChan, wait.NeverStop)
+}
+
+func newSourceAPI(
+	servicesLW cache.ListerWatcher,
+	endpointsLW cache.ListerWatcher,
+	period time.Duration,
+	servicesChan chan<- ServiceUpdate,
+	endpointsChan chan<- EndpointsUpdate,
+	stopCh <-chan struct{}) {
 	serviceController := NewServiceController(servicesLW, period, servicesChan)
 	go serviceController.Run(stopCh)
 
-	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", metav1.NamespaceAll, fields.Everything())
 	endpointsController := NewEndpointsController(endpointsLW, period, endpointsChan)
 	go endpointsController.Run(stopCh)
 
 	if !cache.WaitForCacheSync(stopCh, serviceController.HasSynced, endpointsController.HasSynced) {
 		utilruntime.HandleError(fmt.Errorf("source controllers not synced"))
+		return
 	}
+	servicesChan <- ServiceUpdate{Op: SYNCED}
+	endpointsChan <- EndpointsUpdate{Op: SYNCED}
 }
 
 func sendAddService(servicesChan chan<- ServiceUpdate) func(obj interface{}) {

@@ -34,6 +34,7 @@ const (
 	ADD Operation = iota
 	UPDATE
 	REMOVE
+	SYNCED
 )
 
 // ServiceUpdate describes an operation of services, sent on the channel.
@@ -88,6 +89,7 @@ func NewEndpointsConfig() *EndpointsConfig {
 	return &EndpointsConfig{mux, bcaster, store}
 }
 
+// RegisterHandler registers a handler which is called on every endpoints change.
 func (c *EndpointsConfig) RegisterHandler(handler EndpointsConfigHandler) {
 	c.bcaster.Add(config.ListenerFunc(func(instance interface{}) {
 		glog.V(3).Infof("Calling handler.OnEndpointsUpdate()")
@@ -95,6 +97,7 @@ func (c *EndpointsConfig) RegisterHandler(handler EndpointsConfigHandler) {
 	}))
 }
 
+// Channel returns a channel to which endpoints updates should be delivered.
 func (c *EndpointsConfig) Channel(source string) chan EndpointsUpdate {
 	ch := c.mux.Channel(source)
 	endpointsCh := make(chan EndpointsUpdate)
@@ -106,6 +109,7 @@ func (c *EndpointsConfig) Channel(source string) chan EndpointsUpdate {
 	return endpointsCh
 }
 
+// Config returns list of all endpoints from underlying store.
 func (c *EndpointsConfig) Config() []api.Endpoints {
 	return c.store.MergedState().([]api.Endpoints)
 }
@@ -113,6 +117,7 @@ func (c *EndpointsConfig) Config() []api.Endpoints {
 type endpointsStore struct {
 	endpointLock sync.RWMutex
 	endpoints    map[string]map[types.NamespacedName]*api.Endpoints
+	synced       bool
 	updates      chan<- struct{}
 }
 
@@ -132,18 +137,15 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 		glog.V(5).Infof("Removing an endpoint %s", spew.Sdump(update.Endpoints))
 		name := types.NamespacedName{Namespace: update.Endpoints.Namespace, Name: update.Endpoints.Name}
 		delete(endpoints, name)
+	case SYNCED:
+		s.synced = true
 	default:
 		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
 	}
 	s.endpoints[source] = endpoints
+	synced := s.synced
 	s.endpointLock.Unlock()
-	if s.updates != nil {
-		// TODO: We should not broadcase the signal, until the state is fully
-		// populated (i.e. until initial LIST of the underlying reflector is
-		// propagated here).
-		//
-		// Since we record the snapshot before sending this signal, it's
-		// possible that the consumer ends up performing an extra update.
+	if s.updates != nil && synced {
 		select {
 		case s.updates <- struct{}{}:
 		default:
@@ -188,6 +190,7 @@ func NewServiceConfig() *ServiceConfig {
 	return &ServiceConfig{mux, bcaster, store}
 }
 
+// RegisterHandler registers a handler which is called on every services change.
 func (c *ServiceConfig) RegisterHandler(handler ServiceConfigHandler) {
 	c.bcaster.Add(config.ListenerFunc(func(instance interface{}) {
 		glog.V(3).Infof("Calling handler.OnServiceUpdate()")
@@ -195,6 +198,7 @@ func (c *ServiceConfig) RegisterHandler(handler ServiceConfigHandler) {
 	}))
 }
 
+// Channel returns a channel to which services updates should be delivered.
 func (c *ServiceConfig) Channel(source string) chan ServiceUpdate {
 	ch := c.mux.Channel(source)
 	serviceCh := make(chan ServiceUpdate)
@@ -206,6 +210,7 @@ func (c *ServiceConfig) Channel(source string) chan ServiceUpdate {
 	return serviceCh
 }
 
+// Config returns list of all services from underlying store.
 func (c *ServiceConfig) Config() []api.Service {
 	return c.store.MergedState().([]api.Service)
 }
@@ -213,6 +218,7 @@ func (c *ServiceConfig) Config() []api.Service {
 type serviceStore struct {
 	serviceLock sync.RWMutex
 	services    map[string]map[types.NamespacedName]*api.Service
+	synced      bool
 	updates     chan<- struct{}
 }
 
@@ -232,18 +238,15 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 		glog.V(5).Infof("Removing a service %s", spew.Sdump(update.Service))
 		name := types.NamespacedName{Namespace: update.Service.Namespace, Name: update.Service.Name}
 		delete(services, name)
+	case SYNCED:
+		s.synced = true
 	default:
 		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
 	}
 	s.services[source] = services
+	synced := s.synced
 	s.serviceLock.Unlock()
-	if s.updates != nil {
-		// TODO: We should not broadcase the signal, until the state is fully
-		// populated (i.e. until initial LIST of the underlying reflector is
-		// propagated here).
-		//
-		// Since we record the snapshot before sending this signal, it's
-		// possible that the consumer ends up performing an extra update.
+	if s.updates != nil && synced {
 		select {
 		case s.updates <- struct{}{}:
 		default:
