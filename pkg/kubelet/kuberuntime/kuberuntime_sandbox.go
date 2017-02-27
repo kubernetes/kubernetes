@@ -114,7 +114,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 
 	}
 
-	_, cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
+	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
 	podSandboxConfig.Linux = m.generatePodSandboxLinuxConfig(pod, cgroupParent)
 	if len(portMappings) > 0 {
 		podSandboxConfig.PortMappings = portMappings

@@ -267,9 +267,10 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 }
 
 // GetPodCgroupParent gets pod cgroup parent from container manager.
-func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
+func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 	pcm := kl.containerManager.NewPodContainerManager()
-	return pcm.GetPodContainerName(pod)
+	_, cgroupParent := pcm.GetPodContainerName(pod)
+	return cgroupParent
 }
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
@@ -277,7 +278,7 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
 func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
 	var err error
 	useClusterFirstPolicy := false
-	_, cgroupParent := kl.GetPodCgroupParent(pod)
+	cgroupParent := kl.GetPodCgroupParent(pod)
 	opts := &kubecontainer.RunContainerOptions{CgroupParent: cgroupParent}
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
