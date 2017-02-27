@@ -31,7 +31,7 @@ type SecretForDockerRegistryGeneratorV1 struct {
 	Name string
 	// Username for registry (required)
 	Username string
-	// Email for registry (required)
+	// Email for registry (optional)
 	Email string
 	// Password for registry (required)
 	Password string
@@ -91,7 +91,7 @@ func (s SecretForDockerRegistryGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 		{"docker-username", true},
-		{"docker-email", true},
+		{"docker-email", false},
 		{"docker-password", true},
 		{"docker-server", true},
 	}
@@ -104,9 +104,6 @@ func (s SecretForDockerRegistryGeneratorV1) validate() error {
 	}
 	if len(s.Username) == 0 {
 		return fmt.Errorf("username must be specified")
-	}
-	if len(s.Email) == 0 {
-		return fmt.Errorf("email must be specified")
 	}
 	if len(s.Password) == 0 {
 		return fmt.Errorf("password must be specified")
