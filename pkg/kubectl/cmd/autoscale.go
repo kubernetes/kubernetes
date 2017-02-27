@@ -156,7 +156,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, hpa) {
-			if err := cmdutil.RecordChangeCause(hpa.Object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(hpa.Object, f.Command(cmd, false)); err != nil {
 				return err
 			}
 			object = hpa.Object
