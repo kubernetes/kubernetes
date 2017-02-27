@@ -81,7 +81,9 @@ func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, ser
 	}
 }
 
-func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
+// GetResourceMetric returns pod resourcemetric values based on the given resource for pods
+// matching the given selector in the given namespace
+func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodResourceInfo, time.Time, error) {
 	metricPath := fmt.Sprintf("/apis/metrics/v1alpha1/namespaces/%s/pods", namespace)
 	params := map[string]string{"labelSelector": selector.String()}
 
@@ -129,6 +131,8 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 	return res, timestamp, nil
 }
 
+// GetRawMetric returns pod resourcemetric values based on the given resource for pods
+// matching the given selector in the given namespace
 func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	podList, err := h.podsGetter.Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
@@ -168,7 +172,7 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 	glog.V(4).Infof("Heapster metrics result: %s", string(resultRaw))
 
 	if len(metrics.Items) != len(podNames) {
-		// if we get too many metrics or two few metrics, we have no way of knowing which metric goes to which pod
+		// if we get too many metrics or too few metrics, we have no way of knowing which metric goes to which pod
 		// (note that Heapster returns *empty* metric items when a pod does not exist or have that metric, so this
 		// does not cover the "missing metric entry" case)
 		return nil, time.Time{}, fmt.Errorf("requested metrics for %v pods, got metrics for %v", len(podNames), len(metrics.Items))
