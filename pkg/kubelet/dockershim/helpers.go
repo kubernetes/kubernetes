@@ -320,3 +320,20 @@ func getSecurityOptSeparator(v *semver.Version) rune {
 		return dockertools.SecurityOptSeparatorNew
 	}
 }
+
+// ensureImageExists pulls the image when it doesn't exist. It is used to pull infra container
+// image.
+func ensureImageExists(client dockertools.DockerInterface, image string) error {
+	_, err := client.InspectImageByRef(image)
+	if err == nil {
+		return nil
+	}
+	if !dockertools.IsImageNotFoundError(err) {
+		return fmt.Errorf("failed to inspect infra container image %q: %v", image, err)
+	}
+	err = client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to pull image for the sandbox container: %v", err)
+	}
+	return nil
+}
