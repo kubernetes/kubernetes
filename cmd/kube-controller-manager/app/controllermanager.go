@@ -477,6 +477,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			serviceCIDR,
 			int(s.NodeCIDRMaskSize),
 			s.AllocateNodeCIDRs,
+			nodecontroller.CIDRAllocatorType(s.CIDRAllocatorType),
 			s.EnableTaintManager,
 			utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
 		)

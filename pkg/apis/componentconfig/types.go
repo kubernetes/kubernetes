@@ -794,9 +794,11 @@ type KubeControllerManagerConfiguration struct {
 	ServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
 	NodeCIDRMaskSize int32
-	// allocateNodeCIDRs enables CIDRs for Pods to be allocated and, if
+	// AllocateNodeCIDRs enables CIDRs for Pods to be allocated and, if
 	// ConfigureCloudRoutes is true, to be set on the cloud provider.
 	AllocateNodeCIDRs bool
+	// CIDRAllocatorType determines what kind of pod CIDR allocator will be used.
+	CIDRAllocatorType string
 	// configureCloudRoutes enables CIDRs allocated with allocateNodeCIDRs
 	// to be configured on the cloud provider.
 	ConfigureCloudRoutes bool
