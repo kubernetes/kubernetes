@@ -375,7 +375,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			desiredReplicas = calculateScaleUpLimit(currentReplicas)
 		}
 
-		rescale = shouldScale(a, hpa, currentReplicas, desiredReplicas, timestamp)
+		rescale = a.shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
 	}
 
 	if rescale {
@@ -396,7 +396,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	return a.updateStatus(hpa, currentReplicas, desiredReplicas, metricStatuses, rescale)
 }
 
-func shouldScale(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
+func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
 	if desiredReplicas == currentReplicas {
 		return false
 	}
