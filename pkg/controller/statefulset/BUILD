@@ -62,7 +62,6 @@ go_test(
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/apps/v1beta1:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
-        "//pkg/client/legacylisters:go_default_library",
         "//pkg/client/listers/apps/v1beta1:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/controller:go_default_library",

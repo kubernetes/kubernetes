@@ -20,6 +20,7 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -95,10 +96,15 @@ func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Int
 }
 
 func (m *Helper) Delete(namespace, name string) error {
+	return m.DeleteWithOptions(namespace, name, nil)
+}
+
+func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.DeleteOptions) error {
 	return m.RESTClient.Delete().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
+		Body(options).
 		Do().
 		Error()
 }

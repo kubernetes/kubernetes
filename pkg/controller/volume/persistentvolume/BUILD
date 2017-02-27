@@ -30,6 +30,7 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/goroutinemap:go_default_library",
+        "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

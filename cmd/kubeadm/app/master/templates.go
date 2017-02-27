@@ -75,10 +75,10 @@ spec:
           name: clusterinfo
           readOnly: true
       hostNetwork: true
-      tolerations:
-      - key: "dedicated"
-        value: "master"
-        effect: "NoSchedule"
+      # TODO: Why doesn't the Decoder recognize this new field and decode it properly? Right now it's ignored
+      # tolerations:
+      # - key: {{ .MasterTaintKey }}
+      #  effect: NoSchedule
       securityContext:
           seLinuxOptions:
             type: spc_t

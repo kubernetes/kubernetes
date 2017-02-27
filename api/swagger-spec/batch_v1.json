@@ -1665,8 +1665,7 @@
     "required": [
      "targetPortal",
      "iqn",
-     "lun",
-     "portals"
+     "lun"
     ],
     "properties": {
      "targetPortal": {

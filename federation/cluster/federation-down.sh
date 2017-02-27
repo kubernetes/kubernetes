@@ -49,17 +49,17 @@ function unjoin_clusters() {
 
 unjoin_clusters
 
-cleanup-federation-api-objects || echo "Couldn't cleanup federation api objects"
-
-"${KUBE_ROOT}/cluster/kubectl.sh" delete namespace \
-    --context="${HOST_CLUSTER_CONTEXT}" \
-    "${FEDERATION_NAMESPACE}"
-
-# TODO(madhusudancs): This is an arbitrary amount of sleep to give Kubernetes
-# clusters enough time to delete the underlying cloud provider resources
-# corresponding to the Kubernetes resources we deleted as part of the test
-# teardowns. It is shameful that we are doing this, but this is just a bandage
-# to stop the bleeding. Please don't use this pattern anywhere. Remove this
-# when proper cloud provider cleanups are implemented in the individual test
-# `AfterEach` blocks.
-sleep 2m
+if cleanup-federation-api-objects; then
+  # TODO(madhusudancs): This is an arbitrary amount of sleep to give
+  # Kubernetes clusters enough time to delete the underlying cloud
+  # provider resources corresponding to the Kubernetes resources we
+  # deleted as part of the test tear downs. It is shameful that we
+  # are doing this, but this is just a bandage to stop the bleeding.
+  # Please don't use this pattern anywhere. Remove this when proper
+  # cloud provider cleanups are implemented in the individual test
+  # `AfterEach` blocks.
+  # Also, we wait only if the cleanup succeeds.
+  sleep 2m
+else
+  echo "Couldn't cleanup federation api objects"
+fi

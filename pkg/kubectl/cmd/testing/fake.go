@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 type InternalType struct {
@@ -214,13 +215,15 @@ type TestFactory struct {
 	Typer              runtime.ObjectTyper
 	Client             kubectl.RESTClient
 	UnstructuredClient kubectl.RESTClient
-	Describer          kubectl.Describer
-	Printer            kubectl.ResourcePrinter
+	Describer          printers.Describer
+	Printer            printers.ResourcePrinter
+	CommandPrinter     printers.ResourcePrinter
 	Validator          validation.Schema
 	Namespace          string
 	ClientConfig       *restclient.Config
 	Err                error
 	Command            string
+	GenericPrinter     bool
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -258,16 +261,7 @@ func (f *FakeFactory) FlagSet() *pflag.FlagSet {
 }
 
 func (f *FakeFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	priorityRESTMapper := meta.PriorityRESTMapper{
-		Delegate: f.tf.Mapper,
-		ResourcePriority: []schema.GroupVersionResource{
-			{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
-		},
-		KindPriority: []schema.GroupVersionKind{
-			{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
-		},
-	}
-	return priorityRESTMapper, f.tf.Typer
+	return api.Registry.RESTMapper(), f.tf.Typer
 }
 
 func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
@@ -292,7 +286,7 @@ func (f *FakeFactory) RESTClient() (*restclient.RESTClient, error) {
 	return nil, nil
 }
 
-func (f *FakeFactory) ClientSet() (*internalclientset.Clientset, error) {
+func (f *FakeFactory) ClientSet() (internalclientset.Interface, error) {
 	return nil, nil
 }
 
@@ -317,7 +311,7 @@ func (f *FakeFactory) FederationClientSetForVersion(version *schema.GroupVersion
 func (f *FakeFactory) FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error) {
 	return nil, nil
 }
-func (f *FakeFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (*internalclientset.Clientset, error) {
+func (f *FakeFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
 	return nil, nil
 }
 func (f *FakeFactory) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
@@ -331,11 +325,15 @@ func (f *FakeFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
-func (f *FakeFactory) Describer(*meta.RESTMapping) (kubectl.Describer, error) {
+func (f *FakeFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
 }
 
-func (f *FakeFactory) Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
+func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
+	return f.tf.CommandPrinter, f.tf.GenericPrinter, f.tf.Err
+}
+
+func (f *FakeFactory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -437,7 +435,7 @@ func (f *FakeFactory) EditorEnvs() []string {
 func (f *FakeFactory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writer) {
 }
 
-func (f *FakeFactory) Command() string {
+func (f *FakeFactory) Command(*cobra.Command, bool) string {
 	return f.tf.Command
 }
 
@@ -451,7 +449,7 @@ func (f *FakeFactory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, ob
 	return nil
 }
 
-func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
+func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -459,8 +457,8 @@ func (f *FakeFactory) NewBuilder() *resource.Builder {
 	return nil
 }
 
-func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions {
-	return &kubectl.PrintOptions{}
+func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
+	return &printers.PrintOptions{}
 }
 
 func (f *FakeFactory) DefaultResourceFilterFunc() kubectl.Filters {
@@ -538,7 +536,7 @@ func (f *fakeAPIFactory) JSONEncoder() runtime.Encoder {
 	return testapi.Default.Codec()
 }
 
-func (f *fakeAPIFactory) ClientSet() (*internalclientset.Clientset, error) {
+func (f *fakeAPIFactory) ClientSet() (internalclientset.Interface, error) {
 	// Swap the HTTP client out of the REST client with the fake
 	// version.
 	fakeClient := f.tf.Client.(*fake.RESTClient)
@@ -587,11 +585,15 @@ func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (reso
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
-func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (kubectl.Describer, error) {
+func (f *fakeAPIFactory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
+	return f.tf.CommandPrinter, f.tf.GenericPrinter, f.tf.Err
+}
+
+func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
 }
 
-func (f *fakeAPIFactory) Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
+func (f *fakeAPIFactory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -638,7 +640,7 @@ func (f *fakeAPIFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
 }
 
-func (f *fakeAPIFactory) Command() string {
+func (f *fakeAPIFactory) Command(*cobra.Command, bool) string {
 	return f.tf.Command
 }
 
@@ -664,7 +666,7 @@ func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper,
 	return printer.PrintObj(obj, out)
 }
 
-func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
+func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 

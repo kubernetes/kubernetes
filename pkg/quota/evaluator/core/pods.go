@@ -130,7 +130,7 @@ func (p *podEvaluator) GroupKind() schema.GroupKind {
 	return api.Kind("Pod")
 }
 
-// Handles returns true of the evalutor should handle the specified operation.
+// Handles returns true of the evaluator should handle the specified operation.
 func (p *podEvaluator) Handles(operation admission.Operation) bool {
 	// TODO: update this if/when pods support resizing resource requirements.
 	return admission.Create == operation

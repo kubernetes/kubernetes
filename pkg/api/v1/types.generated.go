@@ -15436,11 +15436,12 @@ func (x *ISCSIVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			yyq2[3] = x.ISCSIInterface != ""
 			yyq2[4] = x.FSType != ""
 			yyq2[5] = x.ReadOnly != false
+			yyq2[6] = len(x.Portals) != 0
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(7)
 			} else {
-				yynn2 = 4
+				yynn2 = 3
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -15583,28 +15584,34 @@ func (x *ISCSIVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.Portals == nil {
-					r.EncodeNil()
-				} else {
-					yym22 := z.EncBinary()
-					_ = yym22
-					if false {
+				if yyq2[6] {
+					if x.Portals == nil {
+						r.EncodeNil()
 					} else {
-						z.F.EncSliceStringV(x.Portals, false, e)
+						yym22 := z.EncBinary()
+						_ = yym22
+						if false {
+						} else {
+							z.F.EncSliceStringV(x.Portals, false, e)
+						}
 					}
+				} else {
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("portals"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.Portals == nil {
-					r.EncodeNil()
-				} else {
-					yym23 := z.EncBinary()
-					_ = yym23
-					if false {
+				if yyq2[6] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("portals"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Portals == nil {
+						r.EncodeNil()
 					} else {
-						z.F.EncSliceStringV(x.Portals, false, e)
+						yym23 := z.EncBinary()
+						_ = yym23
+						if false {
+						} else {
+							z.F.EncSliceStringV(x.Portals, false, e)
+						}
 					}
 				}
 			}

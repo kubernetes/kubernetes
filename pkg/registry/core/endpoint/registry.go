@@ -71,6 +71,6 @@ func (s *storage) UpdateEndpoints(ctx genericapirequest.Context, endpoints *api.
 }
 
 func (s *storage) DeleteEndpoints(ctx genericapirequest.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }

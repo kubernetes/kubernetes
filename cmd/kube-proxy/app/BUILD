@@ -35,6 +35,7 @@ go_library(
         "//pkg/util/resourcecontainer:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",

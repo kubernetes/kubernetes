@@ -37,6 +37,7 @@ import (
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
 )
 
 func falsePredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
@@ -307,7 +308,7 @@ func TestGenericScheduler(t *testing.T) {
 		scheduler := NewGenericScheduler(
 			cache, test.predicates, algorithm.EmptyMetadataProducer, test.prioritizers, algorithm.EmptyMetadataProducer,
 			[]algorithm.SchedulerExtender{})
-		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
+		machine, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 
 		if !reflect.DeepEqual(err, test.wErr) {
 			t.Errorf("Failed : %s, Unexpected error: %v, expected: %v", test.name, err, test.wErr)
@@ -515,16 +516,16 @@ func TestZeroRequest(t *testing.T) {
 			{Map: algorithmpriorities.BalancedResourceAllocationMap, Weight: 1},
 			{
 				Function: algorithmpriorities.NewSelectorSpreadPriority(
-					algorithm.FakeServiceLister([]*v1.Service{}),
-					algorithm.FakeControllerLister([]*v1.ReplicationController{}),
-					algorithm.FakeReplicaSetLister([]*extensions.ReplicaSet{})),
+					schedulertesting.FakeServiceLister([]*v1.Service{}),
+					schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
+					schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{})),
 				Weight: 1,
 			},
 		}
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		list, err := PrioritizeNodes(
 			test.pod, nodeNameToInfo, algorithm.EmptyMetadataProducer, priorityConfigs,
-			algorithm.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
+			schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

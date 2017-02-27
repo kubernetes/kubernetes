@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -77,17 +78,19 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.ResetFlags()
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
+	cmds.AddCommand(NewCmdCompletion(out, ""))
 	cmds.AddCommand(NewCmdInit(out))
 	cmds.AddCommand(NewCmdJoin(out))
 	cmds.AddCommand(NewCmdReset(out))
 	cmds.AddCommand(NewCmdVersion(out))
+	cmds.AddCommand(NewCmdToken(out, err))
 
-	// Wrap not yet usable/supported commands in experimental sub-command:
+	// Wrap not yet fully supported commands in an alpha subcommand
 	experimentalCmd := &cobra.Command{
-		Use:   "ex",
+		Use:   "alpha",
 		Short: "Experimental sub-commands not yet fully functional.",
 	}
-	experimentalCmd.AddCommand(NewCmdToken(out, err))
+	experimentalCmd.AddCommand(phases.NewCmdPhase(out))
 	cmds.AddCommand(experimentalCmd)
 
 	return cmds

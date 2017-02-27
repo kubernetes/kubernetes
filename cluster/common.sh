@@ -709,6 +709,21 @@ EOF
 DOCKER_TEST_LOG_LEVEL: $(yaml-quote ${DOCKER_TEST_LOG_LEVEL})
 EOF
   fi
+  if [ -n "${DOCKER_LOG_DRIVER:-}" ]; then
+      cat >>$file <<EOF
+DOCKER_LOG_DRIVER: $(yaml-quote ${DOCKER_LOG_DRIVER})
+EOF
+  fi
+  if [ -n "${DOCKER_LOG_MAX_SIZE:-}" ]; then
+      cat >>$file <<EOF
+DOCKER_LOG_MAX_SIZE: $(yaml-quote ${DOCKER_LOG_MAX_SIZE})
+EOF
+  fi
+  if [ -n "${DOCKER_LOG_MAX_FILE:-}" ]; then
+      cat >>$file <<EOF
+DOCKER_LOG_MAX_FILE: $(yaml-quote ${DOCKER_LOG_MAX_FILE})
+EOF
+  fi
   if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
     cat >>$file <<EOF
 ENABLE_CUSTOM_METRICS: $(yaml-quote ${ENABLE_CUSTOM_METRICS})

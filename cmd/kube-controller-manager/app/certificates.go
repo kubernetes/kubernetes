@@ -41,7 +41,7 @@ func startCSRController(ctx ControllerContext) (bool, error) {
 
 	certController, err := certcontroller.NewCertificateController(
 		c,
-		ctx.NewInformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
 		signer,
 		certcontroller.NewGroupApprover(ctx.Options.ApproveAllKubeletCSRsForGroup),
 	)

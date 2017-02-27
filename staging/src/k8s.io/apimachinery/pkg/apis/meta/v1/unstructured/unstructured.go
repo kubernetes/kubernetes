@@ -73,11 +73,24 @@ func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
 	}
 	return obj.Object
 }
+
+// UnstructuredContent returns a map contain an overlay of the Items field onto
+// the Object field. Items always overwrites overlay. Changing "items" in the
+// returned object will affect items in the underlying Items field, but changing
+// the "items" slice itself will have no effect.
+// TODO: expose SetUnstructuredContent on runtime.Unstructured that allows
+// items to be changed.
 func (obj *UnstructuredList) UnstructuredContent() map[string]interface{} {
-	if obj.Object == nil {
-		obj.Object = make(map[string]interface{})
+	out := obj.Object
+	if out == nil {
+		out = make(map[string]interface{})
 	}
-	return obj.Object
+	items := make([]interface{}, len(obj.Items))
+	for i, item := range obj.Items {
+		items[i] = item.Object
+	}
+	out["items"] = items
+	return out
 }
 
 // MarshalJSON ensures that the unstructured object produces proper

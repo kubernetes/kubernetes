@@ -80,6 +80,8 @@ const (
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
+	ClientCARegistrationHook ClientCARegistrationHook
+
 	APIResourceConfigSource  serverstorage.APIResourceConfigSource
 	StorageFactory           serverstorage.StorageFactory
 	EnableCoreControllers    bool
@@ -135,6 +137,8 @@ type EndpointReconcilerConfig struct {
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
+
+	ClientCARegistrationHook ClientCARegistrationHook
 }
 
 type completedConfig struct {
@@ -249,6 +253,10 @@ func (c completedConfig) New() (*Master, error) {
 
 	if c.Tunneler != nil {
 		m.installTunneler(c.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
+	}
+
+	if err := m.GenericAPIServer.AddPostStartHook("ca-registration", c.ClientCARegistrationHook.PostStartHook); err != nil {
+		glog.Fatalf("Error registering PostStartHook %q: %v", "ca-registration", err)
 	}
 
 	return m, nil

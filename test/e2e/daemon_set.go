@@ -91,6 +91,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 	f = framework.NewDefaultFramework("daemonsets")
 
 	image := "gcr.io/google_containers/serve_hostname:v1.4"
+	redisImage := "gcr.io/google_containers/redis:e2e"
 	dsName := "daemon-set"
 
 	var ns string
@@ -231,6 +232,64 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
 	})
+
+	It("Should not update pod when spec was updated and update strategy is on delete", func() {
+		label := map[string]string{daemonsetNameLabel: dsName}
+
+		framework.Logf("Creating simple daemon set %s", dsName)
+		_, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Check that daemon pods launch on every node of the cluster.")
+		Expect(err).NotTo(HaveOccurred())
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
+
+		By("Update daemon pods image.")
+		ds, err := c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
+		ds.Spec.Template.Spec.Containers[0].Image = redisImage
+		_, err = c.Extensions().DaemonSets(ns).Update(ds)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Check that demon pods have not set updated image.")
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImage(c, ns, label, image))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Check that daemon pods are still running on every node of the cluster.")
+		Expect(err).NotTo(HaveOccurred())
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
+	})
+
+	It("Should update pod when spec was updated and update strategy is RollingUpdate", func() {
+		label := map[string]string{daemonsetNameLabel: dsName}
+
+		framework.Logf("Creating simple daemon set %s", dsName)
+		_, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Check that daemon pods launch on every node of the cluster.")
+		Expect(err).NotTo(HaveOccurred())
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
+
+		By("Update daemon pods image.")
+		ds, err := c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
+		ds.Spec.Template.Spec.Containers[0].Image = redisImage
+		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
+		_, err = c.Extensions().DaemonSets(ns).Update(ds)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Check that demon pods have not set updated image.")
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImage(c, ns, label, redisImage))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Check that daemon pods are still running on every node of the cluster.")
+		Expect(err).NotTo(HaveOccurred())
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
+	})
+
 })
 
 func newDaemonSet(dsName, image string, label map[string]string) *extensions.DaemonSet {
@@ -388,4 +447,25 @@ func checkDaemonStatus(f *framework.Framework, dsName string) error {
 		return fmt.Errorf("Error in daemon status. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", desired, scheduled, ready)
 	}
 	return nil
+}
+
+func checkDaemonPodsImage(c clientset.Interface, ns string, selector map[string]string, image string) func() (bool, error) {
+	return func() (bool, error) {
+		selector := labels.Set(selector).AsSelector()
+		options := metav1.ListOptions{LabelSelector: selector.String()}
+		podList, err := c.Core().Pods(ns).List(options)
+		if err != nil {
+			return false, err
+		}
+		pods := podList.Items
+
+		for _, pod := range pods {
+			podImage := pod.Spec.Containers[0].Image
+			if podImage != image || !v1.IsPodReady(&pod) {
+				framework.Logf("Wrong image for pod: %s. Expected: %s, got: %s. Pod Ready: %t", pod.Name, image, podImage, v1.IsPodReady(&pod))
+				return false, nil
+			}
+		}
+		return true, nil
+	}
 }

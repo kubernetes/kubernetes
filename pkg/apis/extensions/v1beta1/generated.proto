@@ -111,6 +111,22 @@ message DaemonSetSpec {
   // selector is specified).
   // More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
   optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 2;
+
+  // UpdateStrategy to replace existing DaemonSet pods with new pods.
+  // +optional
+  optional DaemonSetUpdateStrategy updateStrategy = 3;
+
+  // MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should
+  // be ready without any of its container crashing, for it to be considered
+  // available. Defaults to 0 (pod will be considered available as soon as it
+  // is ready).
+  // +optional
+  optional int32 minReadySeconds = 4;
+
+  // A sequence number representing a specific generation of the template.
+  // Populated by the system. It can be set only during the creation.
+  // +optional
+  optional int64 templateGeneration = 5;
 }
 
 // DaemonSetStatus represents the current status of a daemon set.
@@ -137,6 +153,39 @@ message DaemonSetStatus {
   // ObservedGeneration is the most recent generation observed by the daemon set controller.
   // +optional
   optional int64 observedGeneration = 5;
+
+  // UpdatedNumberScheduled is the total number of nodes that are running updated
+  // daemon pod
+  // +optional
+  optional int32 updatedNumberScheduled = 6;
+
+  // NumberAvailable is the number of nodes that should be running the
+  // daemon pod and have one or more of the daemon pod running and
+  // available (ready for at least minReadySeconds)
+  // +optional
+  optional int32 numberAvailable = 7;
+
+  // NumberUnavailable is the number of nodes that should be running the
+  // daemon pod and have none of the daemon pod running and available
+  // (ready for at least minReadySeconds)
+  // +optional
+  optional int32 numberUnavailable = 8;
+}
+
+message DaemonSetUpdateStrategy {
+  // Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
+  // Default is OnDelete.
+  // +optional
+  optional string type = 1;
+
+  // Rolling update config params. Present only if DaemonSetUpdateStrategy =
+  // RollingUpdate.
+  // ---
+  // TODO: Update this to follow our convention for oneOf, whatever we decide it
+  // to be. Same as DeploymentStrategy.RollingUpdate.
+  // See https://github.com/kubernetes/kubernetes/issues/35345
+  // +optional
+  optional RollingUpdateDaemonSet rollingUpdate = 2;
 }
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -782,6 +831,25 @@ message RollbackConfig {
   // The revision to rollback to. If set to 0, rollbck to the last revision.
   // +optional
   optional int64 revision = 1;
+}
+
+// Spec to control the desired behavior of daemon set rolling update.
+message RollingUpdateDaemonSet {
+  // The maximum number of DaemonSet pods that can be unavailable during the
+  // update. Value can be an absolute number (ex: 5) or a percentage of total
+  // number of DaemonSet pods at the start of the update (ex: 10%). Absolute
+  // number is calculated from percentage by rounding up.
+  // This cannot be 0.
+  // Default value is 1.
+  // Example: when this is set to 30%, 30% of the currently running DaemonSet
+  // pods can be stopped for an update at any given time. The update starts
+  // by stopping at most 30% of the currently running DaemonSet pods and then
+  // brings up new DaemonSet pods in their place. Once the new pods are ready,
+  // it then proceeds onto other DaemonSet pods, thus ensuring that at least
+  // 70% of original number of DaemonSet pods are available at all times
+  // during the update.
+  // +optional
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
 }
 
 // Spec to control the desired behavior of rolling update.

@@ -19,6 +19,8 @@ package constants
 import (
 	"path"
 	"time"
+
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
@@ -49,11 +51,22 @@ const (
 	FrontProxyClientCertName           = "front-proxy-client.crt"
 	FrontProxyClientKeyName            = "front-proxy-client.key"
 
-	AdminKubeConfigFileName   = "admin.conf"
-	KubeletKubeConfigFileName = "kubelet.conf"
+	AdminKubeConfigFileName             = "admin.conf"
+	KubeletKubeConfigFileName           = "kubelet.conf"
+	ControllerManagerKubeConfigFileName = "controller-manager.conf"
+	SchedulerKubeConfigFileName         = "scheduler.conf"
+
+	DefaultCertDir = "/etc/kubernetes/pki"
 
 	// Important: a "v"-prefix shouldn't exist here; semver doesn't allow that
 	MinimumControlPlaneVersion = "1.6.0-alpha.2"
+
+	// Some well-known users and groups in the core Kubernetes authorization system
+
+	ControllerManagerUser = "system:kube-controller-manager"
+	SchedulerUser         = "system:kube-scheduler"
+	MastersGroup          = "system:masters"
+	NodesGroup            = "system:nodes"
 
 	// Constants for what we name our ServiceAccounts with limited access to the cluster in case of RBAC
 	KubeDNSServiceAccountName   = "kube-dns"
@@ -67,7 +80,12 @@ const (
 	MinimumAddressesInServiceSubnet = 10
 
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
-	DefaultTokenDuration = time.Duration(8) * time.Hour
+	// Default behaviour is "never expire" == 0
+	DefaultTokenDuration = 0
+
+	// LabelNodeRoleMaster specifies that a node is a master
+	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
+	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
 	// CSVTokenBootstrapUser is currently the user the bootstrap token in the .csv file
 	// TODO: This should change to something more official and supported
@@ -77,9 +95,22 @@ const (
 	CSVTokenBootstrapGroup = "kubeadm:kubelet-bootstrap"
 	// The file name of the tokens file that can be used for bootstrapping
 	CSVTokenFileName = "tokens.csv"
+
+	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
+	MinExternalEtcdVersion = "3.0.14"
 )
 
 var (
+
+	// MasterToleration is the toleration to apply on the PodSpec for being able to run that Pod on the master
+	MasterToleration = v1.Toleration{
+		Key:    LabelNodeRoleMaster,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
 	AuthorizationPolicyPath        = path.Join(KubernetesDir, "abac_policy.json")
 	AuthorizationWebhookConfigPath = path.Join(KubernetesDir, "webhook_authz.conf")
+
+	// DefaultTokenUsages specifies the default functions a token will get
+	DefaultTokenUsages = []string{"signing", "authentication"}
 )

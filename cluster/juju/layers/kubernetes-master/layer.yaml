@@ -2,6 +2,7 @@ repo: https://github.com/kubernetes/kubernetes.git
 includes:
   - 'layer:basic'
   - 'layer:tls-client'
+  - 'layer:leadership'
   - 'layer:debug'
   - 'interface:etcd'
   - 'interface:http'

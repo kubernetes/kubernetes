@@ -35,6 +35,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/api/latest:go_default_library",
         "//plugin/pkg/scheduler/factory:go_default_library",

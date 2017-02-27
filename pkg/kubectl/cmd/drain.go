@@ -47,7 +47,7 @@ import (
 )
 
 type DrainOptions struct {
-	client             *internalclientset.Clientset
+	client             internalclientset.Interface
 	restClient         *restclient.RESTClient
 	factory            cmdutil.Factory
 	Force              bool
@@ -151,7 +151,8 @@ var (
 		DaemonSet controller, which ignores unschedulable markings.  If there are any
 		pods that are neither mirror pods nor managed by ReplicationController,
 		ReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you
-		use --force.
+		use --force.  --force will also allow deletion to proceed if the managing resource of one
+		or more pods is missing.
 
 		'drain' waits for graceful termination. You should not operate on the machine until
 		the command completes.
@@ -309,6 +310,10 @@ func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) 
 
 	sr, err := o.getPodCreator(pod)
 	if err != nil {
+		// if we're forcing, remove orphaned pods with a warning
+		if apierrors.IsNotFound(err) && o.Force {
+			return true, &warning{err.Error()}, nil
+		}
 		return false, nil, &fatal{err.Error()}
 	}
 	if sr != nil {
@@ -321,11 +326,19 @@ func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) 
 }
 
 func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
-	// Note that we return false in all cases where the pod is DaemonSet managed,
+	// Note that we return false in cases where the pod is DaemonSet managed,
 	// regardless of flags.  We never delete them, the only question is whether
 	// their presence constitutes an error.
+	//
+	// The exception is for pods that are orphaned (the referencing
+	// management resource - including DaemonSet - is not found).
+	// Such pods will be deleted if --force is used.
 	sr, err := o.getPodCreator(pod)
 	if err != nil {
+		// if we're forcing, remove orphaned pods with a warning
+		if apierrors.IsNotFound(err) && o.Force {
+			return true, &warning{err.Error()}, nil
+		}
 		return false, nil, &fatal{err.Error()}
 	}
 	if sr == nil || sr.Reference.Kind != "DaemonSet" {
@@ -570,7 +583,7 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 
 // SupportEviction uses Discovery API to find out if the server support eviction subresource
 // If support, it will return its groupVersion; Otherwise, it will return ""
-func SupportEviction(clientset *internalclientset.Clientset) (string, error) {
+func SupportEviction(clientset internalclientset.Interface) (string, error) {
 	discoveryClient := clientset.Discovery()
 	groupList, err := discoveryClient.ServerGroups()
 	if err != nil {
