@@ -404,6 +404,10 @@ type PersistentVolumeSpec struct {
 	// Optional: what happens to a persistent volume when released from its claim.
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy
+	// Name of StorageClass to which this persistent volume belongs. Empty value
+	// means that this volume does not belong to any StorageClass.
+	// +optional
+	StorageClassName string
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
@@ -481,6 +485,10 @@ type PersistentVolumeClaimSpec struct {
 	// claim. When set to non-empty value Selector is not evaluated
 	// +optional
 	VolumeName string
+	// Name of the StorageClass required by the claim.
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
+	// +optional
+	StorageClassName *string
 }
 
 type PersistentVolumeClaimStatus struct {
@@ -2001,6 +2009,9 @@ type PodSpec struct {
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string
+	// If specified, the pod's tolerations.
+	// +optional
+	Tolerations []Toleration
 }
 
 // Sysctl defines a kernel parameter to be set
@@ -2623,6 +2634,10 @@ type NodeSpec struct {
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	// +optional
 	Unschedulable bool
+
+	// If specified, the node's taints.
+	// +optional
+	Taints []Taint
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.

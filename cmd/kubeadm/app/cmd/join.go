@@ -146,8 +146,7 @@ func (j *Join) Run(out io.Writer) error {
 
 	// Write the ca certificate to disk so kubelet can use it for authentication
 	cluster := cfg.Contexts[cfg.CurrentContext].Cluster
-	caCertFile := filepath.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)
-	err = certutil.WriteCert(caCertFile, cfg.Clusters[cluster].CertificateAuthorityData)
+	err = certutil.WriteCert(j.cfg.CACertPath, cfg.Clusters[cluster].CertificateAuthorityData)
 	if err != nil {
 		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}

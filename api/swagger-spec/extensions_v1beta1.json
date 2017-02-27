@@ -6612,6 +6612,20 @@
      "template": {
       "$ref": "v1.PodTemplateSpec",
       "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template"
+     },
+     "updateStrategy": {
+      "$ref": "v1beta1.DaemonSetUpdateStrategy",
+      "description": "UpdateStrategy to replace existing DaemonSet pods with new pods."
+     },
+     "minReadySeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)."
+     },
+     "templateGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation."
      }
     }
    },
@@ -6775,6 +6789,13 @@
      "schedulername": {
       "type": "string",
       "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler."
+     },
+     "tolerations": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Toleration"
+      },
+      "description": "If specified, the pod's tolerations."
      }
     }
    },
@@ -7060,8 +7081,7 @@
     "required": [
      "targetPortal",
      "iqn",
-     "lun",
-     "portals"
+     "lun"
     ],
     "properties": {
      "targetPortal": {
@@ -8406,6 +8426,56 @@
      }
     }
    },
+   "v1.Toleration": {
+    "id": "v1.Toleration",
+    "description": "The pod this Toleration is attached to tolerates any taint that matches the triple \u003ckey,value,effect\u003e using the matching operator \u003coperator\u003e.",
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys."
+     },
+     "operator": {
+      "type": "string",
+      "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category."
+     },
+     "value": {
+      "type": "string",
+      "description": "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string."
+     },
+     "effect": {
+      "type": "string",
+      "description": "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute."
+     },
+     "tolerationSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system."
+     }
+    }
+   },
+   "v1beta1.DaemonSetUpdateStrategy": {
+    "id": "v1beta1.DaemonSetUpdateStrategy",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete."
+     },
+     "rollingUpdate": {
+      "$ref": "v1beta1.RollingUpdateDaemonSet",
+      "description": "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate."
+     }
+    }
+   },
+   "v1beta1.RollingUpdateDaemonSet": {
+    "id": "v1beta1.RollingUpdateDaemonSet",
+    "description": "Spec to control the desired behavior of daemon set rolling update.",
+    "properties": {
+     "maxUnavailable": {
+      "type": "string",
+      "description": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update."
+     }
+    }
+   },
    "v1beta1.DaemonSetStatus": {
     "id": "v1beta1.DaemonSetStatus",
     "description": "DaemonSetStatus represents the current status of a daemon set.",
@@ -8440,6 +8510,21 @@
       "type": "integer",
       "format": "int64",
       "description": "ObservedGeneration is the most recent generation observed by the daemon set controller."
+     },
+     "updatedNumberScheduled": {
+      "type": "integer",
+      "format": "int32",
+      "description": "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod"
+     },
+     "numberAvailable": {
+      "type": "integer",
+      "format": "int32",
+      "description": "NumberAvailable is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least minReadySeconds)"
+     },
+     "numberUnavailable": {
+      "type": "integer",
+      "format": "int32",
+      "description": "NumberUnavailable is the number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least minReadySeconds)"
      }
     }
    },

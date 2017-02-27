@@ -106,6 +106,16 @@ func DeepCopy_batch_CronJobSpec(in interface{}, out interface{}, c *conversion.C
 		if err := DeepCopy_batch_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, c); err != nil {
 			return err
 		}
+		if in.SuccessfulJobsHistoryLimit != nil {
+			in, out := &in.SuccessfulJobsHistoryLimit, &out.SuccessfulJobsHistoryLimit
+			*out = new(int32)
+			**out = **in
+		}
+		if in.FailedJobsHistoryLimit != nil {
+			in, out := &in.FailedJobsHistoryLimit, &out.FailedJobsHistoryLimit
+			*out = new(int32)
+			**out = **in
+		}
 		return nil
 	}
 }

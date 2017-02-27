@@ -21,6 +21,8 @@ import socket
 import string
 import json
 
+import charms.leadership
+
 from shlex import split
 from subprocess import call
 from subprocess import check_call
@@ -140,34 +142,92 @@ def configure_cni(cni):
     cni.set_config(is_master=True, kubeconfig_path='')
 
 
+@when('leadership.is_leader')
 @when('kubernetes-master.components.installed')
 @when_not('authentication.setup')
-def setup_authentication():
+def setup_leader_authentication():
     '''Setup basic authentication and token access for the cluster.'''
     api_opts = FlagManager('kube-apiserver')
     controller_opts = FlagManager('kube-controller-manager')
 
-    api_opts.add('--basic-auth-file', '/srv/kubernetes/basic_auth.csv')
-    api_opts.add('--token-auth-file', '/srv/kubernetes/known_tokens.csv')
+    service_key = '/etc/kubernetes/serviceaccount.key'
+    basic_auth = '/srv/kubernetes/basic_auth.csv'
+    known_tokens = '/srv/kubernetes/known_tokens.csv'
+
+    api_opts.add('--basic-auth-file', basic_auth)
+    api_opts.add('--token-auth-file', known_tokens)
     api_opts.add('--service-cluster-ip-range', service_cidr())
     hookenv.status_set('maintenance', 'Rendering authentication templates.')
-    htaccess = '/srv/kubernetes/basic_auth.csv'
-    if not os.path.isfile(htaccess):
+    if not os.path.isfile(basic_auth):
         setup_basic_auth('admin', 'admin', 'admin')
-    known_tokens = '/srv/kubernetes/known_tokens.csv'
     if not os.path.isfile(known_tokens):
         setup_tokens(None, 'admin', 'admin')
         setup_tokens(None, 'kubelet', 'kubelet')
         setup_tokens(None, 'kube_proxy', 'kube_proxy')
     # Generate the default service account token key
     os.makedirs('/etc/kubernetes', exist_ok=True)
-    cmd = ['openssl', 'genrsa', '-out', '/etc/kubernetes/serviceaccount.key',
+
+    cmd = ['openssl', 'genrsa', '-out', service_key,
            '2048']
     check_call(cmd)
-    api_opts.add('--service-account-key-file',
-                 '/etc/kubernetes/serviceaccount.key')
-    controller_opts.add('--service-account-private-key-file',
-                        '/etc/kubernetes/serviceaccount.key')
+    api_opts.add('--service-account-key-file', service_key)
+    controller_opts.add('--service-account-private-key-file', service_key)
+
+    # read service account key for syndication
+    leader_data = {}
+    for f in [known_tokens, basic_auth, service_key]:
+        with open(f, 'r') as fp:
+            leader_data[f] = fp.read()
+
+    # this is slightly opaque, but we are sending file contents under its file
+    # path as a key.
+    # eg:
+    # {'/etc/kubernetes/serviceaccount.key': 'RSA:2471731...'}
+    charms.leadership.leader_set(leader_data)
+
+    set_state('authentication.setup')
+
+
+@when_not('leadership.is_leader')
+@when('kubernetes-master.components.installed')
+@when_not('authentication.setup')
+def setup_non_leader_authentication():
+    api_opts = FlagManager('kube-apiserver')
+    controller_opts = FlagManager('kube-controller-manager')
+
+    service_key = '/etc/kubernetes/serviceaccount.key'
+    basic_auth = '/srv/kubernetes/basic_auth.csv'
+    known_tokens = '/srv/kubernetes/known_tokens.csv'
+
+    # This races with other codepaths, and seems to require being created first
+    # This block may be extracted later, but for now seems to work as intended
+    os.makedirs('/etc/kubernetes', exist_ok=True)
+    os.makedirs('/srv/kubernetes', exist_ok=True)
+
+    hookenv.status_set('maintenance', 'Rendering authentication templates.')
+
+    # Set an array for looping logic
+    keys = [service_key, basic_auth, known_tokens]
+    for k in keys:
+        # If the path does not exist, assume we need it
+        if not os.path.exists(k):
+            # Fetch data from leadership broadcast
+            contents = charms.leadership.leader_get(k)
+            # Default to logging the warning and wait for leader data to be set
+            if contents is None:
+                msg = "Waiting on leaders crypto keys."
+                hookenv.status_set('waiting', msg)
+                hookenv.log('Missing content for file {}'.format(k))
+                return
+            # Write out the file and move on to the next item
+            with open(k, 'w+') as fp:
+                fp.write(contents)
+
+    api_opts.add('--basic-auth-file', basic_auth)
+    api_opts.add('--token-auth-file', known_tokens)
+    api_opts.add('--service-cluster-ip-range', service_cidr())
+    api_opts.add('--service-account-key-file', service_key)
+    controller_opts.add('--service-account-private-key-file', service_key)
 
     set_state('authentication.setup')
 
@@ -185,7 +245,8 @@ def idle_status():
     if not all_kube_system_pods_running():
         hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
     elif hookenv.config('service-cidr') != service_cidr():
-        hookenv.status_set('active', 'WARN: cannot change service-cidr, still using ' + service_cidr())
+        msg = 'WARN: cannot change service-cidr, still using ' + service_cidr()
+        hookenv.status_set('active', msg)
     else:
         hookenv.status_set('active', 'Kubernetes master running.')
 
@@ -302,7 +363,7 @@ def start_kube_dns():
 
     context = {
         'arch': arch(),
-        # The dictionary named 'pillar' is a construct of the k8s template files.
+        # The dictionary named 'pillar' is a construct of the k8s template file
         'pillar': {
             'dns_server': get_dns_ip(),
             'dns_replicas': 1,

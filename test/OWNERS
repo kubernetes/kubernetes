@@ -5,8 +5,10 @@ reviewers:
   - krousey
   - liggitt
   - madhusudancs
+  - ncdc
   - rmmh
   - smarterclayton
+  - spiffxp
   - spxtr
   - sttts
   - soltysh
@@ -17,7 +19,9 @@ approvers:
   - krousey
   - liggitt
   - madhusudancs
+  - ncdc
   - smarterclayton
+  - spiffxp
   - spxtr
   - sttts
   - mikedanese

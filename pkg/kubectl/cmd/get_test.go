@@ -29,6 +29,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -207,6 +208,53 @@ func TestGetObjects(t *testing.T) {
 
 	if len(buf.String()) == 0 {
 		t.Errorf("unexpected empty output")
+	}
+}
+
+func TestGetObjectIgnoreNotFound(t *testing.T) {
+	initTestErrorHandler(t)
+
+	ns := &api.NamespaceList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "1",
+		},
+		Items: []api.Namespace{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "testns", Namespace: "test", ResourceVersion: "11"},
+				Spec:       api.NamespaceSpec{},
+			},
+		},
+	}
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods/nonexistentpod" && m == "GET":
+				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("")}, nil
+			case p == "/api/v1/namespaces/test" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &ns.Items[0])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf, errBuf)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("ignore-not-found", "true")
+	cmd.Flags().Set("output", "yaml")
+	cmd.Run(cmd, []string{"pods", "nonexistentpod"})
+
+	if buf.String() != "" {
+		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
 
@@ -459,7 +507,8 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	pods, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.CommandPrinter = &testPrinter{}
+	tf.GenericPrinter = true
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
@@ -486,34 +535,37 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	cmd.Flags().Set("output", "json")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	if tf.Printer.(*testPrinter).Objects != nil {
-		t.Errorf("unexpected print to default printer")
+	actual := tf.CommandPrinter.(*testPrinter).Objects
+	fn := func(obj runtime.Object) *unstructured.Unstructured {
+		data, err := runtime.Encode(api.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), obj)
+		if err != nil {
+			panic(err)
+		}
+		out := &unstructured.Unstructured{Object: make(map[string]interface{})}
+		if err := encjson.Unmarshal(data, &out.Object); err != nil {
+			panic(err)
+		}
+		return out
 	}
 
-	out, err := runtime.Decode(codec, buf.Bytes())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	list, err := meta.ExtractList(out)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if errs := runtime.DecodeList(list, codec); len(errs) > 0 {
-		t.Fatalf("unexpected error: %v", errs)
-	}
-	if err := meta.SetList(out, list); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expected := &api.List{
-		Items: []runtime.Object{
-			&pods.Items[0],
-			&pods.Items[1],
-			&svc.Items[0],
+	expected := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{"kind": "List", "apiVersion": "v1", "metadata": map[string]interface{}{}, "selfLink": "", "resourceVersion": ""},
+		Items: []*unstructured.Unstructured{
+			fn(&pods.Items[0]),
+			fn(&pods.Items[1]),
+			fn(&svc.Items[0]),
 		},
 	}
-	if !reflect.DeepEqual(expected, out) {
-		t.Errorf("unexpected output: %#v", out)
+	actualBytes, err := encjson.Marshal(actual[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedBytes, err := encjson.Marshal(expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(actualBytes) != string(expectedBytes) {
+		t.Errorf("unexpected object:\n%s\n%s", expectedBytes, actualBytes)
 	}
 }
 
@@ -720,9 +772,11 @@ func TestWatchSelector(t *testing.T) {
 			}
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
-			case "/watch/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+				if req.URL.Query().Get("watch") == "true" {
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+				} else {
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
+				}
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -760,8 +814,12 @@ func TestWatchResource(t *testing.T) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods[1])}, nil
-			case "/watch/namespaces/test/pods/foo":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+				}
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -798,8 +856,12 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 			switch req.URL.Path {
 			case "/namespaces/test/replicationcontrollers/cassandra":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods[1])}, nil
-			case "/watch/namespaces/test/replicationcontrollers/cassandra":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+			case "/namespaces/test/replicationcontrollers":
+				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=cassandra" {
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+				}
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -837,8 +899,12 @@ func TestWatchOnlyResource(t *testing.T) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods[1])}, nil
-			case "/watch/namespaces/test/pods/foo":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+				}
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -880,9 +946,11 @@ func TestWatchOnlyList(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
-			case "/watch/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+				if req.URL.Query().Get("watch") == "true" {
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+				} else {
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
+				}
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil

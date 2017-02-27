@@ -15,6 +15,60 @@
 # required:
 # KUBE_ROOT: path of the root of the Kubernetes reposiitory
 
+: "${KUBE_ROOT?Must set KUBE_ROOT env var}"
+
+# Provides the $KUBERNETES_PROVIDER, kubeconfig-federation-context()
+# and detect-project function
+source "${KUBE_ROOT}/cluster/kube-util.sh"
+
+# kubefed configuration
+FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
+FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-system}
+FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-e2e-federation}"
+HOST_CLUSTER_ZONE="${FEDERATION_HOST_CLUSTER_ZONE:-}"
+# If $HOST_CLUSTER_ZONE isn't specified, arbitrarily choose
+# last zone as the host cluster zone.
+if [[ -z "${HOST_CLUSTER_ZONE}" ]]; then
+  E2E_ZONES_ARR=($E2E_ZONES)
+  HOST_CLUSTER_ZONE=${E2E_ZONES_ARR[-1]}
+fi
+
+HOST_CLUSTER_CONTEXT="${FEDERATION_HOST_CLUSTER_CONTEXT:-}"
+if [[ -z "${HOST_CLUSTER_CONTEXT}" ]]; then
+  # Sets ${CLUSTER_CONTEXT}
+  kubeconfig-federation-context "${HOST_CLUSTER_ZONE:-}"
+  HOST_CLUSTER_CONTEXT="${CLUSTER_CONTEXT}"
+fi
+
+# kube-dns configuration.
+KUBEDNS_CONFIGMAP_NAME="kube-dns"
+KUBEDNS_CONFIGMAP_NAMESPACE="kube-system"
+KUBEDNS_FEDERATION_FLAG="federations"
+
+function federation_cluster_contexts() {
+  local -r contexts=$("${KUBE_ROOT}/cluster/kubectl.sh" config get-contexts -o name)
+  federation_contexts=()
+  for context in ${contexts}; do
+    # Skip federation context
+    if [[ "${context}" == "${FEDERATION_NAME}" ]]; then
+      continue
+    fi
+    # Skip contexts not beginning with "federation"
+    if [[ "${context}" != federation* ]]; then
+      continue
+    fi
+    federation_contexts+=("${context}")
+  done
+  echo ${federation_contexts[@]}
+}
+
+
+#-----------------------------------------------------------------#
+# NOTE:                                                           #
+# Everything below this line is deprecated. It will be removed    #
+# once we have sufficient confidence in kubefed based testing.    #
+#-----------------------------------------------------------------#
+
 # optional override
 # FEDERATION_IMAGE_REPO_BASE: repo which federated images are tagged under (default gcr.io/google_containers)
 # FEDERATION_NAMESPACE: name of the namespace will created for the federated components in the underlying cluster.
@@ -22,10 +76,9 @@
 # KUBE_ARCH
 # KUBE_BUILD_STAGE
 
-: "${KUBE_ROOT?Must set KUBE_ROOT env var}"
+source "${KUBE_ROOT}/cluster/common.sh"
 
-# Provides the $KUBERNETES_PROVIDER variable and detect-project function
-source "${KUBE_ROOT}/cluster/kube-util.sh"
+host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE}"
 
 # If $FEDERATION_PUSH_REPO_BASE isn't set, then set the GCR registry name
 # based on the detected project name for gce and gke providers.
@@ -46,22 +99,12 @@ if [[ -z "${FEDERATION_PUSH_REPO_BASE}" ]]; then
 fi
 
 FEDERATION_IMAGE_REPO_BASE=${FEDERATION_IMAGE_REPO_BASE:-'gcr.io/google_containers'}
-FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-system}
 
 KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
 KUBE_ARCH=${KUBE_ARCH:-amd64}
 KUBE_BUILD_STAGE=${KUBE_BUILD_STAGE:-release-stage}
 
 source "${KUBE_ROOT}/cluster/common.sh"
-
-# kubefed configuration
-FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-e2e-federation}"
-HOST_CLUSTER_CONTEXT="${FEDERATION_HOST_CLUSTER_CONTEXT:-${1}}"
-
-# kube-dns configuration.
-KUBEDNS_CONFIGMAP_NAME="kube-dns"
-KUBEDNS_CONFIGMAP_NAMESPACE="kube-system"
-KUBEDNS_FEDERATION_FLAG="federations"
 
 host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE}"
 

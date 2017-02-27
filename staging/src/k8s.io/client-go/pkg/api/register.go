@@ -72,20 +72,6 @@ var (
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
-func init() {
-	// TODO(lavalamp): move this call to scheme builder above.  Can't
-	// remove it from here because lots of people inappropriately rely on it
-	// (specifically the unversioned time conversion). Can't have it in
-	// both places because then it gets double api.Registry.  Consequence of
-	// current state is that it only ever gets registered in the main
-	// api.Scheme, even though everyone that uses anything from unversioned
-	// needs these.
-	if err := addConversionFuncs(Scheme); err != nil {
-		// Programmer error.
-		panic(err)
-	}
-}
-
 func addKnownTypes(scheme *runtime.Scheme) error {
 	if err := scheme.AddIgnoredConversionType(&metav1.TypeMeta{}, &metav1.TypeMeta{}); err != nil {
 		return err

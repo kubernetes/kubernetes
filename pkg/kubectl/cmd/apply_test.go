@@ -59,9 +59,15 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
-	filenameRC    = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
-	filenameSVC   = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
-	filenameRCSVC = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
+	filenameRC             = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
+	filenameRCNoAnnotation = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-no-annotation.yaml"
+	filenameRCLASTAPPLIED  = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied.yaml"
+	filenameSVC            = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
+	filenameRCSVC          = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
+	filenameNoExistRC      = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-noexist.yaml"
+	filenameRCPatchTest    = "../../../test/fixtures/pkg/kubectl/cmd/apply/patch.json"
+	dirName                = "../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
+	filenameRCJSON         = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
 )
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
@@ -191,6 +197,129 @@ func walkMapPath(t *testing.T, start map[string]interface{}, path []string) map[
 	}
 
 	return finish
+}
+
+func TestRunApplyViewLastApplied(t *testing.T) {
+	_, rcBytesWithConfig := readReplicationController(t, filenameRCLASTAPPLIED)
+	nameRC, rcBytes := readReplicationController(t, filenameRC)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+
+	tests := []struct {
+		name, nameRC, pathRC, filePath, outputFormat, expectedErr, expectedOut, selector string
+		args                                                                             []string
+		respBytes                                                                        []byte
+	}{
+		{
+			name:         "view with file",
+			filePath:     filenameRC,
+			outputFormat: "",
+			expectedErr:  "",
+			expectedOut:  "test: 1234\n",
+			selector:     "",
+			args:         []string{},
+			respBytes:    rcBytesWithConfig,
+		},
+		{
+			name:         "view with file json format",
+			filePath:     filenameRC,
+			outputFormat: "json",
+			expectedErr:  "",
+			expectedOut:  "{\n  \"test\": 1234\n}\n",
+			selector:     "",
+			args:         []string{},
+			respBytes:    rcBytesWithConfig,
+		},
+		{
+			name:         "view resource/name invalid format",
+			filePath:     "",
+			outputFormat: "wide",
+			expectedErr:  "error: Unexpected -o output mode: wide, the flag 'output' must be one of yaml|json\nSee 'view-last-applied -h' for help and examples.",
+			expectedOut:  "",
+			selector:     "",
+			args:         []string{"rc", "test-rc"},
+			respBytes:    rcBytesWithConfig,
+		},
+		{
+			name:         "view resource with label",
+			filePath:     "",
+			outputFormat: "",
+			expectedErr:  "",
+			expectedOut:  "test: 1234\n",
+			selector:     "name=test-rc",
+			args:         []string{"rc"},
+			respBytes:    rcBytesWithConfig,
+		},
+		{
+			name:         "view resource without annotations",
+			filePath:     "",
+			outputFormat: "",
+			expectedErr:  "error: no last-applied-configuration annotation found on resource: test-rc",
+			expectedOut:  "",
+			selector:     "",
+			args:         []string{"rc", "test-rc"},
+			respBytes:    rcBytes,
+		},
+		{
+			name:         "view resource no match",
+			filePath:     "",
+			outputFormat: "",
+			expectedErr:  "Error from server (NotFound): the server could not find the requested resource (get replicationcontrollers no-match)",
+			expectedOut:  "",
+			selector:     "",
+			args:         []string{"rc", "no-match"},
+			respBytes:    nil,
+		},
+	}
+	for _, test := range tests {
+		f, tf, codec, _ := cmdtesting.NewAPIFactory()
+		tf.Printer = &testPrinter{}
+		tf.UnstructuredClient = &fake.RESTClient{
+			APIRegistry:          api.Registry,
+			NegotiatedSerializer: unstructuredSerializer,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == pathRC && m == "GET":
+					bodyRC := ioutil.NopCloser(bytes.NewReader(test.respBytes))
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+				case p == "/namespaces/test/replicationcontrollers" && m == "GET":
+					bodyRC := ioutil.NopCloser(bytes.NewReader(test.respBytes))
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+				case p == "/namespaces/test/replicationcontrollers/no-match" && m == "GET":
+					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
+				case p == "/api/v1/namespaces/test" && m == "GET":
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			}),
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = defaultClientConfig()
+		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+
+		cmdutil.BehaviorOnFatal(func(str string, code int) {
+			if str != test.expectedErr {
+				t.Errorf("%s: unexpected error: %s\nexpected: %s", test.name, str, test.expectedErr)
+			}
+		})
+
+		cmd := NewCmdApplyViewLastApplied(f, buf, errBuf)
+		if test.filePath != "" {
+			cmd.Flags().Set("filename", test.filePath)
+		}
+		if test.outputFormat != "" {
+			cmd.Flags().Set("output", test.outputFormat)
+		}
+		if test.selector != "" {
+			cmd.Flags().Set("selector", test.selector)
+		}
+
+		cmd.Run(cmd, test.args)
+		if buf.String() != test.expectedOut {
+			t.Fatalf("%s: unexpected output: %s\nexpected: %s", test.name, buf.String(), test.expectedOut)
+		}
+	}
 }
 
 func TestApplyObjectWithoutAnnotation(t *testing.T) {
@@ -529,5 +658,129 @@ func TestApplyNULLPreservation(t *testing.T) {
 
 	if !verifiedPatch {
 		t.Fatal("No server-side patch call detected")
+	}
+}
+
+func TestRunApplySetLastApplied(t *testing.T) {
+	initTestErrorHandler(t)
+	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+
+	noExistRC, _ := readAndAnnotateReplicationController(t, filenameNoExistRC)
+	noExistPath := "/namespaces/test/replicationcontrollers/" + noExistRC
+
+	noAnnotationName, noAnnotationRC := readReplicationController(t, filenameRCNoAnnotation)
+	noAnnotationPath := "/namespaces/test/replicationcontrollers/" + noAnnotationName
+
+	tests := []struct {
+		name, nameRC, pathRC, filePath, expectedErr, expectedOut, output string
+	}{
+		{
+			name:        "set with exist object",
+			filePath:    filenameRC,
+			expectedErr: "",
+			expectedOut: "replicationcontroller/test-rc\n",
+			output:      "name",
+		},
+		{
+			name:        "set with no-exist object",
+			filePath:    filenameNoExistRC,
+			expectedErr: "Error from server (NotFound): the server could not find the requested resource (get replicationcontrollers no-exist)",
+			expectedOut: "",
+			output:      "name",
+		},
+		{
+			name:        "set for the annotation does not exist on the live object",
+			filePath:    filenameRCNoAnnotation,
+			expectedErr: "error: no last-applied-configuration annotation found on resource: no-annotation, to create the annotation, run the command with --create-annotation\nSee 'set-last-applied -h' for help and examples.",
+			expectedOut: "",
+			output:      "name",
+		},
+		{
+			name:        "set with exist object output json",
+			filePath:    filenameRCJSON,
+			expectedErr: "",
+			expectedOut: "replicationcontroller/test-rc\n",
+			output:      "name",
+		},
+		{
+			name:        "set test for a directory of files",
+			filePath:    dirName,
+			expectedErr: "",
+			expectedOut: "replicationcontroller/test-rc\nreplicationcontroller/test-rc\n",
+			output:      "name",
+		},
+	}
+	for _, test := range tests {
+		f, tf, codec, _ := cmdtesting.NewAPIFactory()
+		tf.Printer = &testPrinter{}
+		tf.UnstructuredClient = &fake.RESTClient{
+			APIRegistry:          api.Registry,
+			NegotiatedSerializer: unstructuredSerializer,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == pathRC && m == "GET":
+					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+				case p == noAnnotationPath && m == "GET":
+					bodyRC := ioutil.NopCloser(bytes.NewReader(noAnnotationRC))
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+				case p == noExistPath && m == "GET":
+					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
+				case p == pathRC && m == "PATCH":
+					checkPatchString(t, req)
+					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+				case p == "/api/v1/namespaces/test" && m == "GET":
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			}),
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = defaultClientConfig()
+		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+
+		cmdutil.BehaviorOnFatal(func(str string, code int) {
+			if str != test.expectedErr {
+				t.Errorf("%s: unexpected error: %s\nexpected: %s", test.name, str, test.expectedErr)
+			}
+		})
+
+		cmd := NewCmdApplySetLastApplied(f, buf, errBuf)
+		cmd.Flags().Set("filename", test.filePath)
+		cmd.Flags().Set("output", test.output)
+		cmd.Run(cmd, []string{})
+
+		if buf.String() != test.expectedOut {
+			t.Fatalf("%s: unexpected output: %s\nexpected: %s", test.name, buf.String(), test.expectedOut)
+		}
+
+	}
+
+}
+
+func checkPatchString(t *testing.T, req *http.Request) {
+	checkString := string(readBytesFromFile(t, filenameRCPatchTest))
+	patch, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	patchMap := map[string]interface{}{}
+	if err := json.Unmarshal(patch, &patchMap); err != nil {
+		t.Fatal(err)
+	}
+
+	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+	if _, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]; !ok {
+		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
+	}
+
+	resultString := annotationsMap["kubectl.kubernetes.io/last-applied-configuration"]
+	if resultString != checkString {
+		t.Fatalf("patch annotation is not correct, expect:%s\n but got:%s\n", checkString, resultString)
 	}
 }

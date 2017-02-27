@@ -64,12 +64,12 @@ func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().String("generator", "horizontalpodautoscaler/v1", "The name of the API generator to use. Currently there is only 1 generator.")
+	cmd.Flags().String("generator", "horizontalpodautoscaler/v1", i18n.T("The name of the API generator to use. Currently there is only 1 generator."))
 	cmd.Flags().Int("min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
 	cmd.Flags().Int("max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
 	cmd.Flags().Int("cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used."))
-	cmd.Flags().String("name", "", "The name for the newly created object. If not specified, the name of the input resource will be used.")
+	cmd.Flags().String("name", "", i18n.T("The name for the newly created object. If not specified, the name of the input resource will be used."))
 	cmdutil.AddDryRunFlag(cmd)
 	usage := "identifying the resource to autoscale."
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
@@ -156,7 +156,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, hpa) {
-			if err := cmdutil.RecordChangeCause(hpa.Object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(hpa.Object, f.Command(cmd, false)); err != nil {
 				return err
 			}
 			object = hpa.Object

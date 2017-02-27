@@ -11,6 +11,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "client_ca_hook.go",
         "controller.go",
         "doc.go",
         "import_known_versions.go",
@@ -90,6 +91,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "client_ca_hook_test.go",
         "controller_test.go",
         "import_known_versions_test.go",
         "master_openapi_test.go",
@@ -125,6 +127,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",

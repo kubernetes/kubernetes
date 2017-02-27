@@ -17,8 +17,9 @@ limitations under the License.
 package object
 
 import (
+	"context"
+
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 // The NetworkReference interface is implemented by managed objects

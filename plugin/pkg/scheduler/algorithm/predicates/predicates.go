@@ -25,12 +25,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
@@ -58,13 +59,22 @@ type PersistentVolumeInfo interface {
 	GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error)
 }
 
+// CachedPersistentVolumeInfo implements PersistentVolumeInfo
+type CachedPersistentVolumeInfo struct {
+	corelisters.PersistentVolumeLister
+}
+
+func (c *CachedPersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error) {
+	return c.Get(pvID)
+}
+
 type PersistentVolumeClaimInfo interface {
 	GetPersistentVolumeClaimInfo(namespace string, name string) (*v1.PersistentVolumeClaim, error)
 }
 
 // CachedPersistentVolumeClaimInfo implements PersistentVolumeClaimInfo
 type CachedPersistentVolumeClaimInfo struct {
-	*listers.StoreToPersistentVolumeClaimLister
+	corelisters.PersistentVolumeClaimLister
 }
 
 // GetPersistentVolumeClaimInfo fetches the claim in specified namespace with specified name
@@ -73,22 +83,22 @@ func (c *CachedPersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace
 }
 
 type CachedNodeInfo struct {
-	*listers.StoreToNodeLister
+	corelisters.NodeLister
 }
 
 // GetNodeInfo returns cached data for the node 'id'.
 func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
-	node, exists, err := c.Get(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: id}})
+	node, err := c.Get(id)
+
+	if apierrors.IsNotFound(err) {
+		return nil, fmt.Errorf("node '%v' not found", id)
+	}
 
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", id, err)
 	}
 
-	if !exists {
-		return nil, fmt.Errorf("node '%v' not found", id)
-	}
-
-	return node.(*v1.Node), nil
+	return node, nil
 }
 
 //  Note that predicateMetadata and matchingPodAntiAffinityTerm need to be declared in the same file
@@ -1160,12 +1170,7 @@ func PodToleratesNodeTaints(pod *v1.Pod, meta interface{}, nodeInfo *schedulerca
 		return false, nil, err
 	}
 
-	tolerations, err := v1.GetTolerationsFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		return false, nil, err
-	}
-
-	if v1.TolerationsTolerateTaintsWithFilter(tolerations, taints, func(t *v1.Taint) bool {
+	if v1.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
 		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
 		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
 	}) {

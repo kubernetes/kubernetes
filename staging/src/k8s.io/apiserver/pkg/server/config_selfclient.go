@@ -17,16 +17,18 @@ limitations under the License.
 package server
 
 import (
-	"bytes"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"net"
 
 	restclient "k8s.io/client-go/rest"
 )
 
-func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Config, error) {
+// LoopbackClientServerNameOverride is passed to the apiserver from the loopback client in order to
+// select the loopback certificate via SNI if TLS is used.
+const LoopbackClientServerNameOverride = "apiserver-loopback-client"
+
+func (s *SecureServingInfo) NewLoopbackClientConfig(token string, loopbackCert []byte) (*restclient.Config, error) {
 	if s == nil || (s.Cert == nil && len(s.SNICerts) == 0) {
 		return nil, nil
 	}
@@ -41,7 +43,7 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 		host = "localhost"
 	}
 
-	clientConfig := &restclient.Config{
+	return &restclient.Config{
 		// Increase QPS limits. The client is currently passed to all admission plugins,
 		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
 		// for more details. Once #22422 is fixed, we may want to remove it.
@@ -49,60 +51,13 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 		Burst:       100,
 		Host:        "https://" + net.JoinHostPort(host, port),
 		BearerToken: token,
-	}
-
-	// find certificate for host: either explicitly given, from the server cert bundle or one of the SNI certs,
-	// but only return CA:TRUE certificates.
-	var derCA []byte
-	if s.CACert != nil {
-		derCA = s.CACert.Certificate[0]
-	}
-	if derCA == nil && net.ParseIP(host) == nil {
-		if cert, found := s.SNICerts[host]; found {
-			chain, err := parseChain(cert.Certificate)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse SNI certificate for host %q: %v", host, err)
-			}
-
-			if trustedChain(chain) {
-				return clientConfig, nil
-			}
-
-			ca, err := findCA(chain)
-			if err != nil {
-				return nil, fmt.Errorf("no CA certificate found in SNI server certificate bundle for host %q: %v", host, err)
-			}
-			derCA = ca.Raw
-		}
-	}
-	if derCA == nil && s.Cert != nil {
-		chain, err := parseChain(s.Cert.Certificate)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse server certificate: %v", err)
-		}
-
-		if (net.ParseIP(host) != nil && certMatchesIP(chain[0], host)) || certMatchesName(chain[0], host) {
-			if trustedChain(chain) {
-				return clientConfig, nil
-			}
-
-			ca, err := findCA(chain)
-			if err != nil {
-				return nil, fmt.Errorf("no CA certificate found in server certificate bundle: %v", err)
-			}
-			derCA = ca.Raw
-		}
-	}
-	if derCA == nil {
-		return nil, fmt.Errorf("failed to find certificate which matches %q", host)
-	}
-	pemCA := bytes.Buffer{}
-	if err := pem.Encode(&pemCA, &pem.Block{Type: "CERTIFICATE", Bytes: derCA}); err != nil {
-		return nil, err
-	}
-	clientConfig.CAData = pemCA.Bytes()
-
-	return clientConfig, nil
+		// override the ServerName to select our loopback certificate via SNI. This name is also
+		// used by the client to compare the returns server certificate against.
+		TLSClientConfig: restclient.TLSClientConfig{
+			ServerName: LoopbackClientServerNameOverride,
+			CAData:     loopbackCert,
+		},
+	}, nil
 }
 
 func trustedChain(chain []*x509.Certificate) bool {
@@ -140,7 +95,7 @@ func findCA(chain []*x509.Certificate) (*x509.Certificate, error) {
 	return nil, fmt.Errorf("no certificate with CA:TRUE found in chain")
 }
 
-func (s *ServingInfo) NewSelfClientConfig(token string) (*restclient.Config, error) {
+func (s *ServingInfo) NewLoopbackClientConfig(token string) (*restclient.Config, error) {
 	if s == nil {
 		return nil, nil
 	}

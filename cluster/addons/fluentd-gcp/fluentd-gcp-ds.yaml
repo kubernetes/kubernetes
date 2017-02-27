@@ -7,6 +7,7 @@ metadata:
   labels:
     k8s-app: fluentd-gcp
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
     version: v1.38
 spec:
   template:
@@ -35,6 +36,9 @@ spec:
           - '/bin/sh'
           - '-c'
           - '/run.sh $FLUENTD_ARGS 2>&1 >>/var/log/fluentd.log'
+        env:
+        - name: FLUENTD_ARGS
+          value: --no-supervisor
         resources:
           limits:
             memory: 200Mi

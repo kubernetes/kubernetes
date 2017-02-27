@@ -40,12 +40,15 @@ cluster/gce/trusty/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:            context['pillar'] = {'num_nodes': get_node_count()}
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:        msg = "Cannot change {0} to {1}".format(service_cidr(),
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ca_cert_path = layer_options.get('ca_certificate_path')
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    cluster_dns.set_dns_info(53, hookenv.config('dns_domain'), dns_ip)
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:def send_cluster_dns_detail(cluster_dns):
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:def service_cidr():
 cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    context.update({'kube_api_endpoint': ','.join(api_servers),
+cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    context['ca_cert_path'] = layer_options.get('ca_certificate_path')
 cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:def render_init_scripts(api_servers):
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:    local source_file=${BASH_SOURCE[$stack_skip]}
@@ -67,6 +70,7 @@ cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = add
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar.get('enable_hostpath_provisioner', '').lower() == 'true' -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + enable_garbage_collector + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = params + " " + feature_gates -%}
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:    - echo -998 > /proc/$$$/oom_score_adj && kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
@@ -103,6 +107,9 @@ federation/deploy/config.json.sample:      "cluster_cidr": "10.188.0.0/14",
 federation/deploy/config.json.sample:      "cluster_name": "cluster1-kubernetes",
 federation/deploy/config.json.sample:      "cluster_name": "cluster2-kubernetes",
 federation/deploy/config.json.sample:      "cluster_name": "cluster3-kubernetes",
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,

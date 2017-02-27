@@ -34,21 +34,37 @@ import (
 const CloudProviderName = "azure"
 
 // Config holds the configuration parsed from the --cloud-config flag
+// All fields are required unless otherwise specified
 type Config struct {
-	Cloud                      string `json:"cloud" yaml:"cloud"`
-	TenantID                   string `json:"tenantId" yaml:"tenantId"`
-	SubscriptionID             string `json:"subscriptionId" yaml:"subscriptionId"`
-	ResourceGroup              string `json:"resourceGroup" yaml:"resourceGroup"`
-	Location                   string `json:"location" yaml:"location"`
-	VnetName                   string `json:"vnetName" yaml:"vnetName"`
-	SubnetName                 string `json:"subnetName" yaml:"subnetName"`
-	SecurityGroupName          string `json:"securityGroupName" yaml:"securityGroupName"`
-	RouteTableName             string `json:"routeTableName" yaml:"routeTableName"`
+	// The cloud environment identifier. Takes values from https://github.com/Azure/go-autorest/blob/ec5f4903f77ed9927ac95b19ab8e44ada64c1356/autorest/azure/environments.go#L13
+	Cloud string `json:"cloud" yaml:"cloud"`
+	// The AAD Tenant ID for the Subscription that the cluster is deployed in
+	TenantID string `json:"tenantId" yaml:"tenantId"`
+	// The ID of the Azure Subscription that the cluster is deployed in
+	SubscriptionID string `json:"subscriptionId" yaml:"subscriptionId"`
+	// The name of the resource group that the cluster is deployed in
+	ResourceGroup string `json:"resourceGroup" yaml:"resourceGroup"`
+	// The location of the resource group that the cluster is deployed in
+	Location string `json:"location" yaml:"location"`
+	// The name of the VNet that the cluster is deployed in
+	VnetName string `json:"vnetName" yaml:"vnetName"`
+	// The name of the subnet that the cluster is deployed in
+	SubnetName string `json:"subnetName" yaml:"subnetName"`
+	// The name of the security group attached to the cluster's subnet
+	SecurityGroupName string `json:"securityGroupName" yaml:"securityGroupName"`
+	// (Optional in 1.6) The name of the route table attached to the subnet that the cluster is deployed in
+	RouteTableName string `json:"routeTableName" yaml:"routeTableName"`
+	// (Optional) The name of the availability set that should be used as the load balancer backend
+	// If this is set, the Azure cloudprovider will only add nodes from that availability set to the load
+	// balancer backend pool. If this is not set, and multiple agent pools (availability sets) are used, then
+	// the cloudprovider will try to add all nodes to a single backend pool which is forbidden.
+	// In other words, if you use multiple agent pools (availability sets), you MUST set this field.
 	PrimaryAvailabilitySetName string `json:"primaryAvailabilitySetName" yaml:"primaryAvailabilitySetName"`
 
-	AADClientID     string `json:"aadClientId" yaml:"aadClientId"`
+	// The ClientID for an AAD application with RBAC access to talk to Azure RM APIs
+	AADClientID string `json:"aadClientId" yaml:"aadClientId"`
+	// The ClientSecret for an AAD application with RBAC access to talk to Azure RM APIs
 	AADClientSecret string `json:"aadClientSecret" yaml:"aadClientSecret"`
-	AADTenantID     string `json:"aadTenantId" yaml:"aadTenantId"`
 }
 
 // Cloud holds the config and clients

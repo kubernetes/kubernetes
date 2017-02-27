@@ -128,6 +128,11 @@ func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+
+	// apply subcommands
+	cmd.AddCommand(NewCmdApplyViewLastApplied(f, out, errOut))
+	cmd.AddCommand(NewCmdApplySetLastApplied(f, out, errOut))
+
 	return cmd
 }
 
@@ -254,7 +259,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+				if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
 			}
@@ -309,7 +314,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				if patch, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command()); err == nil {
+				if patch, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command(cmd, true)); err == nil {
 					if _, err = helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
 						glog.V(4).Infof("error recording reason: %v", err)
 					}
@@ -433,7 +438,7 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 type pruner struct {
 	mapper        meta.RESTMapper
 	clientFunc    resource.ClientMapperFunc
-	clientsetFunc func() (*internalclientset.Clientset, error)
+	clientsetFunc func() (internalclientset.Interface, error)
 
 	visitedUids sets.String
 	selector    labels.Selector
@@ -495,7 +500,7 @@ func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, c res
 	return runDelete(namespace, name, mapping, c, nil, p.cascade, p.gracePeriod, p.clientsetFunc)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RESTClient, helper *resource.Helper, cascade bool, gracePeriod int, clientsetFunc func() (*internalclientset.Clientset, error)) error {
+func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RESTClient, helper *resource.Helper, cascade bool, gracePeriod int, clientsetFunc func() (internalclientset.Interface, error)) error {
 	if !cascade {
 		if helper == nil {
 			helper = resource.NewHelper(c, mapping)
@@ -533,7 +538,7 @@ type patcher struct {
 
 	mapping       *meta.RESTMapping
 	helper        *resource.Helper
-	clientsetFunc func() (*internalclientset.Clientset, error)
+	clientsetFunc func() (internalclientset.Interface, error)
 
 	overwrite bool
 	backOff   clockwork.Clock

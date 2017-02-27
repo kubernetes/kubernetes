@@ -1368,6 +1368,13 @@
      "schedulername": {
       "type": "string",
       "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler."
+     },
+     "tolerations": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Toleration"
+      },
+      "description": "If specified, the pod's tolerations."
      }
     }
    },
@@ -1653,8 +1660,7 @@
     "required": [
      "targetPortal",
      "iqn",
-     "lun",
-     "portals"
+     "lun"
     ],
     "properties": {
      "targetPortal": {
@@ -2999,6 +3005,33 @@
      }
     }
    },
+   "v1.Toleration": {
+    "id": "v1.Toleration",
+    "description": "The pod this Toleration is attached to tolerates any taint that matches the triple \u003ckey,value,effect\u003e using the matching operator \u003coperator\u003e.",
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys."
+     },
+     "operator": {
+      "type": "string",
+      "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category."
+     },
+     "value": {
+      "type": "string",
+      "description": "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string."
+     },
+     "effect": {
+      "type": "string",
+      "description": "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute."
+     },
+     "tolerationSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system."
+     }
+    }
+   },
    "v1.PersistentVolumeClaim": {
     "id": "v1.PersistentVolumeClaim",
     "description": "PersistentVolumeClaim is a user's request for and claim to a persistent volume",
@@ -3047,6 +3080,10 @@
      "volumeName": {
       "type": "string",
       "description": "VolumeName is the binding reference to the PersistentVolume backing this claim."
+     },
+     "storageClassName": {
+      "type": "string",
+      "description": "Name of the StorageClass required by the claim. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1"
      }
     }
    },

@@ -1116,6 +1116,18 @@ func (r *Runtime) getSelinuxContext(opt *v1.SELinuxOptions) (string, error) {
 	return strings.Join(ctx, ":"), nil
 }
 
+// From the generateName or the podName return a basename for improving the logging with the Journal
+// journalctl -t podBaseName
+func constructSyslogIdentifier(generateName string, podName string) string {
+	if len(generateName) > 1 && generateName[len(generateName)-1] == '-' {
+		return generateName[0 : len(generateName)-1]
+	}
+	if len(generateName) > 0 {
+		return generateName
+	}
+	return podName
+}
+
 // preparePod will:
 //
 // 1. Invoke 'rkt prepare' to prepare the pod, and get the rkt pod uuid.
@@ -1182,6 +1194,9 @@ func (r *Runtime) preparePod(pod *v1.Pod, podIP string, pullSecrets []v1.Secret,
 		// This enables graceful stop.
 		newUnitOption("Service", "KillMode", "mixed"),
 		newUnitOption("Service", "TimeoutStopSec", fmt.Sprintf("%ds", getPodTerminationGracePeriodInSecond(pod))),
+		// Ops helpers
+		newUnitOption("Unit", "Description", pod.Name),
+		newUnitOption("Service", "SyslogIdentifier", constructSyslogIdentifier(pod.GenerateName, pod.Name)),
 		// Track pod info for garbage collection
 		newUnitOption(unitKubernetesSection, unitPodUID, string(pod.UID)),
 		newUnitOption(unitKubernetesSection, unitPodName, pod.Name),

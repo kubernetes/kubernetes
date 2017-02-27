@@ -63,9 +63,6 @@ spec:
     metadata:
       labels:
         k8s-app: kube-proxy
-      annotations:
-        # TODO: Move this to the beta tolerations field below as soon as the Tolerations field exists in PodSpec
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated","value":"master","effect":"NoSchedule"}]'
     spec:
       containers:
       - name: kube-proxy
@@ -82,10 +79,9 @@ spec:
           name: kube-proxy
       hostNetwork: true
       serviceAccountName: kube-proxy
-      # Tolerate running on the master
+      # TODO: Why doesn't the Decoder recognize this new field and decode it properly? Right now it's ignored
       # tolerations:
-      # - key: dedicated
-      #   value: master
+      # - key: {{ .MasterTaintKey }}
       #   effect: NoSchedule
       volumes:
       - name: kube-proxy
@@ -93,7 +89,7 @@ spec:
           name: kube-proxy
 `
 
-	KubeDNSVersion = "1.12.1"
+	KubeDNSVersion = "1.13.0"
 
 	KubeDNSDeployment = `
 
@@ -122,8 +118,6 @@ spec:
         k8s-app: kube-dns
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
-        # TODO: Move this to the beta tolerations field below as soon as the Tolerations field exists in PodSpec
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}, {"key":"dedicated","value":"master","effect":"NoSchedule"}]'
     spec:
       volumes:
       - name: kube-dns-config
@@ -198,7 +192,6 @@ spec:
           failureThreshold: 5
         args:
         - --cache-size=1000
-        - --no-resolv
         - --server=/{{ .DNSDomain }}/127.0.0.1#10053
         - --server=/in-addr.arpa/127.0.0.1#10053
         - --server=/ip6.arpa/127.0.0.1#10053
@@ -242,9 +235,11 @@ spec:
             cpu: 10m
       dnsPolicy: Default  # Don't use cluster DNS.
       serviceAccountName: kube-dns
+      # TODO: Why doesn't the Decoder recognize this new field and decode it properly? Right now it's ignored
       # tolerations:
-      # - key: dedicated
-      #   value: master
+      # - key: CriticalAddonsOnly
+      #   operator: Exists
+      # - key: {{ .MasterTaintKey }}
       #   effect: NoSchedule
       # TODO: Remove this affinity field as soon as we are using manifest lists
       affinity:

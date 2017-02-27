@@ -466,6 +466,10 @@ type PersistentVolumeSpec struct {
 	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=PersistentVolumeReclaimPolicy"`
+	// Name of StorageClass to which this persistent volume belongs. Empty value
+	// means that this volume does not belong to any StorageClass.
+	// +optional
+	StorageClassName string `json:"storageClassName,omitempty"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
@@ -561,6 +565,10 @@ type PersistentVolumeClaimSpec struct {
 	// VolumeName is the binding reference to the PersistentVolume backing this claim.
 	// +optional
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,3,opt,name=volumeName"`
+	// Name of the StorageClass required by the claim.
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -1015,7 +1023,7 @@ type ISCSIVolumeSource struct {
 	// iSCSI target portal List. The portal is either an IP or ip_addr:port if the port
 	// is other than default (typically TCP ports 860 and 3260).
 	// +optional
-	Portals []string `json:"portals" protobuf:"bytes,7,opt,name=portals"`
+	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
 }
 
 // Represents a Fibre Channel volume.
@@ -2286,6 +2294,9 @@ type PodSpec struct {
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string `json:"schedulername,omitempty" protobuf:"bytes,19,opt,name=schedulername"`
+	// If specified, the pod's tolerations.
+	// +optional
+	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -3022,6 +3033,9 @@ type NodeSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration
 	// +optional
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
+	// If specified, the node's taints.
+	// +optional
+	Taints []Taint `json:"taints,omitempty"  protobuf:"bytes,5,opt,name=taints"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.

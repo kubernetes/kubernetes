@@ -21,8 +21,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 // StorageClassesGetter has a method to return a StorageClassInterface.
@@ -93,7 +93,7 @@ func (c *storageClasses) Delete(name string, options *v1.DeleteOptions) error {
 func (c *storageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("storageclasses").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -105,7 +105,7 @@ func (c *storageClasses) Get(name string, options v1.GetOptions) (result *v1beta
 	err = c.client.Get().
 		Resource("storageclasses").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -116,7 +116,7 @@ func (c *storageClasses) List(opts v1.ListOptions) (result *v1beta1.StorageClass
 	result = &v1beta1.StorageClassList{}
 	err = c.client.Get().
 		Resource("storageclasses").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,10 +124,10 @@ func (c *storageClasses) List(opts v1.ListOptions) (result *v1beta1.StorageClass
 
 // Watch returns a watch.Interface that watches the requested storageClasses.
 func (c *storageClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("storageclasses").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

@@ -94,8 +94,6 @@ type DeploymentController struct {
 
 	// Deployments that need to be synced
 	queue workqueue.RateLimitingInterface
-	// Deployments that need to be checked for progress.
-	progressQueue workqueue.RateLimitingInterface
 }
 
 // NewDeploymentController creates a new DeploymentController.
@@ -112,7 +110,6 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 		client:        client,
 		eventRecorder: eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "deployment-controller"}),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
-		progressQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "progress-check"),
 	}
 	dc.rsControl = controller.RealRSControl{
 		KubeClient: client,
@@ -150,7 +147,6 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer dc.queue.ShutDown()
-	defer dc.progressQueue.ShutDown()
 
 	glog.Infof("Starting deployment controller")
 
@@ -162,7 +158,6 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(dc.worker, time.Second, stopCh)
 	}
-	go wait.Until(dc.progressWorker, time.Second, stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down deployment controller")
@@ -357,17 +352,25 @@ func (dc *DeploymentController) enqueue(deployment *extensions.Deployment) {
 	dc.queue.Add(key)
 }
 
-// checkProgressAfter will enqueue a deployment after the provided amount of time in a secondary queue.
-// Once the deployment is popped out of the secondary queue, it is checked for progress and requeued
-// back to the main queue iff it has failed progressing.
-func (dc *DeploymentController) checkProgressAfter(deployment *extensions.Deployment, after time.Duration) {
+func (dc *DeploymentController) enqueueRateLimited(deployment *extensions.Deployment) {
 	key, err := controller.KeyFunc(deployment)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", deployment, err))
 		return
 	}
 
-	dc.progressQueue.AddAfter(key, after)
+	dc.queue.AddRateLimited(key)
+}
+
+// enqueueAfter will enqueue a deployment after the provided amount of time.
+func (dc *DeploymentController) enqueueAfter(deployment *extensions.Deployment, after time.Duration) {
+	key, err := controller.KeyFunc(deployment)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", deployment, err))
+		return
+	}
+
+	dc.queue.AddAfter(key, after)
 }
 
 // getDeploymentForPod returns the deployment managing the given Pod.
@@ -443,11 +446,11 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 	dc.queue.Forget(key)
 }
 
-// classifyReplicaSets uses NewReplicaSetControllerRefManager to classify ReplicaSets
+// claimReplicaSets uses NewReplicaSetControllerRefManager to classify ReplicaSets
 // and adopts them if their labels match the Deployment but are missing the reference.
 // It also removes the controllerRef for ReplicaSets, whose labels no longer matches
 // the deployment.
-func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deployment) error {
+func (dc *DeploymentController) claimReplicaSets(deployment *extensions.Deployment) error {
 	rsList, err := dc.rsLister.ReplicaSets(deployment.Namespace).List(labels.Everything())
 	if err != nil {
 		return err
@@ -457,32 +460,9 @@ func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deplo
 	if err != nil {
 		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
 	}
-	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, deployment.ObjectMeta, deploymentSelector, getDeploymentKind())
-	matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(rsList)
-	// Adopt replica sets only if this deployment is not going to be deleted.
-	if deployment.DeletionTimestamp == nil {
-		for _, replicaSet := range matchesNeedsController {
-			err := cm.AdoptReplicaSet(replicaSet)
-			// continue to next RS if adoption fails.
-			if err != nil {
-				// If the RS no longer exists, don't even log the error.
-				if !errors.IsNotFound(err) {
-					utilruntime.HandleError(err)
-				}
-			} else {
-				matchesAndControlled = append(matchesAndControlled, replicaSet)
-			}
-		}
-	}
-	// remove the controllerRef for the RS that no longer have matching labels
-	var errlist []error
-	for _, replicaSet := range controlledDoesNotMatch {
-		err := cm.ReleaseReplicaSet(replicaSet)
-		if err != nil {
-			errlist = append(errlist, err)
-		}
-	}
-	return utilerrors.NewAggregate(errlist)
+	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, deployment, deploymentSelector, getDeploymentKind())
+	_, err = cm.ClaimReplicaSets(rsList)
+	return err
 }
 
 // syncDeployment will sync the deployment with the given key.
@@ -565,7 +545,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		dc.cleanupDeployment(oldRSs, d)
 	}
 
-	err = dc.classifyReplicaSets(d)
+	err = dc.claimReplicaSets(d)
 	if err != nil {
 		return err
 	}
@@ -734,63 +714,4 @@ func (dc *DeploymentController) clearDeploymentOverlap(deployment *extensions.De
 	}
 	delete(deployment.Annotations, util.OverlapAnnotation)
 	return dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(deployment)
-}
-
-// progressWorker runs a worker thread that pops items out of a secondary queue, checks if they
-// have failed progressing and if so it adds them back to the main queue.
-func (dc *DeploymentController) progressWorker() {
-	for dc.checkNextItemForProgress() {
-	}
-}
-
-// checkNextItemForProgress checks if a deployment has failed progressing and if so it adds it back
-// to the main queue.
-func (dc *DeploymentController) checkNextItemForProgress() bool {
-	key, quit := dc.progressQueue.Get()
-	if quit {
-		return false
-	}
-	defer dc.progressQueue.Done(key)
-
-	needsResync, err := dc.checkForProgress(key.(string))
-	if err != nil {
-		utilruntime.HandleError(err)
-	}
-	if err == nil && needsResync {
-		glog.V(2).Infof("Deployment %q has failed progressing - syncing it back to the main queue for an update", key.(string))
-		dc.queue.AddRateLimited(key)
-	}
-	dc.progressQueue.Forget(key)
-	return true
-}
-
-// checkForProgress checks the progress for the provided deployment. Meant to be called
-// by the progressWorker and work on items synced in a secondary queue.
-func (dc *DeploymentController) checkForProgress(key string) (bool, error) {
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		return false, err
-	}
-	deployment, err := dc.dLister.Deployments(namespace).Get(name)
-	if errors.IsNotFound(err) {
-		return false, nil
-	}
-	if err != nil {
-		glog.V(2).Infof("Cannot retrieve deployment %q found in the secondary queue: %#v", key, err)
-		return false, err
-	}
-	cond := util.GetDeploymentCondition(deployment.Status, extensions.DeploymentProgressing)
-	// Already marked with a terminal reason - no need to add it back to the main queue.
-	if cond != nil && (cond.Reason == util.TimedOutReason || cond.Reason == util.NewRSAvailableReason) {
-		return false, nil
-	}
-	// Deep-copy otherwise we may mutate our cache.
-	// TODO: Remove deep-copying from here. This worker does not need to sync the annotations
-	// in the deployment.
-	d, err := util.DeploymentDeepCopy(deployment)
-	if err != nil {
-		return false, err
-	}
-	glog.V(2).Infof("Syncing deployment %q for a progress check", key)
-	return dc.hasFailed(d)
 }

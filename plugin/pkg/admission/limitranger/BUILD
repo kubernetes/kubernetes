@@ -18,8 +18,8 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/client/listers/core/internalversion:go_default_library",
-        "//pkg/controller/informers:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//vendor:github.com/hashicorp/golang-lru",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
@@ -41,7 +41,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
-        "//pkg/controller/informers:go_default_library",
+        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",

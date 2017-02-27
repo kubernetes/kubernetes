@@ -32,6 +32,7 @@ go_library(
         "federation-apiserver.go",
         "federation-controller-manager.go",
         "hyperkube.go",
+        "kube-aggregator.go",
         "kube-apiserver.go",
         "kube-controller-manager.go",
         "kube-proxy.go",
@@ -67,6 +68,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/apiserver/pkg/util/logs",
+        "//vendor:k8s.io/kube-aggregator/pkg/cmd/server",
     ],
 )
 

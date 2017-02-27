@@ -12,8 +12,12 @@ docs/man/man1/kube-proxy.1
 docs/man/man1/kube-scheduler.1
 docs/man/man1/kubectl-annotate.1
 docs/man/man1/kubectl-api-versions.1
+docs/man/man1/kubectl-apply-set-last-applied.1
+docs/man/man1/kubectl-apply-view-last-applied.1
 docs/man/man1/kubectl-apply.1
 docs/man/man1/kubectl-attach.1
+docs/man/man1/kubectl-auth-can-i.1
+docs/man/man1/kubectl-auth.1
 docs/man/man1/kubectl-autoscale.1
 docs/man/man1/kubectl-certificate-approve.1
 docs/man/man1/kubectl-certificate-deny.1
@@ -37,6 +41,7 @@ docs/man/man1/kubectl-config.1
 docs/man/man1/kubectl-convert.1
 docs/man/man1/kubectl-cordon.1
 docs/man/man1/kubectl-cp.1
+docs/man/man1/kubectl-create-clusterrole.1
 docs/man/man1/kubectl-create-clusterrolebinding.1
 docs/man/man1/kubectl-create-configmap.1
 docs/man/man1/kubectl-create-deployment.1
@@ -97,7 +102,11 @@ docs/user-guide/kubectl/kubectl.md
 docs/user-guide/kubectl/kubectl_annotate.md
 docs/user-guide/kubectl/kubectl_api-versions.md
 docs/user-guide/kubectl/kubectl_apply.md
+docs/user-guide/kubectl/kubectl_apply_set-last-applied.md
+docs/user-guide/kubectl/kubectl_apply_view-last-applied.md
 docs/user-guide/kubectl/kubectl_attach.md
+docs/user-guide/kubectl/kubectl_auth.md
+docs/user-guide/kubectl/kubectl_auth_can-i.md
 docs/user-guide/kubectl/kubectl_autoscale.md
 docs/user-guide/kubectl/kubectl_certificate.md
 docs/user-guide/kubectl/kubectl_certificate_approve.md
@@ -122,6 +131,7 @@ docs/user-guide/kubectl/kubectl_convert.md
 docs/user-guide/kubectl/kubectl_cordon.md
 docs/user-guide/kubectl/kubectl_cp.md
 docs/user-guide/kubectl/kubectl_create.md
+docs/user-guide/kubectl/kubectl_create_clusterrole.md
 docs/user-guide/kubectl/kubectl_create_clusterrolebinding.md
 docs/user-guide/kubectl/kubectl_create_configmap.md
 docs/user-guide/kubectl/kubectl_create_deployment.md
@@ -179,6 +189,7 @@ docs/yaml/kubectl/kubectl_annotate.yaml
 docs/yaml/kubectl/kubectl_api-versions.yaml
 docs/yaml/kubectl/kubectl_apply.yaml
 docs/yaml/kubectl/kubectl_attach.yaml
+docs/yaml/kubectl/kubectl_auth.yaml
 docs/yaml/kubectl/kubectl_autoscale.yaml
 docs/yaml/kubectl/kubectl_certificate.yaml
 docs/yaml/kubectl/kubectl_cluster-info.yaml

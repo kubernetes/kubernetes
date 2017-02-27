@@ -59,7 +59,7 @@ fi
 # variable. Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
 CVM_VERSION=${CVM_VERSION:-container-vm-v20170214}
-GCI_VERSION=${KUBE_GCI_VERSION:-gci-beta-56-9000-80-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-gci-stable-56-9000-84-2}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
@@ -167,7 +167,7 @@ ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}

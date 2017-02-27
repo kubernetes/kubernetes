@@ -370,7 +370,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-bind-address=127.0.0.1",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
 				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
@@ -388,6 +388,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
 				"--requestheader-client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/front-proxy-ca.crt",
 				"--requestheader-allowed-names=front-proxy-client",
+				"--authorization-mode=RBAC",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
 		},
@@ -399,7 +400,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-bind-address=127.0.0.1",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
 				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
@@ -417,6 +418,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
 				"--requestheader-client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/front-proxy-ca.crt",
 				"--requestheader-allowed-names=front-proxy-client",
+				"--authorization-mode=RBAC",
 				"--advertise-address=foo",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
@@ -430,7 +432,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-bind-address=127.0.0.1",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
 				"--client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
@@ -448,6 +450,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
 				"--requestheader-client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/front-proxy-ca.crt",
 				"--requestheader-allowed-names=front-proxy-client",
+				"--authorization-mode=RBAC",
 				"--etcd-servers=http://127.0.0.1:2379",
 				"--etcd-certfile=fiz",
 				"--etcd-keyfile=faz",
@@ -480,7 +483,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"kube-controller-manager",
 				"--address=127.0.0.1",
 				"--leader-elect",
-				"--master=127.0.0.1:8080",
+				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
 				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
 				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.key",
 				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
@@ -495,7 +498,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"kube-controller-manager",
 				"--address=127.0.0.1",
 				"--leader-elect",
-				"--master=127.0.0.1:8080",
+				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
 				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
 				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.key",
 				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
@@ -511,7 +514,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"kube-controller-manager",
 				"--address=127.0.0.1",
 				"--leader-elect",
-				"--master=127.0.0.1:8080",
+				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
 				"--root-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
 				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.key",
 				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.crt",
@@ -549,7 +552,7 @@ func TestGetSchedulerCommand(t *testing.T) {
 				"kube-scheduler",
 				"--address=127.0.0.1",
 				"--leader-elect",
-				"--master=127.0.0.1:8080",
+				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/scheduler.conf",
 			},
 		},
 	}
@@ -560,6 +563,65 @@ func TestGetSchedulerCommand(t *testing.T) {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(
 					"failed getSchedulerCommand:\n\texpected: %s\n\t  actual: %s",
+					rt.expected[i],
+					actual[i],
+				)
+			}
+		}
+	}
+}
+
+func TestGetAuthzParameters(t *testing.T) {
+	var tests = []struct {
+		authMode string
+		expected []string
+	}{
+		{
+			authMode: "",
+			expected: []string{
+				"--authorization-mode=RBAC",
+			},
+		},
+		{
+			authMode: "RBAC",
+			expected: []string{
+				"--authorization-mode=RBAC",
+			},
+		},
+		{
+			authMode: "AlwaysAllow",
+			expected: []string{
+				"--authorization-mode=RBAC,AlwaysAllow",
+			},
+		},
+		{
+			authMode: "AlwaysDeny",
+			expected: []string{
+				"--authorization-mode=RBAC,AlwaysDeny",
+			},
+		},
+		{
+			authMode: "ABAC",
+			expected: []string{
+				"--authorization-mode=RBAC,ABAC",
+				"--authorization-policy-file=/etc/kubernetes/abac_policy.json",
+			},
+		},
+		{
+			authMode: "Webhook",
+			expected: []string{
+				"--authorization-mode=RBAC,Webhook",
+				"--authorization-webhook-config-file=/etc/kubernetes/webhook_authz.conf",
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		actual := getAuthzParameters(rt.authMode)
+		for i := range actual {
+			if actual[i] != rt.expected[i] {
+				t.Errorf(
+					"failed getAuthzParameters:\n\texpected: %s\n\t  actual: %s",
 					rt.expected[i],
 					actual[i],
 				)

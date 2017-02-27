@@ -170,7 +170,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "5ccb023bc27df288a957c5e994cd44fd19619465"
+			"Rev": "9ff6c6923cfffbcd502984b8e0c80539a94968b7"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",

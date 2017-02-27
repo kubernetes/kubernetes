@@ -4555,10 +4555,24 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"taints": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If specified, the node's taints.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.Taint"),
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.Taint"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.NodeStatus": {
 			Schema: spec.Schema{
@@ -5298,6 +5312,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"storageClassName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of the StorageClass required by the claim. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
 					},
 				},
 			},
@@ -5675,6 +5696,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						"persistentVolumeReclaimPolicy": {
 							SchemaProps: spec.SchemaProps{
 								Description: "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"storageClassName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -6526,12 +6554,25 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"tolerations": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If specified, the pod's tolerations.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.Toleration"),
+										},
+									},
+								},
+							},
+						},
 					},
 					Required: []string{"containers"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/kubernetes/pkg/api/v1.Affinity", "k8s.io/kubernetes/pkg/api/v1.Container", "k8s.io/kubernetes/pkg/api/v1.LocalObjectReference", "k8s.io/kubernetes/pkg/api/v1.PodSecurityContext", "k8s.io/kubernetes/pkg/api/v1.Volume"},
+				"k8s.io/kubernetes/pkg/api/v1.Affinity", "k8s.io/kubernetes/pkg/api/v1.Container", "k8s.io/kubernetes/pkg/api/v1.LocalObjectReference", "k8s.io/kubernetes/pkg/api/v1.PodSecurityContext", "k8s.io/kubernetes/pkg/api/v1.Toleration", "k8s.io/kubernetes/pkg/api/v1.Volume"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.PodStatus": {
 			Schema: spec.Schema{
@@ -12058,7 +12099,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 		"k8s.io/kubernetes/pkg/apis/certificates/v1beta1.CertificateSigningRequestSpec": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
-					Description: "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
+					Description: "This information is immutable after the request is created. Only the Request and Usages fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
 					Properties: map[string]spec.Schema{
 						"request": {
 							SchemaProps: spec.SchemaProps{
@@ -12083,25 +12124,48 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"username": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Information about the requesting user (if relevant) See user.Info interface for details",
+								Description: "Information about the requesting user. See user.Info interface for details.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
 						"uid": {
 							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
+								Description: "UID information about the requesting user. See user.Info interface for details.",
+								Type:        []string{"string"},
+								Format:      "",
 							},
 						},
 						"groups": {
 							SchemaProps: spec.SchemaProps{
-								Type: []string{"array"},
+								Description: "Group information about the requesting user. See user.Info interface for details.",
+								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
 										SchemaProps: spec.SchemaProps{
 											Type:   []string{"string"},
 											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"extra": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Extra information about the requesting user. See user.Info interface for details.",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type: []string{"array"},
+											Items: &spec.SchemaOrArray{
+												Schema: &spec.Schema{
+													SchemaProps: spec.SchemaProps{
+														Type:   []string{"string"},
+														Format: "",
+													},
+												},
+											},
 										},
 									},
 								},
@@ -12762,12 +12826,32 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec"),
 							},
 						},
+						"updateStrategy": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UpdateStrategy to replace existing DaemonSet pods with new pods.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetUpdateStrategy"),
+							},
+						},
+						"minReadySeconds": {
+							SchemaProps: spec.SchemaProps{
+								Description: "MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"templateGeneration": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
+								Type:        []string{"integer"},
+								Format:      "int64",
+							},
+						},
 					},
 					Required: []string{"template"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector", "k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec"},
+				"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector", "k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec", "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetUpdateStrategy"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetStatus": {
 			Schema: spec.Schema{
@@ -12809,11 +12893,55 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "int64",
 							},
 						},
+						"updatedNumberScheduled": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"numberAvailable": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NumberAvailable is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least minReadySeconds)",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"numberUnavailable": {
+							SchemaProps: spec.SchemaProps{
+								Description: "NumberUnavailable is the number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least minReadySeconds)",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
 					},
 					Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled", "numberReady"},
 				},
 			},
 			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetUpdateStrategy": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"rollingUpdate": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDaemonSet"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDaemonSet"},
 		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Deployment": {
 			Schema: spec.Schema{
@@ -14967,6 +15095,23 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDaemonSet": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Spec to control the desired behavior of daemon set rolling update.",
+					Properties: map[string]spec.Schema{
+						"maxUnavailable": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+								Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+		},
 		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDeployment": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -16160,6 +16305,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							SchemaProps: spec.SchemaProps{
 								Description: "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v2alpha1.JobTemplateSpec"),
+							},
+						},
+						"successfulJobsHistoryLimit": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"failedJobsHistoryLimit": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+								Type:        []string{"integer"},
+								Format:      "int32",
 							},
 						},
 					},

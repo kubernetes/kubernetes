@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/install"
@@ -59,6 +60,7 @@ type quotaAdmission struct {
 	stopCh        <-chan struct{}
 	registry      quota.Registry
 	numEvaluators int
+	quotaAccessor *quotaAccessor
 	evaluator     Evaluator
 }
 
@@ -73,29 +75,41 @@ type liveLookupEntry struct {
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
 func NewResourceQuota(registry quota.Registry, config *resourcequotaapi.Configuration, numEvaluators int, stopCh <-chan struct{}) (admission.Interface, error) {
+	quotaAccessor, err := newQuotaAccessor()
+	if err != nil {
+		return nil, err
+	}
+
 	return &quotaAdmission{
 		Handler:       admission.NewHandler(admission.Create, admission.Update),
 		stopCh:        stopCh,
 		registry:      registry,
 		numEvaluators: numEvaluators,
 		config:        config,
+		quotaAccessor: quotaAccessor,
+		evaluator:     NewQuotaEvaluator(quotaAccessor, registry, nil, config, numEvaluators, stopCh),
 	}, nil
 }
 
 func (a *quotaAdmission) SetInternalClientSet(client internalclientset.Interface) {
-	var err error
-	quotaAccessor, err := newQuotaAccessor(client)
-	if err != nil {
-		// TODO handle errors more cleanly
-		panic(err)
-	}
-	go quotaAccessor.Run(a.stopCh)
+	a.quotaAccessor.client = client
+}
 
-	a.evaluator = NewQuotaEvaluator(quotaAccessor, a.registry, nil, a.config, a.numEvaluators, a.stopCh)
+func (a *quotaAdmission) SetInformerFactory(f informers.SharedInformerFactory) {
+	a.quotaAccessor.lister = f.Core().InternalVersion().ResourceQuotas().Lister()
 }
 
 // Validate ensures an authorizer is set.
 func (a *quotaAdmission) Validate() error {
+	if a.quotaAccessor == nil {
+		return fmt.Errorf("missing quotaAccessor")
+	}
+	if a.quotaAccessor.client == nil {
+		return fmt.Errorf("missing quotaAccessor.client")
+	}
+	if a.quotaAccessor.lister == nil {
+		return fmt.Errorf("missing quotaAccessor.lister")
+	}
 	if a.evaluator == nil {
 		return fmt.Errorf("missing evaluator")
 	}

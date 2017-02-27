@@ -17317,6 +17317,39 @@
      "unschedulable": {
       "type": "boolean",
       "description": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration"
+     },
+     "taints": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Taint"
+      },
+      "description": "If specified, the node's taints."
+     }
+    }
+   },
+   "v1.Taint": {
+    "id": "v1.Taint",
+    "description": "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
+    "required": [
+     "key",
+     "effect"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "Required. The taint key to be applied to a node."
+     },
+     "value": {
+      "type": "string",
+      "description": "Required. The taint value corresponding to the taint key."
+     },
+     "effect": {
+      "type": "string",
+      "description": "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule and NoExecute."
+     },
+     "timeAdded": {
+      "type": "string",
+      "description": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints."
      }
     }
    },
@@ -17634,6 +17667,10 @@
      "volumeName": {
       "type": "string",
       "description": "VolumeName is the binding reference to the PersistentVolume backing this claim."
+     },
+     "storageClassName": {
+      "type": "string",
+      "description": "Name of the StorageClass required by the claim. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1"
      }
     }
    },
@@ -17862,6 +17899,10 @@
      "persistentVolumeReclaimPolicy": {
       "type": "string",
       "description": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy"
+     },
+     "storageClassName": {
+      "type": "string",
+      "description": "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass."
      }
     }
    },
@@ -18035,8 +18076,7 @@
     "required": [
      "targetPortal",
      "iqn",
-     "lun",
-     "portals"
+     "lun"
     ],
     "properties": {
      "targetPortal": {
@@ -18499,6 +18539,13 @@
      "schedulername": {
       "type": "string",
       "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler."
+     },
+     "tolerations": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Toleration"
+      },
+      "description": "If specified, the pod's tolerations."
      }
     }
    },
@@ -19655,6 +19702,33 @@
        "$ref": "v1.WeightedPodAffinityTerm"
       },
       "description": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred."
+     }
+    }
+   },
+   "v1.Toleration": {
+    "id": "v1.Toleration",
+    "description": "The pod this Toleration is attached to tolerates any taint that matches the triple \u003ckey,value,effect\u003e using the matching operator \u003coperator\u003e.",
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys."
+     },
+     "operator": {
+      "type": "string",
+      "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category."
+     },
+     "value": {
+      "type": "string",
+      "description": "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string."
+     },
+     "effect": {
+      "type": "string",
+      "description": "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute."
+     },
+     "tolerationSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system."
      }
     }
    },

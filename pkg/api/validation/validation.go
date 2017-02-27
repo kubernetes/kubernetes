@@ -105,9 +105,6 @@ func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList
 
 func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if annotations[api.TolerationsAnnotationKey] != "" {
-		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
-	}
 
 	// TODO: remove these after we EOL the annotations.
 	if hostname, exists := annotations[utilpod.PodHostnameAnnotation]; exists {
@@ -1851,6 +1848,29 @@ func validateTaintEffect(effect *api.TaintEffect, allowEmpty bool, fldPath *fiel
 	return allErrors
 }
 
+// validateOnlyAddedTolerations validates updated pod tolerations.
+func validateOnlyAddedTolerations(newTolerations []api.Toleration, oldTolerations []api.Toleration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, old := range oldTolerations {
+		found := false
+		old.TolerationSeconds = nil
+		for _, new := range newTolerations {
+			new.TolerationSeconds = nil
+			if reflect.DeepEqual(old, new) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "existing toleration can not be modified except its tolerationSeconds"))
+			return allErrs
+		}
+	}
+
+	allErrs = append(allErrs, validateTolerations(newTolerations, fldPath)...)
+	return allErrs
+}
+
 // validateTolerations tests if given tolerations have valid data.
 func validateTolerations(tolerations []api.Toleration, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -1946,6 +1966,10 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 
 	if len(spec.Subdomain) > 0 {
 		allErrs = append(allErrs, ValidateDNS1123Label(spec.Subdomain, fldPath.Child("subdomain"))...)
+	}
+
+	if len(spec.Tolerations) > 0 {
+		allErrs = append(allErrs, validateTolerations(spec.Tolerations, fldPath.Child("tolerations"))...)
 	}
 
 	return allErrs
@@ -2136,29 +2160,6 @@ func validatePodAffinity(podAffinity *api.PodAffinity, fldPath *field.Path) fiel
 		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution, false,
 			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
 	}
-	return allErrs
-}
-
-// ValidateTolerationsInPodAnnotations tests that the serialized tolerations in Pod.Annotations has valid data
-func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	v1Tolerations, err := v1.GetTolerationsFromPodAnnotations(annotations)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, api.TolerationsAnnotationKey, err.Error()))
-		return allErrs
-	}
-	tolerations := make([]api.Toleration, len(v1Tolerations))
-	for i := range v1Tolerations {
-		if err := v1.Convert_v1_Toleration_To_api_Toleration(&v1Tolerations[i], &tolerations[i], nil); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, api.TolerationsAnnotationKey, err.Error()))
-			return allErrs
-		}
-	}
-	if len(tolerations) > 0 {
-		allErrs = append(allErrs, validateTolerations(tolerations, fldPath.Child(api.TolerationsAnnotationKey))...)
-	}
-
 	return allErrs
 }
 
@@ -2370,9 +2371,14 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 		activeDeadlineSeconds := *oldPod.Spec.ActiveDeadlineSeconds
 		mungedPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
 	}
+
+	// Allow only additions to tolerations updates.
+	mungedPod.Spec.Tolerations = oldPod.Spec.Tolerations
+	allErrs = append(allErrs, validateOnlyAddedTolerations(newPod.Spec.Tolerations, oldPod.Spec.Tolerations, specPath.Child("tolerations"))...)
+
 	if !apiequality.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
 		//TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
-		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `containers[*].image` or `spec.activeDeadlineSeconds`"))
+		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `containers[*].image` or `spec.activeDeadlineSeconds` or `spec.tolerations` (only additions to existing tolerations)"))
 	}
 
 	return allErrs
@@ -2720,24 +2726,29 @@ func ValidateReplicationControllerUpdate(controller, oldController *api.Replicat
 // ValidateReplicationControllerStatusUpdate tests if required fields in the replication controller are set.
 func ValidateReplicationControllerStatusUpdate(controller, oldController *api.ReplicationController) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
-	statusPath := field.NewPath("status")
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.Replicas), statusPath.Child("replicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.FullyLabeledReplicas), statusPath.Child("fullyLabeledReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.ReadyReplicas), statusPath.Child("readyReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.AvailableReplicas), statusPath.Child("availableReplicas"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
+	allErrs = append(allErrs, ValidateReplicationControllerStatus(controller.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+func ValidateReplicationControllerStatus(status api.ReplicationControllerStatus, statusPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.Replicas), statusPath.Child("replicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.FullyLabeledReplicas), statusPath.Child("fullyLabeledReplicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.ReadyReplicas), statusPath.Child("readyReplicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.AvailableReplicas), statusPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
 	msg := "cannot be greater than status.replicas"
-	if controller.Status.FullyLabeledReplicas > controller.Status.Replicas {
-		allErrs = append(allErrs, field.Invalid(statusPath.Child("fullyLabeledReplicas"), controller.Status.FullyLabeledReplicas, msg))
+	if status.FullyLabeledReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("fullyLabeledReplicas"), status.FullyLabeledReplicas, msg))
 	}
-	if controller.Status.ReadyReplicas > controller.Status.Replicas {
-		allErrs = append(allErrs, field.Invalid(statusPath.Child("readyReplicas"), controller.Status.ReadyReplicas, msg))
+	if status.ReadyReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("readyReplicas"), status.ReadyReplicas, msg))
 	}
-	if controller.Status.AvailableReplicas > controller.Status.Replicas {
-		allErrs = append(allErrs, field.Invalid(statusPath.Child("availableReplicas"), controller.Status.AvailableReplicas, msg))
+	if status.AvailableReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("availableReplicas"), status.AvailableReplicas, msg))
 	}
-	if controller.Status.ReadyReplicas > controller.Status.AvailableReplicas {
-		allErrs = append(allErrs, field.Invalid(statusPath.Child("readyReplicas"), controller.Status.ReadyReplicas, "cannot be greater than availableReplicas"))
+	if status.AvailableReplicas > status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
 	}
 	return allErrs
 }
@@ -2813,8 +2824,8 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume, fldPath *field.Path) 
 	return allErrs
 }
 
-// validateTaints tests if given taints have valid data.
-func validateTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
+// validateNodeTaints tests if given taints have valid data.
+func validateNodeTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 
 	uniqueTaints := map[api.TaintEffect]sets.String{}
@@ -2847,36 +2858,10 @@ func validateTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
 	return allErrors
 }
 
-// ValidateTaintsInNodeAnnotations tests that the serialized taints in Node.Annotations has valid data
-func ValidateTaintsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	v1Taints, err := v1.GetTaintsFromNodeAnnotations(annotations)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, api.TaintsAnnotationKey, err.Error()))
-		return allErrs
-	}
-	taints := make([]api.Taint, len(v1Taints))
-	for i := range v1Taints {
-		if err := v1.Convert_v1_Taint_To_api_Taint(&v1Taints[i], &taints[i], nil); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, api.TaintsAnnotationKey, err.Error()))
-			return allErrs
-		}
-	}
-	if len(taints) > 0 {
-		allErrs = append(allErrs, validateTaints(taints, fldPath.Child(api.TaintsAnnotationKey))...)
-	}
-
-	return allErrs
-}
-
 func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if annotations[api.PreferAvoidPodsAnnotationKey] != "" {
 		allErrs = append(allErrs, ValidateAvoidPodsInNodeAnnotations(annotations, fldPath)...)
-	}
-	if annotations[api.TaintsAnnotationKey] != "" {
-		allErrs = append(allErrs, ValidateTaintsInNodeAnnotations(annotations, fldPath)...)
 	}
 	return allErrs
 }
@@ -2886,6 +2871,9 @@ func ValidateNode(node *api.Node) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, fldPath)
 	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
+	if len(node.Spec.Taints) > 0 {
+		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
+	}
 
 	// Only validate spec. All status fields are optional and can be updated later.
 
@@ -2948,10 +2936,16 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	// Clear status
 	oldNode.Status = node.Status
 
+	// update taints
+	if len(node.Spec.Taints) > 0 {
+		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
+	}
+	oldNode.Spec.Taints = node.Spec.Taints
+
 	// TODO: Add a 'real' error type for this error and provide print actual diffs.
 	if !apiequality.Semantic.DeepEqual(oldNode, node) {
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
-		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels or capacity"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints or capacity"))
 	}
 
 	return allErrs

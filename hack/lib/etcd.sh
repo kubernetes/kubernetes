@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.0.14}
+ETCD_VERSION=${ETCD_VERSION:-3.0.17}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 
@@ -40,7 +40,6 @@ kube::etcd::validate() {
    export PATH=$KUBE_ROOT/third_party/etcd:$PATH
    hash etcd
    echo $PATH
-   ls $KUBE_ROOT/third_party/etcd
    version=$(etcd --version | head -n 1 | cut -d " " -f 3)
    if [[ "${version}" < "${ETCD_VERSION}" ]]; then
     kube::log::usage "etcd version ${ETCD_VERSION} or greater required."

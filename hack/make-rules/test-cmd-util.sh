@@ -947,8 +947,8 @@ run_kubectl_apply_deployments_tests() {
   # need to explicitly remove replicasets and pods because we changed the deployment selector and orphaned things
   kubectl delete deployments,rs,pods --all --cascade=false --grace-period=0
   # Post-Condition: no Deployments, ReplicaSets, Pods exist
-  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
-  kube::test::get_object_assert replicasets "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::wait_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::wait_object_assert replicasets "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 }
 
@@ -2273,6 +2273,37 @@ run_deployment_tests() {
   # Clean up
   kubectl delete deployment test-nginx "${kube_flags[@]}"
 
+  ### Test cascading deletion
+  ## Test that rs is deleted when deployment is deleted.
+  # Pre-condition: no deployment exists
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create deployment
+  kubectl create -f test/fixtures/doc-yaml/user-guide/deployment.yaml "${kube_flags[@]}"
+  # Wait for rs to come up.
+  kube::test::wait_object_assert rs "{{range.items}}{{$rs_replicas_field}}{{end}}" '3'
+  # Deleting the deployment should delete the rs.
+  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kube::test::wait_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ## Test that rs is not deleted when deployment is deleted with cascade set to false.
+  # Pre-condition: no deployment and rs exist
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create deployment
+  kubectl create deployment nginx-deployment --image=gcr.io/google-containers/nginx:test-cmd
+  # Wait for rs to come up.
+  kube::test::wait_object_assert rs "{{range.items}}{{$rs_replicas_field}}{{end}}" '1'
+  # Delete the deployment with cascade set to false.
+  kubectl delete deployment nginx-deployment "${kube_flags[@]}" --cascade=false
+  # Wait for the deployment to be deleted and then verify that rs is not
+  # deleted.
+  kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert rs "{{range.items}}{{$rs_replicas_field}}{{end}}" '1'
+  # Cleanup
+  # Find the name of the rs to be deleted.
+  output_message=$(kubectl get rs "${kube_flags[@]}" -o template --template={{range.items}}{{$id_field}}{{end}})
+  kubectl delete rs ${output_message} "${kube_flags[@]}"
+
   ### Auto scale deployment
   # Pre-condition: no deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -2384,6 +2415,21 @@ run_rs_tests() {
   kubectl delete rs frontend "${kube_flags[@]}"
   # Post-condition: no pods from frontend replica set
   kube::test::get_object_assert 'pods -l "tier=frontend"' "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ### Create and then delete a replica set with cascade=false, make sure it doesn't delete pods.
+  # Pre-condition: no replica set exists
+  kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
+  kube::log::status "Deleting rs"
+  kubectl delete rs frontend "${kube_flags[@]}" --cascade=false
+  # Wait for the rs to be deleted.
+  kube::test::wait_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Post-condition: All 3 pods still remain from frontend replica set
+  kube::test::get_object_assert 'pods -l "tier=frontend"' "{{range.items}}{{$pod_container_name_field}}:{{end}}" 'php-redis:php-redis:php-redis:'
+  # Cleanup
+  kubectl delete pods -l "tier=frontend" "${kube_flags[@]}"
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
   ### Create replica set frontend from YAML
   # Pre-condition: no replica set exists
@@ -2662,7 +2708,7 @@ runTests() {
   i=0
   create_and_use_new_namespace() {
     i=$(($i+1))
-    kube::log::status "Creating namespace"
+    kube::log::status "Creating namespace namespace${i}"
     kubectl create namespace "namespace${i}"
     kubectl config set-context "${CONTEXT}" --namespace="namespace${i}"
   }
@@ -2690,6 +2736,7 @@ runTests() {
   second_port_field="(index .spec.ports 1).port"
   second_port_name="(index .spec.ports 1).name"
   image_field="(index .spec.containers 0).image"
+  pod_container_name_field="(index .spec.containers 0).name"
   container_name_field="(index .spec.template.spec.containers 0).name"
   hpa_min_field=".spec.minReplicas"
   hpa_max_field=".spec.maxReplicas"
@@ -2803,6 +2850,23 @@ runTests() {
     # make sure the server was properly bootstrapped with clusterroles and bindings
     kube::test::get_object_assert clusterroles/cluster-admin "{{.metadata.name}}" 'cluster-admin'
     kube::test::get_object_assert clusterrolebindings/cluster-admin "{{.metadata.name}}" 'cluster-admin'
+
+    # test `kubectl create clusterrole`
+    kubectl create "${kube_flags[@]}" clusterrole pod-admin --verb=* --resource=pods
+    kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
+    kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+    kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+    kubectl create "${kube_flags[@]}" clusterrole resource-reader --verb=get,list --resource=pods,deployments.extensions
+    kube::test::get_object_assert clusterrole/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
+    kube::test::get_object_assert clusterrole/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:deployments:'
+    kube::test::get_object_assert clusterrole/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':extensions:'
+    kubectl create "${kube_flags[@]}" clusterrole resourcename-reader --verb=get,list --resource=pods --resource-name=foo
+    kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
+    kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+    kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+    kube::test::get_object_assert clusterrole/resourcename-reader "{{range.rules}}{{range.resourceNames}}{{.}}:{{end}}{{end}}" 'foo:'
+
+    # test `kubectl create clusterrolebinding`
     kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --clusterrole=admin --user=super-admin
     kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
     kubectl create "${kube_flags[@]}" clusterrolebinding super-group --clusterrole=admin --group=the-group

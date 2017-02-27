@@ -18,6 +18,7 @@ package daemon
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -45,13 +46,23 @@ var (
 	alwaysReady           = func() bool { return true }
 )
 
-const (
-	noSchedule = `
-	[{
-		"key": "dedicated",
-		"value": "user1",
-		"effect": "NoSchedule"
-	}]`
+var (
+	noScheduleTolerations = []v1.Toleration{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}
+	noScheduleTaints      = []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}
+)
+
+var (
+	nodeNotReady = []v1.Taint{{
+		Key:       metav1.TaintNodeNotReady,
+		Effect:    v1.TaintEffectNoExecute,
+		TimeAdded: metav1.Now(),
+	}}
+
+	nodeUnreachable = []v1.Taint{{
+		Key:       metav1.TaintNodeUnreachable,
+		Effect:    v1.TaintEffectNoExecute,
+		TimeAdded: metav1.Now(),
+	}}
 )
 
 func getKey(ds *extensions.DaemonSet, t *testing.T) string {
@@ -156,6 +167,63 @@ func addFailedPods(podStore cache.Store, nodeName string, label map[string]strin
 	}
 }
 
+type fakePodControl struct {
+	sync.Mutex
+	*controller.FakePodControl
+	podStore cache.Store
+	podIDMap map[string]*v1.Pod
+}
+
+func newFakePodControl() *fakePodControl {
+	podIDMap := make(map[string]*v1.Pod)
+	return &fakePodControl{
+		FakePodControl: &controller.FakePodControl{},
+		podIDMap:       podIDMap}
+}
+
+func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
+	if err := f.FakePodControl.CreatePodsOnNode(nodeName, namespace, template, object); err != nil {
+		return fmt.Errorf("failed to create pod on node %q", nodeName)
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:       template.Labels,
+			Namespace:    namespace,
+			GenerateName: fmt.Sprintf("%s-", nodeName),
+		},
+	}
+
+	if err := api.Scheme.Convert(&template.Spec, &pod.Spec, nil); err != nil {
+		return fmt.Errorf("unable to convert pod template: %v", err)
+	}
+	if len(nodeName) != 0 {
+		pod.Spec.NodeName = nodeName
+	}
+	pod.Name = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", nodeName))
+
+	f.podStore.Update(pod)
+	f.podIDMap[pod.Name] = pod
+	return nil
+}
+
+func (f *fakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
+	if err := f.FakePodControl.DeletePod(namespace, podID, object); err != nil {
+		return fmt.Errorf("failed to delete pod %q", podID)
+	}
+	pod, ok := f.podIDMap[podID]
+	if !ok {
+		return fmt.Errorf("pod %q does not exist", podID)
+	}
+	f.podStore.Delete(pod)
+	delete(f.podIDMap, podID)
+	return nil
+}
+
 type daemonSetsController struct {
 	*DaemonSetsController
 
@@ -164,7 +232,7 @@ type daemonSetsController struct {
 	nodeStore cache.Store
 }
 
-func newTestController(initialObjects ...runtime.Object) (*daemonSetsController, *controller.FakePodControl, *fake.Clientset) {
+func newTestController(initialObjects ...runtime.Object) (*daemonSetsController, *fakePodControl, *fake.Clientset) {
 	clientset := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 
@@ -180,8 +248,9 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	manager.podStoreSynced = alwaysReady
 	manager.nodeStoreSynced = alwaysReady
 	manager.dsStoreSynced = alwaysReady
-	podControl := &controller.FakePodControl{}
+	podControl := newFakePodControl()
 	manager.podControl = podControl
+	podControl.podStore = informerFactory.Core().V1().Pods().Informer().GetStore()
 
 	return &daemonSetsController{
 		manager,
@@ -191,7 +260,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	}, podControl, clientset
 }
 
-func validateSyncDaemonSets(t *testing.T, fakePodControl *controller.FakePodControl, expectedCreates, expectedDeletes int) {
+func validateSyncDaemonSets(t *testing.T, fakePodControl *fakePodControl, expectedCreates, expectedDeletes int) {
 	if len(fakePodControl.Templates) != expectedCreates {
 		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.Templates))
 	}
@@ -200,13 +269,25 @@ func validateSyncDaemonSets(t *testing.T, fakePodControl *controller.FakePodCont
 	}
 }
 
-func syncAndValidateDaemonSets(t *testing.T, manager *daemonSetsController, ds *extensions.DaemonSet, podControl *controller.FakePodControl, expectedCreates, expectedDeletes int) {
+func syncAndValidateDaemonSets(t *testing.T, manager *daemonSetsController, ds *extensions.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		t.Errorf("Could not get key for daemon.")
 	}
 	manager.syncHandler(key)
 	validateSyncDaemonSets(t, podControl, expectedCreates, expectedDeletes)
+}
+
+// clearExpectations copies the FakePodControl to PodStore and clears the create and delete expectations.
+func clearExpectations(t *testing.T, manager *daemonSetsController, ds *extensions.DaemonSet, fakePodControl *fakePodControl) {
+	fakePodControl.Clear()
+
+	key, err := controller.KeyFunc(ds)
+	if err != nil {
+		t.Errorf("Could not get key for daemon.")
+		return
+	}
+	manager.expectations.DeleteExpectations(key)
 }
 
 func TestDeleteFinalStateUnknown(t *testing.T) {
@@ -218,6 +299,15 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	enqueuedKey, _ := manager.queue.Get()
 	if enqueuedKey.(string) != "default/foo" {
 		t.Errorf("expected delete of DeletedFinalStateUnknown to enqueue the daemonset but found: %#v", enqueuedKey)
+	}
+}
+
+func markPodsReady(store cache.Store) {
+	// mark pods as ready
+	for _, obj := range store.List() {
+		pod := obj.(*v1.Pod)
+		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+		v1.UpdatePodCondition(&pod.Status, &condition)
 	}
 }
 
@@ -722,7 +812,7 @@ func TestTaintedNodeDaemonDoesNotLaunchUntoleratePod(t *testing.T) {
 	manager, podControl, _ := newTestController()
 
 	node := newNode("tainted", nil)
-	setNodeTaint(node, noSchedule)
+	setNodeTaint(node, noScheduleTaints)
 	manager.nodeStore.Add(node)
 
 	ds := newDaemonSet("untolerate")
@@ -736,11 +826,45 @@ func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
 	manager, podControl, _ := newTestController()
 
 	node := newNode("tainted", nil)
-	setNodeTaint(node, noSchedule)
+	setNodeTaint(node, noScheduleTaints)
 	manager.nodeStore.Add(node)
 
 	ds := newDaemonSet("tolerate")
-	setDaemonSetToleration(ds, noSchedule)
+	setDaemonSetToleration(ds, noScheduleTolerations)
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSet should launch a pod on a not ready node with taint notReady:NoExecute.
+func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("tainted", nil)
+	setNodeTaint(node, nodeNotReady)
+	node.Status.Conditions = []v1.NodeCondition{
+		{Type: v1.NodeReady, Status: v1.ConditionFalse},
+	}
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("simple")
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSet should launch a pod on an unreachable node with taint unreachable:NoExecute.
+func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("tainted", nil)
+	setNodeTaint(node, nodeUnreachable)
+	node.Status.Conditions = []v1.NodeCondition{
+		{Type: v1.NodeReady, Status: v1.ConditionUnknown},
+	}
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("simple")
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
@@ -754,24 +878,18 @@ func TestNodeDaemonLaunchesToleratePod(t *testing.T) {
 	manager.nodeStore.Add(node)
 
 	ds := newDaemonSet("tolerate")
-	setDaemonSetToleration(ds, noSchedule)
+	setDaemonSetToleration(ds, noScheduleTolerations)
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
-func setNodeTaint(node *v1.Node, taint string) {
-	if node.ObjectMeta.Annotations == nil {
-		node.ObjectMeta.Annotations = make(map[string]string)
-	}
-	node.ObjectMeta.Annotations[v1.TaintsAnnotationKey] = taint
+func setNodeTaint(node *v1.Node, taints []v1.Taint) {
+	node.Spec.Taints = taints
 }
 
-func setDaemonSetToleration(ds *extensions.DaemonSet, toleration string) {
-	if ds.Spec.Template.ObjectMeta.Annotations == nil {
-		ds.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
-	}
-	ds.Spec.Template.ObjectMeta.Annotations[v1.TolerationsAnnotationKey] = toleration
+func setDaemonSetToleration(ds *extensions.DaemonSet, tolerations []v1.Toleration) {
+	ds.Spec.Template.Spec.Tolerations = tolerations
 }
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {

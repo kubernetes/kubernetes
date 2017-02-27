@@ -158,7 +158,7 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 			if err != nil {
 				glog.Errorf("Error creating daemonset %s/%s/: %v", daemonset.Namespace, daemonset.Name, err)
 			} else {
-				glog.V(4).Infof("Successfully created deamonset %s/%s", daemonset.Namespace, daemonset.Name)
+				glog.V(4).Infof("Successfully created daemonset %s/%s", daemonset.Namespace, daemonset.Name)
 			}
 			return err
 		},
@@ -169,7 +169,7 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 			if err != nil {
 				glog.Errorf("Error updating daemonset %s/%s/: %v", daemonset.Namespace, daemonset.Name, err)
 			} else {
-				glog.V(4).Infof("Successfully updating deamonset %s/%s", daemonset.Namespace, daemonset.Name)
+				glog.V(4).Infof("Successfully updating daemonset %s/%s", daemonset.Namespace, daemonset.Name)
 			}
 			return err
 		},
@@ -180,7 +180,7 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 			if err != nil {
 				glog.Errorf("Error deleting daemonset %s/%s/: %v", daemonset.Namespace, daemonset.Name, err)
 			} else {
-				glog.V(4).Infof("Successfully deleting deamonset %s/%s", daemonset.Namespace, daemonset.Name)
+				glog.V(4).Infof("Successfully deleting daemonset %s/%s", daemonset.Namespace, daemonset.Name)
 			}
 			return err
 		})

@@ -758,15 +758,15 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Con
 }
 
 // Delete removes the item from storage.
-func (e *Store) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, error) {
+func (e *Store) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	obj := e.NewFunc()
 	if err := e.Storage.Get(ctx, key, "", obj, false); err != nil {
-		return nil, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
 	// support older consumers of delete by treating "nil" as delete immediately
 	if options == nil {
@@ -778,16 +778,17 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	}
 	graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	// this means finalizers cannot be updated via DeleteOptions if a deletion is already pending
 	if pendingGraceful {
-		return e.finalizeDelete(obj, false)
+		out, err := e.finalizeDelete(obj, false)
+		return out, false, err
 	}
 	// check if obj has pending finalizers
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, kubeerr.NewInternalError(err)
+		return nil, false, kubeerr.NewInternalError(err)
 	}
 	pendingFinalizers := len(accessor.GetFinalizers()) != 0
 	var ignoreNotFound bool
@@ -810,7 +811,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	}
 	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
 	if !deleteImmediately || err != nil {
-		return out, err
+		return out, false, err
 	}
 
 	// delete immediately, or no graceful deletion supported
@@ -822,11 +823,13 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
 			// The lastExisting object may not be the last state of the object
 			// before its deletion, but it's the best approximation.
-			return e.finalizeDelete(lastExisting, true)
+			out, err := e.finalizeDelete(lastExisting, true)
+			return out, true, err
 		}
-		return nil, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
-	return e.finalizeDelete(out, true)
+	out, err = e.finalizeDelete(out, true)
+	return out, true, err
 }
 
 // DeleteCollection removes all items returned by List with a given ListOptions from storage.
@@ -890,7 +893,7 @@ func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *metav1.
 					errs <- err
 					return
 				}
-				if _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
+				if _, _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
 					glog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
 					return

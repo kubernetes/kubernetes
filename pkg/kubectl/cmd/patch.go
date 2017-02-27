@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -81,7 +82,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, kubectl.PrintOptions{
+	p, err := f.Printer(nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 	})
 	cmdutil.CheckErr(err)
@@ -189,7 +190,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				infoCopy := *info
 				infoCopy.Object = patchedObj
 				infoCopy.VersionedObject = patchedObj
-				if patch, patchType, err := cmdutil.ChangeResourcePatch(&infoCopy, f.Command()); err == nil {
+				if patch, patchType, err := cmdutil.ChangeResourcePatch(&infoCopy, f.Command(cmd, true)); err == nil {
 					if _, err = helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
 						glog.V(4).Infof("error recording reason: %v", err)
 					}

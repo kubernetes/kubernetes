@@ -34,11 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server"
 	. "k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	utilcert "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 func setUp(t *testing.T) Config {
@@ -254,9 +255,9 @@ func TestServerRunWithSNI(t *testing.T) {
 		// passed in the client hello info, "localhost" if unset
 		ServerName string
 
-		// optional ip or hostname to pass to NewSelfClientConfig
-		SelfClientBindAddressOverride string
-		ExpectSelfClientError         bool
+		// optional ip or hostname to pass to NewLoopbackClientConfig
+		LoopbackClientBindAddressOverride string
+		ExpectLoopbackClientError         bool
 	}{
 		"only one cert": {
 			Cert: TestCertSpec{
@@ -338,51 +339,7 @@ func TestServerRunWithSNI(t *testing.T) {
 			ServerName:        "www.test.com",
 		},
 
-		"loopback: IP for loopback client on SNI cert": {
-			Cert: TestCertSpec{
-				host: "localhost",
-			},
-			SNICerts: []NamedTestCertSpec{
-				{
-					TestCertSpec: TestCertSpec{
-						host: "test.com",
-						ips:  []string{"127.0.0.1"},
-					},
-				},
-			},
-			ExpectedCertIndex:     -1,
-			ExpectSelfClientError: true,
-		},
-		"loopback: IP for loopback client on server and SNI cert": {
-			Cert: TestCertSpec{
-				ips:  []string{"127.0.0.1"},
-				host: "localhost",
-			},
-			SNICerts: []NamedTestCertSpec{
-				{
-					TestCertSpec: TestCertSpec{
-						host: "test.com",
-						ips:  []string{"127.0.0.1"},
-					},
-				},
-			},
-			ExpectedCertIndex: -1,
-		},
-		"loopback: bind to 0.0.0.0 => loopback uses localhost; localhost on server cert": {
-			Cert: TestCertSpec{
-				host: "localhost",
-			},
-			SNICerts: []NamedTestCertSpec{
-				{
-					TestCertSpec: TestCertSpec{
-						host: "test.com",
-					},
-				},
-			},
-			ExpectedCertIndex:             -1,
-			SelfClientBindAddressOverride: "0.0.0.0",
-		},
-		"loopback: bind to 0.0.0.0 => loopback uses localhost; localhost on SNI cert": {
+		"loopback: LoopbackClientServerNameOverride not on any cert": {
 			Cert: TestCertSpec{
 				host: "test.com",
 			},
@@ -393,12 +350,11 @@ func TestServerRunWithSNI(t *testing.T) {
 					},
 				},
 			},
-			ExpectedCertIndex:             0,
-			SelfClientBindAddressOverride: "0.0.0.0",
+			ExpectedCertIndex: 0,
 		},
-		"loopback: bind to 0.0.0.0 => loopback uses localhost; localhost on server and SNI cert": {
+		"loopback: LoopbackClientServerNameOverride on server cert": {
 			Cert: TestCertSpec{
-				host: "localhost",
+				host: server.LoopbackClientServerNameOverride,
 			},
 			SNICerts: []NamedTestCertSpec{
 				{
@@ -407,8 +363,27 @@ func TestServerRunWithSNI(t *testing.T) {
 					},
 				},
 			},
-			ExpectedCertIndex:             0,
-			SelfClientBindAddressOverride: "0.0.0.0",
+			ExpectedCertIndex: 0,
+		},
+		"loopback: LoopbackClientServerNameOverride on SNI cert": {
+			Cert: TestCertSpec{
+				host: "localhost",
+			},
+			SNICerts: []NamedTestCertSpec{
+				{
+					TestCertSpec: TestCertSpec{
+						host: server.LoopbackClientServerNameOverride,
+					},
+				},
+			},
+			ExpectedCertIndex: -1,
+		},
+		"loopback: bind to 0.0.0.0 => loopback uses localhost": {
+			Cert: TestCertSpec{
+				host: "localhost",
+			},
+			ExpectedCertIndex:                 -1,
+			LoopbackClientBindAddressOverride: "0.0.0.0",
 		},
 	}
 
@@ -554,12 +529,11 @@ NextTest:
 
 		// check that the loopback client can connect
 		host := "127.0.0.1"
-		if len(test.SelfClientBindAddressOverride) != 0 {
-			host = test.SelfClientBindAddressOverride
+		if len(test.LoopbackClientBindAddressOverride) != 0 {
+			host = test.LoopbackClientBindAddressOverride
 		}
-		config.SecureServingInfo.ServingInfo.BindAddress = net.JoinHostPort(host, effectiveSecurePort)
-		cfg, err := config.SecureServingInfo.NewSelfClientConfig("some-token")
-		if test.ExpectSelfClientError {
+		s.LoopbackClientConfig.Host = net.JoinHostPort(host, effectiveSecurePort)
+		if test.ExpectLoopbackClientError {
 			if err == nil {
 				t.Errorf("%q - expected error creating loopback client config", title)
 			}
@@ -569,7 +543,7 @@ NextTest:
 			t.Errorf("%q - failed creating loopback client config: %v", title, err)
 			continue NextTest
 		}
-		client, err := clientset.NewForConfig(cfg)
+		client, err := discovery.NewDiscoveryClientForConfig(s.LoopbackClientConfig)
 		if err != nil {
 			t.Errorf("%q - failed to create loopback client: %v", title, err)
 			continue NextTest

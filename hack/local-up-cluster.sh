@@ -36,10 +36,7 @@ NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 # if enabled, must set CGROUP_ROOT
-CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-false}
-# this is not defaulted to preserve backward compatibility.
-# if EXPERIMENTAL_CGROUPS_PER_QOS is enabled, recommend setting to /
-CGROUP_ROOT=${CGROUP_ROOT:-""}
+CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-true}
 # name of the cgroup driver, i.e. cgroupfs or systemd
 CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 # owner of client certs, default to current user if not specified
@@ -374,7 +371,7 @@ function start_apiserver {
     fi
 
     # Admission Controllers to invoke prior to persisting objects in cluster
-    ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},ResourceQuota,DefaultStorageClass
+    ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},ResourceQuota,DefaultStorageClass,DefaultTolerationSeconds
 
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
@@ -578,6 +575,7 @@ function start_kubelet {
       fi
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
+        --enable-cri=false \
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
@@ -594,7 +592,6 @@ function start_kubelet {
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
         --cgroups-per-qos=${CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
-        --cgroup-root=${CGROUP_ROOT} \
         --keep-terminated-pod-volumes=true \
         --eviction-hard=${EVICTION_HARD} \
         --eviction-soft=${EVICTION_SOFT} \
@@ -692,6 +689,7 @@ function start_kubedns {
         # TODO update to dns role once we have one.
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
         # use kubectl to create kubedns deployment and service
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f ${KUBE_ROOT}/cluster/addons/dns/kubedns-sa.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
         echo "Kube-dns deployment and service successfully deployed."

@@ -57,6 +57,7 @@ import (
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -342,6 +343,7 @@ func (s *ProxyServer) Run() error {
 		http.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
+		http.Handle("/metrics", prometheus.Handler())
 		configz.InstallHandler(http.DefaultServeMux)
 		go wait.Until(func() {
 			err := http.ListenAndServe(s.Config.HealthzBindAddress+":"+strconv.Itoa(int(s.Config.HealthzPort)), nil)

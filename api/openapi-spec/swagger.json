@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Kubernetes",
-   "version": "v1.6.0"
+   "version": "v1.7.0"
   },
   "paths": {
    "/api/": {
@@ -37373,6 +37373,13 @@
       "description": "ID of the node assigned by the cloud provider in the format: \u003cProviderName\u003e://\u003cProviderSpecificNodeID\u003e",
       "type": "string"
      },
+     "taints": {
+      "description": "If specified, the node's taints.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Taint"
+      }
+     },
      "unschedulable": {
       "description": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration",
       "type": "boolean"
@@ -37667,6 +37674,10 @@
       "description": "A label query over volumes to consider for binding.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
+     "storageClassName": {
+      "description": "Name of the StorageClass required by the claim. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1",
+      "type": "string"
+     },
      "volumeName": {
       "description": "VolumeName is the binding reference to the PersistentVolume backing this claim.",
       "type": "string"
@@ -37834,6 +37845,10 @@
      "rbd": {
       "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RBDVolumeSource"
+     },
+     "storageClassName": {
+      "description": "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
+      "type": "string"
      },
      "vsphereVolume": {
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
@@ -38164,6 +38179,13 @@
       "description": "Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.",
       "type": "integer",
       "format": "int64"
+     },
+     "tolerations": {
+      "description": "If specified, the pod's tolerations.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Toleration"
+      }
      },
      "volumes": {
       "description": "List of volumes that can be mounted by containers belonging to the pod. More info: http://kubernetes.io/docs/user-guide/volumes",
@@ -39216,6 +39238,57 @@
      "port": {
       "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.Taint": {
+    "description": "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
+    "required": [
+     "key",
+     "effect"
+    ],
+    "properties": {
+     "effect": {
+      "description": "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule and NoExecute.",
+      "type": "string"
+     },
+     "key": {
+      "description": "Required. The taint key to be applied to a node.",
+      "type": "string"
+     },
+     "timeAdded": {
+      "description": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "value": {
+      "description": "Required. The taint value corresponding to the taint key.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.api.v1.Toleration": {
+    "description": "The pod this Toleration is attached to tolerates any taint that matches the triple \u003ckey,value,effect\u003e using the matching operator \u003coperator\u003e.",
+    "properties": {
+     "effect": {
+      "description": "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.",
+      "type": "string"
+     },
+     "key": {
+      "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.",
+      "type": "string"
+     },
+     "operator": {
+      "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+      "type": "string"
+     },
+     "tolerationSeconds": {
+      "description": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "value": {
+      "description": "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
+      "type": "string"
      }
     }
    },
@@ -40912,6 +40985,11 @@
       "description": "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
       "type": "string"
      },
+     "failedJobsHistoryLimit": {
+      "description": "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+      "type": "integer",
+      "format": "int32"
+     },
      "jobTemplate": {
       "description": "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobTemplateSpec"
@@ -40924,6 +41002,11 @@
       "description": "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
       "type": "integer",
       "format": "int64"
+     },
+     "successfulJobsHistoryLimit": {
+      "description": "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+      "type": "integer",
+      "format": "int32"
      },
      "suspend": {
       "description": "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
@@ -41215,12 +41298,23 @@
     ]
    },
    "io.k8s.kubernetes.pkg.apis.certificates.v1beta1.CertificateSigningRequestSpec": {
-    "description": "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
+    "description": "This information is immutable after the request is created. Only the Request and Usages fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
     "required": [
      "request"
     ],
     "properties": {
+     "extra": {
+      "description": "Extra information about the requesting user. See user.Info interface for details.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
      "groups": {
+      "description": "Group information about the requesting user. See user.Info interface for details.",
       "type": "array",
       "items": {
        "type": "string"
@@ -41232,6 +41326,7 @@
       "format": "byte"
      },
      "uid": {
+      "description": "UID information about the requesting user. See user.Info interface for details.",
       "type": "string"
      },
      "usages": {
@@ -41242,7 +41337,7 @@
       }
      },
      "username": {
-      "description": "Information about the requesting user (if relevant) See user.Info interface for details",
+      "description": "Information about the requesting user. See user.Info interface for details.",
       "type": "string"
      }
     }
@@ -41344,6 +41439,11 @@
      "template"
     ],
     "properties": {
+     "minReadySeconds": {
+      "description": "MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+      "type": "integer",
+      "format": "int32"
+     },
      "selector": {
       "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
@@ -41351,6 +41451,15 @@
      "template": {
       "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"
+     },
+     "templateGeneration": {
+      "description": "A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "updateStrategy": {
+      "description": "UpdateStrategy to replace existing DaemonSet pods with new pods.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetUpdateStrategy"
      }
     }
    },
@@ -41373,6 +41482,11 @@
       "type": "integer",
       "format": "int32"
      },
+     "numberAvailable": {
+      "description": "NumberAvailable is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least minReadySeconds)",
+      "type": "integer",
+      "format": "int32"
+     },
      "numberMisscheduled": {
       "description": "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
       "type": "integer",
@@ -41383,10 +41497,32 @@
       "type": "integer",
       "format": "int32"
      },
+     "numberUnavailable": {
+      "description": "NumberUnavailable is the number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least minReadySeconds)",
+      "type": "integer",
+      "format": "int32"
+     },
      "observedGeneration": {
       "description": "ObservedGeneration is the most recent generation observed by the daemon set controller.",
       "type": "integer",
       "format": "int64"
+     },
+     "updatedNumberScheduled": {
+      "description": "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod",
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetUpdateStrategy": {
+    "properties": {
+     "rollingUpdate": {
+      "description": "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollingUpdateDaemonSet"
+     },
+     "type": {
+      "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+      "type": "string"
      }
     }
    },
@@ -42289,6 +42425,15 @@
       "description": "The revision to rollback to. If set to 0, rollbck to the last revision.",
       "type": "integer",
       "format": "int64"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollingUpdateDaemonSet": {
+    "description": "Spec to control the desired behavior of daemon set rolling update.",
+    "properties": {
+     "maxUnavailable": {
+      "description": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      }
     }
    },

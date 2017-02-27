@@ -33,12 +33,12 @@ const (
 	SecretTypeBootstrapToken v1.SecretType = "bootstrap.kubernetes.io/token"
 
 	// BootstrapTokenIDKey is the id of this token. This can be transmitted in the
-	// clear and encoded in the name of the secret. It should be a random 6
-	// character string. Required
+	// clear and encoded in the name of the secret. It must be a random 6 character
+	// string that matches the regexp `^([a-z0-9]{6})$`. Required.
 	BootstrapTokenIDKey = "token-id"
 
-	// BootstrapTokenSecretKey is the actual secret. Typically this is a random 16
-	// character string. Required.
+	// BootstrapTokenSecretKey is the actual secret. It must be a random 16 character
+	// string that matches the regexp `^([a-z0-9]{16})$`. Required.
 	BootstrapTokenSecretKey = "token-secret"
 
 	// BootstrapTokenExpirationKey is when this token should be expired and no
@@ -47,10 +47,25 @@ const (
 	// should be considered invalid. Optional.
 	BootstrapTokenExpirationKey = "expiration"
 
+	// BootstrapTokenDescriptionKey is a description in human-readable format that
+	// describes what the bootstrap token is used for. Optional.
+	BootstrapTokenDescriptionKey = "description"
+
+	// BootstrapTokenUsagePrefix is the prefix for the other usage constants that specifies different
+	// functions of a bootstrap token
+	BootstrapTokenUsagePrefix = "usage-bootstrap-"
+
 	// BootstrapTokenUsageSigningKey signals that this token should be used to
 	// sign configs as part of the bootstrap process. Value must be "true". Any
 	// other value is assumed to be false. Optional.
 	BootstrapTokenUsageSigningKey = "usage-bootstrap-signing"
+
+	// BootstrapTokenUsageAuthentication signals that this token should be used
+	// as a bearer token to authenticate against the Kubernetes API. The bearer
+	// token takes the form "<token-id>.<token-secret>" and authenticates as the
+	// user "system:bootstrap:<token-id>" in the group "system:bootstrappers".
+	// Value must be "true". Any other value is assumed to be false. Optional.
+	BootstrapTokenUsageAuthentication = "usage-bootstrap-authentication"
 
 	// ConfigMapClusterInfo defines the name for the ConfigMap where the information how to connect and trust the cluster exist
 	ConfigMapClusterInfo = "cluster-info"
@@ -60,4 +75,11 @@ const (
 
 	// JWSSignatureKeyPrefix defines what key prefix the JWS-signed tokens have
 	JWSSignatureKeyPrefix = "jws-kubeconfig-"
+
+	// BootstrapUserPrefix is the username prefix bootstrapping bearer tokens
+	// authenticate as. The full username given is "system:bootstrap:<token-id>".
+	BootstrapUserPrefix = "system:bootstrap:"
+
+	// BootstrapGroup is the group bootstrapping bearer tokens authenticate in.
+	BootstrapGroup = "system:bootstrappers"
 )

@@ -322,19 +322,21 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 		return err
 	}
 
-	return reaper.client.DaemonSets(namespace).Delete(name, nil)
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return reaper.client.DaemonSets(namespace).Delete(name, deleteOptions)
 }
 
 func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	statefulsets := reaper.client.StatefulSets(namespace)
 	scaler := &StatefulSetScaler{reaper.client}
-	ps, err := statefulsets.Get(name, metav1.GetOptions{})
+	ss, err := statefulsets.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	if timeout == 0 {
-		numPets := ps.Spec.Replicas
-		timeout = Timeout + time.Duration(10*numPets)*time.Second
+		numReplicas := ss.Spec.Replicas
+		timeout = Timeout + time.Duration(10*numReplicas)*time.Second
 	}
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 	waitForStatefulSet := NewRetryParams(reaper.pollInterval, reaper.timeout)
@@ -342,10 +344,10 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 		return err
 	}
 
-	// TODO: This shouldn't be needed, see corresponding TODO in StatefulSetHasDesiredPets.
+	// TODO: This shouldn't be needed, see corresponding TODO in StatefulSetHasDesiredReplicas.
 	// StatefulSet should track generation number.
 	pods := reaper.podClient.Pods(namespace)
-	selector, _ := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
+	selector, _ := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := pods.List(options)
 	if err != nil {
@@ -366,7 +368,9 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 
 	// TODO: Cleanup volumes? We don't want to accidentally delete volumes from
 	// stop, so just leave this up to the statefulset.
-	return statefulsets.Delete(name, nil)
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return statefulsets.Delete(name, deleteOptions)
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
@@ -408,8 +412,10 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	if len(errList) > 0 {
 		return utilerrors.NewAggregate(errList)
 	}
-	// once we have all the pods removed we can safely remove the job itself
-	return jobs.Delete(name, nil)
+	// once we have all the pods removed we can safely remove the job itself.
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return jobs.Delete(name, deleteOptions)
 }
 
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
@@ -509,5 +515,7 @@ func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration,
 	if err != nil {
 		return err
 	}
-	return services.Delete(name, nil)
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return services.Delete(name, deleteOptions)
 }

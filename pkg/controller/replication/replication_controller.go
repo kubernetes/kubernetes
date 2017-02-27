@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
@@ -90,14 +89,10 @@ type ReplicationManager struct {
 
 	// Controllers that need to be synced
 	queue workqueue.RateLimitingInterface
-
-	// garbageCollectorEnabled denotes if the garbage collector is enabled. RC
-	// manager behaves differently if GC is enabled.
-	garbageCollectorEnabled bool
 }
 
 // NewReplicationManager configures a replication manager with the specified event recorder
-func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicationManager {
+func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int) *ReplicationManager {
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("replication_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
@@ -115,7 +110,6 @@ func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer cor
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicationmanager"),
-		garbageCollectorEnabled: garbageCollectorEnabled,
 	}
 
 	rcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -485,19 +479,15 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*v1.Pod, rc *v1.Repl
 			go func() {
 				defer wg.Done()
 				var err error
-				if rm.garbageCollectorEnabled {
-					var trueVar = true
-					controllerRef := &metav1.OwnerReference{
-						APIVersion: getRCKind().GroupVersion().String(),
-						Kind:       getRCKind().Kind,
-						Name:       rc.Name,
-						UID:        rc.UID,
-						Controller: &trueVar,
-					}
-					err = rm.podControl.CreatePodsWithControllerRef(rc.Namespace, rc.Spec.Template, rc, controllerRef)
-				} else {
-					err = rm.podControl.CreatePods(rc.Namespace, rc.Spec.Template, rc)
+				var trueVar = true
+				controllerRef := &metav1.OwnerReference{
+					APIVersion: getRCKind().GroupVersion().String(),
+					Kind:       getRCKind().Kind,
+					Name:       rc.Name,
+					UID:        rc.UID,
+					Controller: &trueVar,
 				}
+				err = rm.podControl.CreatePodsWithControllerRef(rc.Namespace, rc.Spec.Template, rc, controllerRef)
 				if err != nil {
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
@@ -611,57 +601,21 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	// modify them, you need to copy it first.
 	// TODO: Do the List and Filter in a single pass, or use an index.
 	var filteredPods []*v1.Pod
-	if rm.garbageCollectorEnabled {
-		// list all pods to include the pods that don't match the rc's selector
-		// anymore but has the stale controller ref.
-		pods, err := rm.podLister.Pods(rc.Namespace).List(labels.Everything())
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error getting pods for rc %q: %v", key, err))
-			rm.queue.Add(key)
-			return err
-		}
-		cm := controller.NewPodControllerRefManager(rm.podControl, rc.ObjectMeta, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), getRCKind())
-		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(pods)
-		// Adopt pods only if this replication controller is not going to be deleted.
-		if rc.DeletionTimestamp == nil {
-			for _, pod := range matchesNeedsController {
-				err := cm.AdoptPod(pod)
-				// continue to next pod if adoption fails.
-				if err != nil {
-					// If the pod no longer exists, don't even log the error.
-					if !errors.IsNotFound(err) {
-						utilruntime.HandleError(err)
-					}
-				} else {
-					matchesAndControlled = append(matchesAndControlled, pod)
-				}
-			}
-		}
-		filteredPods = matchesAndControlled
-		// remove the controllerRef for the pods that no longer have matching labels
-		var errlist []error
-		for _, pod := range controlledDoesNotMatch {
-			err := cm.ReleasePod(pod)
-			if err != nil {
-				errlist = append(errlist, err)
-			}
-		}
-		if len(errlist) != 0 {
-			aggregate := utilerrors.NewAggregate(errlist)
-			// push the RC into work queue again. We need to try to free the
-			// pods again otherwise they will stuck with the stale
-			// controllerRef.
-			rm.queue.Add(key)
-			return aggregate
-		}
-	} else {
-		pods, err := rm.podLister.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelectorPreValidated())
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error getting pods for rc %q: %v", key, err))
-			rm.queue.Add(key)
-			return err
-		}
-		filteredPods = controller.FilterActivePods(pods)
+	// list all pods to include the pods that don't match the rc's selector
+	// anymore but has the stale controller ref.
+	pods, err := rm.podLister.Pods(rc.Namespace).List(labels.Everything())
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Error getting pods for rc %q: %v", key, err))
+		rm.queue.Add(key)
+		return err
+	}
+	cm := controller.NewPodControllerRefManager(rm.podControl, rc, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), getRCKind())
+	filteredPods, err = cm.ClaimPods(pods)
+	if err != nil {
+		// Something went wrong with adoption or release.
+		// Requeue and try again so we don't leave orphans sitting around.
+		rm.queue.Add(key)
+		return err
 	}
 
 	var manageReplicasErr error

@@ -46,6 +46,7 @@ type pausePodConfig struct {
 	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
+	Tolerations                       []v1.Toleration
 }
 
 var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
@@ -90,7 +91,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels, true)
+		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, ignoreLabels, true)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
@@ -689,17 +690,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to relaunch the pod, now with tolerations.")
 		tolerationPodName := "with-tolerations"
 		_ = createPausePod(f, pausePodConfig{
-			Name: tolerationPodName,
-			Annotations: map[string]string{
-				"scheduler.alpha.kubernetes.io/tolerations": `
-					[
-						{
-							"key": "` + testTaint.Key + `",
-							"value": "` + testTaint.Value + `",
-							"effect": "` + string(testTaint.Effect) + `"
-						}
-					]`,
-			},
+			Name:         tolerationPodName,
+			Tolerations:  []v1.Toleration{{Key: testTaint.Key, Value: testTaint.Value, Effect: testTaint.Effect}},
 			NodeSelector: map[string]string{labelKey: labelValue},
 		})
 
@@ -772,6 +764,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 					Image: framework.GetPauseImageName(f.ClientSet),
 				},
 			},
+			Tolerations: conf.Tolerations,
 		},
 	}
 	if conf.Resources != nil {

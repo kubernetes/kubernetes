@@ -220,6 +220,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		if !cgroupManager.Exists(CgroupName(nodeConfig.CgroupRoot)) {
 			return nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist: %v", err)
 		}
+		glog.Infof("container manager verified cgroup-root exists: %v", nodeConfig.CgroupRoot)
 	}
 	return &containerManagerImpl{
 		cadvisorInterface: cadvisorInterface,
@@ -282,15 +283,27 @@ func InitQOS(cgroupDriver, rootContainer string, subsystems *CgroupSubsystems) (
 	for _, qosClass := range qosClasses {
 		// get the container's absolute name
 		absoluteContainerName := CgroupName(path.Join(rootContainer, string(qosClass)))
+
+		resourceParameters := &ResourceConfig{}
+		// the BestEffort QoS class has a statically configured minShares value
+		if qosClass == v1.PodQOSBestEffort {
+			minShares := int64(MinShares)
+			resourceParameters.CpuShares = &minShares
+		}
 		// containerConfig object stores the cgroup specifications
 		containerConfig := &CgroupConfig{
 			Name:               absoluteContainerName,
-			ResourceParameters: &ResourceConfig{},
+			ResourceParameters: resourceParameters,
 		}
 		// check if it exists
 		if !cm.Exists(absoluteContainerName) {
 			if err := cm.Create(containerConfig); err != nil {
 				return QOSContainersInfo{}, fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
+			}
+		} else {
+			// to ensure we actually have the right state, we update the config on startup
+			if err := cm.Update(containerConfig); err != nil {
+				return QOSContainersInfo{}, fmt.Errorf("failed to update top level %v QOS cgroup : %v", qosClass, err)
 			}
 		}
 	}

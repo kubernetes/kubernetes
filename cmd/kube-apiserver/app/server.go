@@ -22,6 +22,7 @@ package app
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -35,6 +36,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -50,8 +52,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
@@ -61,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -126,6 +129,12 @@ func Run(s *options.ServerRunOptions) error {
 	if err := s.Features.ApplyTo(genericConfig); err != nil {
 		return err
 	}
+
+	// Use protobufs for self-communication.
+	// Since not every generic apiserver has to support protobufs, we
+	// cannot default to it in generic apiserver and need to explicitly
+	// set it in kube-apiserver.
+	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
 
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
@@ -253,11 +262,6 @@ func Run(s *options.ServerRunOptions) error {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
 
-	apiAuthenticator, securityDefinitions, err := authenticatorConfig.New()
-	if err != nil {
-		return fmt.Errorf("invalid Authentication Config: %v", err)
-	}
-
 	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
 		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
@@ -267,10 +271,26 @@ func Run(s *options.ServerRunOptions) error {
 
 		// KUBE_API_VERSIONS is used in test-update-storage-objects.sh, disabling a number of API
 		// groups. This leads to a nil client above and undefined behaviour further down.
+		//
 		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
 		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
+
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+
+	if client == nil {
+		// TODO: Remove check once client can never be nil.
+		glog.Errorf("Failed to setup bootstrap token authenticator because the loopback clientset was not setup properly.")
+	} else {
+		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
+			sharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
+		)
+	}
+
+	apiAuthenticator, securityDefinitions, err := authenticatorConfig.New()
+	if err != nil {
+		return fmt.Errorf("invalid authentication config: %v", err)
+	}
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizationConfig.New()
@@ -314,8 +334,25 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
+	clientCA, err := readCAorNil(s.Authentication.ClientCert.ClientCA)
+	if err != nil {
+		return err
+	}
+	requestHeaderProxyCA, err := readCAorNil(s.Authentication.RequestHeader.ClientCAFile)
+	if err != nil {
+		return err
+	}
 	config := &master.Config{
 		GenericConfig: genericConfig,
+
+		ClientCARegistrationHook: master.ClientCARegistrationHook{
+			ClientCA:                         clientCA,
+			RequestHeaderUsernameHeaders:     s.Authentication.RequestHeader.UsernameHeaders,
+			RequestHeaderGroupHeaders:        s.Authentication.RequestHeader.GroupHeaders,
+			RequestHeaderExtraHeaderPrefixes: s.Authentication.RequestHeader.ExtraHeaderPrefixes,
+			RequestHeaderCA:                  requestHeaderProxyCA,
+			RequestHeaderAllowedNames:        s.Authentication.RequestHeader.AllowedNames,
+		},
 
 		APIResourceConfigSource: storageFactory.APIResourceConfigSource,
 		StorageFactory:          storageFactory,
@@ -352,6 +389,13 @@ func Run(s *options.ServerRunOptions) error {
 	sharedInformers.Start(wait.NeverStop)
 	m.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
 	return nil
+}
+
+func readCAorNil(file string) ([]byte, error) {
+	if len(file) == 0 {
+		return nil, nil
+	}
+	return ioutil.ReadFile(file)
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility

@@ -74,6 +74,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 						MatchLabels: defaultLabels,
 					},
 					Template: defaultTemplate,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -99,6 +102,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 						MatchLabels: defaultLabels,
 					},
 					Template: defaultTemplate,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -107,6 +113,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
 					Template: templateNoLabel,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -117,6 +126,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
 					Template: templateNoLabel,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -127,6 +139,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
 					Template: templateNoLabel,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},

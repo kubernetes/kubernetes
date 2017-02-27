@@ -46,12 +46,11 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
@@ -216,12 +215,7 @@ type ControllerContext struct {
 	ClientBuilder controller.ControllerClientBuilder
 
 	// InformerFactory gives access to informers for the controller.
-	// TODO delete this instance once the conversion to generated informers is complete.
 	InformerFactory informers.SharedInformerFactory
-
-	// NewInformerFactory gives access to informers for the controller.
-	// TODO rename this to InformerFactory once the conversion to generated informers is complete.
-	NewInformerFactory newinformers.SharedInformerFactory
 
 	// Options provides access to init options for a given controller
 	Options options.CMServer
@@ -343,9 +337,7 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 
 func StartControllers(controllers map[string]InitFunc, s *options.CMServer, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) error {
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
-	// TODO replace sharedInformers with newSharedInformers
-	sharedInformers := informers.NewSharedInformerFactory(versionedClient, nil, ResyncPeriod(s)())
-	newSharedInformers := newinformers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
+	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
 	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	if len(s.ServiceAccountKeyFile) > 0 {
@@ -385,7 +377,6 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	ctx := ControllerContext{
 		ClientBuilder:      clientBuilder,
 		InformerFactory:    sharedInformers,
-		NewInformerFactory: newSharedInformers,
 		Options:            *s,
 		AvailableResources: availableResources,
 		Stop:               stop,
@@ -426,9 +417,9 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", s.ServiceCIDR, err)
 	}
 	nodeController, err := nodecontroller.NewNodeController(
-		newSharedInformers.Core().V1().Pods(),
-		newSharedInformers.Core().V1().Nodes(),
-		newSharedInformers.Extensions().V1beta1().DaemonSets(),
+		sharedInformers.Core().V1().Pods(),
+		sharedInformers.Core().V1().Nodes(),
+		sharedInformers.Extensions().V1beta1().DaemonSets(),
 		cloud,
 		clientBuilder.ClientOrDie("node-controller"),
 		s.PodEvictionTimeout.Duration,
@@ -444,6 +435,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		int(s.NodeCIDRMaskSize),
 		s.AllocateNodeCIDRs,
 		s.EnableTaintManager,
+		s.UseTaintBasedEvictions,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize nodecontroller: %v", err)
@@ -454,8 +446,8 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	serviceController, err := servicecontroller.New(
 		cloud,
 		clientBuilder.ClientOrDie("service-controller"),
-		newSharedInformers.Core().V1().Services(),
-		newSharedInformers.Core().V1().Nodes(),
+		sharedInformers.Core().V1().Services(),
+		sharedInformers.Core().V1().Nodes(),
 		s.ClusterName,
 	)
 	if err != nil {
@@ -471,7 +463,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
-			routeController := routecontroller.New(routes, clientBuilder.ClientOrDie("route-controller"), newSharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
+			routeController := routecontroller.New(routes, clientBuilder.ClientOrDie("route-controller"), sharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
 			go routeController.Run(stop, s.RouteReconciliationPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
@@ -490,9 +482,9 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		VolumePlugins:             ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
 		Cloud:                     cloud,
 		ClusterName:               s.ClusterName,
-		VolumeInformer:            newSharedInformers.Core().V1().PersistentVolumes(),
-		ClaimInformer:             newSharedInformers.Core().V1().PersistentVolumeClaims(),
-		ClassInformer:             newSharedInformers.Storage().V1beta1().StorageClasses(),
+		VolumeInformer:            sharedInformers.Core().V1().PersistentVolumes(),
+		ClaimInformer:             sharedInformers.Core().V1().PersistentVolumeClaims(),
+		ClassInformer:             sharedInformers.Storage().V1beta1().StorageClasses(),
 		EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
 	}
 	volumeController := persistentvolumecontroller.NewController(params)
@@ -506,10 +498,10 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			clientBuilder.ClientOrDie("attachdetach-controller"),
-			newSharedInformers.Core().V1().Pods(),
-			newSharedInformers.Core().V1().Nodes(),
-			newSharedInformers.Core().V1().PersistentVolumeClaims(),
-			newSharedInformers.Core().V1().PersistentVolumes(),
+			sharedInformers.Core().V1().Pods(),
+			sharedInformers.Core().V1().Nodes(),
+			sharedInformers.Core().V1().PersistentVolumeClaims(),
+			sharedInformers.Core().V1().PersistentVolumes(),
 			cloud,
 			ProbeAttachableVolumePlugins(s.VolumeConfiguration),
 			s.DisableAttachDetachReconcilerSync,
@@ -521,9 +513,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	go attachDetachController.Run(stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	// TODO replace sharedInformers with newSharedInformers
 	sharedInformers.Start(stop)
-	newSharedInformers.Start(stop)
 
 	select {}
 }

@@ -1,5 +1,69 @@
 # changelog
 
+### 0.12.1 (2016-12-19)
+
+* Add DiagnosticLog helper
+
+* Add DatastorePath helper
+
+### 0.12.0 (2016-12-01)
+
+* Disable use of service ticket for datastore HTTP access by default
+
+* Attach context to HTTP requests for cancellations
+
+* Update to vim25/6.5 API
+
+### 0.11.4 (2016-11-15)
+
+* Add object.AuthorizationManager methods: RetrieveRolePermissions, RetrieveAllPermissions, AddRole, RemoveRole, UpdateRole
+
+### 0.11.3 (2016-11-08)
+
+* Allow DatastoreFile.Follow reader to drain current body after stopping
+
+### 0.11.2 (2016-11-01)
+
+* Avoid possible NPE in VirtualMachine.Device method
+
+* Add support for OpaqueNetwork type to Finder
+
+* Add HostConfigManager.AccountManager support for ESX 5.5
+
+### 0.11.1 (2016-10-27)
+
+* Add Finder.ResourcePoolListAll method
+
+### 0.11.0 (2016-10-25)
+
+* Add object.DistributedVirtualPortgroup.Reconfigure method
+
+### 0.10.0 (2016-10-20)
+
+* Add option to set soap.Client.UserAgent
+
+* Add service ticket thumbprint validation
+
+* Update use of http.DefaultTransport fields to 1.7
+
+* Set default locale to en_US (override with GOVMOMI_LOCALE env var)
+
+* Add object.HostCertificateInfo (types.HostCertificateManagerCertificateInfo helpers)
+
+* Add object.HostCertificateManager type and HostConfigManager.CertificateManager method
+
+* Add soap.Client SetRootCAs and SetDialTLS methods
+
+### 0.9.0 (2016-09-09)
+
+* Add object.DatastoreFile helpers for streaming and tailing datastore files
+
+* Add object VirtualMachine.Unregister method
+
+* Add object.ListView methods: Add, Remove, Reset
+
+* Update to Go 1.7 - using stdlib's context package
+
 ### 0.8.0 (2016-06-30)
 
 * Add session.Manager.AcquireLocalTicket

@@ -20,6 +20,7 @@ go_library(
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
+        "//pkg/printers:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
