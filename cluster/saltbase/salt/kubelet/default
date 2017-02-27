@@ -5,8 +5,6 @@
 
 {% if grains.api_servers is defined -%}
   {% set api_servers = "--api-servers=https://" + grains.api_servers -%}
-{% elif grains.apiservers is defined -%} # TODO(remove after 0.16.0): Deprecated form
-  {% set api_servers = "--api-servers=https://" + grains.apiservers -%}
 {% elif grains['roles'][0] == 'kubernetes-master' -%}
   {% set master_ipv4 = salt['grains.get']('fqdn_ip4')[0] -%}
   {% set api_servers = "--api-servers=https://" + master_ipv4 -%}
@@ -190,5 +188,13 @@
 
 {% set kubelet_auth = "--anonymous-auth=false --authorization-mode=Webhook --client-ca-file=" + pillar.get('ca_cert_bundle_path', '/var/lib/kubelet/ca.crt') %}
 
+# TODO(mtaufen): Convert the old switch for standalone mode to the new switch. We need to go through and rip out all the old plumbing eventually,
+# but it's such a hairball this is much easier.
+{% if api_servers_with_port != "" -%}
+  {% set kubeconfig = "--kubeconfig=/var/lib/kubelet/kubeconfig" -%}
+{% else -%}
+  {% set kubeconfig = "" -%}
+{% endif -%}
+
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{babysit_daemons}} {{eviction_hard}} {{kubelet_auth}} {{feature_gates}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{kubeconfig}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{babysit_daemons}} {{eviction_hard}} {{kubelet_auth}} {{feature_gates}} {{test_args}}"
