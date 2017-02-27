@@ -124,6 +124,7 @@ core-kubeconfig
 cors-allowed-origins
 cpu-cfs-quota
 cpu-percent
+create-annotation
 current-release-pr
 current-replicas
 daemonset-lookup-cache-size
