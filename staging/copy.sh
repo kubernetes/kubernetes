@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -115,6 +115,8 @@ echo "generating vendor/"
 # find the dependent packages in staging/, instead of failing. Note that all
 # k8s.io/apimachinery dependencies will be updated later by the robot to point
 # to the real k8s.io/apimachinery commit and vendor the real code.
+git status
+ls -lR $GOPATH
 GOPATH="${GOPATH}:${MAIN_REPO}/staging"
 GO15VENDOREXPERIMENT=1 godep save ./...
 popd > /dev/null
