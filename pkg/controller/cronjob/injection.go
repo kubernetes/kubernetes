@@ -120,6 +120,7 @@ type fakeJobControl struct {
 	Jobs          []batchv1.Job
 	DeleteJobName []string
 	Err           error
+	UpdateJobName []string
 }
 
 var _ jobControlInterface = &fakeJobControl{}
@@ -151,6 +152,7 @@ func (f *fakeJobControl) UpdateJob(namespace string, job *batchv1.Job) (*batchv1
 	if f.Err != nil {
 		return nil, f.Err
 	}
+	f.UpdateJobName = append(f.UpdateJobName, job.Name)
 	return job, nil
 }
 
