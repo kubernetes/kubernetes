@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/pkg/api"
@@ -56,8 +55,14 @@ type StatefulPodControlInterface interface {
 	UpdateStatefulSetReplicas(set *apps.StatefulSet, replicas int32) error
 }
 
-func NewRealStatefulPodControl(client clientset.Interface, setLister appslisters.StatefulSetLister, podLister corelisters.PodLister, recorder record.EventRecorder) StatefulPodControlInterface {
-	return &realStatefulPodControl{client, setLister, podLister, recorder}
+func NewRealStatefulPodControl(
+	client clientset.Interface,
+	setLister appslisters.StatefulSetLister,
+	podLister corelisters.PodLister,
+	pvcLister corelisters.PersistentVolumeClaimLister,
+	recorder record.EventRecorder,
+) StatefulPodControlInterface {
+	return &realStatefulPodControl{client, setLister, podLister, pvcLister, recorder}
 }
 
 // realStatefulPodControl implements StatefulPodControlInterface using a clientset.Interface to communicate with the
@@ -66,6 +71,7 @@ type realStatefulPodControl struct {
 	client    clientset.Interface
 	setLister appslisters.StatefulSetLister
 	podLister corelisters.PodLister
+	pvcLister corelisters.PersistentVolumeClaimLister
 	recorder  record.EventRecorder
 }
 
@@ -209,18 +215,19 @@ func (spc *realStatefulPodControl) recordClaimEvent(verb string, set *apps.State
 func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
 	var errs []error
 	for _, claim := range getPersistentVolumeClaims(set, pod) {
-		_, err := spc.client.Core().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				_, err := spc.client.Core().PersistentVolumeClaims(claim.Namespace).Create(&claim)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("Failed to create PVC %s: %s", claim.Name, err))
-				}
-				spc.recordClaimEvent("create", set, pod, &claim, err)
-			} else {
-				errs = append(errs, fmt.Errorf("Failed to retrieve PVC %s: %s", claim.Name, err))
+		_, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
+		switch {
+		case apierrors.IsNotFound(err):
+			_, err := spc.client.Core().PersistentVolumeClaims(claim.Namespace).Create(&claim)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("Failed to create PVC %s: %s", claim.Name, err))
+			}
+			if err == nil || !apierrors.IsAlreadyExists(err) {
 				spc.recordClaimEvent("create", set, pod, &claim, err)
 			}
+		case err != nil:
+			errs = append(errs, fmt.Errorf("Failed to retrieve PVC %s: %s", claim.Name, err))
+			spc.recordClaimEvent("create", set, pod, &claim, err)
 		}
 		// TODO: Check resource requirements and accessmodes, update if necessary
 	}
