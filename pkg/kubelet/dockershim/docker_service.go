@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -415,4 +416,47 @@ func toAPIProtocol(protocol Protocol) v1.Protocol {
 	}
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return v1.ProtocolTCP
+}
+
+// DockerLegacyService interface embeds some legacy methods for backward compatibility.
+type DockerLegacyService interface {
+	// GetContainerLogs gets logs for a specific container.
+	GetContainerLogs(*v1.Pod, kubecontainer.ContainerID, *v1.PodLogOptions, io.Writer, io.Writer) error
+}
+
+// dockerLegacyService implements the DockerLegacyService. We add this for non json-log driver
+// support. (See #41996)
+type dockerLegacyService struct {
+	client dockertools.DockerInterface
+}
+
+func NewDockerLegacyService(client dockertools.DockerInterface) DockerLegacyService {
+	return &dockerLegacyService{client: client}
+}
+
+// GetContainerLogs get container logs directly from docker daemon.
+func (d *dockerLegacyService) GetContainerLogs(pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
+	container, err := d.client.InspectContainer(containerID.ID)
+	if err != nil {
+		return err
+	}
+	return dockertools.GetContainerLogs(d.client, pod, containerID, logOptions, stdout, stderr, container.Config.Tty)
+}
+
+// criSupportedLogDrivers are log drivers supported by native CRI integration.
+var criSupportedLogDrivers = []string{"json-file"}
+
+// IsCRISupportedLogDriver checks whether the logging driver used by docker is
+// suppoted by native CRI integration.
+func IsCRISupportedLogDriver(client dockertools.DockerInterface) (bool, error) {
+	info, err := client.Info()
+	if err != nil {
+		return false, fmt.Errorf("failed to get docker info: %v", err)
+	}
+	for _, driver := range criSupportedLogDrivers {
+		if info.LoggingDriver == driver {
+			return true, nil
+		}
+	}
+	return false, nil
 }
