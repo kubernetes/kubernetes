@@ -69,6 +69,7 @@ users:
 clusters:
 - name: local
   cluster:
+    server: https://${1}:443
     certificate-authority-data: ${KUBELET_CA_CERT}
 contexts:
 - context:
@@ -153,12 +154,12 @@ assemble_kubelet_flags() {
   if [ "${KUBERNETES_MASTER:-}" = "true" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --enable-debugging-handlers=false --hairpin-mode=none"
     if [ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]; then
-      KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --api-servers=https://${KUBELET_APISERVER} --register-schedulable=false"
+      KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --register-schedulable=false"
     else
       KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --pod-cidr=${MASTER_IP_RANGE}"
     fi
   else # For nodes
-    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --enable-debugging-handlers=true --api-servers=https://${KUBERNETES_MASTER_NAME}"
+    KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --enable-debugging-handlers=true"
     if [ "${HAIRPIN_MODE:-}" = "promiscuous-bridge" ] || \
        [ "${HAIRPIN_MODE:-}" = "hairpin-veth" ] || \
        [ "${HAIRPIN_MODE:-}" = "none" ]; then
@@ -175,7 +176,7 @@ assemble_kubelet_flags() {
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --node-labels=${NODE_LABELS}"
   fi
   # Add the unconditional flags
-  KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --cloud-provider=gce --allow-privileged=true --cgroup-root=/ --system-cgroups=/system --kubelet-cgroups=/kubelet --babysit-daemons=true --pod-manifest-path=/etc/kubernetes/manifests --cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
+  KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --cloud-provider=gce --allow-privileged=true --cgroup-root=/ --system-cgroups=/system --kubelet-cgroups=/kubelet --babysit-daemons=true --pod-manifest-path=/etc/kubernetes/manifests --cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN} --kubeconfig=/var/lib/kubelet/kubeconfig"
   echo "KUBELET_OPTS=\"${KUBELET_CMD_FLAGS}\"" > /etc/default/kubelet
 }
 
@@ -425,7 +426,7 @@ create_master_kubelet_auth() {
   # set in the environment.
   if [ -n "${KUBELET_APISERVER:-}" ] && [ -n "${KUBELET_CERT:-}" ] && [ -n "${KUBELET_KEY:-}" ]; then
     REGISTER_MASTER_KUBELET="true"
-    create_kubelet_kubeconfig
+    create_kubelet_kubeconfig ${KUBELET_APISERVER}
   fi
 }
 

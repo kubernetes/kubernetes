@@ -60,7 +60,7 @@ script
 	echo "Creating required directories"
 	create_dirs
 	echo "Creating kubelet kubeconfig file"
-	create_kubelet_kubeconfig
+	create_kubelet_kubeconfig ${KUBERNETES_MASTER_NAME}
 	echo "Creating kube-proxy kubeconfig file"
 	create_kubeproxy_kubeconfig
 	echo "Assemble kubelet command line"
