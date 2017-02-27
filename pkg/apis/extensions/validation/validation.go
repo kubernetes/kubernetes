@@ -110,6 +110,9 @@ func validateDaemonSetStatus(status *extensions.DaemonSetStatus, fldPath *field.
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredNumberScheduled), fldPath.Child("desiredNumberScheduled"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.NumberReady), fldPath.Child("numberReady"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(status.ObservedGeneration, fldPath.Child("observedGeneration"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedNumberScheduled), fldPath.Child("updatedNumberScheduled"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.NumberAvailable), fldPath.Child("numberAvailable"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.NumberUnavailable), fldPath.Child("numberUnavailable"))...)
 	return allErrs
 }
 
@@ -140,6 +143,40 @@ func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) 
 	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"), spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+	}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.TemplateGeneration), fldPath.Child("templateGeneration"))...)
+
+	allErrs = append(allErrs, ValidateDaemonSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
+	return allErrs
+}
+
+func ValidateRollingUpdateDaemonSet(rollingUpdate *extensions.RollingUpdateDaemonSet, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	if getIntOrPercentValue(rollingUpdate.MaxUnavailable) == 0 {
+		// MaxUnavailable cannot be 0.
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), rollingUpdate.MaxUnavailable, "cannot be 0"))
+	}
+	// Validate that MaxUnavailable is not more than 100%.
+	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	return allErrs
+}
+
+func ValidateDaemonSetUpdateStrategy(strategy *extensions.DaemonSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch strategy.Type {
+	case extensions.OnDeleteDaemonSetStrategyType:
+	case extensions.RollingUpdateDaemonSetStrategyType:
+		// Make sure RollingUpdate field isn't nil.
+		if strategy.RollingUpdate == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), ""))
+			return allErrs
+		}
+		allErrs = append(allErrs, ValidateRollingUpdateDaemonSet(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
+	default:
+		validValues := []string{string(extensions.RollingUpdateDaemonSetStrategyType), string(extensions.OnDeleteDaemonSetStrategyType)}
+		allErrs = append(allErrs, field.NotSupported(fldPath, strategy, validValues))
 	}
 	return allErrs
 }

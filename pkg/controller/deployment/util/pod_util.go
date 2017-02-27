@@ -44,6 +44,8 @@ func GetInternalPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
 	return podTemplateSpecHasher.Sum32()
 }
 
+// TODO: move it to a better place. It's also used by DaemonSets
+// Maybe to pkg/api/v1/resource_helpers.go
 func GetPodTemplateSpecHashFnv(template v1.PodTemplateSpec) uint32 {
 	podTemplateSpecHasher := fnv.New32a()
 	hashutil.DeepHashObject(podTemplateSpecHasher, template)

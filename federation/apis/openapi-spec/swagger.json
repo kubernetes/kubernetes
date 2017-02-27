@@ -13810,6 +13810,11 @@
      "template"
     ],
     "properties": {
+     "minReadySeconds": {
+      "description": "MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+      "type": "integer",
+      "format": "int32"
+     },
      "selector": {
       "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
@@ -13817,6 +13822,15 @@
      "template": {
       "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"
+     },
+     "templateGeneration": {
+      "description": "A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "updateStrategy": {
+      "description": "UpdateStrategy to replace existing DaemonSet pods with new pods.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetUpdateStrategy"
      }
     }
    },
@@ -13839,6 +13853,11 @@
       "type": "integer",
       "format": "int32"
      },
+     "numberAvailable": {
+      "description": "NumberAvailable is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least minReadySeconds)",
+      "type": "integer",
+      "format": "int32"
+     },
      "numberMisscheduled": {
       "description": "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
       "type": "integer",
@@ -13849,10 +13868,32 @@
       "type": "integer",
       "format": "int32"
      },
+     "numberUnavailable": {
+      "description": "NumberUnavailable is the number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least minReadySeconds)",
+      "type": "integer",
+      "format": "int32"
+     },
      "observedGeneration": {
       "description": "ObservedGeneration is the most recent generation observed by the daemon set controller.",
       "type": "integer",
       "format": "int64"
+     },
+     "updatedNumberScheduled": {
+      "description": "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod",
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetUpdateStrategy": {
+    "properties": {
+     "rollingUpdate": {
+      "description": "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollingUpdateDaemonSet"
+     },
+     "type": {
+      "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+      "type": "string"
      }
     }
    },
@@ -14435,6 +14476,15 @@
       "description": "The revision to rollback to. If set to 0, rollbck to the last revision.",
       "type": "integer",
       "format": "int64"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollingUpdateDaemonSet": {
+    "description": "Spec to control the desired behavior of daemon set rolling update.",
+    "properties": {
+     "maxUnavailable": {
+      "description": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      }
     }
    },
