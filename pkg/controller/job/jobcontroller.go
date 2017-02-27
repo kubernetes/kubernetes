@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -283,6 +284,24 @@ func (jm *JobController) processNextWorkItem() bool {
 	return true
 }
 
+// getPodsForJob returns the set of pods that this Job should manage.
+// It also reconciles ControllerRef by adopting/orphaning.
+// Note that the returned Pods are pointers into the cache.
+func (jm *JobController) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
+	selector, err := metav1.LabelSelectorAsSelector(j.Spec.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't convert Job selector: %v", err)
+	}
+	// List all pods to include those that don't match the selector anymore
+	// but have a ControllerRef pointing to this controller.
+	pods, err := jm.podStore.Pods(j.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	cm := controller.NewPodControllerRefManager(jm.podControl, j, selector, ControllerKind)
+	return cm.ClaimPods(pods)
+}
+
 // syncJob will sync the job with the given key if it has had its expectations fulfilled, meaning
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
@@ -314,8 +333,8 @@ func (jm *JobController) syncJob(key string) error {
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(key)
-	selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
-	pods, err := jm.podStore.Pods(job.Namespace).List(selector)
+
+	pods, err := jm.getPodsForJob(&job)
 	if err != nil {
 		return err
 	}
