@@ -280,7 +280,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
-				pod = framework.MakePod(ns, pvc.Name, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
+				pod = framework.MakePod(ns, pvc.Name, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 
 				pod, err = c.Core().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
@@ -310,7 +310,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			framework.SkipUnlessProviderIs("gce")
 			By("Initializing Test Spec")
 			if diskName == "" {
-				diskName, err = createPDWithRetry()
+				diskName, err = framework.CreatePDWithRetry()
 				Expect(err).NotTo(HaveOccurred())
 				pvConfig = framework.PersistentVolumeConfig{
 					NamePrefix: "gce-",
@@ -342,7 +342,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 
 		AddCleanupAction(func() {
 			if len(diskName) > 0 {
-				deletePDWithRetry(diskName)
+				framework.DeletePDWithRetry(diskName)
 			}
 		})
 

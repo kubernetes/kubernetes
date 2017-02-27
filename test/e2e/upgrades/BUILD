@@ -13,6 +13,7 @@ go_library(
         "configmaps.go",
         "deployments.go",
         "horizontal_pod_autoscalers.go",
+        "persistent_volumes.go",
         "secrets.go",
         "services.go",
         "statefulset.go",
