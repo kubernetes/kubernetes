@@ -32,6 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+type PrintHandler interface {
+	Handler(columns, columnsWithWide []string, printFunc interface{}) error
+}
+
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 
 type handlerEntry struct {
@@ -53,6 +57,8 @@ type HumanReadablePrinter struct {
 	encoder      runtime.Encoder
 	decoder      runtime.Decoder
 }
+
+var _ PrintHandler = &HumanReadablePrinter{}
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
 // If encoder and decoder are provided, an attempt to convert unstructured types to internal types is made.
@@ -92,7 +98,7 @@ func (h *HumanReadablePrinter) EnsurePrintHeaders() {
 // See validatePrintHandlerFunc for required method signature.
 func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printFunc interface{}) error {
 	printFuncValue := reflect.ValueOf(printFunc)
-	if err := h.validatePrintHandlerFunc(printFuncValue); err != nil {
+	if err := ValidatePrintHandlerFunc(printFuncValue); err != nil {
 		glog.Errorf("Unable to add print handler: %v", err)
 		return err
 	}
@@ -106,12 +112,12 @@ func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printF
 	return nil
 }
 
-// validatePrintHandlerFunc validates print handler signature.
+// ValidatePrintHandlerFunc validates print handler signature.
 // printFunc is the function that will be called to print an object.
 // It must be of the following type:
 //  func printFunc(object ObjectType, w io.Writer, options PrintOptions) error
 // where ObjectType is the type of the object that will be printed.
-func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value) error {
+func ValidatePrintHandlerFunc(printFunc reflect.Value) error {
 	if printFunc.Kind() != reflect.Func {
 		return fmt.Errorf("invalid print handler. %#v is not a function", printFunc)
 	}
