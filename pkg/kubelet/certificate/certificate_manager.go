@@ -90,17 +90,23 @@ type Config struct {
 	// Rotation is a call back function which, if provided, will be invoked
 	// after a rotation has occurred.
 	Rotation func()
-	// BootstrapCertificatePEM is the certificate data that will be used to
-	// authenticate connections with the CertificateSigningRequestClient and
-	// request a new certificate, if there is no current certificate available
-	// in the CertificateStore. If there is a current certificate available,
-	// this will be ignored.
+	// BootstrapCertificatePEM is the certificate data that will be returned
+	// from the Manager if the CertificateStore doesn't have any cert/key pairs
+	// currently available. If the CertificateStore does have a cert/key pair,
+	// this will be ignored. If the bootstrap cert/key pair are used, they will
+	// be rotated at the first opportunity, possibly well in advance of
+	// expiring. This is intended to allow the first boot of a component to be
+	// initialized using a generic, multi-use cert/key pair which will be
+	// quickly replaced with a unique cert/key pair.
 	BootstrapCertificatePEM []byte
-	// BootstrapKeyPEM is the key data that will be used to authenticate
-	// connections with the CertificateSigningRequestClient and request a new
-	// certificate, if there is no current certificate available in the
-	// CertificateStore. If there is a current certificate available, this will
-	// be ignored.
+	// BootstrapKeyPEM is the key data that will be returned from the Manager
+	// if the CertificateStore doesn't have any cert/key pairs currently
+	// available. If the CertificateStore does have a cert/key pair, this will
+	// be ignored. If the bootstrap cert/key pair are used, they will be
+	// rotated at the first opportunity, possibly well in advance of expiring.
+	// This is intended to allow the first boot of a component to be
+	// initialized using a generic, multi-use cert/key pair which will be
+	// quickly replaced with a unique cert/key pair.
 	BootstrapKeyPEM []byte
 }
 
