@@ -188,7 +188,9 @@ func (s *Scheduler) scheduleOne() {
 	}
 
 	go func() {
-		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+		defer func() {
+			metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+		}()
 
 		b := &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
