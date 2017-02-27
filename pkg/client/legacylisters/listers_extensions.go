@@ -78,7 +78,10 @@ func (s storeDeploymentsNamespacer) Get(name string) (*extensions.Deployment, er
 	return obj.(*extensions.Deployment), nil
 }
 
-// GetDeploymentsForReplicaSet returns a list of deployments managing a replica set. Returns an error only if no matching deployments are found.
+// GetDeploymentsForReplicaSet returns a list of Deployments that potentially
+// match a ReplicaSet. Only the one specified in the ReplicaSet's ControllerRef
+// will actually manage it.
+// Returns an error only if no matching Deployments are found.
 func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.ReplicaSet) (deployments []*extensions.Deployment, err error) {
 	if len(rs.Labels) == 0 {
 		err = fmt.Errorf("no deployments found for ReplicaSet %v because it has no labels", rs.Name)
