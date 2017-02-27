@@ -1,5 +1,5 @@
-apiVersion: apps/v1beta1
-kind: StatefulSet
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: monitoring-influxdb-grafana-v4
   namespace: kube-system
@@ -9,8 +9,9 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
-  serviceName: monitoring-influxdb
   replicas: 1
+  strategy:
+    type: Recreate
   template:
     metadata: 
       labels: 
