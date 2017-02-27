@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -49,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
-	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
@@ -96,21 +94,10 @@ func (kl *Kubelet) makeDevices(pod *v1.Pod, container *v1.Container) ([]kubecont
 	if err != nil {
 		return nil, err
 	}
-	devices := []kubecontainer.DeviceInfo{
-		{
-			PathOnHost:      nvidia.NvidiaCtlDevice,
-			PathInContainer: nvidia.NvidiaCtlDevice,
-			Permissions:     "mrw",
-		},
-		{
-			PathOnHost:      nvidia.NvidiaUVMDevice,
-			PathInContainer: nvidia.NvidiaUVMDevice,
-			Permissions:     "mrw",
-		},
-	}
-
-	for i, path := range nvidiaGPUPaths {
-		devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: "/dev/nvidia" + strconv.Itoa(i), Permissions: "mrw"})
+	var devices []kubecontainer.DeviceInfo
+	for _, path := range nvidiaGPUPaths {
+		// Devices have to be mapped one to one because of nvidia CUDA library requirements.
+		devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: path, Permissions: "mrw"})
 	}
 
 	return devices, nil

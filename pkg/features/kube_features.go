@@ -78,7 +78,8 @@ const (
 	// alpha: v1.6
 	//
 	// Enables support for GPUs as a schedulable resource.
-	// Only Nvidia GPUs are supported as of v1.6
+	// Only Nvidia GPUs are supported as of v1.6.
+	// Works only with Docker Container Runtime.
 	Accelerators utilfeature.Feature = "Accelerators"
 )
 
