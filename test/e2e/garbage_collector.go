@@ -53,7 +53,7 @@ var podTemplateSpec = v1.PodTemplateSpec{
 		Containers: []v1.Container{
 			{
 				Name:  "nginx",
-				Image: "gcr.io/google_containers/nginx:1.7.9",
+				Image: "gcr.io/google_containers/nginx-slim:0.7",
 			},
 		},
 	},
