@@ -94,14 +94,10 @@ type ReplicaSetController struct {
 
 	// Controllers that need to be synced
 	queue workqueue.RateLimitingInterface
-
-	// garbageCollectorEnabled denotes if the garbage collector is enabled. RC
-	// manager behaves differently if GC is enabled.
-	garbageCollectorEnabled bool
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicaSetController {
+func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int) *ReplicaSetController {
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("replicaset_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
@@ -118,7 +114,6 @@ func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, 
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicaset"),
-		garbageCollectorEnabled: garbageCollectorEnabled,
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -487,19 +482,15 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 				defer wg.Done()
 				var err error
 
-				if rsc.garbageCollectorEnabled {
-					var trueVar = true
-					controllerRef := &metav1.OwnerReference{
-						APIVersion: getRSKind().GroupVersion().String(),
-						Kind:       getRSKind().Kind,
-						Name:       rs.Name,
-						UID:        rs.UID,
-						Controller: &trueVar,
-					}
-					err = rsc.podControl.CreatePodsWithControllerRef(rs.Namespace, &rs.Spec.Template, rs, controllerRef)
-				} else {
-					err = rsc.podControl.CreatePods(rs.Namespace, &rs.Spec.Template, rs)
+				var trueVar = true
+				controllerRef := &metav1.OwnerReference{
+					APIVersion: getRSKind().GroupVersion().String(),
+					Kind:       getRSKind().Kind,
+					Name:       rs.Name,
+					UID:        rs.UID,
+					Controller: &trueVar,
 				}
+				err = rsc.podControl.CreatePodsWithControllerRef(rs.Namespace, &rs.Spec.Template, rs, controllerRef)
 				if err != nil {
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for replica set %q/%q", rs.Namespace, rs.Name)
@@ -595,27 +586,19 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	// modify them, you need to copy it first.
 	// TODO: Do the List and Filter in a single pass, or use an index.
 	var filteredPods []*v1.Pod
-	if rsc.garbageCollectorEnabled {
-		// list all pods to include the pods that don't match the rs`s selector
-		// anymore but has the stale controller ref.
-		pods, err := rsc.podLister.Pods(rs.Namespace).List(labels.Everything())
-		if err != nil {
-			return err
-		}
-		cm := controller.NewPodControllerRefManager(rsc.podControl, rs, selector, getRSKind())
-		filteredPods, err = cm.ClaimPods(pods)
-		if err != nil {
-			// Something went wrong with adoption or release.
-			// Requeue and try again so we don't leave orphans sitting around.
-			rsc.queue.Add(key)
-			return err
-		}
-	} else {
-		pods, err := rsc.podLister.Pods(rs.Namespace).List(selector)
-		if err != nil {
-			return err
-		}
-		filteredPods = controller.FilterActivePods(pods)
+	// list all pods to include the pods that don't match the rs`s selector
+	// anymore but has the stale controller ref.
+	pods, err := rsc.podLister.Pods(rs.Namespace).List(labels.Everything())
+	if err != nil {
+		return err
+	}
+	cm := controller.NewPodControllerRefManager(rsc.podControl, rs, selector, getRSKind())
+	filteredPods, err = cm.ClaimPods(pods)
+	if err != nil {
+		// Something went wrong with adoption or release.
+		// Requeue and try again so we don't leave orphans sitting around.
+		rsc.queue.Add(key)
+		return err
 	}
 
 	var manageReplicasErr error

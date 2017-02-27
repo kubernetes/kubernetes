@@ -92,7 +92,7 @@ func (p *serviceEvaluator) GroupKind() schema.GroupKind {
 	return api.Kind("Service")
 }
 
-// Handles returns true of the evalutor should handle the specified operation.
+// Handles returns true of the evaluator should handle the specified operation.
 func (p *serviceEvaluator) Handles(operation admission.Operation) bool {
 	// We handle create and update because a service type can change.
 	return admission.Create == operation || admission.Update == operation

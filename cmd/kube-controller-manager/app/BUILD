@@ -52,7 +52,6 @@ go_library(
         "//pkg/controller/endpoint:go_default_library",
         "//pkg/controller/garbagecollector:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
-        "//pkg/controller/informers:go_default_library",
         "//pkg/controller/job:go_default_library",
         "//pkg/controller/namespace:go_default_library",
         "//pkg/controller/node:go_default_library",

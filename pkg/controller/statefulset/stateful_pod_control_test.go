@@ -40,7 +40,9 @@ func TestStatefulPodControlCreatesPods(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetResource().Resource)
 	})
@@ -71,12 +73,14 @@ func TestStatefulPodControlCreatePodExists(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
 	pvcs := getPersistentVolumeClaims(set, pod)
-	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		claim := pvcs[action.GetResource().GroupResource().Resource]
-		return true, &claim, nil
-	})
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	for k := range pvcs {
+		pvc := pvcs[k]
+		pvcIndexer.Add(&pvc)
+	}
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		create := action.(core.CreateAction)
 		return true, create.GetObject(), nil
@@ -101,10 +105,9 @@ func TestStatefulPodControlCreatePodPvcCreateFailure(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
-	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetResource().Resource)
-	})
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
@@ -126,15 +129,23 @@ func TestStatefulPodControlCreatePodPvcCreateFailure(t *testing.T) {
 	}
 }
 
+type fakeIndexer struct {
+	cache.Indexer
+	getError error
+}
+
+func (f *fakeIndexer) GetByKey(key string) (interface{}, bool, error) {
+	return nil, false, f.getError
+}
+
 func TestStatefulPodControlCreatePodPvcGetFailure(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
-	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
-	})
+	pvcIndexer := &fakeIndexer{getError: errors.New("API server down")}
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
@@ -161,10 +172,9 @@ func TestStatefulPodControlCreatePodFailed(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
-	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetResource().Resource)
-	})
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		create := action.(core.CreateAction)
 		return true, create.GetObject(), nil
@@ -192,7 +202,7 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		t.Error("no-op update should not make any client invocation")
 		return true, nil, apierrors.NewInternalError(errors.New("If we are here we have a problem"))
@@ -211,7 +221,7 @@ func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := fake.NewSimpleClientset(set, pod)
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
 	var updated *v1.Pod
 	fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
@@ -243,7 +253,7 @@ func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
 	gooPod.Name = "goo-0"
 	indexer.Add(gooPod)
 	podLister := corelisters.NewPodLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, nil, podLister, recorder)
+	control := NewRealStatefulPodControl(fakeClient, nil, podLister, nil, recorder)
 	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		pod.Name = "goo-0"
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
@@ -268,7 +278,9 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	pvcs := getPersistentVolumeClaims(set, pod)
 	volumes := make([]v1.Volume, len(pod.Spec.Volumes))
 	for i := range pod.Spec.Volumes {
@@ -280,9 +292,6 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), nil
-	})
-	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetResource().Resource)
 	})
 	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
@@ -316,7 +325,9 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	pvcs := getPersistentVolumeClaims(set, pod)
 	volumes := make([]v1.Volume, len(pod.Spec.Volumes))
 	for i := range pod.Spec.Volumes {
@@ -328,9 +339,6 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), nil
-	})
-	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetResource().Resource)
 	})
 	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
@@ -359,7 +367,7 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 	gooPod.Name = "goo-0"
 	indexer.Add(gooPod)
 	podLister := corelisters.NewPodLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, nil, podLister, recorder)
+	control := NewRealStatefulPodControl(fakeClient, nil, podLister, nil, recorder)
 	conflict := false
 	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
@@ -395,7 +403,7 @@ func TestStatefulPodControlUpdatePodConflictFailure(t *testing.T) {
 	updatedPod.Annotations[podapi.PodHostnameAnnotation] = "wrong"
 	indexer.Add(updatedPod)
 	podLister := corelisters.NewPodLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, nil, podLister, recorder)
+	control := NewRealStatefulPodControl(fakeClient, nil, podLister, nil, recorder)
 	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
@@ -418,7 +426,7 @@ func TestStatefulPodControlDeletesStatefulPod(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
 	fakeClient.AddReactor("delete", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, nil
 	})
@@ -438,7 +446,7 @@ func TestStatefulPodControlDeleteFailure(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
 	fakeClient.AddReactor("delete", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
@@ -457,7 +465,7 @@ func TestStatefulPodControlUpdatesSetStatus(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, recorder)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), nil
@@ -481,7 +489,7 @@ func TestStatefulPodControlUpdateReplicasFailure(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	indexer.Add(set)
 	setLister := appslisters.NewStatefulSetLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, setLister, nil, recorder)
+	control := NewRealStatefulPodControl(fakeClient, setLister, nil, nil, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
@@ -502,7 +510,7 @@ func TestStatefulPodControlUpdateReplicasConflict(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	indexer.Add(set)
 	setLister := appslisters.NewStatefulSetLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, setLister, nil, recorder)
+	control := NewRealStatefulPodControl(fakeClient, setLister, nil, nil, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
 		if !conflict {
@@ -531,7 +539,7 @@ func TestStatefulPodControlUpdateReplicasConflictFailure(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	indexer.Add(set)
 	setLister := appslisters.NewStatefulSetLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, setLister, nil, recorder)
+	control := NewRealStatefulPodControl(fakeClient, setLister, nil, nil, recorder)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))

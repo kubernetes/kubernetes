@@ -213,7 +213,7 @@ func minifyConfig(clientConfig *clientcmdapi.Config, context string) (*clientcmd
 
 // createSecret extracts the kubeconfig for a given cluster and populates
 // a secret with that kubeconfig.
-func createSecret(clientset *internalclientset.Clientset, clientConfig *clientcmdapi.Config, namespace, contextName, secretName string, dryRun bool) (runtime.Object, error) {
+func createSecret(clientset internalclientset.Interface, clientConfig *clientcmdapi.Config, namespace, contextName, secretName string, dryRun bool) (runtime.Object, error) {
 	// Minify the kubeconfig to ensure that there is only information
 	// relevant to the cluster we are registering.
 	newClientConfig, err := minifyConfig(clientConfig, contextName)
@@ -236,7 +236,7 @@ func createSecret(clientset *internalclientset.Clientset, clientConfig *clientcm
 // createConfigMap creates a configmap with name kube-dns in the joining cluster
 // which stores the information about this federation zone name.
 // If the configmap with this name already exists, its updated with this information.
-func createConfigMap(hostClientSet *internalclientset.Clientset, config util.AdminConfig, fedSystemNamespace, targetClusterContext, kubeconfigPath string, dryRun bool) (*api.ConfigMap, error) {
+func createConfigMap(hostClientSet internalclientset.Interface, config util.AdminConfig, fedSystemNamespace, targetClusterContext, kubeconfigPath string, dryRun bool) (*api.ConfigMap, error) {
 	cmDep, err := getCMDeployment(hostClientSet, fedSystemNamespace)
 	if err != nil {
 		return nil, err
@@ -337,7 +337,7 @@ func extractScheme(url string) string {
 	return scheme
 }
 
-func getCMDeployment(hostClientSet *internalclientset.Clientset, fedNamespace string) (*extensions.Deployment, error) {
+func getCMDeployment(hostClientSet internalclientset.Interface, fedNamespace string) (*extensions.Deployment, error) {
 	depList, err := hostClientSet.Extensions().Deployments(fedNamespace).List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err

@@ -32,10 +32,10 @@ const (
 )
 
 var (
-	tokenIDRegexpString = "^([a-z0-9]{6})$"
-	tokenIDRegexp       = regexp.MustCompile(tokenIDRegexpString)
-	tokenRegexpString   = "^([a-z0-9]{6})\\.([a-z0-9]{16})$"
-	tokenRegexp         = regexp.MustCompile(tokenRegexpString)
+	TokenIDRegexpString = "^([a-z0-9]{6})$"
+	TokenIDRegexp       = regexp.MustCompile(TokenIDRegexpString)
+	TokenRegexpString   = "^([a-z0-9]{6})\\.([a-z0-9]{16})$"
+	TokenRegexp         = regexp.MustCompile(TokenRegexpString)
 )
 
 func randBytes(length int) (string, error) {
@@ -69,8 +69,8 @@ func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
 // ParseTokenID tries and parse a valid token ID from a string.
 // An error is returned in case of failure.
 func ParseTokenID(s string) error {
-	if !tokenIDRegexp.MatchString(s) {
-		return fmt.Errorf("token ID [%q] was not of form [%q]", s, tokenIDRegexpString)
+	if !TokenIDRegexp.MatchString(s) {
+		return fmt.Errorf("token ID [%q] was not of form [%q]", s, TokenIDRegexpString)
 	}
 	return nil
 }
@@ -78,9 +78,9 @@ func ParseTokenID(s string) error {
 // ParseToken tries and parse a valid token from a string.
 // A token ID and token secret are returned in case of success, an error otherwise.
 func ParseToken(s string) (string, string, error) {
-	split := tokenRegexp.FindStringSubmatch(s)
+	split := TokenRegexp.FindStringSubmatch(s)
 	if len(split) != 3 {
-		return "", "", fmt.Errorf("token [%q] was not of form [%q]", s, tokenRegexpString)
+		return "", "", fmt.Errorf("token [%q] was not of form [%q]", s, TokenRegexpString)
 	}
 	return split[1], split[2], nil
 }

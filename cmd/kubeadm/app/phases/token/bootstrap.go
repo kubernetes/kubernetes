@@ -29,13 +29,15 @@ import (
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
-const (
-	tokenCreateRetries = 5
-)
+const tokenCreateRetries = 5
 
-// UpdateOrCreateToken attempts to update a token with the given ID, or create if it does
-// not already exist.
-func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscovery, tokenDuration time.Duration) error {
+// CreateNewToken tries to create a token and fails if one with the same ID already exists
+func CreateNewToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscovery, tokenDuration time.Duration, usages []string, description string) error {
+	return UpdateOrCreateToken(client, d, true, tokenDuration, usages, description)
+}
+
+// UpdateOrCreateToken attempts to update a token with the given ID, or create if it does not already exist.
+func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscovery, failIfExists bool, tokenDuration time.Duration, usages []string, description string) error {
 	// Let's make sure the token is valid
 	if valid, err := tokenutil.ValidateToken(d); !valid {
 		return err
@@ -45,8 +47,11 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 	for i := 0; i < tokenCreateRetries; i++ {
 		secret, err := client.Secrets(metav1.NamespaceSystem).Get(secretName, metav1.GetOptions{})
 		if err == nil {
+			if failIfExists {
+				return fmt.Errorf("a token with id %q already exists", d.ID)
+			}
 			// Secret with this ID already exists, update it:
-			secret.Data = encodeTokenSecretData(d, tokenDuration)
+			secret.Data = encodeTokenSecretData(d, tokenDuration, usages, description)
 			if _, err := client.Secrets(metav1.NamespaceSystem).Update(secret); err == nil {
 				return nil
 			} else {
@@ -62,14 +67,13 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 					Name: secretName,
 				},
 				Type: v1.SecretType(bootstrapapi.SecretTypeBootstrapToken),
-				Data: encodeTokenSecretData(d, tokenDuration),
+				Data: encodeTokenSecretData(d, tokenDuration, usages, description),
 			}
 			if _, err := client.Secrets(metav1.NamespaceSystem).Create(secret); err == nil {
 				return nil
 			} else {
 				lastErr = err
 			}
-
 			continue
 		}
 
@@ -82,17 +86,23 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 }
 
 // encodeTokenSecretData takes the token discovery object and an optional duration and returns the .Data for the Secret
-func encodeTokenSecretData(d *kubeadmapi.TokenDiscovery, duration time.Duration) map[string][]byte {
+func encodeTokenSecretData(d *kubeadmapi.TokenDiscovery, duration time.Duration, usages []string, description string) map[string][]byte {
 	data := map[string][]byte{
-		bootstrapapi.BootstrapTokenIDKey:           []byte(d.ID),
-		bootstrapapi.BootstrapTokenSecretKey:       []byte(d.Secret),
-		bootstrapapi.BootstrapTokenUsageSigningKey: []byte("true"),
+		bootstrapapi.BootstrapTokenIDKey:     []byte(d.ID),
+		bootstrapapi.BootstrapTokenSecretKey: []byte(d.Secret),
 	}
 
 	if duration > 0 {
 		// Get the current time, add the specified duration, and format it accordingly
 		durationString := time.Now().Add(duration).Format(time.RFC3339)
 		data[bootstrapapi.BootstrapTokenExpirationKey] = []byte(durationString)
+	}
+	if len(description) > 0 {
+		data[bootstrapapi.BootstrapTokenDescriptionKey] = []byte(description)
+	}
+	for _, usage := range usages {
+		// TODO: Validate the usage string here before
+		data[bootstrapapi.BootstrapTokenUsagePrefix+usage] = []byte("true")
 	}
 	return data
 }
