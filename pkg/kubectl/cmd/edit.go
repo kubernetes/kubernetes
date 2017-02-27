@@ -85,7 +85,10 @@ var (
 		KUBE_EDITOR="nano" kubectl edit svc/docker-registry
 
 		# Edit the job 'myjob' in JSON using the v1 API format:
-		kubectl edit job.v1.batch/myjob -o json`)
+		kubectl edit job.v1.batch/myjob -o json
+
+		# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation:
+		kubectl edit deployment/mydeployment -o yaml --save-config`)
 )
 
 func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
@@ -532,9 +535,11 @@ func visitToCreate(createVisitor resource.Visitor, mapper meta.RESTMapper, out, 
 func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, annotationVisitor resource.Visitor, encoder runtime.Encoder) error {
 	// iterate through all items to apply annotations
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
-		// put configuration annotation in "updates"
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, encoder); err != nil {
-			return err
+		// If the flag is true, create or update the annotation. Otherwise, NOP
+		if cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag) {
+			if err := kubectl.CreateOrUpdateAnnotation(true, info, encoder); err != nil {
+				return err
+			}
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
 			if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
