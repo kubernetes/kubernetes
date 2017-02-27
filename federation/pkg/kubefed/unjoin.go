@@ -162,7 +162,7 @@ func popCluster(f cmdutil.Factory, name string) (*federationapi.Cluster, error) 
 	return cluster, rh.Delete("", name)
 }
 
-func deleteConfigMapFromCluster(hostClientset *internalclientset.Clientset, secret *api.Secret, cluster *federationapi.Cluster, fedSystemNamespace string) error {
+func deleteConfigMapFromCluster(hostClientset internalclientset.Interface, secret *api.Secret, cluster *federationapi.Cluster, fedSystemNamespace string) error {
 	clientset, err := getClientsetFromCluster(secret, cluster)
 	if err != nil {
 		return err
@@ -197,7 +197,7 @@ func deleteConfigMapFromCluster(hostClientset *internalclientset.Clientset, secr
 
 // deleteSecret deletes the secret with the given name from the host
 // cluster.
-func deleteSecret(clientset *internalclientset.Clientset, name, namespace string) error {
+func deleteSecret(clientset internalclientset.Interface, name, namespace string) error {
 	return clientset.Core().Secrets(namespace).Delete(name, &metav1.DeleteOptions{})
 }
 
