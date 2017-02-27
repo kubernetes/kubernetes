@@ -79,6 +79,16 @@ var (
 		Key:    metav1.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
 	}
+
+	// TODO(resouer) will move this to metav1 well_known_labels.go.
+	// TaintNodeNoSchedule would be automatically added by node controller when
+	// node runs into a unschedulable condition and removed when node becomes schedulable.
+	TaintNodeNoSchedule = "node.alpha.kubernetes.io/noSchedule"
+
+	NoScheduleTaintTemplate = &v1.Taint{
+		Key:    TaintNodeNoSchedule,
+		Effect: v1.TaintEffectNoSchedule,
+	}
 )
 
 const (
@@ -555,6 +565,85 @@ func (nc *NodeController) Run(stopCh <-chan struct{}) {
 	<-stopCh
 }
 
+// addOrRemoveNoScheduleTaintByCondition taint or remove NoSchedule taint on this node based on it's condition change.
+func (nc *NodeController) addOrRemoveNoScheduleTaintByCondition(node *v1.Node) (bool, bool) {
+	var changedToUnSchedulable, changedToSchedulable bool
+	observedMap := map[v1.NodeConditionType]*v1.NodeCondition{}
+	_, observedMap[v1.NodeReady] = v1.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, observedMap[v1.NodeOutOfDisk] = v1.GetNodeCondition(&node.Status, v1.NodeOutOfDisk)
+	_, observedMap[v1.NodeNetworkUnavailable] = v1.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+
+	// If there are saved node status, it only make sense to check conditions when some change happened.
+	if savedNodeStatus, found := nc.nodeStatusMap[node.GetName()]; found {
+		for conditionType, condition := range observedMap {
+			_, savedCondition := v1.GetNodeCondition(&savedNodeStatus.status, conditionType)
+			// something changed
+			if (condition != nil && savedCondition == nil) ||
+				(condition != nil && savedCondition != nil && condition.Status != savedCondition.Status) {
+				changedToSchedulable, changedToUnSchedulable = setSchedulingFlag(condition)
+				if changedToUnSchedulable {
+					break
+				}
+			}
+		}
+	} else {
+		// Otherwise, there are no saved node status, it always worth to check conditions
+		for _, condition := range observedMap {
+			if condition != nil {
+				changedToSchedulable, changedToUnSchedulable = setSchedulingFlag(condition)
+				if changedToUnSchedulable {
+					break
+				}
+			}
+		}
+	}
+
+	if changedToUnSchedulable {
+		if err := controller.AddOrUpdateTaintOnNode(nc.kubeClient, node.Name, NoScheduleTaintTemplate); err != nil {
+			glog.Errorf("failed to add NoSchedule taint on node %v, %v", node.GetName(), err)
+		} else {
+			glog.V(2).Infof("Tainting Node %v with NoSchedule taint because its condition changed to unschedulable",
+				node.Name,
+			)
+		}
+	}
+
+	if changedToSchedulable {
+		if err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, NoScheduleTaintTemplate, node); err != nil {
+			glog.Errorf("failed to remove NoSchedule taint on node %v, %v", node.GetName(), err)
+		} else {
+			glog.V(2).Infof("Mark node %v as schedulable again because its condition changed to schedulable",
+				node.Name,
+			)
+		}
+	}
+
+	return changedToSchedulable, changedToUnSchedulable
+}
+
+// setSchedulingFlag calculates the result of scheduling flag by condition
+// 1. changedToSchedulable
+// 2. changedToUnSchedulable
+func setSchedulingFlag(condition *v1.NodeCondition) (bool, bool) {
+	if !isSchedulable(condition) {
+		return false, true
+	} else {
+		return true, false
+	}
+}
+
+// isSchedulable is a flight check for node readiness, disk, and network.
+func isSchedulable(cond *v1.NodeCondition) bool {
+	if (cond.Type == v1.NodeReady) && (cond.Status != v1.ConditionTrue) {
+		return false
+	} else if (cond.Type == v1.NodeOutOfDisk) && (cond.Status != v1.ConditionFalse) {
+		return false
+	} else if (cond.Type == v1.NodeNetworkUnavailable) && (cond.Status != v1.ConditionFalse) {
+		return false
+	}
+	return true
+}
+
 // monitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
@@ -611,6 +700,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			continue
 		}
 		node := nodeCopy.(*v1.Node)
+
 		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*nodeStatusUpdateRetry, func() (bool, error) {
 			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeStatus(node)
 			if err == nil {
@@ -738,6 +828,9 @@ func (nc *NodeController) monitorNodeStatus() error {
 				}
 			}
 		}
+
+		// taint or clear NoSchedule taint based on condition change
+		nc.addOrRemoveNoScheduleTaintByCondition(node)
 	}
 	nc.handleDisruption(zoneToNodeConditions, nodes)
 
