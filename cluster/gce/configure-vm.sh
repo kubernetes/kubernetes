@@ -61,9 +61,10 @@ function create-node-pki {
 
   if [[ -z "${CA_CERT_BUNDLE:-}" ]]; then
     CA_CERT_BUNDLE="${CA_CERT}"
-    CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
-    echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
   fi
+
+  CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
+  echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
 
   if [[ ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
     KUBELET_CERT_PATH="${pki_dir}/kubelet.crt"

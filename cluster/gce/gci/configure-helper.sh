@@ -198,9 +198,10 @@ function create-node-pki {
 
   if [[ -z "${CA_CERT_BUNDLE:-}" ]]; then
     CA_CERT_BUNDLE="${CA_CERT}"
-    CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
-    echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
   fi
+
+  CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
+  echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
 
   if [[ ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
     KUBELET_CERT_PATH="${pki_dir}/kubelet.crt"
@@ -228,33 +229,36 @@ function create-master-pki {
 
   if [[ -z "${APISERVER_SERVER_CERT:-}" || -z "${APISERVER_SERVER_KEY:-}" ]]; then
     APISERVER_SERVER_CERT="${MASTER_CERT}"
-    APISERVER_SERVER_CERT_PATH="${pki_dir}/apiserver.crt"
-    echo "${APISERVER_SERVER_CERT}" | base64 --decode > "${APISERVER_SERVER_CERT_PATH}"
-
     APISERVER_SERVER_KEY="${MASTER_KEY}"
-    APISERVER_SERVER_KEY_PATH="${pki_dir}/apiserver.key"
-    echo "${APISERVER_SERVER_KEY}" | base64 --decode > "${APISERVER_SERVER_KEY_PATH}"
   fi
+
+  APISERVER_SERVER_CERT_PATH="${pki_dir}/apiserver.crt"
+  echo "${APISERVER_SERVER_CERT}" | base64 --decode > "${APISERVER_SERVER_CERT_PATH}"
+
+  APISERVER_SERVER_KEY_PATH="${pki_dir}/apiserver.key"
+  echo "${APISERVER_SERVER_KEY}" | base64 --decode > "${APISERVER_SERVER_KEY_PATH}"
 
   if [[ -z "${APISERVER_CLIENT_CERT:-}" || -z "${APISERVER_CLIENT_KEY:-}" ]]; then
     APISERVER_CLIENT_CERT="${KUBEAPISERVER_CERT}"
-    APISERVER_CLIENT_CERT_PATH="${pki_dir}/apiserver-client.crt"
-    echo "${APISERVER_CLIENT_CERT}" | base64 --decode > "${APISERVER_CLIENT_CERT_PATH}"
-
     APISERVER_CLIENT_KEY="${KUBEAPISERVER_KEY}"
-    APISERVER_CLIENT_KEY_PATH="${pki_dir}/apiserver-client.key"
-    echo "${APISERVER_CLIENT_KEY}" | base64 --decode > "${APISERVER_CLIENT_KEY_PATH}"
   fi
+
+  APISERVER_CLIENT_CERT_PATH="${pki_dir}/apiserver-client.crt"
+  echo "${APISERVER_CLIENT_CERT}" | base64 --decode > "${APISERVER_CLIENT_CERT_PATH}"
+
+  APISERVER_CLIENT_KEY_PATH="${pki_dir}/apiserver-client.key"
+  echo "${APISERVER_CLIENT_KEY}" | base64 --decode > "${APISERVER_CLIENT_KEY_PATH}"
 
   if [[ -z "${SERVICEACCOUNT_CERT:-}" || -z "${SERVICEACCOUNT_KEY:-}" ]]; then
     SERVICEACCOUNT_CERT="${MASTER_CERT}"
-    SERVICEACCOUNT_CERT_PATH="${pki_dir}/serviceaccount.crt"
-    echo "${SERVICEACCOUNT_CERT}" | base64 --decode > "${SERVICEACCOUNT_CERT_PATH}"
-
     SERVICEACCOUNT_KEY="${MASTER_KEY}"
-    SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
-    echo "${SERVICEACCOUNT_KEY}" | base64 --decode > "${SERVICEACCOUNT_KEY_PATH}"
   fi
+
+  SERVICEACCOUNT_CERT_PATH="${pki_dir}/serviceaccount.crt"
+  echo "${SERVICEACCOUNT_CERT}" | base64 --decode > "${SERVICEACCOUNT_CERT_PATH}"
+
+  SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
+  echo "${SERVICEACCOUNT_KEY}" | base64 --decode > "${SERVICEACCOUNT_KEY_PATH}"
 }
 
 # After the first boot and on upgrade, these files exist on the master-pd
