@@ -1023,7 +1023,7 @@ type ISCSIVolumeSource struct {
 	// iSCSI target portal List. The portal is either an IP or ip_addr:port if the port
 	// is other than default (typically TCP ports 860 and 3260).
 	// +optional
-	Portals []string `json:"portals" protobuf:"bytes,7,opt,name=portals"`
+	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
 }
 
 // Represents a Fibre Channel volume.
