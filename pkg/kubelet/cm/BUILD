@@ -25,6 +25,7 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm/util:go_default_library",
+        "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/mount:go_default_library",
