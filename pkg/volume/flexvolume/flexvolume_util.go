@@ -100,6 +100,11 @@ func (u *flexVolumeUtil) init(plugin *flexVolumePlugin) error {
 		return err
 	}
 
+	_, err = handleCmdResponse(unmountCmd, output)
+	if err != nil {
+		return err
+	}
+
 	glog.V(5).Infof("Successfully initialized driver %s", plugin.driverName)
 	return nil
 }

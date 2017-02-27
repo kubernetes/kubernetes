@@ -135,6 +135,15 @@ exit 1
 echo -n $@ &> {{.OutputFile}}
 `
 
+const execScriptTempl3 = `#!/bin/bash
+if [ "$1" == "init" -a $# -eq 1 ]; then
+  echo -n '{
+    "status": "Failure"
+  }'
+  exit 0
+fi
+`
+
 func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, execScriptTempl string, execTemplateData *map[string]interface{}) {
 	vendoredName := plugName
 	if vendorName != "" {
@@ -172,6 +181,21 @@ func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, e
 		t.Errorf("Failed to write plugin exec")
 	}
 	f.Close()
+}
+
+func TestInitFailExitCode0(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("flexvolume_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl3, nil)
+	err = plugMgr.InitPlugins(ProbeVolumePlugins(tmpDir), volumetest.NewFakeVolumeHost("fake", nil, nil, "" /* rootContext */))
+	if err == nil {
+		t.Error("Expect init failure")
+	}
 }
 
 func TestCanSupport(t *testing.T) {
