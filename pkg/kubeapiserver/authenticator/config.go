@@ -17,6 +17,8 @@ limitations under the License.
 package authenticator
 
 import (
+	cryptox509 "crypto/x509"
+	"fmt"
 	"time"
 
 	"github.com/go-openapi/spec"
@@ -50,7 +52,7 @@ type AuthenticatorConfig struct {
 	AnyToken                    bool
 	BasicAuthFile               string
 	BootstrapToken              bool
-	ClientCAFile                string
+	ClientCAData                []byte
 	TokenAuthFile               string
 	OIDCIssuerURL               string
 	OIDCClientID                string
@@ -113,8 +115,8 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	}
 
 	// X509 methods
-	if len(config.ClientCAFile) > 0 {
-		certAuth, err := newAuthenticatorFromClientCAFile(config.ClientCAFile)
+	if len(config.ClientCAData) > 0 {
+		certAuth, err := newAuthenticatorFromClientCA(config.ClientCAData)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -274,11 +276,15 @@ func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccou
 	return bearertoken.New(tokenAuthenticator), nil
 }
 
-// newAuthenticatorFromClientCAFile returns an authenticator.Request or an error
-func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Request, error) {
-	roots, err := certutil.NewPool(clientCAFile)
+// newAuthenticatorFromClientCA returns an authenticator.Request or an error
+func newAuthenticatorFromClientCA(clientCAData []byte) (authenticator.Request, error) {
+	certs, err := certutil.ParseCertsPEM(clientCAData)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading authenticator client CA data: %v", err)
+	}
+	roots := cryptox509.NewCertPool()
+	for _, cert := range certs {
+		roots.AddCert(cert)
 	}
 
 	opts := x509.DefaultVerifyOptions()

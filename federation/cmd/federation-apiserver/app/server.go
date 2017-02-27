@@ -150,7 +150,11 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
-	apiAuthenticator, securityDefinitions, err := s.Authentication.ToAuthenticationConfig().New()
+	authenticationConfig, err := s.Authentication.ToAuthenticationConfig()
+	if err != nil {
+		return fmt.Errorf("invalid Authentication Config: %v", err)
+	}
+	apiAuthenticator, securityDefinitions, err := authenticationConfig.New()
 	if err != nil {
 		return fmt.Errorf("invalid Authentication Config: %v", err)
 	}

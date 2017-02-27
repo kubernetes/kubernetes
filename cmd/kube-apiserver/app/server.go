@@ -251,7 +251,10 @@ func Run(s *options.ServerRunOptions) error {
 		}
 	}
 
-	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
+	authenticatorConfig, err := s.Authentication.ToAuthenticationConfig()
+	if err != nil {
+		return fmt.Errorf("error in authentication configuration: %v", err)
+	}
 	if s.Authentication.ServiceAccounts.Lookup {
 		// If we need to look up service accounts and tokens,
 		// go directly to etcd to avoid recursive auth insanity
@@ -334,9 +337,12 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
-	clientCA, err := readCAorNil(s.Authentication.ClientCert.ClientCA)
-	if err != nil {
-		return err
+	clientCA := s.Authentication.ClientCert.ClientCAData
+	if len(s.Authentication.ClientCert.ClientCAFile) > 0 {
+		clientCA, err = ioutil.ReadFile(s.Authentication.ClientCert.ClientCAFile)
+		if err != nil {
+			return err
+		}
 	}
 	requestHeaderProxyCA, err := readCAorNil(s.Authentication.RequestHeader.ClientCAFile)
 	if err != nil {
