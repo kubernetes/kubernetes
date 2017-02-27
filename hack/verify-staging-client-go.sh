@@ -25,5 +25,5 @@ cd ${KUBE_ROOT}
 echo "Smoke testing client-go examples"
 go install ./staging/src/k8s.io/client-go/examples/... 2>&1 | sed 's/^/  /'
 
-# Run update-staging-client-go.sh in dry-run mode, copy nothing into the staging dir
-hack/update-staging-client-go.sh -d "$@"
+# Run update-staging-client.sh in dry-run mode, copy nothing into the staging dir, but fail on any diff
+hack/update-staging-client-go.sh -d -f "$@"
