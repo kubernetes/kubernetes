@@ -26,15 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	settingslisters "k8s.io/kubernetes/pkg/client/listers/settings/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -54,11 +52,10 @@ type podPresetPlugin struct {
 	*admission.Handler
 	client internalclientset.Interface
 
-	reflector *cache.Reflector
-	stopChan  chan struct{}
-	store     cache.Store
+	lister settingslisters.PodPresetLister
 }
 
+var _ = kubeapiserveradmission.WantsInformerFactory(&podPresetPlugin{})
 var _ = kubeapiserveradmission.WantsInternalClientSet(&podPresetPlugin{})
 
 // NewPlugin creates a new pod injection policy admission plugin.
@@ -69,43 +66,23 @@ func NewPlugin() *podPresetPlugin {
 }
 
 func (plugin *podPresetPlugin) Validate() error {
-	if plugin.store == nil {
-		return fmt.Errorf("%s requires an client", pluginName)
+	if plugin.client == nil {
+		return fmt.Errorf("%s requires a client", pluginName)
+	}
+	if plugin.lister == nil {
+		return fmt.Errorf("%s requires a lister", pluginName)
 	}
 	return nil
 }
 
 func (a *podPresetPlugin) SetInternalClientSet(client internalclientset.Interface) {
 	a.client = client
-	a.store = cache.NewStore(cache.MetaNamespaceKeyFunc)
-	a.reflector = cache.NewReflector(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return client.Settings().PodPresets(v1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return client.Settings().PodPresets(v1.NamespaceAll).Watch(options)
-			},
-		},
-		&settings.PodPreset{},
-		a.store,
-		0,
-	)
-	a.Run()
 }
 
-func (a *podPresetPlugin) Run() {
-	if a.stopChan == nil {
-		a.stopChan = make(chan struct{})
-	}
-	a.reflector.RunUntil(a.stopChan)
-}
-
-func (a *podPresetPlugin) Stop() {
-	if a.stopChan != nil {
-		close(a.stopChan)
-		a.stopChan = nil
-	}
+func (a *podPresetPlugin) SetInformerFactory(f informers.SharedInformerFactory) {
+	podPresetInformer := f.Settings().InternalVersion().PodPresets()
+	a.lister = podPresetInformer.Lister()
+	a.SetReadyFunc(podPresetInformer.Informer().HasSynced)
 }
 
 // Admit injects a pod with the specific fields for each pod injection policy it matches.
@@ -119,14 +96,13 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 	if !ok {
 		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
+	list, err := c.lister.List(labels.Everything())
+	if err != nil {
+		return fmt.Errorf("listing pod presets failed: %v", err)
+	}
 
 	// get the pod injection policies and iterate over them
-	for _, p := range c.store.List() {
-		pip, ok := p.(settings.PodPreset)
-		if !ok {
-			return fmt.Errorf("error converting pod injection policy to PodPreset: %v", p)
-		}
-
+	for _, pip := range list {
 		// make sure the pip is for the same namespace as our pod
 		if pod.GetNamespace() != pip.GetNamespace() {
 			continue
@@ -273,7 +249,7 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 	return nil
 }
 
-func mergeVolumes(pip settings.PodPreset, original []api.Volume) ([]api.Volume, error) {
+func mergeVolumes(pip *settings.PodPreset, original []api.Volume) ([]api.Volume, error) {
 	mod, err := json.Marshal(pip.Spec.Volumes)
 	if err != nil {
 		return nil, fmt.Errorf("marshal of pip Volumes failed: %v", err)
@@ -296,7 +272,7 @@ func mergeVolumes(pip settings.PodPreset, original []api.Volume) ([]api.Volume, 
 	return r, nil
 }
 
-func (c *podPresetPlugin) addEvent(pod *api.Pod, pip settings.PodPreset, message string) {
+func (c *podPresetPlugin) addEvent(pod *api.Pod, pip *settings.PodPreset, message string) {
 	ref, err := api.GetReference(api.Scheme, pod)
 	if err != nil {
 		glog.Errorf("pip %s: get reference for pod %s failed: %v", pip.GetName(), pod.GetName(), err)
