@@ -101,9 +101,10 @@ func newPodList(count int32, status v1.PodPhase, job *batch.Job) []v1.Pod {
 	for i := int32(0); i < count; i++ {
 		newPod := v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("pod-%v", rand.String(10)),
-				Labels:    job.Spec.Selector.MatchLabels,
-				Namespace: job.Namespace,
+				Name:            fmt.Sprintf("pod-%v", rand.String(10)),
+				Labels:          job.Spec.Selector.MatchLabels,
+				Namespace:       job.Namespace,
+				OwnerReferences: []metav1.OwnerReference{*newControllerRef(job)},
 			},
 			Status: v1.PodStatus{Phase: status},
 		}
@@ -273,6 +274,22 @@ func TestControllerSyncJob(t *testing.T) {
 		}
 		if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
 			t.Errorf("%s: unexpected number of deletes.  Expected %d, saw %d\n", name, tc.expectedDeletions, len(fakePodControl.DeletePodName))
+		}
+		// Each create should have an accompanying ControllerRef.
+		if len(fakePodControl.ControllerRefs) != int(tc.expectedCreations) {
+			t.Errorf("%s: unexpected number of ControllerRefs.  Expected %d, saw %d\n", name, tc.expectedCreations, len(fakePodControl.ControllerRefs))
+		}
+		// Make sure the ControllerRefs are correct.
+		for _, controllerRef := range fakePodControl.ControllerRefs {
+			if got, want := controllerRef.APIVersion, "batch/v1"; got != want {
+				t.Errorf("controllerRef.APIVersion = %q, want %q", got, want)
+			}
+			if got, want := controllerRef.Kind, "Job"; got != want {
+				t.Errorf("controllerRef.Kind = %q, want %q", got, want)
+			}
+			if controllerRef.Controller == nil || *controllerRef.Controller != true {
+				t.Errorf("controllerRef.Controller is not set to true")
+			}
 		}
 		// validate status
 		if actual.Status.Active != tc.expectedActive {

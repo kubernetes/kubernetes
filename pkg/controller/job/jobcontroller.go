@@ -46,6 +46,9 @@ import (
 	"github.com/golang/glog"
 )
 
+// ControllerKind contains the schema.GroupVersionKind for this controller type.
+var ControllerKind = batch.SchemeGroupVersion.WithKind("Job")
+
 type JobController struct {
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
@@ -506,7 +509,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 		for i := int32(0); i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				if err := jm.podControl.CreatePods(job.Namespace, &job.Spec.Template, job); err != nil {
+				if err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, newControllerRef(job)); err != nil {
 					defer utilruntime.HandleError(err)
 					// Decrement the expected number of creates because the informer won't observe this pod
 					jm.expectations.CreationObserved(jobKey)
