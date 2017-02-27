@@ -67,9 +67,10 @@ func New(client *http.Client) (*Service, error) {
 }
 
 type Service struct {
-	client    *http.Client
-	BasePath  string // API endpoint base URL
-	UserAgent string // optional additional User-Agent fragment
+	client                    *http.Client
+	BasePath                  string // API endpoint base URL
+	UserAgent                 string // optional additional User-Agent fragment
+	GoogleClientHeaderElement string // client header fragment, for Google use only
 
 	MetricDescriptors *MetricDescriptorsService
 
@@ -83,6 +84,10 @@ func (s *Service) userAgent() string {
 		return googleapi.UserAgent
 	}
 	return googleapi.UserAgent + " " + s.UserAgent
+}
+
+func (s *Service) clientHeader() string {
+	return gensupport.GoogleClientHeader("20170210", s.GoogleClientHeaderElement)
 }
 
 func NewMetricDescriptorsService(s *Service) *MetricDescriptorsService {
@@ -555,6 +560,22 @@ func (s *Point) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+func (s *Point) UnmarshalJSON(data []byte) error {
+	type noMethod Point
+	var s1 struct {
+		DoubleValue *gensupport.JSONFloat64 `json:"doubleValue"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	if s1.DoubleValue != nil {
+		s.DoubleValue = (*float64)(s1.DoubleValue)
+	}
+	return nil
+}
+
 // PointDistribution: Distribution data point value type. When writing
 // distribution points, try to be consistent with the boundaries of your
 // buckets. If you must modify the bucket boundaries, then do so by
@@ -632,6 +653,22 @@ func (s *PointDistributionBucket) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+func (s *PointDistributionBucket) UnmarshalJSON(data []byte) error {
+	type noMethod PointDistributionBucket
+	var s1 struct {
+		LowerBound gensupport.JSONFloat64 `json:"lowerBound"`
+		UpperBound gensupport.JSONFloat64 `json:"upperBound"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.LowerBound = float64(s1.LowerBound)
+	s.UpperBound = float64(s1.UpperBound)
+	return nil
+}
+
 // PointDistributionOverflowBucket: The overflow bucket is a special
 // bucket that does not have the upperBound field; it includes all of
 // the events that are no less than its lower bound.
@@ -667,6 +704,20 @@ func (s *PointDistributionOverflowBucket) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+func (s *PointDistributionOverflowBucket) UnmarshalJSON(data []byte) error {
+	type noMethod PointDistributionOverflowBucket
+	var s1 struct {
+		LowerBound gensupport.JSONFloat64 `json:"lowerBound"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.LowerBound = float64(s1.LowerBound)
+	return nil
+}
+
 // PointDistributionUnderflowBucket: The underflow bucket is a special
 // bucket that does not have the lowerBound field; it includes all of
 // the events that are less than its upper bound.
@@ -700,6 +751,20 @@ func (s *PointDistributionUnderflowBucket) MarshalJSON() ([]byte, error) {
 	type noMethod PointDistributionUnderflowBucket
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *PointDistributionUnderflowBucket) UnmarshalJSON(data []byte) error {
+	type noMethod PointDistributionUnderflowBucket
+	var s1 struct {
+		UpperBound gensupport.JSONFloat64 `json:"upperBound"`
+		*noMethod
+	}
+	s1.noMethod = (*noMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.UpperBound = float64(s1.UpperBound)
+	return nil
 }
 
 // Timeseries: The monitoring data is organized as metrics and stored as
@@ -954,6 +1019,7 @@ func (c *MetricDescriptorsCreateCall) doRequest(alt string) (*http.Response, err
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
+	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	var body io.Reader = nil
 	body, err := googleapi.WithoutDataWrapper.JSONReader(c.metricdescriptor)
 	if err != nil {
@@ -1088,6 +1154,7 @@ func (c *MetricDescriptorsDeleteCall) doRequest(alt string) (*http.Response, err
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
+	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/metricDescriptors/{metric}")
@@ -1265,6 +1332,7 @@ func (c *MetricDescriptorsListCall) doRequest(alt string) (*http.Response, error
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
+	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
@@ -1542,6 +1610,7 @@ func (c *TimeseriesListCall) doRequest(alt string) (*http.Response, error) {
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
+	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
@@ -1772,6 +1841,7 @@ func (c *TimeseriesWriteCall) doRequest(alt string) (*http.Response, error) {
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
+	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	var body io.Reader = nil
 	body, err := googleapi.WithoutDataWrapper.JSONReader(c.writetimeseriesrequest)
 	if err != nil {
@@ -2012,6 +2082,7 @@ func (c *TimeseriesDescriptorsListCall) doRequest(alt string) (*http.Response, e
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
+	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}

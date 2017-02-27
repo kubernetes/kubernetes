@@ -7736,7 +7736,9 @@ go_library(
         "google.golang.org/api/gensupport/backoff.go",
         "google.golang.org/api/gensupport/buffer.go",
         "google.golang.org/api/gensupport/doc.go",
+        "google.golang.org/api/gensupport/header.go",
         "google.golang.org/api/gensupport/json.go",
+        "google.golang.org/api/gensupport/jsonfloat.go",
         "google.golang.org/api/gensupport/media.go",
         "google.golang.org/api/gensupport/params.go",
         "google.golang.org/api/gensupport/resumable.go",
@@ -17149,4 +17151,15 @@ go_library(
         "github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty/isatty_linux.go",
     ],
     tags = ["automanaged"],
+
+go_library(
+    name = "google.golang.org/api/compute/v0.alpha",
+    srcs = ["google.golang.org/api/compute/v0.alpha/compute-gen.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/net/context",
+        "//vendor:golang.org/x/net/context/ctxhttp",
+        "//vendor:google.golang.org/api/gensupport",
+        "//vendor:google.golang.org/api/googleapi",
+    ],
 )
