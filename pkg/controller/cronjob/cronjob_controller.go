@@ -243,6 +243,12 @@ func syncOne(sj *batch.CronJob, js []batch.Job, now time.Time, jc jobControlInte
 		return
 	}
 
+	if err := adoptJobs(sj, js, jc); err != nil {
+		// This is fine. We will retry later.
+		// Adoption is only to advise other controllers. We don't rely on it.
+		glog.V(4).Infof("Unable to adopt Jobs for CronJob %v: %v", nameForLog, err)
+	}
+
 	if sj.Spec.Suspend != nil && *sj.Spec.Suspend {
 		glog.V(4).Infof("Not starting job for %s because it is suspended", nameForLog)
 		return
