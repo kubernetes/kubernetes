@@ -28,11 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/ref"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -278,4 +280,36 @@ func (o byJobStartTime) Less(i, j int) bool {
 	}
 
 	return (*o[i].Status.StartTime).Before(*o[j].Status.StartTime)
+}
+
+// adoptJobs applies missing ControllerRefs to Jobs created by a CronJob.
+//
+// This should only happen if the Jobs were created by an older version of the
+// CronJob controller, since from now on we add ControllerRef upon creation.
+//
+// CronJob doesn't do actual adoption because it doesn't use label selectors to
+// find its Jobs. However, we should apply ControllerRef for potential
+// server-side cascading deletion, and to advise other controllers we own these
+// objects.
+func adoptJobs(sj *batchv2alpha1.CronJob, js []batchv1.Job, jc jobControlInterface) error {
+	var errs []error
+	sjControllerRef := *newControllerRef(sj)
+	for i := range js {
+		job := &js[i]
+		controllerRef := controller.GetControllerOf(job)
+		if controllerRef != nil {
+			continue
+		}
+		job.OwnerReferences = append(job.OwnerReferences, sjControllerRef)
+		updatedJob, err := jc.UpdateJob(job.Namespace, job)
+		if err != nil {
+			// If there's a ResourceVersion or other error, don't bother retrying.
+			// We will just try again on a subsequent CronJob sync.
+			errs = append(errs, err)
+			continue
+		}
+		// Save it back to the array for later consumers.
+		js[i] = *updatedJob
+	}
+	return utilerrors.NewAggregate(errs)
 }
