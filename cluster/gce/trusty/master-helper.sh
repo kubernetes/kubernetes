@@ -38,28 +38,43 @@ source ./helper.sh
 #   get-bearer-token
 #
 function create-master-instance {
-  local address_opt=""
-  [[ -n ${1:-} ]] && address_opt="--address ${1}"
+  local gcloud="gcloud"
+  local address=""
+  [[ -n ${1:-} ]] && address="${1}"
+
   local image_metadata=""
   if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
     ensure-gci-metadata-files
     image_metadata=",gci-update-strategy=${KUBE_TEMP}/gci-update.txt,gci-ensure-gke-docker=${KUBE_TEMP}/gci-docker.txt"
   fi
 
+  local network="--network ${NETWORK} --can-ip-forward"
+  if [[ -n ${address} ]]; then
+    network="$network --address ${address}"
+  fi
+
+  if [[ ${ENABLE_IP_ALIASES} = "true" ]]; then
+    gcloud="gcloud alpha"
+    network="--network-interface network=${NETWORK}"
+    # if address is omitted, instance will not receive an external IP.
+    network="${network},address=${address}"
+    network="${network},subnet=${IP_ALIAS_SUBNETWORK}"
+    network="${network},aliases=pods-default:${IP_ALIAS_SIZE}"
+    network="${network} --no-can-ip-forward"
+  fi
+
   write-master-env
-  gcloud compute instances create "${MASTER_NAME}" \
-    ${address_opt} \
+  ${gcloud} compute instances create "${MASTER_NAME}" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
     --machine-type "${MASTER_SIZE}" \
     --image-project="${MASTER_IMAGE_PROJECT}" \
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
-    --network "${NETWORK}" \
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
-    --can-ip-forward \
     --metadata-from-file \
       "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/trusty/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/trusty/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt${image_metadata}" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
-    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}"
+    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
+    ${network}
 }

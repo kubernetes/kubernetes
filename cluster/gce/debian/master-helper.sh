@@ -31,8 +31,8 @@
 #   get-bearer-token
 #
 function create-master-instance {
-  local address_opt=""
-  [[ -n ${1:-} ]] && address_opt="--address ${1}"
+  local address=""
+  [[ -n ${1:-} ]] && address="${1}"
   local preemptible_master=""
   if [[ "${PREEMPTIBLE_MASTER:-}" == "true" ]]; then
     preemptible_master="--preemptible --maintenance-policy TERMINATE"
@@ -40,7 +40,7 @@ function create-master-instance {
 
   write-master-env
   prepare-startup-script
-  create-master-instance-internal "${MASTER_NAME}" "${address_opt}" "${preemptible_master}"
+  create-master-instance-internal "${MASTER_NAME}" "${address}" "${preemptible_master}"
 }
 
 function replicate-master-instance() {
@@ -76,26 +76,40 @@ function replicate-master-instance() {
 }
 
 function create-master-instance-internal() {
+  local gcloud="gcloud"
   local -r master_name="${1}"
-  local -r address_option="${2:-}"
+  local -r address="${2:-}"
   local -r preemptible_master="${3:-}"
 
-  gcloud compute instances create "${master_name}" \
-    ${address_option} \
+  local network="--network ${NETWORK} --can-ip-forward"
+  if [[ -n ${address} ]]; then
+    network="$network --address ${address}"
+  fi
+
+  if [[ ${ENABLE_IP_ALIASES} = "true" ]]; then
+    gcloud="gcloud alpha"
+    network="--network-interface network=${NETWORK}"
+    # if address is omitted, instance will not receive an external IP.
+    network="${network},address=${address}"
+    network="${network},subnet=${IP_ALIAS_SUBNETWORK}"
+    network="${network},aliases=pods-default:${IP_ALIAS_SIZE}"
+    network="${network} --no-can-ip-forward"
+  fi
+
+  ${gcloud} compute instances create "${master_name}" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
     --machine-type "${MASTER_SIZE}" \
     --image-project="${MASTER_IMAGE_PROJECT}" \
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
-    --network "${NETWORK}" \
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
-    --can-ip-forward \
     --metadata-from-file \
       "startup-script=${KUBE_TEMP}/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml,cluster-name=${KUBE_TEMP}/cluster-name.txt,kube-master-certs=${KUBE_TEMP}/kube-master-certs.yaml" \
     --disk "name=${master_name}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
-    ${preemptible_master}
+    ${preemptible_master} \
+    ${network}
 }
 
 # TODO: This is most likely not the best way to read metadata from the existing master.
