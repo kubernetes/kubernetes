@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
@@ -42,6 +43,12 @@ type jobStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
 var Strategy = jobStrategy{api.Scheme, names.SimpleNameGenerator}
+
+// DefaultGarbageCollectionPolicy returns Orphan because that was the default
+// behavior before the server-side garbage collection was implemented.
+func (jobStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+	return rest.OrphanDependents
+}
 
 // NamespaceScoped returns true because all jobs need to be within a namespace.
 func (jobStrategy) NamespaceScoped() bool {
