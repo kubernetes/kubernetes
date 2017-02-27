@@ -130,16 +130,25 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Duration, token string) error {
+	td := &kubeadmapi.TokenDiscovery{}
+	if len(token) == 0 {
+		err := tokenutil.GenerateToken(td)
+		if err != nil {
+			return err
+		}
+	} else {
+		parsedID, parsedSecret, err := tokenutil.ParseToken(token)
+		if err != nil {
+			return err
+		}
+		td.ID = parsedID
+		td.Secret = parsedSecret
+	}
+
 	client, err := kubeconfigutil.ClientSetFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName))
 	if err != nil {
 		return err
 	}
-
-	parsedID, parsedSecret, err := tokenutil.ParseToken(token)
-	if err != nil {
-		return err
-	}
-	td := &kubeadmapi.TokenDiscovery{ID: parsedID, Secret: parsedSecret}
 
 	err = tokenphase.UpdateOrCreateToken(client, td, tokenDuration)
 	if err != nil {
