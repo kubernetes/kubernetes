@@ -23,7 +23,7 @@ type podGPUs struct {
 	podGPUMapping map[string]sets.String
 }
 
-func newPodGpus() *podGPUs {
+func newPodGPUs() *podGPUs {
 	return &podGPUs{
 		podGPUMapping: map[string]sets.String{},
 	}
