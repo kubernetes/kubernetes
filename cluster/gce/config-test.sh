@@ -198,6 +198,15 @@ fi
 # Optional: Enable Rescheduler
 ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
 
+# Optional: Enable allocation of pod IPs using IP aliases.
+#
+# IP_ALIAS_SIZE is the size of the podCIDR allocated to a node.
+# IP_ALIAS_SUBNETWORK is the subnetwork to allocate from. If empty, a
+#   new subnetwork will be created for the cluster.
+ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
+IP_ALIAS_SIZE=${KUBE_GCE_IP_ALIAS_SIZE:-/24}
+IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
+
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
 ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota}"
 
