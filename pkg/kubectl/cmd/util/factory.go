@@ -131,7 +131,7 @@ type ClientAccessFactory interface {
 	FlagSet() *pflag.FlagSet
 	// Command will stringify and return all environment arguments ie. a command run by a client
 	// using the factory.
-	Command() string
+	Command(cmd *cobra.Command, showSecret bool) string
 	// BindFlags adds any flags that are common to all kubectl sub commands.
 	BindFlags(flags *pflag.FlagSet)
 	// BindExternalFlags adds any flags defined by external projects (not part of pflags)

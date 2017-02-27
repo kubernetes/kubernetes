@@ -151,7 +151,7 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		}
 
 		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
 				return cmdutil.AddSourceToErr("replacing", info.Source, err)
 			}
 		}
@@ -272,7 +272,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		}
 
 		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
 				return cmdutil.AddSourceToErr("replacing", info.Source, err)
 			}
 		}

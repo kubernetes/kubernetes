@@ -752,7 +752,7 @@ func containsShorthand(arg, shorthand string) bool {
 	return strings.Contains(arg, shorthand)
 }
 
-func (f *FlagSet) parseLongArg(s string, args []string) (a []string, err error) {
+func (f *FlagSet) parseLongArg(s string, args []string, fn parseFunc) (a []string, err error) {
 	a = args
 	name := s[2:]
 	if len(name) == 0 || name[0] == '-' || name[0] == '=' {
@@ -786,11 +786,11 @@ func (f *FlagSet) parseLongArg(s string, args []string) (a []string, err error) 
 		err = f.failf("flag needs an argument: %s", s)
 		return
 	}
-	err = f.setFlag(flag, value, s)
+	err = fn(flag, value, s)
 	return
 }
 
-func (f *FlagSet) parseSingleShortArg(shorthands string, args []string) (outShorts string, outArgs []string, err error) {
+func (f *FlagSet) parseSingleShortArg(shorthands string, args []string, fn parseFunc) (outShorts string, outArgs []string, err error) {
 	if strings.HasPrefix(shorthands, "test.") {
 		return
 	}
@@ -825,16 +825,16 @@ func (f *FlagSet) parseSingleShortArg(shorthands string, args []string) (outShor
 		err = f.failf("flag needs an argument: %q in -%s", c, shorthands)
 		return
 	}
-	err = f.setFlag(flag, value, shorthands)
+	err = fn(flag, value, shorthands)
 	return
 }
 
-func (f *FlagSet) parseShortArg(s string, args []string) (a []string, err error) {
+func (f *FlagSet) parseShortArg(s string, args []string, fn parseFunc) (a []string, err error) {
 	a = args
 	shorthands := s[1:]
 
 	for len(shorthands) > 0 {
-		shorthands, a, err = f.parseSingleShortArg(shorthands, args)
+		shorthands, a, err = f.parseSingleShortArg(shorthands, args, fn)
 		if err != nil {
 			return
 		}
@@ -843,7 +843,7 @@ func (f *FlagSet) parseShortArg(s string, args []string) (a []string, err error)
 	return
 }
 
-func (f *FlagSet) parseArgs(args []string) (err error) {
+func (f *FlagSet) parseArgs(args []string, fn parseFunc) (err error) {
 	for len(args) > 0 {
 		s := args[0]
 		args = args[1:]
@@ -863,9 +863,9 @@ func (f *FlagSet) parseArgs(args []string) (err error) {
 				f.args = append(f.args, args...)
 				break
 			}
-			args, err = f.parseLongArg(s, args)
+			args, err = f.parseLongArg(s, args, fn)
 		} else {
-			args, err = f.parseShortArg(s, args)
+			args, err = f.parseShortArg(s, args, fn)
 		}
 		if err != nil {
 			return
@@ -881,7 +881,41 @@ func (f *FlagSet) parseArgs(args []string) (err error) {
 func (f *FlagSet) Parse(arguments []string) error {
 	f.parsed = true
 	f.args = make([]string, 0, len(arguments))
-	err := f.parseArgs(arguments)
+
+	assign := func(flag *Flag, value, origArg string) error {
+		return f.setFlag(flag, value, origArg)
+	}
+
+	err := f.parseArgs(arguments, assign)
+	if err != nil {
+		switch f.errorHandling {
+		case ContinueOnError:
+			return err
+		case ExitOnError:
+			os.Exit(2)
+		case PanicOnError:
+			panic(err)
+		}
+	}
+	return nil
+}
+
+type parseFunc func(flag *Flag, value, origArg string) error
+
+// ParseAll parses flag definitions from the argument list, which should not
+// include the command name. The arguments for fn are flag and value. Must be
+// called after all flags in the FlagSet are defined and before flags are
+// accessed by the program. The return value will be ErrHelp if -help was set
+// but not defined.
+func (f *FlagSet) ParseAll(arguments []string, fn func(flag *Flag, value string) error) error {
+	f.parsed = true
+	f.args = make([]string, 0, len(arguments))
+
+	assign := func(flag *Flag, value, origArg string) error {
+		return fn(flag, value)
+	}
+
+	err := f.parseArgs(arguments, assign)
 	if err != nil {
 		switch f.errorHandling {
 		case ContinueOnError:
@@ -905,6 +939,14 @@ func (f *FlagSet) Parsed() bool {
 func Parse() {
 	// Ignore errors; CommandLine is set for ExitOnError.
 	CommandLine.Parse(os.Args[1:])
+}
+
+// ParseAll parses the command-line flags from os.Args[1:] and called fn for each.
+// The arguments for fn are flag and value. Must be called after all flags are
+// defined and before flags are accessed by the program.
+func ParseAll(fn func(flag *Flag, value string) error) {
+	// Ignore errors; CommandLine is set for ExitOnError.
+	CommandLine.ParseAll(os.Args[1:], fn)
 }
 
 // SetInterspersed sets whether to support interspersed option/non-option arguments.
