@@ -154,6 +154,5 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return fmt.Errorf("Error in installing API: %v", err)
 	}
-	s.PrepareRun().Run(stopCh)
-	return nil
+	return s.PrepareRun().Run(stopCh)
 }

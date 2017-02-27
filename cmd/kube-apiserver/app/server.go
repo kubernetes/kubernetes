@@ -101,8 +101,7 @@ func RunServer(config *master.Config, sharedInformers informers.SharedInformerFa
 	}
 
 	sharedInformers.Start(stopCh)
-	m.GenericAPIServer.PrepareRun().Run(stopCh)
-	return nil
+	return m.GenericAPIServer.PrepareRun().Run(stopCh)
 }
 
 // BuildMasterConfig creates all the resources for running the API server, but runs none of them

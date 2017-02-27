@@ -164,7 +164,5 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	server.GenericAPIServer.PrepareRun().Run(stopCh)
-
-	return nil
+	return server.GenericAPIServer.PrepareRun().Run(stopCh)
 }
