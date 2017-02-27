@@ -80,7 +80,8 @@ const (
 	MinimumAddressesInServiceSubnet = 10
 
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
-	DefaultTokenDuration = time.Duration(8) * time.Hour
+	// Default behaviour is "never expire" == 0
+	DefaultTokenDuration = 0
 
 	// LabelNodeRoleMaster specifies that a node is a master
 	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
@@ -109,4 +110,7 @@ var (
 
 	AuthorizationPolicyPath        = path.Join(KubernetesDir, "abac_policy.json")
 	AuthorizationWebhookConfigPath = path.Join(KubernetesDir, "webhook_authz.conf")
+
+	// DefaultTokenUsages specifies the default functions a token will get
+	DefaultTokenUsages = []string{"signing", "authentication"}
 )
