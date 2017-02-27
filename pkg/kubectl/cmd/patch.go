@@ -190,7 +190,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				infoCopy := *info
 				infoCopy.Object = patchedObj
 				infoCopy.VersionedObject = patchedObj
-				if patch, patchType, err := cmdutil.ChangeResourcePatch(&infoCopy, f.Command()); err == nil {
+				if patch, patchType, err := cmdutil.ChangeResourcePatch(&infoCopy, f.Command(cmd, true)); err == nil {
 					if _, err = helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
 						glog.V(4).Infof("error recording reason: %v", err)
 					}
