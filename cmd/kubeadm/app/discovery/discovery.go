@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -32,14 +33,23 @@ import (
 func For(d *kubeadmapi.NodeConfiguration) (*clientcmdapi.Config, error) {
 	switch {
 	case len(d.DiscoveryFile) != 0:
+		if isURL(d.DiscoveryFile) {
+			return runHTTPSDiscovery(d.DiscoveryFile)
+		}
 		return runFileDiscovery(d.DiscoveryFile)
-	case len(d.DiscoveryURL) != 0:
-		return runHTTPSDiscovery(d.DiscoveryURL)
 	case len(d.DiscoveryToken) != 0:
-		return runTokenDiscovery(d.DiscoveryToken, d.Masters)
+		return runTokenDiscovery(d.DiscoveryToken, d.DiscoveryTokenAPIServers)
 	default:
 		return nil, fmt.Errorf("couldn't find a valid discovery configuration.")
 	}
+}
+
+func isURL(s string) bool {
+	_, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 // runFileDiscovery executes file-based discovery.

@@ -29,9 +29,9 @@ func TestValidateTokenDiscovery(t *testing.T) {
 		f        *field.Path
 		expected bool
 	}{
-		{&kubeadm.NodeConfiguration{Token: "772ef5.6b6baab1d4a0a171", Masters: []string{"192.168.122.100:9898"}}, nil, true},
-		{&kubeadm.NodeConfiguration{Token: ".6b6baab1d4a0a171", Masters: []string{"192.168.122.100:9898"}}, nil, false},
-		{&kubeadm.NodeConfiguration{Token: "772ef5.", Masters: []string{"192.168.122.100:9898"}}, nil, false},
+		{&kubeadm.NodeConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, true},
+		{&kubeadm.NodeConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, false},
+		{&kubeadm.NodeConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, false},
 	}
 	for _, rt := range tests {
 		err := ValidateToken(rt.c.Token, rt.f).ToAggregate()
@@ -175,7 +175,6 @@ func TestValidateNodeConfiguration(t *testing.T) {
 	}{
 		{&kubeadm.NodeConfiguration{}, false},
 		{&kubeadm.NodeConfiguration{
-			DiscoveryURL:   "foo",
 			DiscoveryFile:  "foo",
 			DiscoveryToken: "abcdef.1234567890123456@foobar",
 			CACertPath:     "/some/cert.crt",

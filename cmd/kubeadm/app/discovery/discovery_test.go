@@ -30,13 +30,13 @@ func TestFor(t *testing.T) {
 		{d: kubeadm.NodeConfiguration{}, expect: false},
 		{
 			d: kubeadm.NodeConfiguration{
-				DiscoveryURL: "notnil",
+				DiscoveryFile: "notnil",
 			},
 			expect: false,
 		},
 		{
 			d: kubeadm.NodeConfiguration{
-				DiscoveryURL: "https://localhost",
+				DiscoveryFile: "https://localhost",
 			},
 			expect: false,
 		},

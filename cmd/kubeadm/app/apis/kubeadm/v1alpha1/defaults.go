@@ -68,4 +68,8 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath
 	}
+	if len(obj.Token) != 0 {
+		obj.TLSBootstrapToken = obj.Token
+		obj.DiscoveryToken = obj.Token
+	}
 }
