@@ -78,7 +78,7 @@ func TestDescribePodTolerations(t *testing.T) {
 		Spec: api.PodSpec{
 			Tolerations: []api.Toleration{
 				{Key: "key1", Value: "value1"},
-				{Key: "key2", Value: "value2"},
+				{Key: "key2", Value: "value2", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{300}[0]},
 			},
 		},
 	})
@@ -88,7 +88,7 @@ func TestDescribePodTolerations(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "key1=value1") || !strings.Contains(out, "key2=value2") || !strings.Contains(out, "Tolerations:") {
+	if !strings.Contains(out, "key1=value1") || !strings.Contains(out, "key2=value2:NoExecute for 300s") || !strings.Contains(out, "Tolerations:") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
