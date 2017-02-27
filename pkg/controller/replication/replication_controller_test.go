@@ -160,11 +160,11 @@ type serverResponse struct {
 	obj        interface{}
 }
 
-func NewReplicationManagerFromClient(kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int) (*ReplicationManager, coreinformers.PodInformer, coreinformers.ReplicationControllerInformer) {
+func NewReplicationManagerFromClient(kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int) (*ReplicationController, coreinformers.PodInformer, coreinformers.ReplicationControllerInformer) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	rcInformer := informerFactory.Core().V1().ReplicationControllers()
-	rm := NewReplicationManager(podInformer, rcInformer, kubeClient, burstReplicas, lookupCacheSize, false)
+	rm := NewReplicationController(podInformer, rcInformer, kubeClient, burstReplicas, lookupCacheSize, false)
 	rm.podListerSynced = alwaysReady
 	rm.rcListerSynced = alwaysReady
 	return rm, podInformer, rcInformer
@@ -459,7 +459,7 @@ func TestWatchControllers(t *testing.T) {
 	informers := informers.NewSharedInformerFactory(c, controller.NoResyncPeriodFunc())
 	podInformer := informers.Core().V1().Pods()
 	rcInformer := informers.Core().V1().ReplicationControllers()
-	manager := NewReplicationManager(podInformer, rcInformer, c, BurstReplicas, 0, false)
+	manager := NewReplicationController(podInformer, rcInformer, c, BurstReplicas, 0, false)
 	informers.Start(stopCh)
 
 	var testControllerSpec v1.ReplicationController
@@ -1115,7 +1115,7 @@ func BenchmarkGetPodControllerSingleNS(b *testing.B) {
 }
 
 // setupManagerWithGCEnabled creates a RC manager with a fakePodControl and with garbageCollectorEnabled set to true
-func setupManagerWithGCEnabled(objs ...runtime.Object) (manager *ReplicationManager, fakePodControl *controller.FakePodControl, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer) {
+func setupManagerWithGCEnabled(objs ...runtime.Object) (manager *ReplicationController, fakePodControl *controller.FakePodControl, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer) {
 	c := fakeclientset.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
 	manager, podInformer, rcInformer = NewReplicationManagerFromClient(c, BurstReplicas, 0)
