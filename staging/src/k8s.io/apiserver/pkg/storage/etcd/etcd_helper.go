@@ -380,11 +380,16 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFun
 	}
 	for _, node := range nodes {
 		if node.Dir {
-			trace.Step("Decoding dir " + node.Key + " START")
+			// NOTE: we no longer log this as a discrete step for each directory
+			// node as it produces an immense amount of log spam for any server
+			// with a reasonable amount of content.  that spam can cause restart
+			// times in the order of minutes.  in addition, if you use the journal
+			// all these logs hit the journal rate limiter to the point of making
+			// this actively hostile at finding problems.
+			// see: https://www.freedesktop.org/software/systemd/man/journald.conf.html#RateLimitIntervalSec=
 			if err := h.decodeNodeList(node.Nodes, filter, slicePtr); err != nil {
 				return err
 			}
-			trace.Step("Decoding dir " + node.Key + " END")
 			continue
 		}
 		if obj, found := h.getFromCache(node.ModifiedIndex, filter); found {
