@@ -492,7 +492,11 @@ NextTest:
 			return nil
 		})
 		preparedServer := s.PrepareRun()
-		go preparedServer.Run(stopCh)
+		go func() {
+			if err := preparedServer.Run(stopCh); err != nil {
+				t.Fatal(err)
+			}
+		}()
 
 		// load ca certificates into a pool
 		roots := x509.NewCertPool()
