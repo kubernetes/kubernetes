@@ -60,12 +60,14 @@ var (
 )
 
 const (
-	logsUsageStr = "expected 'logs POD_NAME [CONTAINER_NAME]'.\nPOD_NAME is a required argument for the logs command"
+	logsUsageStr = "expected 'logs (POD_NAME | TYPE/NAME) [CONTAINER_NAME]'.\n(POD_NAME | TYPE/NAME) is a required argument for the logs command"
 )
 
 type LogsOptions struct {
 	Namespace   string
 	ResourceArg string
+	ContainerName string
+	Selector string
 	Options     runtime.Object
 
 	Mapper       meta.RESTMapper
@@ -108,7 +110,10 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int64("tail", -1, "Lines of recent log file to display. Defaults to -1 with no selector, showing all log lines otherwise 10, if a selector is provided.")
 	cmd.Flags().String("since-time", "", i18n.T("Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."))
 	cmd.Flags().Duration("since", 0, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.")
-	cmd.Flags().StringP("container", "c", "", "Print the logs of this container")
+	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+
+	//cmd.Flags().StringP("container", "c", "", "Print the logs of this container")
 
 	cmd.Flags().Bool("interactive", false, "If true, prompt the user for input when required.")
 	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
@@ -118,16 +123,16 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	containerName := cmdutil.GetFlagString(cmd, "container")
-	selector := cmdutil.GetFlagString(cmd, "selector")
+	//containerName := cmdutil.GetFlagString(cmd, "container")
+	//selector := cmdutil.GetFlagString(cmd, "selector")
 	switch len(args) {
 	case 0:
-		if len(selector) == 0 {
+		if len(o.Selector) == 0 {
 			return cmdutil.UsageError(cmd, logsUsageStr)
 		}
 	case 1:
 		o.ResourceArg = args[0]
-		if len(selector) != 0 {
+		if len(o.Selector) != 0 {
 			return cmdutil.UsageError(cmd, "only a selector (-l) or a POD name is allowed")
 		}
 	case 2:
@@ -135,7 +140,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 			return cmdutil.UsageError(cmd, "only one of -c or an inline [CONTAINER] arg is allowed")
 		}
 		o.ResourceArg = args[0]
-		containerName = args[1]
+		o.ContainerName = args[1]
 	default:
 		return cmdutil.UsageError(cmd, logsUsageStr)
 	}
@@ -146,7 +151,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	}
 
 	logOptions := &api.PodLogOptions{
-		Container:  containerName,
+		Container:  o.ContainerName,
 		Follow:     cmdutil.GetFlagBool(cmd, "follow"),
 		Previous:   cmdutil.GetFlagBool(cmd, "previous"),
 		Timestamps: cmdutil.GetFlagBool(cmd, "timestamps"),
@@ -174,7 +179,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	o.Out = out
 
-	if len(selector) != 0 {
+	if len(o.Selector) != 0 {
 		if logOptions.Follow {
 			return cmdutil.UsageError(cmd, "only one of follow (-f) or selector (-l) is allowed")
 		}
@@ -195,14 +200,14 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		if o.ResourceArg != "" {
 			builder.ResourceNames("pods", o.ResourceArg)
 		}
-		if selector != "" {
-			builder.ResourceTypes("pods").SelectorParam(selector)
+		if o.Selector != "" {
+			builder.ResourceTypes("pods").SelectorParam(o.Selector)
 		}
 		infos, err := builder.Do().Infos()
 		if err != nil {
 			return err
 		}
-		if selector == "" && len(infos) != 1 {
+		if o.Selector == "" && len(infos) != 1 {
 			return errors.New("expected a resource")
 		}
 		o.Object = infos[0].Object
