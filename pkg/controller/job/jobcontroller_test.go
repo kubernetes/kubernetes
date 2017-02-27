@@ -24,6 +24,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
@@ -44,6 +45,7 @@ func newJob(parallelism, completions int32) *batch.Job {
 	j := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
+			UID:       uuid.NewUUID(),
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
@@ -91,6 +93,7 @@ func getKey(job *batch.Job, t *testing.T) string {
 func newJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*JobController, informers.SharedInformerFactory) {
 	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
 	jm := NewJobController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient)
+	jm.podControl = &controller.FakePodControl{}
 
 	return jm, sharedInformers
 }
@@ -602,6 +605,118 @@ func TestJobPodLookup(t *testing.T) {
 		} else if tc.expectedName != "" {
 			t.Errorf("Expected a job %v pod %v, found none", tc.expectedName, tc.pod.Name)
 		}
+	}
+}
+
+func newPod(name string, job *batch.Job) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Labels:          job.Spec.Selector.MatchLabels,
+			Namespace:       job.Namespace,
+			OwnerReferences: []metav1.OwnerReference{*newControllerRef(job)},
+		},
+	}
+}
+
+func TestGetPodsForJob(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	job2 := newJob(1, 1)
+	job2.Name = "job2"
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+
+	pod1 := newPod("pod1", job1)
+	pod2 := newPod("pod2", job2)
+	pod3 := newPod("pod3", job1)
+	// Make pod3 an orphan that doesn't match. It should be ignored.
+	pod3.OwnerReferences = nil
+	pod3.Labels = nil
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod3)
+
+	pods, err := jm.getPodsForJob(job1)
+	if err != nil {
+		t.Fatalf("getPodsForJob() error: %v", err)
+	}
+	if got, want := len(pods), 1; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+	if got, want := pods[0].Name, "pod1"; got != want {
+		t.Errorf("pod.Name = %v, want %v", got, want)
+	}
+
+	pods, err = jm.getPodsForJob(job2)
+	if err != nil {
+		t.Fatalf("getPodsForJob() error: %v", err)
+	}
+	if got, want := len(pods), 1; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+	if got, want := pods[0].Name, "pod2"; got != want {
+		t.Errorf("pod.Name = %v, want %v", got, want)
+	}
+}
+
+func TestGetPodsForJobAdopt(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+
+	pod1 := newPod("pod1", job1)
+	pod2 := newPod("pod2", job1)
+	// Make this pod an orphan. It should still be returned because it's adopted.
+	pod2.OwnerReferences = nil
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+
+	pods, err := jm.getPodsForJob(job1)
+	if err != nil {
+		t.Fatalf("getPodsForJob() error: %v", err)
+	}
+	if got, want := len(pods), 2; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+}
+
+func TestGetPodsForJobRelease(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	jm, informer := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+
+	job1 := newJob(1, 1)
+	job1.Name = "job1"
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+
+	pod1 := newPod("pod1", job1)
+	pod2 := newPod("pod2", job1)
+	// Make this pod not match, even though it's owned. It should be released.
+	pod2.Labels = nil
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+
+	pods, err := jm.getPodsForJob(job1)
+	if err != nil {
+		t.Fatalf("getPodsForJob() error: %v", err)
+	}
+	if got, want := len(pods), 1; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+	if got, want := pods[0].Name, "pod1"; got != want {
+		t.Errorf("pod.Name = %v, want %v", got, want)
 	}
 }
 
