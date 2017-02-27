@@ -251,7 +251,7 @@ func (dsc *DaemonSetsController) enqueueDaemonSet(ds *extensions.DaemonSet) {
 		return
 	}
 
-	// TODO: Handle overlapping controllers better. See comment in ReplicationManager.
+	// TODO: Handle overlapping controllers better. See comment in ReplicationController.
 	dsc.queue.Add(key)
 }
 
