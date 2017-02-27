@@ -73,9 +73,36 @@ NETWORK_PLUGIN=${NETWORK_PLUGIN:-""}
 # NETWORK_PLUGIN_PATH is the path to network plugin binary.
 NETWORK_PLUGIN_PATH=${NETWORK_PLUGIN_PATH:-""}
 
+# KUBELET_KUBECONFIG_DIR is the path to a dir for the kubelet's kubeconfig file
+KUBELET_KUBECONFIG_DIR=${KUBELET_KUBECONFIG_DIR:="/var/lib/kubelet"}
+
+# Creates a kubeconfig file for the kubelet.
+# Args: address (e.g. "http://localhost:8080"), destination dir
+function create-kubelet-kubeconfig() {
+  local api_addr=$1
+  local dest_dir=$2
+  mkdir -p "${dest_dir}" &>/dev/null || sudo mkdir -p "${dest_dir}"
+  sudo=$(test -w "${dest_dir}" || echo "sudo -E")
+  cat <<EOF | ${sudo} tee "${dest_dir}"/kubelet.kubeconfig > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: ${api_addr}
+    name: kubelet-env
+contexts:
+  - context:
+      cluster: kubelet-env
+    name: kubelet-env
+current-context: kubelet-env
+EOF
+}
+
 # start_kubelet starts kubelet and redirect kubelet log to $LOG_DIR/kubelet.log.
 kubelet_log=kubelet.log
 start_kubelet() {
+  echo "Creating kubelet.kubeconfig"
+  create-kubelet-kubeconfig "http://localhost:8080" $KUBELET_KUBECONIFG_DIR
   echo "Starting kubelet..."
   sudo -b $KUBELET $@ &>$LOG_DIR/$kubelet_log
   if [ $? -ne 0 ]; then
@@ -152,7 +179,7 @@ config_dir=`mktemp -d`
 file_check_frequency=10s
 pod_cidr=10.180.0.0/24
 log_level=4
-start_kubelet --api-servers $apiserver \
+start_kubelet --kubeconfig "${KUBELET_KUBECONFIG_DIR}/kubelet.kubeconfig" \
   --volume-stats-agg-period $volume_stats_agg_period \
   --allow-privileged=$allow_privileged \
   --serialize-image-pulls=$serialize_image_pulls \
