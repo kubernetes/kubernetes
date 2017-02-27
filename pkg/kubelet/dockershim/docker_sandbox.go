@@ -61,8 +61,9 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 
 	// NOTE: To use a custom sandbox image in a private repository, users need to configure the nodes with credentials properly.
 	// see: http://kubernetes.io/docs/user-guide/images/#configuring-nodes-to-authenticate-to-a-private-repository
-	if err := ds.client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{}); err != nil {
-		return "", fmt.Errorf("unable to pull image for the sandbox container: %v", err)
+	// Only pull sandbox image when it's not present - v1.PullIfNotPresent.
+	if err := ensureSandboxImageExists(ds.client, image); err != nil {
+		return "", err
 	}
 
 	// Step 2: Create the sandbox container.
