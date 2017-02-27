@@ -17,12 +17,14 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
@@ -217,6 +219,70 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionTimeout)
 			Expect(err).To(HaveOccurred())
 			framework.Logf(err.Error())
+		})
+
+		It("should test that deleting a claim before the volume is provisioned deletes the volume. [Volume]", func() {
+			// This case tests for the regressions of a bug fixed by PR #21268
+			// REGRESSION: Deleting the PVC before the PV is provisioned can result in the PV
+			// not being deleted.
+			// NOTE:  Polls until no PVs are detected, times out at 5 minutes.
+
+			const raceAttempts int = 100
+			var suffix string = ns[len(ns)-5:] // match trailing random string of generated namespace
+			var regressedPVs []v1.PersistentVolume
+			var regressCount int
+
+			By("Creating a StorageClass")
+			class := newStorageClass("kubernetes.io/gce-pd", suffix)
+			class, err := c.Storage().StorageClasses().Create(class)
+			Expect(err).NotTo(HaveOccurred())
+			defer c.Storage().StorageClasses().Delete(class.Name, nil)
+			framework.Logf("Created sc %s", class.Name)
+
+			// To increase chance of detection, attempt multiple iterations
+			By(fmt.Sprintf("Creating and deleting PersistentVolumeClaims %d times", raceAttempts))
+			claim := newClaim(ns, suffix, false)
+			for i := 0; i < raceAttempts; i++ {
+				tmpClaim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
+				Expect(err).NotTo(HaveOccurred())
+				err = c.Core().PersistentVolumeClaims(ns).Delete(tmpClaim.Name, nil)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			By(fmt.Sprintf("Checking for residual PersistentVolumes associated with StorageClass %s", class.Name))
+			// Every 10 seconds, check for PVs that have not been deleted.
+			err = wait.Poll(10*time.Second, 300*time.Second, func() (bool, error) {
+				regressedPVs = []v1.PersistentVolume{}
+				regressCount = 0
+
+				allPVs, err := c.Core().PersistentVolumes().List(metav1.ListOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				for _, pv := range allPVs.Items {
+					if pv.Annotations[storageutil.StorageClassAnnotation] == class.Name {
+						regressedPVs = append(regressedPVs, pv)
+						regressCount++
+					}
+				}
+				if regressCount > 0 {
+					return false, nil // Poll until no PVs remain
+				} else {
+					return true, nil // No PVs remain
+				}
+			})
+			defer func() {
+				for _, pv := range regressedPVs {
+					framework.DeletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName)
+					framework.DeletePersistentVolume(c, pv.Name)
+				}
+			}()
+			if regressCount > 0 {
+				framework.Logf("Remaining PersistentVolumes:")
+				for i, pv := range regressedPVs {
+					framework.Logf("%s%d) %s", "\t", i+1, pv.Name)
+				}
+				framework.Failf("Expected 0 PersistentVolumes remaining. Found %d", regressCount)
+			}
+			Expect(err).NotTo(HaveOccurred()) // wait.Poll returned error but no PVs remain
 		})
 	})
 
