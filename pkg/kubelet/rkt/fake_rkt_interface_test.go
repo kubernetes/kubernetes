@@ -28,7 +28,6 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -165,7 +164,7 @@ func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *
 	return nil, fmt.Errorf("Not implemented")
 }
 
-func (f *fakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
+func (f *fakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) (string, string) {
 	return "", ""
 }
 

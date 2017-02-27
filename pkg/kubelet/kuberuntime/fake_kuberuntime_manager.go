@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -50,7 +49,7 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 // fakeRuntimeHelper implements kubecontainer.RuntimeHelper interfaces for testing purposes.
 type fakeRuntimeHelper struct{}
 
-func (f *fakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
+func (f *fakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) (string, string) {
 	return "", ""
 }
 
