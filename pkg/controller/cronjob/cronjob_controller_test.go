@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // schedule is hourly on the hour
@@ -288,6 +289,23 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		}
 		if len(jc.Jobs) != expectedCreates {
 			t.Errorf("%s: expected %d job started, actually %v", name, expectedCreates, len(jc.Jobs))
+		}
+		for i := range jc.Jobs {
+			job := &jc.Jobs[i]
+			controllerRef := controller.GetControllerOf(job)
+			if controllerRef == nil {
+				t.Errorf("%s: expected job to have ControllerRef: %#v", name, job)
+			} else {
+				if got, want := controllerRef.APIVersion, "batch/v2alpha1"; got != want {
+					t.Errorf("%s: controllerRef.APIVersion = %q, want %q", name, got, want)
+				}
+				if got, want := controllerRef.Kind, "CronJob"; got != want {
+					t.Errorf("%s: controllerRef.Kind = %q, want %q", name, got, want)
+				}
+				if controllerRef.Controller == nil || *controllerRef.Controller != true {
+					t.Errorf("%s: controllerRef.Controller is not set to true", name)
+				}
+			}
 		}
 
 		expectedDeletes := 0

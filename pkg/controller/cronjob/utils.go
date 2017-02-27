@@ -180,6 +180,17 @@ func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]tim
 	return starts, nil
 }
 
+func newControllerRef(sj *batchv2alpha1.CronJob) *metav1.OwnerReference {
+	isController := true
+	return &metav1.OwnerReference{
+		APIVersion: controllerKind.GroupVersion().String(),
+		Kind:       controllerKind.Kind,
+		Name:       sj.Name,
+		UID:        sj.UID,
+		Controller: &isController,
+	}
+}
+
 // XXX unit test this
 
 // getJobFromTemplate makes a Job from a CronJob
@@ -199,9 +210,10 @@ func getJobFromTemplate(sj *batchv2alpha1.CronJob, scheduledTime time.Time) (*ba
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      labels,
-			Annotations: annotations,
-			Name:        name,
+			Labels:          labels,
+			Annotations:     annotations,
+			Name:            name,
+			OwnerReferences: []metav1.OwnerReference{*newControllerRef(sj)},
 		},
 	}
 	if err := api.Scheme.Convert(&sj.Spec.JobTemplate.Spec, &job.Spec, nil); err != nil {
