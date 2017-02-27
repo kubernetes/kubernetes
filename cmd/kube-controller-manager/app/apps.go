@@ -30,8 +30,9 @@ func startStatefulSetController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	go statefulset.NewStatefulSetController(
-		ctx.NewInformerFactory.Core().V1().Pods(),
-		ctx.NewInformerFactory.Apps().V1beta1().StatefulSets(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Apps().V1beta1().StatefulSets(),
+		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ctx.ClientBuilder.ClientOrDie("statefulset-controller"),
 	).Run(1, ctx.Stop)
 	return true, nil

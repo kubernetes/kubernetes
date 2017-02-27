@@ -33,8 +33,8 @@ func startJobController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	go job.NewJobController(
-		ctx.NewInformerFactory.Core().V1().Pods(),
-		ctx.NewInformerFactory.Batch().V1().Jobs(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Batch().V1().Jobs(),
 		ctx.ClientBuilder.ClientOrDie("job-controller"),
 	).Run(int(ctx.Options.ConcurrentJobSyncs), ctx.Stop)
 	return true, nil

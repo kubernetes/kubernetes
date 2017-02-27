@@ -72,6 +72,7 @@ type StatefulSetController struct {
 func NewStatefulSetController(
 	podInformer coreinformers.PodInformer,
 	setInformer appsinformers.StatefulSetInformer,
+	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	kubeClient clientset.Interface,
 ) *StatefulSetController {
 	eventBroadcaster := record.NewBroadcaster()
@@ -81,8 +82,16 @@ func NewStatefulSetController(
 
 	ssc := &StatefulSetController{
 		kubeClient: kubeClient,
-		control:    NewDefaultStatefulSetControl(NewRealStatefulPodControl(kubeClient, setInformer.Lister(), podInformer.Lister(), recorder)),
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
+		control: NewDefaultStatefulSetControl(
+			NewRealStatefulPodControl(
+				kubeClient,
+				setInformer.Lister(),
+				podInformer.Lister(),
+				pvcInformer.Lister(),
+				recorder,
+			),
+		),
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
 	}
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
