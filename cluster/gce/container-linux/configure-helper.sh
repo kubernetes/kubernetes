@@ -278,7 +278,7 @@ EOF
   fi
 }
 
-function create-kubelet-kubeconfig {
+function create-kubelet-kubeconfig() {
   echo "Creating kubelet kubeconfig file"
   if [[ -z "${KUBELET_CA_CERT:-}" ]]; then
     KUBELET_CA_CERT="${CA_CERT}"
@@ -294,6 +294,7 @@ users:
 clusters:
 - name: local
   cluster:
+    server: https://${1}:443
     certificate-authority-data: ${KUBELET_CA_CERT}
 contexts:
 - context:
@@ -313,7 +314,7 @@ function create-master-kubelet-auth {
   # set in the environment.
   if [[ -n "${KUBELET_APISERVER:-}" && -n "${KUBELET_CERT:-}" && -n "${KUBELET_KEY:-}" ]]; then
     REGISTER_MASTER_KUBELET="true"
-    create-kubelet-kubeconfig
+    create-kubelet-kubeconfig ${KUBELET_APISERVER}
   fi
 }
 
@@ -506,6 +507,7 @@ function start-kubelet {
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --pod-manifest-path=/etc/kubernetes/manifests"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
+  flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
@@ -514,7 +516,6 @@ function start-kubelet {
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
-      flags+=" --api-servers=https://${KUBELET_APISERVER}"
       flags+=" --register-schedulable=false"
       flags+=" --register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule"
     else
@@ -523,7 +524,6 @@ function start-kubelet {
     fi
   else # For nodes
     flags+=" --enable-debugging-handlers=true"
-    flags+=" --api-servers=https://${KUBERNETES_MASTER_NAME}"
     if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
@@ -1347,7 +1347,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   create-master-kubelet-auth
   create-master-etcd-auth
 else
-  create-kubelet-kubeconfig
+  create-kubelet-kubeconfig ${KUBERNETES_MASTER_NAME}
   create-kubeproxy-kubeconfig
 fi
 
