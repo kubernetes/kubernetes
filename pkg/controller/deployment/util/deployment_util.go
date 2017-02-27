@@ -41,6 +41,7 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -668,9 +669,9 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 }
 
 // WaitForReplicaSetUpdated polls the replica set until it is updated.
-func WaitForReplicaSetUpdated(c clientset.Interface, desiredGeneration int64, namespace, name string) error {
-	return wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		rs, err := c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{})
+func WaitForReplicaSetUpdated(c extensionslisters.ReplicaSetLister, desiredGeneration int64, namespace, name string) error {
+	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		rs, err := c.ReplicaSets(namespace).Get(name)
 		if err != nil {
 			return false, err
 		}
@@ -679,9 +680,9 @@ func WaitForReplicaSetUpdated(c clientset.Interface, desiredGeneration int64, na
 }
 
 // WaitForPodsHashPopulated polls the replica set until updated and fully labeled.
-func WaitForPodsHashPopulated(c clientset.Interface, desiredGeneration int64, namespace, name string) error {
-	return wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err := c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{})
+func WaitForPodsHashPopulated(c extensionslisters.ReplicaSetLister, desiredGeneration int64, namespace, name string) error {
+	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		rs, err := c.ReplicaSets(namespace).Get(name)
 		if err != nil {
 			return false, err
 		}

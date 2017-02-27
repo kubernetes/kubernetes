@@ -43,6 +43,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/crlf"
 	"k8s.io/kubernetes/pkg/util/i18n"
 
@@ -64,9 +65,9 @@ var (
 
 		Editing is done with the API version used to fetch the resource.
 		To edit using a specific API version, fully-qualify the resource, version, and group.
-		
+
 		The default format is YAML. To edit in JSON, specify "-o json".
-		
+
 		The flag --windows-line-endings can be used to force Windows line endings,
 		otherwise the default for your operating system will be used.
 
@@ -92,7 +93,7 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, kubectl.PrintOptions{
+	p, err := f.Printer(nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 	})
 	cmdutil.CheckErr(err)
@@ -343,14 +344,14 @@ func getPrinter(cmd *cobra.Command) (*editPrinterOptions, error) {
 	switch format := cmdutil.GetFlagString(cmd, "output"); format {
 	case "json":
 		return &editPrinterOptions{
-			printer:   &kubectl.JSONPrinter{},
+			printer:   &printers.JSONPrinter{},
 			ext:       ".json",
 			addHeader: false,
 		}, nil
 	// If flag -o is not specified, use yaml as default
 	case "yaml", "":
 		return &editPrinterOptions{
-			printer:   &kubectl.YAMLPrinter{},
+			printer:   &printers.YAMLPrinter{},
 			ext:       ".yaml",
 			addHeader: true,
 		}, nil
@@ -536,7 +537,7 @@ func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, annotationVisitor re
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
 				return err
 			}
 		}
@@ -589,7 +590,7 @@ func (h *editHeader) flush() {
 }
 
 type editPrinterOptions struct {
-	printer   kubectl.ResourcePrinter
+	printer   printers.ResourcePrinter
 	ext       string
 	addHeader bool
 }

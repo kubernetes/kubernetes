@@ -95,21 +95,6 @@ function ensure-local-ssds() {
 # Installs logrotate configuration files
 function setup-logrotate() {
   mkdir -p /etc/logrotate.d/
-  cat >/etc/logrotate.d/docker-containers <<EOF
-/var/lib/docker/containers/*/*-json.log {
-    rotate 5
-    copytruncate
-    missingok
-    notifempty
-    compress
-    maxsize 10M
-    daily
-    dateext
-    dateformat -%Y%m%d-%s
-    create 0644 root root
-}
-EOF
-
   # Configure log rotation for all logs in /var/log, which is where k8s services
   # are configured to write their log files. Whenever logrotate is ran, this
   # config will:
@@ -567,6 +552,11 @@ function assemble-docker-flags {
     echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
     docker_opts+=" --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
   fi
+
+  # Configure docker logging
+  docker_opts+=" --log-driver=${DOCKER_LOG_DRIVER:-json-file}"
+  docker_opts+=" --log-opt=max-size=${DOCKER_LOG_MAX_SIZE:-10m}"
+  docker_opts+=" --log-opt=max-file=${DOCKER_LOG_MAX_FILE:-5}"
 
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 

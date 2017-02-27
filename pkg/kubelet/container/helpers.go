@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -50,6 +51,9 @@ type HandlerRunner interface {
 type RuntimeHelper interface {
 	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*RunContainerOptions, error)
 	GetClusterDNS(pod *v1.Pod) (dnsServers []string, dnsSearches []string, err error)
+	// GetPodCgroupParent returns the the CgroupName identifer, and its literal cgroupfs form on the host
+	// of a pod.
+	GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string)
 	GetPodDir(podUID types.UID) string
 	GeneratePodHostNameAndDomain(pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
@@ -305,4 +309,35 @@ func MakeCapabilities(capAdd []v1.Capability, capDrop []v1.Capability) ([]string
 		dropCaps = append(dropCaps, string(cap))
 	}
 	return addCaps, dropCaps
+}
+
+// MakePortMappings creates internal port mapping from api port mapping.
+func MakePortMappings(container *v1.Container) (ports []PortMapping) {
+	names := make(map[string]struct{})
+	for _, p := range container.Ports {
+		pm := PortMapping{
+			HostPort:      int(p.HostPort),
+			ContainerPort: int(p.ContainerPort),
+			Protocol:      p.Protocol,
+			HostIP:        p.HostIP,
+		}
+
+		// We need to create some default port name if it's not specified, since
+		// this is necessary for rkt.
+		// http://issue.k8s.io/7710
+		if p.Name == "" {
+			pm.Name = fmt.Sprintf("%s-%s:%d", container.Name, p.Protocol, p.ContainerPort)
+		} else {
+			pm.Name = fmt.Sprintf("%s-%s", container.Name, p.Name)
+		}
+
+		// Protect against exposing the same protocol-port more than once in a container.
+		if _, ok := names[pm.Name]; ok {
+			glog.Warningf("Port name conflicted, %q is defined more than once", pm.Name)
+			continue
+		}
+		ports = append(ports, pm)
+		names[pm.Name] = struct{}{}
+	}
+	return
 }

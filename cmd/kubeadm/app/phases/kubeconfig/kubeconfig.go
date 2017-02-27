@@ -18,7 +18,6 @@ package kubeconfig
 
 import (
 	"bytes"
-	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"os"
@@ -32,6 +31,16 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
+// BuildConfigProperties holds some simple information about how this phase should build the KubeConfig object
+type BuildConfigProperties struct {
+	CertDir         string
+	ClientName      string
+	Organization    []string
+	APIServer       string
+	Token           string
+	MakeClientCerts bool
+}
+
 // TODO: Make an integration test for this function that runs after the certificates phase
 // and makes sure that those two phases work well together...
 
@@ -42,61 +51,113 @@ import (
 // /etc/kubernetes/{admin,kubelet}.conf exist but the CA cert doesn't match what's in the pki dir => error
 // /etc/kubernetes/{admin,kubelet}.conf exist but not certs => certs will be generated and conflict with the kubeconfig files => error
 
-// CreateAdminAndKubeletKubeConfig is called from the main init and does the work for the default phase behaviour
-func CreateAdminAndKubeletKubeConfig(masterEndpoint, pkiDir, outDir string) error {
+// CreateInitKubeConfigFiles is called from the main init and does the work for the default phase behaviour
+func CreateInitKubeConfigFiles(masterEndpoint, pkiDir, outDir string) error {
 
-	// Try to load ca.crt and ca.key from the PKI directory
-	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, kubeadmconstants.CACertAndKeyBaseName)
+	hostname, err := os.Hostname()
 	if err != nil {
-		return fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %v", err)
+		return err
 	}
 
-	// User admin should have full access to the cluster
-	// TODO: Add test case that make sure this cert has the x509.ExtKeyUsageClientAuth flag
-	adminCertConfig := certutil.Config{
-		CommonName:   "kubernetes-admin",
-		Organization: []string{"system:masters"},
-		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-	adminKubeConfigFilePath := filepath.Join(outDir, kubeadmconstants.AdminKubeConfigFileName)
-	if err := createKubeConfigFileForClient(masterEndpoint, adminKubeConfigFilePath, adminCertConfig, caCert, caKey); err != nil {
-		return fmt.Errorf("couldn't create config for the admin: %v", err)
+	// Create a lightweight specification for what the files should look like
+	filesToCreateFromSpec := map[string]BuildConfigProperties{
+		kubeadmconstants.AdminKubeConfigFileName: {
+			ClientName:      "kubernetes-admin",
+			APIServer:       masterEndpoint,
+			CertDir:         pkiDir,
+			Organization:    []string{kubeadmconstants.MastersGroup},
+			MakeClientCerts: true,
+		},
+		kubeadmconstants.KubeletKubeConfigFileName: {
+			ClientName:      fmt.Sprintf("system:node:%s", hostname),
+			APIServer:       masterEndpoint,
+			CertDir:         pkiDir,
+			Organization:    []string{kubeadmconstants.NodesGroup},
+			MakeClientCerts: true,
+		},
+		kubeadmconstants.ControllerManagerKubeConfigFileName: {
+			ClientName:      kubeadmconstants.ControllerManagerUser,
+			APIServer:       masterEndpoint,
+			CertDir:         pkiDir,
+			MakeClientCerts: true,
+		},
+		kubeadmconstants.SchedulerKubeConfigFileName: {
+			ClientName:      kubeadmconstants.SchedulerUser,
+			APIServer:       masterEndpoint,
+			CertDir:         pkiDir,
+			MakeClientCerts: true,
+		},
 	}
 
-	// TODO: The kubelet should have limited access to the cluster. Right now, this gives kubelet basically root access
-	// and we do need that in the bootstrap phase, but we should swap it out after the control plane is up
-	// TODO: Add test case that make sure this cert has the x509.ExtKeyUsageClientAuth flag
-	kubeletCertConfig := certutil.Config{
-		CommonName:   "kubelet",
-		Organization: []string{"system:nodes"},
-		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-	kubeletKubeConfigFilePath := filepath.Join(outDir, kubeadmconstants.KubeletKubeConfigFileName)
-	if err := createKubeConfigFileForClient(masterEndpoint, kubeletKubeConfigFilePath, kubeletCertConfig, caCert, caKey); err != nil {
-		return fmt.Errorf("couldn't create a kubeconfig file for the kubelet: %v", err)
+	// Loop through all specs for kubeconfig files and create them if necessary
+	for filename, config := range filesToCreateFromSpec {
+		kubeconfig, err := buildKubeConfig(config)
+		if err != nil {
+			return err
+		}
+
+		kubeConfigFilePath := filepath.Join(outDir, filename)
+		err = writeKubeconfigToDiskIfNotExists(kubeConfigFilePath, kubeconfig)
+		if err != nil {
+			return err
+		}
 	}
 
-	// TODO make credentials for the controller-manager and scheduler
 	return nil
 }
 
-func createKubeConfigFileForClient(masterEndpoint, kubeConfigFilePath string, config certutil.Config, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
-	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, config)
+// GetKubeConfigBytesFromSpec takes properties how to build a KubeConfig file and then returns the bytes of that file
+func GetKubeConfigBytesFromSpec(config BuildConfigProperties) ([]byte, error) {
+	kubeconfig, err := buildKubeConfig(config)
 	if err != nil {
-		return fmt.Errorf("failure while creating %s client certificate [%v]", config.CommonName, err)
+		return []byte{}, err
 	}
 
-	kubeconfig := kubeconfigutil.CreateWithCerts(
-		masterEndpoint,
-		"kubernetes",
-		config.CommonName,
-		certutil.EncodeCertPEM(caCert),
-		certutil.EncodePrivateKeyPEM(key),
-		certutil.EncodeCertPEM(cert),
-	)
+	kubeConfigBytes, err := clientcmd.Write(*kubeconfig)
+	if err != nil {
+		return []byte{}, err
+	}
+	return kubeConfigBytes, nil
+}
 
-	// Write it now to a file if there already isn't a valid one
-	return writeKubeconfigToDiskIfNotExists(kubeConfigFilePath, kubeconfig)
+// buildKubeConfig creates a kubeconfig object from some commonly specified properties in the struct above
+func buildKubeConfig(config BuildConfigProperties) (*clientcmdapi.Config, error) {
+
+	// Try to load ca.crt and ca.key from the PKI directory
+	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(config.CertDir, kubeadmconstants.CACertAndKeyBaseName)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %v", err)
+	}
+
+	// If this file should have client certs, generate one from the spec
+	if config.MakeClientCerts {
+		certConfig := certutil.Config{
+			CommonName:   config.ClientName,
+			Organization: config.Organization,
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+		cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, certConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failure while creating %s client certificate [%v]", certConfig.CommonName, err)
+		}
+		return kubeconfigutil.CreateWithCerts(
+			config.APIServer,
+			"kubernetes",
+			config.ClientName,
+			certutil.EncodeCertPEM(caCert),
+			certutil.EncodePrivateKeyPEM(key),
+			certutil.EncodeCertPEM(cert),
+		), nil
+	}
+
+	// otherwise, create a kubeconfig with a token
+	return kubeconfigutil.CreateWithToken(
+		config.APIServer,
+		"kubernetes",
+		config.ClientName,
+		certutil.EncodeCertPEM(caCert),
+		config.Token,
+	), nil
 }
 
 // writeKubeconfigToDiskIfNotExists saves the KubeConfig struct to disk if there isn't any file at the given path

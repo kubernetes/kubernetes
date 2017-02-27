@@ -811,7 +811,7 @@ $ kubectl delete daemonset cassandra
 
 A custom [`SeedProvider`](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java)
 is included for running Cassandra on top of Kubernetes.  Only when you deploy Cassandra
-via a replication control or a deamonset, you will need to use the custom seed provider.
+via a replication control or a daemonset, you will need to use the custom seed provider.
 In Cassandra, a `SeedProvider` bootstraps the gossip protocol that Cassandra uses to find other
 Cassandra nodes. Seed addresses are hosts deemed as contact points. Cassandra
 instances use the seed list to find each other and learn the topology of the

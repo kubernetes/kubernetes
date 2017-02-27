@@ -160,7 +160,6 @@ go_library(
         "//test/images/net/nat:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/aws/aws-sdk-go/aws",
-        "//vendor:github.com/aws/aws-sdk-go/aws/awserr",
         "//vendor:github.com/aws/aws-sdk-go/aws/session",
         "//vendor:github.com/aws/aws-sdk-go/service/autoscaling",
         "//vendor:github.com/aws/aws-sdk-go/service/ec2",

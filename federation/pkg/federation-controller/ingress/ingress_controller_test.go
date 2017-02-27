@@ -43,7 +43,10 @@ import (
 )
 
 const (
-	maxTrials = 20
+	maxTrials         = 20
+	clusters   string = "clusters"
+	ingresses  string = "ingresses"
+	configmaps string = "configmaps"
 )
 
 func TestIngressController(t *testing.T) {
@@ -57,28 +60,28 @@ func TestIngressController(t *testing.T) {
 
 	t.Log("Creating fake infrastructure")
 	fedClient := &fakefedclientset.Clientset{}
-	RegisterFakeList("clusters", &fedClient.Fake, &fakeClusterList)
-	RegisterFakeList("ingresses", &fedClient.Fake, &extensionsv1beta1.IngressList{Items: []extensionsv1beta1.Ingress{}})
-	fedIngressWatch := RegisterFakeWatch("ingresses", &fedClient.Fake)
-	clusterWatch := RegisterFakeWatch("clusters", &fedClient.Fake)
-	fedClusterUpdateChan := RegisterFakeCopyOnUpdate("clusters", &fedClient.Fake, clusterWatch)
-	fedIngressUpdateChan := RegisterFakeCopyOnUpdate("ingresses", &fedClient.Fake, fedIngressWatch)
+	RegisterFakeList(clusters, &fedClient.Fake, &fakeClusterList)
+	RegisterFakeList(ingresses, &fedClient.Fake, &extensionsv1beta1.IngressList{Items: []extensionsv1beta1.Ingress{}})
+	fedIngressWatch := RegisterFakeWatch(ingresses, &fedClient.Fake)
+	clusterWatch := RegisterFakeWatch(clusters, &fedClient.Fake)
+	fedClusterUpdateChan := RegisterFakeCopyOnUpdate(clusters, &fedClient.Fake, clusterWatch)
+	fedIngressUpdateChan := RegisterFakeCopyOnUpdate(ingresses, &fedClient.Fake, fedIngressWatch)
 
 	cluster1Client := &fakekubeclientset.Clientset{}
-	RegisterFakeList("ingresses", &cluster1Client.Fake, &extensionsv1beta1.IngressList{Items: []extensionsv1beta1.Ingress{}})
-	RegisterFakeList("configmaps", &cluster1Client.Fake, &fakeConfigMapList1)
-	cluster1IngressWatch := RegisterFakeWatch("ingresses", &cluster1Client.Fake)
-	cluster1ConfigMapWatch := RegisterFakeWatch("configmaps", &cluster1Client.Fake)
-	cluster1IngressCreateChan := RegisterFakeCopyOnCreate("ingresses", &cluster1Client.Fake, cluster1IngressWatch)
-	cluster1IngressUpdateChan := RegisterFakeCopyOnUpdate("ingresses", &cluster1Client.Fake, cluster1IngressWatch)
+	RegisterFakeList(ingresses, &cluster1Client.Fake, &extensionsv1beta1.IngressList{Items: []extensionsv1beta1.Ingress{}})
+	RegisterFakeList(configmaps, &cluster1Client.Fake, &fakeConfigMapList1)
+	cluster1IngressWatch := RegisterFakeWatch(ingresses, &cluster1Client.Fake)
+	cluster1ConfigMapWatch := RegisterFakeWatch(configmaps, &cluster1Client.Fake)
+	cluster1IngressCreateChan := RegisterFakeCopyOnCreate(ingresses, &cluster1Client.Fake, cluster1IngressWatch)
+	cluster1IngressUpdateChan := RegisterFakeCopyOnUpdate(ingresses, &cluster1Client.Fake, cluster1IngressWatch)
 
 	cluster2Client := &fakekubeclientset.Clientset{}
-	RegisterFakeList("ingresses", &cluster2Client.Fake, &extensionsv1beta1.IngressList{Items: []extensionsv1beta1.Ingress{}})
-	RegisterFakeList("configmaps", &cluster2Client.Fake, &fakeConfigMapList2)
-	cluster2IngressWatch := RegisterFakeWatch("ingresses", &cluster2Client.Fake)
-	cluster2ConfigMapWatch := RegisterFakeWatch("configmaps", &cluster2Client.Fake)
-	cluster2IngressCreateChan := RegisterFakeCopyOnCreate("ingresses", &cluster2Client.Fake, cluster2IngressWatch)
-	cluster2ConfigMapUpdateChan := RegisterFakeCopyOnUpdate("configmaps", &cluster2Client.Fake, cluster2ConfigMapWatch)
+	RegisterFakeList(ingresses, &cluster2Client.Fake, &extensionsv1beta1.IngressList{Items: []extensionsv1beta1.Ingress{}})
+	RegisterFakeList(configmaps, &cluster2Client.Fake, &fakeConfigMapList2)
+	cluster2IngressWatch := RegisterFakeWatch(ingresses, &cluster2Client.Fake)
+	cluster2ConfigMapWatch := RegisterFakeWatch(configmaps, &cluster2Client.Fake)
+	cluster2IngressCreateChan := RegisterFakeCopyOnCreate(ingresses, &cluster2Client.Fake, cluster2IngressWatch)
+	cluster2ConfigMapUpdateChan := RegisterFakeCopyOnUpdate(configmaps, &cluster2Client.Fake, cluster2ConfigMapWatch)
 
 	clientFactoryFunc := func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
@@ -263,6 +266,11 @@ func TestIngressController(t *testing.T) {
 
 func GetIngressFromChan(t *testing.T, c chan runtime.Object) *extensionsv1beta1.Ingress {
 	obj := GetObjectFromChan(c)
+
+	if obj == nil {
+		return nil
+	}
+
 	ingress, ok := obj.(*extensionsv1beta1.Ingress)
 	if !ok {
 		t.Logf("Object on channel was not of type *extensionsv1beta1.Ingress: %v", obj)
@@ -271,13 +279,20 @@ func GetIngressFromChan(t *testing.T, c chan runtime.Object) *extensionsv1beta1.
 }
 
 func GetConfigMapFromChan(c chan runtime.Object) *apiv1.ConfigMap {
-	configMap, _ := GetObjectFromChan(c).(*apiv1.ConfigMap)
-	return configMap
+	if configMap := GetObjectFromChan(c); configMap == nil {
+		return nil
+	} else {
+		return configMap.(*apiv1.ConfigMap)
+	}
+
 }
 
 func GetClusterFromChan(c chan runtime.Object) *federationapi.Cluster {
-	cluster, _ := GetObjectFromChan(c).(*federationapi.Cluster)
-	return cluster
+	if cluster := GetObjectFromChan(c); cluster == nil {
+		return nil
+	} else {
+		return cluster.(*federationapi.Cluster)
+	}
 }
 
 func NewConfigMap(uid string) *apiv1.ConfigMap {

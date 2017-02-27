@@ -218,7 +218,7 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 							Resources:     componentResources("250m"),
 						},
 					},
-					Tolerations: getMasterToleration(),
+					Tolerations: []v1.Toleration{kubeadmconstants.MasterToleration},
 				},
 			},
 		},
@@ -269,7 +269,7 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 							Env:           getProxyEnvVars(),
 						},
 					},
-					Tolerations: getMasterToleration(),
+					Tolerations: []v1.Toleration{kubeadmconstants.MasterToleration},
 					DNSPolicy:   v1.DNSDefault,
 				},
 			},
@@ -319,7 +319,7 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 							Env:           getProxyEnvVars(),
 						},
 					},
-					Tolerations: getMasterToleration(),
+					Tolerations: []v1.Toleration{kubeadmconstants.MasterToleration},
 				},
 			},
 		},
@@ -329,16 +329,4 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 
 func buildStaticManifestFilepath(name string) string {
 	return path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests", name+".yaml")
-}
-
-func getMasterToleration() []v1.Toleration {
-	// Tolerate the master taint we add to our master nodes, as this can and should
-	// run there.
-	// TODO: Duplicated above
-	return []v1.Toleration{{
-		Key:      "dedicated",
-		Value:    "master",
-		Operator: v1.TolerationOpEqual,
-		Effect:   v1.TaintEffectNoSchedule,
-	}}
 }

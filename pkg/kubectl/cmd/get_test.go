@@ -29,6 +29,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -506,7 +507,8 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	pods, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.CommandPrinter = &testPrinter{}
+	tf.GenericPrinter = true
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
@@ -533,34 +535,37 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	cmd.Flags().Set("output", "json")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	if tf.Printer.(*testPrinter).Objects != nil {
-		t.Errorf("unexpected print to default printer")
+	actual := tf.CommandPrinter.(*testPrinter).Objects
+	fn := func(obj runtime.Object) *unstructured.Unstructured {
+		data, err := runtime.Encode(api.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), obj)
+		if err != nil {
+			panic(err)
+		}
+		out := &unstructured.Unstructured{Object: make(map[string]interface{})}
+		if err := encjson.Unmarshal(data, &out.Object); err != nil {
+			panic(err)
+		}
+		return out
 	}
 
-	out, err := runtime.Decode(codec, buf.Bytes())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	list, err := meta.ExtractList(out)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if errs := runtime.DecodeList(list, codec); len(errs) > 0 {
-		t.Fatalf("unexpected error: %v", errs)
-	}
-	if err := meta.SetList(out, list); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expected := &api.List{
-		Items: []runtime.Object{
-			&pods.Items[0],
-			&pods.Items[1],
-			&svc.Items[0],
+	expected := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{"kind": "List", "apiVersion": "v1", "metadata": map[string]interface{}{}, "selfLink": "", "resourceVersion": ""},
+		Items: []*unstructured.Unstructured{
+			fn(&pods.Items[0]),
+			fn(&pods.Items[1]),
+			fn(&svc.Items[0]),
 		},
 	}
-	if !reflect.DeepEqual(expected, out) {
-		t.Errorf("unexpected output: %#v", out)
+	actualBytes, err := encjson.Marshal(actual[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedBytes, err := encjson.Marshal(expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(actualBytes) != string(expectedBytes) {
+		t.Errorf("unexpected object:\n%s\n%s", expectedBytes, actualBytes)
 	}
 }
 

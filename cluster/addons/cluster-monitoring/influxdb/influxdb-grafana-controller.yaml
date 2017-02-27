@@ -7,6 +7,7 @@ metadata:
     k8s-app: influxGrafana
     version: v4
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 spec: 
   replicas: 1
   selector: 
@@ -20,7 +21,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 
-        - image: gcr.io/google_containers/heapster_influxdb:v0.7
+        - image: gcr.io/google_containers/heapster-influxdb-amd64:v1.1.1
           name: influxdb
           resources:
             # keep request = limit to keep this container in guaranteed class
@@ -36,7 +37,7 @@ spec:
           volumeMounts:
           - name: influxdb-persistent-storage
             mountPath: /data
-        - image: gcr.io/google_containers/heapster_grafana:v3.1.1
+        - image: gcr.io/google_containers/heapster-grafana-amd64:v4.0.2
           name: grafana
           env:
           resources:

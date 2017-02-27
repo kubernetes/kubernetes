@@ -60,6 +60,7 @@ bounding-dirs
 build-dependencies
 build-only
 build-tag
+ca-cert-path
 cadvisor-port
 cert-dir
 certificate-authority
@@ -73,6 +74,7 @@ cleanup-iptables
 client-ca-file
 client-certificate
 client-key
+client-name
 clientset-api-path
 clientset-name
 clientset-only
@@ -87,6 +89,8 @@ cluster-ip
 cluster-monitor-period
 cluster-name
 cluster-signing-cert-file
+cluster-signing-gke-kubeconfig
+cluster-signing-gke-retry-backoff
 cluster-signing-key-file
 cluster-tag
 cni-bin-dir
@@ -122,6 +126,7 @@ core-kubeconfig
 cors-allowed-origins
 cpu-cfs-quota
 cpu-percent
+create-annotation
 current-release-pr
 current-replicas
 daemonset-lookup-cache-size
@@ -164,6 +169,10 @@ dump-logs-on-failure
 duration-sec
 e2e-output-dir
 e2e-verify-service-account
+etcd-metrics-scrape-uri
+etcd-upgrade-storage
+etcd-upgrade-version
+etcd-version-scrape-uri
 enable-controller-attach-detach
 enable-cri
 enable-custom-metrics
@@ -505,6 +514,7 @@ pv-recycler-pod-template-filepath-hostpath
 pv-recycler-pod-template-filepath-nfs
 pv-recycler-timeout-increment-hostpath
 pvclaimbinder-sync-period
+quiet
 read-only-port
 really-crash-for-testing
 reconcile-cidr

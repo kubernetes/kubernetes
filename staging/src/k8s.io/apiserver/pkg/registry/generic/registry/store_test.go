@@ -335,7 +335,7 @@ func TestStoreCreate(t *testing.T) {
 
 	// now delete pod with graceful period set
 	delOpts := &metav1.DeleteOptions{GracePeriodSeconds: &gracefulPeriod}
-	_, err = registry.Delete(testContext, podA.Name, delOpts)
+	_, _, err = registry.Delete(testContext, podA.Name, delOpts)
 	if err != nil {
 		t.Fatalf("Failed to delete pod gracefully. Unexpected error: %v", err)
 	}
@@ -609,7 +609,7 @@ func TestStoreDelete(t *testing.T) {
 	defer destroyFunc()
 
 	// test failure condition
-	_, err := registry.Delete(testContext, podA.Name, nil)
+	_, _, err := registry.Delete(testContext, podA.Name, nil)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -621,9 +621,12 @@ func TestStoreDelete(t *testing.T) {
 	}
 
 	// delete object
-	_, err = registry.Delete(testContext, podA.Name, nil)
+	_, wasDeleted, err := registry.Delete(testContext, podA.Name, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
+	}
+	if !wasDeleted {
+		t.Errorf("unexpected, pod %s should have been deleted immediately", podA.Name)
 	}
 
 	// try to get a item which should be deleted
@@ -690,9 +693,12 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	// delete the pod with grace period=0, the pod should still exist because it has a finalizer
-	_, err = registry.Delete(testContext, podWithFinalizer.Name, metav1.NewDeleteOptions(0))
+	_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, pod %s should not have been deleted immediately", podWithFinalizer.Name)
 	}
 	_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
 	if err != nil {
@@ -747,9 +753,12 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	// delete object with nil delete options doesn't delete the object
-	_, err = registry.Delete(testContext, podWithFinalizer.Name, nil)
+	_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, pod %s should not have been deleted immediately", podWithFinalizer.Name)
 	}
 
 	// the object should still exist
@@ -1043,7 +1052,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		_, err = registry.Delete(testContext, tc.pod.Name, tc.options)
+		_, _, err = registry.Delete(testContext, tc.pod.Name, tc.options)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
