@@ -604,13 +604,17 @@ func equalIgnoreHash(template1, template2 api.PodTemplateSpec) (bool, error) {
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
 func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
 	newRSTemplate := GetNewReplicaSetTemplate(deployment)
+	sort.Sort(controller.ReplicaSetsByCreationTimestamp(rsList))
 	for i := range rsList {
 		equal, err := equalIgnoreHash(rsList[i].Spec.Template, newRSTemplate)
 		if err != nil {
 			return nil, err
 		}
 		if equal {
-			// This is the new ReplicaSet.
+			// In rare cases, such as after cluster upgrades, Deployment may end up with
+			// having more than one new ReplicaSets that have the same template as its template,
+			// see https://github.com/kubernetes/kubernetes/issues/40415
+			// We deterministically choose the oldest new ReplicaSet.
 			return rsList[i], nil
 		}
 	}
@@ -625,7 +629,12 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 	// All pods and replica sets are labeled with pod-template-hash to prevent overlapping
 	oldRSs := map[string]*extensions.ReplicaSet{}
 	allOldRSs := map[string]*extensions.ReplicaSet{}
-	newRSTemplate := GetNewReplicaSetTemplate(deployment)
+	requiredRSs := []*extensions.ReplicaSet{}
+	allRSs := []*extensions.ReplicaSet{}
+	newRS, err := FindNewReplicaSet(deployment, rsList)
+	if err != nil {
+		return requiredRSs, allRSs, err
+	}
 	for _, pod := range podList.Items {
 		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
 		for _, rs := range rsList {
@@ -633,12 +642,8 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 			if err != nil {
 				return nil, nil, fmt.Errorf("invalid label selector: %v", err)
 			}
-			// Filter out replica set that has the same pod template spec as the deployment - that is the new replica set.
-			equal, err := equalIgnoreHash(rs.Spec.Template, newRSTemplate)
-			if err != nil {
-				return nil, nil, err
-			}
-			if equal {
+			// Filter out new replica set
+			if newRS != nil && rs.UID == newRS.UID {
 				continue
 			}
 			allOldRSs[rs.ObjectMeta.Name] = rs
@@ -647,12 +652,10 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 			}
 		}
 	}
-	requiredRSs := []*extensions.ReplicaSet{}
 	for key := range oldRSs {
 		value := oldRSs[key]
 		requiredRSs = append(requiredRSs, value)
 	}
-	allRSs := []*extensions.ReplicaSet{}
 	for key := range allOldRSs {
 		value := allOldRSs[key]
 		allRSs = append(allRSs, value)
