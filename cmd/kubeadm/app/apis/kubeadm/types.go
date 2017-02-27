@@ -26,7 +26,6 @@ type EnvParams struct {
 	HostEtcdPath     string
 	HyperkubeImage   string
 	RepositoryPrefix string
-	DiscoveryImage   string
 	EtcdImage        string
 }
 
@@ -88,14 +87,7 @@ type Etcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta
 
-	Discovery  Discovery
-	CACertPath string
-}
-
-// ClusterInfo TODO add description
-type ClusterInfo struct {
-	metav1.TypeMeta
-	// TODO(phase1+) this may become simply `api.Config`
-	CertificateAuthorities []string
-	Endpoints              []string
+	Discovery         Discovery
+	CACertPath        string
+	TLSBootstrapToken string
 }

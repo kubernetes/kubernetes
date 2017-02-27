@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/renstrom/dedent"
@@ -83,6 +84,8 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		"The discovery method kubeadm will use for connecting nodes to the master",
 	)
 
+	cmd.PersistentFlags().StringVar(&cfg.TLSBootstrapToken, "tls-bootstrap-token", cfg.TLSBootstrapToken, "Token for TLS Bootstrapping")
+
 	return cmd
 }
 
@@ -131,11 +134,23 @@ func (j *Join) Validate() error {
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	cfg, err := discovery.For(j.cfg.Discovery)
+	cfg, err := discovery.For(j.cfg.Discovery, j.cfg.TLSBootstrapToken)
 	if err != nil {
 		return err
 	}
-	if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	client, err := kubeconfigutil.KubeConfigToClientSet(cfg)
+	if err != nil {
+		return err
+	}
+	if err := kubenode.ValidateAPIServer(client); err != nil {
+		return err
+	}
+	if err := kubenode.PerformTLSBootstrap(cfg, hostname); err != nil {
 		return err
 	}
 

@@ -32,6 +32,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -313,11 +314,11 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"--tls-private-key-file="+getCertFilePath(kubeadmconstants.APIServerKeyName),
 		"--kubelet-client-certificate="+getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
 		"--kubelet-client-key="+getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
-		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
 		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
 		"--storage-backend=etcd3",
 		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+		"--experimental-bootstrap-token-auth",
 		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
 		// so add it unconditionally with recommended values
 		"--requestheader-username-headers=X-Remote-User",
@@ -383,8 +384,9 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		"--service-account-private-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
 		"--cluster-signing-cert-file="+getCertFilePath(kubeadmconstants.CACertName),
 		"--cluster-signing-key-file="+getCertFilePath(kubeadmconstants.CAKeyName),
-		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+kubeadmconstants.CSVTokenBootstrapGroup,
+		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+bootstrapapi.BootstrapGroup,
 		"--use-service-account-credentials",
+		"--controllers=*,bootstrapsigner,tokencleaner",
 	)
 
 	if cfg.CloudProvider != "" {

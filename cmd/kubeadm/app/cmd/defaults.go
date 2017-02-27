@@ -76,7 +76,7 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	// Validate token if any, otherwise generate
 	if cfg.Discovery.Token != nil {
 		if cfg.Discovery.Token.ID != "" && cfg.Discovery.Token.Secret != "" {
-			fmt.Printf("[init] A token has been provided, validating [%s]\n", tokenutil.BearerToken(cfg.Discovery.Token))
+			fmt.Printf("[init] A token has been provided, validating %q\n", tokenutil.BearerToken(cfg.Discovery.Token))
 			if valid, err := tokenutil.ValidateToken(cfg.Discovery.Token); valid == false {
 				return err
 			}
@@ -89,7 +89,7 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
 		// If there aren't any addresses specified, default to the first advertised address which can be user-provided or the default network interface's IP address
 		if len(cfg.Discovery.Token.Addresses) == 0 {
-			cfg.Discovery.Token.Addresses = []string{cfg.API.AdvertiseAddresses[0] + ":" + strconv.Itoa(kubeadmapiext.DefaultDiscoveryBindPort)}
+			cfg.Discovery.Token.Addresses = []string{cfg.API.AdvertiseAddresses[0] + ":" + strconv.Itoa(kubeadmapiext.DefaultAPIBindPort)}
 		}
 	}
 
