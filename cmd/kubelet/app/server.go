@@ -156,24 +156,10 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 	}, nil
 }
 
-func getKubeClient(s *options.KubeletServer) (*clientset.Clientset, error) {
-	clientConfig, err := CreateAPIServerClientConfig(s)
-	if err == nil {
-		kubeClient, err := clientset.NewForConfig(clientConfig)
-		if err != nil {
-			return nil, err
-		}
-		return kubeClient, nil
-	}
-	return nil, err
-}
-
 // Tries to download the kubelet-<node-name> configmap from "kube-system" namespace via the API server and returns a JSON string or error
-func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (string, error) {
-	// TODO(mtaufen): should probably cache clientset and pass into this function rather than regenerate on every request
-	kubeClient, err := getKubeClient(s)
-	if err != nil {
-		return "", err
+func getRemoteKubeletConfig(s *options.KubeletServer, kubeClient *clientset.Clientset, kubeDeps *kubelet.KubeletDeps) (string, error) {
+	if kubeClient == nil {
+		return "", fmt.Errorf("kube clientset is nil")
 	}
 
 	configmap, err := func() (*v1.ConfigMap, error) {
@@ -181,6 +167,7 @@ func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletD
 		hostname := nodeutil.GetHostname(s.HostnameOverride)
 
 		if kubeDeps != nil && kubeDeps.Cloud != nil {
+			var err error
 			instances, ok := kubeDeps.Cloud.Instances()
 			if !ok {
 				err = fmt.Errorf("failed to get instances from cloud provider, can't determine nodename")
@@ -219,12 +206,12 @@ func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletD
 	return jsonstr, nil
 }
 
-func startKubeletConfigSyncLoop(s *options.KubeletServer, currentKC string) {
+func startKubeletConfigSyncLoop(s *options.KubeletServer, kubeClient *clientset.Clientset, currentKC string) {
 	glog.Infof("Starting Kubelet configuration sync loop")
 	go func() {
 		wait.PollInfinite(30*time.Second, func() (bool, error) {
 			glog.Infof("Checking API server for new Kubelet configuration.")
-			remoteKC, err := getRemoteKubeletConfig(s, nil)
+			remoteKC, err := getRemoteKubeletConfig(s, kubeClient, nil)
 			if err == nil {
 				// Detect new config by comparing with the last JSON string we extracted.
 				if remoteKC != currentKC {
@@ -241,11 +228,11 @@ func startKubeletConfigSyncLoop(s *options.KubeletServer, currentKC string) {
 
 // Try to check for config on the API server, return that config if we get it, and start
 // a background thread that checks for updates to configs.
-func initKubeletConfigSync(s *options.KubeletServer) (*componentconfig.KubeletConfiguration, error) {
-	jsonstr, err := getRemoteKubeletConfig(s, nil)
+func initKubeletConfigSync(s *options.KubeletServer, kubeClient *clientset.Clientset) (*componentconfig.KubeletConfiguration, error) {
+	jsonstr, err := getRemoteKubeletConfig(s, kubeClient, nil)
 	if err == nil {
 		// We will compare future API server config against the config we just got (jsonstr):
-		startKubeletConfigSyncLoop(s, jsonstr)
+		startKubeletConfigSyncLoop(s, kubeClient, jsonstr)
 
 		// Convert json from API server to external type struct, and convert that to internal type struct
 		extKC := componentconfigv1alpha1.KubeletConfiguration{}
@@ -263,7 +250,7 @@ func initKubeletConfigSync(s *options.KubeletServer) (*componentconfig.KubeletCo
 	} else {
 		// Couldn't get a configuration from the API server yet.
 		// Restart as soon as anything comes back from the API server.
-		startKubeletConfigSyncLoop(s, "")
+		startKubeletConfigSyncLoop(s, kubeClient, "")
 		return nil, err
 	}
 }
@@ -331,35 +318,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	err = utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
 		return err
-	}
-
-	// Register current configuration with /configz endpoint
-	cfgz, cfgzErr := initConfigz(&s.KubeletConfiguration)
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		// Look for config on the API server. If it exists, replace s.KubeletConfiguration
-		// with it and continue. initKubeletConfigSync also starts the background thread that checks for new config.
-
-		// Don't do dynamic Kubelet configuration in runonce mode
-		if s.RunOnce == false {
-			remoteKC, err := initKubeletConfigSync(s)
-			if err == nil {
-				// Update s (KubeletServer) with new config from API server
-				s.KubeletConfiguration = *remoteKC
-				// Ensure that /configz is up to date with the new config
-				if cfgzErr != nil {
-					glog.Errorf("was unable to register configz before due to %s, will not be able to set now", cfgzErr)
-				} else {
-					setConfigz(cfgz, &s.KubeletConfiguration)
-				}
-				// Update feature gates from the new config
-				err = utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
-				if err != nil {
-					return err
-				}
-			} else {
-				glog.Errorf("failed to init dynamic Kubelet configuration sync: %v", err)
-			}
-		}
 	}
 
 	if kubeDeps == nil {
@@ -474,6 +432,35 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 		if err != nil {
 			return err
+		}
+	}
+
+	// Register current configuration with /configz endpoint
+	cfgz, cfgzErr := initConfigz(&s.KubeletConfiguration)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		// Look for config on the API server. If it exists, replace s.KubeletConfiguration
+		// with it and continue. initKubeletConfigSync also starts the background thread that checks for new config.
+
+		// Don't do dynamic Kubelet configuration in runonce mode
+		if s.RunOnce == false {
+			remoteKC, err := initKubeletConfigSync(s, kubeDeps.KubeClient)
+			if err == nil {
+				// Update s (KubeletServer) with new config from API server
+				s.KubeletConfiguration = *remoteKC
+				// Ensure that /configz is up to date with the new config
+				if cfgzErr != nil {
+					glog.Errorf("was unable to register configz before due to %s, will not be able to set now", cfgzErr)
+				} else {
+					setConfigz(cfgz, &s.KubeletConfiguration)
+				}
+				// Update feature gates from the new config
+				err = utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+				if err != nil {
+					return err
+				}
+			} else {
+				glog.Errorf("failed to init dynamic Kubelet configuration sync: %v", err)
+			}
 		}
 	}
 
