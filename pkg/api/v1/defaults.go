@@ -110,12 +110,16 @@ func SetDefaults_ContainerPort(obj *ContainerPort) {
 func SetDefaults_Container(obj *Container) {
 	if obj.ImagePullPolicy == "" {
 		// Ignore error and assume it has been validated elsewhere
-		_, tag, _, _ := parsers.ParseImageName(obj.Image)
+		_, _, digest, _ := parsers.ParseImageName(obj.Image)
 
-		// Check image tag
-		if tag == "latest" {
+		if digest == "" {
+			// If we aren't pulling by digest, then our reference to the
+			// image is mutable and must be revalidated in case it has changed.
 			obj.ImagePullPolicy = PullAlways
 		} else {
+			// For digest-based pulls, if we already have the digest, then it is impossible
+			// for a registry to give us anything difference from what we have based on the
+			// cryptographic guarantees of content addressing.
 			obj.ImagePullPolicy = PullIfNotPresent
 		}
 	}
