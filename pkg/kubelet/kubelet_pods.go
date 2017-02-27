@@ -1022,6 +1022,12 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 		return err
 	}
 
+	if kl.dockerLegacyService != nil {
+		// dockerLegacyService should only be non-nil when we actually need it, so
+		// inject it into the runtimeService.
+		// TODO(random-liu): Remove this hack after deprecating unsupported log driver.
+		return kl.dockerLegacyService.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
+	}
 	return kl.containerRuntime.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
 }
 
