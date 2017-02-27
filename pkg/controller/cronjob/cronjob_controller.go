@@ -54,6 +54,9 @@ import (
 
 // Utilities for dealing with Jobs and CronJobs and time.
 
+// ControllerKind contains the schema.GroupVersionKind for this controller type.
+var ControllerKind = batch.SchemeGroupVersion.WithKind("CronJob")
+
 type CronJobController struct {
 	kubeClient clientset.Interface
 	jobControl jobControlInterface
