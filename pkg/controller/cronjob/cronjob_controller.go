@@ -238,6 +238,12 @@ func syncOne(sj *batchv2alpha1.CronJob, js []batchv1.Job, now time.Time, jc jobC
 	}
 	*sj = *updatedSJ
 
+	if sj.DeletionTimestamp != nil {
+		// The CronJob is being deleted.
+		// Don't do anything other than updating status.
+		return
+	}
+
 	if sj.Spec.Suspend != nil && *sj.Spec.Suspend {
 		glog.V(4).Infof("Not starting job for %s because it is suspended", nameForLog)
 		return
