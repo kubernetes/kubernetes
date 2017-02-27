@@ -19,11 +19,13 @@ package storage
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/net/context"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -394,6 +396,86 @@ func TestWatch(t *testing.T) {
 			{"metadata.name": "bar"},
 		},
 	)
+}
+
+func TestConvertToTableList(t *testing.T) {
+	storage, _, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericapirequest.NewDefaultContext()
+
+	headers := []metav1alpha1.TableListHeader{
+		{Name: "NAME", Type: "string"},
+		{Name: "READY", Type: "string"},
+		{Name: "STATUS", Type: "string"},
+		{Name: "RESTARTS", Type: "string"},
+		{Name: "AGE", Type: "string"},
+		{Name: "IP", Type: "string"},
+		{Name: "NODE", Type: "string"},
+	}
+
+	testCases := []struct {
+		in  runtime.Object
+		out *metav1alpha1.TableList
+		err bool
+	}{
+		{
+			in:  nil,
+			err: true,
+		},
+		{
+			in: &api.Pod{},
+			out: &metav1alpha1.TableList{
+				Headers: headers,
+				Items: []metav1alpha1.TableListItem{
+					{Cells: []interface{}{"", "0/0", "", "0", "<unknown>", "<none>", ""}},
+				},
+			},
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo", CreationTimestamp: metav1.NewTime(time.Now().Add(-370 * 24 * time.Hour))},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "ctr1"},
+						{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
+					},
+					NodeName: "test-node",
+				},
+				Status: api.PodStatus{
+					PodIP: "10.1.2.3",
+					Phase: api.PodPending,
+					ContainerStatuses: []api.ContainerStatus{
+						{Name: "ctr1", State: api.ContainerState{Running: &api.ContainerStateRunning{}}, RestartCount: 10, Ready: true},
+						{Name: "ctr2", State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}}, RestartCount: 0},
+					},
+				},
+			},
+			out: &metav1alpha1.TableList{
+				Headers: headers,
+				Items: []metav1alpha1.TableListItem{
+					{Cells: []interface{}{"foo", "1/2", "Pending", "10", "1y", "10.1.2.3", "test-node"}},
+				},
+			},
+		},
+		{
+			in:  &api.PodList{},
+			out: &metav1alpha1.TableList{Headers: headers},
+		},
+	}
+	for i, test := range testCases {
+		out, err := storage.ConvertToTableList(ctx, test.in, nil)
+		if err != nil {
+			if test.err {
+				continue
+			}
+			t.Errorf("%d: error: %v", i, err)
+			continue
+		}
+		if !api.Semantic.DeepEqual(test.out, out) {
+			t.Errorf("%d: mismatch: %s", i, diff.ObjectReflectDiff(test.out, out))
+		}
+	}
 }
 
 func TestEtcdCreate(t *testing.T) {
