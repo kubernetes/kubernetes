@@ -449,8 +449,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps.ContainerManager == nil {
-		if s.SystemCgroups != "" && s.CgroupRoot == "" {
-			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
+		if s.SystemCgroups != "" {
+			return fmt.Errorf("invalid configuration: system container was specified ")
 		}
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
 			glog.Infof("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
