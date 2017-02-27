@@ -158,7 +158,7 @@ func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			NFS: &v1.NFSVolumeSource{
-				Path: volumeName,
+				Path: mountPath,
 			},
 		},
 	}

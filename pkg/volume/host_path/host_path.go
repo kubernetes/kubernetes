@@ -142,7 +142,7 @@ func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) 
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			HostPath: &v1.HostPathVolumeSource{
-				Path: volumeName,
+				Path: mountPath,
 			},
 		},
 	}
