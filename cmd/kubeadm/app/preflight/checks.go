@@ -488,7 +488,6 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.Port), 10250}},
 		PortOpenCheck{port: int(cfg.API.Port)},
-		PortOpenCheck{port: 8080},
 		PortOpenCheck{port: 10250},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},

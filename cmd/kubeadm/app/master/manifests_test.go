@@ -280,16 +280,23 @@ func TestComponentResources(t *testing.T) {
 
 func TestComponentProbe(t *testing.T) {
 	var tests = []struct {
-		port int
-		path string
+		port   int
+		path   string
+		scheme api.URIScheme
 	}{
 		{
-			port: 1,
-			path: "foo",
+			port:   1,
+			path:   "foo",
+			scheme: api.URISchemeHTTP,
+		},
+		{
+			port:   2,
+			path:   "bar",
+			scheme: api.URISchemeHTTPS,
 		},
 	}
 	for _, rt := range tests {
-		actual := componentProbe(rt.port, rt.path)
+		actual := componentProbe(rt.port, rt.path, rt.scheme)
 		if actual.Handler.HTTPGet.Port != intstr.FromInt(rt.port) {
 			t.Errorf(
 				"failed componentProbe:\n\texpected: %v\n\t  actual: %v",
@@ -302,6 +309,13 @@ func TestComponentProbe(t *testing.T) {
 				"failed componentProbe:\n\texpected: %s\n\t  actual: %s",
 				rt.path,
 				actual.Handler.HTTPGet.Path,
+			)
+		}
+		if actual.Handler.HTTPGet.Scheme != rt.scheme {
+			t.Errorf(
+				"failed componentProbe:\n\texpected: %v\n\t  actual: %v",
+				rt.scheme,
+				actual.Handler.HTTPGet.Scheme,
 			)
 		}
 	}
@@ -371,7 +385,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-bind-address=127.0.0.1",
+				"--insecure-port=0",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
@@ -401,7 +415,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-bind-address=127.0.0.1",
+				"--insecure-port=0",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
@@ -433,7 +447,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-bind-address=127.0.0.1",
+				"--insecure-port=0",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/sa.pub",
