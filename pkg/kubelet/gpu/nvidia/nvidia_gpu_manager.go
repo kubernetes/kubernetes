@@ -80,7 +80,7 @@ func NewNvidiaGPUManager(activePodsLister activePodsLister, dockerClient dockert
 // Initialize the GPU devices, so far only needed to discover the GPU paths.
 func (ngm *nvidiaGPUManager) Start() error {
 	if ngm.dockerClient == nil {
-		return fmt.Errorf("invalid docker client specified")
+		return fmt.Errorf("Invalid docker client specified in GPU Manager")
 	}
 	ngm.Lock()
 	defer ngm.Unlock()
@@ -94,7 +94,7 @@ func (ngm *nvidiaGPUManager) Start() error {
 	}
 	ngm.defaultDevices = []string{nvidiaCtlDevice, nvidiaUVMDevice}
 	_, err := os.Stat(nvidiaUVMToolsDevice)
-	if os.IsNotExist(err) {
+	if !os.IsNotExist(err) {
 		ngm.defaultDevices = append(ngm.defaultDevices, nvidiaUVMToolsDevice)
 	}
 
@@ -154,12 +154,14 @@ func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) (
 	}
 	// Get GPU devices in use.
 	devicesInUse := ngm.allocated.devices()
+	glog.V(5).Infof("gpus in use: %v", devicesInUse.List())
 	// Get a list of available GPUs.
 	available := ngm.allGPUs.Difference(devicesInUse)
+	glog.V(5).Infof("gpus available: %v", available.List())
 	if int64(available.Len()) < gpusNeeded {
 		return nil, fmt.Errorf("requested number of GPUs unavailable. Requested: %d, Available: %d", gpusNeeded, available.Len())
 	}
-	ret := available.List()[:gpusNeeded]
+	ret := available.UnsortedList()[:gpusNeeded]
 	for _, device := range ret {
 		// Update internal allocated GPU cache.
 		ngm.allocated.insert(string(pod.UID), device)
@@ -184,6 +186,7 @@ func (ngm *nvidiaGPUManager) updateAllocatedGPUs() error {
 	}
 	allocatedPodUids := ngm.allocated.pods()
 	podsToBeRemoved := allocatedPodUids.Difference(activePodUids)
+	glog.V(5).Infof("pods to be removed: %v", podsToBeRemoved.List())
 	ngm.allocated.delete(podsToBeRemoved.List())
 	return nil
 }

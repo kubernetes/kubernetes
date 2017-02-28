@@ -53,7 +53,7 @@ func (pgpu *podGPUs) delete(pods []string) {
 func (pgpu *podGPUs) devices() sets.String {
 	ret := sets.NewString()
 	for _, devices := range pgpu.podGPUMapping {
-		ret.Union(devices)
+		ret = ret.Union(devices)
 	}
 	return ret
 }
