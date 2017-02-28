@@ -1160,6 +1160,19 @@ run_kubectl_get_tests() {
   output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o go-template='{{.missing}}' "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'map has no entry for key "missing"'
 
+  ### Test kubectl get watch
+  output_message=$(kubectl get pods -w --request-timeout=1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'STATUS'    # headers
+  kube::test::if_has_string "${output_message}" 'valid-pod' # pod details
+  output_message=$(kubectl get pods/valid-pod -o name -w --request-timeout=1 "${kube_flags[@]}")
+  kube::test::if_has_not_string "${output_message}" 'STATUS' # no headers
+  kube::test::if_has_string     "${output_message}" 'pods/valid-pod' # resource name
+  output_message=$(kubectl get pods/valid-pod -o yaml -w --request-timeout=1 "${kube_flags[@]}")
+  kube::test::if_has_not_string "${output_message}" 'STATUS'          # no headers
+  kube::test::if_has_string     "${output_message}" 'name: valid-pod' # yaml
+  output_message=$(! kubectl get pods/invalid-pod -w --request-timeout=1 "${kube_flags[@]}" 2>&1)
+  kube::test::if_has_string "${output_message}" '"invalid-pod" not found'
+
   # cleanup
   kubectl delete pods valid-pod "${kube_flags[@]}"
 
