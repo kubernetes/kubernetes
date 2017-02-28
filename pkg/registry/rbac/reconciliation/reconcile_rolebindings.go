@@ -21,29 +21,48 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 )
 
-// ReconcileClusterRoleBindingOptions holds options for running a role binding reconciliation
-type ReconcileClusterRoleBindingOptions struct {
+type RoleBindingModifier interface {
+	Get(namespace, name string) (RoleBinding, error)
+	Delete(namespace, name string, uid types.UID) error
+	Create(RoleBinding) (RoleBinding, error)
+	Update(RoleBinding) (RoleBinding, error)
+}
+
+type RoleBinding interface {
+	GetNamespace() string
+	GetName() string
+	GetUID() types.UID
+	GetLabels() map[string]string
+	SetLabels(map[string]string)
+	GetAnnotations() map[string]string
+	SetAnnotations(map[string]string)
+	GetRoleRef() rbac.RoleRef
+	GetSubjects() []rbac.Subject
+	SetSubjects([]rbac.Subject)
+}
+
+// ReconcileRoleBindingOptions holds options for running a role binding reconciliation
+type ReconcileRoleBindingOptions struct {
 	// RoleBinding is the expected rolebinding that will be reconciled
-	RoleBinding *rbac.ClusterRoleBinding
+	RoleBinding RoleBinding
 	// Confirm indicates writes should be performed. When false, results are returned as a dry-run.
 	Confirm bool
 	// RemoveExtraSubjects indicates reconciliation should remove extra subjects from an existing role binding
 	RemoveExtraSubjects bool
 	// Client is used to look up existing rolebindings, and create/update the rolebinding when Confirm=true
-	Client internalversion.ClusterRoleBindingInterface
+	Client RoleBindingModifier
 }
 
 // ReconcileClusterRoleBindingResult holds the result of a reconciliation operation.
 type ReconcileClusterRoleBindingResult struct {
 	// RoleBinding is the reconciled rolebinding from the reconciliation operation.
 	// If the reconcile was performed as a dry-run, or the existing rolebinding was protected, the reconciled rolebinding is not persisted.
-	RoleBinding *rbac.ClusterRoleBinding
+	RoleBinding RoleBinding
 
 	// MissingSubjects contains expected subjects that were missing from the currently persisted rolebinding
 	MissingSubjects []rbac.Subject
@@ -60,11 +79,11 @@ type ReconcileClusterRoleBindingResult struct {
 	Protected bool
 }
 
-func (o *ReconcileClusterRoleBindingOptions) Run() (*ReconcileClusterRoleBindingResult, error) {
+func (o *ReconcileRoleBindingOptions) Run() (*ReconcileClusterRoleBindingResult, error) {
 	return o.run(0)
 }
 
-func (o *ReconcileClusterRoleBindingOptions) run(attempts int) (*ReconcileClusterRoleBindingResult, error) {
+func (o *ReconcileRoleBindingOptions) run(attempts int) (*ReconcileClusterRoleBindingResult, error) {
 	// This keeps us from retrying forever if a rolebinding keeps appearing and disappearing as we reconcile.
 	// Conflict errors on update are handled at a higher level.
 	if attempts > 3 {
@@ -73,12 +92,12 @@ func (o *ReconcileClusterRoleBindingOptions) run(attempts int) (*ReconcileCluste
 
 	var result *ReconcileClusterRoleBindingResult
 
-	existingBinding, err := o.Client.Get(o.RoleBinding.Name, metav1.GetOptions{})
+	existingBinding, err := o.Client.Get(o.RoleBinding.GetNamespace(), o.RoleBinding.GetName())
 	switch {
 	case errors.IsNotFound(err):
 		result = &ReconcileClusterRoleBindingResult{
 			RoleBinding:     o.RoleBinding,
-			MissingSubjects: o.RoleBinding.Subjects,
+			MissingSubjects: o.RoleBinding.GetSubjects(),
 			Operation:       ReconcileCreate,
 		}
 
@@ -104,10 +123,7 @@ func (o *ReconcileClusterRoleBindingOptions) run(attempts int) (*ReconcileCluste
 	switch result.Operation {
 	case ReconcileRecreate:
 		// Try deleting
-		err := o.Client.Delete(
-			existingBinding.Name,
-			&metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &existingBinding.UID}},
-		)
+		err := o.Client.Delete(existingBinding.GetNamespace(), existingBinding.GetName(), existingBinding.GetUID())
 		switch {
 		case err == nil, errors.IsNotFound(err):
 			// object no longer exists, as desired
@@ -155,13 +171,13 @@ func (o *ReconcileClusterRoleBindingOptions) run(attempts int) (*ReconcileCluste
 
 // computeReconciledRoleBinding returns the rolebinding that must be created and/or updated to make the
 // existing rolebinding's subjects, roleref, labels, and annotations match the expected rolebinding
-func computeReconciledRoleBinding(existing, expected *rbac.ClusterRoleBinding, removeExtraSubjects bool) (*ReconcileClusterRoleBindingResult, error) {
+func computeReconciledRoleBinding(existing, expected RoleBinding, removeExtraSubjects bool) (*ReconcileClusterRoleBindingResult, error) {
 	result := &ReconcileClusterRoleBindingResult{Operation: ReconcileNone}
 
-	result.Protected = (existing.Annotations[rbac.AutoUpdateAnnotationKey] == "false")
+	result.Protected = (existing.GetAnnotations()[rbac.AutoUpdateAnnotationKey] == "false")
 
 	// Reset the binding completely if the roleRef is different
-	if expected.RoleRef != existing.RoleRef {
+	if expected.GetRoleRef() != existing.GetRoleRef() {
 		result.RoleBinding = expected
 		result.Operation = ReconcileRecreate
 		return result, nil
@@ -172,30 +188,30 @@ func computeReconciledRoleBinding(existing, expected *rbac.ClusterRoleBinding, r
 	if err != nil {
 		return nil, err
 	}
-	result.RoleBinding = changedObj.(*rbac.ClusterRoleBinding)
+	result.RoleBinding = changedObj.(RoleBinding)
 
 	// Merge expected annotations and labels
-	result.RoleBinding.Annotations = merge(expected.Annotations, result.RoleBinding.Annotations)
-	if !reflect.DeepEqual(result.RoleBinding.Annotations, existing.Annotations) {
+	result.RoleBinding.SetAnnotations(merge(expected.GetAnnotations(), result.RoleBinding.GetAnnotations()))
+	if !reflect.DeepEqual(result.RoleBinding.GetAnnotations(), existing.GetAnnotations()) {
 		result.Operation = ReconcileUpdate
 	}
-	result.RoleBinding.Labels = merge(expected.Labels, result.RoleBinding.Labels)
-	if !reflect.DeepEqual(result.RoleBinding.Labels, existing.Labels) {
+	result.RoleBinding.SetLabels(merge(expected.GetLabels(), result.RoleBinding.GetLabels()))
+	if !reflect.DeepEqual(result.RoleBinding.GetLabels(), existing.GetLabels()) {
 		result.Operation = ReconcileUpdate
 	}
 
 	// Compute extra and missing subjects
-	result.MissingSubjects, result.ExtraSubjects = diffSubjectLists(expected.Subjects, existing.Subjects)
+	result.MissingSubjects, result.ExtraSubjects = diffSubjectLists(expected.GetSubjects(), existing.GetSubjects())
 
 	switch {
 	case !removeExtraSubjects && len(result.MissingSubjects) > 0:
 		// add missing subjects in the union case
-		result.RoleBinding.Subjects = append(result.RoleBinding.Subjects, result.MissingSubjects...)
+		result.RoleBinding.SetSubjects(append(result.RoleBinding.GetSubjects(), result.MissingSubjects...))
 		result.Operation = ReconcileUpdate
 
 	case removeExtraSubjects && (len(result.MissingSubjects) > 0 || len(result.ExtraSubjects) > 0):
 		// stomp to expected subjects in the non-union case
-		result.RoleBinding.Subjects = expected.Subjects
+		result.RoleBinding.SetSubjects(expected.GetSubjects())
 		result.Operation = ReconcileUpdate
 	}
 
