@@ -62,6 +62,14 @@ func TestMakeFuncs(t *testing.T) {
 }
 
 func TestErrorUsefulMessage(t *testing.T) {
+	{
+		s := Invalid(nil, nil, "").Error()
+		t.Logf("message: %v", s)
+		if !strings.Contains(s, "null") {
+			t.Errorf("error message did not contain 'null': %s", s)
+		}
+	}
+
 	s := Invalid(NewPath("foo"), "bar", "deet").Error()
 	t.Logf("message: %v", s)
 	for _, part := range []string{"foo", "bar", "deet", ErrorTypeInvalid.String()} {
