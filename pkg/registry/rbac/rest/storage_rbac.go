@@ -147,7 +147,7 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 
 		// ensure bootstrap roles are created or reconciled
 		for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
-			opts := reconciliation.ReconcileClusterRoleOptions{
+			opts := reconciliation.ReconcileRoleOptions{
 				Role:    reconciliation.ClusterRoleRuleOwner{ClusterRole: &clusterRole},
 				Client:  reconciliation.ClusterRoleModifier{Client: clientset.ClusterRoles()},
 				Confirm: true,
@@ -175,9 +175,9 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 
 		// ensure bootstrap rolebindings are created or reconciled
 		for _, clusterRoleBinding := range append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...) {
-			opts := reconciliation.ReconcileClusterRoleBindingOptions{
-				RoleBinding: &clusterRoleBinding,
-				Client:      clientset.ClusterRoleBindings(),
+			opts := reconciliation.ReconcileRoleBindingOptions{
+				RoleBinding: reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: &clusterRoleBinding},
+				Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: clientset.ClusterRoleBindings()},
 				Confirm:     true,
 			}
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -206,7 +206,7 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 		// ensure bootstrap namespaced roles are created or reconciled
 		for namespace, roles := range bootstrappolicy.NamespaceRoles() {
 			for _, role := range roles {
-				opts := reconciliation.ReconcileClusterRoleOptions{
+				opts := reconciliation.ReconcileRoleOptions{
 					Role:    reconciliation.RoleRuleOwner{Role: &role},
 					Client:  reconciliation.RoleModifier{Client: clientset},
 					Confirm: true,

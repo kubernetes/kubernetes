@@ -161,13 +161,15 @@ func TestComputeUpdate(t *testing.T) {
 	}
 
 	for k, tc := range tests {
-		result, err := computeReconciledRoleBinding(tc.ActualBinding, tc.ExpectedBinding, tc.RemoveExtraSubjects)
+		actualRoleBinding := ClusterRoleBindingAdapter{ClusterRoleBinding: tc.ActualBinding}
+		expectedRoleBinding := ClusterRoleBindingAdapter{ClusterRoleBinding: tc.ExpectedBinding}
+		result, err := computeReconciledRoleBinding(actualRoleBinding, expectedRoleBinding, tc.RemoveExtraSubjects)
 		if err != nil {
 			t.Errorf("%s: %v", k, err)
 			continue
 		}
 		updateNeeded := result.Operation != ReconcileNone
-		updatedBinding := result.RoleBinding
+		updatedBinding := result.RoleBinding.(ClusterRoleBindingAdapter).ClusterRoleBinding
 		if updateNeeded != tc.ExpectedUpdateNeeded {
 			t.Errorf("%s: Expected\n\t%v\ngot\n\t%v (%v)", k, tc.ExpectedUpdateNeeded, updateNeeded, result.Operation)
 			continue
