@@ -78,6 +78,38 @@ func init() {
 			rbac.NewRule("get").Groups(legacyGroup).Resources("configmaps").Names("extension-apiserver-authentication").RuleOrDie(),
 		},
 	})
+	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+		// role for the bootstrap signer to be able to inspect kube-system secrets
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "bootstrap-signer"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
+		},
+	})
+	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+		// role for the token-cleaner to be able to remove secrets, but only in kube-system
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "token-cleaner"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+	addNamespaceRoleBinding(metav1.NamespaceSystem,
+		rbac.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
+	addNamespaceRoleBinding(metav1.NamespaceSystem,
+		rbac.NewRoleBinding(saRolePrefix+"token-cleaner", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "token-cleaner").BindingOrDie())
+
+	addNamespaceRole(metav1.NamespacePublic, rbac.Role{
+		// role for the bootstrap signer to be able to write its configmap
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "bootstrap-signer"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+			rbac.NewRule("update").Groups(legacyGroup).Resources("configmaps").Names("cluster-info").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+	addNamespaceRoleBinding(metav1.NamespacePublic,
+		rbac.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespacePublic).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
+
 }
 
 // NamespaceRoles returns a map of namespace to slice of roles to create
