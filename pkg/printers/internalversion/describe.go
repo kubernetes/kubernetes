@@ -916,14 +916,16 @@ func describeContainers(label string, containers []api.Container, containerStatu
 		status, ok := statuses[container.Name]
 		describeContainerBasicInfo(container, status, ok, space, w)
 		describeContainerCommand(container, w)
-		describeContainerResource(container, w)
 		if ok {
 			describeContainerState(status, w)
 		}
+		describeContainerResource(container, w)
 		describeContainerProbe(container, w)
-		describeContainerVolumes(container, w)
-		describeContainerEnvFrom(container, resolverFn, w)
+		if len(container.EnvFrom) > 0 {
+			describeContainerEnvFrom(container, resolverFn, w)
+		}
 		describeContainerEnvVars(container, resolverFn, w)
+		describeContainerVolumes(container, w)
 	}
 }
 
@@ -2372,6 +2374,10 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
+	internalDeployment := &extensions.Deployment{}
+	if err := api.Scheme.Convert(d, internalDeployment, extensions.SchemeGroupVersion); err != nil {
+		return "", err
+	}
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", d.ObjectMeta.Name)
@@ -2387,6 +2393,10 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 			ru := d.Spec.Strategy.RollingUpdate
 			w.Write(LEVEL_0, "RollingUpdateStrategy:\t%s max unavailable, %s max surge\n", ru.MaxUnavailable.String(), ru.MaxSurge.String())
 		}
+		if len(internalDeployment.Spec.Template.Spec.InitContainers) > 0 {
+			describeContainers("Init Containers", internalDeployment.Spec.Template.Spec.InitContainers, nil, nil, w, "")
+		}
+		describeContainers("Containers", internalDeployment.Spec.Template.Spec.Containers, nil, nil, w, "")
 		if len(d.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
 			w.Write(LEVEL_1, "----\t------\t------\n")
