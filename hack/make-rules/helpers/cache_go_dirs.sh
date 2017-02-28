@@ -53,6 +53,7 @@ function kfind() {
         \)                         \
         \)                         \
         "$@"
+    find -H ./vendor/k8s.io/client-go -not \( \( -path "./vendor/k8s.io/client-go/pkg" \) -prune \) "$@"
 }
 
 NEED_FIND=true
