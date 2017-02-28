@@ -174,8 +174,8 @@ func modifyHostNetworkOptionForContainer(hostNetwork bool, sandboxID string, hc 
 
 // modifyPIDNamespaceOverrides implements two overrides for the default PID namespace sharing in Docker:
 //     1. Docker engine prior to API Version 1.24 doesn't support attaching to another container's
-//        PID namespace. This check can be removed when Kubernetes' minimum Docker version advances
-//        past 1.11 (API version 1.23).
+//        PID namespace, and it didn't stabilize until 1.26. This check can be removed when Kubernetes'
+//        minimum Docker version is at least 1.13.1 (API version 1.26).
 //     2. The administrator has overridden the default behavior by means of the --disable-docker-shared-pid
 //        kubelet flag. This is an "escape hatch" to return to previous behavior of isolated namespaces
 //        and should be removed once no longer needed.
@@ -183,7 +183,7 @@ func modifyPIDNamespaceOverrides(disableSharedPID bool, version *semver.Version,
 	if !strings.HasPrefix(string(hc.PidMode), "container:") {
 		return
 	}
-	if disableSharedPID || version.LT(semver.Version{Major: 1, Minor: 25}) {
+	if disableSharedPID || version.LT(semver.Version{Major: 1, Minor: 26}) {
 		hc.PidMode = ""
 	}
 }
