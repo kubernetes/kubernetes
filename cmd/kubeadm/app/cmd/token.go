@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -287,6 +288,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client *clientset.Clientset) e
 			}
 			usages = append(usages, strings.TrimPrefix(k, bootstrapapi.BootstrapTokenUsagePrefix))
 		}
+		sort.Strings(usages)
 		usageString := strings.Join(usages, ",")
 		if len(usageString) == 0 {
 			usageString = "<none>"
