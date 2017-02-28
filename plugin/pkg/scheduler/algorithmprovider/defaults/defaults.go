@@ -41,6 +41,7 @@ const (
 	DefaultMaxAzureDiskVolumes = 16
 	ClusterAutoscalerProvider  = "ClusterAutoscalerProvider"
 	StatefulSetKind            = "StatefulSet"
+	KubeMaxPDVols              = "KUBE_MAX_PD_VOLS"
 )
 
 func init() {
@@ -217,7 +218,7 @@ func defaultPriorities() sets.String {
 
 // getMaxVols checks the max PD volumes environment variable, otherwise returning a default value
 func getMaxVols(defaultVal int) int {
-	if rawMaxVols := os.Getenv("KUBE_MAX_PD_VOLS"); rawMaxVols != "" {
+	if rawMaxVols := os.Getenv(KubeMaxPDVols); rawMaxVols != "" {
 		if parsedMaxVols, err := strconv.Atoi(rawMaxVols); err != nil {
 			glog.Errorf("Unable to parse maxiumum PD volumes value, using default of %v: %v", defaultVal, err)
 		} else if parsedMaxVols <= 0 {
