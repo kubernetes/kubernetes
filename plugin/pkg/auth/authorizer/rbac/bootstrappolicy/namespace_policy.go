@@ -28,6 +28,9 @@ import (
 var (
 	// namespaceRoles is a map of namespace to slice of roles to create
 	namespaceRoles = map[string][]rbac.Role{}
+
+	// namespaceRoleBindings is a map of namespace to slice of roleBindings to create
+	namespaceRoleBindings = map[string][]rbac.RoleBinding{}
 )
 
 func addNamespaceRole(namespace string, role rbac.Role) {
@@ -48,6 +51,24 @@ func addNamespaceRole(namespace string, role rbac.Role) {
 	namespaceRoles[namespace] = existingRoles
 }
 
+func addNamespaceRoleBinding(namespace string, roleBinding rbac.RoleBinding) {
+	if !strings.HasPrefix(namespace, "kube-") {
+		glog.Fatalf(`roles can only be bootstrapped into reserved namespaces starting with "kube-", not %q`, namespace)
+	}
+
+	existingRoleBindings := namespaceRoleBindings[namespace]
+	for _, existingRoleBinding := range existingRoleBindings {
+		if roleBinding.Name == existingRoleBinding.Name {
+			glog.Fatalf("rolebinding %q was already registered in %q", roleBinding.Name, namespace)
+		}
+	}
+
+	roleBinding.Namespace = namespace
+	addDefaultMetadata(&roleBinding)
+	existingRoleBindings = append(existingRoleBindings, roleBinding)
+	namespaceRoleBindings[namespace] = existingRoleBindings
+}
+
 func init() {
 	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
 		// role for finding authentication config info for starting a server
@@ -62,4 +83,9 @@ func init() {
 // NamespaceRoles returns a map of namespace to slice of roles to create
 func NamespaceRoles() map[string][]rbac.Role {
 	return namespaceRoles
+}
+
+// NamespaceRoleBindings returns a map of namespace to slice of roles to create
+func NamespaceRoleBindings() map[string][]rbac.RoleBinding {
+	return namespaceRoleBindings
 }
