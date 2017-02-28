@@ -21,24 +21,34 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
+	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	hpastorage "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
 )
 
-func installAutoscalingAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
-	hpaStorage, hpaStatusStorage := hpastorage.NewREST(optsGetter)
-
-	autoscalingResources := map[string]rest.Storage{
-		"horizontalpodautoscalers":        hpaStorage,
-		"horizontalpodautoscalers/status": hpaStatusStorage,
+func installAutoscalingAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter, apiResourceConfigSource storage.APIResourceConfigSource) {
+	hpaStorageFn := func() map[string]rest.Storage {
+		hpaStorage, hpaStatusStorage := hpastorage.NewREST(optsGetter)
+		return map[string]rest.Storage{
+			"horizontalpodautoscalers":        hpaStorage,
+			"horizontalpodautoscalers/status": hpaStatusStorage,
+		}
+	}
+	resourcesStorageMap := map[string]getResourcesStorageFunc{
+		"horizontalpodautoscalers": hpaStorageFn,
+	}
+	shouldInstallGroup, resources := enabledResources(autoscalingv1.SchemeGroupVersion, resourcesStorageMap, apiResourceConfigSource)
+	if !shouldInstallGroup {
+		return
 	}
 	autoscalingGroupMeta := api.Registry.GroupOrDie(autoscaling.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *autoscalingGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-			"v1": autoscalingResources,
+			"v1": resources,
 		},
 		OptionsExternalVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,

@@ -21,24 +21,34 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	jobstorage "k8s.io/kubernetes/pkg/registry/batch/job/storage"
 )
 
-func installBatchAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
-	jobStorage := jobstorage.NewStorage(optsGetter)
-
-	batchResources := map[string]rest.Storage{
-		"jobs":        jobStorage.Job,
-		"jobs/status": jobStorage.Status,
+func installBatchAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter, apiResourceConfigSource storage.APIResourceConfigSource) {
+	jobsStorageFn := func() map[string]rest.Storage {
+		jobStorage := jobstorage.NewStorage(optsGetter)
+		return map[string]rest.Storage{
+			"jobs":        jobStorage.Job,
+			"jobs/status": jobStorage.Status,
+		}
+	}
+	resourcesStorageMap := map[string]getResourcesStorageFunc{
+		"jobs": jobsStorageFn,
+	}
+	shouldInstallGroup, resources := enabledResources(batchv1.SchemeGroupVersion, resourcesStorageMap, apiResourceConfigSource)
+	if !shouldInstallGroup {
+		return
 	}
 	batchGroupMeta := api.Registry.GroupOrDie(batch.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *batchGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-			"v1": batchResources,
+			"v1": resources,
 		},
 		OptionsExternalVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,

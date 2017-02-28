@@ -38,8 +38,11 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/generated/openapi"
@@ -108,8 +111,7 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
-	// TODO: register cluster federation resources here.
-	resourceConfig := serverstorage.NewResourceConfig()
+	resourceConfig := defaultResourceConfig()
 
 	if s.Etcd.StorageConfig.DeserializationCacheSize == 0 {
 		// When size of cache is not explicitly set, set it to 50000
@@ -206,14 +208,40 @@ func Run(s *options.ServerRunOptions) error {
 	routes.UIRedirect{}.Install(m.HandlerContainer)
 	routes.Logs{}.Install(m.HandlerContainer)
 
-	installFederationAPIs(m, genericConfig.RESTOptionsGetter)
-	installCoreAPIs(s, m, genericConfig.RESTOptionsGetter)
-	installExtensionsAPIs(m, genericConfig.RESTOptionsGetter)
-	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
-	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
+	apiResourceConfigSource := storageFactory.APIResourceConfigSource
+	installFederationAPIs(m, genericConfig.RESTOptionsGetter, apiResourceConfigSource)
+	installCoreAPIs(s, m, genericConfig.RESTOptionsGetter, apiResourceConfigSource)
+	installExtensionsAPIs(m, genericConfig.RESTOptionsGetter, apiResourceConfigSource)
+	installBatchAPIs(m, genericConfig.RESTOptionsGetter, apiResourceConfigSource)
+	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter, apiResourceConfigSource)
 
 	sharedInformers.Start(wait.NeverStop)
 	return m.PrepareRun().Run(wait.NeverStop)
+}
+
+func defaultResourceConfig() *serverstorage.ResourceConfig {
+	rc := serverstorage.NewResourceConfig()
+
+	rc.EnableVersions(
+		federationv1beta1.SchemeGroupVersion,
+	)
+
+	// All core resources except these are disabled by default.
+	rc.EnableResources(
+		apiv1.SchemeGroupVersion.WithResource("secrets"),
+		apiv1.SchemeGroupVersion.WithResource("services"),
+		apiv1.SchemeGroupVersion.WithResource("namespaces"),
+		apiv1.SchemeGroupVersion.WithResource("events"),
+		apiv1.SchemeGroupVersion.WithResource("configmaps"),
+	)
+	// All extension resources except these are disabled by default.
+	rc.EnableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+	)
+	return rc
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility
