@@ -624,6 +624,41 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 }
 
+func TestGetEtcdCommand(t *testing.T) {
+	var tests = []struct {
+		cfg      *kubeadmapi.MasterConfiguration
+		expected []string
+	}{
+		{
+			cfg: &kubeadmapi.MasterConfiguration{},
+			expected: []string{
+				"etcd",
+				"--listen-client-urls=http://127.0.0.1:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379",
+				"--data-dir=/var/lib/etcd",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{Etcd: kubeadmapi.Etcd{ListenURL: "http://10.0.1.10:2379", AdvertiseURL: "http://10.0.1.10:2379"}},
+			expected: []string{
+				"etcd",
+				"--listen-client-urls=http://127.0.0.1:2379,http://10.0.1.10:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379,http://10.0.1.10:2379",
+				"--data-dir=/var/lib/etcd",
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		actual := getEtcdCommand(rt.cfg)
+		sort.Strings(actual)
+		sort.Strings(rt.expected)
+		if !reflect.DeepEqual(actual, rt.expected) {
+			t.Errorf("failed getControllerManagerCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+		}
+	}
+}
+
 func TestGetSchedulerCommand(t *testing.T) {
 	var tests = []struct {
 		cfg      *kubeadmapi.MasterConfiguration
