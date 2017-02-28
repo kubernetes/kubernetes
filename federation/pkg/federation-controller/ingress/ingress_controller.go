@@ -288,7 +288,6 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 
 	ic.deletionHelper = deletionhelper.NewDeletionHelper(
 		ic.hasFinalizerFunc,
-		ic.removeFinalizerFunc,
 		ic.addFinalizerFunc,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
@@ -312,31 +311,6 @@ func (ic *IngressController) hasFinalizerFunc(obj pkgruntime.Object, finalizer s
 		}
 	}
 	return false
-}
-
-// Removes the finalizer from the given objects ObjectMeta.
-// Assumes that the given object is a ingress.
-func (ic *IngressController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
-	ingress := obj.(*extensionsv1beta1.Ingress)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range ingress.ObjectMeta.Finalizers {
-		if string(ingress.ObjectMeta.Finalizers[i]) != finalizer {
-			newFinalizers = append(newFinalizers, ingress.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	ingress.ObjectMeta.Finalizers = newFinalizers
-	ingress, err := ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from ingress %s: %v", finalizer, ingress.Name, err)
-	}
-	return ingress, nil
 }
 
 // Adds the given finalizers to the given objects ObjectMeta.
@@ -915,7 +889,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 // delete deletes the given ingress or returns error if the deletion was not complete.
 func (ic *IngressController) delete(ingress *extensionsv1beta1.Ingress) error {
 	glog.V(3).Infof("Handling deletion of ingress: %v", *ingress)
-	_, err := ic.deletionHelper.HandleObjectInUnderlyingClusters(ingress)
+	err := ic.deletionHelper.HandleObjectInUnderlyingClusters(ingress)
 	if err != nil {
 		return err
 	}

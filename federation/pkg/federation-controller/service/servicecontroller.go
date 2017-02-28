@@ -291,7 +291,6 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 
 	s.deletionHelper = deletionhelper.NewDeletionHelper(
 		s.hasFinalizerFunc,
-		s.removeFinalizerFunc,
 		s.addFinalizerFunc,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
@@ -320,31 +319,6 @@ func (s *ServiceController) hasFinalizerFunc(obj pkgruntime.Object, finalizer st
 		}
 	}
 	return false
-}
-
-// Removes the finalizer from the given objects ObjectMeta.
-// Assumes that the given object is a service.
-func (s *ServiceController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
-	service := obj.(*v1.Service)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range service.ObjectMeta.Finalizers {
-		if string(service.ObjectMeta.Finalizers[i]) != finalizer {
-			newFinalizers = append(newFinalizers, service.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	service.ObjectMeta.Finalizers = newFinalizers
-	service, err := s.federationClient.Core().Services(service.Namespace).Update(service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from service %s: %v", finalizer, service.Name, err)
-	}
-	return service, nil
 }
 
 // Adds the given finalizers to the given objects ObjectMeta.
@@ -1043,7 +1017,7 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 // delete deletes the given service or returns error if the deletion was not complete.
 func (s *ServiceController) delete(service *v1.Service) error {
 	glog.V(3).Infof("Handling deletion of service: %v", *service)
-	_, err := s.deletionHelper.HandleObjectInUnderlyingClusters(service)
+	err := s.deletionHelper.HandleObjectInUnderlyingClusters(service)
 	if err != nil {
 		return err
 	}

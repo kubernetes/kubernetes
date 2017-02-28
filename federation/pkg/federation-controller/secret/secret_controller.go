@@ -168,7 +168,6 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 
 	secretcontroller.deletionHelper = deletionhelper.NewDeletionHelper(
 		secretcontroller.hasFinalizerFunc,
-		secretcontroller.removeFinalizerFunc,
 		secretcontroller.addFinalizerFunc,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
@@ -193,31 +192,6 @@ func (secretcontroller *SecretController) hasFinalizerFunc(obj pkgruntime.Object
 		}
 	}
 	return false
-}
-
-// Removes the finalizer from the given objects ObjectMeta.
-// Assumes that the given object is a secret.
-func (secretcontroller *SecretController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
-	secret := obj.(*apiv1.Secret)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range secret.ObjectMeta.Finalizers {
-		if string(secret.ObjectMeta.Finalizers[i]) != finalizer {
-			newFinalizers = append(newFinalizers, secret.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	secret.ObjectMeta.Finalizers = newFinalizers
-	secret, err := secretcontroller.federatedApiClient.Core().Secrets(secret.Namespace).Update(secret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from secret %s: %v", finalizer, secret.Name, err)
-	}
-	return secret, nil
 }
 
 // Adds the given finalizers to the given objects ObjectMeta.
@@ -419,7 +393,7 @@ func (secretcontroller *SecretController) reconcileSecret(secret types.Namespace
 // delete deletes the given secret or returns error if the deletion was not complete.
 func (secretcontroller *SecretController) delete(secret *apiv1.Secret) error {
 	glog.V(3).Infof("Handling deletion of secret: %v", *secret)
-	_, err := secretcontroller.deletionHelper.HandleObjectInUnderlyingClusters(secret)
+	err := secretcontroller.deletionHelper.HandleObjectInUnderlyingClusters(secret)
 	if err != nil {
 		return err
 	}

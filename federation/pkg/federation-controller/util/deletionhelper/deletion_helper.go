@@ -38,43 +38,39 @@ const (
 	// deleted from all underlying clusters before being deleted from
 	// federation control plane.
 	// This is ignored if FinalizerOrphan is also present on the resource.
-	// In that case, both finalizers are removed from the resource and the
-	// resource is deleted from federation control plane without affecting
-	// the underlying clusters.
+	// In that case, the resource is deleted from the federation control
+	// plane without affecting the underlying clusters.
 	FinalizerDeleteFromUnderlyingClusters string = "federation.kubernetes.io/delete-from-underlying-clusters"
 )
 
 type HasFinalizerFunc func(runtime.Object, string) bool
-type RemoveFinalizerFunc func(runtime.Object, string) (runtime.Object, error)
 type AddFinalizerFunc func(runtime.Object, []string) (runtime.Object, error)
 type ObjNameFunc func(runtime.Object) string
 
 type DeletionHelper struct {
-	hasFinalizerFunc    HasFinalizerFunc
-	removeFinalizerFunc RemoveFinalizerFunc
-	addFinalizerFunc    AddFinalizerFunc
-	objNameFunc         ObjNameFunc
-	updateTimeout       time.Duration
-	eventRecorder       record.EventRecorder
-	informer            util.FederatedInformer
-	updater             util.FederatedUpdater
+	hasFinalizerFunc HasFinalizerFunc
+	addFinalizerFunc AddFinalizerFunc
+	objNameFunc      ObjNameFunc
+	updateTimeout    time.Duration
+	eventRecorder    record.EventRecorder
+	informer         util.FederatedInformer
+	updater          util.FederatedUpdater
 }
 
 func NewDeletionHelper(
-	hasFinalizerFunc HasFinalizerFunc, removeFinalizerFunc RemoveFinalizerFunc,
+	hasFinalizerFunc HasFinalizerFunc,
 	addFinalizerFunc AddFinalizerFunc, objNameFunc ObjNameFunc,
 	updateTimeout time.Duration, eventRecorder record.EventRecorder,
 	informer util.FederatedInformer,
 	updater util.FederatedUpdater) *DeletionHelper {
 	return &DeletionHelper{
-		hasFinalizerFunc:    hasFinalizerFunc,
-		removeFinalizerFunc: removeFinalizerFunc,
-		addFinalizerFunc:    addFinalizerFunc,
-		objNameFunc:         objNameFunc,
-		updateTimeout:       updateTimeout,
-		eventRecorder:       eventRecorder,
-		informer:            informer,
-		updater:             updater,
+		hasFinalizerFunc: hasFinalizerFunc,
+		addFinalizerFunc: addFinalizerFunc,
+		objNameFunc:      objNameFunc,
+		updateTimeout:    updateTimeout,
+		eventRecorder:    eventRecorder,
+		informer:         informer,
+		updater:          updater,
 	}
 }
 
@@ -104,37 +100,27 @@ func (dh *DeletionHelper) EnsureFinalizers(obj runtime.Object) (
 }
 
 // Deletes the resources corresponding to the given federated resource from
-// all underlying clusters, unless it has the FinalizerOrphan finalizer.
-// Removes FinalizerOrphan and FinalizerDeleteFromUnderlyingClusters finalizers
-// when done.
+// all underlying clusters if the resource has the FinalizerDeleteFromUnderlyingClusters
+// finalizer and does not have the FinalizerOrphan finalizer.
 // Callers are expected to keep calling this (with appropriate backoff) until
 // it succeeds.
-func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
-	runtime.Object, error) {
+func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) error {
 	objName := dh.objNameFunc(obj)
 	glog.V(2).Infof("Handling deletion of federated dependents for object: %s", objName)
 	if !dh.hasFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters) {
 		glog.V(2).Infof("obj does not have %s finalizer. Nothing to do", FinalizerDeleteFromUnderlyingClusters)
-		return obj, nil
+		return nil
 	}
-	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, metav1.FinalizerOrphan)
-	if hasOrphanFinalizer {
-		glog.V(2).Infof("Found finalizer orphan. Nothing to do, just remove the finalizer")
-		// If the obj has FinalizerOrphan finalizer, then we need to orphan the
-		// corresponding objects in underlying clusters.
-		// Just remove both the finalizers in that case.
-		obj, err := dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
-		if err != nil {
-			return obj, err
-		}
-		return dh.removeFinalizerFunc(obj, metav1.FinalizerOrphan)
+	if dh.hasFinalizerFunc(obj, metav1.FinalizerOrphan) {
+		glog.V(2).Infof("obj has %s finalizer. Nothing to do", metav1.FinalizerOrphan)
+		return nil
 	}
 
 	glog.V(2).Infof("Deleting obj %s from underlying clusters", objName)
 	// Else, we need to delete the obj from all underlying clusters.
 	unreadyClusters, err := dh.informer.GetUnreadyClusters()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get a list of unready clusters: %v", err)
+		return fmt.Errorf("failed to get a list of unready clusters: %v", err)
 	}
 	// TODO: Handle the case when cluster resource is watched after this is executed.
 	// This can happen if a namespace is deleted before its creation had been
@@ -143,7 +129,7 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 	clusterNsObjs, err := dh.informer.GetTargetStore().GetFromAllClusters(storeKey)
 	glog.V(3).Infof("Found %d objects in underlying clusters", len(clusterNsObjs))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get object %s from underlying clusters: %v", objName, err)
+		return fmt.Errorf("failed to get object %s from underlying clusters: %v", objName, err)
 	}
 	operations := make([]util.FederatedOperation, 0)
 	for _, clusterNsObj := range clusterNsObjs {
@@ -159,7 +145,7 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 			"Failed to delete obj %s in cluster %s: %v", objName, op.ClusterName, operror)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute updates for obj %s: %v", objName, err)
+		return fmt.Errorf("failed to execute updates for obj %s: %v", objName, err)
 	}
 	if len(operations) > 0 {
 		// We have deleted a bunch of resources.
@@ -168,7 +154,7 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 		for _, op := range operations {
 			clusterNames = append(clusterNames, op.ClusterName)
 		}
-		return nil, fmt.Errorf("waiting for object %s to be deleted from clusters: %s", objName, strings.Join(clusterNames, ", "))
+		return fmt.Errorf("waiting for object %s to be deleted from clusters: %s", objName, strings.Join(clusterNames, ", "))
 	}
 
 	// We have now deleted the object from all *ready* clusters.
@@ -179,9 +165,8 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 		for _, cluster := range unreadyClusters {
 			clusterNames = append(clusterNames, cluster.Name)
 		}
-		return nil, fmt.Errorf("waiting for clusters %s to become ready to verify that obj %s has been deleted", strings.Join(clusterNames, ", "), objName)
+		return fmt.Errorf("waiting for clusters %s to become ready to verify that obj %s has been deleted", strings.Join(clusterNames, ", "), objName)
 	}
 
-	// All done. Just remove the finalizer.
-	return dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
+	return nil
 }

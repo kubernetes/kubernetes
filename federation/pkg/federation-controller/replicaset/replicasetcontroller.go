@@ -212,7 +212,6 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 
 	frsc.deletionHelper = deletionhelper.NewDeletionHelper(
 		frsc.hasFinalizerFunc,
-		frsc.removeFinalizerFunc,
 		frsc.addFinalizerFunc,
 		// objNameFunc
 		func(obj runtime.Object) string {
@@ -237,31 +236,6 @@ func (frsc *ReplicaSetController) hasFinalizerFunc(obj runtime.Object, finalizer
 		}
 	}
 	return false
-}
-
-// Removes the finalizer from the given objects ObjectMeta.
-// Assumes that the given object is a replicaset.
-func (frsc *ReplicaSetController) removeFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
-	replicaset := obj.(*extensionsv1.ReplicaSet)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range replicaset.ObjectMeta.Finalizers {
-		if string(replicaset.ObjectMeta.Finalizers[i]) != finalizer {
-			newFinalizers = append(newFinalizers, replicaset.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	replicaset.ObjectMeta.Finalizers = newFinalizers
-	replicaset, err := frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Update(replicaset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from replicaset %s: %v", finalizer, replicaset.Name, err)
-	}
-	return replicaset, nil
 }
 
 // Adds the given finalizers to the given objects ObjectMeta.
@@ -654,7 +628,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSetsOnClusterChange() {
 // delete deletes the given replicaset or returns error if the deletion was not complete.
 func (frsc *ReplicaSetController) delete(replicaset *extensionsv1.ReplicaSet) error {
 	glog.V(3).Infof("Handling deletion of replicaset: %v", *replicaset)
-	_, err := frsc.deletionHelper.HandleObjectInUnderlyingClusters(replicaset)
+	err := frsc.deletionHelper.HandleObjectInUnderlyingClusters(replicaset)
 	if err != nil {
 		return err
 	}
