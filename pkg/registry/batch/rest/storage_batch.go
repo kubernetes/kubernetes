@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -52,15 +54,21 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	version := batchapiv1.SchemeGroupVersion
-
 	storage := map[string]rest.Storage{}
+	p.AddV1JobsStorage(apiResourceConfigSource, restOptionsGetter, storage)
+	return storage
+}
+
+// Adds rest storage interfaces for v1/jobs resource to the given storage map.
+func (p RESTStorageProvider) AddV1JobsStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, storage map[string]rest.Storage) {
+	version := batchapiv1.SchemeGroupVersion
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
 		jobsStorage, jobsStatusStorage := jobstore.NewREST(restOptionsGetter)
 		storage["jobs"] = jobsStorage
 		storage["jobs/status"] = jobsStatusStorage
+	} else {
+		glog.V(1).Infof("Skipping disabled resource batch/v1/jobs")
 	}
-	return storage
 }
 
 func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {

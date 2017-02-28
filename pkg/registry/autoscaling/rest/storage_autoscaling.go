@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"github.com/golang/glog"
+
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -46,15 +48,21 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	version := autoscalingapiv1.SchemeGroupVersion
-
 	storage := map[string]rest.Storage{}
+	p.AddV1HPAStorage(apiResourceConfigSource, restOptionsGetter, storage)
+	return storage
+}
+
+// Adds rest storage interfaces for v1/horizontalpodautoscalers resource to the given storage map.
+func (p RESTStorageProvider) AddV1HPAStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, storage map[string]rest.Storage) {
+	version := autoscalingapiv1.SchemeGroupVersion
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
 		hpaStorage, hpaStatusStorage := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
 		storage["horizontalpodautoscalers"] = hpaStorage
 		storage["horizontalpodautoscalers/status"] = hpaStatusStorage
+	} else {
+		glog.V(1).Infof("Skipping disabled resource autoscaling/v1/horizontalpodautoscalers")
 	}
-	return storage
 }
 
 func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {

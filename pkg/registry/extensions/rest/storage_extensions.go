@@ -72,40 +72,71 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		thirdPartyResourceStorage := thirdpartyresourcestore.NewREST(restOptionsGetter)
 		storage["thirdpartyresources"] = thirdPartyResourceStorage
 	}
-
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
-		daemonSetStorage, daemonSetStatusStorage := daemonstore.NewREST(restOptionsGetter)
-		storage["daemonsets"] = daemonSetStorage
-		storage["daemonsets/status"] = daemonSetStatusStorage
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
-		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
-		storage["deployments"] = deploymentStorage.Deployment
-		storage["deployments/status"] = deploymentStorage.Status
-		storage["deployments/rollback"] = deploymentStorage.Rollback
-		storage["deployments/scale"] = deploymentStorage.Scale
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("ingresses")) {
-		ingressStorage, ingressStatusStorage := ingressstore.NewREST(restOptionsGetter)
-		storage["ingresses"] = ingressStorage
-		storage["ingresses/status"] = ingressStatusStorage
-	}
+	p.AddDaemonSetsStorage(apiResourceConfigSource, restOptionsGetter, storage)
+	p.AddDeploymentsStorage(apiResourceConfigSource, restOptionsGetter, storage)
+	p.AddIngressesStorage(apiResourceConfigSource, restOptionsGetter, storage)
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("podsecuritypolicy")) || apiResourceConfigSource.ResourceEnabled(version.WithResource("podsecuritypolicies")) {
 		podSecurityExtensionsStorage := pspstore.NewREST(restOptionsGetter)
 		storage["podSecurityPolicies"] = podSecurityExtensionsStorage
 	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
-		replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
-		storage["replicasets"] = replicaSetStorage.ReplicaSet
-		storage["replicasets/status"] = replicaSetStorage.Status
-		storage["replicasets/scale"] = replicaSetStorage.Scale
-	}
+	p.AddReplicaSetsStorage(apiResourceConfigSource, restOptionsGetter, storage)
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("networkpolicies")) {
 		networkExtensionsStorage := networkpolicystore.NewREST(restOptionsGetter)
 		storage["networkpolicies"] = networkExtensionsStorage
 	}
 
 	return storage
+}
+
+// Adds rest storage interfaces for /deployments resource to the given storage map.
+func (p RESTStorageProvider) AddDeploymentsStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, storage map[string]rest.Storage) {
+	version := extensionsapiv1beta1.SchemeGroupVersion
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
+		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
+		storage["deployments"] = deploymentStorage.Deployment
+		storage["deployments/status"] = deploymentStorage.Status
+		storage["deployments/rollback"] = deploymentStorage.Rollback
+		storage["deployments/scale"] = deploymentStorage.Scale
+	} else {
+		glog.V(1).Infof("Skipping disabled resource %s/deployments", version.String())
+	}
+}
+
+// Adds rest storage interfaces for /ingresses resource to the given storage map.
+func (p RESTStorageProvider) AddIngressesStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, storage map[string]rest.Storage) {
+	version := extensionsapiv1beta1.SchemeGroupVersion
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("ingresses")) {
+		ingressStorage, ingressStatusStorage := ingressstore.NewREST(restOptionsGetter)
+		storage["ingresses"] = ingressStorage
+		storage["ingresses/status"] = ingressStatusStorage
+	} else {
+		glog.V(1).Infof("Skipping disabled resource %s/ingresses", version.String())
+	}
+}
+
+// Adds rest storage interfaces for /replicasets resource to the given storage map.
+func (p RESTStorageProvider) AddReplicaSetsStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, storage map[string]rest.Storage) {
+	version := extensionsapiv1beta1.SchemeGroupVersion
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
+		replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
+		storage["replicasets"] = replicaSetStorage.ReplicaSet
+		storage["replicasets/status"] = replicaSetStorage.Status
+		storage["replicasets/scale"] = replicaSetStorage.Scale
+	} else {
+		glog.V(1).Infof("Skipping disabled resource %s/replicasets", version.String())
+	}
+}
+
+// Adds rest storage interfaces for /daemonsets resource to the given storage map.
+func (p RESTStorageProvider) AddDaemonSetsStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, storage map[string]rest.Storage) {
+	version := extensionsapiv1beta1.SchemeGroupVersion
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
+		daemonSetStorage, daemonSetStatusStorage := daemonstore.NewREST(restOptionsGetter)
+		storage["daemonsets"] = daemonSetStorage
+		storage["daemonsets/status"] = daemonSetStatusStorage
+	} else {
+		glog.V(1).Infof("Skipping disabled resource %s/daemonsets", version.String())
+	}
 }
 
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {

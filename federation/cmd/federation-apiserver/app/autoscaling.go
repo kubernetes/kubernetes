@@ -21,24 +21,31 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	hpastorage "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
+	restStorage "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
 )
 
-func installAutoscalingAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
-	hpaStorage, hpaStatusStorage := hpastorage.NewREST(optsGetter)
-
-	autoscalingResources := map[string]rest.Storage{
-		"horizontalpodautoscalers":        hpaStorage,
-		"horizontalpodautoscalers/status": hpaStatusStorage,
+func installAutoscalingAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter, apiResourceConfigSource storage.APIResourceConfigSource) {
+	groupName := autoscaling.GroupName
+	if !apiResourceConfigSource.AnyResourcesForGroupEnabled(groupName) {
+		glog.V(1).Infof("Skipping disabled API group %q", groupName)
+		return
 	}
-	autoscalingGroupMeta := api.Registry.GroupOrDie(autoscaling.GroupName)
+	resources := map[string]rest.Storage{}
+	restStorage.RESTStorageProvider{}.AddV1HPAStorage(apiResourceConfigSource, optsGetter, resources)
+	if len(resources) == 0 {
+		glog.V(1).Infof("Skipping API group %q since there is no enabled resource", groupName)
+		return
+	}
+
+	autoscalingGroupMeta := api.Registry.GroupOrDie(groupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *autoscalingGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-			"v1": autoscalingResources,
+			"v1": resources,
 		},
 		OptionsExternalVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,

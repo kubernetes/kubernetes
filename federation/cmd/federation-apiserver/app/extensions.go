@@ -21,39 +21,34 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	daemonsetstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
-	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
-	ingressstore "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage"
-	replicasetstore "k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage"
+	restStorage "k8s.io/kubernetes/pkg/registry/extensions/rest"
 )
 
-func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
-	replicaSetStorage := replicasetstore.NewStorage(optsGetter)
-	deploymentStorage := deploymentstore.NewStorage(optsGetter)
-	ingressStorage, ingressStatusStorage := ingressstore.NewREST(optsGetter)
-	daemonSetStorage, daemonSetStatusStorage := daemonsetstore.NewREST(optsGetter)
-
-	extensionsResources := map[string]rest.Storage{
-		"replicasets":          replicaSetStorage.ReplicaSet,
-		"replicasets/status":   replicaSetStorage.Status,
-		"replicasets/scale":    replicaSetStorage.Scale,
-		"ingresses":            ingressStorage,
-		"ingresses/status":     ingressStatusStorage,
-		"daemonsets":           daemonSetStorage,
-		"daemonsets/status":    daemonSetStatusStorage,
-		"deployments":          deploymentStorage.Deployment,
-		"deployments/status":   deploymentStorage.Status,
-		"deployments/scale":    deploymentStorage.Scale,
-		"deployments/rollback": deploymentStorage.Rollback,
+func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter, apiResourceConfigSource storage.APIResourceConfigSource) {
+	groupName := extensions.GroupName
+	if !apiResourceConfigSource.AnyResourcesForGroupEnabled(groupName) {
+		glog.V(1).Infof("Skipping disabled API group %q", groupName)
+		return
 	}
+	resources := map[string]rest.Storage{}
+	restStorage.RESTStorageProvider{}.AddReplicaSetsStorage(apiResourceConfigSource, optsGetter, resources)
+	restStorage.RESTStorageProvider{}.AddIngressesStorage(apiResourceConfigSource, optsGetter, resources)
+	restStorage.RESTStorageProvider{}.AddDaemonSetsStorage(apiResourceConfigSource, optsGetter, resources)
+	restStorage.RESTStorageProvider{}.AddDeploymentsStorage(apiResourceConfigSource, optsGetter, resources)
+	if len(resources) == 0 {
+		glog.V(1).Infof("Skipping API group %q since there is no enabled resource", groupName)
+		return
+	}
+
 	extensionsGroupMeta := api.Registry.GroupOrDie(extensions.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *extensionsGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-			"v1beta1": extensionsResources,
+			"v1beta1": resources,
 		},
 		OptionsExternalVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,

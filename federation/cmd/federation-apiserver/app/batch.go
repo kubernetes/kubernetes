@@ -21,30 +21,41 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	jobstorage "k8s.io/kubernetes/pkg/registry/batch/job/storage"
+	restStorage "k8s.io/kubernetes/pkg/registry/batch/rest"
 )
 
-func installBatchAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
-	jobStorage := jobstorage.NewStorage(optsGetter)
-
-	batchResources := map[string]rest.Storage{
-		"jobs":        jobStorage.Job,
-		"jobs/status": jobStorage.Status,
+func installBatchAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter, apiResourceConfigSource storage.APIResourceConfigSource) {
+	glog.Infof("Processing batch")
+	groupName := batch.GroupName
+	if !apiResourceConfigSource.AnyResourcesForGroupEnabled(groupName) {
+		//		glog.V(1).Infof("Skipping disabled API group %q", groupName)
+		glog.Infof("Skipping disabled API group %q", groupName)
+		return
 	}
+	resources := map[string]rest.Storage{}
+	restStorage.RESTStorageProvider{}.AddV1JobsStorage(apiResourceConfigSource, optsGetter, resources)
+	if len(resources) == 0 {
+		//		glog.V(1).Infof("Skipping API group %q since there is no enabled resource", groupName)
+		glog.Infof("Skipping API group %q since there is no enabled resource", groupName)
+		return
+	}
+
 	batchGroupMeta := api.Registry.GroupOrDie(batch.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *batchGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-			"v1": batchResources,
+			"v1": resources,
 		},
 		OptionsExternalVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,
 	}
+	glog.Infof("Installing batch")
 	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}

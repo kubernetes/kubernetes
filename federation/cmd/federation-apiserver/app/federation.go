@@ -22,20 +22,33 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/pkg/api"
-
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
+	fedv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
+	"k8s.io/kubernetes/pkg/api"
 )
 
-func installFederationAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
-	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(optsGetter)
-	federationResources := map[string]rest.Storage{
-		"clusters":        clusterStorage,
-		"clusters/status": clusterStatusStorage,
+func installFederationAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter, apiResourceConfigSource storage.APIResourceConfigSource) {
+	groupName := federation.GroupName
+	if !apiResourceConfigSource.AnyResourcesForGroupEnabled(groupName) {
+		glog.V(1).Infof("Skipping disabled API group %q", groupName)
+		return
 	}
-	federationGroupMeta := api.Registry.GroupOrDie(federation.GroupName)
+	federationResources := map[string]rest.Storage{}
+	if apiResourceConfigSource.ResourceEnabled(fedv1beta1.SchemeGroupVersion.WithResource("clusters")) {
+		clusterStorage, clusterStatusStorage := clusteretcd.NewREST(optsGetter)
+		federationResources["clusters"] = clusterStorage
+		federationResources["clusters/status"] = clusterStatusStorage
+	} else {
+		glog.V(1).Infof("Skipping disabled resource clusters in API group %q", groupName)
+	}
+	if len(federationResources) == 0 {
+		glog.V(1).Infof("Skipping API group %q since there is no enabled resource", groupName)
+		return
+	}
+	federationGroupMeta := api.Registry.GroupOrDie(groupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *federationGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{

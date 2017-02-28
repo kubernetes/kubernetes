@@ -29,40 +29,46 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/federation/apis/core"
 	_ "k8s.io/kubernetes/federation/apis/core/install"
-	"k8s.io/kubernetes/federation/apis/core/v1"
+	corev1 "k8s.io/kubernetes/federation/apis/core/v1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
-	eventstore "k8s.io/kubernetes/pkg/registry/core/event/storage"
-	namespacestore "k8s.io/kubernetes/pkg/registry/core/namespace/storage"
-	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
-	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
+	restStorage "k8s.io/kubernetes/pkg/registry/core/rest"
+	servicestorage "k8s.io/kubernetes/pkg/registry/core/service/storage"
 )
 
-func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
-	serviceStore, serviceStatusStore := servicestore.NewREST(optsGetter)
-	namespaceStore, namespaceStatusStore, namespaceFinalizeStore := namespacestore.NewREST(optsGetter)
-	secretStore := secretstore.NewREST(optsGetter)
-	configMapStore := configmapstore.NewREST(optsGetter)
-	eventStore := eventstore.NewREST(optsGetter, uint64(s.EventTTL.Seconds()))
-
-	coreResources := map[string]rest.Storage{
-		"secrets":             secretStore,
-		"services":            serviceStore,
-		"services/status":     serviceStatusStore,
-		"namespaces":          namespaceStore,
-		"namespaces/status":   namespaceStatusStore,
-		"namespaces/finalize": namespaceFinalizeStore,
-		"events":              eventStore,
-		"configmaps":          configMapStore,
+func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter, apiResourceConfigSource storage.APIResourceConfigSource) {
+	groupName := corev1.GroupName
+	if !apiResourceConfigSource.AnyResourcesForGroupEnabled(groupName) {
+		glog.V(1).Infof("Skipping disabled API group %q", groupName)
+		return
 	}
+	resources := map[string]rest.Storage{}
+	version := corev1.SchemeGroupVersion
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("services")) {
+		serviceStore, serviceStatusStore := servicestorage.NewREST(optsGetter)
+		resources["services/status"] = serviceStatusStore
+		resources["services"] = serviceStore
+	} else {
+		glog.V(1).Infof("Skipping disabled resource %s/services", version.String())
+	}
+
+	restStorage.LegacyRESTStorageProvider{}.AddNamespacesStorage(apiResourceConfigSource, optsGetter, resources)
+	restStorage.LegacyRESTStorageProvider{}.AddSecretsStorage(apiResourceConfigSource, optsGetter, resources)
+	restStorage.LegacyRESTStorageProvider{}.AddConfigMapsStorage(apiResourceConfigSource, optsGetter, resources)
+	restStorage.LegacyRESTStorageProvider{}.AddEventsStorage(apiResourceConfigSource, optsGetter, uint64(s.EventTTL.Seconds()), resources)
+	if len(resources) == 0 {
+		glog.V(1).Infof("Skipping API group %q since there is no enabled resource", groupName)
+		return
+	}
+
 	coreGroupMeta := api.Registry.GroupOrDie(core.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *coreGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-			v1.SchemeGroupVersion.Version: coreResources,
+			corev1.SchemeGroupVersion.Version: resources,
 		},
 		OptionsExternalVersion: &api.Registry.GroupOrDie(core.GroupName).GroupVersion,
 		Scheme:                 core.Scheme,
