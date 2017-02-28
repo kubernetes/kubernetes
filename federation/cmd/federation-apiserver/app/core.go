@@ -46,7 +46,7 @@ func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPI
 	namespaceStore, namespaceStatusStore, namespaceFinalizeStore := namespacestore.NewREST(optsGetter)
 	secretStore := secretstore.NewREST(optsGetter)
 	configMapStore := configmapstore.NewREST(optsGetter)
-	eventStore := eventstore.NewREST(optsGetter, uint64(s.EventTTL.Seconds()))
+	eventStore := eventstore.NewREST(optsGetter, uint64(s.EventTTL.Seconds()), "")
 
 	coreResources := map[string]rest.Storage{
 		"secrets":             secretStore,

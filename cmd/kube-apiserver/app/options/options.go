@@ -55,6 +55,7 @@ type ServerRunOptions struct {
 
 	AllowPrivileged           bool
 	EventTTL                  time.Duration
+	EventWebHookCfgFile       string
 	KubeletConfig             kubeletclient.KubeletClientConfig
 	KubernetesServiceNodePort int
 	MasterCount               int
@@ -80,7 +81,8 @@ func NewServerRunOptions() *ServerRunOptions {
 		StorageSerialization: kubeoptions.NewStorageSerializationOptions(),
 		APIEnablement:        kubeoptions.NewAPIEnablementOptions(),
 
-		EventTTL:    1 * time.Hour,
+		EventTTL: 1 * time.Hour,
+
 		MasterCount: 1,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:         ports.KubeletPort,
@@ -131,6 +133,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events. Default is 1h.")
+
+	fs.StringVar(&s.EventWebHookCfgFile, "event-webhook-config-file", s.EventWebHookCfgFile,
+		"File with webhook configuration in kubeconfig format.")
 
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged,
 		"If true, allow privileged containers.")

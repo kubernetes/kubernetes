@@ -37,7 +37,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "events",
 	}
-	return NewREST(restOptions, testTTL), server
+	return NewREST(restOptions, testTTL, ""), server
 }
 
 func validNewEvent(namespace string) *api.Event {

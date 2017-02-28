@@ -87,6 +87,7 @@ type Config struct {
 	EnableCoreControllers    bool
 	EndpointReconcilerConfig EndpointReconcilerConfig
 	EventTTL                 time.Duration
+	EventWebHookCfgFile      string
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
 
 	// Used to start and monitor tunneling
@@ -230,6 +231,7 @@ func (c completedConfig) New() (*Master, error) {
 			ProxyTransport:       c.ProxyTransport,
 			KubeletClientConfig:  c.KubeletClientConfig,
 			EventTTL:             c.EventTTL,
+			EventWebHookCfgFile:  c.EventWebHookCfgFile,
 			ServiceIPRange:       c.ServiceIPRange,
 			ServiceNodePortRange: c.ServiceNodePortRange,
 			LoopbackClientConfig: c.GenericConfig.LoopbackClientConfig,

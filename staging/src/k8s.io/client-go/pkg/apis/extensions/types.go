@@ -1121,3 +1121,15 @@ type NetworkPolicyList struct {
 
 	Items []NetworkPolicy
 }
+
+// EventResult is the event-webhook response
+type EventResult struct {
+	metav1.TypeMeta
+
+	// +optional
+	metav1.ObjectMeta
+
+	// Error message indicating failure
+	// +optional
+	Error string
+}

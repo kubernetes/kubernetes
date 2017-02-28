@@ -341,6 +341,16 @@ message DeploymentStrategy {
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
 
+// EventResult is the event-webhook response
+message EventResult {
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Error message indicating failure
+  // +optional
+  optional string error = 2;
+}
+
 // FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
 message FSGroupStrategyOptions {
   // Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.

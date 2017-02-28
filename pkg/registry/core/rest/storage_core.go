@@ -72,6 +72,7 @@ type LegacyRESTStorageProvider struct {
 	ProxyTransport      http.RoundTripper
 	KubeletClientConfig kubeletclient.KubeletClientConfig
 	EventTTL            time.Duration
+	EventWebHookCfgFile string
 
 	// ServiceIPRange is used to build cluster IPs for discovery.
 	ServiceIPRange       net.IPNet
@@ -115,7 +116,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 	podTemplateStorage := podtemplatestore.NewREST(restOptionsGetter)
 
-	eventStorage := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
+	eventStorage := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()), c.EventWebHookCfgFile)
 	limitRangeStorage := limitrangestore.NewREST(restOptionsGetter)
 
 	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotastore.NewREST(restOptionsGetter)
