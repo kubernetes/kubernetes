@@ -484,7 +484,7 @@ func (m *manager) couldBeDeleted(uid types.UID, status v1.PodStatus) bool {
 // needsReconcile compares the given status with the status in the pod manager (which
 // in fact comes from apiserver), returns whether the status needs to be reconciled with
 // the apiserver. Now when pod status is inconsistent between apiserver and kubelet,
-// kubelet should forcibly send an update to reconclie the inconsistence, because kubelet
+// kubelet should forcibly send an update to reconcile the inconsistence, because kubelet
 // should be the source of truth of pod status.
 // NOTE(random-liu): It's simpler to pass in mirror pod uid and get mirror pod by uid, but
 // now the pod manager only supports getting mirror pod by static pod, so we have to pass
