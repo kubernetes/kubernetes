@@ -120,36 +120,98 @@ const (
 	HairpinNone = "none"
 )
 
-// TODO: curate the ordering and structure of this config object
+// KubeletConfiguration contains the configuration for a Kubelet object. 
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
-	// podManifestPath is the path to the directory containing pod manifests to
-	// run, or the path to a single manifest file
-	PodManifestPath string
-	// syncFrequency is the max period between synchronizing running
-	// containers and config
-	SyncFrequency metav1.Duration
-	// fileCheckFrequency is the duration between checking config files for
-	// new data
-	FileCheckFrequency metav1.Duration
-	// httpCheckFrequency is the duration between checking http for new data
-	HTTPCheckFrequency metav1.Duration
-	// manifestURL is the URL for accessing the container manifest
-	ManifestURL string
-	// manifestURLHeader is the HTTP header to use when accessing the manifest
-	// URL, with the key separated from the value with a ':', as in 'key:value'
-	ManifestURLHeader string
-	// enableServer enables the Kubelet's server
-	EnableServer bool
+	// basic
+
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces)
 	Address string
+	// cloudProvider is the provider for cloud services.
+	// +optional
+	CloudProvider string
+	// cloudConfigFile is the path to the cloud provider configuration file.
+	// +optional
+	CloudConfigFile string
+	// ExitOnLockContention is a flag that signifies to the kubelet that it is running
+	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
+	// This will cause the kubelet to listen to inotify events on the lock file,
+	// releasing it and exiting when another process tries to open that file.
+	ExitOnLockContention bool
+	// hostnameOverride is the hostname used to identify the kubelet instead
+	// of the actual hostname.
+	HostnameOverride string
+	// lockFilePath is the path that kubelet will use to as a lock file.
+	// It uses this file as a lock to synchronize with other kubelet processes
+	// that may be running.
+	LockFilePath string
+	// nodeIP is IP address of the node. If set, kubelet will use this IP
+	// address for the node.
+	// +optional
+	NodeIP string
+	// nodeLabels to add when registering the node in the cluster.
+	NodeLabels map[string]string
 	// port is the port for the Kubelet to serve on.
 	Port int32
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
 	ReadOnlyPort int32
+	// rootDirectory is the directory path to place kubelet files (volume
+	// mounts,etc).
+	RootDirectory string
+
+	// startup
+
+	// containerized should be set to true if kubelet is running in a container.
+	Containerized bool
+	// enableServer enables the Kubelet's server
+	EnableServer bool
+	// featureGates is a string of comma-separated key=value pairs that describe feature
+	// gates for alpha/experimental features.
+	FeatureGates string
+	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
+	// Tells the Kubelet to fail to start if swap is enabled on the node.
+	ExperimentalFailSwapOn bool
+
+	// API server
+
+	// contentType is contentType of requests sent to apiserver.
+	ContentType string
+	// eventBurst is the maximum size of a bursty event records, temporarily
+	// allows event records to burst to this number, while still not exceeding
+	// event-qps. Only used if eventQps > 0
+	EventBurst int32
+	// eventRecordQPS is the maximum event creations per second. If 0, there
+	// is no limit enforced.
+	EventRecordQPS int32
+	// kubeAPIBurst is the burst to allow while talking with kubernetes
+	// apiserver
+	KubeAPIBurst int32
+	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
+	KubeAPIQPS int32
+	// registerNode enables automatic registration with the apiserver.
+	RegisterNode bool
+	// registerSchedulable tells the kubelet to register the node as
+	// schedulable. Won't have any effect if register-node is false.
+	// DEPRECATED: use registerWithTaints instead
+	RegisterSchedulable bool
+	// registerWithTaints are an array of taints to add to a node object when
+	// the kubelet registers itself. This only takes effect when registerNode
+	// is true and upon the initial registration of the node.
+	RegisterWithTaints []api.Taint
+
+	// Authentication & Authorization
+
+	// authentication specifies how requests to the Kubelet's server are authenticated
+	Authentication KubeletAuthentication
+	// authorization specifies how requests to the Kubelet's server are authorized
+	Authorization KubeletAuthorization
+	// certDirectory is the directory where the TLS certs are located (by
+	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
+	// are provided, this flag will be ignored.
+	CertDirectory string
 	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
@@ -159,30 +221,70 @@ type KubeletConfiguration struct {
 	// tlsPrivateKeyFile is the ile containing x509 private key matching
 	// tlsCertFile.
 	TLSPrivateKeyFile string
-	// certDirectory is the directory where the TLS certs are located (by
-	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
-	// are provided, this flag will be ignored.
-	CertDirectory string
-	// authentication specifies how requests to the Kubelet's server are authenticated
-	Authentication KubeletAuthentication
-	// authorization specifies how requests to the Kubelet's server are authorized
-	Authorization KubeletAuthorization
-	// hostnameOverride is the hostname used to identify the kubelet instead
-	// of the actual hostname.
-	HostnameOverride string
-	// podInfraContainerImage is the image whose network/ipc namespaces
-	// containers in each pod will use.
-	PodInfraContainerImage string
-	// dockerEndpoint is the path to the docker endpoint to communicate with.
-	DockerEndpoint string
-	// rootDirectory is the directory path to place kubelet files (volume
-	// mounts,etc).
-	RootDirectory string
-	// seccompProfileRoot is the directory path for seccomp profiles.
-	SeccompProfileRoot string
-	// allowPrivileged enables containers to request privileged mode.
-	// Defaults to false.
-	AllowPrivileged bool
+
+	// Pod Management
+
+	// manifestURL is the URL for accessing the container manifest
+	ManifestURL string
+	// manifestURLHeader is the HTTP header to use when accessing the manifest
+	// URL, with the key separated from the value with a ':', as in 'key:value'
+	ManifestURLHeader string
+	// masterServiceNamespace is The namespace from which the kubernetes
+	// master services should be injected into pods.
+	MasterServiceNamespace string
+	// maxPods is the number of pods that can run on this Kubelet.
+	MaxPods int32
+	// podManifestPath is the path to the directory containing pod manifests to
+	// run, or the path to a single manifest file
+	PodManifestPath string
+	// Maximum number of pods per core. Cannot exceed MaxPods
+	PodsPerCore int32
+
+	// Container Management
+
+	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
+	// +optional
+	EvictionHard string
+// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
+	// +optional
+	EvictionMaxPodGracePeriod int32
+	// Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
+	// +optional
+	EvictionMinimumReclaim string
+	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
+	// +optional
+	EvictionPressureTransitionPeriod metav1.Duration
+	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
+	// +optional
+	EvictionSoft string
+	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
+	// +optional
+	EvictionSoftGracePeriod string
+	// maxContainerCount is the maximum number of old instances of containers
+	// to retain globally. Each container takes up some disk space.
+	MaxContainerCount int32
+	// maxPerPodContainerCount is the maximum number of old instances to
+	// retain per container. Each container takes up some disk space.
+	MaxPerPodContainerCount int32
+	// minimumGCAge is the minimum age for a finished container before it is
+	// garbage collected.
+	MinimumGCAge metav1.Duration
+	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
+	// +optional
+	ExperimentalKernelMemcgNotification bool
+
+	// Host Resources
+
+	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
+	// specify CPU limits
+	CPUCFSQuota bool
+	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
+	// This flag accepts a list of options. Acceptible options are `pods`, `system-reserved` & `kube-reserved`.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	EnforceNodeAllocatable []string
+	// hostIPCSources is a comma-separated list of sources from which the
+	// Kubelet allows pods to use the host ipc namespace. Defaults to "*".
+	HostIPCSources []string
 	// hostNetworkSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use of host network. Defaults to "*". Valid
 	// options are "file", "http", "api", and "*" (all sources).
@@ -190,165 +292,48 @@ type KubeletConfiguration struct {
 	// hostPIDSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host pid namespace. Defaults to "*".
 	HostPIDSources []string
-	// hostIPCSources is a comma-separated list of sources from which the
-	// Kubelet allows pods to use the host ipc namespace. Defaults to "*".
-	HostIPCSources []string
-	// registryPullQPS is the limit of registry pulls per second. If 0,
-	// unlimited. Set to 0 for no limit. Defaults to 5.0.
-	RegistryPullQPS int32
-	// registryBurst is the maximum size of a bursty pulls, temporarily allows
-	// pulls to burst to this number, while still not exceeding registryQps.
-	// Only used if registryQPS > 0.
-	RegistryBurst int32
-	// eventRecordQPS is the maximum event creations per second. If 0, there
-	// is no limit enforced.
-	EventRecordQPS int32
-	// eventBurst is the maximum size of a bursty event records, temporarily
-	// allows event records to burst to this number, while still not exceeding
-	// event-qps. Only used if eventQps > 0
-	EventBurst int32
-	// enableDebuggingHandlers enables server endpoints for log collection
-	// and local running of containers and commands
-	EnableDebuggingHandlers bool
-	// minimumGCAge is the minimum age for a finished container before it is
-	// garbage collected.
-	MinimumGCAge metav1.Duration
-	// maxPerPodContainerCount is the maximum number of old instances to
-	// retain per container. Each container takes up some disk space.
-	MaxPerPodContainerCount int32
-	// maxContainerCount is the maximum number of old instances of containers
-	// to retain globally. Each container takes up some disk space.
-	MaxContainerCount int32
-	// cAdvisorPort is the port of the localhost cAdvisor endpoint
-	CAdvisorPort int32
-	// healthzPort is the port of the localhost healthz endpoint
-	HealthzPort int32
-	// healthzBindAddress is the IP address for the healthz server to serve
-	// on.
-	HealthzBindAddress string
-	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
-	// must be within the range [-1000, 1000].
-	OOMScoreAdj int32
-	// registerNode enables automatic registration with the apiserver.
-	RegisterNode bool
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for kubernetes system components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
+	KubeReserved ConfigurationMap
+	// maxOpenFiles is Number of files that can be opened by Kubelet process.
+	MaxOpenFiles int64
+	// Default behaviour for kernel tuning
+	ProtectKernelDefaults bool
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for non-kubernetes components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
+	SystemReserved ConfigurationMap
+	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	// +experimental
+	AllowedUnsafeSysctls []string
+	// This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
+	// nvidiaGPUs is the number of NVIDIA GPU devices on this node.
+	// +experimental
+	NvidiaGPUs int32
+
+	// Networking
+
 	// clusterDomain is the DNS domain for this cluster. If set, kubelet will
 	// configure all containers to search this domain in addition to the
 	// host's search domains.
 	ClusterDomain string
-	// masterServiceNamespace is The namespace from which the kubernetes
-	// master services should be injected into pods.
-	MasterServiceNamespace string
 	// clusterDNS is a list of IP address for a cluster DNS server.  If set,
 	// kubelet will configure all containers to use this for DNS resolution
 	// instead of the host's DNS servers
 	ClusterDNS []string
-	// streamingConnectionIdleTimeout is the maximum time a streaming connection
-	// can be idle before the connection is automatically closed.
-	StreamingConnectionIdleTimeout metav1.Duration
-	// nodeStatusUpdateFrequency is the frequency that kubelet posts node
-	// status to master. Note: be cautious when changing the constant, it
-	// must work with nodeMonitorGracePeriod in nodecontroller.
-	NodeStatusUpdateFrequency metav1.Duration
-	// imageMinimumGCAge is the minimum age for an unused image before it is
-	// garbage collected.
-	ImageMinimumGCAge metav1.Duration
-	// imageGCHighThresholdPercent is the percent of disk usage after which
-	// image garbage collection is always run.
-	ImageGCHighThresholdPercent int32
-	// imageGCLowThresholdPercent is the percent of disk usage before which
-	// image garbage collection is never run. Lowest disk usage to garbage
-	// collect to.
-	ImageGCLowThresholdPercent int32
-	// lowDiskSpaceThresholdMB is the absolute free disk space, in MB, to
-	// maintain. When disk space falls below this threshold, new pods would
-	// be rejected.
-	LowDiskSpaceThresholdMB int32
-	// How frequently to calculate and cache volume disk usage for all pods
-	VolumeStatsAggPeriod metav1.Duration
-	// networkPluginName is the name of the network plugin to be invoked for
-	// various events in kubelet/pod lifecycle
-	NetworkPluginName string
-	// networkPluginMTU is the MTU to be passed to the network plugin,
-	// and overrides the default MTU for cases where it cannot be automatically
-	// computed (such as IPSEC).
-	NetworkPluginMTU int32
-	// networkPluginDir is the full path of the directory in which to search
-	// for network plugins (and, for backwards-compat, CNI config files)
-	NetworkPluginDir string
-	// CNIConfDir is the full path of the directory in which to search for
-	// CNI config files
-	CNIConfDir string
 	// CNIBinDir is the full path of the directory in which to search for
 	// CNI plugin binaries
+	// +alpha
 	CNIBinDir string
-	// volumePluginDir is the full path of the directory in which to search
-	// for additional third party volume plugins
-	VolumePluginDir string
-	// cloudProvider is the provider for cloud services.
-	// +optional
-	CloudProvider string
-	// cloudConfigFile is the path to the cloud provider configuration file.
-	// +optional
-	CloudConfigFile string
-	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
-	// +optional
-	KubeletCgroups string
-	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
-	// And all Burstable and BestEffort pods are brought up under their
-	// specific top level QoS cgroup.
-	// +optional
-	CgroupsPerQOS bool
-	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
-	// +optional
-	CgroupDriver string
-	// Cgroups that container runtime is expected to be isolated in.
-	// +optional
-	RuntimeCgroups string
-	// SystemCgroups is absolute name of cgroups in which to place
-	// all non-kernel processes that are not already in a container. Empty
-	// for no container. Rolling back the flag requires a reboot.
-	// +optional
-	SystemCgroups string
-	// CgroupRoot is the root cgroup to use for pods.
-	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
-	// +optional
-	CgroupRoot string
-	// containerRuntime is the container runtime to use.
-	ContainerRuntime string
-	// remoteRuntimeEndpoint is the endpoint of remote runtime service
-	RemoteRuntimeEndpoint string
-	// remoteImageEndpoint is the endpoint of remote image service
-	RemoteImageEndpoint string
-	// runtimeRequestTimeout is the timeout for all runtime requests except long running
-	// requests - pull, logs, exec and attach.
-	// +optional
-	RuntimeRequestTimeout metav1.Duration
-	// If no pulling progress is made before the deadline imagePullProgressDeadline,
-	// the image pulling will be cancelled. Defaults to 1m0s.
-	// +optional
-	ImagePullProgressDeadline metav1.Duration
-	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
-	// $PATH.
-	// +optional
-	RktPath string
-	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
-	ExperimentalMounterPath string
-	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
-	// +optional
-	RktAPIEndpoint string
-	// rktStage1Image is the image to use as stage1. Local paths and
-	// http/https URLs are supported.
-	// +optional
-	RktStage1Image string
-	// lockFilePath is the path that kubelet will use to as a lock file.
-	// It uses this file as a lock to synchronize with other kubelet processes
-	// that may be running.
-	LockFilePath string
-	// ExitOnLockContention is a flag that signifies to the kubelet that it is running
-	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
-	// This will cause the kubelet to listen to inotify events on the lock file,
-	// releasing it and exiting when another process tries to open that file.
-	ExitOnLockContention bool
+	// CNIConfDir is the full path of the directory in which to search for
+	// CNI config files
+	// +alpha
+	CNIConfDir string
 	// How should the kubelet configure the container bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
 	// themselves if they should try to access their own Service. Values:
@@ -358,149 +343,207 @@ type KubeletConfiguration struct {
 	// Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
 	// because promiscous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string
-	// The node has babysitter process monitoring docker and kubelet.
-	BabysitDaemons bool
-	// maxPods is the number of pods that can run on this Kubelet.
-	MaxPods int32
-	// nvidiaGPUs is the number of NVIDIA GPU devices on this node.
-	NvidiaGPUs int32
-	// dockerExecHandlerName is the handler to use when executing a command
-	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
-	// 'native'.
-	DockerExecHandlerName string
+	// iptablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
+	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
+	IPTablesDropBit int32
+	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT
+	// Values must be within the range [0, 31].
+	// Warning: Please match the value of corresponding parameter in kube-proxy
+	// TODO: clean up IPTablesMasqueradeBit in kube-proxy
+	IPTablesMasqueradeBit int32
+	// If true, Kubelet ensures a set of iptables rules are present on host.
+	// These rules will serve as utility for various components, e.g. kube-proxy.
+	// The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
+	MakeIPTablesUtilChains bool
+	// networkPluginDir is the full path of the directory in which to search
+	// for network plugins (and, for backwards-compat, CNI config files)
+	NetworkPluginDir string
+	// networkPluginMTU is the MTU to be passed to the network plugin,
+	// and overrides the default MTU for cases where it cannot be automatically
+	// computed (such as IPSEC).
+	NetworkPluginMTU int32
+	// networkPluginName is the name of the network plugin to be invoked for
+	// various events in kubelet/pod lifecycle
+	NetworkPluginName string
+	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
+	NonMasqueradeCIDR string
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration."), []
 	ResolverConfig string
-	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
-	// specify CPU limits
-	CPUCFSQuota bool
-	// containerized should be set to true if kubelet is running in a container.
-	Containerized bool
-	// maxOpenFiles is Number of files that can be opened by Kubelet process.
-	MaxOpenFiles int64
-	// registerSchedulable tells the kubelet to register the node as
-	// schedulable. Won't have any effect if register-node is false.
-	// DEPRECATED: use registerWithTaints instead
-	RegisterSchedulable bool
-	// registerWithTaints are an array of taints to add to a node object when
-	// the kubelet registers itself. This only takes effect when registerNode
-	// is true and upon the initial registration of the node.
-	RegisterWithTaints []api.Taint
-	// contentType is contentType of requests sent to apiserver.
-	ContentType string
-	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
-	KubeAPIQPS int32
-	// kubeAPIBurst is the burst to allow while talking with kubernetes
-	// apiserver
-	KubeAPIBurst int32
+
+	// CGroups
+
+	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
+	// +optional
+	CgroupDriver string
+	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
+	// And all Burstable and BestEffort pods are brought up under their
+	// specific top level QoS cgroup.
+	// +optional
+	CgroupsPerQOS bool
+	// CgroupRoot is the root cgroup to use for pods.
+	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
+	// +optional
+	CgroupRoot string
+	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
+	// +optional
+	KubeletCgroups string
+	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `KubeReserved` compute resource reservation for Kubernetes node system daemons.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	KubeReservedCgroup string
+	// Cgroups that container runtime is expected to be isolated in.
+	// +optional
+	RuntimeCgroups string
+	// SystemCgroups is absolute name of cgroups in which to place
+	// all non-kernel processes that are not already in a container. Empty
+	// for no container. Rolling back the flag requires a reboot.
+	// +optional
+	SystemCgroups string
+	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	SystemReservedCgroup string
+
+	// Container Runtime
+
+	// allowPrivileged enables containers to request privileged mode.
+	// Defaults to false.
+	AllowPrivileged bool
+	// containerRuntime is the container runtime to use.
+	ContainerRuntime string
+	// dockerEndpoint is the path to the docker endpoint to communicate with.
+	DockerEndpoint string
+	// dockerExecHandlerName is the handler to use when executing a command
+	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
+	// 'native'.
+	DockerExecHandlerName string
+	// Enable Container Runtime Interface (CRI) integration.
+	// +optional
+	EnableCRI bool
+	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
+	// must be within the range [-1000, 1000].
+	OOMScoreAdj int32
+	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
+	// +optional
+	RktAPIEndpoint string
+	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
+	// $PATH.
+	// +optional
+	RktPath string
+	// rktStage1Image is the image to use as stage1. Local paths and
+	// http/https URLs are supported.
+	// +optional
+	RktStage1Image string
+	// remoteImageEndpoint is the endpoint of remote image service
+	RemoteImageEndpoint string
+	// remoteRuntimeEndpoint is the endpoint of remote runtime service
+	RemoteRuntimeEndpoint string
+	// runtimeRequestTimeout is the timeout for all runtime requests except long running
+	// requests - pull, logs, exec and attach.
+	// +optional
+	RuntimeRequestTimeout metav1.Duration
+	// seccompProfileRoot is the directory path for seccomp profiles.
+	SeccompProfileRoot string
+
+	// Image Management
+
+	// imageGCHighThresholdPercent is the percent of disk usage after which
+	// image garbage collection is always run.
+	ImageGCHighThresholdPercent int32
+	// imageGCLowThresholdPercent is the percent of disk usage before which
+	// image garbage collection is never run. Lowest disk usage to garbage
+	// collect to.
+	ImageGCLowThresholdPercent int32
+	// imageMinimumGCAge is the minimum age for an unused image before it is
+	// garbage collected.
+	ImageMinimumGCAge metav1.Duration
+	// If no pulling progress is made before the deadline imagePullProgressDeadline,
+	// the image pulling will be cancelled. Defaults to 1m0s.
+	// +optional
+	ImagePullProgressDeadline metav1.Duration
+	// podInfraContainerImage is the image whose network/ipc namespaces
+	// containers in each pod will use.
+	PodInfraContainerImage string
+	// registryBurst is the maximum size of a bursty pulls, temporarily allows
+	// pulls to burst to this number, while still not exceeding registryQps.
+	// Only used if registryQPS > 0.
+	RegistryBurst int32
+	// registryPullQPS is the limit of registry pulls per second. If 0,
+	// unlimited. Set to 0 for no limit. Defaults to 5.0.
+	RegistryPullQPS int32
 	// serializeImagePulls when enabled, tells the Kubelet to pull images one
 	// at a time. We recommend *not* changing the default value on nodes that
 	// run docker daemon with version  < 1.9 or an Aufs storage backend.
 	// Issue #10959 has more details.
 	SerializeImagePulls bool
-	// outOfDiskTransitionFrequency is duration for which the kubelet has to
-	// wait before transitioning out of out-of-disk node condition status.
-	// +optional
-	OutOfDiskTransitionFrequency metav1.Duration
-	// nodeIP is IP address of the node. If set, kubelet will use this IP
-	// address for the node.
-	// +optional
-	NodeIP string
-	// nodeLabels to add when registering the node in the cluster.
-	NodeLabels map[string]string
-	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
-	NonMasqueradeCIDR string
-	// enable gathering custom metrics.
-	EnableCustomMetrics bool
-	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
-	// +optional
-	EvictionHard string
-	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
-	// +optional
-	EvictionSoft string
-	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
-	// +optional
-	EvictionSoftGracePeriod string
-	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
-	// +optional
-	EvictionPressureTransitionPeriod metav1.Duration
-	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
-	// +optional
-	EvictionMaxPodGracePeriod int32
-	// Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
-	// +optional
-	EvictionMinimumReclaim string
-	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
-	// +optional
-	ExperimentalKernelMemcgNotification bool
-	// Maximum number of pods per core. Cannot exceed MaxPods
-	PodsPerCore int32
+	// streamingConnectionIdleTimeout is the maximum time a streaming connection
+	// can be idle before the connection is automatically closed.
+	StreamingConnectionIdleTimeout metav1.Duration
+
+	// Disk & Volume
+
 	// enableControllerAttachDetach enables the Attach/Detach controller to
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
 	EnableControllerAttachDetach bool
-	// Default behaviour for kernel tuning
-	ProtectKernelDefaults bool
-	// If true, Kubelet ensures a set of iptables rules are present on host.
-	// These rules will serve as utility for various components, e.g. kube-proxy.
-	// The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
-	MakeIPTablesUtilChains bool
-	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT
-	// Values must be within the range [0, 31].
-	// Warning: Please match the value of corresponding parameter in kube-proxy
-	// TODO: clean up IPTablesMasqueradeBit in kube-proxy
-	IPTablesMasqueradeBit int32
-	// iptablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
-	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
-	IPTablesDropBit int32
-	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
+	// This can be useful for debugging volume related issues.
+	KeepTerminatedPodVolumes bool
+	// lowDiskSpaceThresholdMB is the absolute free disk space, in MB, to
+	// maintain. When disk space falls below this threshold, new pods would
+	// be rejected.
+	LowDiskSpaceThresholdMB int32
+	// outOfDiskTransitionFrequency is duration for which the kubelet has to
+	// wait before transitioning out of out-of-disk node condition status.
 	// +optional
-	AllowedUnsafeSysctls []string
-	// featureGates is a string of comma-separated key=value pairs that describe feature
-	// gates for alpha/experimental features.
-	FeatureGates string
-	// Enable Container Runtime Interface (CRI) integration.
-	// +optional
-	EnableCRI bool
-	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
-	// Tells the Kubelet to fail to start if swap is enabled on the node.
-	ExperimentalFailSwapOn bool
+	OutOfDiskTransitionFrequency metav1.Duration
+	// volumePluginDir is the full path of the directory in which to search
+	// for additional third party volume plugins
+	// +alpha
+	VolumePluginDir string
+	// How frequently to calculate and cache volume disk usage for all pods
+	VolumeStatsAggPeriod metav1.Duration
+	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
+	ExperimentalMounterPath string
 	// This flag, if set, enables a check prior to mount operations to verify that the required components
 	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
 	// and fails the mount operation fails.
 	ExperimentalCheckNodeCapabilitiesBeforeMount bool
-	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
-	// This can be useful for debugging volume related issues.
-	KeepTerminatedPodVolumes bool
 
-	/* following flags are meant for Node Allocatable */
+	// Status & Monitoring
 
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
-	// that describe resources reserved for non-kubernetes components.
-	// Currently only cpu and memory are supported. [default=none]
-	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	SystemReserved ConfigurationMap
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
-	// that describe resources reserved for kubernetes system components.
-	// Currently only cpu and memory are supported. [default=none]
-	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	KubeReserved ConfigurationMap
-	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
-	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
-	SystemReservedCgroup string
-	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `KubeReserved` compute resource reservation for Kubernetes node system daemons.
-	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
-	KubeReservedCgroup string
-	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
-	// This flag accepts a list of options. Acceptible options are `pods`, `system-reserved` & `kube-reserved`.
-	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
-	EnforceNodeAllocatable []string
-	// This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
-	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
-	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
+	// The node has babysitter process monitoring docker and kubelet.
+	// DEPRECATED
+	BabysitDaemons bool
+	// cAdvisorPort is the port of the localhost cAdvisor endpoint
+	CAdvisorPort int32
+	// enable gathering custom metrics.
+	EnableCustomMetrics bool
+	// fileCheckFrequency is the duration between checking config files for
+	// new data
+	FileCheckFrequency metav1.Duration
+	// healthzPort is the port of the localhost healthz endpoint
+	HealthzPort int32
+	// healthzBindAddress is the IP address for the healthz server to serve
+	// on.
+	HealthzBindAddress string
+	// httpCheckFrequency is the duration between checking http for new data
+	HTTPCheckFrequency metav1.Duration
+	// nodeStatusUpdateFrequency is the frequency that kubelet posts node
+	// status to master. Note: be cautious when changing the constant, it
+	// must work with nodeMonitorGracePeriod in nodecontroller.
+	NodeStatusUpdateFrequency metav1.Duration
+	// syncFrequency is the max period between synchronizing running
+	// containers and config
+	SyncFrequency metav1.Duration
+
+	// Testing
+
+	// enableDebuggingHandlers enables server endpoints for log collection
+	// and local running of containers and commands
+	EnableDebuggingHandlers bool
 }
 
 type KubeletAuthorizationMode string
