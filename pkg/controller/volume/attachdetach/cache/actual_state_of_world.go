@@ -557,10 +557,7 @@ func (asw *actualStateOfWorld) GetAttachedVolumesPerNode() map[types.NodeName][]
 	attachedVolumesPerNode := make(map[types.NodeName][]operationexecutor.AttachedVolume)
 	for _, volumeObj := range asw.attachedVolumes {
 		for nodeName, nodeObj := range volumeObj.nodesAttachedTo {
-			volumes, exists := attachedVolumesPerNode[nodeName]
-			if !exists {
-				volumes = []operationexecutor.AttachedVolume{}
-			}
+			volumes := attachedVolumesPerNode[nodeName]
 			volumes = append(volumes, getAttachedVolume(&volumeObj, &nodeObj).AttachedVolume)
 			attachedVolumesPerNode[nodeName] = volumes
 		}
