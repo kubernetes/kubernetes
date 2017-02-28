@@ -4639,6 +4639,13 @@ func GetPodsInNamespace(c clientset.Interface, ns string, ignoreLabels map[strin
 // RunCmd runs cmd using args and returns its stdout and stderr. It also outputs
 // cmd's stdout and stderr to their respective OS streams.
 func RunCmd(command string, args ...string) (string, string, error) {
+	return RunCmdEnv(nil, command, args...)
+}
+
+// RunCmdEnv runs cmd with the provided environment and args and
+// returns its stdout and stderr. It also outputs cmd's stdout and
+// stderr to their respective OS streams.
+func RunCmdEnv(env []string, command string, args ...string) (string, string, error) {
 	Logf("Running %s %v", command, args)
 	var bout, berr bytes.Buffer
 	cmd := exec.Command(command, args...)
@@ -4649,6 +4656,7 @@ func RunCmd(command string, args ...string) (string, string, error) {
 	// newlines.
 	cmd.Stdout = io.MultiWriter(os.Stdout, &bout)
 	cmd.Stderr = io.MultiWriter(os.Stderr, &berr)
+	cmd.Env = env
 	err := cmd.Run()
 	stdout, stderr := bout.String(), berr.String()
 	if err != nil {
