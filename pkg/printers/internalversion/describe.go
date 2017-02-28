@@ -577,7 +577,7 @@ func printControllers(annotation map[string]string) string {
 
 func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
 	if volumes == nil || len(volumes) == 0 {
-		w.Write(LEVEL_0, "%sNo volumes.\n", space)
+		w.Write(LEVEL_0, "%sVolumes:\t<none>\n", space)
 		return
 	}
 	w.Write(LEVEL_0, "%sVolumes:\n", space)
@@ -1026,7 +1026,7 @@ func describeContainerVolumes(container api.Container, w *PrefixWriter) {
 	if len(container.VolumeMounts) == 0 {
 		none = "\t<none>"
 	}
-	w.Write(LEVEL_2, "Volume Mounts:%s\n", none)
+	w.Write(LEVEL_2, "Mounts:%s\n", none)
 	sort.Sort(SortableVolumeMounts(container.VolumeMounts))
 	for _, mount := range container.VolumeMounts {
 		flags := []string{}
@@ -1047,7 +1047,7 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 	if len(container.Env) == 0 {
 		none = "\t<none>"
 	}
-	w.Write(LEVEL_2, "Environment Variables:%s\n", none)
+	w.Write(LEVEL_2, "Environment:%s\n", none)
 
 	for _, e := range container.Env {
 		if e.ValueFrom == nil {
@@ -2341,7 +2341,7 @@ func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceN
 
 func DescribeEvents(el *api.EventList, w *PrefixWriter) {
 	if len(el.Items) == 0 {
-		w.Write(LEVEL_0, "No events.\n")
+		w.Write(LEVEL_0, "Events:\t<none>\n")
 		return
 	}
 	sort.Sort(events.SortableEvents(el.Items))
