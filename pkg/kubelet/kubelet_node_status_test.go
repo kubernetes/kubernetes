@@ -400,10 +400,9 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:       *resource.NewMilliQuantity(2800, resource.DecimalSI),
-				v1.ResourceMemory:    *resource.NewQuantity(19900E6, resource.BinarySI),
-				v1.ResourcePods:      *resource.NewQuantity(0, resource.DecimalSI),
-				v1.ResourceNvidiaGPU: *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceCPU:    *resource.NewMilliQuantity(2800, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(19900E6, resource.BinarySI),
+				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 		},
 	}
