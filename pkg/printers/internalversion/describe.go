@@ -1180,6 +1180,26 @@ func describeStatus(stateName string, state api.ContainerState, w *PrefixWriter)
 	}
 }
 
+func describeVolumeClaimTemplates(templates []api.PersistentVolumeClaim, w *PrefixWriter) {
+	if len(templates) == 0 {
+		w.Write(LEVEL_0, "Volume Claims:\t<none>\n")
+		return
+	}
+	w.Write(LEVEL_0, "Volume Claims:\n")
+	for _, pvc := range templates {
+		w.Write(LEVEL_1, "Name:\t%s\n", pvc.Name)
+		w.Write(LEVEL_1, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pvc.ObjectMeta))
+		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.NewString())
+		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.NewString())
+		if capacity, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; ok {
+			w.Write(LEVEL_1, "Capacity:\t%s\n", capacity)
+		} else {
+			w.Write(LEVEL_1, "Capacity:\t%s\n", "<default>")
+		}
+		w.Write(LEVEL_1, "Access Modes:\t%s\n", pvc.Spec.AccessModes)
+	}
+}
+
 func printBoolPtr(value *bool) string {
 	if value != nil {
 		return printBool(*value)
@@ -2081,16 +2101,16 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
-		w.Write(LEVEL_0, "Name:\t%s\n", ps.Name)
-		w.Write(LEVEL_0, "Namespace:\t%s\n", ps.Namespace)
-		w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&ps.Spec.Template.Spec))
-		w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(ps.Spec.Selector))
-		w.Write(LEVEL_0, "Labels:\t%s\n", labels.FormatLabels(ps.Labels))
-		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", ps.Status.Replicas, ps.Spec.Replicas)
-		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(ps.Annotations))
+		w.Write(LEVEL_0, "Name:\t%s\n", ps.ObjectMeta.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", ps.ObjectMeta.Namespace)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", ps.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		printLabelsMultiline(w, "Labels", ps.Labels)
+		printAnnotationsMultiline(w, "Annotations", ps.Annotations)
+		w.Write(LEVEL_0, "Replicas:\t%d desired | %d total\n", ps.Spec.Replicas, ps.Status.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
-		describeVolumes(ps.Spec.Template.Spec.Volumes, w, "")
+		DescribePodTemplate(&ps.Spec.Template, out)
+		describeVolumeClaimTemplates(ps.Spec.VolumeClaimTemplates, w)
 		if describerSettings.ShowEvents {
 			events, _ := p.client.Core().Events(namespace).Search(api.Scheme, ps)
 			if events != nil {
