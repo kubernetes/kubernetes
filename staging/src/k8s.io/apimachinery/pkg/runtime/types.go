@@ -16,6 +16,8 @@ limitations under the License.
 
 package runtime
 
+import "k8s.io/apimachinery/pkg/runtime/schema"
+
 // Note that the types provided in this file are not versioned and are intended to be
 // safe to use from within all versions of every API object.
 
@@ -33,6 +35,7 @@ package runtime
 // +k8s:deepcopy-gen=true
 // +protobuf=true
 // +k8s:openapi-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TypeMeta struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
@@ -43,6 +46,8 @@ type TypeMeta struct {
 const (
 	ContentTypeJSON string = "application/json"
 )
+
+func (obj *TypeMeta) GetObjectKind() schema.ObjectKind { return obj }
 
 // RawExtension is used to hold extensions in external versions.
 //
@@ -124,6 +129,8 @@ type Unknown struct {
 
 // VersionedObjects is used by Decoders to give callers a way to access all versions
 // of an object during the decoding process.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:deepcopy-gen=true
 type VersionedObjects struct {
 	// Objects is the set of objects retrieved during decoding, in order of conversion.
 	// The 0 index is the object as serialized on the wire. If conversion has occurred,

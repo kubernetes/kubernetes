@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/examples/third-party-resources/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
@@ -87,7 +88,7 @@ func main() {
 		panic(err)
 	}
 
-	var example Example
+	var example types.Example
 
 	err = tprclient.Get().
 		Resource("examples").
@@ -98,17 +99,17 @@ func main() {
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Create an instance of our TPR
-			example := &Example{
+			example := &types.Example{
 				Metadata: metav1.ObjectMeta{
 					Name: "example1",
 				},
-				Spec: ExampleSpec{
+				Spec: types.ExampleSpec{
 					Foo: "hello",
 					Bar: true,
 				},
 			}
 
-			var result Example
+			var result types.Example
 			err = tprclient.Post().
 				Resource("examples").
 				Namespace(api.NamespaceDefault).
@@ -127,7 +128,7 @@ func main() {
 	}
 
 	// Fetch a list of our TPRs
-	exampleList := ExampleList{}
+	exampleList := types.ExampleList{}
 	err = tprclient.Get().Resource("examples").Do().Into(&exampleList)
 	if err != nil {
 		panic(err)
@@ -157,8 +158,8 @@ func configureClient(config *rest.Config) {
 		func(scheme *runtime.Scheme) error {
 			scheme.AddKnownTypes(
 				groupversion,
-				&Example{},
-				&ExampleList{},
+				&types.Example{},
+				&types.ExampleList{},
 			)
 			return nil
 		})

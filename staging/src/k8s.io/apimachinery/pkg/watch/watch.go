@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/golang/glog"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // Interface can be implemented by anything that knows how to watch and report changes.
@@ -50,6 +51,8 @@ const (
 )
 
 // Event represents a single event to a watched resource.
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type Event struct {
 	Type EventType
 
@@ -60,6 +63,8 @@ type Event struct {
 	//    depending on context.
 	Object runtime.Object
 }
+
+func (e *Event) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 type emptyWatch chan Event
 

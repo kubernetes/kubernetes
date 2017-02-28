@@ -25,26 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-type TestType struct {
-}
-
-func (t TestType) GetObjectKind() schema.ObjectKind {
-	return t
-}
-
-func (t TestType) SetGroupVersionKind(kind schema.GroupVersionKind) {
-}
-
-func (t TestType) GroupVersionKind() schema.GroupVersionKind {
-	return schema.GroupVersionKind{
-		Group:   "test",
-		Version: "v1",
-		Kind:    "TestType",
-	}
-}
 
 func assertEqual(t *testing.T, expected, actual interface{}) {
 	var equal bool

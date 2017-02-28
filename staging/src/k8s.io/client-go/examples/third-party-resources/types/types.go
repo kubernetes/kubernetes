@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package types
 
 import (
 	"encoding/json"
@@ -23,11 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// +k8s:deepcopy-gen=true
 type ExampleSpec struct {
 	Foo string `json:"foo"`
 	Bar bool   `json:"bar"`
 }
 
+// +k8s:deepcopy-gen=true
 type Example struct {
 	metav1.TypeMeta `json:",inline"`
 	Metadata        metav1.ObjectMeta `json:"metadata"`
@@ -35,6 +37,7 @@ type Example struct {
 	Spec ExampleSpec `json:"spec"`
 }
 
+// +k8s:deepcopy-gen=true
 type ExampleList struct {
 	metav1.TypeMeta `json:",inline"`
 	Metadata        metav1.ListMeta `json:"metadata"`

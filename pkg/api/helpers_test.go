@@ -18,7 +18,6 @@ package api
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"

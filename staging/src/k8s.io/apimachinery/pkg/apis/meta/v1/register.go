@@ -57,7 +57,6 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)
 	AddConversionFuncs(scheme)
 	RegisterDefaults(scheme)
 }
@@ -77,6 +76,5 @@ func init() {
 	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)
 	RegisterDefaults(scheme)
 }
