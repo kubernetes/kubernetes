@@ -42,7 +42,7 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.EnableProfiling, "profiling", o.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", o.EnableContentionProfiling,
-		"Enable contention profiling. Requires --profiling to be set to work.")
+		"Enable lock contention profiling, if profiling is enabled")
 	fs.BoolVar(&o.EnableSwaggerUI, "enable-swagger-ui", o.EnableSwaggerUI,
 		"Enables swagger ui on the apiserver at /swagger-ui")
 }
