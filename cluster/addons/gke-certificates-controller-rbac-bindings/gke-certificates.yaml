@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: gke-certificates
+  labels:
+    kubernetes.io/cluster-service: "true"
+subjects:
+  - kind: User
+    name: system:gke-certificates-controller
+roleRef:
+  kind: ClusterRole
+  name: system:controller:certificate-controller
+  apiGroup: rbac.authorization.k8s.io

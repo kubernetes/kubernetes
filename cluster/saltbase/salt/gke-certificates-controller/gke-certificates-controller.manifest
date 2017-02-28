@@ -1,0 +1,119 @@
+{% set params = "--kubeconfig=/etc/srv/kubernetes/gke-certificates-controller/kubeconfig --cluster-signing-gke-kubeconfig=/etc/gke_certificates_controller.config" -%}
+{% set srv_kube_path = "/srv/kubernetes" -%}
+
+{% set log_level = pillar['log_level'] -%}
+{% if pillar['gke_certificates_test_log_level'] is defined -%}
+  {% set log_level = pillar['gke_certificates_test_log_level'] -%}
+{% endif -%}
+
+# test_args has to be kept at the end, so they'll overwrite any prior configuration
+{% if pillar['gke_certificates_test_args'] is defined -%}
+{% set params = params + " " + pillar['gke_certificates_test_args'] -%}
+{% endif -%}
+
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"gke-certificates-controller",
+  "namespace": "kube-system",
+  "labels": {
+    "tier": "control-plane",
+    "component": "gke-certificates-controller"
+  }
+},
+"spec":{
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "gke-certificates-controller",
+    "image": "{{pillar['kube_docker_registry']}}/gke-certificates-controller:{{pillar['gke-certificates-controller_docker_tag']}}",
+    "resources": {
+      "requests": {
+        "cpu": "10m"
+      }
+    },
+    "command": [
+                 "/bin/sh",
+                 "-c",
+                 "/usr/local/bin/gke-certificates-controller {{params}} 1>>/var/log/gke-certificates-controller.log 2>&1"
+               ],
+    "volumeMounts": [
+        {
+          "name": "gkeconfig",
+          "mountPath": "/etc/gke_certificates_signing.config",
+          "readOnly": true
+        },
+        {
+          "name": "logfile",
+          "mountPath": "/var/log/gke-certificates-controller.log",
+          "readOnly": false
+        },
+        {
+          "name": "srvkube",
+          "mountPath": "{{srv_kube_path}}",
+          "readOnly": true
+        },
+        {
+	  "name": "etcssl",
+          "mountPath": "/etc/ssl",
+          "readOnly": true
+        },
+        {
+	  "name": "usrsharecacerts",
+          "mountPath": "/usr/share/ca-certificates",
+          "readOnly": true
+	},
+        {
+	  "name": "varssl",
+          "mountPath": "/var/ssl",
+          "readOnly": true
+	},
+        {
+	  "name": "etcopenssl",
+          "mountPath": "/etc/openssl",
+          "readOnly": true
+	},
+        {
+	  "name": "etcpki",
+          "mountPath": "/etc/pki",
+          "readOnly": true
+	}
+      ]
+    }
+],
+"volumes":[
+  {
+    "name": "srvkube",
+    "hostPath": {"path": "{{srv_kube_path}}"}
+  },
+  {
+    "name": "gkeconfig",
+    "hostPath": {"path": "/etc/gke_certificates_signing.config"}
+  },
+  {
+    "name": "logfile",
+    "hostPath": {"path": "/var/log/gke-certificates-controller.log"}
+  },
+  {
+    "name": "etcssl",
+    "hostPath": {"path": "/etc/ssl"}
+  },
+  {
+    "name": "usrsharecacerts",
+    "hostPath": {"path": "/usr/share/ca-certificates"}
+  },
+  {
+    "name": "varssl",
+    "hostPath": {"path": "/var/ssl"}
+  },
+  {
+    "name": "etcopenssl",
+    "hostPath": {"path": "/etc/openssl"}
+  },
+  {
+    "name": "etcpki",
+    "hostPath": {"path": "/etc/pki"}
+  }
+]
+}}

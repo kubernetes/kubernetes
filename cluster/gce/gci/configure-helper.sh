@@ -275,22 +275,25 @@ function create-master-auth {
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"                 "admin,admin,system:masters"
   fi
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN},"     "system:kube-controller-manager,uid:system:kube-controller-manager"
   fi
   if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"              "system:kube-scheduler,uid:system:kube-scheduler"
   fi
   if [[ -n "${KUBELET_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "system:node:node-name,uid:kubelet,system:nodes"
+    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                     "system:node:node-name,uid:kubelet,system:nodes"
   fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"                  "system:kube-proxy,uid:kube_proxy"
   fi
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
+    replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"       "system:node-problem-detector,uid:node-problem-detector"
+  fi
+  if [[ -n "${GKE_CERTIFICATES_CONTROLLER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${GKE_CERTIFICATES_CONTROLLER_TOKEN}," "system:gke-certificates-controller,uid:system:gke-certificates-controller"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -619,6 +622,7 @@ function load-docker-images {
     try-load-docker-image "${img_dir}/kube-apiserver.tar"
     try-load-docker-image "${img_dir}/kube-controller-manager.tar"
     try-load-docker-image "${img_dir}/kube-scheduler.tar"
+    try-load-docker-image "${img_dir}/gke-certificates-controller.tar"
   else
     try-load-docker-image "${img_dir}/kube-proxy.tar"
   fi
@@ -1210,6 +1214,76 @@ function start-kube-scheduler {
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
+function start-gke-certificates-controller {
+  if [[ -z "${GKE_CERTIFICATES_URL:-}" ]]; then
+    return
+  fi
+
+  echo "Creating gke-certificates-controller kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/gke-certificates-controller
+  cat <<EOF >/etc/srv/kubernetes/gke-certificates-controller/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: gke-certificates-controller
+  user:
+    token: ${GKE_CERTIFICATES_CONTROLLER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: gke-certificates-controller
+  name: gke-certificates-controller
+current-context: gke-certificates-controller
+EOF
+
+  cat <<EOF >/etc/gke_certificates_signing.config
+clusters:
+  - name: gke-certificates-server
+    cluster:
+      server: ${GKE_CERTIFICATES_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: gke
+contexts:
+- context:
+    cluster: gke-certificates-server
+    user: kube-apiserver
+  name: gke
+EOF
+
+  prepare-log-file /var/log/gke-certificates-controller.log
+
+  local kube_docker_registry="gcr.io/google_containers"
+  if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
+    kube_docker_registry=${KUBE_DOCKER_REGISTRY}
+  fi
+  local -r gke_certificates_controller_docker_tag=$(cat /home/kubernetes/kube-docker-files/gke-certificates-controller.docker_tag)
+  local params="${GKE_CERTIFICATES_CONTROLLER_TEST_LOG_LEVEL:-"--v=2"}"
+  params+=" --kubeconfig=/etc/srv/kubernetes/gke-certificates-controller/kubeconfig"
+  params+=" --cluster-signing-gke-kubeconfig=/etc/gke_certificates_signing.config"
+
+  # Remove salt comments and replace variables with values.
+  local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gke-certificates-controller.manifest"
+  remove-salt-config-comments "${src_file}"
+
+  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
+  sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${src_file}
+  sed -i -e "s@{{pillar\['gke-certificates-controller_docker_tag'\]}}@${gke_certificates_controller_docker_tag}@g" ${src_file}
+  sed -i -e "s@{{params}}@${params}@g" ${src_file}
+  cp "${src_file}" /etc/kubernetes/manifests
+
+  setup-addon-manifests "addons" "gke-certificates-controller-rbac-bindings"
+}
+
+
 # Starts cluster autoscaler.
 # Assumed vars (which are calculated in function compute-master-manifest-variables)
 #   CLOUD_CONFIG_OPT
@@ -1509,6 +1583,7 @@ fi
 # generate the controller manager and scheduler tokens here since they are only used on the master.
 KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 KUBE_SCHEDULER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+GKE_CERTIFICATES_CONTROLLER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
 setup-os-params
 config-ip-firewall
@@ -1551,6 +1626,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-lb-controller
   start-rescheduler
   start-fluentd-static-pod
+  start-gke-certificates-controller
 else
   start-kube-proxy
   # Kube-registry-proxy.
