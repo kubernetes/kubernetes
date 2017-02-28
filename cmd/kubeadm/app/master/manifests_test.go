@@ -32,7 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-const testCertsDir = "/var/lib/certs"
+const (
+	testCertsDir = "/var/lib/certs"
+	etcdDataDir  = "/var/lib/etcd"
+)
 
 func TestWriteStaticPodManifests(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "")
@@ -127,12 +130,13 @@ func TestEtcdVolume(t *testing.T) {
 		expected api.Volume
 	}{
 		{
-			cfg: &kubeadmapi.MasterConfiguration{},
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{DataDir: etcdDataDir},
+			},
 			expected: api.Volume{
 				Name: "etcd",
 				VolumeSource: api.VolumeSource{
-					HostPath: &api.HostPathVolumeSource{
-						Path: kubeadmapi.GlobalEnvParams.HostEtcdPath},
+					HostPath: &api.HostPathVolumeSource{Path: etcdDataDir},
 				}},
 		},
 	}
@@ -163,13 +167,13 @@ func TestEtcdVolumeMount(t *testing.T) {
 		{
 			expected: api.VolumeMount{
 				Name:      "etcd",
-				MountPath: "/var/lib/etcd",
+				MountPath: etcdDataDir,
 			},
 		},
 	}
 
 	for _, rt := range tests {
-		actual := etcdVolumeMount()
+		actual := etcdVolumeMount(etcdDataDir)
 		if actual.Name != rt.expected.Name {
 			t.Errorf(
 				"failed etcdVolumeMount:\n\texpected: %s\n\t  actual: %s",
@@ -660,6 +664,62 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
 			t.Errorf("failed getControllerManagerCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+		}
+	}
+}
+
+func TestGetEtcdCommand(t *testing.T) {
+	var tests = []struct {
+		cfg      *kubeadmapi.MasterConfiguration
+		expected []string
+	}{
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{DataDir: "/var/lib/etcd"},
+			},
+			expected: []string{
+				"etcd",
+				"--listen-client-urls=http://127.0.0.1:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379",
+				"--data-dir=/var/lib/etcd",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					DataDir: "/var/lib/etcd",
+					ExtraArgs: map[string]string{
+						"listen-client-urls":    "http://10.0.1.10:2379",
+						"advertise-client-urls": "http://10.0.1.10:2379",
+					},
+				},
+			},
+			expected: []string{
+				"etcd",
+				"--listen-client-urls=http://10.0.1.10:2379",
+				"--advertise-client-urls=http://10.0.1.10:2379",
+				"--data-dir=/var/lib/etcd",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{DataDir: "/etc/foo"},
+			},
+			expected: []string{
+				"etcd",
+				"--listen-client-urls=http://127.0.0.1:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379",
+				"--data-dir=/etc/foo",
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		actual := getEtcdCommand(rt.cfg)
+		sort.Strings(actual)
+		sort.Strings(rt.expected)
+		if !reflect.DeepEqual(actual, rt.expected) {
+			t.Errorf("failed getEtcdCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 		}
 	}
 }
