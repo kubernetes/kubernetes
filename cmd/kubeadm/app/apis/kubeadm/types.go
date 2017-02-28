@@ -78,10 +78,12 @@ type Networking struct {
 }
 
 type Etcd struct {
-	Endpoints []string
-	CAFile    string
-	CertFile  string
-	KeyFile   string
+	Endpoints    []string
+	CAFile       string
+	CertFile     string
+	KeyFile      string
+	ListenURL    string
+	AdvertiseURL string
 }
 
 type NodeConfiguration struct {
