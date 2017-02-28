@@ -18,6 +18,7 @@ go_library(
         "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/registry/batch/cronjob/storage:go_default_library",
         "//pkg/registry/batch/job/storage:go_default_library",
+        "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apiserver/pkg/registry/generic",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
