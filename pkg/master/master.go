@@ -234,7 +234,7 @@ func (c completedConfig) New() (*Master, error) {
 			ServiceNodePortRange: c.ServiceNodePortRange,
 			LoopbackClientConfig: c.GenericConfig.LoopbackClientConfig,
 		}
-		m.InstallLegacyAPI(c.Config, c.Config.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
+		m.InstallLegacyAPI(c.Config, c.Config.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider, c.APIResourceConfigSource)
 	}
 
 	restStorageProviders := []RESTStorageProvider{
@@ -262,8 +262,9 @@ func (c completedConfig) New() (*Master, error) {
 	return m, nil
 }
 
-func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
-	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
+func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider,
+	apiResourceConfigSource serverstorage.APIResourceConfigSource) {
+	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter, apiResourceConfigSource)
 	if err != nil {
 		glog.Fatalf("Error building core storage: %v", err)
 	}
