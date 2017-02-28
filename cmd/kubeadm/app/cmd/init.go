@@ -108,6 +108,14 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane`,
 	)
+	cmd.PersistentFlags().StringVar(
+		&cfg.Etcd.ListenURL, "etcd-listen-url", cfg.Etcd.ListenURL,
+		"Specify a listen-client-urls value to the etcd container",
+	)
+	cmd.PersistentFlags().StringVar(
+		&cfg.Etcd.AdvertiseURL, "etcd-advertise-url", cfg.Etcd.AdvertiseURL,
+		"Specify a advertise-client-urls value to the etcd container",
+	)
 
 	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
 
