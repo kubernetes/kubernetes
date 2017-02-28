@@ -48,5 +48,5 @@ if ${RUN_BENCHMARK:-false}; then
 fi
 # Running density tests. It might take a long time.
 kube::log::status "performance test (density) start"
-go test -test.run=. -test.timeout=60m -test.short=false
+go test -test.run=. -test.timeout=60m -test.short=false -args -v 3
 kube::log::status "...density tests finished"
