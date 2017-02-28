@@ -16180,6 +16180,176 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscaler": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Status and (in future) Configuration of ClusterAutoscaler.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard object metadata.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Current information about ClusterAutoscaler.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscalerStatus"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscalerStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscalerCondition": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ClusterAutoscalerCondition describes some aspect of ClusterAutoscaler work.",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Defines the aspect that the condition describes. For example, it can be Health or ScaleUp/Down activity.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status of the condition. Tells how given aspect",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"message": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Free text extra information about the condition. It may contain some extra debugging data, like why the cluster is unhealthy.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"reason": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Unique, one-word, CamelCase reason for the condition's last transition.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"lastProbeTime": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Last time we probed the condition.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							},
+						},
+						"lastTransitionTime": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Since when the condition was in the given state.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscalerList": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ClusterAutoscalerList is a list of ClusterAutoscaler objects.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "metadata is the standard list metadata.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "items is the list of ClusterAutoscaler objects.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscaler"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"items"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscaler"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscalerStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Status of ClusterAutoscaler",
+					Properties: map[string]spec.Schema{
+						"nodeGroupStatuses": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status information of individual node groups on which CA works.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.NodeGroupStatus"),
+										},
+									},
+								},
+							},
+						},
+						"clusterwideConditions": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Conditions that apply to the whole autoscaler.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscalerCondition"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscalerCondition", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.NodeGroupStatus"},
+		},
 		"k8s.io/kubernetes/pkg/apis/batch/v2alpha1.CronJob": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -16957,6 +17127,37 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricStatus", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.PodsMetricStatus", "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ResourceMetricStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.NodeGroupStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Status of a group of nodes controlled by ClusterAutoscaler.",
+					Properties: map[string]spec.Schema{
+						"providerID": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Name of the node group. On GCE it will be equal to MIG url, on AWS it will be ASG name, etc.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"conditions": {
+							SchemaProps: spec.SchemaProps{
+								Description: "List of conditions that describe the state of the node group.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscalerCondition"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ClusterAutoscalerCondition"},
 		},
 		"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1.ObjectMetricSource": {
 			Schema: spec.Schema{

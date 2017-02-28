@@ -25,6 +25,10 @@ limitations under the License.
 		k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1/generated.proto
 
 	It has these top-level messages:
+		ClusterAutoscaler
+		ClusterAutoscalerCondition
+		ClusterAutoscalerList
+		ClusterAutoscalerStatus
 		CrossVersionObjectReference
 		HorizontalPodAutoscaler
 		HorizontalPodAutoscalerList
@@ -32,6 +36,7 @@ limitations under the License.
 		HorizontalPodAutoscalerStatus
 		MetricSpec
 		MetricStatus
+		NodeGroupStatus
 		ObjectMetricSource
 		ObjectMetricStatus
 		PodsMetricSource
@@ -64,67 +69,93 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 const _ = proto.GoGoProtoPackageIsVersion1
 
+func (m *ClusterAutoscaler) Reset()                    { *m = ClusterAutoscaler{} }
+func (*ClusterAutoscaler) ProtoMessage()               {}
+func (*ClusterAutoscaler) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{0} }
+
+func (m *ClusterAutoscalerCondition) Reset()      { *m = ClusterAutoscalerCondition{} }
+func (*ClusterAutoscalerCondition) ProtoMessage() {}
+func (*ClusterAutoscalerCondition) Descriptor() ([]byte, []int) {
+	return fileDescriptorGenerated, []int{1}
+}
+
+func (m *ClusterAutoscalerList) Reset()                    { *m = ClusterAutoscalerList{} }
+func (*ClusterAutoscalerList) ProtoMessage()               {}
+func (*ClusterAutoscalerList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{2} }
+
+func (m *ClusterAutoscalerStatus) Reset()                    { *m = ClusterAutoscalerStatus{} }
+func (*ClusterAutoscalerStatus) ProtoMessage()               {}
+func (*ClusterAutoscalerStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{3} }
+
 func (m *CrossVersionObjectReference) Reset()      { *m = CrossVersionObjectReference{} }
 func (*CrossVersionObjectReference) ProtoMessage() {}
 func (*CrossVersionObjectReference) Descriptor() ([]byte, []int) {
-	return fileDescriptorGenerated, []int{0}
+	return fileDescriptorGenerated, []int{4}
 }
 
 func (m *HorizontalPodAutoscaler) Reset()                    { *m = HorizontalPodAutoscaler{} }
 func (*HorizontalPodAutoscaler) ProtoMessage()               {}
-func (*HorizontalPodAutoscaler) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{1} }
+func (*HorizontalPodAutoscaler) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{5} }
 
 func (m *HorizontalPodAutoscalerList) Reset()      { *m = HorizontalPodAutoscalerList{} }
 func (*HorizontalPodAutoscalerList) ProtoMessage() {}
 func (*HorizontalPodAutoscalerList) Descriptor() ([]byte, []int) {
-	return fileDescriptorGenerated, []int{2}
+	return fileDescriptorGenerated, []int{6}
 }
 
 func (m *HorizontalPodAutoscalerSpec) Reset()      { *m = HorizontalPodAutoscalerSpec{} }
 func (*HorizontalPodAutoscalerSpec) ProtoMessage() {}
 func (*HorizontalPodAutoscalerSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptorGenerated, []int{3}
+	return fileDescriptorGenerated, []int{7}
 }
 
 func (m *HorizontalPodAutoscalerStatus) Reset()      { *m = HorizontalPodAutoscalerStatus{} }
 func (*HorizontalPodAutoscalerStatus) ProtoMessage() {}
 func (*HorizontalPodAutoscalerStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptorGenerated, []int{4}
+	return fileDescriptorGenerated, []int{8}
 }
 
 func (m *MetricSpec) Reset()                    { *m = MetricSpec{} }
 func (*MetricSpec) ProtoMessage()               {}
-func (*MetricSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{5} }
+func (*MetricSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{9} }
 
 func (m *MetricStatus) Reset()                    { *m = MetricStatus{} }
 func (*MetricStatus) ProtoMessage()               {}
-func (*MetricStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{6} }
+func (*MetricStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{10} }
+
+func (m *NodeGroupStatus) Reset()                    { *m = NodeGroupStatus{} }
+func (*NodeGroupStatus) ProtoMessage()               {}
+func (*NodeGroupStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{11} }
 
 func (m *ObjectMetricSource) Reset()                    { *m = ObjectMetricSource{} }
 func (*ObjectMetricSource) ProtoMessage()               {}
-func (*ObjectMetricSource) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{7} }
+func (*ObjectMetricSource) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{12} }
 
 func (m *ObjectMetricStatus) Reset()                    { *m = ObjectMetricStatus{} }
 func (*ObjectMetricStatus) ProtoMessage()               {}
-func (*ObjectMetricStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{8} }
+func (*ObjectMetricStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{13} }
 
 func (m *PodsMetricSource) Reset()                    { *m = PodsMetricSource{} }
 func (*PodsMetricSource) ProtoMessage()               {}
-func (*PodsMetricSource) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{9} }
+func (*PodsMetricSource) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{14} }
 
 func (m *PodsMetricStatus) Reset()                    { *m = PodsMetricStatus{} }
 func (*PodsMetricStatus) ProtoMessage()               {}
-func (*PodsMetricStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{10} }
+func (*PodsMetricStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{15} }
 
 func (m *ResourceMetricSource) Reset()                    { *m = ResourceMetricSource{} }
 func (*ResourceMetricSource) ProtoMessage()               {}
-func (*ResourceMetricSource) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{11} }
+func (*ResourceMetricSource) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{16} }
 
 func (m *ResourceMetricStatus) Reset()                    { *m = ResourceMetricStatus{} }
 func (*ResourceMetricStatus) ProtoMessage()               {}
-func (*ResourceMetricStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{12} }
+func (*ResourceMetricStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{17} }
 
 func init() {
+	proto.RegisterType((*ClusterAutoscaler)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.ClusterAutoscaler")
+	proto.RegisterType((*ClusterAutoscalerCondition)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.ClusterAutoscalerCondition")
+	proto.RegisterType((*ClusterAutoscalerList)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.ClusterAutoscalerList")
+	proto.RegisterType((*ClusterAutoscalerStatus)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.ClusterAutoscalerStatus")
 	proto.RegisterType((*CrossVersionObjectReference)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.CrossVersionObjectReference")
 	proto.RegisterType((*HorizontalPodAutoscaler)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler")
 	proto.RegisterType((*HorizontalPodAutoscalerList)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerList")
@@ -132,6 +163,7 @@ func init() {
 	proto.RegisterType((*HorizontalPodAutoscalerStatus)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerStatus")
 	proto.RegisterType((*MetricSpec)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.MetricSpec")
 	proto.RegisterType((*MetricStatus)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.MetricStatus")
+	proto.RegisterType((*NodeGroupStatus)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.NodeGroupStatus")
 	proto.RegisterType((*ObjectMetricSource)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.ObjectMetricSource")
 	proto.RegisterType((*ObjectMetricStatus)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.ObjectMetricStatus")
 	proto.RegisterType((*PodsMetricSource)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.PodsMetricSource")
@@ -139,6 +171,170 @@ func init() {
 	proto.RegisterType((*ResourceMetricSource)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.ResourceMetricSource")
 	proto.RegisterType((*ResourceMetricStatus)(nil), "k8s.io.kubernetes.pkg.apis.autoscaling.v2alpha1.ResourceMetricStatus")
 }
+func (m *ClusterAutoscaler) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ClusterAutoscaler) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
+	n1, err := m.ObjectMeta.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n1
+	data[i] = 0x1a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
+	n2, err := m.Status.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n2
+	return i, nil
+}
+
+func (m *ClusterAutoscalerCondition) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ClusterAutoscalerCondition) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Type)))
+	i += copy(data[i:], m.Type)
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Status)))
+	i += copy(data[i:], m.Status)
+	data[i] = 0x1a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Message)))
+	i += copy(data[i:], m.Message)
+	data[i] = 0x22
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Reason)))
+	i += copy(data[i:], m.Reason)
+	data[i] = 0x2a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.LastProbeTime.Size()))
+	n3, err := m.LastProbeTime.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n3
+	data[i] = 0x32
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.LastTransitionTime.Size()))
+	n4, err := m.LastTransitionTime.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n4
+	return i, nil
+}
+
+func (m *ClusterAutoscalerList) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ClusterAutoscalerList) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
+	n5, err := m.ListMeta.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n5
+	if len(m.Items) > 0 {
+		for _, msg := range m.Items {
+			data[i] = 0x12
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *ClusterAutoscalerStatus) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ClusterAutoscalerStatus) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.NodeGroupStatuses) > 0 {
+		for _, msg := range m.NodeGroupStatuses {
+			data[i] = 0xa
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if len(m.ClusterwideConditions) > 0 {
+		for _, msg := range m.ClusterwideConditions {
+			data[i] = 0x12
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
 func (m *CrossVersionObjectReference) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -187,27 +383,27 @@ func (m *HorizontalPodAutoscaler) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n1, err := m.ObjectMeta.MarshalTo(data[i:])
+	n6, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n1
+	i += n6
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n2, err := m.Spec.MarshalTo(data[i:])
+	n7, err := m.Spec.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n2
+	i += n7
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
-	n3, err := m.Status.MarshalTo(data[i:])
+	n8, err := m.Status.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n3
+	i += n8
 	return i, nil
 }
 
@@ -229,11 +425,11 @@ func (m *HorizontalPodAutoscalerList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n4, err := m.ListMeta.MarshalTo(data[i:])
+	n9, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n4
+	i += n9
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -267,11 +463,11 @@ func (m *HorizontalPodAutoscalerSpec) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ScaleTargetRef.Size()))
-	n5, err := m.ScaleTargetRef.MarshalTo(data[i:])
+	n10, err := m.ScaleTargetRef.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n5
+	i += n10
 	if m.MinReplicas != nil {
 		data[i] = 0x10
 		i++
@@ -319,11 +515,11 @@ func (m *HorizontalPodAutoscalerStatus) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.LastScaleTime.Size()))
-		n6, err := m.LastScaleTime.MarshalTo(data[i:])
+		n11, err := m.LastScaleTime.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n6
+		i += n11
 	}
 	data[i] = 0x18
 	i++
@@ -369,31 +565,31 @@ func (m *MetricSpec) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Object.Size()))
-		n7, err := m.Object.MarshalTo(data[i:])
+		n12, err := m.Object.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n7
+		i += n12
 	}
 	if m.Pods != nil {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Pods.Size()))
-		n8, err := m.Pods.MarshalTo(data[i:])
+		n13, err := m.Pods.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n8
+		i += n13
 	}
 	if m.Resource != nil {
 		data[i] = 0x22
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Resource.Size()))
-		n9, err := m.Resource.MarshalTo(data[i:])
+		n14, err := m.Resource.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n9
+		i += n14
 	}
 	return i, nil
 }
@@ -421,31 +617,65 @@ func (m *MetricStatus) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Object.Size()))
-		n10, err := m.Object.MarshalTo(data[i:])
+		n15, err := m.Object.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n10
+		i += n15
 	}
 	if m.Pods != nil {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Pods.Size()))
-		n11, err := m.Pods.MarshalTo(data[i:])
+		n16, err := m.Pods.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n11
+		i += n16
 	}
 	if m.Resource != nil {
 		data[i] = 0x22
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Resource.Size()))
-		n12, err := m.Resource.MarshalTo(data[i:])
+		n17, err := m.Resource.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n12
+		i += n17
+	}
+	return i, nil
+}
+
+func (m *NodeGroupStatus) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *NodeGroupStatus) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.ProviderID)))
+	i += copy(data[i:], m.ProviderID)
+	if len(m.Conditions) > 0 {
+		for _, msg := range m.Conditions {
+			data[i] = 0x12
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
 	}
 	return i, nil
 }
@@ -468,11 +698,11 @@ func (m *ObjectMetricSource) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Target.Size()))
-	n13, err := m.Target.MarshalTo(data[i:])
+	n18, err := m.Target.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n13
+	i += n18
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.MetricName)))
@@ -480,11 +710,11 @@ func (m *ObjectMetricSource) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.TargetValue.Size()))
-	n14, err := m.TargetValue.MarshalTo(data[i:])
+	n19, err := m.TargetValue.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n14
+	i += n19
 	return i, nil
 }
 
@@ -506,11 +736,11 @@ func (m *ObjectMetricStatus) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Target.Size()))
-	n15, err := m.Target.MarshalTo(data[i:])
+	n20, err := m.Target.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n15
+	i += n20
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.MetricName)))
@@ -518,11 +748,11 @@ func (m *ObjectMetricStatus) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.CurrentValue.Size()))
-	n16, err := m.CurrentValue.MarshalTo(data[i:])
+	n21, err := m.CurrentValue.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n16
+	i += n21
 	return i, nil
 }
 
@@ -548,11 +778,11 @@ func (m *PodsMetricSource) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.TargetAverageValue.Size()))
-	n17, err := m.TargetAverageValue.MarshalTo(data[i:])
+	n22, err := m.TargetAverageValue.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n17
+	i += n22
 	return i, nil
 }
 
@@ -578,11 +808,11 @@ func (m *PodsMetricStatus) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.CurrentAverageValue.Size()))
-	n18, err := m.CurrentAverageValue.MarshalTo(data[i:])
+	n23, err := m.CurrentAverageValue.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n18
+	i += n23
 	return i, nil
 }
 
@@ -614,11 +844,11 @@ func (m *ResourceMetricSource) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.TargetAverageValue.Size()))
-		n19, err := m.TargetAverageValue.MarshalTo(data[i:])
+		n24, err := m.TargetAverageValue.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n19
+		i += n24
 	}
 	return i, nil
 }
@@ -650,11 +880,11 @@ func (m *ResourceMetricStatus) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.CurrentAverageValue.Size()))
-	n20, err := m.CurrentAverageValue.MarshalTo(data[i:])
+	n25, err := m.CurrentAverageValue.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n20
+	i += n25
 	return i, nil
 }
 
@@ -685,6 +915,66 @@ func encodeVarintGenerated(data []byte, offset int, v uint64) int {
 	data[offset] = uint8(v)
 	return offset + 1
 }
+func (m *ClusterAutoscaler) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ObjectMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Status.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *ClusterAutoscalerCondition) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Type)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Status)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Message)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Reason)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.LastProbeTime.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.LastTransitionTime.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *ClusterAutoscalerList) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ClusterAutoscalerStatus) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.NodeGroupStatuses) > 0 {
+		for _, e := range m.NodeGroupStatuses {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.ClusterwideConditions) > 0 {
+		for _, e := range m.ClusterwideConditions {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *CrossVersionObjectReference) Size() (n int) {
 	var l int
 	_ = l
@@ -802,6 +1092,20 @@ func (m *MetricStatus) Size() (n int) {
 	return n
 }
 
+func (m *NodeGroupStatus) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.ProviderID)
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Conditions) > 0 {
+		for _, e := range m.Conditions {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *ObjectMetricSource) Size() (n int) {
 	var l int
 	_ = l
@@ -886,6 +1190,54 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *ClusterAutoscaler) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ClusterAutoscaler{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "ClusterAutoscalerStatus", "ClusterAutoscalerStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ClusterAutoscalerCondition) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ClusterAutoscalerCondition{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
+		`LastProbeTime:` + strings.Replace(strings.Replace(this.LastProbeTime.String(), "Time", "k8s_io_apimachinery_pkg_apis_meta_v1.Time", 1), `&`, ``, 1) + `,`,
+		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_apimachinery_pkg_apis_meta_v1.Time", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ClusterAutoscalerList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ClusterAutoscalerList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "ClusterAutoscaler", "ClusterAutoscaler", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ClusterAutoscalerStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ClusterAutoscalerStatus{`,
+		`NodeGroupStatuses:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.NodeGroupStatuses), "NodeGroupStatus", "NodeGroupStatus", 1), `&`, ``, 1) + `,`,
+		`ClusterwideConditions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ClusterwideConditions), "ClusterAutoscalerCondition", "ClusterAutoscalerCondition", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
 }
 func (this *CrossVersionObjectReference) String() string {
 	if this == nil {
@@ -975,6 +1327,17 @@ func (this *MetricStatus) String() string {
 	}, "")
 	return s
 }
+func (this *NodeGroupStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NodeGroupStatus{`,
+		`ProviderID:` + fmt.Sprintf("%v", this.ProviderID) + `,`,
+		`Conditions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Conditions), "ClusterAutoscalerCondition", "ClusterAutoscalerCondition", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *ObjectMetricSource) String() string {
 	if this == nil {
 		return "nil"
@@ -1052,6 +1415,565 @@ func valueToStringGenerated(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (m *ClusterAutoscaler) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ClusterAutoscaler: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ClusterAutoscaler: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ObjectMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Status.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ClusterAutoscalerCondition) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ClusterAutoscalerCondition: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ClusterAutoscalerCondition: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Type = ClusterAutoscalerConditionType(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Status = ClusterAutoscalerConditionStatus(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Message = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Reason = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastProbeTime", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.LastProbeTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastTransitionTime", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.LastTransitionTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ClusterAutoscalerList) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ClusterAutoscalerList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ClusterAutoscalerList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, ClusterAutoscaler{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ClusterAutoscalerStatus) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ClusterAutoscalerStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ClusterAutoscalerStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeGroupStatuses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NodeGroupStatuses = append(m.NodeGroupStatuses, NodeGroupStatus{})
+			if err := m.NodeGroupStatuses[len(m.NodeGroupStatuses)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ClusterwideConditions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ClusterwideConditions = append(m.ClusterwideConditions, ClusterAutoscalerCondition{})
+			if err := m.ClusterwideConditions[len(m.ClusterwideConditions)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *CrossVersionObjectReference) Unmarshal(data []byte) error {
 	l := len(data)
@@ -2119,6 +3041,116 @@ func (m *MetricStatus) Unmarshal(data []byte) error {
 	}
 	return nil
 }
+func (m *NodeGroupStatus) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NodeGroupStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NodeGroupStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ProviderID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ProviderID = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Conditions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Conditions = append(m.Conditions, ClusterAutoscalerCondition{})
+			if err := m.Conditions[len(m.Conditions)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *ObjectMetricSource) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
@@ -2982,81 +4014,99 @@ var (
 )
 
 var fileDescriptorGenerated = []byte{
-	// 1208 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xd4, 0x57, 0x5b, 0x6f, 0x1b, 0x45,
-	0x14, 0x8e, 0x2f, 0x49, 0xc3, 0x38, 0x37, 0x26, 0x55, 0xea, 0x26, 0xd4, 0x8e, 0xf6, 0xa9, 0x54,
-	0xb0, 0x4b, 0x4c, 0x41, 0x54, 0x08, 0xa1, 0xd8, 0x5c, 0x5a, 0x11, 0xa7, 0x61, 0x1a, 0x2a, 0x04,
-	0x48, 0x30, 0x59, 0x4f, 0x9c, 0x21, 0xde, 0x8b, 0x76, 0x66, 0xad, 0x26, 0x52, 0x25, 0x7e, 0x00,
-	0x0f, 0xbc, 0xf0, 0x13, 0x90, 0xf8, 0x07, 0x3c, 0x83, 0x84, 0x94, 0xc7, 0xf2, 0xc6, 0x93, 0x45,
-	0xdc, 0x37, 0x7e, 0x42, 0x25, 0x2e, 0xda, 0x99, 0xf1, 0x5e, 0xbc, 0x5e, 0x13, 0x87, 0xb4, 0x82,
-	0x37, 0xef, 0xcc, 0x39, 0xdf, 0x77, 0xce, 0xf9, 0xce, 0x9c, 0x19, 0x83, 0xb7, 0x0f, 0xdf, 0x60,
-	0x3a, 0x75, 0x8c, 0x43, 0x7f, 0x8f, 0x78, 0x36, 0xe1, 0x84, 0x19, 0xee, 0x61, 0xdb, 0xc0, 0x2e,
-	0x65, 0x06, 0xf6, 0xb9, 0xc3, 0x4c, 0xdc, 0xa1, 0x76, 0xdb, 0xe8, 0xd6, 0x70, 0xc7, 0x3d, 0xc0,
-	0x1b, 0x46, 0x9b, 0xd8, 0xc4, 0xc3, 0x9c, 0xb4, 0x74, 0xd7, 0x73, 0xb8, 0x03, 0x0d, 0x09, 0xa0,
-	0x47, 0x00, 0xba, 0x7b, 0xd8, 0xd6, 0x03, 0x00, 0x3d, 0x06, 0xa0, 0x0f, 0x00, 0x56, 0x5f, 0x6e,
-	0x53, 0x7e, 0xe0, 0xef, 0xe9, 0xa6, 0x63, 0x19, 0x6d, 0xa7, 0xed, 0x18, 0x02, 0x67, 0xcf, 0xdf,
-	0x17, 0x5f, 0xe2, 0x43, 0xfc, 0x92, 0xf8, 0xab, 0x37, 0x55, 0x80, 0xd8, 0xa5, 0x16, 0x36, 0x0f,
-	0xa8, 0x4d, 0xbc, 0xa3, 0x41, 0x88, 0x86, 0x47, 0x98, 0xe3, 0x7b, 0x26, 0x19, 0x8e, 0x6a, 0xac,
-	0x17, 0x33, 0x2c, 0xc2, 0xb1, 0xd1, 0x4d, 0xe5, 0xb2, 0x6a, 0x64, 0x79, 0x79, 0xbe, 0xcd, 0xa9,
-	0x95, 0xa6, 0x79, 0xfd, 0x9f, 0x1c, 0x98, 0x79, 0x40, 0x2c, 0x9c, 0xf2, 0x7b, 0x35, 0xcb, 0xcf,
-	0xe7, 0xb4, 0x63, 0x50, 0x9b, 0x33, 0xee, 0x8d, 0xcb, 0x89, 0x11, 0xaf, 0x4b, 0xbc, 0x28, 0x21,
-	0xf2, 0x00, 0x5b, 0x6e, 0x87, 0x8c, 0xca, 0xe9, 0xa5, 0x4c, 0x81, 0x47, 0x59, 0xdf, 0x3a, 0x6b,
-	0x3b, 0xa4, 0x5c, 0xb5, 0x6f, 0x73, 0x60, 0xad, 0xe1, 0x39, 0x8c, 0xdd, 0x27, 0x1e, 0xa3, 0x8e,
-	0x7d, 0x77, 0xef, 0x4b, 0x62, 0x72, 0x44, 0xf6, 0x89, 0x47, 0x6c, 0x93, 0xc0, 0x75, 0x50, 0x3c,
-	0xa4, 0x76, 0xab, 0x9c, 0x5b, 0xcf, 0x5d, 0x7f, 0xae, 0x3e, 0x77, 0xd2, 0xab, 0x4e, 0xf5, 0x7b,
-	0xd5, 0xe2, 0x07, 0xd4, 0x6e, 0x21, 0xb1, 0x13, 0x58, 0xd8, 0xd8, 0x22, 0xe5, 0x7c, 0xd2, 0x62,
-	0x1b, 0x5b, 0x04, 0x89, 0x1d, 0x58, 0x03, 0x00, 0xbb, 0x54, 0x11, 0x94, 0x0b, 0xc2, 0x0e, 0x2a,
-	0x3b, 0xb0, 0xb9, 0x73, 0x47, 0xed, 0xa0, 0x98, 0x95, 0xf6, 0x38, 0x0f, 0xae, 0xdc, 0x76, 0x3c,
-	0x7a, 0xec, 0xd8, 0x1c, 0x77, 0x76, 0x9c, 0xd6, 0xa6, 0xca, 0x83, 0x78, 0xf0, 0x0b, 0x30, 0x1b,
-	0xf4, 0x42, 0x0b, 0x73, 0x2c, 0xe2, 0x2a, 0xd5, 0x5e, 0xd1, 0x55, 0x3f, 0xc7, 0xa5, 0x89, 0x3a,
-	0x3a, 0xb0, 0xd6, 0xbb, 0x1b, 0xba, 0x4c, 0xae, 0x49, 0x38, 0x8e, 0xf8, 0xa3, 0x35, 0x14, 0xa2,
-	0x42, 0x1b, 0x14, 0x99, 0x4b, 0x4c, 0x91, 0x53, 0xa9, 0xb6, 0xa5, 0x4f, 0x78, 0x5a, 0xf4, 0x8c,
-	0xc8, 0xef, 0xb9, 0xc4, 0x8c, 0x2a, 0x14, 0x7c, 0x21, 0xc1, 0x03, 0xbb, 0x60, 0x86, 0x71, 0xcc,
-	0x7d, 0x26, 0xaa, 0x53, 0xaa, 0x6d, 0x5f, 0x18, 0xa3, 0x40, 0xad, 0x2f, 0x28, 0xce, 0x19, 0xf9,
-	0x8d, 0x14, 0x9b, 0xf6, 0x7b, 0x0e, 0xac, 0x65, 0x78, 0x6e, 0x51, 0xc6, 0xe1, 0x67, 0xa9, 0x4a,
-	0xeb, 0x67, 0xab, 0x74, 0xe0, 0x2d, 0xea, 0xbc, 0xa4, 0x98, 0x67, 0x07, 0x2b, 0xb1, 0x2a, 0x5b,
-	0x60, 0x9a, 0x72, 0x62, 0xb1, 0x72, 0x7e, 0xbd, 0x70, 0xbd, 0x54, 0xbb, 0x7d, 0x51, 0x49, 0xd7,
-	0xe7, 0x15, 0xe9, 0xf4, 0x9d, 0x00, 0x1e, 0x49, 0x16, 0xed, 0xcf, 0x7c, 0x66, 0xb2, 0x81, 0x14,
-	0xf0, 0xeb, 0x1c, 0x58, 0x10, 0x9f, 0xbb, 0xd8, 0x6b, 0x93, 0xe0, 0x0c, 0xa8, 0x9c, 0x27, 0xd7,
-	0x7f, 0xcc, 0x89, 0xaa, 0xaf, 0xa8, 0xe0, 0x16, 0xee, 0x25, 0xb8, 0xd0, 0x10, 0x37, 0xdc, 0x00,
-	0x25, 0x8b, 0xda, 0x88, 0xb8, 0x1d, 0x6a, 0x62, 0x26, 0x5a, 0x71, 0xba, 0xbe, 0xd8, 0xef, 0x55,
-	0x4b, 0xcd, 0x68, 0x19, 0xc5, 0x6d, 0xe0, 0x6b, 0xa0, 0x64, 0xe1, 0x07, 0xa1, 0x4b, 0x41, 0xb8,
-	0x2c, 0x2b, 0xbe, 0x52, 0x33, 0xda, 0x42, 0x71, 0x3b, 0xb8, 0x0f, 0x2e, 0x59, 0x84, 0x7b, 0xd4,
-	0x64, 0xe5, 0xa2, 0x50, 0xe2, 0xcd, 0x89, 0x13, 0x6e, 0x0a, 0x7f, 0xd1, 0xdf, 0x8b, 0x8a, 0xef,
-	0x92, 0x5c, 0x63, 0x68, 0x00, 0xae, 0xfd, 0x52, 0x00, 0xd7, 0xc6, 0xf6, 0x29, 0x7c, 0x0f, 0x40,
-	0x67, 0x4f, 0x8c, 0xc9, 0xd6, 0xfb, 0x72, 0x50, 0x05, 0x13, 0x23, 0x50, 0xa1, 0x50, 0x5f, 0xe9,
-	0xf7, 0xaa, 0xf0, 0x6e, 0x6a, 0x17, 0x8d, 0xf0, 0x80, 0x26, 0x98, 0xef, 0x60, 0xc6, 0x65, 0x85,
-	0xa9, 0x1a, 0x4e, 0xa5, 0xda, 0x8d, 0xb3, 0x35, 0x6f, 0xe0, 0x51, 0x7f, 0xbe, 0xdf, 0xab, 0xce,
-	0x6f, 0xc5, 0x41, 0x50, 0x12, 0x13, 0x6e, 0x82, 0x45, 0xd3, 0xf7, 0x3c, 0x62, 0xf3, 0xa1, 0x8a,
-	0x5f, 0x51, 0x15, 0x58, 0x6c, 0x24, 0xb7, 0xd1, 0xb0, 0x7d, 0x00, 0xd1, 0x22, 0x8c, 0x7a, 0xa4,
-	0x15, 0x42, 0x14, 0x93, 0x10, 0xef, 0x24, 0xb7, 0xd1, 0xb0, 0x3d, 0x7c, 0x08, 0x16, 0x14, 0xaa,
-	0xaa, 0x77, 0x79, 0x5a, 0x68, 0xf8, 0xd6, 0x79, 0x35, 0x94, 0x13, 0x23, 0xec, 0xd2, 0x46, 0x02,
-	0x1c, 0x0d, 0x91, 0x69, 0x7f, 0xe4, 0x01, 0x88, 0xc4, 0x87, 0x37, 0x41, 0x91, 0x1f, 0xb9, 0x44,
-	0x5d, 0x17, 0xeb, 0x83, 0x51, 0xb7, 0x7b, 0xe4, 0x92, 0x27, 0xbd, 0xea, 0x92, 0xb2, 0x14, 0xb7,
-	0x7f, 0xb0, 0x86, 0x84, 0x35, 0x6c, 0x83, 0x19, 0x47, 0x9c, 0x12, 0xa5, 0x53, 0x63, 0xe2, 0xd8,
-	0xc3, 0x29, 0x1e, 0xc2, 0xd7, 0x41, 0x30, 0xef, 0xd4, 0xe1, 0x53, 0xf0, 0xf0, 0x73, 0x50, 0x74,
-	0x9d, 0xd6, 0x60, 0xca, 0x6e, 0x4e, 0x4c, 0xb3, 0xe3, 0xb4, 0x58, 0x82, 0x64, 0x36, 0xc8, 0x2e,
-	0x58, 0x45, 0x02, 0x18, 0x3a, 0x60, 0x76, 0xf0, 0xba, 0x11, 0x4a, 0x96, 0x6a, 0xef, 0x4e, 0x4c,
-	0x82, 0x14, 0x40, 0x82, 0x68, 0x2e, 0x98, 0xa1, 0x83, 0x1d, 0x14, 0x92, 0x68, 0x7f, 0xe5, 0xc1,
-	0x5c, 0x5c, 0xb8, 0xff, 0x86, 0x02, 0xb2, 0x87, 0x9e, 0xb2, 0x02, 0x92, 0xe4, 0x19, 0x28, 0x20,
-	0x89, 0xb2, 0x14, 0xf8, 0x2e, 0x0f, 0x60, 0xba, 0xfd, 0x20, 0x07, 0x33, 0x5c, 0xcc, 0xf2, 0xa7,
-	0x72, 0x89, 0x84, 0x17, 0xba, 0xba, 0x2f, 0x14, 0x57, 0xf0, 0xd4, 0x92, 0xd3, 0x76, 0x3b, 0x7a,
-	0x92, 0x85, 0x4f, 0x9d, 0x66, 0xb8, 0x83, 0x62, 0x56, 0x90, 0x80, 0x92, 0xf4, 0xbe, 0x8f, 0x3b,
-	0x3e, 0x51, 0xca, 0x8c, 0xbd, 0xe7, 0xf5, 0x41, 0xf2, 0xfa, 0x87, 0x3e, 0xb6, 0x39, 0xe5, 0x47,
-	0xd1, 0x2d, 0xb3, 0x1b, 0x41, 0xa1, 0x38, 0xae, 0xf6, 0xfd, 0x70, 0x9d, 0x64, 0xbf, 0xfe, 0x7f,
-	0xea, 0x74, 0x00, 0xe6, 0xd4, 0xf0, 0xfb, 0x37, 0x85, 0xba, 0xac, 0x58, 0xe6, 0x1a, 0x31, 0x2c,
-	0x94, 0x40, 0xd6, 0x7e, 0xca, 0x81, 0xa5, 0xe1, 0x51, 0x33, 0x14, 0x72, 0xee, 0x4c, 0x21, 0x1f,
-	0x03, 0x28, 0x13, 0xde, 0xec, 0x12, 0x0f, 0xb7, 0x89, 0x0c, 0x3c, 0x7f, 0xae, 0xc0, 0x57, 0x15,
-	0x17, 0xdc, 0x4d, 0x21, 0xa2, 0x11, 0x2c, 0xda, 0xcf, 0xc9, 0x24, 0xa4, 0xda, 0xe7, 0x49, 0xe2,
-	0x21, 0x58, 0x56, 0xd5, 0xb9, 0x80, 0x2c, 0xd6, 0x14, 0xd9, 0x72, 0x23, 0x0d, 0x89, 0x46, 0xf1,
-	0x68, 0x3f, 0xe4, 0xc1, 0xe5, 0x51, 0x23, 0x19, 0x36, 0xd5, 0x1f, 0x1f, 0x99, 0xc5, 0xad, 0xf8,
-	0x1f, 0x9f, 0x27, 0xbd, 0xea, 0x8b, 0xe3, 0xfe, 0xc1, 0x85, 0x13, 0x26, 0xf6, 0x2f, 0xe9, 0x63,
-	0x50, 0x4e, 0x54, 0xf1, 0x23, 0x4e, 0x3b, 0xf4, 0x58, 0xbe, 0x80, 0xe4, 0xe3, 0xef, 0x85, 0x7e,
-	0xaf, 0x5a, 0xde, 0xcd, 0xb0, 0x41, 0x99, 0xde, 0xb0, 0x3b, 0xb2, 0x0b, 0xce, 0xd7, 0xbe, 0x2b,
-	0x13, 0x74, 0xc0, 0x8f, 0xe9, 0xca, 0xc9, 0x2e, 0xb8, 0xe0, 0xca, 0x7d, 0x0a, 0xae, 0x26, 0x85,
-	0x4b, 0x97, 0xee, 0x5a, 0xbf, 0x57, 0xbd, 0xda, 0xc8, 0x32, 0x42, 0xd9, 0xfe, 0x59, 0xdd, 0x57,
-	0x78, 0x36, 0xdd, 0x57, 0xbf, 0x71, 0x72, 0x5a, 0x99, 0x7a, 0x74, 0x5a, 0x99, 0xfa, 0xf5, 0xb4,
-	0x32, 0xf5, 0x55, 0xbf, 0x92, 0x3b, 0xe9, 0x57, 0x72, 0x8f, 0xfa, 0x95, 0xdc, 0x6f, 0xfd, 0x4a,
-	0xee, 0x9b, 0xc7, 0x95, 0xa9, 0x4f, 0x66, 0x07, 0x83, 0xf0, 0xef, 0x00, 0x00, 0x00, 0xff, 0xff,
-	0x95, 0xf2, 0xec, 0x8a, 0x16, 0x12, 0x00, 0x00,
+	// 1500 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xd4, 0x58, 0xcd, 0x6f, 0x1b, 0x45,
+	0x1b, 0xcf, 0x3a, 0x4e, 0x9a, 0x8e, 0xd3, 0xa4, 0x99, 0x7e, 0xb9, 0xe9, 0x5b, 0x3b, 0xda, 0xc3,
+	0xab, 0xb6, 0x7a, 0xdf, 0xdd, 0xb7, 0x7e, 0x0b, 0xa2, 0x42, 0x08, 0xb2, 0x2e, 0xb4, 0xa5, 0x71,
+	0x1a, 0xa6, 0xa6, 0x42, 0x80, 0x04, 0x93, 0xdd, 0xa9, 0x33, 0xc4, 0xfb, 0xa1, 0xd9, 0xb1, 0x69,
+	0x2a, 0x55, 0x70, 0x45, 0xe2, 0xc0, 0x85, 0x3b, 0x17, 0x24, 0xfe, 0x03, 0xce, 0x20, 0x81, 0x72,
+	0x2c, 0x37, 0x4e, 0x56, 0xeb, 0x1e, 0x90, 0xf8, 0x13, 0x2a, 0xf1, 0xa1, 0x9d, 0x9d, 0x5d, 0xef,
+	0x7a, 0xbd, 0x26, 0x6e, 0xd3, 0x08, 0x6e, 0xf1, 0xcc, 0xf3, 0xfc, 0x7e, 0xcf, 0xd7, 0x3c, 0xcf,
+	0xb3, 0x01, 0xaf, 0x6e, 0xbf, 0xe4, 0x6b, 0xd4, 0xd5, 0xb7, 0x3b, 0x9b, 0x84, 0x39, 0x84, 0x13,
+	0x5f, 0xf7, 0xb6, 0x5b, 0x3a, 0xf6, 0xa8, 0xaf, 0xe3, 0x0e, 0x77, 0x7d, 0x13, 0xb7, 0xa9, 0xd3,
+	0xd2, 0xbb, 0x35, 0xdc, 0xf6, 0xb6, 0xf0, 0x45, 0xbd, 0x45, 0x1c, 0xc2, 0x30, 0x27, 0x96, 0xe6,
+	0x31, 0x97, 0xbb, 0x50, 0x0f, 0x01, 0xb4, 0x01, 0x80, 0xe6, 0x6d, 0xb7, 0xb4, 0x00, 0x40, 0x4b,
+	0x00, 0x68, 0x11, 0xc0, 0xf2, 0x7f, 0x5b, 0x94, 0x6f, 0x75, 0x36, 0x35, 0xd3, 0xb5, 0xf5, 0x96,
+	0xdb, 0x72, 0x75, 0x81, 0xb3, 0xd9, 0xb9, 0x23, 0x7e, 0x89, 0x1f, 0xe2, 0xaf, 0x10, 0x7f, 0xf9,
+	0x92, 0x34, 0x10, 0x7b, 0xd4, 0xc6, 0xe6, 0x16, 0x75, 0x08, 0xdb, 0x89, 0x4c, 0xd4, 0x19, 0xf1,
+	0xdd, 0x0e, 0x33, 0xc9, 0xb0, 0x55, 0x63, 0xb5, 0x7c, 0xdd, 0x26, 0x1c, 0xeb, 0xdd, 0x8c, 0x2f,
+	0xcb, 0x7a, 0x9e, 0x16, 0xeb, 0x38, 0x9c, 0xda, 0x59, 0x9a, 0x17, 0xff, 0x4a, 0xc1, 0x37, 0xb7,
+	0x88, 0x8d, 0x33, 0x7a, 0xff, 0xcf, 0xd3, 0xeb, 0x70, 0xda, 0xd6, 0xa9, 0xc3, 0x7d, 0xce, 0xc6,
+	0xf9, 0xe4, 0x13, 0xd6, 0x25, 0x6c, 0xe0, 0x10, 0xb9, 0x8b, 0x6d, 0xaf, 0x4d, 0x46, 0xf9, 0xf4,
+	0x9f, 0xdc, 0x04, 0x8f, 0x92, 0xbe, 0xbc, 0xd7, 0x72, 0xc8, 0xa8, 0xaa, 0xbf, 0x28, 0x60, 0xa9,
+	0xde, 0xee, 0xf8, 0x9c, 0xb0, 0x55, 0x29, 0x49, 0x18, 0xfc, 0x10, 0xcc, 0x05, 0xd1, 0xb6, 0x30,
+	0xc7, 0x65, 0x65, 0x45, 0x39, 0x57, 0xaa, 0xfd, 0x4f, 0x93, 0x15, 0x93, 0x74, 0x7e, 0x50, 0x33,
+	0x81, 0xb4, 0xd6, 0xbd, 0xa8, 0xdd, 0xdc, 0xfc, 0x88, 0x98, 0xbc, 0x41, 0x38, 0x36, 0xe0, 0x6e,
+	0xaf, 0x3a, 0xd5, 0xef, 0x55, 0xc1, 0xe0, 0x0c, 0xc5, 0xa8, 0xd0, 0x03, 0xb3, 0x3e, 0xc7, 0xbc,
+	0xe3, 0x97, 0xa7, 0x05, 0xfe, 0x35, 0x6d, 0xc2, 0x8a, 0xd4, 0x32, 0x56, 0xdf, 0x12, 0x78, 0xc6,
+	0x82, 0xe4, 0x9d, 0x0d, 0x7f, 0x23, 0xc9, 0xa3, 0x3e, 0x9c, 0x06, 0xcb, 0x19, 0x9d, 0xba, 0xeb,
+	0x58, 0x94, 0x53, 0xd7, 0x81, 0x06, 0x28, 0xf2, 0x1d, 0x8f, 0x08, 0x77, 0x0f, 0x1b, 0x9a, 0x04,
+	0x29, 0x36, 0x77, 0x3c, 0xf2, 0xa4, 0x57, 0xad, 0xe4, 0x6b, 0x06, 0x12, 0x48, 0xe8, 0xc2, 0x37,
+	0x63, 0xa7, 0x0a, 0x02, 0xa5, 0x96, 0x36, 0xe5, 0x49, 0xaf, 0xba, 0x92, 0x8f, 0x93, 0x36, 0x17,
+	0x9e, 0x07, 0x87, 0x6c, 0xe2, 0xfb, 0xb8, 0x45, 0x44, 0x84, 0x0e, 0x1b, 0x8b, 0x12, 0xec, 0x50,
+	0x23, 0x3c, 0x46, 0xd1, 0x3d, 0xfc, 0x37, 0x98, 0x65, 0x04, 0xfb, 0xae, 0x53, 0x2e, 0x0a, 0xc9,
+	0x38, 0x02, 0x48, 0x9c, 0x22, 0x79, 0x0b, 0x5b, 0xe0, 0x48, 0x1b, 0xfb, 0x7c, 0x83, 0xb9, 0x9b,
+	0xa4, 0x49, 0x6d, 0x52, 0x9e, 0x11, 0xa1, 0xbf, 0xb0, 0xb7, 0xd4, 0x06, 0x1a, 0xc6, 0x09, 0x09,
+	0x7d, 0x64, 0x2d, 0x09, 0x84, 0xd2, 0xb8, 0xb0, 0x0b, 0x60, 0x70, 0xd0, 0x64, 0xd8, 0xf1, 0xc3,
+	0x18, 0x05, 0x6c, 0xb3, 0x13, 0xb3, 0x2d, 0x4b, 0x36, 0xb8, 0x96, 0x41, 0x43, 0x23, 0x18, 0xd4,
+	0x9e, 0x02, 0x4e, 0x64, 0x02, 0xbc, 0x46, 0x7d, 0x0e, 0xdf, 0xcf, 0x14, 0xb4, 0xb6, 0x37, 0x3b,
+	0x02, 0x6d, 0x51, 0xce, 0x47, 0xa5, 0x2d, 0x73, 0xd1, 0x49, 0xa2, 0x98, 0x5b, 0x60, 0x86, 0x72,
+	0x62, 0x07, 0x69, 0x9f, 0x3e, 0x57, 0xaa, 0x19, 0xcf, 0x5e, 0xcb, 0xc6, 0x11, 0x49, 0x37, 0x73,
+	0x3d, 0x00, 0x46, 0x21, 0xbe, 0xba, 0x5b, 0x00, 0xa7, 0x72, 0xea, 0x1e, 0x7e, 0xa6, 0x80, 0x25,
+	0xc7, 0xb5, 0xc8, 0x55, 0xe6, 0x76, 0xbc, 0xf0, 0x8c, 0xf8, 0x65, 0x45, 0x58, 0xf4, 0xda, 0xc4,
+	0x16, 0xad, 0xa7, 0x91, 0x8c, 0xd3, 0xd2, 0x9e, 0xa5, 0xf5, 0x61, 0x0a, 0x94, 0x65, 0x85, 0x5f,
+	0x29, 0xe0, 0x84, 0x19, 0xda, 0xf9, 0x31, 0xb5, 0x48, 0x5c, 0xe3, 0x51, 0x84, 0x6e, 0x3c, 0x7b,
+	0x84, 0x62, 0x4c, 0xe3, 0xac, 0x34, 0x2d, 0x4a, 0x7d, 0x9a, 0x11, 0x8d, 0x36, 0x44, 0xfd, 0x52,
+	0x01, 0x67, 0xea, 0xcc, 0xf5, 0xfd, 0xdb, 0x84, 0xf9, 0xd4, 0x75, 0xc2, 0x2e, 0x85, 0xc8, 0x1d,
+	0xc2, 0x88, 0x63, 0x12, 0xb8, 0x02, 0x8a, 0xdb, 0xd4, 0xb1, 0x64, 0x3f, 0x98, 0x8f, 0xfa, 0xc1,
+	0x0d, 0xea, 0x58, 0x48, 0xdc, 0x04, 0x12, 0x0e, 0xb6, 0x89, 0x7c, 0xeb, 0xb1, 0xc4, 0x3a, 0xb6,
+	0x09, 0x12, 0x37, 0xb0, 0x06, 0x00, 0xf6, 0xa8, 0x24, 0x90, 0xcf, 0x38, 0x6e, 0x8b, 0xab, 0x1b,
+	0xd7, 0xe5, 0x0d, 0x4a, 0x48, 0xa9, 0x8f, 0x0b, 0xe0, 0xd4, 0x35, 0x97, 0xd1, 0x7b, 0xae, 0xc3,
+	0x71, 0x7b, 0xc3, 0xb5, 0x0e, 0xb4, 0x2d, 0x3b, 0xa0, 0xe8, 0x7b, 0xc4, 0x14, 0x3e, 0x95, 0x6a,
+	0x6b, 0x13, 0xa7, 0x29, 0xc7, 0xf2, 0x5b, 0x1e, 0x31, 0x07, 0x11, 0x0a, 0x7e, 0x21, 0xc1, 0x03,
+	0xbb, 0x43, 0x63, 0x60, 0x7d, 0xdf, 0x18, 0xc7, 0x0f, 0x83, 0x5f, 0x15, 0x70, 0x26, 0x47, 0xf3,
+	0x00, 0xfa, 0x85, 0x9d, 0xee, 0x17, 0xd7, 0xf6, 0xcb, 0xe9, 0x9c, 0xae, 0xf1, 0x7b, 0x21, 0xd7,
+	0xd9, 0x20, 0x15, 0xf0, 0x73, 0x05, 0x2c, 0x88, 0x9f, 0x4d, 0xcc, 0x5a, 0x24, 0x78, 0x03, 0xd2,
+	0xe7, 0xc9, 0xf3, 0x3f, 0xe6, 0x45, 0x19, 0x27, 0xa5, 0x71, 0x0b, 0xb7, 0x52, 0x5c, 0x68, 0x88,
+	0x1b, 0x5e, 0x04, 0x25, 0x9b, 0x3a, 0x88, 0x78, 0x6d, 0x6a, 0xe2, 0x70, 0x94, 0xce, 0x18, 0x8b,
+	0xfd, 0x5e, 0xb5, 0xd4, 0x18, 0x1c, 0xa3, 0xa4, 0x0c, 0x7c, 0x01, 0x94, 0x6c, 0x7c, 0x37, 0x56,
+	0x99, 0x16, 0x2a, 0xc7, 0x24, 0x5f, 0xa9, 0x31, 0xb8, 0x42, 0x49, 0x39, 0x78, 0x27, 0x98, 0xb1,
+	0x9c, 0x51, 0xd3, 0x2f, 0x17, 0x45, 0x26, 0x5e, 0x9e, 0xd8, 0xe1, 0x86, 0xd0, 0x17, 0xf5, 0x9d,
+	0x18, 0xd0, 0x02, 0x13, 0x45, 0xe0, 0xea, 0x4f, 0xd3, 0xe0, 0xec, 0xd8, 0x3a, 0x85, 0x6f, 0x00,
+	0xe8, 0x6e, 0x8a, 0xfd, 0xd0, 0xba, 0x1a, 0x6e, 0x68, 0x41, 0xc7, 0x08, 0xb2, 0x30, 0x6d, 0x9c,
+	0x0c, 0x26, 0xe0, 0xcd, 0xcc, 0x2d, 0x1a, 0xa1, 0x01, 0xcd, 0x70, 0xc4, 0x87, 0x11, 0xa6, 0xb2,
+	0x39, 0x4d, 0x36, 0x74, 0x97, 0xa2, 0xf1, 0x1e, 0x83, 0xa0, 0x34, 0x26, 0x5c, 0x05, 0x8b, 0x66,
+	0x87, 0x31, 0xe2, 0xf0, 0xa1, 0x88, 0x9f, 0x92, 0x11, 0x58, 0xac, 0xa7, 0xaf, 0xd1, 0xb0, 0x7c,
+	0x00, 0x61, 0x11, 0x9f, 0x32, 0x62, 0xc5, 0x10, 0xc5, 0x34, 0xc4, 0x95, 0xf4, 0x35, 0x1a, 0x96,
+	0x87, 0xf7, 0xc1, 0x82, 0x44, 0x95, 0xf1, 0x2e, 0xcf, 0x88, 0x1c, 0xbe, 0xf2, 0xb4, 0x39, 0x0c,
+	0x3b, 0x46, 0x5c, 0xa5, 0xf5, 0x14, 0x38, 0x1a, 0x22, 0x53, 0x7f, 0x2b, 0x00, 0x30, 0x48, 0x3e,
+	0xbc, 0x94, 0x5a, 0x1f, 0x57, 0x86, 0xd6, 0xc7, 0xa3, 0x52, 0x52, 0x7c, 0xf6, 0x24, 0x16, 0xc6,
+	0x16, 0x98, 0x75, 0xc5, 0x2b, 0x91, 0x79, 0xaa, 0x4f, 0x6c, 0x7b, 0xdc, 0xc5, 0x63, 0x78, 0x03,
+	0x04, 0xfd, 0x4e, 0x3e, 0x3e, 0x09, 0x0f, 0x3f, 0x00, 0x45, 0xcf, 0xb5, 0xa2, 0x2e, 0xbb, 0x3a,
+	0x31, 0xcd, 0x86, 0x6b, 0xf9, 0x29, 0x92, 0xb9, 0xc0, 0xbb, 0xe0, 0x14, 0x09, 0x60, 0xe8, 0x82,
+	0xb9, 0xe8, 0xb3, 0x4e, 0x64, 0xb2, 0x54, 0x7b, 0x7d, 0x62, 0x12, 0x24, 0x01, 0x52, 0x44, 0xf3,
+	0x41, 0x0f, 0x8d, 0x6e, 0x50, 0x4c, 0xa2, 0xfe, 0x51, 0x00, 0xf3, 0xc9, 0xc4, 0xfd, 0x3d, 0x32,
+	0x10, 0xd6, 0xd0, 0x73, 0xce, 0x40, 0x48, 0x72, 0x00, 0x19, 0x08, 0x89, 0xf2, 0x32, 0xf0, 0xa3,
+	0x02, 0x16, 0x87, 0xb6, 0xc1, 0x60, 0xe3, 0xf1, 0x98, 0xdb, 0xa5, 0x16, 0x61, 0xd7, 0xaf, 0xc8,
+	0x54, 0xc4, 0x1b, 0xc7, 0x46, 0x7c, 0x83, 0x12, 0x52, 0xf0, 0x13, 0x00, 0xcc, 0xe7, 0xba, 0x20,
+	0xc6, 0x06, 0x24, 0xb6, 0xc2, 0x04, 0xa5, 0xfa, 0x75, 0x01, 0xc0, 0xec, 0x3b, 0x82, 0x1c, 0xcc,
+	0x72, 0x31, 0x94, 0x9e, 0xcb, 0x34, 0x8c, 0x37, 0x13, 0x39, 0xf8, 0x24, 0x57, 0x10, 0xc1, 0x70,
+	0x6c, 0xac, 0x0f, 0x76, 0xcb, 0xd8, 0x81, 0x46, 0x7c, 0x83, 0x12, 0x52, 0x90, 0x80, 0x52, 0xa8,
+	0x7d, 0x1b, 0xb7, 0x3b, 0x44, 0x96, 0xd8, 0xd8, 0x85, 0x45, 0x8b, 0xb2, 0xa8, 0xbd, 0xd5, 0xc1,
+	0x0e, 0xa7, 0x7c, 0x67, 0x30, 0x2e, 0x9b, 0x03, 0x28, 0x94, 0xc4, 0x55, 0xbf, 0x19, 0x8e, 0x53,
+	0x98, 0xf3, 0x7f, 0x4e, 0x9c, 0xb6, 0xc0, 0xbc, 0xec, 0xe2, 0xcf, 0x12, 0xa8, 0xe3, 0x92, 0x65,
+	0xbe, 0x9e, 0xc0, 0x42, 0x29, 0x64, 0xf5, 0x7b, 0x05, 0x1c, 0x1d, 0xee, 0x99, 0x43, 0x26, 0x2b,
+	0x7b, 0x32, 0xf9, 0x1e, 0x80, 0xa1, 0xc3, 0xab, 0x5d, 0xc2, 0x70, 0x8b, 0x84, 0x86, 0x17, 0x9e,
+	0xca, 0xf0, 0xf8, 0x73, 0xba, 0x99, 0x41, 0x44, 0x23, 0x58, 0xd4, 0x1f, 0xd2, 0x4e, 0xc4, 0x2f,
+	0x7c, 0x62, 0x27, 0xee, 0x83, 0x63, 0x32, 0x3a, 0xfb, 0xe0, 0xc5, 0x19, 0x49, 0x76, 0xac, 0x9e,
+	0x85, 0x44, 0xa3, 0x78, 0xd4, 0x6f, 0x0b, 0xe0, 0xf8, 0xa8, 0xd9, 0x02, 0x1b, 0xf2, 0x0b, 0x2e,
+	0xf4, 0xe2, 0x72, 0xf2, 0x0b, 0xee, 0x49, 0xaf, 0x7a, 0x7e, 0xdc, 0xff, 0xe0, 0xe2, 0x56, 0x99,
+	0xf8, 0xdc, 0x7b, 0x07, 0x94, 0x53, 0x51, 0x7c, 0x9b, 0xd3, 0x36, 0xbd, 0x17, 0xae, 0x72, 0xe1,
+	0x16, 0xfb, 0xaf, 0x7e, 0xaf, 0x5a, 0x6e, 0xe6, 0xc8, 0xa0, 0x5c, 0x6d, 0xd8, 0x1d, 0x59, 0x05,
+	0x4f, 0x57, 0xbe, 0x27, 0x27, 0xa8, 0x80, 0xef, 0xb2, 0x91, 0x0b, 0xab, 0x60, 0x9f, 0x23, 0xf7,
+	0x1e, 0x38, 0x9d, 0x4e, 0x5c, 0x36, 0x74, 0x67, 0xfb, 0xbd, 0xea, 0xe9, 0x7a, 0x9e, 0x10, 0xca,
+	0xd7, 0xcf, 0xab, 0xbe, 0xe9, 0x83, 0xa9, 0x3e, 0xe3, 0xc2, 0xee, 0xa3, 0xca, 0xd4, 0x83, 0x47,
+	0x95, 0xa9, 0x9f, 0x1f, 0x55, 0xa6, 0x3e, 0xed, 0x57, 0x94, 0xdd, 0x7e, 0x45, 0x79, 0xd0, 0xaf,
+	0x28, 0x0f, 0xfb, 0x15, 0xe5, 0x8b, 0xc7, 0x95, 0xa9, 0x77, 0xe7, 0xa2, 0x46, 0xf8, 0x67, 0x00,
+	0x00, 0x00, 0xff, 0xff, 0x0b, 0x8f, 0x96, 0x36, 0xd8, 0x17, 0x00, 0x00,
 }
