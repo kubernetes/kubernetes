@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -56,7 +55,7 @@ type AggregatorOptions struct {
 }
 
 // NewCommandStartAggregator provides a CLI handler for 'start master' command
-func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
+func NewCommandStartAggregator(out, err io.Writer, stopCh <-chan struct{}) *cobra.Command {
 	o := NewDefaultOptions(out, err)
 
 	cmd := &cobra.Command{
@@ -69,7 +68,7 @@ func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunAggregator(); err != nil {
+			if err := o.RunAggregator(stopCh); err != nil {
 				return err
 			}
 			return nil
@@ -110,7 +109,7 @@ func (o *AggregatorOptions) Complete() error {
 	return nil
 }
 
-func (o AggregatorOptions) RunAggregator() error {
+func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost"); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -161,11 +160,9 @@ func (o AggregatorOptions) RunAggregator() error {
 		return err
 	}
 
-	server, err := config.Complete().New()
+	server, err := config.Complete().New(stopCh)
 	if err != nil {
 		return err
 	}
-	server.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
-
-	return nil
+	return server.GenericAPIServer.PrepareRun().Run(stopCh)
 }
