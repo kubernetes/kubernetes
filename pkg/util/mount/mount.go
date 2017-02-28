@@ -98,11 +98,6 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 // It provides options to override the default mounter behavior.
 // mounterPath allows using an alternative to `/bin/mount` for mounting.
 func New(mounterPath string) Interface {
-	// If mounter-path flag is not set, use default mount path
-	if mounterPath == "" {
-		mounterPath = defaultMountCommand
-	}
-
 	return &Mounter{
 		mounterPath: mounterPath,
 	}
