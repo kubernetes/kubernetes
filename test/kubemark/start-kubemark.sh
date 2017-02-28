@@ -101,7 +101,7 @@ function write-pki-config-to-master {
     sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.crt\" && \
     sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.key\" && \
     sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /etc/srv/kubernetes/known_tokens.csv\" && \
-    sudo bash -c \"echo \"${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,uid:kubelet,system:nodes\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${HEAPSTER_TOKEN},system:heapster,uid:heapster\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${NODE_PROBLEM_DETECTOR_TOKEN},system:node-problem-detector,uid:system:node-problem-detector\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
