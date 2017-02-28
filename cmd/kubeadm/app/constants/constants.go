@@ -98,6 +98,9 @@ const (
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"
+
+	// DefaultAdmissionControl specifies the default admission control options that will be used
+	DefaultAdmissionControl = "NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds"
 )
 
 var (

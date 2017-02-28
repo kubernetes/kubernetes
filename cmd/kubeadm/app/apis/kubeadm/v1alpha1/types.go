@@ -34,6 +34,10 @@ type MasterConfiguration struct {
 	// controller manager are managed by Kubernetes itself. This option is likely to
 	// become the default in the future.
 	SelfHosted bool `json:"selfHosted"`
+
+	APIServerExtraArgs         map[string]string `json:"apiServerExtraArgs"`
+	ControllerManagerExtraArgs map[string]string `json:"controllerManagerExtraArgs"`
+	SchedulerExtraArgs         map[string]string `json:"schedulerExtraArgs"`
 }
 
 type API struct {

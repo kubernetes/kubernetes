@@ -303,30 +303,33 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	command = append(getComponentBaseCommand(apiServer),
-		"--insecure-bind-address=127.0.0.1",
-		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
-		"--service-cluster-ip-range="+cfg.Networking.ServiceSubnet,
-		"--service-account-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
-		"--client-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--tls-cert-file="+getCertFilePath(kubeadmconstants.APIServerCertName),
-		"--tls-private-key-file="+getCertFilePath(kubeadmconstants.APIServerKeyName),
-		"--kubelet-client-certificate="+getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
-		"--kubelet-client-key="+getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
-		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
-		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
-		"--allow-privileged",
-		"--storage-backend=etcd3",
-		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+	defaultArguments := map[string]string{
+		"insecure-bind-address":           "127.0.0.1",
+		"admission-control":               kubeadmconstants.DefaultAdmissionControl,
+		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
+		"service-account-key-file":        getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
+		"client-ca-file":                  getCertFilePath(kubeadmconstants.CACertName),
+		"tls-cert-file":                   getCertFilePath(kubeadmconstants.APIServerCertName),
+		"tls-private-key-file":            getCertFilePath(kubeadmconstants.APIServerKeyName),
+		"kubelet-client-certificate":      getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
+		"kubelet-client-key":              getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
+		"token-auth-file":                 path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CSVTokenFileName),
+		"secure-port":                     fmt.Sprintf("%d", cfg.API.Port),
+		"allow-privileged":                "true",
+		"storage-backend":                 "etcd3",
+		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+
 		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
 		// so add it unconditionally with recommended values
-		"--requestheader-username-headers=X-Remote-User",
-		"--requestheader-group-headers=X-Remote-Group",
-		"--requestheader-extra-headers-prefix=X-Remote-Extra-",
-		"--requestheader-client-ca-file="+getCertFilePath(kubeadmconstants.FrontProxyCACertName),
-		"--requestheader-allowed-names=front-proxy-client",
-	)
+		"requestheader-username-headers":     "X-Remote-User",
+		"requestheader-group-headers":        "X-Remote-Group",
+		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
+		"requestheader-client-ca-file":       getCertFilePath(kubeadmconstants.FrontProxyCACertName),
+		"requestheader-allowed-names":        "front-proxy-client",
+	}
 
+	command = getComponentBaseCommand(apiServer)
+	command = append(command, getExtraParameters(cfg.APIServerExtraArgs, defaultArguments)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationMode)...)
 
 	// Use first address we are given
@@ -375,17 +378,20 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/controller-manager.lock"}
 	}
 
-	command = append(getComponentBaseCommand(controllerManager),
-		"--address=127.0.0.1",
-		"--leader-elect",
-		"--kubeconfig="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
-		"--root-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--service-account-private-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
-		"--cluster-signing-cert-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--cluster-signing-key-file="+getCertFilePath(kubeadmconstants.CAKeyName),
-		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+kubeadmconstants.CSVTokenBootstrapGroup,
-		"--use-service-account-credentials",
-	)
+	defaultArguments := map[string]string{
+		"address":                                                  "127.0.0.1",
+		"leader-elect":                                             "true",
+		"kubeconfig":                                               path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
+		"root-ca-file":                                             getCertFilePath(kubeadmconstants.CACertName),
+		"service-account-private-key-file":                         getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
+		"cluster-signing-cert-file":                                getCertFilePath(kubeadmconstants.CACertName),
+		"cluster-signing-key-file":                                 getCertFilePath(kubeadmconstants.CAKeyName),
+		"insecure-experimental-approve-all-kubelet-csrs-for-group": kubeadmconstants.CSVTokenBootstrapGroup,
+		"use-service-account-credentials":                          "true",
+	}
+
+	command = getComponentBaseCommand(controllerManager)
+	command = append(command, getExtraParameters(cfg.ControllerManagerExtraArgs, defaultArguments)...)
 
 	if cfg.CloudProvider != "" {
 		command = append(command, "--cloud-provider="+cfg.CloudProvider)
@@ -413,11 +419,14 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	command = append(getComponentBaseCommand(scheduler),
-		"--address=127.0.0.1",
-		"--leader-elect",
-		"--kubeconfig="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
-	)
+	defaultArguments := map[string]string{
+		"address":      "127.0.0.1",
+		"leader-elect": "true",
+		"kubeconfig":   path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+	}
+
+	command = getComponentBaseCommand(scheduler)
+	command = append(command, getExtraParameters(cfg.SchedulerExtraArgs, defaultArguments)...)
 
 	return command
 }
@@ -468,6 +477,21 @@ func getAuthzParameters(authzMode string) []string {
 		command = append(command, "--authorization-policy-file="+kubeadmconstants.AuthorizationPolicyPath)
 	case authzmodes.ModeWebhook:
 		command = append(command, "--authorization-webhook-config-file="+kubeadmconstants.AuthorizationWebhookConfigPath)
+	}
+	return command
+}
+
+func getExtraParameters(overrides map[string]string, defaults map[string]string) []string {
+	var command []string
+	for k, v := range overrides {
+		if len(v) > 0 {
+			command = append(command, fmt.Sprintf("--%s=%s", k, v))
+		}
+	}
+	for k, v := range defaults {
+		if _, overrideExists := overrides[k]; !overrideExists {
+			command = append(command, fmt.Sprintf("--%s=%s", k, v))
+		}
 	}
 	return command
 }
