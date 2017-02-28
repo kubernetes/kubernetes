@@ -61,9 +61,37 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	var cfgPath string
 
 	cmd := &cobra.Command{
-		Use:   "join <master address>",
+		Use:   "join <flags> [DiscoveryTokenAPIServers]",
 		Short: "Run this on any machine you wish to join an existing cluster",
+		Long: dedent.Dedent(`
+		When joining a kubeadm initialized cluster, we need to establish 
+		bidirectional trust. This is split into discovery (having the Node 
+		trust the Kubernetes Master) and TLS bootstrap (having the Kubernetes 
+		Master trust the Node).
+
+		There are 2 main schemes for discovery. The first is to use a shared 
+		token along with the IP address of the API server. The second is to 
+		provide a file (a subset of the standard kubeconfig file). This file 
+		can be a local file or downloaded via an HTTPS URL. The forms are 
+		kubeadm join --discovery-token abcdef.1234567890abcdef 1.2.3.4:6443, 
+		kubeadm join --discovery-file path/to/file.conf or kubeadm join 
+		--discovery-file https://url/file.conf. Only one form can be used. If 
+		the discovery information is loaded from a URL, HTTPS must be used and 
+		the host installed CA bundle is used to verify the connection.
+
+		The TLS bootstrap mechanism is also driven via a shared token. This is 
+		used to temporarily authenticate with the Kubernetes Master to submit a
+		certificate signing request (CSR) for a locally created key pair. By 
+		default kubeadm will set up the Kubernetes Master to automatically 
+		approve these signing requests. This token is passed in with the 
+		--tls-bootstrap-token abcdef.1234567890abcdef flag.
+
+		Often times the same token is use for both parts. In this case, the 
+		--token flag can be used instead of specifying the each token 
+		individually.
+		`),
 		Run: func(cmd *cobra.Command, args []string) {
+			cfg.DiscoveryTokenAPIServers = args
 			j, err := NewJoin(cfgPath, args, &cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(j.Validate())
@@ -71,16 +99,26 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
+	cmd.PersistentFlags().StringVar(
+		&cfgPath, "config", cfgPath,
+		"Path to kubeadm config file")
+
+	cmd.PersistentFlags().StringVar(
+		&cfg.DiscoveryFile, "discovery-file", "",
+		"A file or url from which to load cluster information")
+	cmd.PersistentFlags().StringVar(
+		&cfg.DiscoveryToken, "discovery-token", "",
+		"A token used to validate cluster information fetched from the master")
+	cmd.PersistentFlags().StringVar(
+		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
+		"A token used for TLS bootstrapping")
+	cmd.PersistentFlags().StringVar(
+		&cfg.Token, "token", "",
+		"Use this token for both discovery-token and tls-bootstrap-token")
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
 		"skip preflight checks normally run before modifying the system",
-	)
-
-	cmd.PersistentFlags().Var(
-		discovery.NewDiscoveryValue(&cfg.Discovery), "discovery",
-		"The discovery method kubeadm will use for connecting nodes to the master",
 	)
 
 	return cmd
@@ -126,12 +164,12 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 }
 
 func (j *Join) Validate() error {
-	return validation.ValidateNodeConfiguration(j.cfg).ToAggregate()
+	return validation.ValidateNodeConfiguration(j.cfg)
 }
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	cfg, err := discovery.For(j.cfg.Discovery)
+	cfg, err := discovery.For(j.cfg)
 	if err != nil {
 		return err
 	}

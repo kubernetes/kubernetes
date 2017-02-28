@@ -16,7 +16,10 @@ go_library(
         "version.go",
     ],
     tags = ["automanaged"],
-    deps = ["//cmd/kubeadm/app/preflight:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
+        "//cmd/kubeadm/app/preflight:go_default_library",
+    ],
 )
 
 go_test(
