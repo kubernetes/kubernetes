@@ -258,7 +258,7 @@ func ErrorPrintHandler(obj *TestPrintType, w io.Writer, options printers.PrintOp
 
 func TestCustomTypePrinting(t *testing.T) {
 	columns := []string{"Data"}
-	printer := printers.NewHumanReadablePrinter(printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
 	printer.Handler(columns, nil, PrintCustomType)
 
 	obj := TestPrintType{"test object"}
@@ -275,7 +275,7 @@ func TestCustomTypePrinting(t *testing.T) {
 
 func TestCustomTypePrintingWithKind(t *testing.T) {
 	columns := []string{"Data"}
-	printer := printers.NewHumanReadablePrinter(printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
 	printer.Handler(columns, nil, PrintCustomType)
 	printer.EnsurePrintWithKind("test")
 
@@ -293,7 +293,7 @@ func TestCustomTypePrintingWithKind(t *testing.T) {
 
 func TestPrintHandlerError(t *testing.T) {
 	columns := []string{"Data"}
-	printer := printers.NewHumanReadablePrinter(printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
 	printer.Handler(columns, nil, ErrorPrintHandler)
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
@@ -304,7 +304,7 @@ func TestPrintHandlerError(t *testing.T) {
 }
 
 func TestUnknownTypePrinting(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
 	buffer := &bytes.Buffer{}
 	err := printer.PrintObj(&TestUnknownType{}, buffer)
 	if err == nil {
@@ -522,10 +522,10 @@ func TestPrinters(t *testing.T) {
 	jsonpathPrinter = printers.NewVersionedPrinter(jsonpathPrinter, api.Scheme, v1.SchemeGroupVersion)
 
 	allPrinters := map[string]printers.ResourcePrinter{
-		"humanReadable": printers.NewHumanReadablePrinter(printers.PrintOptions{
+		"humanReadable": printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 			NoHeaders: true,
 		}),
-		"humanReadableHeaders": printers.NewHumanReadablePrinter(printers.PrintOptions{}),
+		"humanReadableHeaders": printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{}),
 		"json":                 &printers.JSONPrinter{},
 		"yaml":                 &printers.YAMLPrinter{},
 		"template":             templatePrinter,
@@ -571,7 +571,7 @@ func TestPrinters(t *testing.T) {
 
 func TestPrintEventsResultSorted(t *testing.T) {
 	// Arrange
-	printer := printers.NewHumanReadablePrinter(printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
 	AddHandlers(printer)
 
 	obj := api.EventList{
@@ -616,7 +616,7 @@ func TestPrintEventsResultSorted(t *testing.T) {
 }
 
 func TestPrintNodeStatus(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
 	AddHandlers(printer)
 	table := []struct {
 		node   api.Node
@@ -736,7 +736,7 @@ func TestPrintNodeStatus(t *testing.T) {
 }
 
 func TestPrintNodeOSImage(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(printers.PrintOptions{
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
@@ -781,7 +781,7 @@ func TestPrintNodeOSImage(t *testing.T) {
 }
 
 func TestPrintNodeKernelVersion(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(printers.PrintOptions{
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
@@ -826,7 +826,7 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 }
 
 func TestPrintNodeExternalIP(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(printers.PrintOptions{
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		Wide: true,
 	})
 	AddHandlers(printer)
@@ -1219,7 +1219,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 	for _, test := range table {
 		if test.isNamespaced {
 			// Expect output to include namespace when requested.
-			printer := printers.NewHumanReadablePrinter(printers.PrintOptions{
+			printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 				WithNamespace: true,
 			})
 			AddHandlers(printer)
@@ -1234,7 +1234,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			}
 		} else {
 			// Expect error when trying to get all namespaces for un-namespaced object.
-			printer := printers.NewHumanReadablePrinter(printers.PrintOptions{
+			printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 				WithNamespace: true,
 			})
 			buffer := &bytes.Buffer{}
