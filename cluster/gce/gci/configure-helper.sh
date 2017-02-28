@@ -652,7 +652,7 @@ function start-kubelet {
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --pod-manifest-path=/etc/kubernetes/manifests"
-  flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
+  flags+=" --experimental-mounter-path=${CONTAINERIZED_MOUNTER_HOME}/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
@@ -926,6 +926,18 @@ function compute-master-manifest-variables {
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY}"
   fi
+}
+
+# A helper function that bind mounts kubelet dirs for running mount in a chroot
+function prepare-mounter-rootfs {
+  echo "Prepare containerized mounter"
+  mount --bind "${CONTAINERIZED_MOUNTER_HOME}" "${CONTAINERIZED_MOUNTER_HOME}"
+  mount -o remount,exec "${CONTAINERIZED_MOUNTER_HOME}"
+  CONTAINERIZED_MOUNTER_ROOTFS="${CONTAINERIZED_MOUNTER_HOME}/rootfs"
+  mount --rbind /var/lib/kubelet/ "${CONTAINERIZED_MOUNTER_ROOTFS}/var/lib/kubelet"
+  mount --make-rshared "${CONTAINERIZED_MOUNTER_ROOTFS}/var/lib/kubelet"
+  mount --bind -o ro /proc "${CONTAINERIZED_MOUNTER_ROOTFS}/proc"
+  mount --bind -o ro /dev "${CONTAINERIZED_MOUNTER_ROOTFS}/dev"
 }
 
 # A helper function for removing salt configuration and comments from a file.
@@ -1479,15 +1491,11 @@ function override-kubectl {
     echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
 }
 
-function pre-warm-mounter {
-    echo "prewarming mounter"
-    ${KUBE_HOME}/bin/mounter &> /dev/null
-}
-
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
 
 KUBE_HOME="/home/kubernetes"
+CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
 if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
   echo "The ${KUBE_HOME}/kube-env file does not exist!! Terminate cluster initialization."
   exit 1
@@ -1534,7 +1542,6 @@ fi
 
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
-pre-warm-mounter
 assemble-docker-flags
 load-docker-images
 start-kubelet
@@ -1565,4 +1572,5 @@ else
   fi
 fi
 reset-motd
+prepare-mounter-rootfs
 echo "Done for the configuration for kubernetes"
