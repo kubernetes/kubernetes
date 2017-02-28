@@ -833,7 +833,7 @@ func WaitForPersistentVolumeClaimPhase(phase v1.PersistentVolumeClaimPhase, c cl
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
 		pvc, err := c.Core().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
 		if err != nil {
-			Logf("Get persistent volume claim %s in failed, ignoring for %v: %v", pvcName, Poll, err)
+			Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, Poll, err)
 			continue
 		} else {
 			if pvc.Status.Phase == phase {
