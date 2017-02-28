@@ -349,7 +349,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		RootFreeDiskMB:   int(kubeCfg.LowDiskSpaceThresholdMB),
 	}
 
-	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable 
+	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
 	if kubeCfg.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
 		// Do not provide kubeCfg.EnforceNodeAllocatable to eviction threshold parsing if we are not enforcing Evictions
 		enforceNodeAllocatable = []string{}
