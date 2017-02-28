@@ -54,6 +54,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentSpec, InType: reflect.TypeOf(&DeploymentSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentStatus, InType: reflect.TypeOf(&DeploymentStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentStrategy, InType: reflect.TypeOf(&DeploymentStrategy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_EventResult, InType: reflect.TypeOf(&EventResult{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_FSGroupStrategyOptions, InType: reflect.TypeOf(&FSGroupStrategyOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_HTTPIngressPath, InType: reflect.TypeOf(&HTTPIngressPath{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_HTTPIngressRuleValue, InType: reflect.TypeOf(&HTTPIngressRuleValue{})},
@@ -374,6 +375,20 @@ func DeepCopy_extensions_DeploymentStrategy(in interface{}, out interface{}, c *
 			in, out := &in.RollingUpdate, &out.RollingUpdate
 			*out = new(RollingUpdateDeployment)
 			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_extensions_EventResult(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*EventResult)
+		out := out.(*EventResult)
+		*out = *in
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
+			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		return nil
 	}

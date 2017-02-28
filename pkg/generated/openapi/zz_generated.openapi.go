@@ -13297,6 +13297,43 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDeployment"},
 		},
+		"k8s.io/kubernetes/pkg/apis/extensions/v1beta1.EventResult": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "EventResult is the event-webhook response",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"error": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Error message indicating failure",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+		},
 		"k8s.io/kubernetes/pkg/apis/policy/v1beta1.Eviction": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{

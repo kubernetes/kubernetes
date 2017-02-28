@@ -73,6 +73,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus,
 		Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy,
 		Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy,
+		Convert_v1beta1_EventResult_To_extensions_EventResult,
+		Convert_extensions_EventResult_To_v1beta1_EventResult,
 		Convert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions,
 		Convert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions,
 		Convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath,
@@ -642,6 +644,26 @@ func autoConvert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in 
 		out.RollingUpdate = nil
 	}
 	return nil
+}
+
+func autoConvert_v1beta1_EventResult_To_extensions_EventResult(in *EventResult, out *extensions.EventResult, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.Error = in.Error
+	return nil
+}
+
+func Convert_v1beta1_EventResult_To_extensions_EventResult(in *EventResult, out *extensions.EventResult, s conversion.Scope) error {
+	return autoConvert_v1beta1_EventResult_To_extensions_EventResult(in, out, s)
+}
+
+func autoConvert_extensions_EventResult_To_v1beta1_EventResult(in *extensions.EventResult, out *EventResult, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.Error = in.Error
+	return nil
+}
+
+func Convert_extensions_EventResult_To_v1beta1_EventResult(in *extensions.EventResult, out *EventResult, s conversion.Scope) error {
+	return autoConvert_extensions_EventResult_To_v1beta1_EventResult(in, out, s)
 }
 
 func autoConvert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions(in *FSGroupStrategyOptions, out *extensions.FSGroupStrategyOptions, s conversion.Scope) error {
