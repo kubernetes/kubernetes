@@ -188,7 +188,7 @@ __custom_func() {
     * jobs
     * limitranges (aka 'limits')
     * namespaces (aka 'ns')
-    * networkpolicies
+    * networkpolicies (aka 'netpol')
     * nodes (aka 'no')
     * persistentvolumeclaims (aka 'pvc')
     * persistentvolumes (aka 'pv')
