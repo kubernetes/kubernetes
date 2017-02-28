@@ -32,6 +32,8 @@ import (
 	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/printers"
+
+	"vbom.ml/util/sortorder"
 )
 
 // Sorting printer sorts list types before delegating to another printer.
@@ -175,7 +177,7 @@ func isLess(i, j reflect.Value) (bool, error) {
 	case reflect.Float32, reflect.Float64:
 		return i.Float() < j.Float(), nil
 	case reflect.String:
-		return i.String() < j.String(), nil
+		return sortorder.NaturalLess(i.String(), j.String()), nil
 	case reflect.Ptr:
 		return isLess(i.Elem(), j.Elem())
 	case reflect.Struct:
@@ -254,7 +256,7 @@ func isLess(i, j reflect.Value) (bool, error) {
 			}
 		case string:
 			if jtype, ok := j.Interface().(string); ok {
-				return itype < jtype, nil
+				return sortorder.NaturalLess(itype, jtype), nil
 			}
 		default:
 			return false, fmt.Errorf("unsortable type: %T", itype)

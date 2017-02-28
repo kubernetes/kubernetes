@@ -16568,3 +16568,12 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/apis/storage/v1beta1",
     ],
 )
+
+go_library(
+    name = "vbom.ml/util/sortorder",
+    srcs = [
+        "vbom.ml/util/sortorder/doc.go",
+        "vbom.ml/util/sortorder/natsort.go",
+    ],
+    tags = ["automanaged"],
+)
