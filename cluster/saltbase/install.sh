@@ -29,6 +29,7 @@ readonly KUBE_DOCKER_WRAPPED_BINARIES=(
   kube-controller-manager
   kube-scheduler
   kube-proxy
+  gke-certificates-controller
 )
 
 readonly SERVER_BIN_TAR=${1-}
