@@ -18,6 +18,7 @@ package framework
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -27,6 +28,15 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
+
+func EtcdUpgrade(targetStorage, targetVersion string) error {
+	switch TestContext.Provider {
+	case "gce":
+		return etcdUpgradeGCE(targetStorage, targetVersion)
+	default:
+		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", TestContext.Provider)
+	}
+}
 
 // The following upgrade functions are passed into the framework below and used
 // to do the actual upgrades.
@@ -39,6 +49,17 @@ var MasterUpgrade = func(v string) error {
 	default:
 		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", TestContext.Provider)
 	}
+}
+
+func etcdUpgradeGCE(targetStorage, targetVersion string) error {
+	env := append(
+		os.Environ(),
+		"TEST_ETCD_VERSION="+targetVersion,
+		"STORAGE_BACKEND="+targetStorage,
+		"TEST_ETCD_IMAGE=3.0.17")
+
+	_, _, err := RunCmdEnv(env, path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-l", "-M")
+	return err
 }
 
 func masterUpgradeGCE(rawV string) error {

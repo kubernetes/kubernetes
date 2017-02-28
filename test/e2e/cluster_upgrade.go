@@ -118,6 +118,24 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 	})
 })
 
+var _ = framework.KubeDescribe("etcd uUpgrade [Feature:EtcdUpgrade]", func() {
+	f := framework.NewDefaultFramework("etcd-upgrade")
+
+	framework.KubeDescribe("etcd upgrade", func() {
+		It("should maintain a functioning cluster", func() {
+			cm := chaosmonkey.New(func() {
+				framework.ExpectNoError(framework.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
+				// TODO(mml): verify etcd version
+			})
+			cm.Register(func(sem *chaosmonkey.Semaphore) {
+				// Close over f.
+				testServiceRemainsUp(f, sem)
+			})
+			cm.Do()
+		})
+	})
+})
+
 // realVersion turns a version constant s into a version string deployable on
 // GKE.  See hack/get-build.sh for more information.
 func realVersion(s string) (string, error) {
