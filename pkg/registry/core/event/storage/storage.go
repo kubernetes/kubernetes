@@ -17,11 +17,15 @@ limitations under the License.
 package storage
 
 import (
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/kubernetes/pkg/api"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/event"
 )
@@ -30,8 +34,12 @@ type REST struct {
 	*genericregistry.Store
 }
 
+var (
+	groupVersions = []schema.GroupVersion{extensions.SchemeGroupVersion}
+)
+
 // NewREST returns a RESTStorage object that will work against events.
-func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) *REST {
+func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64, kubeConfigFile string) *REST {
 	resource := api.Resource("events")
 	opts, err := optsGetter.GetRESTOptions(resource)
 	if err != nil {
@@ -56,10 +64,35 @@ func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) *REST {
 		QualifiedResource: resource,
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource(resource.Resource),
 
+		// AfterCreate:    fakeShuntHandler,
 		CreateStrategy: event.Strategy,
 		UpdateStrategy: event.Strategy,
 		DeleteStrategy: event.Strategy,
 	}
+
+	// Check to see is a event-webhook config file has been specified.
+	if len(kubeConfigFile) > 0 {
+		w, err := webhook.NewGenericWebhook(api.Registry, api.Codecs, kubeConfigFile, groupVersions, 0)
+		if err != nil {
+			panic(err)
+		}
+		// Set the post primary object create handler
+		store.AfterCreate = func(obj runtime.Object) error {
+			// non-blocking fire and log.
+			go func() {
+				result := &extensions.EventResult{}
+				err = w.RestClient.Post().Body(obj).Do().Into(result)
+				if err != nil {
+					glog.Errorf("Failed to POST event-webhook error = %v", err)
+				}
+				if len(result.Error) > 0 {
+					glog.Errorf("event-webhook error = %v", result.Error)
+				}
+			}()
+			return nil
+		}
+	}
+
 	options := &generic.StoreOptions{RESTOptions: opts, AttrFunc: event.GetAttrs} // Pass in opts to use UndecoratedStorage
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up

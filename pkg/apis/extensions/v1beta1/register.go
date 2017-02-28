@@ -60,6 +60,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PodSecurityPolicyList{},
 		&NetworkPolicy{},
 		&NetworkPolicyList{},
+		&EventResult{},
 	)
 	// Add the watch version that applies
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

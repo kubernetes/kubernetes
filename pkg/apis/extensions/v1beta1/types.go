@@ -1146,3 +1146,15 @@ type NetworkPolicyList struct {
 	// Items is a list of schema objects.
 	Items []NetworkPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// EventResult is the event-webhook response
+type EventResult struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Error message indicating failure
+	// +optional
+	Error string `json:"error,omitempty" protobuf:"bytes,2,opt,name=error"`
+}

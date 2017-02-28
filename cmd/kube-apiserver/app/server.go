@@ -358,6 +358,7 @@ func Run(s *options.ServerRunOptions) error {
 		StorageFactory:          storageFactory,
 		EnableCoreControllers:   true,
 		EventTTL:                s.EventTTL,
+		EventWebHookCfgFile:     s.EventWebHookCfgFile,
 		KubeletClientConfig:     s.KubeletConfig,
 		EnableUISupport:         true,
 		EnableLogsSupport:       true,
