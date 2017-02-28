@@ -102,13 +102,8 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(cfg.Etcd.Endpoints) == 0 {
 		etcdPod := componentPod(api.Container{
-			Name: etcd,
-			Command: []string{
-				"etcd",
-				"--listen-client-urls=http://127.0.0.1:2379",
-				"--advertise-client-urls=http://127.0.0.1:2379",
-				"--data-dir=/var/lib/etcd",
-			},
+			Name:          etcd,
+			Command:       getEtcdCommand(cfg),
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
@@ -363,6 +358,20 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 			command = append(command, "--cloud-config="+DefaultCloudConfigPath)
 		}
 	}
+
+	return command
+}
+
+func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+	var command []string
+
+	defaultArguments := map[string]string{
+		"listen-client-urls":    "http://127.0.0.1:2379",
+		"advertise-client-urls": "http://127.0.0.1:2379",
+	}
+
+	command = append(command, "etcd", "--data-dir=/var/lib/etcd")
+	command = append(command, getExtraParameters(cfg.Etcd.ExtraArgs, defaultArguments)...)
 
 	return command
 }
