@@ -29,18 +29,15 @@ import (
 )
 
 func installBatchAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter, apiResourceConfigSource storage.APIResourceConfigSource) {
-	glog.Infof("Processing batch")
 	groupName := batch.GroupName
 	if !apiResourceConfigSource.AnyResourcesForGroupEnabled(groupName) {
-		//		glog.V(1).Infof("Skipping disabled API group %q", groupName)
-		glog.Infof("Skipping disabled API group %q", groupName)
+		glog.V(1).Infof("Skipping disabled API group %q", groupName)
 		return
 	}
 	resources := map[string]rest.Storage{}
 	restStorage.RESTStorageProvider{}.AddV1JobsStorage(apiResourceConfigSource, optsGetter, resources)
 	if len(resources) == 0 {
-		//		glog.V(1).Infof("Skipping API group %q since there is no enabled resource", groupName)
-		glog.Infof("Skipping API group %q since there is no enabled resource", groupName)
+		glog.V(1).Infof("Skipping API group %q since there is no enabled resource", groupName)
 		return
 	}
 
@@ -55,7 +52,6 @@ func installBatchAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.R
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,
 	}
-	glog.Infof("Installing batch")
 	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
