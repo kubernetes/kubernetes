@@ -3476,10 +3476,10 @@ type Secret struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN
-	// or leading dot followed by valid DNS_SUBDOMAIN.
-	// The serialized form of the secret data is a base64 encoded string,
-	// representing the arbitrary (possibly non-string) data value here.
+	// Data contains the secret data. Each key must consist of alphanumeric
+	// characters, '-', '_' or '.'. The serialized form of the secret data is a
+	// base64 encoded string, representing the arbitrary (possibly non-string)
+	// data value here.
 	// +optional
 	Data map[string][]byte
 
@@ -3589,7 +3589,7 @@ type ConfigMap struct {
 	metav1.ObjectMeta
 
 	// Data contains the configuration data.
-	// Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
+	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
 	// +optional
 	Data map[string]string
 }
