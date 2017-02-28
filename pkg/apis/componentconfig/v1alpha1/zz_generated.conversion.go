@@ -395,6 +395,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}
+	out.QOSReserveRequests = *(*componentconfig.ConfigurationMap)(unsafe.Pointer(&in.QOSReserveRequests))
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	if err := v1.Convert_Pointer_bool_To_bool(&in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains, s); err != nil {
 		return err
@@ -572,6 +573,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}
+	out.QOSReserveRequests = *(*map[string]string)(unsafe.Pointer(&in.QOSReserveRequests))
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	if err := v1.Convert_bool_To_Pointer_bool(&in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains, s); err != nil {
 		return err
