@@ -193,7 +193,7 @@ type SecureServingInfo struct {
 // NewConfig returns a Config struct with the default values
 func NewConfig() *Config {
 	return &Config{
-		ReadWritePort:               6443,
+		ReadWritePort:               443,
 		RequestContextMapper:        apirequest.NewRequestContextMapper(),
 		BuildHandlerChainsFunc:      DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
