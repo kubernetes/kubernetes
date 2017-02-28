@@ -920,6 +920,19 @@ func validateFlexVolumeSource(fv *api.FlexVolumeSource, fldPath *field.Path) fie
 	if len(fv.Driver) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
 	}
+
+	// Make sure user-specified options don't use kubernetes namespaces
+	for k := range fv.Options {
+		namespace := k
+		if parts := strings.SplitN(k, "/", 2); len(parts) == 2 {
+			namespace = parts[0]
+		}
+		normalized := "." + strings.ToLower(namespace)
+		if strings.HasSuffix(normalized, ".kubernetes.io") || strings.HasSuffix(normalized, ".k8s.io") {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("options").Key(k), k, "kubernetes.io and k8s.io namespaces are reserved"))
+		}
+	}
+
 	return allErrs
 }
 

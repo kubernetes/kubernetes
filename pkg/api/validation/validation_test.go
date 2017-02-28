@@ -8775,3 +8775,86 @@ func TestEndpointAddressNodeNameCanBeAnIPAddress(t *testing.T) {
 		t.Error("Endpoint should accept a NodeName that is an IP address")
 	}
 }
+
+func TestValidateFlexVolumeSource(t *testing.T) {
+	testcases := map[string]struct {
+		source       *api.FlexVolumeSource
+		expectedErrs map[string]string
+	}{
+		"valid": {
+			source:       &api.FlexVolumeSource{Driver: "foo"},
+			expectedErrs: map[string]string{},
+		},
+		"valid with options": {
+			source:       &api.FlexVolumeSource{Driver: "foo", Options: map[string]string{"foo": "bar"}},
+			expectedErrs: map[string]string{},
+		},
+		"no driver": {
+			source:       &api.FlexVolumeSource{Driver: ""},
+			expectedErrs: map[string]string{"driver": "Required value"},
+		},
+		"reserved option keys": {
+			source: &api.FlexVolumeSource{
+				Driver: "foo",
+				Options: map[string]string{
+					// valid options
+					"myns.io":               "A",
+					"myns.io/bar":           "A",
+					"myns.io/kubernetes.io": "A",
+
+					// invalid options
+					"KUBERNETES.IO":     "A",
+					"kubernetes.io":     "A",
+					"kubernetes.io/":    "A",
+					"kubernetes.io/foo": "A",
+
+					"alpha.kubernetes.io":     "A",
+					"alpha.kubernetes.io/":    "A",
+					"alpha.kubernetes.io/foo": "A",
+
+					"k8s.io":     "A",
+					"k8s.io/":    "A",
+					"k8s.io/foo": "A",
+
+					"alpha.k8s.io":     "A",
+					"alpha.k8s.io/":    "A",
+					"alpha.k8s.io/foo": "A",
+				},
+			},
+			expectedErrs: map[string]string{
+				"options[KUBERNETES.IO]":           "reserved",
+				"options[kubernetes.io]":           "reserved",
+				"options[kubernetes.io/]":          "reserved",
+				"options[kubernetes.io/foo]":       "reserved",
+				"options[alpha.kubernetes.io]":     "reserved",
+				"options[alpha.kubernetes.io/]":    "reserved",
+				"options[alpha.kubernetes.io/foo]": "reserved",
+				"options[k8s.io]":                  "reserved",
+				"options[k8s.io/]":                 "reserved",
+				"options[k8s.io/foo]":              "reserved",
+				"options[alpha.k8s.io]":            "reserved",
+				"options[alpha.k8s.io/]":           "reserved",
+				"options[alpha.k8s.io/foo]":        "reserved",
+			},
+		},
+	}
+
+	for k, tc := range testcases {
+		errs := validateFlexVolumeSource(tc.source, nil)
+		for _, err := range errs {
+			expectedErr, ok := tc.expectedErrs[err.Field]
+			if !ok {
+				t.Errorf("%s: unexpected err on field %s: %v", k, err.Field, err)
+				continue
+			}
+			if !strings.Contains(err.Error(), expectedErr) {
+				t.Errorf("%s: expected err on field %s to contain '%s', was %v", k, err.Field, expectedErr, err.Error())
+				continue
+			}
+		}
+		if len(errs) != len(tc.expectedErrs) {
+			t.Errorf("%s: expected errs %#v, got %#v", k, tc.expectedErrs, errs)
+			continue
+		}
+	}
+}
