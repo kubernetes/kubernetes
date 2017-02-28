@@ -291,8 +291,8 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = new(bool)
 			**out = **in
 		}
-		if in.DockerDisableSharedPID != nil {
-			in, out := &in.DockerDisableSharedPID, &out.DockerDisableSharedPID
+		if in.DockerEnableSharedPID != nil {
+			in, out := &in.DockerEnableSharedPID, &out.DockerEnableSharedPID
 			*out = new(bool)
 			**out = **in
 		}

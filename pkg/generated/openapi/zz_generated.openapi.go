@@ -13360,7 +13360,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"dockerDisableSharedPID": {
+						"dockerEnableSharedPID": {
 							SchemaProps: spec.SchemaProps{
 								Description: "This flag, if set, disables use of a shared PID namespace for pods run by the docker CRI runtime.",
 								Type:        []string{"boolean"},
