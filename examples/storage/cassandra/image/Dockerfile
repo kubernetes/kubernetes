@@ -20,7 +20,7 @@ ENV DI_VERSION="1.1.1" DI_SHA="dec8167091671df0dd3748a8938102479db5fffc"
 
 RUN mv /java.list /etc/apt/sources.list.d/java.list \
   && apt-get update \
-  && apt-get -qq -y --force-yes install --no-install-recommends procps openjdk-8-jre-headless libjemalloc1 curl localepurge \
+  && apt-get -qq -y --force-yes install --no-install-recommends -t jessie-backports procps openjdk-8-jre-headless libjemalloc1 curl localepurge \
   && curl -L https://github.com/Yelp/dumb-init/releases/download/v${DI_VERSION}/dumb-init_${DI_VERSION}_amd64 > /sbin/dumb-init \
   && echo "$DI_SHA  /sbin/dumb-init" | sha1sum -c - \
   && mv /cassandra.list /etc/apt/sources.list.d/cassandra.list \
