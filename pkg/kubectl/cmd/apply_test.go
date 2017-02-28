@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestApplyExtraArgsFail(t *testing.T) {
@@ -430,6 +432,65 @@ func TestApplyObject(t *testing.T) {
 	expectRC := "replicationcontroller/" + nameRC + "\n"
 	if buf.String() != expectRC {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
+	}
+}
+
+func TestApplyObjectOutput(t *testing.T) {
+	initTestErrorHandler(t)
+	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+
+	// Add some extra data to the post-patch object
+	postPatchObj := &unstructured.Unstructured{}
+	if err := json.Unmarshal(currentRC, &postPatchObj.Object); err != nil {
+		t.Fatal(err)
+	}
+	postPatchLabels := postPatchObj.GetLabels()
+	if postPatchLabels == nil {
+		postPatchLabels = map[string]string{}
+	}
+	postPatchLabels["post-patch"] = "value"
+	postPatchObj.SetLabels(postPatchLabels)
+	postPatchData, err := json.Marshal(postPatchObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.CommandPrinter = &printers.YAMLPrinter{}
+	tf.GenericPrinter = true
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == pathRC && m == "GET":
+				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+			case p == pathRC && m == "PATCH":
+				validatePatchApplication(t, req)
+				bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply(f, buf, errBuf)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("output", "yaml")
+	cmd.Run(cmd, []string{})
+
+	if !strings.Contains(buf.String(), "name: test-rc") {
+		t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "name: test-rc")
+	}
+	if !strings.Contains(buf.String(), "post-patch: value") {
+		t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "post-patch: value")
 	}
 }
 
