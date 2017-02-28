@@ -67,6 +67,9 @@ const (
 	FailedPlacementReason = "FailedPlacement"
 	// FailedDaemonPodReason is added to an event when the status of a Pod of a DaemonSet is 'Failed'.
 	FailedDaemonPodReason = "FailedDaemonPod"
+
+	// metricsCacheSize defines the size of the metrics cache
+	metricsCacheSize = 1000
 )
 
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
@@ -104,6 +107,8 @@ type DaemonSetsController struct {
 
 	// DaemonSet keys that need to be synced.
 	queue workqueue.RateLimitingInterface
+
+	metricsCache *metricsCache
 }
 
 func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface, lookupCacheSize int) *DaemonSetsController {
@@ -179,6 +184,7 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 
 	dsc.syncHandler = dsc.syncDaemonSet
 	dsc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
+	dsc.metricsCache = newMetricsCache(metricsCacheSize)
 	return dsc
 }
 
@@ -215,6 +221,8 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(dsc.runWorker, time.Second, stopCh)
 	}
+
+	Register()
 
 	<-stopCh
 	glog.Infof("Shutting down Daemon Set Controller")
@@ -332,6 +340,7 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	glog.V(4).Infof("Pod %s added.", pod.Name)
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
+		dsc.metricsCache.recordRecreatePod(ds, pod, time.Now())
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
@@ -358,9 +367,12 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 	if curDS := dsc.getPodDaemonSet(curPod); curDS != nil {
 		dsc.enqueueDaemonSet(curDS)
 
-		// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
-		if changedToReady && curDS.Spec.MinReadySeconds > 0 {
-			dsc.enqueueDaemonSetAfter(curDS, time.Duration(curDS.Spec.MinReadySeconds)*time.Second)
+		if changedToReady {
+			dsc.metricsCache.recordReadyPod(curDS, curPod, time.Now())
+			// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
+			if curDS.Spec.MinReadySeconds > 0 {
+				dsc.enqueueDaemonSetAfter(curDS, time.Duration(curDS.Spec.MinReadySeconds)*time.Second)
+			}
 		}
 	}
 	// If the labels have not changed, then the daemon set responsible for
@@ -396,6 +408,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	}
 	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
+		dsc.metricsCache.recordDeletePod(ds, pod, time.Now())
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))

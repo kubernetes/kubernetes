@@ -120,6 +120,8 @@ var InterestingControllerManagerMetrics = []string{
 	"garbage_collector_event_processing_latency_microseconds",
 	"garbage_collector_dirty_processing_latency_microseconds",
 	"garbage_collector_orphan_processing_latency_microseconds",
+	"daemonset_rollingupdate_pod_kill_create_latency_milliseconds",
+	"daemonset_rollingupdate_pod_kill_ready_latency_milliseconds",
 }
 
 var InterestingKubeletMetrics = []string{
