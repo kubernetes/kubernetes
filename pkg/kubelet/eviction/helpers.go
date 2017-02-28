@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
@@ -95,17 +96,10 @@ func validSignal(signal evictionapi.Signal) bool {
 }
 
 // ParseThresholdConfig parses the flags for thresholds.
-func ParseThresholdConfig(includeAllocatableThreshold bool, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim string) ([]evictionapi.Threshold, error) {
+func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim string) ([]evictionapi.Threshold, error) {
 	results := []evictionapi.Threshold{}
-	if includeAllocatableThreshold {
-		results = append(results, evictionapi.Threshold{
-			Signal:   evictionapi.SignalAllocatableMemoryAvailable,
-			Operator: evictionapi.OpLessThan,
-			Value: evictionapi.ThresholdValue{
-				Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
-			},
-		})
-	}
+	allocatableThresholds := getAllocatableThreshold(allocatableConfig)
+	results = append(results, allocatableThresholds...)
 
 	hardThresholds, err := parseThresholdStatements(evictionHard)
 	if err != nil {
@@ -223,6 +217,24 @@ func parseThresholdStatement(statement string) (evictionapi.Threshold, error) {
 			Quantity: &quantity,
 		},
 	}, nil
+}
+
+// getAllocatableThreshold returns the thresholds applicable for the allocatable configuration
+func getAllocatableThreshold(allocatableConfig []string) []evictionapi.Threshold {
+	for _, key := range allocatableConfig {
+		if key == cm.NodeAllocatableEnforcementKey {
+			return []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+				},
+			}
+		}
+	}
+	return []evictionapi.Threshold{}
 }
 
 // parsePercentage parses a string representing a percentage value

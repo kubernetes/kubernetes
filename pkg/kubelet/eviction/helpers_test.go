@@ -350,7 +350,7 @@ func TestParseThresholdConfig(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		thresholds, err := ParseThresholdConfig(false, testCase.evictionHard, testCase.evictionSoft, testCase.evictionSoftGracePeriod, testCase.evictionMinReclaim)
+		thresholds, err := ParseThresholdConfig([]string{}, testCase.evictionHard, testCase.evictionSoft, testCase.evictionSoftGracePeriod, testCase.evictionMinReclaim)
 		if testCase.expectErr != (err != nil) {
 			t.Errorf("Err not as expected, test: %v, error expected: %v, actual: %v", testName, testCase.expectErr, err)
 		}
