@@ -164,7 +164,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 }
 
 func (j *Join) Validate() error {
-	return validation.ValidateNodeConfiguration(j.cfg).ToAggregate()
+	return validation.ValidateNodeConfiguration(j.cfg)
 }
 
 // Run executes worker node provisioning and tries to join an existing cluster.

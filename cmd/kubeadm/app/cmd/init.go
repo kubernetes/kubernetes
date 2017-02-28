@@ -172,7 +172,7 @@ type Init struct {
 
 // Validate validates configuration passed to "kubeadm init"
 func (i *Init) Validate() error {
-	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()
+	return validation.ValidateMasterConfiguration(i.cfg)
 }
 
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.

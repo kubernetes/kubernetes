@@ -21,12 +21,14 @@ import (
 	"os"
 	"strings"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
 const (
 	DefaultErrorExitCode = 1
 	PreFlightExitCode    = 2
+	ValidationExitCode   = 3
 )
 
 type debugError interface {
@@ -63,6 +65,8 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 		return
 	case *preflight.Error:
 		handleErr(err.Error(), PreFlightExitCode)
+	case *validation.Error:
+		handleErr(err.Error(), ValidationExitCode)
 	default:
 		handleErr(err.Error(), DefaultErrorExitCode)
 	}
