@@ -2527,6 +2527,22 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 	})
 }
 
+func GetTTLAnnotationFromNode(node *v1.Node) (time.Duration, bool) {
+	if node.Annotations == nil {
+		return time.Duration(0), false
+	}
+	value, ok := node.Annotations[v1.ObjectTTLAnnotationKey]
+	if !ok {
+		return time.Duration(0), false
+	}
+	intValue, err := strconv.Atoi(value)
+	if err != nil {
+		Logf("Cannot convert TTL annotation from %#v to int", *node)
+		return time.Duration(0), false
+	}
+	return time.Duration(intValue) * time.Second, true
+}
+
 func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, labelValue string) {
 	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
 }
