@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 make -C "${KUBE_ROOT}/federation/" build_image
 make -C "${KUBE_ROOT}/federation/" push
