@@ -170,7 +170,7 @@ func dns() error {
 				"kubernetes.default using nslookup %s error: %v", failed, strings.Join(nsArgs, " "), err)
 	}
 
-	// Can resolve kubernetes.default using the kubelete dns and domain values
+	// Can resolve kubernetes.default using the kubelet dns and domain values
 	return printSuccess("Dns Check (Optional): %s", success)
 }
 
