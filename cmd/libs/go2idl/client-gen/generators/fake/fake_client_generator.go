@@ -25,6 +25,7 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/types"
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
+	scheme "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/scheme"
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
@@ -117,6 +118,17 @@ func PackageForClientset(customArgs clientgenargs.Args, fakeClientsetPackage str
 					outputPackage:        "fake",
 					imports:              generator.NewImportTracker(),
 					realClientsetPackage: filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName),
+				},
+				&scheme.GenScheme{
+					DefaultGen: generator.DefaultGen{
+						OptionalName: "register",
+					},
+					InputPackages:  customArgs.GroupVersionToInputPath,
+					OutputPackage:  fakeClientsetPackage,
+					Groups:         customArgs.Groups,
+					ImportTracker:  generator.NewImportTracker(),
+					PrivateScheme:  true,
+					CreateRegistry: true, // needed to know about root resources and for RESTMapper
 				},
 			}
 			return generators
