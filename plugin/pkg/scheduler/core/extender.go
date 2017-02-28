@@ -198,6 +198,7 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 // Bind informs the extender about the scheduling decision, before the decision is
 // conveyed to the apiserver.
 func (h *HTTPExtender) Bind(pod *v1.Pod, node string) error {
+	var result schedulerapi.BindingResult
 	if h.bindVerb == "" {
 		return nil
 	}
@@ -205,7 +206,13 @@ func (h *HTTPExtender) Bind(pod *v1.Pod, node string) error {
 		Pod:  *pod,
 		Node: node,
 	}
-	return h.send(h.bindVerb, &binding, nil)
+	if err := h.send(h.bindVerb, &binding, &result); err != nil {
+		return err
+	}
+	if result.Error != "" {
+		return fmt.Errorf(result.Error)
+	}
+	return nil
 }
 
 // Helper function to send messages to the extender
@@ -233,16 +240,14 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 		return fmt.Errorf("Failed %v with extender at URL %v, code %v", action, h.extenderURL, resp.StatusCode)
 	}
 
-	if result != nil {
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 
-		if err := json.Unmarshal(body, result); err != nil {
-			return err
-		}
+	if err := json.Unmarshal(body, result); err != nil {
+		return err
 	}
 	return nil
 }

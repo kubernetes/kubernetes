@@ -174,6 +174,12 @@ type Binding struct {
 	Node string
 }
 
+// BindingResult represents the result of binding of a pod to a node.
+type BindingResult struct {
+	// Error message indicating failure
+	Error string
+}
+
 // HostPriority represents the priority of scheduling to a particular host, higher priority is better.
 type HostPriority struct {
 	// Name of the host

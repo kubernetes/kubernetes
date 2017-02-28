@@ -74,6 +74,8 @@ func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Requ
 	decoder := json.NewDecoder(req.Body)
 	defer req.Body.Close()
 
+	encoder := json.NewEncoder(w)
+
 	if strings.Contains(req.URL.Path, filter) || strings.Contains(req.URL.Path, prioritize) {
 		var args schedulerapi.ExtenderArgs
 
@@ -81,8 +83,6 @@ func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Requ
 			http.Error(w, "Decode error", http.StatusBadRequest)
 			return
 		}
-
-		encoder := json.NewEncoder(w)
 
 		if strings.Contains(req.URL.Path, filter) {
 			resp := &schedulerapi.ExtenderFilterResult{}
@@ -114,11 +114,15 @@ func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Requ
 			return
 		}
 
+		resp := &schedulerapi.BindingResult{}
+
 		if err := e.Bind(&args.Pod, args.Node); err != nil {
-			http.Error(w, fmt.Sprintf("Bind failed with error: %v", err), http.StatusInternalServerError)
-			return
+			resp.Error = err.Error()
 		}
-		w.WriteHeader(http.StatusOK)
+
+		if err := encoder.Encode(resp); err != nil {
+			t.Fatalf("Failed to encode %+v", resp)
+		}
 	} else {
 		http.Error(w, "Unknown method", http.StatusNotFound)
 	}
