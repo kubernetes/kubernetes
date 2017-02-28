@@ -1533,7 +1533,7 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(
 
 		// If volumes have not been unmounted/detached, do not delete the cgroup in case so the charge does not go to the parent.
 		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
-			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up, Skipping cgroups deletion: %v", uid)
+			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up, Skipping cgroups deletion.", uid)
 			continue
 		}
 		glog.V(3).Infof("Orphaned pod %q found, removing pod cgroups", uid)
