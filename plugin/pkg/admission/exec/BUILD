@@ -10,12 +10,16 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["admission.go"],
+    srcs = [
+        "admission.go",
+        "static_admission.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apiserver/pkg/admission",
@@ -25,12 +29,17 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["admission_test.go"],
+    srcs = [
+        "admission_test.go",
+        "static_admission_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apiserver/pkg/admission",
