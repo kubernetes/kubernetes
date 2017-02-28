@@ -718,6 +718,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 					{"Node:"},
 					{"Labels:", "app=redis"},
 					{"role=master"},
+					{"Annotations:"},
 					{"Status:", "Running"},
 					{"IP:"},
 					{"Controllers:", "ReplicationController/redis-master"},
@@ -737,6 +738,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				{"Selector:", "app=redis,role=master"},
 				{"Labels:", "app=redis"},
 				{"role=master"},
+				{"Annotations:"},
 				{"Replicas:", "1 current", "1 desired"},
 				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
 				// {"Events:"} would ordinarily go in the list
@@ -754,6 +756,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				{"Namespace:", ns},
 				{"Labels:", "app=redis"},
 				{"role=master"},
+				{"Annotations:"},
 				{"Selector:", "app=redis", "role=master"},
 				{"Type:", "ClusterIP"},
 				{"IP:"},
@@ -771,6 +774,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			requiredStrings = [][]string{
 				{"Name:", node.Name},
 				{"Labels:"},
+				{"Annotations:"},
 				{"CreationTimestamp:"},
 				{"Conditions:"},
 				{"Type", "Status", "LastHeartbeatTime", "LastTransitionTime", "Reason", "Message"},
@@ -790,6 +794,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			requiredStrings = [][]string{
 				{"Name:", ns},
 				{"Labels:"},
+				{"Annotations:"},
 				{"Status:", "Active"}}
 			checkOutput(output, requiredStrings)
 
