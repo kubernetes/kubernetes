@@ -423,29 +423,27 @@ func (rm *ReplicationManager) enqueueControllerAfter(obj interface{}, after time
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
 func (rm *ReplicationManager) worker() {
-	workFunc := func() bool {
-		key, quit := rm.queue.Get()
-		if quit {
-			return true
-		}
-		defer rm.queue.Done(key)
+	for rm.processNextWorkItem() {
+	}
+}
 
-		err := rm.syncHandler(key.(string))
-		if err == nil {
-			rm.queue.Forget(key)
-			return false
-		}
-
-		rm.queue.AddRateLimited(key)
-		utilruntime.HandleError(err)
+func (rm *ReplicationManager) processNextWorkItem() bool {
+	key, quit := rm.queue.Get()
+	if quit {
 		return false
 	}
-	for {
-		if quit := workFunc(); quit {
-			glog.Infof("replication controller worker shutting down")
-			return
-		}
+	defer rm.queue.Done(key)
+
+	err := rm.syncHandler(key.(string))
+	if err == nil {
+		rm.queue.Forget(key)
+		return true
 	}
+
+	utilruntime.HandleError(fmt.Errorf("sync %q failed: %v", key, err))
+	rm.queue.AddRateLimited(key)
+
+	return true
 }
 
 // manageReplicas checks and updates replicas for the given replication controller.
@@ -605,16 +603,11 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	// anymore but has the stale controller ref.
 	pods, err := rm.podLister.Pods(rc.Namespace).List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error getting pods for rc %q: %v", key, err))
-		rm.queue.Add(key)
 		return err
 	}
 	cm := controller.NewPodControllerRefManager(rm.podControl, rc, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), getRCKind())
 	filteredPods, err = cm.ClaimPods(pods)
 	if err != nil {
-		// Something went wrong with adoption or release.
-		// Requeue and try again so we don't leave orphans sitting around.
-		rm.queue.Add(key)
 		return err
 	}
 
