@@ -177,7 +177,7 @@ func (rc *reconciler) reconcile() {
 				if !timeout {
 					glog.Infof("Started DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 				} else {
-					glog.Infof("Started DetachVolume for volume %q from node %q. This volume is not safe to detach, but maxWaitForUnmountDuration %v expired, force detaching",
+					glog.Warningf("Started DetachVolume for volume %q from node %q. This volume is not safe to detach, but maxWaitForUnmountDuration %v expired, force detaching",
 						attachedVolume.VolumeName,
 						attachedVolume.NodeName,
 						rc.maxWaitForUnmountDuration)
@@ -230,6 +230,6 @@ func (rc *reconciler) reconcile() {
 	// Update Node Status
 	err := rc.nodeStatusUpdater.UpdateNodeStatuses()
 	if err != nil {
-		glog.Infof("UpdateNodeStatuses failed with: %v", err)
+		glog.Warningf("UpdateNodeStatuses failed with: %v", err)
 	}
 }
