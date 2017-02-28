@@ -56,34 +56,18 @@ func VisitPodSecretNames(pod *api.Pod, visitor func(string) bool) bool {
 	for i := range pod.Spec.Volumes {
 		source = &pod.Spec.Volumes[i].VolumeSource
 		switch {
-		// case source.AWSElasticBlockStore:
-		// case source.AzureDisk:
 		case source.AzureFile != nil:
-			if len(source.AzureFile.SecretName) > 0 && !visitor(source.Secret.SecretName) {
+			if len(source.AzureFile.SecretName) > 0 && !visitor(source.AzureFile.SecretName) {
 				return false
 			}
 		case source.CephFS != nil:
 			if source.CephFS.SecretRef != nil && !visitor(source.CephFS.SecretRef.Name) {
 				return false
 			}
-		// case source.Cinder:
-		// case source.ConfigMap:
-		// case source.DownwardAPI:
-		// case source.EmptyDir:
-		// case source.FC:
 		case source.FlexVolume != nil:
 			if source.FlexVolume.SecretRef != nil && !visitor(source.FlexVolume.SecretRef.Name) {
 				return false
 			}
-		// case source.Flocker:
-		// case source.GCEPersistentDisk:
-		// case source.GitRepo:
-		// case source.Glusterfs:
-		// case source.HostPath:
-		// case source.ISCSI:
-		// case source.NFS:
-		// case source.PersistentVolumeClaim:
-		// case source.PhotonPersistentDisk:
 		case source.Projected != nil:
 			for j := range source.Projected.Sources {
 				if source.Projected.Sources[j].Secret != nil {
@@ -92,7 +76,6 @@ func VisitPodSecretNames(pod *api.Pod, visitor func(string) bool) bool {
 					}
 				}
 			}
-		// case source.Quobyte:
 		case source.RBD != nil:
 			if source.RBD.SecretRef != nil && !visitor(source.RBD.SecretRef.Name) {
 				return false
@@ -102,7 +85,6 @@ func VisitPodSecretNames(pod *api.Pod, visitor func(string) bool) bool {
 				return false
 			}
 		}
-		// case source.VsphereVolume:
 	}
 	return true
 }
