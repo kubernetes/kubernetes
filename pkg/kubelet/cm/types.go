@@ -47,6 +47,18 @@ type CgroupConfig struct {
 	ResourceParameters *ResourceConfig
 }
 
+// MemoryStats holds the on-demand stastistics from the memory cgroup
+type MemoryStats struct {
+	// Memory usage (in bytes).
+	Usage int64
+}
+
+// ResourceStats holds on-demand stastistics from various cgroup subsystems
+type ResourceStats struct {
+	// Memory statistics.
+	MemoryStats *MemoryStats
+}
+
 // CgroupManager allows for cgroup management.
 // Supports Cgroup Creation ,Deletion and Updates.
 type CgroupManager interface {
@@ -72,6 +84,8 @@ type CgroupManager interface {
 	Pids(name CgroupName) []int
 	// ReduceCPULimits reduces the CPU CFS values to the minimum amount of shares.
 	ReduceCPULimits(cgroupName CgroupName) error
+	// GetResourceStats returns statistics of the specified cgroup as read from the cgroup fs.
+	GetResourceStats(name CgroupName) (*ResourceStats, error)
 }
 
 // QOSContainersInfo stores the names of containers per qos
