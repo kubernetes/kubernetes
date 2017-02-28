@@ -17,6 +17,8 @@ limitations under the License.
 package e2e_node
 
 import (
+	"path"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -24,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -49,18 +52,23 @@ func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequir
 	return res
 }
 
+// Kubelet internal cgroup name for node allocatable cgroup.
+const defaultNodeAllocatableCgroup = "kubepods"
+
 // makePodToVerifyCgroups returns a pod that verifies the existence of the specified cgroups.
 func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *v1.Pod {
 	// convert the names to their literal cgroupfs forms...
 	cgroupFsNames := []string{}
 	for _, cgroupName := range cgroupNames {
+		// Add top level cgroup used to enforce node allocatable.
+		cgroupName = cm.CgroupName(path.Join(defaultNodeAllocatableCgroup, string(cgroupName)))
 		if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 			cgroupFsNames = append(cgroupFsNames, cm.ConvertCgroupNameToSystemd(cgroupName, true))
 		} else {
 			cgroupFsNames = append(cgroupFsNames, string(cgroupName))
 		}
 	}
-
+	glog.Infof("expecting %v cgroups to be found", cgroupFsNames)
 	// build the pod command to either verify cgroups exist
 	command := ""
 	for _, cgroupFsName := range cgroupFsNames {

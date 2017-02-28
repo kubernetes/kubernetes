@@ -189,16 +189,16 @@ func TestTryOrdering(t *testing.T) {
 		switch value.Value {
 		case "first":
 			if !value.AddedAt.Equal(time.Unix(0, time.Millisecond.Nanoseconds())) {
-				t.Fatalf("added time for %s is %d", value.Value, value.AddedAt)
+				t.Fatalf("added time for %s is %v", value.Value, value.AddedAt)
 			}
 
 		case "second":
 			if !value.AddedAt.Equal(time.Unix(0, 2*time.Millisecond.Nanoseconds())) {
-				t.Fatalf("added time for %s is %d", value.Value, value.AddedAt)
+				t.Fatalf("added time for %s is %v", value.Value, value.AddedAt)
 			}
 			if hasQueued {
 				if !value.ProcessAt.Equal(time.Unix(0, 6*time.Millisecond.Nanoseconds())) {
-					t.Fatalf("process time for %s is %d", value.Value, value.ProcessAt)
+					t.Fatalf("process time for %s is %v", value.Value, value.ProcessAt)
 				}
 				break
 			}
@@ -209,7 +209,7 @@ func TestTryOrdering(t *testing.T) {
 
 		case "third":
 			if !value.AddedAt.Equal(time.Unix(0, 3*time.Millisecond.Nanoseconds())) {
-				t.Fatalf("added time for %s is %d", value.Value, value.AddedAt)
+				t.Fatalf("added time for %s is %v", value.Value, value.AddedAt)
 			}
 		}
 		order = append(order, value.Value)

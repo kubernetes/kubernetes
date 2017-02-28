@@ -14,7 +14,6 @@ cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "feature_gates"
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
-cluster/gce/configure-vm.sh:  local -r client_ca_file="/srv/salt-overlay/salt/kubelet/ca.crt"
 cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",ABAC"
 cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",Webhook"
 cluster/gce/container-linux/configure-helper.sh:    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
@@ -40,7 +39,6 @@ cluster/gce/trusty/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:            context['pillar'] = {'num_nodes': get_node_count()}
-cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:        msg = "Cannot change {0} to {1}".format(service_cidr(),
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ca_cert_path = layer_options.get('ca_certificate_path')
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    cluster_dns.set_dns_info(53, hookenv.config('dns_domain'), dns_ip)
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
@@ -171,6 +169,8 @@ test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's o
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("failed to get oom_score_adj for %d", pid)
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("failed to get oom_score_adj for %d: %v", pid, err)
 test/e2e_node/container_manager_test.go:	procfsPath := path.Join("/proc", strconv.Itoa(pid), "oom_score_adj")
+test/e2e_node/node_container_manager_test.go:	kubeReservedCgroup   = "/kube_reserved"
+test/e2e_node/node_container_manager_test.go:	systemReservedCgroup = "/system_reserved"
 test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
 test/images/mount-tester/mt.go:	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
