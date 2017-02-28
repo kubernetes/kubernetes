@@ -350,7 +350,7 @@ func TestParseThresholdConfig(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		thresholds, err := ParseThresholdConfig(testCase.evictionHard, testCase.evictionSoft, testCase.evictionSoftGracePeriod, testCase.evictionMinReclaim)
+		thresholds, err := ParseThresholdConfig(false, testCase.evictionHard, testCase.evictionSoft, testCase.evictionSoftGracePeriod, testCase.evictionMinReclaim)
 		if testCase.expectErr != (err != nil) {
 			t.Errorf("Err not as expected, test: %v, error expected: %v, actual: %v", testName, testCase.expectErr, err)
 		}
@@ -699,6 +699,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	}
 	nodeAvailableBytes := uint64(1024 * 1024 * 1024)
 	nodeWorkingSetBytes := uint64(1024 * 1024 * 1024)
+	allocatableMemoryCapacity := uint64(5 * 1024 * 1024 * 1024)
 	imageFsAvailableBytes := uint64(1024 * 1024)
 	imageFsCapacityBytes := uint64(1024 * 1024 * 2)
 	nodeFsAvailableBytes := uint64(1024)
@@ -738,14 +739,30 @@ func TestMakeSignalObservations(t *testing.T) {
 		podMaker("pod1", "ns2", "uuid2", 1),
 		podMaker("pod3", "ns3", "uuid3", 1),
 	}
-	containerWorkingSetBytes := int64(1024 * 1024)
+	containerWorkingSetBytes := int64(1024 * 1024 * 1024)
 	for _, pod := range pods {
 		fakeStats.Pods = append(fakeStats.Pods, newPodStats(pod, containerWorkingSetBytes))
 	}
-	actualObservations, statsFunc, err := makeSignalObservations(provider)
+	res := quantityMustParse("5Gi")
+	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *res})
+	// Allocatable thresholds are always 100%.  Verify that Threshold == Capacity.
+	if res.CmpInt64(int64(allocatableMemoryCapacity)) != 0 {
+		t.Errorf("Expected Threshold %v to be equal to value %v", res.Value(), allocatableMemoryCapacity)
+	}
+	actualObservations, statsFunc, err := makeSignalObservations(provider, nodeProvider)
 
 	if err != nil {
 		t.Errorf("Unexpected err: %v", err)
+	}
+	allocatableMemQuantity, found := actualObservations[evictionapi.SignalAllocatableMemoryAvailable]
+	if !found {
+		t.Errorf("Expected allocatable memory observation, but didnt find one")
+	}
+	if allocatableMemQuantity.available.Value() != 2*containerWorkingSetBytes {
+		t.Errorf("Expected %v, actual: %v", containerWorkingSetBytes, allocatableMemQuantity.available.Value())
+	}
+	if expectedBytes := int64(allocatableMemoryCapacity); allocatableMemQuantity.capacity.Value() != expectedBytes {
+		t.Errorf("Expected %v, actual: %v", expectedBytes, allocatableMemQuantity.capacity.Value())
 	}
 	memQuantity, found := actualObservations[evictionapi.SignalMemoryAvailable]
 	if !found {
