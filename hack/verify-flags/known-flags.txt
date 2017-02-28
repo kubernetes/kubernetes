@@ -236,6 +236,7 @@ experimental-keystone-url
 experimental-mounter-path
 experimental-nvidia-gpus
 experimental-prefix
+experimental-qos-reserved
 external-etcd-cafile
 external-etcd-certfile
 external-etcd-endpoints
