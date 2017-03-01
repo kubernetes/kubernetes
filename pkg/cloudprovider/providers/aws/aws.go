@@ -157,6 +157,10 @@ const (
 	createTagSteps        = 9
 )
 
+// awsTagNameMasterRoles is a set of well-known AWS tag names that indicate the instance is a master
+// The major consequence is that it is then not considered for AWS zone discovery for dynamic volume creation.
+var awsTagNameMasterRoles = sets.NewString("kubernetes.io/role/master", "k8s.io/role/master")
+
 // Maps from backend protocol to ELB protocol
 var backendProtocolMapping = map[string]string{
 	"https": "https",
@@ -1066,9 +1070,9 @@ func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
 	return matchingInstances, nil
 }
 
-// getAllZones retrieves  a list of all the zones in which nodes are running
+// getCandidateZonesForDynamicVolume retrieves  a list of all the zones in which nodes are running
 // It currently involves querying all instances
-func (c *Cloud) getAllZones() (sets.String, error) {
+func (c *Cloud) getCandidateZonesForDynamicVolume() (sets.String, error) {
 	// We don't currently cache this; it is currently used only in volume
 	// creation which is expected to be a comparatively rare occurrence.
 
@@ -1092,10 +1096,19 @@ func (c *Cloud) getAllZones() (sets.String, error) {
 	zones := sets.NewString()
 
 	for _, instance := range instances {
-		// Only return fully-ready instances when listing instances
-		// (vs a query by name, where we will return it if we find it)
-		if orEmpty(instance.State.Name) == "pending" {
-			glog.V(2).Infof("Skipping EC2 instance (pending): %s", *instance.InstanceId)
+		// We skip over master nodes, if the installation tool labels them with one of the well-known master labels
+		// This avoids creating a volume in a zone where only the master is running - e.g. #34583
+		// This is a short-term workaround until the scheduler takes care of zone selection
+		master := false
+		for _, tag := range instance.Tags {
+			tagKey := aws.StringValue(tag.Key)
+			if awsTagNameMasterRoles.Has(tagKey) {
+				master = true
+			}
+		}
+
+		if master {
+			glog.V(4).Infof("Ignoring master instance %q in zone discovery", aws.StringValue(instance.InstanceId))
 			continue
 		}
 
@@ -1609,7 +1622,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 
 // CreateDisk implements Volumes.CreateDisk
 func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, error) {
-	allZones, err := c.getAllZones()
+	allZones, err := c.getCandidateZonesForDynamicVolume()
 	if err != nil {
 		return "", fmt.Errorf("error querying for all zones: %v", err)
 	}
