@@ -93,8 +93,8 @@ func (dh *DeletionHelper) EnsureFinalizers(obj runtime.Object) (
 	if !dh.hasFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters) {
 		finalizers = append(finalizers, FinalizerDeleteFromUnderlyingClusters)
 	}
-	if !dh.hasFinalizerFunc(obj, metav1.FinalizerOrphan) {
-		finalizers = append(finalizers, metav1.FinalizerOrphan)
+	if !dh.hasFinalizerFunc(obj, metav1.FinalizerOrphanDependents) {
+		finalizers = append(finalizers, metav1.FinalizerOrphanDependents)
 	}
 	if len(finalizers) != 0 {
 		glog.V(2).Infof("Adding finalizers %v to %s", finalizers, dh.objNameFunc(obj))
@@ -117,7 +117,7 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 		glog.V(2).Infof("obj does not have %s finalizer. Nothing to do", FinalizerDeleteFromUnderlyingClusters)
 		return obj, nil
 	}
-	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, metav1.FinalizerOrphan)
+	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, metav1.FinalizerOrphanDependents)
 	if hasOrphanFinalizer {
 		glog.V(2).Infof("Found finalizer orphan. Nothing to do, just remove the finalizer")
 		// If the obj has FinalizerOrphan finalizer, then we need to orphan the
@@ -127,7 +127,7 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 		if err != nil {
 			return obj, err
 		}
-		return dh.removeFinalizerFunc(obj, metav1.FinalizerOrphan)
+		return dh.removeFinalizerFunc(obj, metav1.FinalizerOrphanDependents)
 	}
 
 	glog.V(2).Infof("Deleting obj %s from underlying clusters", objName)

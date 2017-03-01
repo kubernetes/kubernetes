@@ -479,13 +479,14 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*v1.Pod, rc *v1.Repl
 			go func() {
 				defer wg.Done()
 				var err error
-				var trueVar = true
+				boolPtr := func(b bool) *bool { return &b }
 				controllerRef := &metav1.OwnerReference{
-					APIVersion: getRCKind().GroupVersion().String(),
-					Kind:       getRCKind().Kind,
-					Name:       rc.Name,
-					UID:        rc.UID,
-					Controller: &trueVar,
+					APIVersion:         getRCKind().GroupVersion().String(),
+					Kind:               getRCKind().Kind,
+					Name:               rc.Name,
+					UID:                rc.UID,
+					BlockOwnerDeletion: boolPtr(true),
+					Controller:         boolPtr(true),
 				}
 				err = rm.podControl.CreatePodsWithControllerRef(rc.Namespace, rc.Spec.Template, rc, controllerRef)
 				if err != nil {
