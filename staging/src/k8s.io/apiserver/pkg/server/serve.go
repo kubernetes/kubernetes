@@ -56,6 +56,13 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 		},
 	}
 
+	if s.SecureServingInfo.MinTLSVersion > 0 {
+		secureServer.TLSConfig.MinVersion = s.SecureServingInfo.MinTLSVersion
+	}
+	if len(s.SecureServingInfo.CipherSuites) > 0 {
+		secureServer.TLSConfig.CipherSuites = s.SecureServingInfo.CipherSuites
+	}
+
 	if s.SecureServingInfo.Cert != nil {
 		secureServer.TLSConfig.Certificates = []tls.Certificate{*s.SecureServingInfo.Cert}
 	}
