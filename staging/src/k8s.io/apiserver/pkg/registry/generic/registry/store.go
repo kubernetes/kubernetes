@@ -173,7 +173,7 @@ type Store struct {
 var _ rest.StandardStorage = &Store{}
 var _ rest.Exporter = &Store{}
 
-const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
+const optimisticLockErrorMsg = "the object has been modified (specifiedResourceVersion: %d, currentResourceVersion: %d); please apply your changes to the latest version and try again"
 
 // NamespaceKeyRootFunc is the default function for constructing storage paths
 // to resource directories enforcing namespace rules.
@@ -453,7 +453,7 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 				return nil, nil, kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
 			}
 			if newVersion != version {
-				return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
+				return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf(optimisticLockErrorMsg, newVersion, version))
 			}
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
