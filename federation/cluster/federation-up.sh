@@ -84,7 +84,8 @@ function init() {
       --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
       --dns-zone-name="${DNS_ZONE_NAME}" \
       --dns-provider="${DNS_PROVIDER}" \
-      --image="${kube_registry}/hyperkube-amd64:${kube_version}"
+      --image="${kube_registry}/hyperkube-amd64:${kube_version}" \
+      --apiserver-arg-overrides="--storage-backend=etcd2"
 }
 
 # join_clusters joins the clusters in the local kubeconfig to federation. The clusters
