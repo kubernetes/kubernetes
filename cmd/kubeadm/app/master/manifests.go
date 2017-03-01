@@ -74,7 +74,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getAPIServerCommand(cfg, false),
 			VolumeMounts:  volumeMounts,
-			LivenessProbe: componentProbe(8080, "/healthz"),
+			LivenessProbe: componentProbe(6443, "/healthz", api.URISchemeHTTPS),
 			Resources:     componentResources("250m"),
 			Env:           getProxyEnvVars(),
 		}, volumes...),
@@ -83,7 +83,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getControllerManagerCommand(cfg, false),
 			VolumeMounts:  volumeMounts,
-			LivenessProbe: componentProbe(10252, "/healthz"),
+			LivenessProbe: componentProbe(10252, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("200m"),
 			Env:           getProxyEnvVars(),
 		}, volumes...),
@@ -92,7 +92,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getSchedulerCommand(cfg, false),
 			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
-			LivenessProbe: componentProbe(10251, "/healthz"),
+			LivenessProbe: componentProbe(10251, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
 		}, k8sVolume(cfg)),
@@ -110,7 +110,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			},
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
-			LivenessProbe: componentProbe(2379, "/health"),
+			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
 
 		etcdPod.Spec.SecurityContext = &api.PodSecurityContext{
@@ -249,13 +249,14 @@ func componentResources(cpu string) api.ResourceRequirements {
 	}
 }
 
-func componentProbe(port int, path string) *api.Probe {
+func componentProbe(port int, path string, scheme api.URIScheme) *api.Probe {
 	return &api.Probe{
 		Handler: api.Handler{
 			HTTPGet: &api.HTTPGetAction{
-				Host: "127.0.0.1",
-				Path: path,
-				Port: intstr.FromInt(port),
+				Host:   "127.0.0.1",
+				Path:   path,
+				Port:   intstr.FromInt(port),
+				Scheme: scheme,
 			},
 		},
 		InitialDelaySeconds: 15,
@@ -304,7 +305,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 	}
 
 	defaultArguments := map[string]string{
-		"insecure-bind-address":           "127.0.0.1",
+		"insecure-port":                   "0",
 		"admission-control":               kubeadmconstants.DefaultAdmissionControl,
 		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
 		"service-account-key-file":        getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
@@ -318,7 +319,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"allow-privileged":                "true",
 		"storage-backend":                 "etcd3",
 		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
-
 		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
 		// so add it unconditionally with recommended values
 		"requestheader-username-headers":     "X-Remote-User",
