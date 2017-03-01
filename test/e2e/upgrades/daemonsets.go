@@ -36,16 +36,15 @@ type DaemonSetUpgradeTest struct {
 	daemonSet *extensions.DaemonSet
 }
 
+func (DaemonSetUpgradeTest) Name() string { return "daemonset-upgrade" }
+
 // Setup creates a DaemonSet and verifies that it's running
 func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
-	namespace := "daemonset-upgrade"
 	daemonSetName := "ds1"
 	labelSet := map[string]string{"ds-name": daemonSetName}
 	image := "gcr.io/google_containers/serve_hostname:v1.4"
 
-	// Grab a unique namespace so we don't collide.
-	ns, err := f.CreateNamespace(namespace, nil)
-	framework.ExpectNoError(err)
+	ns := f.Namespace
 
 	t.daemonSet = &extensions.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -71,6 +70,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 	}
 
 	By("Creating a DaemonSet")
+	var err error
 	if t.daemonSet, err = f.ClientSet.Extensions().DaemonSets(ns.Name).Create(t.daemonSet); err != nil {
 		framework.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
 	}

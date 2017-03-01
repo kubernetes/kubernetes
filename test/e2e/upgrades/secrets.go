@@ -33,13 +33,13 @@ type SecretUpgradeTest struct {
 	secret *v1.Secret
 }
 
+func (SecretUpgradeTest) Name() string { return "secret-upgrade" }
+
 // Setup creates a secret and then verifies that a pod can consume it.
 func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
 	secretName := "upgrade-secret"
 
-	// Grab a unique namespace so we don't collide.
-	ns, err := f.CreateNamespace("secret-upgrade", nil)
-	framework.ExpectNoError(err)
+	ns := f.Namespace
 
 	t.secret = &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -52,6 +52,7 @@ func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
 	}
 
 	By("Creating a secret")
+	var err error
 	if t.secret, err = f.ClientSet.Core().Secrets(ns.Name).Create(t.secret); err != nil {
 		framework.Failf("unable to create test secret %s: %v", t.secret.Name, err)
 	}
