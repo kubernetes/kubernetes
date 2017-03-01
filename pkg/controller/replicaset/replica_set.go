@@ -171,7 +171,6 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*extensions.ReplicaSet {
 	rss, err := rsc.rsLister.GetPodReplicaSets(pod)
 	if err != nil {
-		glog.V(4).Infof("No ReplicaSets found for pod %v, ReplicaSet controller will avoid syncing", pod.Name)
 		return nil
 	}
 	if len(rss) > 1 {
@@ -208,7 +207,6 @@ func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 // When a pod is created, enqueue the replica set that manages it and update its expectations.
 func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
 
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
@@ -223,6 +221,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 			// It's controlled by a different type of controller.
 			return
 		}
+		glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
 		rs, err := rsc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
 		if err != nil {
 			return
@@ -240,7 +239,12 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	// them to see if anyone wants to adopt it.
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
-	for _, rs := range rsc.getPodReplicaSets(pod) {
+	rss := rsc.getPodReplicaSets(pod)
+	if len(rss) == 0 {
+		return
+	}
+	glog.V(4).Infof("Orphan Pod %s created: %#v.", pod.Name, pod)
+	for _, rs := range rss {
 		rsc.enqueueReplicaSet(rs)
 	}
 }
@@ -256,7 +260,6 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
 
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if curPod.DeletionTimestamp != nil {
@@ -291,6 +294,7 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 			// It's controlled by a different type of controller.
 			return
 		}
+		glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
 		rs, err := rsc.rsLister.ReplicaSets(curPod.Namespace).Get(curControllerRef.Name)
 		if err != nil {
 			return
@@ -313,7 +317,12 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
 	if labelChanged || controllerRefChanged {
-		for _, rs := range rsc.getPodReplicaSets(curPod) {
+		rss := rsc.getPodReplicaSets(curPod)
+		if len(rss) == 0 {
+			return
+		}
+		glog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		for _, rs := range rss {
 			rsc.enqueueReplicaSet(rs)
 		}
 	}
@@ -340,7 +349,6 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 			return
 		}
 	}
-	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
 
 	controllerRef := controller.GetControllerOf(pod)
 	if controllerRef == nil {
@@ -351,6 +359,7 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 		// It's controlled by a different type of controller.
 		return
 	}
+	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
 
 	rs, err := rsc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
 	if err != nil {
