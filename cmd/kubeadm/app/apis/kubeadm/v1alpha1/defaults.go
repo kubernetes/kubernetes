@@ -47,8 +47,8 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.KubernetesVersion = DefaultKubernetesVersion
 	}
 
-	if obj.API.Port == 0 {
-		obj.API.Port = DefaultAPIBindPort
+	if obj.API.BindPort == 0 {
+		obj.API.BindPort = DefaultAPIBindPort
 	}
 
 	if obj.Networking.ServiceSubnet == "" {

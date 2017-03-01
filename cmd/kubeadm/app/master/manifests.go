@@ -315,7 +315,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"kubelet-client-certificate":      getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
 		"kubelet-client-key":              getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
 		"token-auth-file":                 path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CSVTokenFileName),
-		"secure-port":                     fmt.Sprintf("%d", cfg.API.Port),
+		"secure-port":                     fmt.Sprintf("%d", cfg.API.BindPort),
 		"allow-privileged":                "true",
 		"storage-backend":                 "etcd3",
 		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
@@ -332,13 +332,10 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 	command = append(command, getExtraParameters(cfg.APIServerExtraArgs, defaultArguments)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationMode)...)
 
-	// Use first address we are given
-	if len(cfg.API.AdvertiseAddresses) > 0 {
-		if selfHosted {
-			command = append(command, "--advertise-address=$(POD_IP)")
-		} else {
-			command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddresses[0]))
-		}
+	if selfHosted {
+		command = append(command, "--advertise-address=$(POD_IP)")
+	} else {
+		command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddress))
 	}
 
 	// Check if the user decided to use an external etcd cluster
