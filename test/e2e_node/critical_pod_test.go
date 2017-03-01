@@ -111,7 +111,7 @@ func getNodeCPUAndMemoryCapacity(f *framework.Framework) v1.ResourceList {
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
 	Expect(len(nodeList.Items)).To(Equal(1))
-	capacity := nodeList.Items[0].Status.Capacity
+	capacity := nodeList.Items[0].Status.Allocatable
 	return v1.ResourceList{
 		v1.ResourceCPU:    capacity[v1.ResourceCPU],
 		v1.ResourceMemory: capacity[v1.ResourceMemory],
