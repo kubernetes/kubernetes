@@ -105,8 +105,6 @@ func TestDefaulting(t *testing.T) {
 		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSetList"}:                          {},
 		{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:                             {},
 		{Group: "extensions", Version: "v1beta1", Kind: "DeploymentList"}:                         {},
-		{Group: "apps", Version: "v1beta1", Kind: "Deployment"}:                                   {},
-		{Group: "apps", Version: "v1beta1", Kind: "DeploymentList"}:                               {},
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:                             {},
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSetList"}:                         {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}:     {},

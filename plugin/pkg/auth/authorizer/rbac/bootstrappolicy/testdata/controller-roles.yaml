@@ -197,7 +197,6 @@ items:
     name: system:controller:deployment-controller
   rules:
   - apiGroups:
-    - apps
     - extensions
     resources:
     - deployments
@@ -207,7 +206,6 @@ items:
     - update
     - watch
   - apiGroups:
-    - apps
     - extensions
     resources:
     - deployments/status
@@ -253,7 +251,6 @@ items:
     name: system:controller:disruption-controller
   rules:
   - apiGroups:
-    - apps
     - extensions
     resources:
     - deployments
@@ -418,7 +415,6 @@ items:
     - get
     - update
   - apiGroups:
-    - apps
     - extensions
     resources:
     - deployments/scale

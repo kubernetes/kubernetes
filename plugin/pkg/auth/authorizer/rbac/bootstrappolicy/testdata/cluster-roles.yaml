@@ -81,9 +81,6 @@ items:
   - apiGroups:
     - apps
     resources:
-    - deployments
-    - deployments/rollback
-    - deployments/scale
     - statefulsets
     verbs:
     - create
@@ -127,7 +124,6 @@ items:
     resources:
     - daemonsets
     - deployments
-    - deployments/rollback
     - deployments/scale
     - ingresses
     - replicasets
@@ -263,9 +259,6 @@ items:
   - apiGroups:
     - apps
     resources:
-    - deployments
-    - deployments/rollback
-    - deployments/scale
     - statefulsets
     verbs:
     - create
@@ -309,7 +302,6 @@ items:
     resources:
     - daemonsets
     - deployments
-    - deployments/rollback
     - deployments/scale
     - ingresses
     - replicasets
@@ -500,13 +492,6 @@ items:
     - deployments
     - podsecuritypolicies
     - replicasets
-    verbs:
-    - list
-    - watch
-  - apiGroups:
-    - apps
-    resources:
-    - deployments
     verbs:
     - list
     - watch
@@ -952,8 +937,6 @@ items:
   - apiGroups:
     - apps
     resources:
-    - deployments
-    - deployments/scale
     - statefulsets
     verbs:
     - get
