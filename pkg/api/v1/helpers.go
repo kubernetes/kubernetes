@@ -84,7 +84,7 @@ func IsServiceIPRequested(service *Service) bool {
 
 var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes),
-	metav1.FinalizerOrphan,
+	metav1.FinalizerOrphanDependents,
 )
 
 func IsStandardFinalizerName(str string) bool {
