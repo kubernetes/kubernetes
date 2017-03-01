@@ -355,7 +355,8 @@ func (s *StatefulSetTester) SetHealthy(ss *apps.StatefulSet) {
 	}
 }
 
-func (s *StatefulSetTester) waitForStatus(ss *apps.StatefulSet, expectedReplicas int32) {
+// WaitForStatus waits for the ss.Status.Replicas to be equal to expectedReplicas
+func (s *StatefulSetTester) WaitForStatus(ss *apps.StatefulSet, expectedReplicas int32) {
 	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
@@ -402,7 +403,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		if err := sst.Scale(&ss, 0); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
-		sst.waitForStatus(&ss, 0)
+		sst.WaitForStatus(&ss, 0)
 		Logf("Deleting statefulset %v", ss.Name)
 		if err := c.Apps().StatefulSets(ss.Namespace).Delete(ss.Name, nil); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
