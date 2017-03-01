@@ -37,6 +37,7 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/storage/install:all-srcs",
         "//pkg/apis/storage/util:all-srcs",
+        "//pkg/apis/storage/v1:all-srcs",
         "//pkg/apis/storage/v1beta1:all-srcs",
         "//pkg/apis/storage/validation:all-srcs",
     ],
