@@ -66,7 +66,7 @@ func TestConfigMapController(t *testing.T) {
 	RegisterFakeList(configmaps, &cluster2Client.Fake, &apiv1.ConfigMapList{Items: []apiv1.ConfigMap{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate(configmaps, &cluster2Client.Fake, cluster2Watch)
 
-	configmapController := NewConfigMapController(fakeClient)
+	configmapController := newConfigMapController(fakeClient)
 	informer := ToFederatedInformerForTestOnly(configmapController.configmapFederatedInformer)
 	informer.SetClientFactory(func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
@@ -79,10 +79,7 @@ func TestConfigMapController(t *testing.T) {
 		}
 	})
 
-	configmapController.clusterAvailableDelay = time.Second
-	configmapController.configmapReviewDelay = 50 * time.Millisecond
-	configmapController.smallDelay = 20 * time.Millisecond
-	configmapController.updateTimeout = 5 * time.Second
+	configmapController.minimizeLatency()
 
 	stop := make(chan struct{})
 	configmapController.Run(stop)
