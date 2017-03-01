@@ -20,8 +20,20 @@ import (
 	"fmt"
 	"path"
 	"sync"
+	"time"
+
+	"github.com/golang/glog"
+
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
+)
+
+const (
+	// how often the qos cgroup manager will perform periodic update
+	// of the qos level cgroup resource constraints
+	periodicQOSCgroupUpdateInterval = 1 * time.Minute
 )
 
 type QOSContainerManager interface {
@@ -106,6 +118,47 @@ func (m *qosContainerManagerImpl) Start(nodeInfo *v1.Node, activePods ActivePods
 	m.nodeInfo = nodeInfo
 	m.activePods = activePods
 
+	// update qos cgroup tiers on startup and in periodic intervals
+	// to ensure desired state is in synch with actual state.
+	go wait.Until(func() {
+		err := m.UpdateCgroups()
+		if err != nil {
+			glog.Warningf("[ContainerManager] Failed to reserve QoS requests: %v", err)
+		}
+	}, periodicQOSCgroupUpdateInterval, wait.NeverStop)
+
+	return nil
+}
+
+func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
+	pods := m.activePods()
+	burstablePodCPURequest := int64(0)
+	for i := range pods {
+		pod := pods[i]
+		qosClass := qos.GetPodQOS(pod)
+		if qosClass != v1.PodQOSBurstable {
+			// we only care about the burstable qos tier
+			continue
+		}
+		req, _, err := v1.PodRequestsAndLimits(pod)
+		if err != nil {
+			return err
+		}
+		if request, found := req[v1.ResourceCPU]; found {
+			burstablePodCPURequest += request.MilliValue()
+		}
+	}
+
+	// make sure best effort is always 2 shares
+	bestEffortCPUShares := int64(MinShares)
+	configs[v1.PodQOSBestEffort].ResourceParameters.CpuShares = &bestEffortCPUShares
+
+	// set burstable shares based on current observe state
+	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
+	if burstableCPUShares < int64(MinShares) {
+		burstableCPUShares = int64(MinShares)
+	}
+	configs[v1.PodQOSBurstable].ResourceParameters.CpuShares = &burstableCPUShares
 	return nil
 }
 
@@ -113,7 +166,30 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	m.Lock()
 	defer m.Unlock()
 
-	// TODO: Update cgroups
+	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
+		v1.PodQOSBurstable: {
+			Name:               CgroupName(m.qosContainersInfo.Burstable),
+			ResourceParameters: &ResourceConfig{},
+		},
+		v1.PodQOSBestEffort: {
+			Name:               CgroupName(m.qosContainersInfo.BestEffort),
+			ResourceParameters: &ResourceConfig{},
+		},
+	}
+
+	// update the qos level cgroup settings for cpu shares
+	if err := m.setCPUCgroupConfig(qosConfigs); err != nil {
+		return err
+	}
+
+	for _, config := range qosConfigs {
+		err := m.cgroupManager.Update(config)
+		if err != nil {
+			glog.V(2).Infof("[ContainerManager]: Failed to update QoS cgroup configuration")
+			return err
+		}
+	}
+	glog.V(2).Infof("[ContainerManager]: Updated QoS cgroup configuration")
 
 	return nil
 }
