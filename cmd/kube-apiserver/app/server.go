@@ -42,7 +42,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -90,14 +89,14 @@ cluster's shared state through which all other components interact.`,
 	return cmd
 }
 
-// Run runs the specified APIServer.  This should never exit.
-func Run(s *options.ServerRunOptions) error {
+// Run runs the apiserver and configures it to stop with the given channel.
+func Run(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	config, sharedInformers, err := BuildMasterConfig(s)
 	if err != nil {
 		return err
 	}
 
-	return RunServer(config, sharedInformers, wait.NeverStop)
+	return RunServer(config, sharedInformers, stopCh)
 }
 
 // RunServer uses the provided config and shared informers to run the apiserver.  It does not return.
