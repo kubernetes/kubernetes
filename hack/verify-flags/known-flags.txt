@@ -691,3 +691,4 @@ www-prefix
 zone-id
 zone-name
 
+horizontal-pod-autoscaler-use-rest-clients
