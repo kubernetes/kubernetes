@@ -19,6 +19,7 @@ package admission
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/golang/glog"
 
@@ -98,6 +99,13 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 
 	if storageutil.HasStorageClassAnnotation(pvc.ObjectMeta) {
 		// The user asked for a class.
+		// check and make sure the user has access to this class
+		// if they do not, then return a NewForbidden error to prevent creation
+		err := isValidStorageClassNamespace(c.store, pvc)
+		if err != nil {
+			return admission.NewForbidden(a, err)
+		}
+
 		return nil
 	}
 
@@ -143,4 +151,48 @@ func getDefaultClass(lister storagelisters.StorageClassLister) (*storage.Storage
 		return nil, errors.NewInternalError(fmt.Errorf("%d default StorageClasses were found", len(defaultClasses)))
 	}
 	return defaultClasses[0], nil
+}
+
+// isValidStorageClassNamespace checks to see if a StorageClass has been restricted to what
+// namespaces can use it via an annotation, this will return an error if the requested StorageClass on
+// the claim does not match the StorageClass namespaces annotation and Name.
+func isValidStorageClassNamespace(store cache.Store, claim *api.PersistentVolumeClaim) error {
+	sc := []*storage.StorageClass{}
+
+	// if no storageclasses exist yet, then we can return nil and wait
+	// for the storageclass as normal
+	if len(store.List()) == 0 {
+		return nil
+	}
+
+	for _, c := range store.List() {
+		class, ok := c.(*storage.StorageClass)
+		if !ok {
+			return errors.NewInternalError(fmt.Errorf("error converting stored object to StorageClass: %v", c))
+		}
+		// Check the storageclass Namespace Annotation,
+		// if exists, split the strings and see if we match
+		scProjects := storageutil.GetStorageClassNamespaces(class.ObjectMeta)
+		if len(scProjects) > 0 {
+			result := strings.Split(scProjects, ",")
+			for i := range result {
+				// annotation must equal Namespace AND class Name
+				if strings.TrimSpace(result[i]) == claim.Namespace && class.Name == storageutil.GetClaimStorageClass(claim){
+					return nil
+				}
+			}
+		} else {
+			// StorageClass has no annotation for namespace and therefor no
+			// restrictions
+			sc = append(sc, class)
+		}
+	}
+
+	if len(sc) > 0 {
+		// we have at least one storageclass that exists
+		// and no restrictions
+		return nil
+	}
+
+	return errors.NewInternalError(fmt.Errorf("claim %s in namespace %s is not allowed to use StorageClass %s - contact the cluster-admin or storage-admin for access", claim.Name, claim.Namespace, storageutil.GetStorageClassAnnotation(claim.ObjectMeta)))
 }
