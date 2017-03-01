@@ -62,7 +62,7 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 		Provisioner: provisionerPluginName,
 	}
 
-	if _, err := client.Storage().StorageClasses().Create(&s); err != nil {
+	if _, err := client.StorageV1beta1().StorageClasses().Create(&s); err != nil {
 		t.Errorf("unable to create test storage class: %v", err)
 	}
 	defer deleteStorageClassOrErrorf(t, client, s.Namespace, s.Name)
@@ -90,7 +90,7 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 }
 
 func deleteStorageClassOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.Storage().StorageClasses().Delete(name, nil); err != nil {
+	if err := c.StorageV1beta1().StorageClasses().Delete(name, nil); err != nil {
 		t.Errorf("unable to delete storage class %v: %v", name, err)
 	}
 }
