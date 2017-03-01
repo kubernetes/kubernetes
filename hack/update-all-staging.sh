@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
 SILENT=true
 ALL=false
@@ -50,39 +51,32 @@ if ! $ALL ; then
 	echo "Running in short-circuit mode; run with -a to force all scripts to run."
 fi
 
+kube::util::ensure_clean_working_dir
+kube::util::ensure_godep_version v74
+
+if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
+	echo "Running godep restore"
+	godep restore
+fi
+
 BASH_TARGETS="
-	update-generated-protobuf
-	update-codegen
-	update-codecgen
-	update-generated-docs
-	update-generated-swagger-docs
-	update-swagger-spec
-	update-openapi-spec
-	update-api-reference-docs
-	update-bazel
-	update-federation-openapi-spec
-	verify-staging-client-go
-	verify-staging-godeps"
+	staging-client-go
+	staging-godeps
+	bazel"
 
 for t in $BASH_TARGETS
 do
-	echo -e "${color_yellow}Running $t${color_norm}"
+	echo -e "${color_yellow}Updating $t${color_norm}"
 	if $SILENT ; then
-		if ! bash "$KUBE_ROOT/hack/$t.sh" 1> /dev/null; then
-			echo -e "${color_red}Running $t FAILED${color_norm}"
-			if [[ $t == "verify"* ]]; then
-				echo -e "${color_red}Run ./hack/update-all-staging.sh to fix it"
-			fi
+		if ! bash "$KUBE_ROOT/hack/update-$t.sh" 1> /dev/null; then
+			echo -e "${color_red}Updating $t FAILED${color_norm}"
 			if ! $ALL; then
 				exit 1
 			fi
 		fi
 	else
-		if ! bash "$KUBE_ROOT/hack/$t.sh"; then
-			echo -e "${color_red}Running $t FAILED${color_norm}"
-			if [[ $t == "verify"* ]]; then
-				echo -e "${color_red}Run ./hack/update-all-staging.sh to fix it"
-			fi
+		if ! bash "$KUBE_ROOT/hack/update-$t.sh"; then
+			echo -e "${color_red}Updating $t FAILED${color_norm}"
 			if ! $ALL; then
 				exit 1
 			fi
