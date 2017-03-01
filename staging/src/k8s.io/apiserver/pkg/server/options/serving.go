@@ -73,11 +73,11 @@ func NewSecureServingOptions() *SecureServingOptions {
 	return &SecureServingOptions{
 		ServingOptions: ServingOptions{
 			BindAddress: net.ParseIP("0.0.0.0"),
-			BindPort:    6443,
+			BindPort:    443,
 		},
 		ServerCert: GeneratableKeyCert{
 			PairName:      "apiserver",
-			CertDirectory: "/var/run/kubernetes",
+			CertDirectory: "apiserver.local.config/certificates",
 		},
 	}
 }

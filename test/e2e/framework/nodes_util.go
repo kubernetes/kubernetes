@@ -55,7 +55,7 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 		os.Environ(),
 		"TEST_ETCD_VERSION="+target_version,
 		"STORAGE_BACKEND="+target_storage,
-		"TEST_ETCD_IMAGE=3.0.14")
+		"TEST_ETCD_IMAGE=3.0.17")
 
 	_, _, err := RunCmdEnv(env, path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-l", "-M")
 	return err

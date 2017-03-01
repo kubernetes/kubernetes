@@ -243,6 +243,7 @@ func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.Resource
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", namespace.Name)
 		printLabelsMultiline(w, "Labels", namespace.Labels)
+		printAnnotationsMultiline(w, "Annotations", namespace.Annotations)
 		w.Write(LEVEL_0, "Status:\t%s\n", string(namespace.Status.Phase))
 		if resourceQuotaList != nil {
 			w.Write(LEVEL_0, "\n")
@@ -522,6 +523,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			w.Write(LEVEL_0, "Start Time:\t%s\n", pod.Status.StartTime.Time.Format(time.RFC1123Z))
 		}
 		printLabelsMultiline(w, "Labels", pod.Labels)
+		printAnnotationsMultiline(w, "Annotations", pod.Annotations)
 		if pod.DeletionTimestamp != nil {
 			w.Write(LEVEL_0, "Status:\tTerminating (expires %s)\n", pod.DeletionTimestamp.Time.Format(time.RFC1123Z))
 			w.Write(LEVEL_0, "Termination Grace Period:\t%ds\n", *pod.DeletionGracePeriodSeconds)
@@ -800,6 +802,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(w, "Labels", pv.Labels)
+		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
 		w.Write(LEVEL_0, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pv.ObjectMeta))
 		w.Write(LEVEL_0, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
@@ -879,6 +882,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 		w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
 		w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		printLabelsMultiline(w, "Labels", pvc.Labels)
+		printAnnotationsMultiline(w, "Annotations", pvc.Annotations)
 		w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
 		w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
 		if events != nil {
@@ -1219,6 +1223,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 		}
 		w.Write(LEVEL_0, "Selector:\t%s\n", labels.FormatLabels(controller.Spec.Selector))
 		printLabelsMultiline(w, "Labels", controller.Labels)
+		printAnnotationsMultiline(w, "Annotations", controller.Annotations)
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 
@@ -1240,7 +1245,7 @@ func DescribePodTemplate(template *api.PodTemplateSpec, out io.Writer) {
 	}
 	printLabelsMultiline(w, "  Labels", template.Labels)
 	if len(template.Annotations) > 0 {
-		printLabelsMultiline(w, "  Annotations", template.Annotations)
+		printAnnotationsMultiline(w, "  Annotations", template.Annotations)
 	}
 	if len(template.Spec.ServiceAccountName) > 0 {
 		w.Write(LEVEL_1, "Service Account:\t%s\n", template.Spec.ServiceAccountName)
@@ -1289,6 +1294,7 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&rs.Spec.Template.Spec))
 		w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(rs.Spec.Selector))
 		printLabelsMultiline(w, "Labels", rs.Labels)
+		printAnnotationsMultiline(w, "Annotations", rs.Annotations)
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t")
 		if getPodErr != nil {
@@ -1344,6 +1350,7 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 			w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *job.Spec.ActiveDeadlineSeconds)
 		}
 		printLabelsMultiline(w, "Labels", job.Labels)
+		printAnnotationsMultiline(w, "Annotations", job.Annotations)
 		w.Write(LEVEL_0, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
 		describeVolumes(job.Spec.Template.Spec.Volumes, w, "")
 		if events != nil {
@@ -1387,6 +1394,7 @@ func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string
 		}
 		describeJobTemplate(scheduledJob.Spec.JobTemplate, w)
 		printLabelsMultiline(w, "Labels", scheduledJob.Labels)
+		printAnnotationsMultiline(w, "Annotations", scheduledJob.Annotations)
 		if scheduledJob.Status.LastScheduleTime != nil {
 			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", scheduledJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
 		} else {
@@ -1484,6 +1492,7 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		w.Write(LEVEL_0, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
 		printLabelsMultiline(w, "Labels", daemon.Labels)
+		printAnnotationsMultiline(w, "Annotations", daemon.Annotations)
 		w.Write(LEVEL_0, "Desired Number of Nodes Scheduled: %d\n", daemon.Status.DesiredNumberScheduled)
 		w.Write(LEVEL_0, "Current Number of Nodes Scheduled: %d\n", daemon.Status.CurrentNumberScheduled)
 		w.Write(LEVEL_0, "Number of Nodes Misscheduled: %d\n", daemon.Status.NumberMisscheduled)
@@ -1518,7 +1527,7 @@ func describeSecret(secret *api.Secret) (string, error) {
 		w.Write(LEVEL_0, "Namespace:\t%s\n", secret.Namespace)
 		printLabelsMultiline(w, "Labels", secret.Labels)
 		skipAnnotations := sets.NewString(annotations.LastAppliedConfigAnnotation)
-		printLabelsMultilineWithFilter(w, "Annotations", secret.Annotations, skipAnnotations)
+		printAnnotationsMultilineWithFilter(w, "Annotations", secret.Annotations, skipAnnotations)
 
 		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
 
@@ -1694,6 +1703,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		w.Write(LEVEL_0, "Name:\t%s\n", service.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", service.Namespace)
 		printLabelsMultiline(w, "Labels", service.Labels)
+		printAnnotationsMultiline(w, "Annotations", service.Annotations)
 		w.Write(LEVEL_0, "Selector:\t%s\n", labels.FormatLabels(service.Spec.Selector))
 		w.Write(LEVEL_0, "Type:\t%s\n", service.Spec.Type)
 		w.Write(LEVEL_0, "IP:\t%s\n", service.Spec.ClusterIP)
@@ -1755,6 +1765,7 @@ func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error)
 		w.Write(LEVEL_0, "Name:\t%s\n", ep.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", ep.Namespace)
 		printLabelsMultiline(w, "Labels", ep.Labels)
+		printAnnotationsMultiline(w, "Annotations", ep.Annotations)
 
 		w.Write(LEVEL_0, "Subsets:\n")
 		for i := range ep.Subsets {
@@ -1861,6 +1872,7 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", serviceAccount.Namespace)
 		printLabelsMultiline(w, "Labels", serviceAccount.Labels)
+		printAnnotationsMultiline(w, "Annotations", serviceAccount.Annotations)
 		w.WriteLine()
 
 		var (
@@ -1957,6 +1969,7 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
 		w.Write(LEVEL_0, "Role:\t%s\n", findNodeRole(node))
 		printLabelsMultiline(w, "Labels", node.Labels)
+		printAnnotationsMultiline(w, "Annotations", node.Annotations)
 		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Phase:\t%v\n", node.Status.Phase)
@@ -2159,7 +2172,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		w.Write(LEVEL_0, "Name:\t%s\n", hpa.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", hpa.Namespace)
 		printLabelsMultiline(w, "Labels", hpa.Labels)
-		printLabelsMultiline(w, "Annotations", hpa.Annotations)
+		printAnnotationsMultiline(w, "Annotations", hpa.Annotations)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Reference:\t%s/%s\n",
 			hpa.Spec.ScaleTargetRef.Kind,
@@ -2355,6 +2368,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 		w.Write(LEVEL_0, "Namespace:\t%s\n", d.ObjectMeta.Namespace)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
 		printLabelsMultiline(w, "Labels", d.Labels)
+		printAnnotationsMultiline(w, "Annotations", d.Annotations)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		w.Write(LEVEL_0, "Replicas:\t%d desired | %d updated | %d total | %d available | %d unavailable\n", *(d.Spec.Replicas), d.Status.UpdatedReplicas, d.Status.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
 		w.Write(LEVEL_0, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
@@ -2492,7 +2506,7 @@ func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 		w.Write(LEVEL_0, "Name:\t%s\n", configMap.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", configMap.Namespace)
 		printLabelsMultiline(w, "Labels", configMap.Labels)
-		printLabelsMultiline(w, "Annotations", configMap.Annotations)
+		printAnnotationsMultiline(w, "Annotations", configMap.Annotations)
 
 		w.Write(LEVEL_0, "\nData\n====\n")
 		for k, v := range configMap.Data {
@@ -2567,7 +2581,7 @@ func describeNetworkPolicy(networkPolicy *extensions.NetworkPolicy) (string, err
 		w.Write(LEVEL_0, "Name:\t%s\n", networkPolicy.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", networkPolicy.Namespace)
 		printLabelsMultiline(w, "Labels", networkPolicy.Labels)
-		printLabelsMultiline(w, "Annotations", networkPolicy.Annotations)
+		printAnnotationsMultiline(w, "Annotations", networkPolicy.Annotations)
 
 		return nil
 	})
@@ -2996,5 +3010,57 @@ func versionedClientsetForDeployment(internalClient clientset.Interface) version
 	return &versionedclientset.Clientset{
 		CoreV1Client:            coreclientset.New(internalClient.Core().RESTClient()),
 		ExtensionsV1beta1Client: extensionsclientset.New(internalClient.Extensions().RESTClient()),
+	}
+}
+
+var maxAnnotationLen = 200
+
+// printAnnotationsMultilineWithFilter prints filtered multiple annotations with a proper alignment.
+func printAnnotationsMultilineWithFilter(w *PrefixWriter, title string, annotations map[string]string, skip sets.String) {
+	printAnnotationsMultilineWithIndent(w, "", title, "\t", annotations, skip)
+}
+
+// printAnnotationsMultiline prints multiple annotations with a proper alignment.
+func printAnnotationsMultiline(w *PrefixWriter, title string, annotations map[string]string) {
+	printAnnotationsMultilineWithIndent(w, "", title, "\t", annotations, sets.NewString())
+}
+
+// printAnnotationsMultilineWithIndent prints multiple annotations with a user-defined alignment.
+// If annotation string is too long, we omit chars more than 200 length.
+func printAnnotationsMultilineWithIndent(w *PrefixWriter, initialIndent, title, innerIndent string, annotations map[string]string, skip sets.String) {
+
+	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
+
+	if len(annotations) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+
+	// to print labels in the sorted order
+	keys := make([]string, 0, len(annotations))
+	for key := range annotations {
+		if skip.Has(key) {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	if len(annotations) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+	sort.Strings(keys)
+
+	for i, key := range keys {
+		if i != 0 {
+			w.Write(LEVEL_0, initialIndent)
+			w.Write(LEVEL_0, innerIndent)
+		}
+		line := fmt.Sprintf("%s=%s", key, annotations[key])
+		if len(line) > maxAnnotationLen {
+			w.Write(LEVEL_0, "%s...\n", line[:maxAnnotationLen])
+		} else {
+			w.Write(LEVEL_0, "%s\n", line)
+		}
+		i++
 	}
 }

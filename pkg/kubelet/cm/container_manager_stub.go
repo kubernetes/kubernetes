@@ -50,6 +50,10 @@ func (cm *containerManagerStub) Status() Status {
 	return Status{}
 }
 
+func (cm *containerManagerStub) GetNodeAllocatableReservation() v1.ResourceList {
+	return nil
+}
+
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerStub{}
 }

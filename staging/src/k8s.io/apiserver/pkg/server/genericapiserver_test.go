@@ -126,7 +126,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(s.RequestContextMapper(), config.RequestContextMapper)
 
 	// these values get defaulted
-	assert.Equal(net.JoinHostPort(config.PublicAddress.String(), "6443"), s.ExternalAddress)
+	assert.Equal(net.JoinHostPort(config.PublicAddress.String(), "443"), s.ExternalAddress)
 	assert.NotNil(s.swaggerConfig)
 	assert.Equal("http://"+s.ExternalAddress, s.swaggerConfig.WebServicesUrl)
 }

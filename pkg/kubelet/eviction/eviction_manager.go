@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -66,7 +67,7 @@ type managerImpl struct {
 	// records when a threshold was first observed
 	thresholdsFirstObservedAt thresholdsObservedAt
 	// records the set of thresholds that have been met (including graceperiod) but not yet resolved
-	thresholdsMet []Threshold
+	thresholdsMet []evictionapi.Threshold
 	// resourceToRankFunc maps a resource to ranking function for that resource.
 	resourceToRankFunc map[v1.ResourceName]rankFunc
 	// resourceToNodeReclaimFuncs maps a resource to an ordered list of functions that know how to reclaim that resource.
@@ -152,12 +153,12 @@ func (m *managerImpl) IsUnderDiskPressure() bool {
 	return hasNodeCondition(m.nodeConditions, v1.NodeDiskPressure)
 }
 
-func startMemoryThresholdNotifier(thresholds []Threshold, observations signalObservations, hard bool, handler thresholdNotifierHandlerFunc) error {
+func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observations signalObservations, hard bool, handler thresholdNotifierHandlerFunc) error {
 	for _, threshold := range thresholds {
-		if threshold.Signal != SignalMemoryAvailable || hard != isHardEvictionThreshold(threshold) {
+		if threshold.Signal != evictionapi.SignalMemoryAvailable || hard != isHardEvictionThreshold(threshold) {
 			continue
 		}
-		observed, found := observations[SignalMemoryAvailable]
+		observed, found := observations[evictionapi.SignalMemoryAvailable]
 		if !found {
 			continue
 		}
@@ -171,7 +172,7 @@ func startMemoryThresholdNotifier(thresholds []Threshold, observations signalObs
 			return fmt.Errorf("memory cgroup mount point not found")
 		}
 		attribute := "memory.usage_in_bytes"
-		quantity := getThresholdQuantity(threshold.Value, observed.capacity)
+		quantity := evictionapi.GetThresholdQuantity(threshold.Value, observed.capacity)
 		usageThreshold := resource.NewQuantity(observed.capacity.Value(), resource.DecimalSI)
 		usageThreshold.Sub(*quantity)
 		description := fmt.Sprintf("<%s available", formatThresholdValue(threshold.Value))

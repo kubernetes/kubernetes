@@ -38,7 +38,6 @@ cmd/libs/go2idl/openapi-gen
 cmd/libs/go2idl/set-gen
 cmd/linkcheck
 examples
-examples/apiserver/server
 examples/explorer
 examples/https-nginx
 examples/sharing-clusters
@@ -173,6 +172,7 @@ pkg/kubelet/api
 pkg/kubelet/container
 pkg/kubelet/envvars
 pkg/kubelet/eviction
+pkg/kubelet/eviction/api
 pkg/kubelet/util/csr
 pkg/kubelet/util/format
 pkg/kubelet/util/ioutils
@@ -384,7 +384,6 @@ test/images/resource-consumer/consume-cpu
 test/images/serve_hostname
 test/integration/examples
 test/integration/federation
-test/integration/kubeaggregator
 test/integration/metrics
 test/integration/objectmeta
 test/integration/openshift

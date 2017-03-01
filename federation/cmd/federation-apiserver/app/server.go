@@ -213,8 +213,7 @@ func Run(s *options.ServerRunOptions) error {
 	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
 
 	sharedInformers.Start(wait.NeverStop)
-	m.PrepareRun().Run(wait.NeverStop)
-	return nil
+	return m.PrepareRun().Run(wait.NeverStop)
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility

@@ -1265,3 +1265,37 @@ func TestDescribeEvents(t *testing.T) {
 		}
 	}
 }
+
+func TestPrintLabelsMultiline(t *testing.T) {
+	var maxLenAnnotationStr string = "MaxLenAnnotation=Multicast addressing can be used in the link layer (Layer 2 in the OSI model), such as Ethernet multicast, and at the internet layer (Layer 3 for OSI) for Internet Protocol Version 4 "
+	testCases := []struct {
+		annotations map[string]string
+		expectPrint string
+	}{
+		{
+			annotations: map[string]string{"col1": "asd", "COL2": "zxc"},
+			expectPrint: "Annotations:\tCOL2=zxc\n\tcol1=asd\n",
+		},
+		{
+			annotations: map[string]string{"MaxLenAnnotation": maxLenAnnotationStr[17:]},
+			expectPrint: "Annotations:\t" + maxLenAnnotationStr + "\n",
+		},
+		{
+			annotations: map[string]string{"MaxLenAnnotation": maxLenAnnotationStr[17:] + "1"},
+			expectPrint: "Annotations:\t" + maxLenAnnotationStr + "...\n",
+		},
+		{
+			annotations: map[string]string{},
+			expectPrint: "Annotations:\t<none>\n",
+		},
+	}
+	for i, testCase := range testCases {
+		out := new(bytes.Buffer)
+		writer := &PrefixWriter{out}
+		printAnnotationsMultiline(writer, "Annotations", testCase.annotations)
+		output := out.String()
+		if output != testCase.expectPrint {
+			t.Errorf("Test case %d: expected to find %q in output: %q", i, testCase.expectPrint, output)
+		}
+	}
+}
