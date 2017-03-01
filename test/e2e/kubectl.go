@@ -734,19 +734,15 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			requiredStrings := [][]string{
 				{"Name:", "redis-master"},
 				{"Namespace:", ns},
-				{"Image(s):", redisImage},
 				{"Selector:", "app=redis,role=master"},
 				{"Labels:", "app=redis"},
 				{"role=master"},
 				{"Annotations:"},
 				{"Replicas:", "1 current", "1 desired"},
 				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
-				// {"Events:"} would ordinarily go in the list
-				// here, but in some rare circumstances the
-				// events are delayed, and instead kubectl
-				// prints "No events." This string will match
-				// either way.
-				{"vents"}}
+				{"Pod Template:"},
+				{"Image:", redisImage},
+				{"Events:"}}
 			checkOutput(output, requiredStrings)
 
 			// Service
