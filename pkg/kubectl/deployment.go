@@ -22,8 +22,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 // DeploymentBasicGeneratorV1 supports stable generation of a deployment
@@ -65,7 +65,7 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 		return nil, err
 	}
 
-	podSpec := api.PodSpec{Containers: []api.Container{}}
+	podSpec := v1.PodSpec{Containers: []v1.Container{}}
 	for _, imageString := range s.Images {
 		// Retain just the image name
 		imageSplit := strings.Split(imageString, "/")
@@ -76,22 +76,22 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 		} else if strings.Contains(name, "@") {
 			name = strings.Split(name, "@")[0]
 		}
-		podSpec.Containers = append(podSpec.Containers, api.Container{Name: name, Image: imageString})
+		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
 	}
 
 	// setup default label and selector
 	labels := map[string]string{}
 	labels["app"] = s.Name
 	selector := metav1.LabelSelector{MatchLabels: labels}
-	deployment := extensions.Deployment{
+	deployment := extensionsv1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: extensionsv1beta1.DeploymentSpec{
 			Replicas: 1,
 			Selector: &selector,
-			Template: api.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
