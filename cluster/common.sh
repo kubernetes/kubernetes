@@ -1073,6 +1073,8 @@ function parse-master-env() {
   EXTRA_DOCKER_OPTS=$(get-env-val "${master_env}" "EXTRA_DOCKER_OPTS")
   KUBELET_CERT_BASE64=$(get-env-val "${master_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${master_env}" "KUBELET_KEY")
+  MASTER_CERT_BASE64=$(get-env-val "${master_env}" "MASTER_CERT")
+  MASTER_KEY_BASE64=$(get-env-val "${master_env}" "MASTER_KEY")
 }
 
 # Update or verify required gcloud components are installed
