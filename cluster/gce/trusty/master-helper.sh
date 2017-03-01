@@ -22,7 +22,7 @@
 # GCI and Trusty share the configuration code. We have to keep the GCI specific code
 # here as long as the release-1.2 branch has not been deprecated.
 
-source ./helper.sh
+source ${KUBE_ROOT}/cluster/gce/trusty/helper.sh
 
 # create-master-instance creates the master instance. If called with
 # an argument, the argument is used as the name to a reserved IP

@@ -22,7 +22,7 @@
 # GCI and Trusty share the configuration code. We have to keep the GCI specific code
 # here as long as the release-1.2 branch has not been deprecated.
 
-source ./helper.sh
+source ${KUBE_ROOT}/cluster/gce/trusty/helper.sh
 
 # $1: template name (required)
 function create-node-instance-template {
