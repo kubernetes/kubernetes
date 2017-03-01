@@ -37,6 +37,7 @@ go_library(
         "//vendor:github.com/coreos/pkg/capnslog",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/kardianos/osext",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
         "//vendor:k8s.io/client-go/dynamic",
         "//vendor:k8s.io/client-go/rest",

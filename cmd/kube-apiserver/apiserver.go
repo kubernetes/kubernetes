@@ -24,6 +24,7 @@ import (
 	"os"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -47,7 +48,7 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	if err := app.Run(s); err != nil {
+	if err := app.Run(s, wait.NeverStop); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
