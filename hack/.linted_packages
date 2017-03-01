@@ -8,6 +8,7 @@ cmd/genkubedocs
 cmd/genman
 cmd/genswaggertypedocs
 cmd/genyaml
+cmd/gke-certificates-controller
 cmd/kube-apiserver
 cmd/kube-apiserver/app
 cmd/kube-apiserver/app/options
@@ -37,7 +38,6 @@ cmd/libs/go2idl/openapi-gen
 cmd/libs/go2idl/set-gen
 cmd/linkcheck
 examples
-examples/apiserver/server
 examples/explorer
 examples/https-nginx
 examples/sharing-clusters
@@ -172,6 +172,7 @@ pkg/kubelet/api
 pkg/kubelet/container
 pkg/kubelet/envvars
 pkg/kubelet/eviction
+pkg/kubelet/eviction/api
 pkg/kubelet/util/csr
 pkg/kubelet/util/format
 pkg/kubelet/util/ioutils
@@ -180,6 +181,7 @@ pkg/kubelet/volumemanager/cache
 pkg/kubelet/volumemanager/populator
 pkg/kubelet/volumemanager/reconciler
 pkg/labels
+pkg/printers
 pkg/proxy/config
 pkg/proxy/healthcheck
 pkg/quota
@@ -267,6 +269,7 @@ plugin/pkg/admission/resourcequota/apis/resourcequota/install
 plugin/pkg/admission/resourcequota/apis/resourcequota/validation
 plugin/pkg/admission/securitycontext/scdeny
 plugin/pkg/auth
+plugin/pkg/auth/authenticator/token/bootstrap
 plugin/pkg/auth/authorizer
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
 staging/src/k8s.io/apimachinery/pkg/api/equality
@@ -381,7 +384,6 @@ test/images/resource-consumer/consume-cpu
 test/images/serve_hostname
 test/integration/examples
 test/integration/federation
-test/integration/kubeaggregator
 test/integration/metrics
 test/integration/objectmeta
 test/integration/openshift

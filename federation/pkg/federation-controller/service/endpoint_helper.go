@@ -17,9 +17,9 @@ limitations under the License.
 package service
 
 import (
-	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	cache "k8s.io/client-go/tools/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -81,29 +81,25 @@ func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache
 		// here we filtered all non-federation services
 		return nil
 	}
-	endpointInterface, exists, err := clusterCache.endpointStore.GetByKey(key)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		glog.Errorf("Did not successfully get %v from store: %v, will retry later", key, err)
 		clusterCache.endpointQueue.Add(key)
 		return err
 	}
-	if exists {
-		endpoint, ok := endpointInterface.(*v1.Endpoints)
-		if ok {
-			glog.V(4).Infof("Found endpoint for federation service %s/%s from cluster %s", endpoint.Namespace, endpoint.Name, clusterName)
-			err = cc.processEndpointUpdate(cachedService, endpoint, clusterName, serviceController)
-		} else {
-			_, ok := endpointInterface.(cache.DeletedFinalStateUnknown)
-			if !ok {
-				return fmt.Errorf("Object contained wasn't a service or a deleted key: %+v", endpointInterface)
-			}
-			glog.Infof("Found tombstone for %v", key)
-			err = cc.processEndpointDeletion(cachedService, clusterName, serviceController)
-		}
-	} else {
+	endpoint, err := clusterCache.endpointStore.Endpoints(namespace).Get(name)
+	switch {
+	case errors.IsNotFound(err):
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		glog.Infof("Can not get endpoint %v for cluster %s from endpointStore", key, clusterName)
 		err = cc.processEndpointDeletion(cachedService, clusterName, serviceController)
+	case err != nil:
+		glog.Errorf("Did not successfully get %v from store: %v, will retry later", key, err)
+		clusterCache.endpointQueue.Add(key)
+		return err
+	default:
+		glog.V(4).Infof("Found endpoint for federation service %s/%s from cluster %s", endpoint.Namespace, endpoint.Name, clusterName)
+		err = cc.processEndpointUpdate(cachedService, endpoint, clusterName, serviceController)
 	}
 	if err != nil {
 		glog.Errorf("Failed to sync service: %+v, put back to service queue", err)

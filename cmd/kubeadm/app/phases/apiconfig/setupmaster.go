@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const apiCallRetryInterval = 500 * time.Millisecond
@@ -58,12 +59,9 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 		return err
 	}
 
-	// TODO: Switch to the new master label defined in https://github.com/kubernetes/kubernetes/pull/39112
-	n.ObjectMeta.Labels[metav1.NodeLabelKubeadmAlphaRole] = metav1.NodeLabelRoleMaster
-
-	// TODO: Use the Taints beta field on the NodeSpec now
-	taintsAnnotation, _ := json.Marshal([]v1.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
-	n.ObjectMeta.Annotations[v1.TaintsAnnotationKey] = string(taintsAnnotation)
+	// The master node is tainted and labelled accordingly
+	n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleMaster] = ""
+	n.Spec.Taints = []v1.Taint{{Key: kubeadmconstants.LabelNodeRoleMaster, Value: "", Effect: "NoSchedule"}}
 
 	newData, err := json.Marshal(n)
 	if err != nil {

@@ -70,9 +70,8 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 	return nil
 }
 
-var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
+var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
-
 	Describe("Validate OOM score adjustments", func() {
 		Context("once the node is setup", func() {
 			It("docker daemon's oom-score-adj should be -999", func() {

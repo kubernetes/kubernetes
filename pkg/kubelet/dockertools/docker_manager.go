@@ -405,6 +405,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 
 	// default to the image ID, but try and inspect for the RepoDigests
 	imageID := DockerPrefix + iResult.Image
+	imageName := iResult.Config.Image
 	imgInspectResult, err := dm.client.InspectImageByID(iResult.Image)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", iResult.Image, containerName, err))
@@ -416,12 +417,12 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		if len(imgInspectResult.RepoDigests) > 0 {
 			imageID = DockerPullablePrefix + imgInspectResult.RepoDigests[0]
 		}
+
+		if len(imgInspectResult.RepoTags) > 0 {
+			imageName = imgInspectResult.RepoTags[0]
+		}
 	}
 
-	imageName := iResult.Config.Image
-	if len(imgInspectResult.RepoTags) > 0 {
-		imageName = imgInspectResult.RepoTags[0]
-	}
 	status := kubecontainer.ContainerStatus{
 		Name:         containerName,
 		RestartCount: containerInfo.RestartCount,
@@ -2249,7 +2250,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		setupNetworkResult := kubecontainer.NewSyncResult(kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod))
 		result.AddSyncResult(setupNetworkResult)
 		if !kubecontainer.IsHostNetworkPod(pod) {
-			if err := dm.network.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID.ContainerID()); err != nil {
+			if err := dm.network.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID.ContainerID(), pod.Annotations); err != nil {
 				setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, err.Error())
 				glog.Error(err)
 

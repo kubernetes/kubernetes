@@ -294,6 +294,11 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
+	// Items for all in one resources secrets, configmaps, and downward API
+	Projected *ProjectedVolumeSource
+	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+	// +optional
+	PortworxVolume *PortworxVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -356,6 +361,9 @@ type PersistentVolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
+	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+	// +optional
+	PortworxVolume *PortworxVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -402,6 +410,10 @@ type PersistentVolumeSpec struct {
 	// Optional: what happens to a persistent volume when released from its claim.
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy
+	// Name of StorageClass to which this persistent volume belongs. Empty value
+	// means that this volume does not belong to any StorageClass.
+	// +optional
+	StorageClassName string
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
@@ -479,6 +491,10 @@ type PersistentVolumeClaimSpec struct {
 	// claim. When set to non-empty value Selector is not evaluated
 	// +optional
 	VolumeName string
+	// Name of the StorageClass required by the claim.
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
+	// +optional
+	StorageClassName *string
 }
 
 type PersistentVolumeClaimStatus struct {
@@ -625,6 +641,10 @@ type ISCSIVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Required: list of iSCSI target portal ips for high availability.
+	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
+	// +optional
+	Portals []string
 }
 
 // Represents a Fibre Channel volume.
@@ -742,7 +762,29 @@ type SecretVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
-	// Specify whether the Secret or it's key must be defined
+	// Specify whether the Secret or its key must be defined
+	// +optional
+	Optional *bool
+}
+
+// Adapts a secret into a projected volume.
+//
+// The contents of the target Secret's Data field will be presented in a
+// projected volume as files using the keys in the Data field as the file names.
+// Note that this is identical to a secret volume source without the default
+// mode.
+type SecretProjection struct {
+	LocalObjectReference
+	// If unspecified, each key-value pair in the Data field of the referenced
+	// Secret will be projected into the volume as a file whose name is the
+	// key and content is the value. If specified, the listed keys will be
+	// projected into the specified paths, and unlisted keys will not be
+	// present. If a key is specified which is not present in the Secret,
+	// the volume setup will error unless it is marked optional. Paths must be
+	// relative and may not contain the '..' path or start with '..'.
+	// +optional
+	Items []KeyToPath
+	// Specify whether the Secret or its key must be defined
 	// +optional
 	Optional *bool
 }
@@ -923,6 +965,15 @@ type DownwardAPIVolumeFile struct {
 	Mode *int32
 }
 
+// Represents downward API info for projecting into a projected volume.
+// Note that this is identical to a downwardAPI volume source without the default
+// mode.
+type DownwardAPIProjection struct {
+	// Items is a list of DownwardAPIVolume file
+	// +optional
+	Items []DownwardAPIVolumeFile
+}
+
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 type AzureFileVolumeSource struct {
 	// the name of secret that contains Azure Storage Account Name and Key
@@ -954,6 +1005,21 @@ type PhotonPersistentDiskVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string
+}
+
+// PortworxVolumeSource represents a Portworx volume resource.
+type PortworxVolumeSource struct {
+	// VolumeID uniquely identifies a Portworx volume
+	VolumeID string
+	// FSType represents the filesystem type to mount
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
 }
 
 type AzureDataDiskCachingMode string
@@ -1011,6 +1077,54 @@ type ConfigMapVolumeSource struct {
 	// Specify whether the ConfigMap or it's keys must be defined
 	// +optional
 	Optional *bool
+}
+
+// Adapts a ConfigMap into a projected volume.
+//
+// The contents of the target ConfigMap's Data field will be presented in a
+// projected volume as files using the keys in the Data field as the file names,
+// unless the items element is populated with specific mappings of keys to paths.
+// Note that this is identical to a configmap volume source without the default
+// mode.
+type ConfigMapProjection struct {
+	LocalObjectReference
+	// If unspecified, each key-value pair in the Data field of the referenced
+	// ConfigMap will be projected into the volume as a file whose name is the
+	// key and content is the value. If specified, the listed keys will be
+	// projected into the specified paths, and unlisted keys will not be
+	// present. If a key is specified which is not present in the ConfigMap,
+	// the volume setup will error unless it is marked optional. Paths must be
+	// relative and may not contain the '..' path or start with '..'.
+	// +optional
+	Items []KeyToPath
+	// Specify whether the ConfigMap or it's keys must be defined
+	// +optional
+	Optional *bool
+}
+
+// Represents a projected volume source
+type ProjectedVolumeSource struct {
+	// list of volume projections
+	Sources []VolumeProjection
+	// Mode bits to use on created files by default. Must be a value between
+	// 0 and 0777.
+	// Directories within the path are not affected by this setting.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup, and the result can be other mode bits set.
+	// +optional
+	DefaultMode *int32
+}
+
+// Projection that may be projected along with other supported volume types
+type VolumeProjection struct {
+	// all types below are the supported types for projection into the same volume
+
+	// information about the secret data to project
+	Secret *SecretProjection
+	// information about the downwardAPI data to project
+	DownwardAPI *DownwardAPIProjection
+	// information about the configMap data to project
+	ConfigMap *ConfigMapProjection
 }
 
 // Maps a string key to a path within a volume.
@@ -1883,6 +1997,9 @@ type PodSpec struct {
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod
 	// The pod will be allowed to use secrets referenced by the ServiceAccount
 	ServiceAccountName string
+	// AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.
+	// +optional
+	AutomountServiceAccountToken *bool
 
 	// NodeName is a request to schedule this pod onto a specific node.  If it is non-empty,
 	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
@@ -1913,6 +2030,9 @@ type PodSpec struct {
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string
+	// If specified, the pod's tolerations.
+	// +optional
+	Tolerations []Toleration
 }
 
 // Sysctl defines a kernel parameter to be set
@@ -2421,6 +2541,11 @@ type ServiceAccount struct {
 	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
 	// +optional
 	ImagePullSecrets []LocalObjectReference
+
+	// AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
+	// Can be overridden at the pod level.
+	// +optional
+	AutomountServiceAccountToken *bool
 }
 
 // ServiceAccountList is a list of ServiceAccount objects
@@ -2530,6 +2655,10 @@ type NodeSpec struct {
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	// +optional
 	Unschedulable bool
+
+	// If specified, the node's taints.
+	// +optional
+	Taints []Taint
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -2720,6 +2849,8 @@ const (
 	NodeHostName     NodeAddressType = "Hostname"
 	NodeExternalIP   NodeAddressType = "ExternalIP"
 	NodeInternalIP   NodeAddressType = "InternalIP"
+	NodeExternalDNS  NodeAddressType = "ExternalDNS"
+	NodeInternalDNS  NodeAddressType = "InternalDNS"
 )
 
 type NodeAddress struct {
@@ -2869,6 +3000,20 @@ type Preconditions struct {
 	UID *types.UID
 }
 
+// DeletionPropagation decides whether and how garbage collection will be performed.
+type DeletionPropagation string
+
+const (
+	// Orphans the dependents.
+	DeletePropagationOrphan DeletionPropagation = "Orphan"
+	// Deletes the object from the key-value store, the garbage collector will delete the dependents in the background.
+	DeletePropagationBackground DeletionPropagation = "Background"
+	// The object exists in the key-value store until the garbage collector deletes all the dependents whose ownerReference.blockOwnerDeletion=true from the key-value store.
+	// API sever will put the "DeletingDependents" finalizer on the object, and sets its deletionTimestamp.
+	// This policy is cascading, i.e., the dependents will be deleted with Foreground.
+	DeletePropagationForeground DeletionPropagation = "Foreground"
+)
+
 // DeleteOptions may be provided when deleting an API object
 // DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
 type DeleteOptions struct {
@@ -2885,10 +3030,18 @@ type DeleteOptions struct {
 	// +optional
 	Preconditions *Preconditions
 
+	// Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7.
 	// Should the dependent objects be orphaned. If true/false, the "orphan"
 	// finalizer will be added to/removed from the object's finalizers list.
+	// Either this field or PropagationPolicy may be set, but not both.
 	// +optional
 	OrphanDependents *bool
+
+	// Whether and how garbage collection will be performed.
+	// Defaults to Default.
+	// Either this field or OrphanDependents may be set, but not both.
+	// +optional
+	PropagationPolicy *DeletionPropagation
 }
 
 // ListOptions is the query options to a standard REST list call, and has future support for

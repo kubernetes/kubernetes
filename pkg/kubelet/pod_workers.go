@@ -291,9 +291,9 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 		}
 
 		// we timeout and return an error if we don't get a callback within a reasonable time.
-		// the default timeout is relative to the grace period (we settle on 2s to wait for kubelet->runtime traffic to complete in sigkill)
+		// the default timeout is relative to the grace period (we settle on 10s to wait for kubelet->runtime traffic to complete in sigkill)
 		timeout := int64(gracePeriod + (gracePeriod / 2))
-		minTimeout := int64(2)
+		minTimeout := int64(10)
 		if timeout < minTimeout {
 			timeout = minTimeout
 		}

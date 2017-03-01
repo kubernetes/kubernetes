@@ -328,6 +328,9 @@ type VolumeSource struct {
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,23,opt,name=photonPersistentDisk"`
 	// Items for all in one resources secrets, configmaps, and downward API
 	Projected *ProjectedVolumeSource `json:"projected,omitempty"`
+	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+	// +optional
+	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty" protobuf:"bytes,24,opt,name=portworxVolume"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -413,6 +416,9 @@ type PersistentVolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
 	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,17,opt,name=photonPersistentDisk"`
+	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+	// +optional
+	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty" protobuf:"bytes,18,opt,name=portworxVolume"`
 }
 
 // +genclient=true
@@ -466,6 +472,10 @@ type PersistentVolumeSpec struct {
 	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=PersistentVolumeReclaimPolicy"`
+	// Name of StorageClass to which this persistent volume belongs. Empty value
+	// means that this volume does not belong to any StorageClass.
+	// +optional
+	StorageClassName string `json:"storageClassName,omitempty"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
@@ -561,6 +571,10 @@ type PersistentVolumeClaimSpec struct {
 	// VolumeName is the binding reference to the PersistentVolume backing this claim.
 	// +optional
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,3,opt,name=volumeName"`
+	// Name of the StorageClass required by the claim.
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -1015,7 +1029,7 @@ type ISCSIVolumeSource struct {
 	// iSCSI target portal List. The portal is either an IP or ip_addr:port if the port
 	// is other than default (typically TCP ports 860 and 3260).
 	// +optional
-	Portals []string `json:"portals" protobuf:"bytes,7,opt,name=portals"`
+	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
 }
 
 // Represents a Fibre Channel volume.
@@ -1097,6 +1111,20 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
+}
+
+// PortworxVolumeSource represents a Portworx volume resource.
+type PortworxVolumeSource struct {
+	// VolumeID uniquely identifies a Portworx volume
+	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
+	// FSType represents the filesystem type to mount
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
 // Adapts a ConfigMap into a volume.
@@ -2286,6 +2314,9 @@ type PodSpec struct {
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string `json:"schedulername,omitempty" protobuf:"bytes,19,opt,name=schedulername"`
+	// If specified, the pod's tolerations.
+	// +optional
+	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -3022,6 +3053,9 @@ type NodeSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration
 	// +optional
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
+	// If specified, the node's taints.
+	// +optional
+	Taints []Taint `json:"taints,omitempty"  protobuf:"bytes,5,opt,name=taints"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -3398,6 +3432,20 @@ type Preconditions struct {
 	UID *types.UID `json:"uid,omitempty" protobuf:"bytes,1,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }
 
+// DeletionPropagation decides if a deletion will propagate to the dependents of the object, and how the garbage collector will handle the propagation.
+type DeletionPropagation string
+
+const (
+	// Orphans the dependents.
+	DeletePropagationOrphan DeletionPropagation = "Orphan"
+	// Deletes the object from the key-value store, the garbage collector will delete the dependents in the background.
+	DeletePropagationBackground DeletionPropagation = "Background"
+	// The object exists in the key-value store until the garbage collector deletes all the dependents whose ownerReference.blockOwnerDeletion=true from the key-value store.
+	// API sever will put the "DeletingDependents" finalizer on the object, and sets its deletionTimestamp.
+	// This policy is cascading, i.e., the dependents will be deleted with Foreground.
+	DeletePropagationForeground DeletionPropagation = "Foreground"
+)
+
 // DeleteOptions may be provided when deleting an API object
 // DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
 // +k8s:openapi-gen=false
@@ -3416,10 +3464,18 @@ type DeleteOptions struct {
 	// +optional
 	Preconditions *Preconditions `json:"preconditions,omitempty" protobuf:"bytes,2,opt,name=preconditions"`
 
+	// Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7.
 	// Should the dependent objects be orphaned. If true/false, the "orphan"
 	// finalizer will be added to/removed from the object's finalizers list.
+	// Either this field or PropagationPolicy may be set, but not both.
 	// +optional
 	OrphanDependents *bool `json:"orphanDependents,omitempty" protobuf:"varint,3,opt,name=orphanDependents"`
+
+	// Whether and how garbage collection will be performed.
+	// Defaults to Default.
+	// Either this field or OrphanDependents may be set, but not both.
+	// +optional
+	PropagationPolicy *DeletionPropagation
 }
 
 // ListOptions is the query options to a standard REST list call.

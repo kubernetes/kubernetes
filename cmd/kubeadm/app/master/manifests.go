@@ -32,6 +32,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -73,7 +74,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getAPIServerCommand(cfg, false),
 			VolumeMounts:  volumeMounts,
-			LivenessProbe: componentProbe(8080, "/healthz"),
+			LivenessProbe: componentProbe(6443, "/healthz", api.URISchemeHTTPS),
 			Resources:     componentResources("250m"),
 			Env:           getProxyEnvVars(),
 		}, volumes...),
@@ -82,7 +83,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getControllerManagerCommand(cfg, false),
 			VolumeMounts:  volumeMounts,
-			LivenessProbe: componentProbe(10252, "/healthz"),
+			LivenessProbe: componentProbe(10252, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("200m"),
 			Env:           getProxyEnvVars(),
 		}, volumes...),
@@ -90,10 +91,11 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Name:          kubeScheduler,
 			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getSchedulerCommand(cfg, false),
-			LivenessProbe: componentProbe(10251, "/healthz"),
+			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
+			LivenessProbe: componentProbe(10251, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
-		}),
+		}, k8sVolume(cfg)),
 	}
 
 	// Add etcd static pod spec only if external etcd is not configured
@@ -108,8 +110,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			},
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
-			LivenessProbe: componentProbe(2379, "/health"),
-			Resources:     componentResources("200m"),
+			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
 
 		etcdPod.Spec.SecurityContext = &api.PodSecurityContext{
@@ -248,13 +249,14 @@ func componentResources(cpu string) api.ResourceRequirements {
 	}
 }
 
-func componentProbe(port int, path string) *api.Probe {
+func componentProbe(port int, path string, scheme api.URIScheme) *api.Probe {
 	return &api.Probe{
 		Handler: api.Handler{
 			HTTPGet: &api.HTTPGetAction{
-				Host: "127.0.0.1",
-				Path: path,
-				Port: intstr.FromInt(port),
+				Host:   "127.0.0.1",
+				Path:   path,
+				Port:   intstr.FromInt(port),
+				Scheme: scheme,
 			},
 		},
 		InitialDelaySeconds: 15,
@@ -302,39 +304,33 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	command = append(getComponentBaseCommand(apiServer),
-		"--insecure-bind-address=127.0.0.1",
-		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
-		"--service-cluster-ip-range="+cfg.Networking.ServiceSubnet,
-		"--service-account-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
-		"--client-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--tls-cert-file="+getCertFilePath(kubeadmconstants.APIServerCertName),
-		"--tls-private-key-file="+getCertFilePath(kubeadmconstants.APIServerKeyName),
-		"--kubelet-client-certificate="+getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
-		"--kubelet-client-key="+getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
-		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
-		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
-		"--allow-privileged",
-		"--storage-backend=etcd3",
-		"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+	defaultArguments := map[string]string{
+		"insecure-port":                   "0",
+		"admission-control":               kubeadmconstants.DefaultAdmissionControl,
+		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
+		"service-account-key-file":        getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
+		"client-ca-file":                  getCertFilePath(kubeadmconstants.CACertName),
+		"tls-cert-file":                   getCertFilePath(kubeadmconstants.APIServerCertName),
+		"tls-private-key-file":            getCertFilePath(kubeadmconstants.APIServerKeyName),
+		"kubelet-client-certificate":      getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
+		"kubelet-client-key":              getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
+		"token-auth-file":                 path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CSVTokenFileName),
+		"secure-port":                     fmt.Sprintf("%d", cfg.API.Port),
+		"allow-privileged":                "true",
+		"storage-backend":                 "etcd3",
+		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
 		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
 		// so add it unconditionally with recommended values
-		"--requestheader-username-headers=X-Remote-User",
-		"--requestheader-group-headers=X-Remote-Group",
-		"--requestheader-extra-headers-prefix=X-Remote-Extra-",
-		"--requestheader-client-ca-file="+getCertFilePath(kubeadmconstants.FrontProxyCACertName),
-		"--requestheader-allowed-names=front-proxy-client",
-	)
-
-	if cfg.AuthorizationMode != "" {
-		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
-		switch cfg.AuthorizationMode {
-		case kubeadmconstants.AuthzModeABAC:
-			command = append(command, "--authorization-policy-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationPolicyFile))
-		case kubeadmconstants.AuthzModeWebhook:
-			command = append(command, "--authorization-webhook-config-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AuthorizationWebhookConfigFile))
-		}
+		"requestheader-username-headers":     "X-Remote-User",
+		"requestheader-group-headers":        "X-Remote-Group",
+		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
+		"requestheader-client-ca-file":       getCertFilePath(kubeadmconstants.FrontProxyCACertName),
+		"requestheader-allowed-names":        "front-proxy-client",
 	}
+
+	command = getComponentBaseCommand(apiServer)
+	command = append(command, getExtraParameters(cfg.APIServerExtraArgs, defaultArguments)...)
+	command = append(command, getAuthzParameters(cfg.AuthorizationMode)...)
 
 	// Use first address we are given
 	if len(cfg.API.AdvertiseAddresses) > 0 {
@@ -382,17 +378,20 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/controller-manager.lock"}
 	}
 
-	command = append(getComponentBaseCommand(controllerManager),
-		"--address=127.0.0.1",
-		"--leader-elect",
-		"--master=127.0.0.1:8080",
-		"--root-ca-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--service-account-private-key-file="+getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
-		"--cluster-signing-cert-file="+getCertFilePath(kubeadmconstants.CACertName),
-		"--cluster-signing-key-file="+getCertFilePath(kubeadmconstants.CAKeyName),
-		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+kubeadmconstants.CSVTokenBootstrapGroup,
-		"--use-service-account-credentials",
-	)
+	defaultArguments := map[string]string{
+		"address":                                                  "127.0.0.1",
+		"leader-elect":                                             "true",
+		"kubeconfig":                                               path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
+		"root-ca-file":                                             getCertFilePath(kubeadmconstants.CACertName),
+		"service-account-private-key-file":                         getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
+		"cluster-signing-cert-file":                                getCertFilePath(kubeadmconstants.CACertName),
+		"cluster-signing-key-file":                                 getCertFilePath(kubeadmconstants.CAKeyName),
+		"insecure-experimental-approve-all-kubelet-csrs-for-group": kubeadmconstants.CSVTokenBootstrapGroup,
+		"use-service-account-credentials":                          "true",
+	}
+
+	command = getComponentBaseCommand(controllerManager)
+	command = append(command, getExtraParameters(cfg.ControllerManagerExtraArgs, defaultArguments)...)
 
 	if cfg.CloudProvider != "" {
 		command = append(command, "--cloud-provider="+cfg.CloudProvider)
@@ -420,11 +419,14 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	command = append(getComponentBaseCommand(scheduler),
-		"--address=127.0.0.1",
-		"--leader-elect",
-		"--master=127.0.0.1:8080",
-	)
+	defaultArguments := map[string]string{
+		"address":      "127.0.0.1",
+		"leader-elect": "true",
+		"kubeconfig":   path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+	}
+
+	command = getComponentBaseCommand(scheduler)
+	command = append(command, getExtraParameters(cfg.SchedulerExtraArgs, defaultArguments)...)
 
 	return command
 }
@@ -458,4 +460,38 @@ func getSelfHostedAPIServerEnv() []api.EnvVar {
 	}
 
 	return append(getProxyEnvVars(), podIPEnvVar)
+}
+
+func getAuthzParameters(authzMode string) []string {
+	command := []string{}
+	// RBAC is always on. If the user specified
+	authzModes := []string{authzmodes.ModeRBAC}
+	if len(authzMode) != 0 && authzMode != authzmodes.ModeRBAC {
+		authzModes = append(authzModes, authzMode)
+	}
+
+	command = append(command, "--authorization-mode="+strings.Join(authzModes, ","))
+
+	switch authzMode {
+	case authzmodes.ModeABAC:
+		command = append(command, "--authorization-policy-file="+kubeadmconstants.AuthorizationPolicyPath)
+	case authzmodes.ModeWebhook:
+		command = append(command, "--authorization-webhook-config-file="+kubeadmconstants.AuthorizationWebhookConfigPath)
+	}
+	return command
+}
+
+func getExtraParameters(overrides map[string]string, defaults map[string]string) []string {
+	var command []string
+	for k, v := range overrides {
+		if len(v) > 0 {
+			command = append(command, fmt.Sprintf("--%s=%s", k, v))
+		}
+	}
+	for k, v := range defaults {
+		if _, overrideExists := overrides[k]; !overrideExists {
+			command = append(command, fmt.Sprintf("--%s=%s", k, v))
+		}
+	}
+	return command
 }

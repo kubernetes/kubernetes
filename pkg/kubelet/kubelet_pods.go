@@ -203,36 +203,6 @@ func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string) error {
 	return ioutil.WriteFile(fileName, buffer.Bytes(), 0644)
 }
 
-func makePortMappings(container *v1.Container) (ports []kubecontainer.PortMapping) {
-	names := make(map[string]struct{})
-	for _, p := range container.Ports {
-		pm := kubecontainer.PortMapping{
-			HostPort:      int(p.HostPort),
-			ContainerPort: int(p.ContainerPort),
-			Protocol:      p.Protocol,
-			HostIP:        p.HostIP,
-		}
-
-		// We need to create some default port name if it's not specified, since
-		// this is necessary for rkt.
-		// http://issue.k8s.io/7710
-		if p.Name == "" {
-			pm.Name = fmt.Sprintf("%s-%s:%d", container.Name, p.Protocol, p.ContainerPort)
-		} else {
-			pm.Name = fmt.Sprintf("%s-%s", container.Name, p.Name)
-		}
-
-		// Protect against exposing the same protocol-port more than once in a container.
-		if _, ok := names[pm.Name]; ok {
-			glog.Warningf("Port name conflicted, %q is defined more than once", pm.Name)
-			continue
-		}
-		ports = append(ports, pm)
-		names[pm.Name] = struct{}{}
-	}
-	return
-}
-
 // truncatePodHostnameIfNeeded truncates the pod hostname if it's longer than 63 chars.
 func truncatePodHostnameIfNeeded(podName, hostname string) (string, error) {
 	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
@@ -293,13 +263,18 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 	return hostname, hostDomain, nil
 }
 
+// GetPodCgroupParent gets pod cgroup parent from container manager.
+func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
+	pcm := kl.containerManager.NewPodContainerManager()
+	return pcm.GetPodContainerName(pod)
+}
+
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	var err error
-	pcm := kl.containerManager.NewPodContainerManager()
-	_, podContainerName := pcm.GetPodContainerName(pod)
-	opts := &kubecontainer.RunContainerOptions{CgroupParent: podContainerName}
+	_, cgroupParent := kl.GetPodCgroupParent(pod)
+	opts := &kubecontainer.RunContainerOptions{CgroupParent: cgroupParent}
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
 		return nil, err
@@ -308,7 +283,8 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	podName := volumehelper.GetUniquePodName(pod)
 	volumes := kl.volumeManager.GetMountedVolumesForPod(podName)
 
-	opts.PortMappings = makePortMappings(container)
+	opts.PortMappings = kubecontainer.MakePortMappings(container)
+	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
 	opts.Devices = makeDevices(container)
 
 	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
@@ -677,6 +653,9 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 		if err := pcm.ReduceCPULimits(podCgroup); err != nil {
 			glog.Warningf("Failed to reduce the CPU values to the minimum amount of shares: %v", err)
 		}
+	}
+	if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
+		glog.V(2).Infof("Failed to update QoS cgroups while killing pod: %v", err)
 	}
 	return nil
 }
@@ -1557,7 +1536,7 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(
 
 		// If volumes have not been unmounted/detached, do not delete the cgroup in case so the charge does not go to the parent.
 		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
-			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up, Skipping cgroups deletion: %v", uid)
+			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up, Skipping cgroups deletion.", uid)
 			continue
 		}
 		glog.V(3).Infof("Orphaned pod %q found, removing pod cgroups", uid)

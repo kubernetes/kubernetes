@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"math"
 	"math/rand"
 	"net/http"
 	"os"
@@ -398,11 +399,9 @@ func NewServer(cfg *ServerConfig) (srv *EtcdServer, err error) {
 	srv.applyV2 = &applierV2store{store: srv.store, cluster: srv.cluster}
 
 	srv.be = be
-	srv.lessor = lease.NewLessor(srv.be)
+	minTTL := time.Duration((3*cfg.ElectionTicks)/2) * time.Duration(cfg.TickMs) * time.Millisecond
+	srv.lessor = lease.NewLessor(srv.be, int64(math.Ceil(minTTL.Seconds())))
 
-	// always recover lessor before kv. When we recover the mvcc.KV it will reattach keys to its leases.
-	// If we recover mvcc.KV first, it will attach the keys to the wrong lessor before it recovers.
-	srv.lessor = lease.NewLessor(srv.be)
 	srv.kv = mvcc.New(srv.be, srv.lessor, &srv.consistIndex)
 	if beExist {
 		kvindex := srv.kv.ConsistentIndex()

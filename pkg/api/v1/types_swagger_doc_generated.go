@@ -355,7 +355,8 @@ var map_DeleteOptions = map[string]string{
 	"":                   "DeleteOptions may be provided when deleting an API object DEPRECATED: This type has been moved to meta/v1 and will be removed soon.",
 	"gracePeriodSeconds": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
 	"preconditions":      "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
-	"orphanDependents":   "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+	"orphanDependents":   "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
+	"PropagationPolicy":  "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
 }
 
 func (DeleteOptions) SwaggerDoc() map[string]string {
@@ -936,6 +937,7 @@ var map_NodeSpec = map[string]string{
 	"externalID":    "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
 	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
 	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration",
+	"taints":        "If specified, the node's taints.",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {
@@ -1059,11 +1061,12 @@ func (PersistentVolumeClaimList) SwaggerDoc() map[string]string {
 }
 
 var map_PersistentVolumeClaimSpec = map[string]string{
-	"":            "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
-	"accessModes": "AccessModes contains the desired access modes the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes-1",
-	"selector":    "A label query over volumes to consider for binding.",
-	"resources":   "Resources represents the minimum resources the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
-	"volumeName":  "VolumeName is the binding reference to the PersistentVolume backing this claim.",
+	"":                 "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
+	"accessModes":      "AccessModes contains the desired access modes the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes-1",
+	"selector":         "A label query over volumes to consider for binding.",
+	"resources":        "Resources represents the minimum resources the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
+	"volumeName":       "VolumeName is the binding reference to the PersistentVolume backing this claim.",
+	"storageClassName": "Name of the StorageClass required by the claim. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1",
 }
 
 func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
@@ -1120,6 +1123,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1132,6 +1136,7 @@ var map_PersistentVolumeSpec = map[string]string{
 	"accessModes":                   "AccessModes contains all ways the volume can be mounted. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes",
 	"claimRef":                      "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#binding",
 	"persistentVolumeReclaimPolicy": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy",
+	"storageClassName":              "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
 }
 
 func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
@@ -1331,6 +1336,7 @@ var map_PodSpec = map[string]string{
 	"subdomain":                     "If specified, the fully qualified Pod hostname will be \"<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>\". If not specified, the pod will not have a domainname at all.",
 	"affinity":                      "If specified, the pod's scheduling constraints",
 	"schedulername":                 "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
+	"tolerations":                   "If specified, the pod's tolerations.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1393,6 +1399,17 @@ var map_PodTemplateSpec = map[string]string{
 
 func (PodTemplateSpec) SwaggerDoc() map[string]string {
 	return map_PodTemplateSpec
+}
+
+var map_PortworxVolumeSource = map[string]string{
+	"":         "PortworxVolumeSource represents a Portworx volume resource.",
+	"volumeID": "VolumeID uniquely identifies a Portworx volume",
+	"fsType":   "FSType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+}
+
+func (PortworxVolumeSource) SwaggerDoc() map[string]string {
+	return map_PortworxVolumeSource
 }
 
 var map_Preconditions = map[string]string{
@@ -1893,6 +1910,7 @@ var map_VolumeSource = map[string]string{
 	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
 	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 	"projected":            "Items for all in one resources secrets, configmaps, and downward API",
+	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

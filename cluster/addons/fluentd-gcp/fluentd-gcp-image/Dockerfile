@@ -20,41 +20,39 @@
 # scope and that the Logging API has been enabled for the project
 # in the Google Developer Console.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.6
+FROM gcr.io/google-containers/debian-base-amd64:0.1
 
+COPY Gemfile /Gemfile
 
-# Disable prompts from apt
-ENV DEBIAN_FRONTEND noninteractive
-
-# Install build tools
-RUN apt-get -qq update && \
-    apt-get install -y -qq curl ca-certificates gcc make bash sudo && \
-    apt-get install -y -qq --reinstall lsb-base lsb-release && \
-    # Install logging agent and required gems
-    /usr/bin/curl -sSL https://toolbelt.treasuredata.com/sh/install-ubuntu-xenial-td-agent2.sh | sh && \
-    sed -i -e "s/USER=td-agent/USER=root/" -e "s/GROUP=td-agent/GROUP=root/" /etc/init.d/td-agent && \
-    td-agent-gem install --no-document fluent-plugin-record-reformer -v 0.8.2 && \
-    td-agent-gem install --no-document fluent-plugin-systemd -v 0.0.5 && \
-    td-agent-gem install --no-document fluent-plugin-google-cloud -v 0.5.6 && \
-    td-agent-gem install --no-document fluent-plugin-detect-exceptions -v 0.0.4 && \
-    # Remove build tools
-    apt-get remove -y -qq gcc make && \
-    apt-get autoremove -y -qq && \
-    apt-get clean -qq && \
-    # Remove unnecessary files
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-        /opt/td-agent/embedded/share/doc \
-        /opt/td-agent/embedded/share/gtk-doc \
-        /opt/td-agent/embedded/lib/postgresql \
-        /opt/td-agent/embedded/bin/postgres \
-        /opt/td-agent/embedded/share/postgresql \
-        /etc/td-agent/td-agent.conf
+# 1. Install & configure dependencies.
+# 2. Install fluentd via ruby.
+# 3. Remove build dependencies.
+# 4. Cleanup leftover caches & files.
+RUN BUILD_DEPS="make gcc g++ libc-dev ruby-dev" \
+    && clean-install $BUILD_DEPS \
+                     ca-certificates \
+                     libjemalloc1 \
+                     liblz4-1 \
+                     ruby \
+    && echo 'gem: --no-document' >> /etc/gemrc \
+    && gem install --file Gemfile \
+    && apt-get purge -y --auto-remove \
+                     -o APT::AutoRemove::RecommendsImportant=false \
+                     $BUILD_DEPS \
+    && rm -rf /tmp/* \
+              /var/lib/apt/lists/* \
+              /usr/lib/ruby/gems/*/cache/*.gem \
+              /var/log/* \
+              /var/tmp/*
 
 # Copy the Fluentd configuration file for logging Docker container logs.
-COPY fluent.conf /etc/td-agent/td-agent.conf
-
-# Copy the entrypoint for the container
+COPY fluent.conf /etc/fluent/fluent.conf
 COPY run.sh /run.sh
+
+# Expose prometheus metrics.
+EXPOSE 80
+
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 # Start Fluentd to pick up our config that watches Docker container logs.
 CMD /run.sh $FLUENTD_ARGS

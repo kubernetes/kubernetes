@@ -17,9 +17,10 @@ limitations under the License.
 package methods
 
 import (
+	"context"
+
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type RetrieveDynamicTypeManagerBody struct {

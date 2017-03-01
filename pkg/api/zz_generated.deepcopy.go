@@ -158,6 +158,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplate, InType: reflect.TypeOf(&PodTemplate{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplateList, InType: reflect.TypeOf(&PodTemplateList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplateSpec, InType: reflect.TypeOf(&PodTemplateSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PortworxVolumeSource, InType: reflect.TypeOf(&PortworxVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Preconditions, InType: reflect.TypeOf(&Preconditions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
@@ -759,6 +760,11 @@ func DeepCopy_api_DeleteOptions(in interface{}, out interface{}, c *conversion.C
 		if in.OrphanDependents != nil {
 			in, out := &in.OrphanDependents, &out.OrphanDependents
 			*out = new(bool)
+			**out = **in
+		}
+		if in.PropagationPolicy != nil {
+			in, out := &in.PropagationPolicy, &out.PropagationPolicy
+			*out = new(DeletionPropagation)
 			**out = **in
 		}
 		return nil
@@ -1516,6 +1522,9 @@ func DeepCopy_api_Node(in interface{}, out interface{}, c *conversion.Cloner) er
 		} else {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
+		if err := DeepCopy_api_NodeSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
 		if err := DeepCopy_api_NodeStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
@@ -1675,6 +1684,15 @@ func DeepCopy_api_NodeSpec(in interface{}, out interface{}, c *conversion.Cloner
 		in := in.(*NodeSpec)
 		out := out.(*NodeSpec)
 		*out = *in
+		if in.Taints != nil {
+			in, out := &in.Taints, &out.Taints
+			*out = make([]Taint, len(*in))
+			for i := range *in {
+				if err := DeepCopy_api_Taint(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}
 }
@@ -1888,6 +1906,11 @@ func DeepCopy_api_PersistentVolumeClaimSpec(in interface{}, out interface{}, c *
 		if err := DeepCopy_api_ResourceRequirements(&in.Resources, &out.Resources, c); err != nil {
 			return err
 		}
+		if in.StorageClassName != nil {
+			in, out := &in.StorageClassName, &out.StorageClassName
+			*out = new(string)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -2040,6 +2063,11 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		if in.PhotonPersistentDisk != nil {
 			in, out := &in.PhotonPersistentDisk, &out.PhotonPersistentDisk
 			*out = new(PhotonPersistentDiskVolumeSource)
+			**out = **in
+		}
+		if in.PortworxVolume != nil {
+			in, out := &in.PortworxVolume, &out.PortworxVolume
+			*out = new(PortworxVolumeSource)
 			**out = **in
 		}
 		return nil
@@ -2417,6 +2445,15 @@ func DeepCopy_api_PodSpec(in interface{}, out interface{}, c *conversion.Cloner)
 				return err
 			}
 		}
+		if in.Tolerations != nil {
+			in, out := &in.Tolerations, &out.Tolerations
+			*out = make([]Toleration, len(*in))
+			for i := range *in {
+				if err := DeepCopy_api_Toleration(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}
 }
@@ -2527,6 +2564,15 @@ func DeepCopy_api_PodTemplateSpec(in interface{}, out interface{}, c *conversion
 		if err := DeepCopy_api_PodSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
+		return nil
+	}
+}
+
+func DeepCopy_api_PortworxVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PortworxVolumeSource)
+		out := out.(*PortworxVolumeSource)
+		*out = *in
 		return nil
 	}
 }
@@ -3420,6 +3466,11 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 			if err := DeepCopy_api_ProjectedVolumeSource(*in, *out, c); err != nil {
 				return err
 			}
+		}
+		if in.PortworxVolume != nil {
+			in, out := &in.PortworxVolume, &out.PortworxVolume
+			*out = new(PortworxVolumeSource)
+			**out = **in
 		}
 		return nil
 	}

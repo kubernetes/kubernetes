@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -58,7 +59,20 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 		Burst:         5000,
 	})
 
-	schedulerConfigurator = factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight)
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+
+	schedulerConfigurator = factory.NewConfigFactory(
+		v1.DefaultSchedulerName,
+		clientSet,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		v1.DefaultHardPodAffinitySymmetricWeight,
+	)
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
@@ -70,11 +84,15 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 		glog.Fatalf("Error creating scheduler: %v", err)
 	}
 
+	stop := make(chan struct{})
+	informerFactory.Start(stop)
+
 	sched.Run()
 
 	destroyFunc = func() {
 		glog.Infof("destroying")
 		sched.StopEverything()
+		close(stop)
 		s.Close()
 		glog.Infof("destroyed")
 	}

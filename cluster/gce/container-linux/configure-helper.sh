@@ -167,7 +167,7 @@ function create-master-auth {
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
   fi
   if [[ -n "${KUBELET_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "system:node:node-name,uid:kubelet,system:nodes"
+    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "kubelet,uid:kubelet,system:nodes"
   fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
@@ -904,11 +904,17 @@ function start-kube-apiserver {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   params+=" --authorization-mode=${authorization_mode}"
 
+  local container_env=""
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+  fi
+
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag=$(cat /opt/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{srv_sshproxy_path}}@/etc/srv/sshproxy@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
@@ -975,6 +981,10 @@ function start-kube-controller-manager {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   local -r kube_rc_docker_tag=$(cat /opt/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
+  local container_env=""
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+  fi
 
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
   remove-salt-config-comments "${src_file}"
@@ -983,6 +993,7 @@ function start-kube-controller-manager {
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-controller-manager_docker_tag'\]}}@${kube_rc_docker_tag}@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"

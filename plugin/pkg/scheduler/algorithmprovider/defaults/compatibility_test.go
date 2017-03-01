@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -345,8 +346,20 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		defer server.Close()
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+		informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-		if _, err := factory.NewConfigFactory(client, "some-scheduler-name", v1.DefaultHardPodAffinitySymmetricWeight).CreateFromConfig(policy); err != nil {
+		if _, err := factory.NewConfigFactory(
+			"some-scheduler-name",
+			client,
+			informerFactory.Core().V1().Nodes(),
+			informerFactory.Core().V1().PersistentVolumes(),
+			informerFactory.Core().V1().PersistentVolumeClaims(),
+			informerFactory.Core().V1().ReplicationControllers(),
+			informerFactory.Extensions().V1beta1().ReplicaSets(),
+			informerFactory.Apps().V1beta1().StatefulSets(),
+			informerFactory.Core().V1().Services(),
+			v1.DefaultHardPodAffinitySymmetricWeight,
+		).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
 		}

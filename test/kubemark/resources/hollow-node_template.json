@@ -157,11 +157,9 @@
 						}
 					],
 					"command": [
-						"/node-problem-detector",
-						"--kernel-monitor=/config/kernel.monitor",
-						"--apiserver-override=https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig",
-						"--alsologtostderr",
-						"1>>/var/log/npd-$(NODE_NAME).log 2>&1"
+						"/bin/sh",
+						"-c",
+						"/node-problem-detector --kernel-monitor=/config/kernel.monitor --apiserver-override=\"https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig\" --alsologtostderr 1>>/var/log/npd-$(NODE_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{

@@ -82,10 +82,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 }
 
 // Delete enforces life-cycle rules for namespace termination
-func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, error) {
+func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	nsObj, err := r.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	namespace := nsObj.(*api.Namespace)
@@ -105,7 +105,7 @@ func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav
 			name,
 			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *options.Preconditions.UID, namespace.UID),
 		)
-		return nil, err
+		return nil, false, err
 	}
 
 	// upon first request to delete, we switch the phase to start namespace termination
@@ -113,7 +113,7 @@ func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav
 	if namespace.DeletionTimestamp.IsZero() {
 		key, err := r.Store.KeyFunc(ctx, name)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		preconditions := storage.Preconditions{UID: options.Preconditions.UID}
@@ -143,7 +143,7 @@ func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav
 					newFinalizers := []string{}
 					for i := range existingNamespace.ObjectMeta.Finalizers {
 						finalizer := existingNamespace.ObjectMeta.Finalizers[i]
-						if string(finalizer) != metav1.FinalizerOrphan {
+						if string(finalizer) != metav1.FinalizerOrphanDependents {
 							newFinalizers = append(newFinalizers, finalizer)
 						}
 					}
@@ -159,16 +159,16 @@ func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav
 			if _, ok := err.(*apierrors.StatusError); !ok {
 				err = apierrors.NewInternalError(err)
 			}
-			return nil, err
+			return nil, false, err
 		}
 
-		return out, nil
+		return out, false, nil
 	}
 
 	// prior to final deletion, we must ensure that finalizers is empty
 	if len(namespace.Spec.Finalizers) != 0 {
 		err = apierrors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
-		return nil, err
+		return nil, false, err
 	}
 	return r.Store.Delete(ctx, name, options)
 }

@@ -22,11 +22,10 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
-
-var AuthorizationModeChoices = []string{authorizer.ModeAlwaysAllow, authorizer.ModeAlwaysDeny, authorizer.ModeABAC, authorizer.ModeWebhook, authorizer.ModeRBAC}
 
 type BuiltInAuthorizationOptions struct {
 	Mode                        string
@@ -38,7 +37,7 @@ type BuiltInAuthorizationOptions struct {
 
 func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 	return &BuiltInAuthorizationOptions{
-		Mode: authorizer.ModeAlwaysAllow,
+		Mode: authzmodes.ModeAlwaysAllow,
 		WebhookCacheAuthorizedTTL:   5 * time.Minute,
 		WebhookCacheUnauthorizedTTL: 30 * time.Second,
 	}
@@ -52,7 +51,7 @@ func (s *BuiltInAuthorizationOptions) Validate() []error {
 func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Mode, "authorization-mode", s.Mode, ""+
 		"Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+
-		strings.Join(AuthorizationModeChoices, ",")+".")
+		strings.Join(authzmodes.AuthorizationModeChoices, ",")+".")
 
 	fs.StringVar(&s.PolicyFile, "authorization-policy-file", s.PolicyFile, ""+
 		"File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.")

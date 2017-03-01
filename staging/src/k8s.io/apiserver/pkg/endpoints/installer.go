@@ -516,12 +516,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	kubeVerbs := map[string]struct{}{}
 	reqScope := handlers.RequestScope{
-		ContextFunc:    ctxFn,
-		Serializer:     a.group.Serializer,
-		ParameterCodec: a.group.ParameterCodec,
-		Creater:        a.group.Creater,
-		Convertor:      a.group.Convertor,
-		Copier:         a.group.Copier,
+		ContextFunc:     ctxFn,
+		Serializer:      a.group.Serializer,
+		ParameterCodec:  a.group.ParameterCodec,
+		Creater:         a.group.Creater,
+		Convertor:       a.group.Convertor,
+		Copier:          a.group.Copier,
+		Typer:           a.group.Typer,
+		UnsafeConvertor: a.group.UnsafeConvertor,
 
 		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
 		Resource:    a.group.GroupVersion.WithResource(resource),
@@ -1054,6 +1056,8 @@ func typeToJSON(typeName string) string {
 	case "metav1.Time", "*metav1.Time":
 		return "string"
 	case "byte", "*byte":
+		return "string"
+	case "v1.DeletionPropagation", "*v1.DeletionPropagation":
 		return "string"
 
 	// TODO: Fix these when go-restful supports a way to specify an array query param:

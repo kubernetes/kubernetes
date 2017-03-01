@@ -141,6 +141,8 @@ func autoConvert_v2alpha1_CronJobSpec_To_batch_CronJobSpec(in *CronJobSpec, out 
 	if err := Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
 		return err
 	}
+	out.SuccessfulJobsHistoryLimit = (*int32)(unsafe.Pointer(in.SuccessfulJobsHistoryLimit))
+	out.FailedJobsHistoryLimit = (*int32)(unsafe.Pointer(in.FailedJobsHistoryLimit))
 	return nil
 }
 
@@ -156,6 +158,8 @@ func autoConvert_batch_CronJobSpec_To_v2alpha1_CronJobSpec(in *batch.CronJobSpec
 	if err := Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
 		return err
 	}
+	out.SuccessfulJobsHistoryLimit = (*int32)(unsafe.Pointer(in.SuccessfulJobsHistoryLimit))
+	out.FailedJobsHistoryLimit = (*int32)(unsafe.Pointer(in.FailedJobsHistoryLimit))
 	return nil
 }
 

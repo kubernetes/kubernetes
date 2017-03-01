@@ -66,12 +66,12 @@
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/digest",
-			"Comment": "v2.4.0-rc.1-38-gcd27f179",
+			"Comment": "v2.4.0-rc.1-38-gcd27f17",
 			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/reference",
-			"Comment": "v2.4.0-rc.1-38-gcd27f179",
+			"Comment": "v2.4.0-rc.1-38-gcd27f17",
 			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
 		},
 		{
@@ -111,12 +111,12 @@
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
-			"Comment": "v0.2-33-ge18d7aa8",
+			"Comment": "v0.2-33-ge18d7aa",
 			"Rev": "e18d7aa8f8c624c915db340349aad4c49b10d173"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/sortkeys",
-			"Comment": "v0.2-33-ge18d7aa8",
+			"Comment": "v0.2-33-ge18d7aa",
 			"Rev": "e18d7aa8f8c624c915db340349aad4c49b10d173"
 		},
 		{
@@ -170,7 +170,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "5ccb023bc27df288a957c5e994cd44fd19619465"
+			"Rev": "9ff6c6923cfffbcd502984b8e0c80539a94968b7"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",

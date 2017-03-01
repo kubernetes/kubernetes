@@ -63,6 +63,16 @@ const (
 	nodeCountPerNamespace = 100
 )
 
+var randomKind = schema.GroupKind{Kind: "Random"}
+
+var knownKinds = []schema.GroupKind{
+	api.Kind("ReplicationController"),
+	extensions.Kind("Deployment"),
+	// TODO: uncomment when Jobs are fixed: #38497
+	//batch.Kind("Job"),
+	extensions.Kind("ReplicaSet"),
+}
+
 // This test suite can take a long time to run, so by default it is added to
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -141,6 +151,8 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
 		// Test with secrets
 		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment"), secretsPerPod: 2},
+		// Special test case which randomizes created resources
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: randomKind},
 	}
 
 	for _, testArg := range loadTests {
@@ -370,7 +382,9 @@ func generateConfigsForGroup(
 ) ([]testutils.RunObjectConfig, []*testutils.SecretConfig) {
 	configs := make([]testutils.RunObjectConfig, 0, count)
 	secretConfigs := make([]*testutils.SecretConfig, 0, count*secretsPerPod)
+	savedKind := kind
 	for i := 1; i <= count; i++ {
+		kind = savedKind
 		namespace := nss[i%len(nss)].Name
 		secretNames := make([]string, 0, secretsPerPod)
 
@@ -398,6 +412,10 @@ func generateConfigsForGroup(
 			CpuRequest:     10,       // 0.01 core
 			MemRequest:     26214400, // 25MB
 			SecretNames:    secretNames,
+		}
+
+		if kind == randomKind {
+			kind = knownKinds[rand.Int()%len(knownKinds)]
 		}
 
 		var config testutils.RunObjectConfig

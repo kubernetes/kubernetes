@@ -12,10 +12,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "loadbalancer.go",
-        "port_allocator.go",
         "proxier.go",
         "proxysocket.go",
         "roundrobin.go",
+        "types.go",
         "udp_server.go",
     ],
     tags = ["automanaged"],
@@ -26,17 +26,14 @@ go_library(
         "//pkg/util/slice:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = [
-        "port_allocator_test.go",
         "proxier_test.go",
         "roundrobin_test.go",
     ],
@@ -48,7 +45,6 @@ go_test(
         "//pkg/util/netsh/testing:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
     ],
 )

@@ -370,11 +370,10 @@ type DeploymentList struct {
 	Items []Deployment
 }
 
-// TODO(madhusudancs): Uncomment while implementing DaemonSet updates.
-/* Commenting out for v1.2. We are planning to bring these types back with a more robust DaemonSet update implementation in v1.3, hence not deleting but just commenting the types out.
 type DaemonSetUpdateStrategy struct {
-	// Type of daemon set update. Only "RollingUpdate" is supported at this time. Default is RollingUpdate.
-// +optional
+	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
+	// Default is OnDelete.
+	// +optional
 	Type DaemonSetUpdateStrategyType
 
 	// Rolling update config params. Present only if DaemonSetUpdateStrategy =
@@ -382,7 +381,8 @@ type DaemonSetUpdateStrategy struct {
 	//---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be. Same as DeploymentStrategy.RollingUpdate.
-// +optional
+	// See https://github.com/kubernetes/kubernetes/issues/35345
+	// +optional
 	RollingUpdate *RollingUpdateDaemonSet
 }
 
@@ -391,6 +391,9 @@ type DaemonSetUpdateStrategyType string
 const (
 	// Replace the old daemons by new ones using rolling update i.e replace them on each node one after the other.
 	RollingUpdateDaemonSetStrategyType DaemonSetUpdateStrategyType = "RollingUpdate"
+
+	// Replace the old daemons only when it's killed
+	OnDeleteDaemonSetStrategyType DaemonSetUpdateStrategyType = "OnDelete"
 )
 
 // Spec to control the desired behavior of daemon set rolling update.
@@ -408,17 +411,9 @@ type RollingUpdateDaemonSet struct {
 	// it then proceeds onto other DaemonSet pods, thus ensuring that at least
 	// 70% of original number of DaemonSet pods are available at all times
 	// during the update.
-// +optional
+	// +optional
 	MaxUnavailable intstr.IntOrString
-
-	// Minimum number of seconds for which a newly created DaemonSet pod should
-	// be ready without any of its container crashing, for it to be considered
-	// available. Defaults to 0 (pod will be considered available as soon as it
-	// is ready).
-// +optional
-	MinReadySeconds int
 }
-*/
 
 // DaemonSetSpec is the specification of a daemon set.
 type DaemonSetSpec struct {
@@ -436,30 +431,22 @@ type DaemonSetSpec struct {
 	// More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
 	Template api.PodTemplateSpec
 
-	// TODO(madhusudancs): Uncomment while implementing DaemonSet updates.
-	/* Commenting out for v1.2. We are planning to bring these fields back with a more robust DaemonSet update implementation in v1.3, hence not deleting but just commenting these fields out.
-		// Update strategy to replace existing DaemonSet pods with new pods.
+	// UpdateStrategy to replace existing DaemonSet pods with new pods.
 	// +optional
-		UpdateStrategy DaemonSetUpdateStrategy
+	UpdateStrategy DaemonSetUpdateStrategy
 
-		// Label key that is added to DaemonSet pods to distinguish between old and
-		// new pod templates during DaemonSet update.
-		// Users can set this to an empty string to indicate that the system should
-		// not add any label. If unspecified, system uses
-		// DefaultDaemonSetUniqueLabelKey("daemonset.kubernetes.io/podTemplateHash").
-		// Value of this key is hash of DaemonSetSpec.PodTemplateSpec.
-		// No label is added if this is set to empty string.
+	// MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should
+	// be ready without any of its container crashing, for it to be considered
+	// available. Defaults to 0 (pod will be considered available as soon as it
+	// is ready).
 	// +optional
-		UniqueLabelKey string
-	*/
+	MinReadySeconds int32
+
+	// A sequence number representing a specific generation of the template.
+	// Populated by the system. It can be set only during the creation.
+	// +optional
+	TemplateGeneration int64
 }
-
-const (
-	// DefaultDaemonSetUniqueLabelKey is the default key of the labels that is added
-	// to daemon set pods to distinguish between old and new pod templates during
-	// DaemonSet update. See DaemonSetSpec's UniqueLabelKey field for more information.
-	DefaultDaemonSetUniqueLabelKey string = "daemonset.kubernetes.io/podTemplateHash"
-)
 
 // DaemonSetStatus represents the current status of a daemon set.
 type DaemonSetStatus struct {
@@ -482,6 +469,23 @@ type DaemonSetStatus struct {
 	// ObservedGeneration is the most recent generation observed by the daemon set controller.
 	// +optional
 	ObservedGeneration int64
+
+	// UpdatedNumberScheduled is the total number of nodes that are running updated
+	// daemon pod
+	// +optional
+	UpdatedNumberScheduled int32
+
+	// NumberAvailable is the number of nodes that should be running the
+	// daemon pod and have one or more of the daemon pod running and
+	// available (ready for at least minReadySeconds)
+	// +optional
+	NumberAvailable int32
+
+	// NumberUnavailable is the number of nodes that should be running the
+	// daemon pod and have none of the daemon pod running and available
+	// (ready for at least minReadySeconds)
+	// +optional
+	NumberUnavailable int32
 }
 
 // +genclient=true
@@ -507,6 +511,13 @@ type DaemonSet struct {
 	// +optional
 	Status DaemonSetStatus
 }
+
+const (
+	// DaemonSetTemplateGenerationKey is the key of the labels that is added
+	// to daemon set pods to distinguish between old and new pod templates
+	// during DaemonSet template update.
+	DaemonSetTemplateGenerationKey string = "pod-template-generation"
+)
 
 // DaemonSetList is a collection of daemon sets.
 type DaemonSetList struct {
@@ -905,6 +916,8 @@ var (
 	Quobyte               FSType = "quobyte"
 	AzureDisk             FSType = "azureDisk"
 	PhotonPersistentDisk  FSType = "photonPersistentDisk"
+	Projected             FSType = "projected"
+	PortworxVolume        FSType = "portworxVolume"
 	All                   FSType = "*"
 )
 

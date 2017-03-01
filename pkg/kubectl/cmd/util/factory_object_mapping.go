@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/swagger"
-	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,6 +47,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 type ring1Factory struct {
@@ -58,10 +59,12 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	f := &ring1Factory{
 		clientAccessFactory: clientAccessFactory,
 	}
-
 	return f
 }
 
+// TODO: This method should return an error now that it can fail.  Alternatively, it needs to
+//   return lazy implementations of mapper and typer that don't hit the wire until they are
+//   invoked.
 func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	mapper := api.Registry.RESTMapper()
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
@@ -143,7 +146,7 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 	return restclient.RESTClientFor(cfg)
 }
 
-func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, error) {
+func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
 	if mapping.GroupVersionKind.Group == federation.GroupName {
 		fedClientSet, err := f.clientAccessFactory.FederationClientSetForVersion(&mappingVersion)
@@ -151,7 +154,7 @@ func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, 
 			return nil, err
 		}
 		if mapping.GroupVersionKind.Kind == "Cluster" {
-			return &kubectl.ClusterDescriber{Interface: fedClientSet}, nil
+			return &printersinternal.ClusterDescriber{Interface: fedClientSet}, nil
 		}
 	}
 
@@ -166,7 +169,7 @@ func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, 
 	}
 
 	// try to get a describer
-	if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset); ok {
+	if describer, ok := printersinternal.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset); ok {
 		return describer, nil
 	}
 	// if this is a kind we don't have a describer for yet, go generic if possible
@@ -178,7 +181,7 @@ func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, 
 }
 
 // helper function to make a generic describer, or return an error
-func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RESTMapping) (kubectl.Describer, error) {
+func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RESTMapping) (printers.Describer, error) {
 	clientConfig, err := clientAccessFactory.ClientConfig()
 	if err != nil {
 		return nil, err
@@ -202,7 +205,7 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 	}
 	eventsClient := clientSet.Core()
 
-	return kubectl.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
+	return printersinternal.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
 }
 
 func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
@@ -210,51 +213,48 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclien
 	if err != nil {
 		return nil, err
 	}
+	opts, ok := options.(*api.PodLogOptions)
+	if !ok {
+		return nil, errors.New("provided options object is not a PodLogOptions")
+	}
 
+	var selector labels.Selector
+	var namespace string
 	switch t := object.(type) {
 	case *api.Pod:
-		opts, ok := options.(*api.PodLogOptions)
-		if !ok {
-			return nil, errors.New("provided options object is not a PodLogOptions")
-		}
 		return clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
 
 	case *api.ReplicationController:
-		opts, ok := options.(*api.PodLogOptions)
-		if !ok {
-			return nil, errors.New("provided options object is not a PodLogOptions")
-		}
-		selector := labels.SelectorFromSet(t.Spec.Selector)
-		sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
-		pod, numPods, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 20*time.Second, sortBy)
-		if err != nil {
-			return nil, err
-		}
-		if numPods > 1 {
-			fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
-		}
-
-		return clientset.Core().Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
+		namespace = t.Namespace
+		selector = labels.SelectorFromSet(t.Spec.Selector)
 
 	case *extensions.ReplicaSet:
-		opts, ok := options.(*api.PodLogOptions)
-		if !ok {
-			return nil, errors.New("provided options object is not a PodLogOptions")
-		}
-		selector, err := metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
-		sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
-		pod, numPods, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 20*time.Second, sortBy)
+
+	case *extensions.Deployment:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
-			return nil, err
-		}
-		if numPods > 1 {
-			fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
+			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
 
-		return clientset.Core().Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
+	case *batch.Job:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *apps.StatefulSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label selector: %v", err)
+		}
 
 	default:
 		gvks, _, err := api.Scheme.ObjectKinds(object)
@@ -263,6 +263,16 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclien
 		}
 		return nil, fmt.Errorf("cannot get the logs from %v", gvks[0])
 	}
+
+	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
+	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector, 20*time.Second, sortBy)
+	if err != nil {
+		return nil, err
+	}
+	if numPods > 1 {
+		fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
+	}
+	return clientset.Core().Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
 }
 
 func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
@@ -326,29 +336,35 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object) (*api.Pod, 
 	case *extensions.ReplicaSet:
 		namespace = t.Namespace
 		selector = labels.SelectorFromSet(t.Spec.Selector.MatchLabels)
+
 	case *api.ReplicationController:
 		namespace = t.Namespace
 		selector = labels.SelectorFromSet(t.Spec.Selector)
+
 	case *apps.StatefulSet:
 		namespace = t.Namespace
 		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
+
 	case *extensions.Deployment:
 		namespace = t.Namespace
 		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
+
 	case *batch.Job:
 		namespace = t.Namespace
 		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
+
 	case *api.Pod:
 		return t, nil
+
 	default:
 		gvks, _, err := api.Scheme.ObjectKinds(object)
 		if err != nil {
@@ -356,51 +372,10 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object) (*api.Pod, 
 		}
 		return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
 	}
+
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector, 1*time.Minute, sortBy)
 	return pod, err
-}
-
-func (f *ring1Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
-	printer, generic, err := PrinterForCommand(cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	// Make sure we output versioned data for generic printers
-	if generic {
-		if mapping == nil {
-			return nil, fmt.Errorf("no serialization format found")
-		}
-		version := mapping.GroupVersionKind.GroupVersion()
-		if version.Empty() {
-			return nil, fmt.Errorf("no serialization format found")
-		}
-
-		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
-
-	} else {
-		// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
-		columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
-		if err != nil {
-			columnLabel = []string{}
-		}
-		printer, err = f.clientAccessFactory.Printer(mapping, kubectl.PrintOptions{
-			NoHeaders:          GetFlagBool(cmd, "no-headers"),
-			WithNamespace:      withNamespace,
-			Wide:               GetWideFlag(cmd),
-			ShowAll:            GetFlagBool(cmd, "show-all"),
-			ShowLabels:         GetFlagBool(cmd, "show-labels"),
-			AbsoluteTimestamps: isWatch(cmd),
-			ColumnLabels:       columnLabel,
-		})
-		if err != nil {
-			return nil, err
-		}
-		printer = maybeWrapSortingPrinter(cmd, printer)
-	}
-
-	return printer, nil
 }
 
 func (f *ring1Factory) Validator(validate bool, cacheDir string) (validation.Schema, error) {

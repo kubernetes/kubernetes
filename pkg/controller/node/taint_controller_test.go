@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"testing"
@@ -47,24 +46,10 @@ func addToleration(pod *v1.Pod, index int, duration int64) *v1.Pod {
 		pod.Annotations = map[string]string{}
 	}
 	if duration < 0 {
-		pod.Annotations["scheduler.alpha.kubernetes.io/tolerations"] = `
-  [
-    {
-      "key": "testTaint` + fmt.Sprintf("%v", index) + `",
-      "value": "test` + fmt.Sprintf("%v", index) + `",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `"
-    }
-  ]`
+		pod.Spec.Tolerations = []v1.Toleration{{Key: "testTaint" + fmt.Sprintf("%v", index), Value: "test" + fmt.Sprintf("%v", index), Effect: v1.TaintEffectNoExecute}}
+
 	} else {
-		pod.Annotations["scheduler.alpha.kubernetes.io/tolerations"] = `
-  [
-    {
-      "key": "testTaint` + fmt.Sprintf("%v", index) + `",
-      "value": "test` + fmt.Sprintf("%v", index) + `",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `",
-      "tolerationSeconds": ` + fmt.Sprintf("%v", duration) + `
-    }
-  ]`
+		pod.Spec.Tolerations = []v1.Toleration{{Key: "testTaint" + fmt.Sprintf("%v", index), Value: "test" + fmt.Sprintf("%v", index), Effect: v1.TaintEffectNoExecute, TolerationSeconds: &duration}}
 	}
 	return pod
 }
@@ -74,15 +59,7 @@ func addTaintsToNode(node *v1.Node, key, value string, indices []int) *v1.Node {
 	for _, index := range indices {
 		taints = append(taints, createNoExecuteTaint(index))
 	}
-	taintsData, err := json.Marshal(taints)
-	if err != nil {
-		panic(err)
-	}
-
-	if node.Annotations == nil {
-		node.Annotations = make(map[string]string)
-	}
-	node.Annotations[v1.TaintsAnnotationKey] = string(taintsData)
+	node.Spec.Taints = taints
 	return node
 }
 
@@ -509,27 +486,13 @@ func TestUpdateNode(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "pod1",
-						Annotations: map[string]string{
-							"scheduler.alpha.kubernetes.io/tolerations": `
-  [
-    {
-      "key": "testTaint1",
-      "value": "test1",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `",
-      "tolerationSeconds": ` + fmt.Sprintf("%v", 1) + `
-    },
-    {
-      "key": "testTaint2",
-      "value": "test2",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `",
-      "tolerationSeconds": ` + fmt.Sprintf("%v", 100) + `
-    }
-  ]
-  `,
-						},
 					},
 					Spec: v1.PodSpec{
 						NodeName: "node1",
+						Tolerations: []v1.Toleration{
+							{Key: "testTaint1", Value: "test1", Effect: v1.TaintEffectNoExecute, TolerationSeconds: &[]int64{1}[0]},
+							{Key: "testTaint2", Value: "test2", Effect: v1.TaintEffectNoExecute, TolerationSeconds: &[]int64{100}[0]},
+						},
 					},
 					Status: v1.PodStatus{
 						Conditions: []v1.PodCondition{

@@ -21,6 +21,9 @@ import (
 	"io/ioutil"
 	"os"
 
+	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,8 +72,30 @@ func createClient(s *options.SchedulerServer) (*clientset.Clientset, error) {
 }
 
 // createScheduler encapsulates the entire creation of a runnable scheduler.
-func createScheduler(s *options.SchedulerServer, kubecli *clientset.Clientset, recorder record.EventRecorder) (*scheduler.Scheduler, error) {
-	configurator := factory.NewConfigFactory(kubecli, s.SchedulerName, s.HardPodAffinitySymmetricWeight)
+func createScheduler(
+	s *options.SchedulerServer,
+	kubecli *clientset.Clientset,
+	nodeInformer coreinformers.NodeInformer,
+	pvInformer coreinformers.PersistentVolumeInformer,
+	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	replicationControllerInformer coreinformers.ReplicationControllerInformer,
+	replicaSetInformer extensionsinformers.ReplicaSetInformer,
+	statefulSetInformer appsinformers.StatefulSetInformer,
+	serviceInformer coreinformers.ServiceInformer,
+	recorder record.EventRecorder,
+) (*scheduler.Scheduler, error) {
+	configurator := factory.NewConfigFactory(
+		s.SchedulerName,
+		kubecli,
+		nodeInformer,
+		pvInformer,
+		pvcInformer,
+		replicationControllerInformer,
+		replicaSetInformer,
+		statefulSetInformer,
+		serviceInformer,
+		s.HardPodAffinitySymmetricWeight,
+	)
 
 	// Rebuild the configurator with a default Create(...) method.
 	configurator = &schedulerConfigurator{

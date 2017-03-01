@@ -34,8 +34,11 @@ var upgradeTests = []upgrades.Test{
 	&upgrades.SecretUpgradeTest{},
 	&upgrades.StatefulSetUpgradeTest{},
 	&upgrades.DeploymentUpgradeTest{},
+	&upgrades.JobUpgradeTest{},
 	&upgrades.ConfigMapUpgradeTest{},
 	&upgrades.HPAUpgradeTest{},
+	&upgrades.PersistentVolumeUpgradeTest{},
+	&upgrades.DaemonSetUpgradeTest{},
 }
 
 var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
@@ -97,6 +100,28 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 					upgradeType: upgrades.ClusterUpgrade,
 				})
 			}
+			cm.Do()
+		})
+	})
+})
+
+var _ = framework.KubeDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
+	f := framework.NewDefaultFramework("etcd-upgrade")
+
+	framework.KubeDescribe("etcd upgrade", func() {
+		It("should maintain a functioning cluster", func() {
+			cm := chaosmonkey.New(func() {
+				framework.ExpectNoError(framework.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
+				// TODO(mml): verify the etcd version
+			})
+			for _, t := range upgradeTests {
+				cm.RegisterInterface(&chaosMonkeyAdapter{
+					test:        t,
+					framework:   f,
+					upgradeType: upgrades.EtcdUpgrade,
+				})
+			}
+
 			cm.Do()
 		})
 	})

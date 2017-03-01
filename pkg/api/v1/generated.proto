@@ -680,10 +680,18 @@ message DeleteOptions {
   // +optional
   optional Preconditions preconditions = 2;
 
+  // Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7.
   // Should the dependent objects be orphaned. If true/false, the "orphan"
   // finalizer will be added to/removed from the object's finalizers list.
+  // Either this field or PropagationPolicy may be set, but not both.
   // +optional
   optional bool orphanDependents = 3;
+
+  // Whether and how garbage collection will be performed.
+  // Defaults to Default.
+  // Either this field or OrphanDependents may be set, but not both.
+  // +optional
+  optional string propagationPolicy = 4;
 }
 
 // Represents downward API info for projecting into a projected volume.
@@ -1622,6 +1630,10 @@ message NodeSpec {
   // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration
   // +optional
   optional bool unschedulable = 4;
+
+  // If specified, the node's taints.
+  // +optional
+  repeated Taint taints = 5;
 }
 
 // NodeStatus is information about the current status of a node.
@@ -1989,6 +2001,11 @@ message PersistentVolumeClaimSpec {
   // VolumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
   optional string volumeName = 3;
+
+  // Name of the StorageClass required by the claim.
+  // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
+  // +optional
+  optional string storageClassName = 5;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2119,6 +2136,10 @@ message PersistentVolumeSource {
 
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 17;
+
+  // PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+  // +optional
+  optional PortworxVolumeSource portworxVolume = 18;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2149,6 +2170,11 @@ message PersistentVolumeSpec {
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy
   // +optional
   optional string persistentVolumeReclaimPolicy = 5;
+
+  // Name of StorageClass to which this persistent volume belongs. Empty value
+  // means that this volume does not belong to any StorageClass.
+  // +optional
+  optional string storageClassName = 6;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -2662,6 +2688,10 @@ message PodSpec {
   // If not specified, the pod will be dispatched by default scheduler.
   // +optional
   optional string schedulername = 19;
+
+  // If specified, the pod's tolerations.
+  // +optional
+  repeated Toleration tolerations = 22;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -2770,6 +2800,22 @@ message PodTemplateSpec {
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
   // +optional
   optional PodSpec spec = 2;
+}
+
+// PortworxVolumeSource represents a Portworx volume resource.
+message PortworxVolumeSource {
+  // VolumeID uniquely identifies a Portworx volume
+  optional string volumeID = 1;
+
+  // FSType represents the filesystem type to mount
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
+  optional string fsType = 2;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 3;
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -3793,7 +3839,11 @@ message VolumeSource {
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
 
   // Items for all in one resources secrets, configmaps, and downward API
-  optional ProjectedVolumeSource projected = 24;
+  optional ProjectedVolumeSource projected = 25;
+
+  // PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+  // +optional
+  optional PortworxVolumeSource portworxVolume = 24;
 }
 
 // Represents a vSphere volume resource.

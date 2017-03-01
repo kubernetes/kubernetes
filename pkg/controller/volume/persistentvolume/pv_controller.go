@@ -35,6 +35,7 @@ import (
 	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
+	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	vol "k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -1017,23 +1018,10 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 
 	// Plugin found
 	recorder := ctrl.newRecyclerEventRecorder(volume)
-	recycler, err := plugin.NewRecycler(volume.Name, spec, recorder)
-	if err != nil {
-		// Cannot create recycler
-		strerr := fmt.Sprintf("Failed to create recycler: %v", err)
-		if _, err = ctrl.updateVolumePhaseWithEvent(volume, v1.VolumeFailed, v1.EventTypeWarning, "VolumeFailedRecycle", strerr); err != nil {
-			glog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
-			// Save failed, retry on the next deletion attempt
-			return
-		}
-		// Despite the volume being Failed, the controller will retry recycling
-		// the volume in every syncVolume() call.
-		return
-	}
 
-	if err = recycler.Recycle(); err != nil {
+	if err = plugin.Recycle(volume.Name, spec, recorder); err != nil {
 		// Recycler failed
-		strerr := fmt.Sprintf("Recycler failed: %s", err)
+		strerr := fmt.Sprintf("Recycle failed: %s", err)
 		if _, err = ctrl.updateVolumePhaseWithEvent(volume, v1.VolumeFailed, v1.EventTypeWarning, "VolumeFailedRecycle", strerr); err != nil {
 			glog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
 			// Save failed, retry on the next deletion attempt
@@ -1427,9 +1415,12 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 
 	err := ctrl.runningOperations.Run(operationName, operation)
 	if err != nil {
-		if goroutinemap.IsAlreadyExists(err) {
+		switch {
+		case goroutinemap.IsAlreadyExists(err):
 			glog.V(4).Infof("operation %q is already running, skipping", operationName)
-		} else {
+		case exponentialbackoff.IsExponentialBackoff(err):
+			glog.V(4).Infof("operation %q postponed due to exponential backoff", operationName)
+		default:
 			glog.Errorf("error scheduling operation %q: %v", operationName, err)
 		}
 	}

@@ -56,7 +56,7 @@ func NewStorageCodec(opts StorageCodecConfig) (runtime.Codec, error) {
 
 	// etcd2 only supports string data - we must wrap any result before returning
 	// TODO: storagebackend should return a boolean indicating whether it supports binary data
-	if !serializer.EncodesAsText && (opts.Config.Type == storagebackend.StorageTypeUnset || opts.Config.Type == storagebackend.StorageTypeETCD2) {
+	if !serializer.EncodesAsText && opts.Config.Type == storagebackend.StorageTypeETCD2 {
 		glog.V(4).Infof("Wrapping the underlying binary storage serializer with a base64 encoding for etcd2")
 		s = runtime.NewBase64Serializer(s)
 	}

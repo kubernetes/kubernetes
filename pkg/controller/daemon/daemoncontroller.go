@@ -29,6 +29,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
@@ -44,6 +45,9 @@ import (
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/daemon/util"
+	"k8s.io/kubernetes/pkg/features"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -255,6 +259,17 @@ func (dsc *DaemonSetsController) enqueueDaemonSet(ds *extensions.DaemonSet) {
 	dsc.queue.Add(key)
 }
 
+func (dsc *DaemonSetsController) enqueueDaemonSetAfter(obj interface{}, after time.Duration) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+
+	// TODO: Handle overlapping controllers better. See comment in ReplicationManager.
+	dsc.queue.AddAfter(key, after)
+}
+
 func (dsc *DaemonSetsController) getPodDaemonSet(pod *v1.Pod) *extensions.DaemonSet {
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := dsc.lookupCache.GetMatchingObject(pod); cached {
@@ -342,8 +357,14 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 		return
 	}
 	glog.V(4).Infof("Pod %s updated.", curPod.Name)
+	changedToReady := !v1.IsPodReady(oldPod) && v1.IsPodReady(curPod)
 	if curDS := dsc.getPodDaemonSet(curPod); curDS != nil {
 		dsc.enqueueDaemonSet(curDS)
+
+		// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
+		if changedToReady && curDS.Spec.MinReadySeconds > 0 {
+			dsc.enqueueDaemonSetAfter(curDS, time.Duration(curDS.Spec.MinReadySeconds)*time.Second)
+		}
 	}
 	// If the labels have not changed, then the daemon set responsible for
 	// the pod is the same as it was before. In that case we have enqueued the daemon
@@ -521,11 +542,23 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 			}
 		}
 	}
+	errors := dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods)
 
+	// Throw an error when the daemon pods fail, to use ratelimiter to prevent kill-recreate hot loop
+	if failedPodsObserved > 0 {
+		errors = append(errors, fmt.Errorf("deleted %d failed pods of DaemonSet %s/%s", failedPodsObserved, ds.Namespace, ds.Name))
+	}
+
+	return utilerrors.NewAggregate(errors)
+}
+
+// syncNodes deletes given pods and creates new daemon set pods on the given node
+// returns slice with erros if any
+func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string) []error {
 	// We need to set expectations before creating/deleting pods to avoid race conditions.
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {
-		return fmt.Errorf("couldn't get key for object %#v: %v", ds, err)
+		return []error{fmt.Errorf("couldn't get key for object %#v: %v", ds, err)}
 	}
 
 	createDiff := len(nodesNeedingDaemonPods)
@@ -546,10 +579,11 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v, creating %d", ds.Name, nodesNeedingDaemonPods, createDiff)
 	createWait := sync.WaitGroup{}
 	createWait.Add(createDiff)
+	template := util.GetPodTemplateWithGeneration(ds.Spec.Template, ds.Spec.TemplateGeneration)
 	for i := 0; i < createDiff; i++ {
 		go func(ix int) {
 			defer createWait.Done()
-			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &ds.Spec.Template, ds); err != nil {
+			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds); err != nil {
 				glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 				dsc.expectations.CreationObserved(dsKey)
 				errCh <- err
@@ -581,18 +615,17 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	for err := range errCh {
 		errors = append(errors, err)
 	}
-	// Throw an error when the daemon pods fail, to use ratelimiter to prevent kill-recreate hot loop
-	if failedPodsObserved > 0 {
-		errors = append(errors, fmt.Errorf("deleted %d failed pods of DaemonSet %s/%s", failedPodsObserved, ds.Namespace, ds.Name))
-	}
-	return utilerrors.NewAggregate(errors)
+	return errors
 }
 
-func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady int) error {
+func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable int) error {
 	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled &&
 		int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled &&
 		int(ds.Status.NumberMisscheduled) == numberMisscheduled &&
 		int(ds.Status.NumberReady) == numberReady &&
+		int(ds.Status.UpdatedNumberScheduled) == updatedNumberScheduled &&
+		int(ds.Status.NumberAvailable) == numberAvailable &&
+		int(ds.Status.NumberUnavailable) == numberUnavailable &&
 		ds.Status.ObservedGeneration >= ds.Generation {
 		return nil
 	}
@@ -611,6 +644,9 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 		toUpdate.Status.CurrentNumberScheduled = int32(currentNumberScheduled)
 		toUpdate.Status.NumberMisscheduled = int32(numberMisscheduled)
 		toUpdate.Status.NumberReady = int32(numberReady)
+		toUpdate.Status.UpdatedNumberScheduled = int32(updatedNumberScheduled)
+		toUpdate.Status.NumberAvailable = int32(numberAvailable)
+		toUpdate.Status.NumberUnavailable = int32(numberUnavailable)
 
 		if _, updateErr = dsClient.UpdateStatus(toUpdate); updateErr == nil {
 			return nil
@@ -638,7 +674,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 		return fmt.Errorf("couldn't get list of nodes when updating daemon set %#v: %v", ds, err)
 	}
 
-	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady int
+	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable int
 	for i := range nodeList {
 		node := nodeList[i]
 		wantToRun, _, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
@@ -652,11 +688,18 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 			desiredNumberScheduled++
 			if scheduled {
 				currentNumberScheduled++
-				// Sort the daemon pods by creation time, so the the oldest is first.
+				// Sort the daemon pods by creation time, so that the oldest is first.
 				daemonPods, _ := nodeToDaemonPods[node.Name]
 				sort.Sort(podByCreationTimestamp(daemonPods))
-				if v1.IsPodReady(daemonPods[0]) {
+				pod := daemonPods[0]
+				if v1.IsPodReady(pod) {
 					numberReady++
+					if v1.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+						numberAvailable++
+					}
+				}
+				if util.IsPodUpdated(ds.Spec.TemplateGeneration, pod) {
+					updatedNumberScheduled++
 				}
 			}
 		} else {
@@ -665,8 +708,9 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 			}
 		}
 	}
+	numberUnavailable := desiredNumberScheduled - numberAvailable
 
-	err = storeDaemonSetStatus(dsc.kubeClient.Extensions().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady)
+	err = storeDaemonSetStatus(dsc.kubeClient.Extensions().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable)
 	if err != nil {
 		return fmt.Errorf("error storing status for daemon set %#v: %v", ds, err)
 	}
@@ -714,6 +758,17 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		}
 	}
 
+	dsNeedsSync = dsc.expectations.SatisfiedExpectations(dsKey)
+	if dsNeedsSync && ds.DeletionTimestamp == nil {
+		switch ds.Spec.UpdateStrategy.Type {
+		case extensions.RollingUpdateDaemonSetStrategyType:
+			err = dsc.rollingUpdate(ds)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
 	return dsc.updateDaemonSetStatus(ds)
 }
 
@@ -730,6 +785,11 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
 func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *extensions.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err error) {
+	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
+	newPod.Namespace = ds.Namespace
+	newPod.Spec.NodeName = node.Name
+	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(newPod)
+
 	// Because these bools require an && of all their required conditions, we start
 	// with all bools set to true and set a bool to false if a condition is not met.
 	// A bool should probably not be set to true after this line.
@@ -741,6 +801,11 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 
 	// TODO: Move it to the predicates
 	for _, c := range node.Status.Conditions {
+		if critical {
+			break
+		}
+		// TODO: There are other node status that the DaemonSet should ideally respect too,
+		//       e.g. MemoryPressure, and DiskPressure
 		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
 			// the kubelet will evict this pod if it needs to. Let kubelet
 			// decide whether to continue running this pod so leave shouldContinueRunning
@@ -749,9 +814,31 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		}
 	}
 
-	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
-	newPod.Namespace = ds.Namespace
-	newPod.Spec.NodeName = node.Name
+	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
+	// Add infinite toleration for taint notReady:NoExecute here
+	// to survive taint-based eviction enforced by NodeController
+	// when node turns not ready.
+	_, err = v1.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+		Key:      metav1.TaintNodeNotReady,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoExecute,
+	})
+	if err != nil {
+		return false, false, false, err
+	}
+
+	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
+	// Add infinite toleration for taint unreachable:NoExecute here
+	// to survive taint-based eviction enforced by NodeController
+	// when node turns unreachable.
+	_, err = v1.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+		Key:      metav1.TaintNodeUnreachable,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoExecute,
+	})
+	if err != nil {
+		return false, false, false, err
+	}
 
 	pods := []*v1.Pod{}
 
@@ -839,8 +926,9 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 // and PodToleratesNodeTaints predicate
 func daemonSetPredicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var predicateFails []algorithm.PredicateFailureReason
+	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(pod)
 
-	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
+	fit, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
 	if err != nil {
 		return false, predicateFails, err
 	}
@@ -848,7 +936,13 @@ func daemonSetPredicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, 
 		predicateFails = append(predicateFails, reasons...)
 	}
 
-	fit, reasons, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
+	if critical {
+		// If the pod is marked as critical and support for critical pod annotations is enabled,
+		// check predicates for critical pods only.
+		fit, reasons, err = predicates.EssentialPredicates(pod, nil, nodeInfo)
+	} else {
+		fit, reasons, err = predicates.GeneralPredicates(pod, nil, nodeInfo)
+	}
 	if err != nil {
 		return false, predicateFails, err
 	}

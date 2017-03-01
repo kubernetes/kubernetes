@@ -54,6 +54,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "deployment_controller_test.go",
+        "progress_test.go",
         "recreate_test.go",
         "rolling_test.go",
         "sync_test.go",
@@ -75,6 +76,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/client-go/testing",
         "//vendor:k8s.io/client-go/tools/record",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

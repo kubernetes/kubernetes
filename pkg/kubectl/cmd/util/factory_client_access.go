@@ -49,6 +49,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 type ring0Factory struct {
@@ -166,11 +168,11 @@ func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, er
 	return f.discoveryFactory.DiscoveryClient()
 }
 
-func (f *ring0Factory) ClientSet() (*internalclientset.Clientset, error) {
+func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
 	return f.clientCache.ClientSetForVersion(nil)
 }
 
-func (f *ring0Factory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (*internalclientset.Clientset, error) {
+func (f *ring0Factory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
 	return f.clientCache.ClientSetForVersion(requiredVersion)
 }
 
@@ -330,14 +332,35 @@ func (f *ring0Factory) FlagSet() *pflag.FlagSet {
 	return f.flags
 }
 
-// TODO: We need to filter out stuff like secrets.
-func (f *ring0Factory) Command() string {
+// Set showSecrets false to filter out stuff like secrets.
+func (f *ring0Factory) Command(cmd *cobra.Command, showSecrets bool) string {
 	if len(os.Args) == 0 {
 		return ""
 	}
+
+	flags := ""
+	parseFunc := func(flag *pflag.Flag, value string) error {
+		flags = flags + " --" + flag.Name
+		if set, ok := flag.Annotations["classified"]; showSecrets || !ok || len(set) == 0 {
+			flags = flags + "=" + value
+		} else {
+			flags = flags + "=CLASSIFIED"
+		}
+		return nil
+	}
+	var err error
+	err = cmd.Flags().ParseAll(os.Args[1:], parseFunc)
+	if err != nil || !cmd.Flags().Parsed() {
+		return ""
+	}
+
+	args := ""
+	if arguments := cmd.Flags().Args(); len(arguments) > 0 {
+		args = " " + strings.Join(arguments, " ")
+	}
+
 	base := filepath.Base(os.Args[0])
-	args := append([]string{base}, os.Args[1:]...)
-	return strings.Join(args, " ")
+	return base + args + flags
 }
 
 func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
@@ -360,12 +383,12 @@ func (f *ring0Factory) BindExternalFlags(flags *pflag.FlagSet) {
 	flags.AddGoFlagSet(flag.CommandLine)
 }
 
-func (f *ring0Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions {
+func (f *ring0Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
 	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
 	if err != nil {
 		columnLabel = []string{}
 	}
-	opts := &kubectl.PrintOptions{
+	opts := &printers.PrintOptions{
 		NoHeaders:          GetFlagBool(cmd, "no-headers"),
 		WithNamespace:      withNamespace,
 		Wide:               GetWideFlag(cmd),
@@ -392,8 +415,10 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 	}
 }
 
-func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
-	return kubectl.NewHumanReadablePrinter(options), nil
+func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+	p := printers.NewHumanReadablePrinter(options)
+	printersinternal.AddHandlers(p)
+	return p, nil
 }
 
 func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {

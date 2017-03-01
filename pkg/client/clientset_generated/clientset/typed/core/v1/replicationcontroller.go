@@ -21,8 +21,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 // ReplicationControllersGetter has a method to return a ReplicationControllerInterface.
@@ -116,7 +116,7 @@ func (c *replicationControllers) DeleteCollection(options *meta_v1.DeleteOptions
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +129,7 @@ func (c *replicationControllers) Get(name string, options meta_v1.GetOptions) (r
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +141,7 @@ func (c *replicationControllers) List(opts meta_v1.ListOptions) (result *v1.Repl
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -149,11 +149,11 @@ func (c *replicationControllers) List(opts meta_v1.ListOptions) (result *v1.Repl
 
 // Watch returns a watch.Interface that watches the requested replicationControllers.
 func (c *replicationControllers) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

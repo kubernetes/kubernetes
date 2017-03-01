@@ -163,22 +163,13 @@ func (s *Scheme) AddUnversionedTypes(version schema.GroupVersion, types ...Objec
 // the struct becomes the "kind" field when encoding. Version may not be empty - use the
 // APIVersionInternal constant if you have a type that does not have a formal version.
 func (s *Scheme) AddKnownTypes(gv schema.GroupVersion, types ...Object) {
-	if len(gv.Version) == 0 {
-		panic(fmt.Sprintf("version is required on all types: %s %v", gv, types[0]))
-	}
 	for _, obj := range types {
 		t := reflect.TypeOf(obj)
 		if t.Kind() != reflect.Ptr {
 			panic("All types must be pointers to structs.")
 		}
 		t = t.Elem()
-		if t.Kind() != reflect.Struct {
-			panic("All types must be pointers to structs.")
-		}
-
-		gvk := gv.WithKind(t.Name())
-		s.gvkToType[gvk] = t
-		s.typeToGVK[t] = append(s.typeToGVK[t], gvk)
+		s.AddKnownTypeWithName(gv.WithKind(t.Name()), obj)
 	}
 }
 
@@ -199,7 +190,17 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 		panic("All types must be pointers to structs.")
 	}
 
+	if oldT, found := s.gvkToType[gvk]; found && oldT != t {
+		panic(fmt.Sprintf("Double registration of different types for %v: old=%v.%v, new=%v.%v", gvk, oldT.PkgPath(), oldT.Name(), t.PkgPath(), t.Name()))
+	}
+
 	s.gvkToType[gvk] = t
+
+	for _, existingGvk := range s.typeToGVK[t] {
+		if existingGvk == gvk {
+			return
+		}
+	}
 	s.typeToGVK[t] = append(s.typeToGVK[t], gvk)
 }
 

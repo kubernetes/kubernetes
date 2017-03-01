@@ -368,7 +368,8 @@ ifeq ($(PRINT_HELP),y)
 release-skip-tests quick-release:
 	@echo "$$RELEASE_SKIP_TESTS_HELP_INFO"
 else
-release-skip-tests quick-release: KUBE_RELEASE_RUN_TESTS = n KUBE_FASTBUILD = true
+release-skip-tests quick-release: KUBE_RELEASE_RUN_TESTS = n
+release-skip-tests quick-release: KUBE_FASTBUILD = true
 release-skip-tests quick-release:
 	build/release.sh
 endif

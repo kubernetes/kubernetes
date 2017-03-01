@@ -174,7 +174,8 @@ func TestCommonKindsRegistered(t *testing.T) {
 				t.Error(err)
 			}
 			defaults := gv.WithKind("")
-			if _, got, err := api.Codecs.LegacyCodec().Decode([]byte(`{"kind":"`+kind+`"}`), &defaults, nil); err != nil || gvk != *got {
+			var got *schema.GroupVersionKind
+			if obj, got, err = api.Codecs.LegacyCodec().Decode([]byte(`{"kind":"`+kind+`"}`), &defaults, obj); err != nil || gvk != *got {
 				t.Errorf("expected %v: %v %v", gvk, got, err)
 			}
 			data, err := runtime.Encode(api.Codecs.LegacyCodec(*gv), obj)

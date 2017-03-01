@@ -188,6 +188,8 @@
   {% set params = params + " " + pillar['apiserver_test_args'] -%}
 {% endif -%}
 
+{% set container_env = "" -%}
+
 {
 "apiVersion": "v1",
 "kind": "Pod",
@@ -215,6 +217,7 @@
                  "-c",
                  "/usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
                ],
+    {{container_env}}
     "livenessProbe": {
       "httpGet": {
         "host": "127.0.0.1",
@@ -261,7 +264,7 @@
         "mountPath": "/etc/openssl",
         "readOnly": true},
         { "name": "etcpki",
-        "mountPath": "/etc/pki",
+        "mountPath": "/etc/srv/pki",
         "readOnly": true},
         { "name": "srvsshproxy",
         "mountPath": "{{srv_sshproxy_path}}",
@@ -306,7 +309,7 @@
   },
   { "name": "etcpki",
     "hostPath": {
-        "path": "/etc/pki"}
+        "path": "/etc/srv/pki"}
   },
   { "name": "srvsshproxy",
     "hostPath": {

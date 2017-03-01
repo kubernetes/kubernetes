@@ -1963,3 +1963,31 @@ func TestPreparePodArgs(t *testing.T) {
 		assert.Equal(t, testCase.cmd, cmd, fmt.Sprintf("Test case #%d", i))
 	}
 }
+
+func TestConstructSyslogIdentifier(t *testing.T) {
+	testCases := []struct {
+		podName         string
+		podGenerateName string
+		identifier      string
+	}{
+		{
+			"prometheus-node-exporter-rv90m",
+			"prometheus-node-exporter-",
+			"prometheus-node-exporter",
+		},
+		{
+			"simplepod",
+			"",
+			"simplepod",
+		},
+		{
+			"p",
+			"",
+			"p",
+		},
+	}
+	for i, testCase := range testCases {
+		identifier := constructSyslogIdentifier(testCase.podGenerateName, testCase.podName)
+		assert.Equal(t, testCase.identifier, identifier, fmt.Sprintf("Test case #%d", i))
+	}
+}

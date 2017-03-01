@@ -23,9 +23,8 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset"
-	internalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
-	fakeinternalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion/fake"
-	"k8s.io/kubernetes/pkg/api"
+	testgroupinternalversion "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
+	faketestgroupinternalversion "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -33,7 +32,7 @@ import (
 // without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
-	o := testing.NewObjectTracker(api.Registry, api.Scheme, api.Codecs.UniversalDecoder())
+	o := testing.NewObjectTracker(registry, scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
@@ -41,7 +40,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	}
 
 	fakePtr := testing.Fake{}
-	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o, api.Registry.RESTMapper()))
+	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o, registry.RESTMapper()))
 
 	fakePtr.AddWatchReactor("*", testing.DefaultWatchReactor(watch.NewFake(), nil))
 
@@ -62,6 +61,6 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // Testgroup retrieves the TestgroupClient
-func (c *Clientset) Testgroup() internalversiontestgroup.TestgroupInterface {
-	return &fakeinternalversiontestgroup.FakeTestgroup{Fake: &c.Fake}
+func (c *Clientset) Testgroup() testgroupinternalversion.TestgroupInterface {
+	return &faketestgroupinternalversion.FakeTestgroup{Fake: &c.Fake}
 }

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -81,9 +82,11 @@ type RequestScope struct {
 	Serializer runtime.NegotiatedSerializer
 	runtime.ParameterCodec
 
-	Creater   runtime.ObjectCreater
-	Convertor runtime.ObjectConvertor
-	Copier    runtime.ObjectCopier
+	Creater         runtime.ObjectCreater
+	Convertor       runtime.ObjectConvertor
+	Copier          runtime.ObjectCopier
+	Typer           runtime.ObjectTyper
+	UnsafeConvertor runtime.ObjectConvertor
 
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
@@ -305,12 +308,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {
-			glog.Infof("Started to log from %v for %v", ctx, req.Request.URL.RequestURI())
-			watcher, err := rw.Watch(ctx, &opts)
-			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
-				return
-			}
 			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
 			timeout := time.Duration(0)
 			if opts.TimeoutSeconds != nil {
@@ -318,6 +315,13 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 			if timeout == 0 && minRequestTimeout > 0 {
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
+			}
+			glog.V(2).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.Request.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
+
+			watcher, err := rw.Watch(ctx, &opts)
+			if err != nil {
+				scope.err(err, res.ResponseWriter, req.Request)
+				return
 			}
 			serveWatch(watcher, scope, req, res, timeout)
 			return
@@ -520,7 +524,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return nil
 		}
 
-		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS, scope.Namer, scope.Copier, scope.Resource, codec)
+		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS,
+			scope.Namer, scope.Copier, scope.Creater, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
@@ -550,6 +555,9 @@ func patchResource(
 	patchJS []byte,
 	namer ScopeNamer,
 	copier runtime.ObjectCopier,
+	creater runtime.ObjectCreater,
+	unsafeConvertor runtime.ObjectConvertor,
+	kind schema.GroupVersionKind,
 	resource schema.GroupVersionResource,
 	codec runtime.Codec,
 ) (runtime.Object, error) {
@@ -594,10 +602,28 @@ func patchResource(
 				}
 				originalObjJS, originalPatchedObjJS = originalJS, patchedJS
 			case types.StrategicMergePatchType:
-				originalMap, patchMap, err := strategicPatchObject(codec, currentObject, patchJS, objToUpdate, versionedObj)
+				// Since the patch is applied on versioned objects, we need to convert the
+				// current object to versioned representation first.
+				currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
 				if err != nil {
 					return nil, err
 				}
+				versionedObjToUpdate, err := creater.New(kind)
+				if err != nil {
+					return nil, err
+				}
+				originalMap, patchMap, err := strategicPatchObject(codec, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
+				if err != nil {
+					return nil, err
+				}
+				// Convert the object back to unversioned.
+				gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+				unversionedObjToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
+				if err != nil {
+					return nil, err
+				}
+				objToUpdate = unversionedObjToUpdate
+				// Store unstructured representations for possible retries.
 				originalObjMap, originalPatchMap = originalMap, patchMap
 			}
 			if err := checkName(objToUpdate, name, namespace, namer); err != nil {
@@ -614,14 +640,15 @@ func patchResource(
 			// 3. ensure no conflicts between the two patches
 			// 4. apply the #1 patch to the currentJS object
 
-			// TODO: This should be one-step conversion that doesn't require
-			// json marshaling and unmarshaling once #39017 is fixed.
-			data, err := runtime.Encode(codec, currentObject)
+			currentObjMap := make(map[string]interface{})
+
+			// Since the patch is applied on versioned objects, we need to convert the
+			// current object to versioned representation first.
+			currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
 			if err != nil {
 				return nil, err
 			}
-			currentObjMap := make(map[string]interface{})
-			if err := json.Unmarshal(data, &currentObjMap); err != nil {
+			if err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject, &currentObjMap); err != nil {
 				return nil, err
 			}
 
@@ -677,8 +704,17 @@ func patchResource(
 				return nil, errors.NewConflict(resource.GroupResource(), name, patchDiffErr)
 			}
 
-			objToUpdate := patcher.New()
-			if err := applyPatchToObject(codec, currentObjMap, originalPatchMap, objToUpdate, versionedObj); err != nil {
+			versionedObjToUpdate, err := creater.New(kind)
+			if err != nil {
+				return nil, err
+			}
+			if err := applyPatchToObject(codec, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
+				return nil, err
+			}
+			// Convert the object back to unversioned.
+			gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+			objToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
+			if err != nil {
 				return nil, err
 			}
 
@@ -857,8 +893,11 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 
 		trace.Step("About do delete object from database")
+		wasDeleted := true
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			return r.Delete(ctx, name, options)
+			obj, deleted, err := r.Delete(ctx, name, options)
+			wasDeleted = deleted
+			return obj, err
 		})
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
@@ -866,12 +905,22 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 		trace.Step("Object deleted from database")
 
+		status := http.StatusOK
+		// Return http.StatusAccepted if the resource was not deleted immediately and
+		// user requested cascading deletion by setting OrphanDependents=false.
+		// Note: We want to do this always if resource was not deleted immediately, but
+		// that will break existing clients.
+		// Other cases where resource is not instantly deleted are: namespace deletion
+		// and pod graceful deletion.
+		if !wasDeleted && options.OrphanDependents != nil && *options.OrphanDependents == false {
+			status = http.StatusAccepted
+		}
 		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.
 		if result == nil {
 			result = &metav1.Status{
 				Status: metav1.StatusSuccess,
-				Code:   http.StatusOK,
+				Code:   int32(status),
 				Details: &metav1.StatusDetails{
 					Name: name,
 					Kind: scope.Kind.Kind,
@@ -886,7 +935,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				}
 			}
 		}
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
 	}
 }
 

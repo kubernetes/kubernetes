@@ -37,6 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -44,7 +46,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeStore cache.Store, c clientset.Interface)
+type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface)
 
 type nodeStateManager struct {
 	makeSchedulable   nodeMutationFunc
@@ -59,8 +61,20 @@ func TestUnschedulableNodes(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
-	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight)
+	schedulerConfigFactory := factory.NewConfigFactory(
+		v1.DefaultSchedulerName,
+		clientSet,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		v1.DefaultHardPodAffinitySymmetricWeight,
+	)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
@@ -68,11 +82,12 @@ func TestUnschedulableNodes(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+	informerFactory.Start(schedulerConfig.StopEverything)
 	scheduler.New(schedulerConfig).Run()
 
 	defer close(schedulerConfig.StopEverything)
 
-	DoTestUnschedulableNodes(t, clientSet, ns, schedulerConfigFactory.GetNodeStore())
+	DoTestUnschedulableNodes(t, clientSet, ns, schedulerConfigFactory.GetNodeLister())
 }
 
 func podScheduled(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
@@ -94,23 +109,23 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 
 // Wait till the passFunc confirms that the object it expects to see is in the store.
 // Used to observe reflected events.
-func waitForReflection(t *testing.T, s cache.Store, key string, passFunc func(n interface{}) bool) error {
+func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key string, passFunc func(n interface{}) bool) error {
 	nodes := []*v1.Node{}
 	err := wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-		if n, _, err := s.GetByKey(key); err == nil && passFunc(n) {
+		n, err := nodeLister.Get(key)
+
+		switch {
+		case err == nil && passFunc(n):
 			return true, nil
-		} else {
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			} else {
-				if n == nil {
-					nodes = append(nodes, nil)
-				} else {
-					nodes = append(nodes, n.(*v1.Node))
-				}
-			}
-			return false, nil
+		case errors.IsNotFound(err):
+			nodes = append(nodes, nil)
+		case err != nil:
+			t.Errorf("Unexpected error: %v", err)
+		default:
+			nodes = append(nodes, n)
 		}
+
+		return false, nil
 	})
 	if err != nil {
 		t.Logf("Logging consecutive node versions received from store:")
@@ -121,7 +136,7 @@ func waitForReflection(t *testing.T, s cache.Store, key string, passFunc func(n 
 	return err
 }
 
-func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Namespace, nodeStore cache.Store) {
+func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Namespace, nodeLister corelisters.NodeLister) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
 	defer cs.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
@@ -167,12 +182,12 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 	nodeModifications := []nodeStateManager{
 		// Test node.Spec.Unschedulable=true/false
 		{
-			makeUnSchedulable: func(t *testing.T, n *v1.Node, s cache.Store, c clientset.Interface) {
+			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
 				n.Spec.Unschedulable = true
 				if _, err := c.Core().Nodes().Update(n); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=true: %v", err)
 				}
-				err = waitForReflection(t, s, nodeKey, func(node interface{}) bool {
+				err = waitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
 					// An unschedulable node should still be present in the store
 					// Nodes that are unschedulable or that are not ready or
 					// have their disk full (Node.Spec.Conditions) are excluded
@@ -183,12 +198,12 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 					t.Fatalf("Failed to observe reflected update for setting unschedulable=true: %v", err)
 				}
 			},
-			makeSchedulable: func(t *testing.T, n *v1.Node, s cache.Store, c clientset.Interface) {
+			makeSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
 				n.Spec.Unschedulable = false
 				if _, err := c.Core().Nodes().Update(n); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=false: %v", err)
 				}
-				err = waitForReflection(t, s, nodeKey, func(node interface{}) bool {
+				err = waitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
 					return node != nil && node.(*v1.Node).Spec.Unschedulable == false
 				})
 				if err != nil {
@@ -198,7 +213,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 		},
 		// Test node.Status.Conditions=ConditionTrue/Unknown
 		{
-			makeUnSchedulable: func(t *testing.T, n *v1.Node, s cache.Store, c clientset.Interface) {
+			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
 				n.Status = v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
@@ -208,14 +223,14 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 				if _, err = c.Core().Nodes().UpdateStatus(n); err != nil {
 					t.Fatalf("Failed to update node with bad status condition: %v", err)
 				}
-				err = waitForReflection(t, s, nodeKey, func(node interface{}) bool {
+				err = waitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
 					return node != nil && node.(*v1.Node).Status.Conditions[0].Status == v1.ConditionUnknown
 				})
 				if err != nil {
 					t.Fatalf("Failed to observe reflected update for status condition update: %v", err)
 				}
 			},
-			makeSchedulable: func(t *testing.T, n *v1.Node, s cache.Store, c clientset.Interface) {
+			makeSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
 				n.Status = v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
@@ -225,7 +240,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 				if _, err = c.Core().Nodes().UpdateStatus(n); err != nil {
 					t.Fatalf("Failed to update node with healthy status condition: %v", err)
 				}
-				err = waitForReflection(t, s, nodeKey, func(node interface{}) bool {
+				err = waitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
 					return node != nil && node.(*v1.Node).Status.Conditions[0].Status == v1.ConditionTrue
 				})
 				if err != nil {
@@ -242,7 +257,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 		}
 
 		// Apply the unschedulable modification to the node, and wait for the reflection
-		mod.makeUnSchedulable(t, unSchedNode, nodeStore, cs)
+		mod.makeUnSchedulable(t, unSchedNode, nodeLister, cs)
 
 		// Create the new pod, note that this needs to happen post unschedulable
 		// modification or we have a race in the test.
@@ -273,7 +288,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 		if err != nil {
 			t.Fatalf("Failed to get node: %v", err)
 		}
-		mod.makeSchedulable(t, schedNode, nodeStore, cs)
+		mod.makeSchedulable(t, schedNode, nodeLister, cs)
 
 		// Wait until the pod is scheduled.
 		err = wait.Poll(time.Second, wait.ForeverTestTimeout, podScheduled(cs, myPod.Namespace, myPod.Name))
@@ -329,7 +344,19 @@ func TestMultiScheduler(t *testing.T) {
 	// non-namespaced objects (Nodes).
 	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
-	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight)
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+	schedulerConfigFactory := factory.NewConfigFactory(
+		v1.DefaultSchedulerName,
+		clientSet,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		v1.DefaultHardPodAffinitySymmetricWeight,
+	)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
@@ -337,6 +364,7 @@ func TestMultiScheduler(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+	informerFactory.Start(schedulerConfig.StopEverything)
 	scheduler.New(schedulerConfig).Run()
 	// default-scheduler will be stopped later
 
@@ -399,8 +427,20 @@ func TestMultiScheduler(t *testing.T) {
 
 	// 5. create and start a scheduler with name "foo-scheduler"
 	clientSet2 := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	informerFactory2 := informers.NewSharedInformerFactory(clientSet, 0)
 
-	schedulerConfigFactory2 := factory.NewConfigFactory(clientSet2, "foo-scheduler", v1.DefaultHardPodAffinitySymmetricWeight)
+	schedulerConfigFactory2 := factory.NewConfigFactory(
+		"foo-scheduler",
+		clientSet2,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		v1.DefaultHardPodAffinitySymmetricWeight,
+	)
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
 	if err != nil {
 		t.Errorf("Couldn't create scheduler config: %v", err)
@@ -408,6 +448,7 @@ func TestMultiScheduler(t *testing.T) {
 	eventBroadcaster2 := record.NewBroadcaster()
 	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(api.Scheme, clientv1.EventSource{Component: "foo-scheduler"})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet2.Core().RESTClient()).Events("")})
+	informerFactory2.Start(schedulerConfig2.StopEverything)
 	scheduler.New(schedulerConfig2).Run()
 
 	defer close(schedulerConfig2.StopEverything)
@@ -490,12 +531,24 @@ func TestAllocatable(t *testing.T) {
 
 	// 1. create and start default-scheduler
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
 	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
-	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight)
+	schedulerConfigFactory := factory.NewConfigFactory(
+		v1.DefaultSchedulerName,
+		clientSet,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		v1.DefaultHardPodAffinitySymmetricWeight,
+	)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
@@ -503,6 +556,7 @@ func TestAllocatable(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+	informerFactory.Start(schedulerConfig.StopEverything)
 	scheduler.New(schedulerConfig).Run()
 	// default-scheduler will be stopped later
 	defer close(schedulerConfig.StopEverything)

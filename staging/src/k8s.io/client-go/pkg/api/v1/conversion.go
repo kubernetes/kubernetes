@@ -271,7 +271,7 @@ func Convert_v1_ReplicationController_to_extensions_ReplicaSet(in *ReplicationCo
 func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *ReplicationControllerSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
 	out.Replicas = *in.Replicas
 	if in.Selector != nil {
-		api.Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
+		metav1.Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
 	}
 	if in.Template != nil {
 		if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, &out.Template, s); err != nil {
@@ -314,7 +314,7 @@ func Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(in *exten
 	out.MinReadySeconds = in.MinReadySeconds
 	var invalidErr error
 	if in.Selector != nil {
-		invalidErr = api.Convert_unversioned_LabelSelector_to_map(in.Selector, &out.Selector, s)
+		invalidErr = metav1.Convert_unversioned_LabelSelector_to_map(in.Selector, &out.Selector, s)
 	}
 	out.Template = new(PodTemplateSpec)
 	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, out.Template, s); err != nil {

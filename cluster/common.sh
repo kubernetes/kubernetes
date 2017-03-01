@@ -665,6 +665,7 @@ NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
 KUBE_UID: $(yaml-quote ${KUBE_UID:-})
 ENABLE_DEFAULT_STORAGE_CLASS: $(yaml-quote ${ENABLE_DEFAULT_STORAGE_CLASS:-})
 ENABLE_APISERVER_BASIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_BASIC_AUDIT:-})
+ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-false})
 EOF
   if [ -n "${KUBELET_PORT:-}" ]; then
     cat >>$file <<EOF
@@ -706,6 +707,21 @@ EOF
   if [ -n "${DOCKER_TEST_LOG_LEVEL:-}" ]; then
       cat >>$file <<EOF
 DOCKER_TEST_LOG_LEVEL: $(yaml-quote ${DOCKER_TEST_LOG_LEVEL})
+EOF
+  fi
+  if [ -n "${DOCKER_LOG_DRIVER:-}" ]; then
+      cat >>$file <<EOF
+DOCKER_LOG_DRIVER: $(yaml-quote ${DOCKER_LOG_DRIVER})
+EOF
+  fi
+  if [ -n "${DOCKER_LOG_MAX_SIZE:-}" ]; then
+      cat >>$file <<EOF
+DOCKER_LOG_MAX_SIZE: $(yaml-quote ${DOCKER_LOG_MAX_SIZE})
+EOF
+  fi
+  if [ -n "${DOCKER_LOG_MAX_FILE:-}" ]; then
+      cat >>$file <<EOF
+DOCKER_LOG_MAX_FILE: $(yaml-quote ${DOCKER_LOG_MAX_FILE})
 EOF
   fi
   if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
@@ -1057,6 +1073,8 @@ function parse-master-env() {
   EXTRA_DOCKER_OPTS=$(get-env-val "${master_env}" "EXTRA_DOCKER_OPTS")
   KUBELET_CERT_BASE64=$(get-env-val "${master_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${master_env}" "KUBELET_KEY")
+  MASTER_CERT_BASE64=$(get-env-val "${master_env}" "MASTER_CERT")
+  MASTER_KEY_BASE64=$(get-env-val "${master_env}" "MASTER_KEY")
 }
 
 # Update or verify required gcloud components are installed

@@ -31,13 +31,13 @@ import (
 // genClientset generates a package for a clientset.
 type genClientset struct {
 	generator.DefaultGen
-	groups             []clientgentypes.GroupVersions
-	typedClientPath    string
-	outputPackage      string
-	imports            namer.ImportTracker
-	clientsetGenerated bool
+	groups               []clientgentypes.GroupVersions
+	fakeClientsetPackage string
+	outputPackage        string
+	imports              namer.ImportTracker
+	clientsetGenerated   bool
 	// the import path of the generated real clientset.
-	clientsetPath string
+	realClientsetPackage string
 }
 
 var _ generator.Generator = &genClientset{}
@@ -59,17 +59,17 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
-			typedClientPath := filepath.Join(g.typedClientPath, group.Group.NonEmpty(), version.NonEmpty())
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), typedClientPath)))
-			fakeTypedClientPath := filepath.Join(typedClientPath, "fake")
-			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), fakeTypedClientPath)))
+			groupClientPackage := filepath.Join(g.fakeClientsetPackage, "typed", group.Group.NonEmpty(), version.NonEmpty())
+			fakeGroupClientPackage := filepath.Join(groupClientPackage, "fake")
+
+			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), groupClientPackage)))
+			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), fakeGroupClientPackage)))
 		}
 	}
 	// the package that has the clientset Interface
-	imports = append(imports, fmt.Sprintf("clientset \"%s\"", g.clientsetPath))
+	imports = append(imports, fmt.Sprintf("clientset \"%s\"", g.realClientsetPackage))
 	// imports for the code in commonTemplate
 	imports = append(imports,
-		"k8s.io/kubernetes/pkg/api",
 		"k8s.io/client-go/testing",
 		"k8s.io/client-go/discovery",
 		"fakediscovery \"k8s.io/client-go/discovery/fake\"",
@@ -85,11 +85,10 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
-	sw.Do(common, nil)
-
-	sw.Do(checkImpl, nil)
-
 	allGroups := clientgentypes.ToGroupVersionPackages(g.groups)
+
+	sw.Do(common, nil)
+	sw.Do(checkImpl, nil)
 
 	for _, g := range allGroups {
 		sw.Do(clientsetInterfaceImplTemplate, g)
@@ -109,7 +108,7 @@ var common = `
 // without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
-	o := testing.NewObjectTracker(api.Registry, api.Scheme, api.Codecs.UniversalDecoder())
+	o := testing.NewObjectTracker(registry, scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
@@ -117,7 +116,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	}
 
 	fakePtr := testing.Fake{}
-	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o, api.Registry.RESTMapper()))
+	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o, registry.RESTMapper()))
 
 	fakePtr.AddWatchReactor("*", testing.DefaultWatchReactor(watch.NewFake(), nil))
 

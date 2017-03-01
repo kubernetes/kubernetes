@@ -46,6 +46,30 @@ func TestValidateTokenDiscovery(t *testing.T) {
 	}
 }
 
+func TestValidateAuthorizationMode(t *testing.T) {
+	var tests = []struct {
+		s        string
+		f        *field.Path
+		expected bool
+	}{
+		{"", nil, false},
+		{"rBAC", nil, false},      // not supported
+		{"not valid", nil, false}, // not supported
+		{"RBAC", nil, true},       // supported
+		{"Webhook", nil, true},    // supported
+	}
+	for _, rt := range tests {
+		actual := ValidateAuthorizationMode(rt.s, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateAuthorizationMode:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
 func TestValidateServiceSubnet(t *testing.T) {
 	var tests = []struct {
 		s        string
@@ -71,6 +95,30 @@ func TestValidateServiceSubnet(t *testing.T) {
 	}
 }
 
+func TestValidateCloudProvider(t *testing.T) {
+	var tests = []struct {
+		s        string
+		f        *field.Path
+		expected bool
+	}{
+		{"", nil, true},      // if not provided, ok, it's optional
+		{"1234", nil, false}, // not supported
+		{"awws", nil, false}, // not supported
+		{"aws", nil, true},   // supported
+		{"gce", nil, true},   // supported
+	}
+	for _, rt := range tests {
+		actual := ValidateCloudProvider(rt.s, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateCloudProvider:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
 func TestValidateMasterConfiguration(t *testing.T) {
 	var tests = []struct {
 		s        *kubeadm.MasterConfiguration
@@ -87,15 +135,27 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					Addresses: []string{"foobar"},
 				},
 			},
+			AuthorizationMode: "RBAC",
+			Networking: kubeadm.Networking{
+				ServiceSubnet: "10.96.0.1/12",
+			},
 		}, false},
 		{&kubeadm.MasterConfiguration{
 			Discovery: kubeadm.Discovery{
 				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
 			},
+			AuthorizationMode: "RBAC",
+			Networking: kubeadm.Networking{
+				ServiceSubnet: "10.96.0.1/12",
+			},
 		}, true},
 		{&kubeadm.MasterConfiguration{
 			Discovery: kubeadm.Discovery{
 				File: &kubeadm.FileDiscovery{Path: "foo"},
+			},
+			AuthorizationMode: "RBAC",
+			Networking: kubeadm.Networking{
+				ServiceSubnet: "10.96.0.1/12",
 			},
 		}, true},
 		{&kubeadm.MasterConfiguration{
@@ -105,6 +165,10 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					Secret:    "1234567890123456",
 					Addresses: []string{"foobar"},
 				},
+			},
+			AuthorizationMode: "RBAC",
+			Networking: kubeadm.Networking{
+				ServiceSubnet: "10.96.0.1/12",
 			},
 		}, true},
 	}
@@ -136,16 +200,25 @@ func TestValidateNodeConfiguration(t *testing.T) {
 					Addresses: []string{"foobar"},
 				},
 			},
+			CACertPath: "/some/cert.crt",
 		}, false},
 		{&kubeadm.NodeConfiguration{
 			Discovery: kubeadm.Discovery{
 				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
 			},
+			CACertPath: "/some/path", // no .crt suffix
+		}, false},
+		{&kubeadm.NodeConfiguration{
+			Discovery: kubeadm.Discovery{
+				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
+			},
+			CACertPath: "/some/cert.crt",
 		}, true},
 		{&kubeadm.NodeConfiguration{
 			Discovery: kubeadm.Discovery{
 				File: &kubeadm.FileDiscovery{Path: "foo"},
 			},
+			CACertPath: "/some/other/cert.crt",
 		}, true},
 		{&kubeadm.NodeConfiguration{
 			Discovery: kubeadm.Discovery{
@@ -155,6 +228,7 @@ func TestValidateNodeConfiguration(t *testing.T) {
 					Addresses: []string{"foobar"},
 				},
 			},
+			CACertPath: "/a/third/cert.crt",
 		}, true},
 	}
 	for _, rt := range tests {

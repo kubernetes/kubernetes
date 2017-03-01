@@ -20,6 +20,7 @@ import (
 	"io"
 	osexec "os/exec"
 	"syscall"
+	"time"
 )
 
 // ErrExecutableNotFound is returned if the executable is not found.
@@ -48,6 +49,11 @@ type Cmd interface {
 	SetDir(dir string)
 	SetStdin(in io.Reader)
 	SetStdout(out io.Writer)
+	// Stops the command by sending SIGTERM. It is not guaranteed the
+	// process will stop before this function returns. If the process is not
+	// responding, an internal timer function will send a SIGKILL to force
+	// terminate after 10 seconds.
+	Stop()
 }
 
 // ExitError is an interface that presents an API similar to os.ProcessState, which is
@@ -108,6 +114,21 @@ func (cmd *cmdWrapper) Output() ([]byte, error) {
 		return out, handleError(err)
 	}
 	return out, nil
+}
+
+// Stop is part of the Cmd interface.
+func (cmd *cmdWrapper) Stop() {
+	c := (*osexec.Cmd)(cmd)
+	if c.ProcessState.Exited() {
+		return
+	}
+	c.Process.Signal(syscall.SIGTERM)
+	time.AfterFunc(10*time.Second, func() {
+		if c.ProcessState.Exited() {
+			return
+		}
+		c.Process.Signal(syscall.SIGKILL)
+	})
 }
 
 func handleError(err error) error {

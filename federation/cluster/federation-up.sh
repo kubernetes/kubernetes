@@ -29,14 +29,13 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # For `kube::log::status` function since it already sources
 # "${KUBE_ROOT}/cluster/lib/logging.sh" and DEFAULT_KUBECONFIG
 source "${KUBE_ROOT}/cluster/common.sh"
-# For $FEDERATION_KUBE_CONTEXT, $HOST_CLUSTER_CONTEXT,
+# For $FEDERATION_NAME, $FEDERATION_KUBE_CONTEXT, $HOST_CLUSTER_CONTEXT,
 # $KUBEDNS_CONFIGMAP_NAME, $KUBEDNS_CONFIGMAP_NAMESPACE and
 # $KUBEDNS_FEDERATION_FLAG.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
-FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
-
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
+DNS_PROVIDER="${FEDERATION_DNS_PROVIDER:-google-clouddns}"
 FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
 
 # get_version returns the version in KUBERNETES_RELEASE or defaults to the
@@ -84,29 +83,34 @@ function init() {
       "${FEDERATION_NAME}" \
       --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
       --dns-zone-name="${DNS_ZONE_NAME}" \
-      --image="${kube_registry}/hyperkube-amd64:${kube_version}"
+      --dns-provider="${DNS_PROVIDER}" \
+      --image="${kube_registry}/hyperkube-amd64:${kube_version}" \
+      --apiserver-arg-overrides="--storage-backend=etcd2"
 }
 
 # join_clusters joins the clusters in the local kubeconfig to federation. The clusters
 # and their kubeconfig entries in the local kubeconfig are created while deploying clusters, i.e. when kube-up is run.
 function join_clusters() {
-  for cluster in $("${KUBE_ROOT}/cluster/kubectl.sh" config get-clusters |sed -n '1!p'); do
-    # Skip federation context
-    if [[ "${cluster}" == "${FEDERATION_NAME}" ]]; then
-      continue
-    fi
-    # Skip contexts not beginning with "federation"
-    if [[ "${cluster}" != federation* ]]; then
-      continue
-    fi
+  for context in $(federation_cluster_contexts); do
+    kube::log::status "Joining cluster with name '${context}' to federation with name '${FEDERATION_NAME}'"
 
-  kube::log::status "Joining cluster with name '${cluster}' to federation with name '${FEDERATION_NAME}'"
+    "${KUBE_ROOT}/federation/develop/kubefed.sh" join \
+        "${context}" \
+        --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
+        --context="${FEDERATION_NAME}" \
+        --secret-name="${context//_/-}"    # Replace "_" by "-"
 
-  "${KUBE_ROOT}/federation/develop/kubefed.sh" join \
-      "${cluster}" \
-      --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
-      --context="${FEDERATION_NAME}" \
-      --secret-name="${cluster//_/-}"    # Replace "_" by "-"
+    # Create kube-dns configmap in each cluster for kube-dns to accept
+    # federation queries.
+    # TODO: This shouldn't be required after
+    # https://github.com/kubernetes/kubernetes/pull/39338.
+    # Remove this after the PR is merged.
+    kube::log::status "Creating \"kube-dns\" ConfigMap in \"kube-system\" namespace in cluster \"${context}\""
+    "${KUBE_ROOT}/cluster/kubectl.sh" create configmap \
+        --context="${context}" \
+        --namespace="${KUBEDNS_CONFIGMAP_NAMESPACE}" \
+        "${KUBEDNS_CONFIGMAP_NAME}" \
+        --from-literal="${KUBEDNS_FEDERATION_FLAG}"="${FEDERATIONS_DOMAIN_MAP}"
   done
 }
 

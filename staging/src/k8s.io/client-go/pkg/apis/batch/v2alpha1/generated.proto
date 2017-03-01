@@ -82,6 +82,16 @@ message CronJobSpec {
   // JobTemplate is the object that describes the job that will be created when
   // executing a CronJob.
   optional JobTemplateSpec jobTemplate = 5;
+
+  // The number of successful finished jobs to retain.
+  // This is a pointer to distinguish between explicit zero and not specified.
+  // +optional
+  optional int32 successfulJobsHistoryLimit = 6;
+
+  // The number of failed finished jobs to retain.
+  // This is a pointer to distinguish between explicit zero and not specified.
+  // +optional
+  optional int32 failedJobsHistoryLimit = 7;
 }
 
 // CronJobStatus represents the current state of a cron job.

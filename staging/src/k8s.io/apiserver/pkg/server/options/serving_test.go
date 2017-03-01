@@ -34,11 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server"
 	. "k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	utilcert "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 func setUp(t *testing.T) Config {
@@ -254,9 +255,9 @@ func TestServerRunWithSNI(t *testing.T) {
 		// passed in the client hello info, "localhost" if unset
 		ServerName string
 
-		// optional ip or hostname to pass to NewSelfClientConfig
-		SelfClientBindAddressOverride string
-		ExpectSelfClientError         bool
+		// optional ip or hostname to pass to NewLoopbackClientConfig
+		LoopbackClientBindAddressOverride string
+		ExpectLoopbackClientError         bool
 	}{
 		"only one cert": {
 			Cert: TestCertSpec{
@@ -338,51 +339,7 @@ func TestServerRunWithSNI(t *testing.T) {
 			ServerName:        "www.test.com",
 		},
 
-		"loopback: IP for loopback client on SNI cert": {
-			Cert: TestCertSpec{
-				host: "localhost",
-			},
-			SNICerts: []NamedTestCertSpec{
-				{
-					TestCertSpec: TestCertSpec{
-						host: "test.com",
-						ips:  []string{"127.0.0.1"},
-					},
-				},
-			},
-			ExpectedCertIndex:     -1,
-			ExpectSelfClientError: true,
-		},
-		"loopback: IP for loopback client on server and SNI cert": {
-			Cert: TestCertSpec{
-				ips:  []string{"127.0.0.1"},
-				host: "localhost",
-			},
-			SNICerts: []NamedTestCertSpec{
-				{
-					TestCertSpec: TestCertSpec{
-						host: "test.com",
-						ips:  []string{"127.0.0.1"},
-					},
-				},
-			},
-			ExpectedCertIndex: -1,
-		},
-		"loopback: bind to 0.0.0.0 => loopback uses localhost; localhost on server cert": {
-			Cert: TestCertSpec{
-				host: "localhost",
-			},
-			SNICerts: []NamedTestCertSpec{
-				{
-					TestCertSpec: TestCertSpec{
-						host: "test.com",
-					},
-				},
-			},
-			ExpectedCertIndex:             -1,
-			SelfClientBindAddressOverride: "0.0.0.0",
-		},
-		"loopback: bind to 0.0.0.0 => loopback uses localhost; localhost on SNI cert": {
+		"loopback: LoopbackClientServerNameOverride not on any cert": {
 			Cert: TestCertSpec{
 				host: "test.com",
 			},
@@ -393,12 +350,11 @@ func TestServerRunWithSNI(t *testing.T) {
 					},
 				},
 			},
-			ExpectedCertIndex:             0,
-			SelfClientBindAddressOverride: "0.0.0.0",
+			ExpectedCertIndex: 0,
 		},
-		"loopback: bind to 0.0.0.0 => loopback uses localhost; localhost on server and SNI cert": {
+		"loopback: LoopbackClientServerNameOverride on server cert": {
 			Cert: TestCertSpec{
-				host: "localhost",
+				host: server.LoopbackClientServerNameOverride,
 			},
 			SNICerts: []NamedTestCertSpec{
 				{
@@ -407,8 +363,27 @@ func TestServerRunWithSNI(t *testing.T) {
 					},
 				},
 			},
-			ExpectedCertIndex:             0,
-			SelfClientBindAddressOverride: "0.0.0.0",
+			ExpectedCertIndex: 0,
+		},
+		"loopback: LoopbackClientServerNameOverride on SNI cert": {
+			Cert: TestCertSpec{
+				host: "localhost",
+			},
+			SNICerts: []NamedTestCertSpec{
+				{
+					TestCertSpec: TestCertSpec{
+						host: server.LoopbackClientServerNameOverride,
+					},
+				},
+			},
+			ExpectedCertIndex: -1,
+		},
+		"loopback: bind to 0.0.0.0 => loopback uses localhost": {
+			Cert: TestCertSpec{
+				host: "localhost",
+			},
+			ExpectedCertIndex:                 -1,
+			LoopbackClientBindAddressOverride: "0.0.0.0",
 		},
 	}
 
@@ -473,115 +448,121 @@ NextTest:
 		}
 
 		stopCh := make(chan struct{})
+		func() {
+			defer close(stopCh)
 
-		// launch server
-		config := setUp(t)
+			// launch server
+			config := setUp(t)
 
-		v := fakeVersion()
-		config.Version = &v
+			v := fakeVersion()
+			config.Version = &v
 
-		config.EnableIndex = true
-		secureOptions := &SecureServingOptions{
-			ServingOptions: ServingOptions{
-				BindAddress: net.ParseIP("127.0.0.1"),
-				BindPort:    6443,
-			},
-			ServerCert: GeneratableKeyCert{
-				CertKey: CertKey{
-					CertFile: serverCertBundleFile,
-					KeyFile:  serverKeyFile,
+			config.EnableIndex = true
+			secureOptions := &SecureServingOptions{
+				ServingOptions: ServingOptions{
+					BindAddress: net.ParseIP("127.0.0.1"),
+					BindPort:    6443,
 				},
-			},
-			SNICertKeys: namedCertKeys,
-		}
-		config.LoopbackClientConfig = &restclient.Config{}
-		if err := secureOptions.ApplyTo(&config); err != nil {
-			t.Errorf("%q - failed applying the SecureServingOptions: %v", title, err)
-			continue NextTest
-		}
-		config.InsecureServingInfo = nil
-
-		s, err := config.Complete().New()
-		if err != nil {
-			t.Errorf("%q - failed creating the server: %v", title, err)
-			continue NextTest
-		}
-
-		// patch in a 0-port to enable auto port allocation
-		s.SecureServingInfo.BindAddress = "127.0.0.1:0"
-
-		// add poststart hook to know when the server is up.
-		startedCh := make(chan struct{})
-		s.AddPostStartHook("test-notifier", func(context PostStartHookContext) error {
-			close(startedCh)
-			return nil
-		})
-		preparedServer := s.PrepareRun()
-		go preparedServer.Run(stopCh)
-
-		// load ca certificates into a pool
-		roots := x509.NewCertPool()
-		for _, caCert := range caCerts {
-			roots.AddCert(caCert)
-		}
-
-		<-startedCh
-
-		effectiveSecurePort := fmt.Sprintf("%d", preparedServer.EffectiveSecurePort())
-		// try to dial
-		addr := fmt.Sprintf("localhost:%s", effectiveSecurePort)
-		t.Logf("Dialing %s as %q", addr, test.ServerName)
-		conn, err := tls.Dial("tcp", addr, &tls.Config{
-			RootCAs:    roots,
-			ServerName: test.ServerName, // used for SNI in the client HELLO packet
-		})
-		if err != nil {
-			t.Errorf("%q - failed to connect: %v", title, err)
-			continue NextTest
-		}
-
-		// check returned server certificate
-		sig := x509CertSignature(conn.ConnectionState().PeerCertificates[0])
-		gotCertIndex, found := signatures[sig]
-		if !found {
-			t.Errorf("%q - unknown signature returned from server: %s", title, sig)
-		}
-		if gotCertIndex != test.ExpectedCertIndex {
-			t.Errorf("%q - expected cert index %d, got cert index %d", title, test.ExpectedCertIndex, gotCertIndex)
-		}
-
-		conn.Close()
-
-		// check that the loopback client can connect
-		host := "127.0.0.1"
-		if len(test.SelfClientBindAddressOverride) != 0 {
-			host = test.SelfClientBindAddressOverride
-		}
-		config.SecureServingInfo.ServingInfo.BindAddress = net.JoinHostPort(host, effectiveSecurePort)
-		cfg, err := config.SecureServingInfo.NewSelfClientConfig("some-token")
-		if test.ExpectSelfClientError {
-			if err == nil {
-				t.Errorf("%q - expected error creating loopback client config", title)
+				ServerCert: GeneratableKeyCert{
+					CertKey: CertKey{
+						CertFile: serverCertBundleFile,
+						KeyFile:  serverKeyFile,
+					},
+				},
+				SNICertKeys: namedCertKeys,
 			}
-			continue NextTest
-		}
-		if err != nil {
-			t.Errorf("%q - failed creating loopback client config: %v", title, err)
-			continue NextTest
-		}
-		client, err := clientset.NewForConfig(cfg)
-		if err != nil {
-			t.Errorf("%q - failed to create loopback client: %v", title, err)
-			continue NextTest
-		}
-		got, err := client.ServerVersion()
-		if err != nil {
-			t.Errorf("%q - failed to connect with loopback client: %v", title, err)
-			continue NextTest
-		}
-		if expected := &v; !reflect.DeepEqual(got, expected) {
-			t.Errorf("%q - loopback client didn't get correct version info: expected=%v got=%v", title, expected, got)
-		}
+			config.LoopbackClientConfig = &restclient.Config{}
+			if err := secureOptions.ApplyTo(&config); err != nil {
+				t.Errorf("%q - failed applying the SecureServingOptions: %v", title, err)
+				return
+			}
+			config.InsecureServingInfo = nil
+
+			s, err := config.Complete().New()
+			if err != nil {
+				t.Errorf("%q - failed creating the server: %v", title, err)
+				return
+			}
+
+			// patch in a 0-port to enable auto port allocation
+			s.SecureServingInfo.BindAddress = "127.0.0.1:0"
+
+			// add poststart hook to know when the server is up.
+			startedCh := make(chan struct{})
+			s.AddPostStartHook("test-notifier", func(context PostStartHookContext) error {
+				close(startedCh)
+				return nil
+			})
+			preparedServer := s.PrepareRun()
+			go func() {
+				if err := preparedServer.Run(stopCh); err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			// load ca certificates into a pool
+			roots := x509.NewCertPool()
+			for _, caCert := range caCerts {
+				roots.AddCert(caCert)
+			}
+
+			<-startedCh
+
+			effectiveSecurePort := fmt.Sprintf("%d", preparedServer.EffectiveSecurePort())
+			// try to dial
+			addr := fmt.Sprintf("localhost:%s", effectiveSecurePort)
+			t.Logf("Dialing %s as %q", addr, test.ServerName)
+			conn, err := tls.Dial("tcp", addr, &tls.Config{
+				RootCAs:    roots,
+				ServerName: test.ServerName, // used for SNI in the client HELLO packet
+			})
+			if err != nil {
+				t.Errorf("%q - failed to connect: %v", title, err)
+				return
+			}
+
+			// check returned server certificate
+			sig := x509CertSignature(conn.ConnectionState().PeerCertificates[0])
+			gotCertIndex, found := signatures[sig]
+			if !found {
+				t.Errorf("%q - unknown signature returned from server: %s", title, sig)
+			}
+			if gotCertIndex != test.ExpectedCertIndex {
+				t.Errorf("%q - expected cert index %d, got cert index %d", title, test.ExpectedCertIndex, gotCertIndex)
+			}
+
+			conn.Close()
+
+			// check that the loopback client can connect
+			host := "127.0.0.1"
+			if len(test.LoopbackClientBindAddressOverride) != 0 {
+				host = test.LoopbackClientBindAddressOverride
+			}
+			s.LoopbackClientConfig.Host = net.JoinHostPort(host, effectiveSecurePort)
+			if test.ExpectLoopbackClientError {
+				if err == nil {
+					t.Errorf("%q - expected error creating loopback client config", title)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("%q - failed creating loopback client config: %v", title, err)
+				return
+			}
+			client, err := discovery.NewDiscoveryClientForConfig(s.LoopbackClientConfig)
+			if err != nil {
+				t.Errorf("%q - failed to create loopback client: %v", title, err)
+				return
+			}
+			got, err := client.ServerVersion()
+			if err != nil {
+				t.Errorf("%q - failed to connect with loopback client: %v", title, err)
+				return
+			}
+			if expected := &v; !reflect.DeepEqual(got, expected) {
+				t.Errorf("%q - loopback client didn't get correct version info: expected=%v got=%v", title, expected, got)
+			}
+		}()
 	}
 }
 

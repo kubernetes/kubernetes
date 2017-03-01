@@ -17,15 +17,28 @@ limitations under the License.
 package session
 
 import (
+	"context"
 	"net/url"
+	"os"
 
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
+
+// Locale defaults to "en_US" and can be overridden via this var or the GOVMOMI_LOCALE env var.
+// A value of "_" uses the server locale setting.
+var Locale = os.Getenv("GOVMOMI_LOCALE")
+
+func init() {
+	if Locale == "_" {
+		Locale = ""
+	} else if Locale == "" {
+		Locale = "en_US"
+	}
+}
 
 type Manager struct {
 	client      *vim25.Client
@@ -44,9 +57,20 @@ func (sm Manager) Reference() types.ManagedObjectReference {
 	return *sm.client.ServiceContent.SessionManager
 }
 
+func (sm *Manager) SetLocale(ctx context.Context, locale string) error {
+	req := types.SetLocale{
+		This:   sm.Reference(),
+		Locale: locale,
+	}
+
+	_, err := methods.SetLocale(ctx, sm.client, &req)
+	return err
+}
+
 func (sm *Manager) Login(ctx context.Context, u *url.Userinfo) error {
 	req := types.Login{
-		This: sm.Reference(),
+		This:   sm.Reference(),
+		Locale: Locale,
 	}
 
 	if u != nil {

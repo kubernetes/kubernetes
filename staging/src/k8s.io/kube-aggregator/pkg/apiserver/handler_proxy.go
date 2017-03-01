@@ -172,8 +172,8 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 
 	r.destinationHost = apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc"
 	r.restConfig = &restclient.Config{
-		Insecure: apiService.Spec.InsecureSkipTLSVerify,
 		TLSClientConfig: restclient.TLSClientConfig{
+			Insecure: apiService.Spec.InsecureSkipTLSVerify,
 			CertData: r.proxyClientCert,
 			KeyData:  r.proxyClientKey,
 			CAData:   apiService.Spec.CABundle,

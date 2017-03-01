@@ -61,8 +61,9 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 
 	// NOTE: To use a custom sandbox image in a private repository, users need to configure the nodes with credentials properly.
 	// see: http://kubernetes.io/docs/user-guide/images/#configuring-nodes-to-authenticate-to-a-private-repository
-	if err := ds.client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{}); err != nil {
-		return "", fmt.Errorf("unable to pull image for the sandbox container: %v", err)
+	// Only pull sandbox image when it's not present - v1.PullIfNotPresent.
+	if err := ensureSandboxImageExists(ds.client, image); err != nil {
+		return "", err
 	}
 
 	// Step 2: Create the sandbox container.
@@ -103,7 +104,7 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 	// on the host as well, to satisfy parts of the pod spec that aren't
 	// recognized by the CNI standard yet.
 	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
-	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID)
+	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations)
 	// TODO: Do we need to teardown on failure or can we rely on a StopPodSandbox call with the given ID?
 	return createResp.ID, err
 }
@@ -469,6 +470,16 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 
 	// Apply resource options.
 	setSandboxResources(hc)
+
+	// Apply cgroupsParent derived from the sandbox config.
+	if lc := c.GetLinux(); lc != nil {
+		// Apply Cgroup options.
+		cgroupParent, err := ds.GenerateExpectedCgroupParent(lc.CgroupParent)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate cgroup parent in expected syntax for container %q: %v", c.Metadata.Name, err)
+		}
+		hc.CgroupParent = cgroupParent
+	}
 
 	// Set security options.
 	securityOpts, err := getSandboxSecurityOpts(c, ds.seccompProfileRoot, securityOptSep)

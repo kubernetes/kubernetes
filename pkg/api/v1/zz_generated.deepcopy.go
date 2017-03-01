@@ -155,6 +155,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodTemplate, InType: reflect.TypeOf(&PodTemplate{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodTemplateList, InType: reflect.TypeOf(&PodTemplateList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodTemplateSpec, InType: reflect.TypeOf(&PodTemplateSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PortworxVolumeSource, InType: reflect.TypeOf(&PortworxVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Preconditions, InType: reflect.TypeOf(&Preconditions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
@@ -731,6 +732,11 @@ func DeepCopy_v1_DeleteOptions(in interface{}, out interface{}, c *conversion.Cl
 		if in.OrphanDependents != nil {
 			in, out := &in.OrphanDependents, &out.OrphanDependents
 			*out = new(bool)
+			**out = **in
+		}
+		if in.PropagationPolicy != nil {
+			in, out := &in.PropagationPolicy, &out.PropagationPolicy
+			*out = new(DeletionPropagation)
 			**out = **in
 		}
 		return nil
@@ -1472,6 +1478,9 @@ func DeepCopy_v1_Node(in interface{}, out interface{}, c *conversion.Cloner) err
 		} else {
 			out.ObjectMeta = *newVal.(*meta_v1.ObjectMeta)
 		}
+		if err := DeepCopy_v1_NodeSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
 		if err := DeepCopy_v1_NodeStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
@@ -1631,6 +1640,15 @@ func DeepCopy_v1_NodeSpec(in interface{}, out interface{}, c *conversion.Cloner)
 		in := in.(*NodeSpec)
 		out := out.(*NodeSpec)
 		*out = *in
+		if in.Taints != nil {
+			in, out := &in.Taints, &out.Taints
+			*out = make([]Taint, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1_Taint(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}
 }
@@ -1844,6 +1862,11 @@ func DeepCopy_v1_PersistentVolumeClaimSpec(in interface{}, out interface{}, c *c
 		if err := DeepCopy_v1_ResourceRequirements(&in.Resources, &out.Resources, c); err != nil {
 			return err
 		}
+		if in.StorageClassName != nil {
+			in, out := &in.StorageClassName, &out.StorageClassName
+			*out = new(string)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -1996,6 +2019,11 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 		if in.PhotonPersistentDisk != nil {
 			in, out := &in.PhotonPersistentDisk, &out.PhotonPersistentDisk
 			*out = new(PhotonPersistentDiskVolumeSource)
+			**out = **in
+		}
+		if in.PortworxVolume != nil {
+			in, out := &in.PortworxVolume, &out.PortworxVolume
+			*out = new(PortworxVolumeSource)
 			**out = **in
 		}
 		return nil
@@ -2373,6 +2401,15 @@ func DeepCopy_v1_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 				return err
 			}
 		}
+		if in.Tolerations != nil {
+			in, out := &in.Tolerations, &out.Tolerations
+			*out = make([]Toleration, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1_Toleration(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}
 }
@@ -2483,6 +2520,15 @@ func DeepCopy_v1_PodTemplateSpec(in interface{}, out interface{}, c *conversion.
 		if err := DeepCopy_v1_PodSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_PortworxVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PortworxVolumeSource)
+		out := out.(*PortworxVolumeSource)
+		*out = *in
 		return nil
 	}
 }
@@ -3393,6 +3439,11 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 			if err := DeepCopy_v1_ProjectedVolumeSource(*in, *out, c); err != nil {
 				return err
 			}
+		}
+		if in.PortworxVolume != nil {
+			in, out := &in.PortworxVolume, &out.PortworxVolume
+			*out = new(PortworxVolumeSource)
+			**out = **in
 		}
 		return nil
 	}

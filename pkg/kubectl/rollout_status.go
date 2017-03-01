@@ -36,12 +36,18 @@ func StatusViewerFor(kind schema.GroupKind, c internalclientset.Interface) (Stat
 	switch kind {
 	case extensions.Kind("Deployment"):
 		return &DeploymentStatusViewer{c.Extensions()}, nil
+	case extensions.Kind("DaemonSet"):
+		return &DaemonSetStatusViewer{c.Extensions()}, nil
 	}
 	return nil, fmt.Errorf("no status viewer has been implemented for %v", kind)
 }
 
 type DeploymentStatusViewer struct {
 	c extensionsclient.DeploymentsGetter
+}
+
+type DaemonSetStatusViewer struct {
+	c extensionsclient.DaemonSetsGetter
 }
 
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done
@@ -76,4 +82,24 @@ func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) 
 		return fmt.Sprintf("deployment %q successfully rolled out\n", name), true, nil
 	}
 	return fmt.Sprintf("Waiting for deployment spec update to be observed...\n"), false, nil
+}
+
+// Status returns a message describing daemon set status, and a bool value indicating if the status is considered done
+func (s *DaemonSetStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
+	//ignoring revision as DaemonSets does not have history yet
+
+	daemon, err := s.c.DaemonSets(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", false, err
+	}
+	if daemon.Generation <= daemon.Status.ObservedGeneration {
+		if daemon.Status.UpdatedNumberScheduled < daemon.Status.DesiredNumberScheduled {
+			return fmt.Sprintf("Waiting for rollout to finish: %d out of %d new pod have been updated...\n", daemon.Status.UpdatedNumberScheduled, daemon.Status.DesiredNumberScheduled), false, nil
+		}
+		if daemon.Status.NumberAvailable < daemon.Status.DesiredNumberScheduled {
+			return fmt.Sprintf("Waiting for rollout to finish: %d of %d updated pods are available...\n", daemon.Status.NumberAvailable, daemon.Status.DesiredNumberScheduled), false, nil
+		}
+		return fmt.Sprintf("daemon set %q successfully rolled out\n", name), true, nil
+	}
+	return fmt.Sprintf("Waiting for daemon set spec update to be observed...\n"), false, nil
 }

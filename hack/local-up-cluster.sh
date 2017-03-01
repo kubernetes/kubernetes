@@ -29,6 +29,7 @@ RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
 POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
+KUBELET_FLAGS=${KUBELET_FLAGS:-""}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
 # Place the binaries required by NET_PLUGIN in this directory, eg: "/home/kubernetes/bin".
@@ -36,10 +37,7 @@ NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 # if enabled, must set CGROUP_ROOT
-CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-false}
-# this is not defaulted to preserve backward compatibility.
-# if EXPERIMENTAL_CGROUPS_PER_QOS is enabled, recommend setting to /
-CGROUP_ROOT=${CGROUP_ROOT:-""}
+CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-true}
 # name of the cgroup driver, i.e. cgroupfs or systemd
 CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 # owner of client certs, default to current user if not specified
@@ -374,7 +372,7 @@ function start_apiserver {
     fi
 
     # Admission Controllers to invoke prior to persisting objects in cluster
-    ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},ResourceQuota,DefaultStorageClass
+    ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},ResourceQuota,DefaultStorageClass,DefaultTolerationSeconds
 
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
@@ -468,7 +466,7 @@ function start_apiserver {
     # this uses the API port because if you don't have any authenticator, you can't seem to use the secure port at all.
     # this matches what happened with the combination in 1.4.
     # TODO change this conditionally based on whether API_PORT is on or off
-    kube::util::wait_for_url "http://${API_HOST_IP}:${API_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} \
+    kube::util::wait_for_url "http://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} \
         || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
 
     # Create kubeconfigs for all components, using client certs
@@ -578,6 +576,7 @@ function start_kubelet {
       fi
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
+        --enable-cri=false \
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
@@ -594,7 +593,6 @@ function start_kubelet {
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
         --cgroups-per-qos=${CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
-        --cgroup-root=${CGROUP_ROOT} \
         --keep-terminated-pod-volumes=true \
         --eviction-hard=${EVICTION_HARD} \
         --eviction-soft=${EVICTION_SOFT} \
@@ -606,7 +604,8 @@ function start_kubelet {
         ${net_plugin_args} \
         ${container_runtime_endpoint_args} \
         ${image_service_endpoint_args} \
-        --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
+        --port="$KUBELET_PORT" \
+	${KUBELET_FLAGS} >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
       # Quick check that kubelet is running.
       if ps -p $KUBELET_PID > /dev/null ; then 
@@ -692,6 +691,7 @@ function start_kubedns {
         # TODO update to dns role once we have one.
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
         # use kubectl to create kubedns deployment and service
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f ${KUBE_ROOT}/cluster/addons/dns/kubedns-sa.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
         echo "Kube-dns deployment and service successfully deployed."

@@ -19,7 +19,6 @@ go_library(
         "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/client-go/discovery",
-        "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
@@ -48,6 +47,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/fake:all-srcs",
+        "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/scheme:all-srcs",
         "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion:all-srcs",
     ],
     tags = ["automanaged"],

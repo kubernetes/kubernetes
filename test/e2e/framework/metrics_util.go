@@ -117,9 +117,9 @@ var InterestingApiServerMetrics = []string{
 }
 
 var InterestingControllerManagerMetrics = []string{
-	"garbage_collector_event_processing_latency_microseconds",
-	"garbage_collector_dirty_processing_latency_microseconds",
-	"garbage_collector_orphan_processing_latency_microseconds",
+	"garbage_collector_event_queue_latency",
+	"garbage_collector_dirty_queue_latency",
+	"garbage_collector_orhan_queue_latency",
 }
 
 var InterestingKubeletMetrics = []string{
@@ -221,7 +221,7 @@ func readLatencyMetrics(c clientset.Interface) (APIResponsiveness, error) {
 
 	ignoredResources := sets.NewString("events")
 	// TODO: figure out why we're getting non-capitalized proxy and fix this.
-	ignoredVerbs := sets.NewString("WATCHLIST", "PROXY", "proxy", "CONNECT")
+	ignoredVerbs := sets.NewString("WATCH", "WATCHLIST", "PROXY", "proxy", "CONNECT")
 
 	for _, sample := range samples {
 		// Example line:

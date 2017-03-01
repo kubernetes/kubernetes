@@ -59,9 +59,29 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
-	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 )
+
+// alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
+// It is useful in tests and when using kubernetes in an open manner.
+type alwaysAdmit struct{}
+
+func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
+	return nil
+}
+
+func (alwaysAdmit) Handles(operation admission.Operation) bool {
+	return true
+}
+
+type alwaysDeny struct{}
+
+func (alwaysDeny) Admit(a admission.Attributes) (err error) {
+	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
+}
+
+func (alwaysDeny) Handles(operation admission.Operation) bool {
+	return true
+}
 
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
@@ -207,7 +227,7 @@ func init() {
 
 	mapper = nsMapper
 	namespaceMapper = nsMapper
-	admissionControl = admit.NewAlwaysAdmit()
+	admissionControl = alwaysAdmit{}
 	requestContextMapper = request.NewRequestContextMapper()
 
 	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
@@ -240,7 +260,7 @@ func handle(storage map[string]rest.Storage) http.Handler {
 
 // tests with a deny admission controller
 func handleDeny(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, deny.NewAlwaysDeny(), selfLinker)
+	return handleInternal(storage, alwaysDeny{}, selfLinker)
 }
 
 // tests using the new namespace scope mechanism
@@ -457,19 +477,19 @@ func (storage *SimpleRESTStorage) checkContext(ctx request.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *metav1.DeleteOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
 	storage.deleteOptions = options
 	if err := storage.errors["delete"]; err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
 	var err error
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(&genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: id}})
 	}
-	return obj, err
+	return obj, true, err
 }
 
 func (storage *SimpleRESTStorage) New() runtime.Object {
@@ -605,7 +625,8 @@ type LegacyRESTStorage struct {
 }
 
 func (storage LegacyRESTStorage) Delete(ctx request.Context, id string) (runtime.Object, error) {
-	return storage.SimpleRESTStorage.Delete(ctx, id, nil)
+	obj, _, err := storage.SimpleRESTStorage.Delete(ctx, id, nil)
+	return obj, err
 }
 
 type MetadataRESTStorage struct {
@@ -737,6 +758,7 @@ func TestNotFound(t *testing.T) {
 		"groupless namespaced PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
 		"groupless namespaced watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusNotFound},
 		"groupless namespaced watch with bad method":        {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"groupless namespaced watch param with bad method":  {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar?watch=true", http.StatusMethodNotAllowed},
 
 		// Positive checks to make sure everything is wired correctly
 		"GET root": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusOK},
@@ -768,6 +790,7 @@ func TestNotFound(t *testing.T) {
 		"namespaced PUT with extra segment":       {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
 		"namespaced watch missing storage":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusNotFound},
 		"namespaced watch with bad method":        {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"namespaced watch param with bad method":  {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar?watch=true", http.StatusMethodNotAllowed},
 	}
 	handler := handle(map[string]rest.Storage{
 		"simples":     &SimpleRESTStorage{},
@@ -2991,7 +3014,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 		namespace:   "other",
 		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
 	}
-	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, deny.NewAlwaysDeny(), selfLinker)
+	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, alwaysDeny{}, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
