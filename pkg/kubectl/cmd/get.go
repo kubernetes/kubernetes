@@ -54,11 +54,12 @@ var (
 
 		` + valid_resources + `
 
-		This command will hide resources that have completed. For instance, pods that are in the Succeeded or Failed phases.
-		You can see the full results for any resource by providing the '--show-all' flag.
+		This command will hide resources that have completed, such as pods that are
+		in the Succeeded or Failed phases. You can see the full results for any
+		resource by providing the '--show-all' flag.
 
 		By specifying the output as 'template' and providing a Go template as the value
-		of the --template flag, you can filter the attributes of the fetched resource(s).`)
+		of the --template flag, you can filter the attributes of the fetched resources.`)
 
 	get_example = templates.Examples(`
 		# List all pods in ps output format.
@@ -184,13 +185,6 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return cmdutil.UsageError(cmd, usageString)
 	}
 
-	// always show resources when getting by name or filename, or if the output
-	// is machine-consumable, or if multiple resource kinds were requested.
-	if cmdutil.OutputsRawFormat(cmd) {
-		if !cmd.Flag("show-all").Changed {
-			cmd.Flag("show-all").Value.Set("true")
-		}
-	}
 	export := cmdutil.GetFlagBool(cmd, "export")
 
 	filterFuncs := f.DefaultResourceFilterFunc()
