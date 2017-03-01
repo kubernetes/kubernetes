@@ -18,9 +18,7 @@ package daemonset
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -78,15 +76,12 @@ func TestDaemonSetController(t *testing.T) {
 		}
 	})
 
-	daemonsetController.clusterAvailableDelay = time.Second
-	daemonsetController.daemonsetReviewDelay = 50 * time.Millisecond
-	daemonsetController.smallDelay = 20 * time.Millisecond
-	daemonsetController.updateTimeout = 5 * time.Second
+	daemonsetController.minimizeLatency()
 
 	stop := make(chan struct{})
 	daemonsetController.Run(stop)
 
-	daemonset1 := extensionsv1.DaemonSet{
+	daemonset1 := &extensionsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-daemonset",
 			Namespace: "ns",
@@ -100,20 +95,20 @@ func TestDaemonSetController(t *testing.T) {
 	}
 
 	// Test add federated daemonset.
-	daemonsetWatch.Add(&daemonset1)
+	daemonsetWatch.Add(daemonset1)
 
 	// There should be an update to add both the finalizers.
 	updatedDaemonSet := GetDaemonSetFromChan(daemonsetUpdateChan)
 	assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
 	assert.True(t, daemonsetController.hasFinalizerFunc(updatedDaemonSet, metav1.FinalizerOrphanDependents))
-	daemonset1 = *updatedDaemonSet
+	daemonset1 = updatedDaemonSet
 
 	createdDaemonSet := GetDaemonSetFromChan(cluster1CreateChan)
 	assert.NotNil(t, createdDaemonSet)
 	assert.Equal(t, daemonset1.Namespace, createdDaemonSet.Namespace)
 	assert.Equal(t, daemonset1.Name, createdDaemonSet.Name)
-	assert.True(t, daemonsetsEqual(daemonset1, *createdDaemonSet),
-		fmt.Sprintf("expected: %v, actual: %v", daemonset1, *createdDaemonSet))
+	assert.True(t, util.DaemonSetsEquivalent(daemonset1, createdDaemonSet),
+		fmt.Sprintf("expected: %v, actual: %v", *daemonset1, *createdDaemonSet))
 
 	// Wait for the daemonset to appear in the informer store
 	err := WaitForStoreUpdate(
@@ -126,18 +121,18 @@ func TestDaemonSetController(t *testing.T) {
 	daemonset1.Annotations = map[string]string{
 		"A": "B",
 	}
-	daemonsetWatch.Modify(&daemonset1)
+	daemonsetWatch.Modify(daemonset1)
 	updatedDaemonSet = GetDaemonSetFromChan(cluster1UpdateChan)
 	assert.NotNil(t, updatedDaemonSet)
 	assert.Equal(t, daemonset1.Name, updatedDaemonSet.Name)
 	assert.Equal(t, daemonset1.Namespace, updatedDaemonSet.Namespace)
-	assert.True(t, daemonsetsEqual(daemonset1, *updatedDaemonSet),
-		fmt.Sprintf("expected: %v, actual: %v", daemonset1, *updatedDaemonSet))
+	assert.True(t, util.DaemonSetsEquivalent(daemonset1, updatedDaemonSet),
+		fmt.Sprintf("expected: %v, actual: %v", *daemonset1, *updatedDaemonSet))
 
 	// Test update federated daemonset.
 	daemonset1.Spec.Template.Name = "TEST"
-	daemonsetWatch.Modify(&daemonset1)
-	err = CheckObjectFromChan(cluster1UpdateChan, MetaAndSpecCheckingFunction(&daemonset1))
+	daemonsetWatch.Modify(daemonset1)
+	err = CheckObjectFromChan(cluster1UpdateChan, MetaAndSpecCheckingFunction(daemonset1))
 	assert.NoError(t, err)
 
 	// Test add cluster
@@ -146,14 +141,10 @@ func TestDaemonSetController(t *testing.T) {
 	assert.NotNil(t, createdDaemonSet2)
 	assert.Equal(t, daemonset1.Name, createdDaemonSet2.Name)
 	assert.Equal(t, daemonset1.Namespace, createdDaemonSet2.Namespace)
-	assert.True(t, daemonsetsEqual(daemonset1, *createdDaemonSet2),
-		fmt.Sprintf("expected: %v, actual: %v", daemonset1, *createdDaemonSet2))
+	assert.True(t, util.DaemonSetsEquivalent(daemonset1, createdDaemonSet2),
+		fmt.Sprintf("expected: %v, actual: %v", *daemonset1, *createdDaemonSet2))
 
 	close(stop)
-}
-
-func daemonsetsEqual(a, b extensionsv1.DaemonSet) bool {
-	return util.ObjectMetaEquivalent(a.ObjectMeta, b.ObjectMeta) && reflect.DeepEqual(a.Spec, b.Spec)
 }
 
 func GetDaemonSetFromChan(c chan runtime.Object) *extensionsv1.DaemonSet {

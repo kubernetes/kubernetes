@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
@@ -87,6 +88,18 @@ type DaemonSetController struct {
 	clusterAvailableDelay time.Duration
 	smallDelay            time.Duration
 	updateTimeout         time.Duration
+}
+
+// StartDaemonSetController starts a new secret controller
+func StartDaemonSetController(config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
+	restclient.AddUserAgent(config, "daemonset-controller")
+	client := federationclientset.NewForConfigOrDie(config)
+	controller := NewDaemonSetController(client)
+	if minimizeLatency {
+		controller.minimizeLatency()
+	}
+	glog.Infof("Starting DaemonSet controller")
+	controller.Run(stopChan)
 }
 
 // NewDaemonSetController returns a new daemonset controller
@@ -207,6 +220,14 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 	)
 
 	return daemonsetcontroller
+}
+
+// minimizeLatency reduces delays and timeouts to make the controller more responsive (useful for testing).
+func (daemonsetcontroller *DaemonSetController) minimizeLatency() {
+	daemonsetcontroller.clusterAvailableDelay = time.Second
+	daemonsetcontroller.daemonsetReviewDelay = 50 * time.Millisecond
+	daemonsetcontroller.smallDelay = 20 * time.Millisecond
+	daemonsetcontroller.updateTimeout = 5 * time.Second
 }
 
 // Returns true if the given object has the given finalizer in its ObjectMeta.

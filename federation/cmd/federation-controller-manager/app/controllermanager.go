@@ -200,9 +200,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, daemonsetcontroller.ControllerName, daemonsetcontroller.RequiredResources, true) {
-		daemonsetcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "daemonset-controller"))
-		daemonsetcontroller := daemonsetcontroller.NewDaemonSetController(daemonsetcontrollerClientset)
-		daemonsetcontroller.Run(wait.NeverStop)
+		daemonsetcontroller.StartDaemonSetController(restClientCfg, stopChan, minimizeLatency)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, replicasetcontroller.ControllerName, replicasetcontroller.RequiredResources, true) {

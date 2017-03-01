@@ -31,6 +31,7 @@ func TestFederationCRUD(t *testing.T) {
 	defer fedFixture.TearDown(t)
 
 	controllerFixtures := []framework.ControllerFixture{
+		&framework.DaemonSetFixture{},
 		&framework.SecretFixture{},
 	}
 	for _, fixture := range controllerFixtures {

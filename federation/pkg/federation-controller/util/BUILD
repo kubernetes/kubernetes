@@ -14,6 +14,7 @@ go_library(
         "backoff.go",
         "cluster_util.go",
         "configmap.go",
+        "daemonset.go",
         "delaying_deliverer.go",
         "deployment.go",
         "federated_informer.go",
