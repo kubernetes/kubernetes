@@ -1664,6 +1664,30 @@
 			"Rev": "f7ee69f31298ecbe5d2b349c711e2547a617d398"
 		},
 		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api/client",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api/client/volume",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api/spec",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/pkg/units",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/volume",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
 			"ImportPath": "github.com/lpabon/godbc",
 			"Comment": "v1.0-1-g9577782",
 			"Rev": "9577782540c1398b710ddae1b86268ba03a19b0c"
@@ -2392,6 +2416,10 @@
 			"ImportPath": "github.com/xyproto/simpleredis",
 			"Comment": "v1.0-13-g5292687",
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
+		},
+		{
+			"ImportPath": "go.pedge.io/pb/go/google/protobuf",
+			"Rev": "f3c84f58974dc53d460d0855337cad85843bf0df"
 		},
 		{
 			"ImportPath": "go4.org/errorutil",
