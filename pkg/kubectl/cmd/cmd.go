@@ -170,6 +170,10 @@ __custom_func() {
             __kubectl_get_resource_node
             return
             ;;
+        kubectl_config_use-context)
+            __kubectl_get_contexts
+            return
+            ;;
         *)
             ;;
     esac
