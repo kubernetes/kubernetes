@@ -76,6 +76,15 @@ __kubectl_get_namespaces()
     fi
 }
 
+__kubectl_get_contexts()
+{
+    local template kubectl_out
+    template="{{ range .contexts  }}{{ .name }} {{ end }}"
+    if kubectl_out=$(kubectl config $(__kubectl_override_flags) -o template --template="${template}" view 2>/dev/null); then
+        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
+    fi
+}
+
 __kubectl_parse_get()
 {
     local template
@@ -323,6 +332,16 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		cmds.Flag("namespace").Annotations[cobra.BashCompCustom] = append(
 			cmds.Flag("namespace").Annotations[cobra.BashCompCustom],
 			"__kubectl_get_namespaces",
+		)
+	}
+
+	if cmds.Flag("context") != nil {
+		if cmds.Flag("context").Annotations == nil {
+			cmds.Flag("context").Annotations = map[string][]string{}
+		}
+		cmds.Flag("context").Annotations[cobra.BashCompCustom] = append(
+			cmds.Flag("context").Annotations[cobra.BashCompCustom],
+			"__kubectl_get_contexts",
 		)
 	}
 
