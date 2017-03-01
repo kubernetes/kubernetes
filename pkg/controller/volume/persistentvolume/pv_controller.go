@@ -98,7 +98,7 @@ import (
 //
 // The binding is two-step process. PV.Spec.ClaimRef is modified first and
 // PVC.Spec.VolumeName second. At any point of this transaction, the PV or PVC
-// can be modified by user or other controller or completelly deleted. Also,
+// can be modified by user or other controller or completely deleted. Also,
 // two (or more) controllers may try to bind different volumes to different
 // claims at the same time. The controller must recover from any conflicts
 // that may arise from these conditions.
