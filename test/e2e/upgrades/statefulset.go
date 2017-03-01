@@ -33,6 +33,8 @@ type StatefulSetUpgradeTest struct {
 	set     *apps.StatefulSet
 }
 
+func (StatefulSetUpgradeTest) Name() string { return "statefulset-upgrade" }
+
 // Setup creates a StatefulSet and a HeadlessService. It verifies the basic SatefulSet properties
 func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 	ssName := "ss"
