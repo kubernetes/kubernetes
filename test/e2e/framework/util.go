@@ -62,6 +62,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -5402,4 +5403,96 @@ func DescribeIng(ns string) {
 	desc, _ := RunKubectl(
 		"describe", "ing", fmt.Sprintf("--namespace=%v", ns))
 	Logf(desc)
+}
+
+// RestartNodes restart nodes with `gcloud compute instances reset`. Note that this function
+// only works with gcloud now.
+func (f *Framework) RestartNodes(nodeNames []string) error {
+	// List old boot IDs.
+	oldBootIDs := make(map[string]string)
+	for _, name := range nodeNames {
+		node, err := f.ClientSet.Core().Nodes().Get(name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("error getting node info before reboot: %s", err)
+		}
+		oldBootIDs[name] = node.Status.NodeInfo.BootID
+	}
+	// Reboot the nodes.
+	args := []string{
+		"compute",
+		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		"instances",
+		"reset",
+	}
+	args = append(args, nodeNames...)
+	args = append(args, fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone))
+	stdout, stderr, err := RunCmd("gcloud", args...)
+	if err != nil {
+		return fmt.Errorf("error restarting nodes: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
+	}
+	// Wait for their boot IDs to change.
+	for _, name := range nodeNames {
+		if err := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
+			node, err := f.ClientSet.Core().Nodes().Get(name, metav1.GetOptions{})
+			if err != nil {
+				return false, fmt.Errorf("error getting node info after reboot: %s", err)
+			}
+			return node.Status.NodeInfo.BootID != oldBootIDs[name], nil
+		}); err != nil {
+			return fmt.Errorf("error waiting for node %s boot ID to change: %s", name, err)
+		}
+	}
+	return nil
+}
+
+// VerifyEvents verifies there are num specific events generated. Note that reason and message will not be
+// compared if they are empty.
+func VerifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, num int, reason, message string) error {
+	events, err := e.List(options)
+	if err != nil {
+		return err
+	}
+	count := 0
+	for _, event := range events.Items {
+		if (reason != "" && event.Reason != reason) || (message != "" && event.Message != message) {
+			return fmt.Errorf("unexpected event: %v", event)
+		}
+		count += int(event.Count)
+	}
+	if count != num {
+		return fmt.Errorf("expect event number %d, got %d: %v", num, count, events.Items)
+	}
+	return nil
+}
+
+// GetNodeCondition gets specific node condition from the node object.
+func GetNodeCondition(n coreclientset.NodeInterface, nodeName string, condition v1.NodeConditionType) (*v1.NodeCondition, error) {
+	node, err := n.Get(nodeName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	_, c := v1.GetNodeCondition(&node.Status, condition)
+	if c == nil {
+		return nil, fmt.Errorf("node condition %q not found", condition)
+	}
+	return c, nil
+}
+
+// VerifyNodeCondition verifies specific node condition is generated, and status, reason and message are as expected.
+// Note that reason and message will not be compared if they are empty.
+func VerifyNodeCondition(n coreclientset.NodeInterface, nodeName string, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
+	c, err := GetNodeCondition(n, nodeName, condition)
+	if err != nil {
+		return err
+	}
+	if c.Status != status || (reason != "" && c.Reason != reason) || (message != "" && c.Message != message) {
+		return fmt.Errorf("unexpected node condition %q: %+v", condition, c)
+	}
+	return nil
+}
+
+// EventuallyAndConsistently is a combination of gomega Eventually and Consistently.
+func EventuallyAndConsistently(verifyFunc func() error, timeout, consistent, interval time.Duration) {
+	Eventually(verifyFunc, timeout, interval).Should(Succeed())
+	Consistently(verifyFunc, consistent, interval).Should(Succeed())
 }

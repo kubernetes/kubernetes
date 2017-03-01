@@ -95,7 +95,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		}
 
 		By("restarting all of the nodes")
-		err = restartNodes(f, nodeNamesBefore)
+		err = f.RestartNodes(nodeNamesBefore)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("ensuring all nodes are ready after the restart")
@@ -151,42 +151,4 @@ func waitForNPods(ps *testutils.PodStore, expect int, timeout time.Duration) ([]
 			expect, timeout, errLast)
 	}
 	return podNames, nil
-}
-
-func restartNodes(f *framework.Framework, nodeNames []string) error {
-	// List old boot IDs.
-	oldBootIDs := make(map[string]string)
-	for _, name := range nodeNames {
-		node, err := f.ClientSet.Core().Nodes().Get(name, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("error getting node info before reboot: %s", err)
-		}
-		oldBootIDs[name] = node.Status.NodeInfo.BootID
-	}
-	// Reboot the nodes.
-	args := []string{
-		"compute",
-		fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
-		"instances",
-		"reset",
-	}
-	args = append(args, nodeNames...)
-	args = append(args, fmt.Sprintf("--zone=%s", framework.TestContext.CloudConfig.Zone))
-	stdout, stderr, err := framework.RunCmd("gcloud", args...)
-	if err != nil {
-		return fmt.Errorf("error restarting nodes: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
-	}
-	// Wait for their boot IDs to change.
-	for _, name := range nodeNames {
-		if err := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
-			node, err := f.ClientSet.Core().Nodes().Get(name, metav1.GetOptions{})
-			if err != nil {
-				return false, fmt.Errorf("error getting node info after reboot: %s", err)
-			}
-			return node.Status.NodeInfo.BootID != oldBootIDs[name], nil
-		}); err != nil {
-			return fmt.Errorf("error waiting for node %s boot ID to change: %s", name, err)
-		}
-	}
-	return nil
 }

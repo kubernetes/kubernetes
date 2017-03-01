@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -320,23 +319,15 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 					Expect(err).NotTo(HaveOccurred())
 				}
 
-				By(fmt.Sprintf("Wait for %d events generated", test.events))
-				Eventually(func() error {
-					return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
-				}, pollTimeout, pollInterval).Should(Succeed())
-				By(fmt.Sprintf("Make sure only %d events generated", test.events))
-				Consistently(func() error {
-					return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
-				}, pollConsistent, pollInterval).Should(Succeed())
-
+				By(fmt.Sprintf("Make sure %d events generated", test.events))
+				framework.EventuallyAndConsistently(func() error {
+					return framework.VerifyEvents(c.Core().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
+				}, pollTimeout, pollConsistent, pollInterval)
 				By(fmt.Sprintf("Make sure node condition %q is set", condition))
-				Eventually(func() error {
-					return verifyNodeCondition(c.Core().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
-				}, pollTimeout, pollInterval).Should(Succeed())
-				By(fmt.Sprintf("Make sure node condition %q is stable", condition))
-				Consistently(func() error {
-					return verifyNodeCondition(c.Core().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
-				}, pollConsistent, pollInterval).Should(Succeed())
+				framework.EventuallyAndConsistently(func() error {
+					return framework.VerifyNodeCondition(c.Core().Nodes(), framework.TestContext.NodeName,
+						condition, test.conditionType, test.conditionReason, test.conditionMessage)
+				}, pollTimeout, pollConsistent, pollInterval)
 			}
 		})
 
@@ -395,51 +386,4 @@ func getNodeTime() (time.Time, time.Time, error) {
 	bootTime := nodeTime.Add(-time.Duration(info.Uptime * int64(time.Second)))
 
 	return nodeTime, bootTime, nil
-}
-
-// verifyEvents verifies there are num specific events generated
-func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, num int, reason, message string) error {
-	events, err := e.List(options)
-	if err != nil {
-		return err
-	}
-	count := 0
-	for _, event := range events.Items {
-		if event.Reason != reason || event.Message != message {
-			return fmt.Errorf("unexpected event: %v", event)
-		}
-		count += int(event.Count)
-	}
-	if count != num {
-		return fmt.Errorf("expect event number %d, got %d: %v", num, count, events.Items)
-	}
-	return nil
-}
-
-// verifyNoEvents verifies there is no event generated
-func verifyNoEvents(e coreclientset.EventInterface, options metav1.ListOptions) error {
-	events, err := e.List(options)
-	if err != nil {
-		return err
-	}
-	if len(events.Items) != 0 {
-		return fmt.Errorf("unexpected events: %v", events.Items)
-	}
-	return nil
-}
-
-// verifyNodeCondition verifies specific node condition is generated, if reason and message are empty, they will not be checked
-func verifyNodeCondition(n coreclientset.NodeInterface, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
-	node, err := n.Get(framework.TestContext.NodeName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	_, c := v1.GetNodeCondition(&node.Status, condition)
-	if c == nil {
-		return fmt.Errorf("node condition %q not found", condition)
-	}
-	if c.Status != status || c.Reason != reason || c.Message != message {
-		return fmt.Errorf("unexpected node condition %q: %+v", condition, c)
-	}
-	return nil
 }
