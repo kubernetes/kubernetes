@@ -425,7 +425,9 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			if err != nil {
 				return err
 			}
-			if cloud == nil {
+			if strings.EqualFold(s.CloudProvider, cloudprovider.ExternalCloudProvider) {
+				glog.V(2).Info("External cloud provider specified. No cloudprovider initialization will be performed by kubelet")
+			} else if cloud == nil {
 				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
 			} else {
 				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -36,6 +37,8 @@ var (
 	providersMutex sync.Mutex
 	providers      = make(map[string]Factory)
 )
+
+const ExternalCloudProvider = "external"
 
 // RegisterCloudProvider registers a cloudprovider.Factory by name.  This
 // is expected to happen during app startup.
@@ -92,6 +95,11 @@ func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 
 	if name == "" {
 		glog.Info("No cloud provider specified.")
+		return nil, nil
+	}
+
+	if strings.EqualFold(name, ExternalCloudProvider) {
+		glog.Info("External cloud provider specified")
 		return nil, nil
 	}
 
