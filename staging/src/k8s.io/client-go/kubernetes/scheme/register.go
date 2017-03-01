@@ -36,6 +36,7 @@ import (
 	policyv1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	rbacv1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
+	settingsv1alpha1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	storagev1beta1 "k8s.io/client-go/pkg/apis/storage/v1beta1"
 )
 
@@ -78,6 +79,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	policyv1beta1.AddToScheme(scheme)
 	rbacv1beta1.AddToScheme(scheme)
 	rbacv1alpha1.AddToScheme(scheme)
+	settingsv1alpha1.AddToScheme(scheme)
 	storagev1beta1.AddToScheme(scheme)
 
 }

@@ -19,46 +19,58 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.apis.storage.v1beta1;
+package k8s.io.kubernetes.pkg.apis.settings.v1alpha1;
 
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/client-go/pkg/api/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "v1alpha1";
 
-// StorageClass describes the parameters for a class of storage for
-// which PersistentVolumes can be dynamically provisioned.
-// 
-// StorageClasses are non-namespaced; the name of the storage class
-// according to etcd is in ObjectMeta.Name.
-message StorageClass {
-  // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+// PodPreset is a policy resource that defines additional runtime
+// requirements for a Pod.
+message PodPreset {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Provisioner indicates the type of the provisioner.
-  optional string provisioner = 2;
-
-  // Parameters holds the parameters for the provisioner that should
-  // create volumes of this storage class.
   // +optional
-  map<string, string> parameters = 3;
+  optional PodPresetSpec spec = 2;
 }
 
-// StorageClassList is a collection of storage classes.
-message StorageClassList {
-  // Standard list metadata
+// PodPresetList is a list of PodPreset objects.
+message PodPresetList {
+  // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of StorageClasses
-  repeated StorageClass items = 2;
+  // Items is a list of schema objects.
+  repeated PodPreset items = 2;
+}
+
+// PodPresetSpec is a description of a pod injection policy.
+message PodPresetSpec {
+  // Selector is a label query over a set of resources, in this case pods.
+  // Required.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 1;
+
+  // Env defines the collection of EnvVar to inject into containers.
+  // +optional
+  repeated k8s.io.kubernetes.pkg.api.v1.EnvVar env = 2;
+
+  // EnvFrom defines the collection of EnvFromSource to inject into containers.
+  // +optional
+  repeated k8s.io.kubernetes.pkg.api.v1.EnvFromSource envFrom = 3;
+
+  // Volumes defines the collection of Volume to inject into the pod.
+  // +optional
+  repeated k8s.io.kubernetes.pkg.api.v1.Volume volumes = 4;
+
+  // VolumeMounts defines the collection of VolumeMount to inject into containers.
+  // +optional
+  repeated k8s.io.kubernetes.pkg.api.v1.VolumeMount volumeMounts = 5;
 }
 
