@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -53,7 +54,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.DeploymentBasicV1Beta1GeneratorName)
+	cmdutil.AddGeneratorFlags(cmd, cmdutil.DeploymentBasicAppsV1Beta1GeneratorName)
 	cmd.Flags().StringSlice("image", []string{}, "Image name to run.")
 	cmd.MarkFlagRequired("image")
 	return cmd
@@ -65,8 +66,26 @@ func CreateDeployment(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, a
 	if err != nil {
 		return err
 	}
+
+	clientset, err := f.ClientSet()
+	if err != nil {
+		return err
+	}
+	resourcesList, err := clientset.Discovery().ServerResources()
+	// ServerResources ignores errors for old servers do not expose discovery
+	if err != nil {
+		return fmt.Errorf("failed to discover supported resources: %v", err)
+	}
+	// fallback to the old generator if server does not support apps/v1beta deployments
+	generatorName := cmdutil.GetFlagString(cmd, "generator")
+	if !contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) &&
+		generatorName == cmdutil.DeploymentBasicAppsV1Beta1GeneratorName {
+		generatorName = cmdutil.DeploymentBasicV1Beta1GeneratorName
+	}
 	var generator kubectl.StructuredGenerator
-	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
+	switch generatorName {
+	case cmdutil.DeploymentBasicAppsV1Beta1GeneratorName:
+		generator = &kubectl.DeploymentBasicGeneratorV1{Name: name, Images: cmdutil.GetFlagStringSlice(cmd, "image")}
 	case cmdutil.DeploymentBasicV1Beta1GeneratorName:
 		generator = &kubectl.DeploymentBasicGeneratorV1{Name: name, Images: cmdutil.GetFlagStringSlice(cmd, "image")}
 	default:

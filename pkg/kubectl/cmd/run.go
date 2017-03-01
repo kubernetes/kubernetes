@@ -33,8 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/api"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -213,7 +214,9 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		}
 		switch restartPolicy {
 		case api.RestartPolicyAlways:
-			if contains(resourcesList, v1beta1.SchemeGroupVersion.WithResource("deployments")) {
+			if contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+				generatorName = "deployment/apps.v1beta1"
+			} else if contains(resourcesList, extensionsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
 				generatorName = "deployment/v1beta1"
 			} else {
 				generatorName = "run/v1"

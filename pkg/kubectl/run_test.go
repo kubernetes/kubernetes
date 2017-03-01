@@ -22,15 +22,17 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/v1"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 func TestGenerate(t *testing.T) {
+	one := int32(1)
 	tests := []struct {
 		params    map[string]interface{}
-		expected  *api.ReplicationController
+		expected  *v1.ReplicationController
 		expectErr bool
 	}{
 		{
@@ -41,24 +43,24 @@ func TestGenerate(t *testing.T) {
 				"replicas":          "1",
 				"port":              "",
 			},
-			expected: &api.ReplicationController{
+			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: &one,
 					Selector: map[string]string{"run": "foo"},
-					Template: &api.PodTemplateSpec{
+					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Name:            "foo",
 									Image:           "someimage",
-									ImagePullPolicy: api.PullAlways,
+									ImagePullPolicy: v1.PullAlways,
 								},
 							},
 						},
@@ -75,24 +77,24 @@ func TestGenerate(t *testing.T) {
 				"port":     "",
 				"env":      []string{"a=b", "c=d"},
 			},
-			expected: &api.ReplicationController{
+			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: &one,
 					Selector: map[string]string{"run": "foo"},
-					Template: &api.PodTemplateSpec{
+					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Name:  "foo",
 									Image: "someimage",
-									Env: []api.EnvVar{
+									Env: []v1.EnvVar{
 										{
 											Name:  "a",
 											Value: "b",
@@ -119,24 +121,24 @@ func TestGenerate(t *testing.T) {
 				"port":              "",
 				"args":              []string{"bar", "baz", "blah"},
 			},
-			expected: &api.ReplicationController{
+			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: &one,
 					Selector: map[string]string{"run": "foo"},
-					Template: &api.PodTemplateSpec{
+					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Name:            "foo",
 									Image:           "someimage",
-									ImagePullPolicy: api.PullNever,
+									ImagePullPolicy: v1.PullNever,
 									Args:            []string{"bar", "baz", "blah"},
 								},
 							},
@@ -154,20 +156,20 @@ func TestGenerate(t *testing.T) {
 				"args":     []string{"bar", "baz", "blah"},
 				"command":  "true",
 			},
-			expected: &api.ReplicationController{
+			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: &one,
 					Selector: map[string]string{"run": "foo"},
-					Template: &api.PodTemplateSpec{
+					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Name:    "foo",
 									Image:   "someimage",
@@ -186,24 +188,24 @@ func TestGenerate(t *testing.T) {
 				"replicas": "1",
 				"port":     "80",
 			},
-			expected: &api.ReplicationController{
+			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: &one,
 					Selector: map[string]string{"run": "foo"},
-					Template: &api.PodTemplateSpec{
+					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Name:  "foo",
 									Image: "someimage",
-									Ports: []api.ContainerPort{
+									Ports: []v1.ContainerPort{
 										{
 											ContainerPort: 80,
 										},
@@ -224,25 +226,25 @@ func TestGenerate(t *testing.T) {
 				"port":              "80",
 				"hostport":          "80",
 			},
-			expected: &api.ReplicationController{
+			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: &one,
 					Selector: map[string]string{"run": "foo"},
-					Template: &api.PodTemplateSpec{
+					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Name:            "foo",
 									Image:           "someimage",
-									ImagePullPolicy: api.PullIfNotPresent,
-									Ports: []api.ContainerPort{
+									ImagePullPolicy: v1.PullIfNotPresent,
+									Ports: []v1.ContainerPort{
 										{
 											ContainerPort: 80,
 											HostPort:      80,
@@ -272,20 +274,20 @@ func TestGenerate(t *testing.T) {
 				"replicas": "1",
 				"labels":   "foo=bar,baz=blah",
 			},
-			expected: &api.ReplicationController{
+			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: &one,
 					Selector: map[string]string{"foo": "bar", "baz": "blah"},
-					Template: &api.PodTemplateSpec{
+					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Name:  "foo",
 									Image: "someimage",
@@ -348,31 +350,31 @@ func TestGenerate(t *testing.T) {
 				"requests": "cpu=100m,memory=100Mi",
 				"limits":   "cpu=400m,memory=200Mi",
 			},
-			expected: &api.ReplicationController{
+			expected: &v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+				Spec: v1.ReplicationControllerSpec{
+					Replicas: &one,
 					Selector: map[string]string{"foo": "bar", "baz": "blah"},
-					Template: &api.PodTemplateSpec{
+					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Name:  "foo",
 									Image: "someimage",
-									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
-											api.ResourceCPU:    resource.MustParse("100m"),
-											api.ResourceMemory: resource.MustParse("100Mi"),
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
 										},
-										Limits: api.ResourceList{
-											api.ResourceCPU:    resource.MustParse("400m"),
-											api.ResourceMemory: resource.MustParse("200Mi"),
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("400m"),
+											v1.ResourceMemory: resource.MustParse("200Mi"),
 										},
 									},
 								},
@@ -394,8 +396,8 @@ func TestGenerate(t *testing.T) {
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*api.ReplicationController).Spec.Template, test.expected.Spec.Template) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected.Spec.Template, obj.(*api.ReplicationController).Spec.Template)
+		if !reflect.DeepEqual(obj.(*v1.ReplicationController).Spec.Template, test.expected.Spec.Template) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected.Spec.Template, obj.(*v1.ReplicationController).Spec.Template)
 		}
 	}
 }
@@ -403,7 +405,7 @@ func TestGenerate(t *testing.T) {
 func TestGeneratePod(t *testing.T) {
 	tests := []struct {
 		params    map[string]interface{}
-		expected  *api.Pod
+		expected  *v1.Pod
 		expectErr bool
 	}{
 		{
@@ -412,20 +414,20 @@ func TestGeneratePod(t *testing.T) {
 				"image": "someimage",
 				"port":  "",
 			},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:            "foo",
 							Image:           "someimage",
-							ImagePullPolicy: api.PullIfNotPresent,
+							ImagePullPolicy: v1.PullIfNotPresent,
 						},
 					},
-					DNSPolicy:     api.DNSClusterFirst,
-					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
 				},
 			},
 		},
@@ -446,17 +448,17 @@ func TestGeneratePod(t *testing.T) {
 				"image-pull-policy": "Always",
 				"env":               []string{"a=b", "c=d"},
 			},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:            "foo",
 							Image:           "someimage",
-							ImagePullPolicy: api.PullAlways,
-							Env: []api.EnvVar{
+							ImagePullPolicy: v1.PullAlways,
+							Env: []v1.EnvVar{
 								{
 									Name:  "a",
 									Value: "b",
@@ -468,8 +470,8 @@ func TestGeneratePod(t *testing.T) {
 							},
 						},
 					},
-					DNSPolicy:     api.DNSClusterFirst,
-					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
 				},
 			},
 		},
@@ -479,25 +481,25 @@ func TestGeneratePod(t *testing.T) {
 				"image": "someimage",
 				"port":  "80",
 			},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:            "foo",
 							Image:           "someimage",
-							ImagePullPolicy: api.PullIfNotPresent,
-							Ports: []api.ContainerPort{
+							ImagePullPolicy: v1.PullIfNotPresent,
+							Ports: []v1.ContainerPort{
 								{
 									ContainerPort: 80,
 								},
 							},
 						},
 					},
-					DNSPolicy:     api.DNSClusterFirst,
-					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
 				},
 			},
 		},
@@ -508,17 +510,17 @@ func TestGeneratePod(t *testing.T) {
 				"port":     "80",
 				"hostport": "80",
 			},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:            "foo",
 							Image:           "someimage",
-							ImagePullPolicy: api.PullIfNotPresent,
-							Ports: []api.ContainerPort{
+							ImagePullPolicy: v1.PullIfNotPresent,
+							Ports: []v1.ContainerPort{
 								{
 									ContainerPort: 80,
 									HostPort:      80,
@@ -526,8 +528,8 @@ func TestGeneratePod(t *testing.T) {
 							},
 						},
 					},
-					DNSPolicy:     api.DNSClusterFirst,
-					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
 				},
 			},
 		},
@@ -547,21 +549,21 @@ func TestGeneratePod(t *testing.T) {
 				"replicas": "1",
 				"labels":   "foo=bar,baz=blah",
 			},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:            "foo",
 							Image:           "someimage",
-							ImagePullPolicy: api.PullIfNotPresent,
+							ImagePullPolicy: v1.PullIfNotPresent,
 						},
 					},
-					DNSPolicy:     api.DNSClusterFirst,
-					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
 				},
 			},
 		},
@@ -573,23 +575,23 @@ func TestGeneratePod(t *testing.T) {
 				"labels":   "foo=bar,baz=blah",
 				"stdin":    "true",
 			},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:            "foo",
 							Image:           "someimage",
-							ImagePullPolicy: api.PullIfNotPresent,
+							ImagePullPolicy: v1.PullIfNotPresent,
 							Stdin:           true,
 							StdinOnce:       true,
 						},
 					},
-					DNSPolicy:     api.DNSClusterFirst,
-					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
 				},
 			},
 		},
@@ -602,23 +604,23 @@ func TestGeneratePod(t *testing.T) {
 				"stdin":            "true",
 				"leave-stdin-open": "true",
 			},
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:            "foo",
 							Image:           "someimage",
-							ImagePullPolicy: api.PullIfNotPresent,
+							ImagePullPolicy: v1.PullIfNotPresent,
 							Stdin:           true,
 							StdinOnce:       false,
 						},
 					},
-					DNSPolicy:     api.DNSClusterFirst,
-					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
 				},
 			},
 		},
@@ -632,16 +634,17 @@ func TestGeneratePod(t *testing.T) {
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*api.Pod), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.Pod))
+		if !reflect.DeepEqual(obj.(*v1.Pod), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.Pod))
 		}
 	}
 }
 
 func TestGenerateDeployment(t *testing.T) {
+	three := int32(3)
 	tests := []struct {
 		params    map[string]interface{}
-		expected  *extensions.Deployment
+		expected  *extensionsv1beta1.Deployment
 		expectErr bool
 	}{
 		{
@@ -660,33 +663,33 @@ func TestGenerateDeployment(t *testing.T) {
 				"requests":          "cpu=100m,memory=100Mi",
 				"limits":            "cpu=400m,memory=200Mi",
 			},
-			expected: &extensions.Deployment{
+			expected: &extensionsv1beta1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				Spec: extensions.DeploymentSpec{
-					Replicas: 3,
+				Spec: extensionsv1beta1.DeploymentSpec{
+					Replicas: &three,
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar", "baz": "blah"}},
-					Template: api.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
 								{
 									Name:            "foo",
 									Image:           "someimage",
-									ImagePullPolicy: api.PullAlways,
+									ImagePullPolicy: v1.PullAlways,
 									Stdin:           true,
-									Ports: []api.ContainerPort{
+									Ports: []v1.ContainerPort{
 										{
 											ContainerPort: 80,
 											HostPort:      80,
 										},
 									},
 									Command: []string{"bar", "baz", "blah"},
-									Env: []api.EnvVar{
+									Env: []v1.EnvVar{
 										{
 											Name:  "a",
 											Value: "b",
@@ -696,14 +699,14 @@ func TestGenerateDeployment(t *testing.T) {
 											Value: "d",
 										},
 									},
-									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
-											api.ResourceCPU:    resource.MustParse("100m"),
-											api.ResourceMemory: resource.MustParse("100Mi"),
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
 										},
-										Limits: api.ResourceList{
-											api.ResourceCPU:    resource.MustParse("400m"),
-											api.ResourceMemory: resource.MustParse("200Mi"),
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("400m"),
+											v1.ResourceMemory: resource.MustParse("200Mi"),
 										},
 									},
 								},
@@ -724,8 +727,8 @@ func TestGenerateDeployment(t *testing.T) {
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*extensions.Deployment), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*extensions.Deployment))
+		if !reflect.DeepEqual(obj.(*extensionsv1beta1.Deployment), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*extensionsv1beta1.Deployment))
 		}
 	}
 }
@@ -733,7 +736,7 @@ func TestGenerateDeployment(t *testing.T) {
 func TestGenerateJob(t *testing.T) {
 	tests := []struct {
 		params    map[string]interface{}
-		expected  *batch.Job
+		expected  *batchv1.Job
 		expectErr bool
 	}{
 		{
@@ -752,32 +755,32 @@ func TestGenerateJob(t *testing.T) {
 				"limits":           "cpu=400m,memory=200Mi",
 				"restart":          "OnFailure",
 			},
-			expected: &batch.Job{
+			expected: &batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				Spec: batch.JobSpec{
-					Template: api.PodTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},
 						},
-						Spec: api.PodSpec{
-							RestartPolicy: api.RestartPolicyOnFailure,
-							Containers: []api.Container{
+						Spec: v1.PodSpec{
+							RestartPolicy: v1.RestartPolicyOnFailure,
+							Containers: []v1.Container{
 								{
 									Name:      "foo",
 									Image:     "someimage",
 									Stdin:     true,
 									StdinOnce: false,
-									Ports: []api.ContainerPort{
+									Ports: []v1.ContainerPort{
 										{
 											ContainerPort: 80,
 											HostPort:      80,
 										},
 									},
 									Command: []string{"bar", "baz", "blah"},
-									Env: []api.EnvVar{
+									Env: []v1.EnvVar{
 										{
 											Name:  "a",
 											Value: "b",
@@ -787,14 +790,14 @@ func TestGenerateJob(t *testing.T) {
 											Value: "d",
 										},
 									},
-									Resources: api.ResourceRequirements{
-										Requests: api.ResourceList{
-											api.ResourceCPU:    resource.MustParse("100m"),
-											api.ResourceMemory: resource.MustParse("100Mi"),
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
 										},
-										Limits: api.ResourceList{
-											api.ResourceCPU:    resource.MustParse("400m"),
-											api.ResourceMemory: resource.MustParse("200Mi"),
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("400m"),
+											v1.ResourceMemory: resource.MustParse("200Mi"),
 										},
 									},
 								},
@@ -815,8 +818,8 @@ func TestGenerateJob(t *testing.T) {
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*batch.Job), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batch.Job))
+		if !reflect.DeepEqual(obj.(*batchv1.Job), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batchv1.Job))
 		}
 	}
 }
@@ -824,7 +827,7 @@ func TestGenerateJob(t *testing.T) {
 func TestGenerateCronJob(t *testing.T) {
 	tests := []struct {
 		params    map[string]interface{}
-		expected  *batch.CronJob
+		expected  *batchv2alpha1.CronJob
 		expectErr bool
 	}{
 		{
@@ -844,36 +847,36 @@ func TestGenerateCronJob(t *testing.T) {
 				"restart":          "OnFailure",
 				"schedule":         "0/5 * * * ?",
 			},
-			expected: &batch.CronJob{
+			expected: &batchv2alpha1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				Spec: batch.CronJobSpec{
+				Spec: batchv2alpha1.CronJobSpec{
 					Schedule:          "0/5 * * * ?",
-					ConcurrencyPolicy: batch.AllowConcurrent,
-					JobTemplate: batch.JobTemplateSpec{
-						Spec: batch.JobSpec{
-							Template: api.PodTemplateSpec{
+					ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
+					JobTemplate: batchv2alpha1.JobTemplateSpec{
+						Spec: batchv2alpha1.JobSpec{
+							Template: v1.PodTemplateSpec{
 								ObjectMeta: metav1.ObjectMeta{
 									Labels: map[string]string{"foo": "bar", "baz": "blah"},
 								},
-								Spec: api.PodSpec{
-									RestartPolicy: api.RestartPolicyOnFailure,
-									Containers: []api.Container{
+								Spec: v1.PodSpec{
+									RestartPolicy: v1.RestartPolicyOnFailure,
+									Containers: []v1.Container{
 										{
 											Name:      "foo",
 											Image:     "someimage",
 											Stdin:     true,
 											StdinOnce: false,
-											Ports: []api.ContainerPort{
+											Ports: []v1.ContainerPort{
 												{
 													ContainerPort: 80,
 													HostPort:      80,
 												},
 											},
 											Command: []string{"bar", "baz", "blah"},
-											Env: []api.EnvVar{
+											Env: []v1.EnvVar{
 												{
 													Name:  "a",
 													Value: "b",
@@ -883,14 +886,14 @@ func TestGenerateCronJob(t *testing.T) {
 													Value: "d",
 												},
 											},
-											Resources: api.ResourceRequirements{
-												Requests: api.ResourceList{
-													api.ResourceCPU:    resource.MustParse("100m"),
-													api.ResourceMemory: resource.MustParse("100Mi"),
+											Resources: v1.ResourceRequirements{
+												Requests: v1.ResourceList{
+													v1.ResourceCPU:    resource.MustParse("100m"),
+													v1.ResourceMemory: resource.MustParse("100Mi"),
 												},
-												Limits: api.ResourceList{
-													api.ResourceCPU:    resource.MustParse("400m"),
-													api.ResourceMemory: resource.MustParse("200Mi"),
+												Limits: v1.ResourceList{
+													v1.ResourceCPU:    resource.MustParse("400m"),
+													v1.ResourceMemory: resource.MustParse("200Mi"),
 												},
 											},
 										},
@@ -913,8 +916,8 @@ func TestGenerateCronJob(t *testing.T) {
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*batch.CronJob), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batch.CronJob))
+		if !reflect.DeepEqual(obj.(*batchv2alpha1.CronJob), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batchv2alpha1.CronJob))
 		}
 	}
 }
@@ -922,7 +925,7 @@ func TestGenerateCronJob(t *testing.T) {
 func TestParseEnv(t *testing.T) {
 	tests := []struct {
 		envArray  []string
-		expected  []api.EnvVar
+		expected  []v1.EnvVar
 		expectErr bool
 		test      string
 	}{
@@ -932,7 +935,7 @@ func TestParseEnv(t *testing.T) {
 				"HAS_COMMAS=foo,bar",
 				"HAS_EQUALS=jJnro54iUu75xNy==",
 			},
-			expected: []api.EnvVar{
+			expected: []v1.EnvVar{
 				{
 					Name:  "THIS_ENV",
 					Value: "isOK",
@@ -953,7 +956,7 @@ func TestParseEnv(t *testing.T) {
 			envArray: []string{
 				"WITH_OUT_EQUALS",
 			},
-			expected:  []api.EnvVar{},
+			expected:  []v1.EnvVar{},
 			expectErr: true,
 			test:      "test case 2",
 		},
@@ -961,7 +964,7 @@ func TestParseEnv(t *testing.T) {
 			envArray: []string{
 				"WITH_OUT_VALUES=",
 			},
-			expected: []api.EnvVar{
+			expected: []v1.EnvVar{
 				{
 					Name:  "WITH_OUT_VALUES",
 					Value: "",
@@ -974,7 +977,7 @@ func TestParseEnv(t *testing.T) {
 			envArray: []string{
 				"=WITH_OUT_NAME",
 			},
-			expected:  []api.EnvVar{},
+			expected:  []v1.EnvVar{},
 			expectErr: true,
 			test:      "test case 4",
 		},
