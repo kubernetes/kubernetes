@@ -87,6 +87,7 @@ const (
 
 	lbAddrRetryInterval = 5 * time.Second
 	podWaitInterval     = 2 * time.Second
+	initStepTimeout     = 2 * time.Minute
 
 	apiserverServiceTypeFlag      = "api-server-service-type"
 	apiserverAdvertiseAddressFlag = "api-server-advertise-address"
@@ -266,22 +267,36 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	}
 
 	// 1.
-	fmt.Fprint(cmdOut, "Creating a namespace for federation system components... ")
-	_, err = createNamespace(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+	fmt.Fprintf(cmdOut, "Creating a namespace %s for federation system components...", i.commonOptions.FederationSystemNamespace)
+	glog.V(4).Infof("Creating a namespace %s for federation system components", i.commonOptions.FederationSystemNamespace)
+
+	err = runAndShowProgress(cmdOut, func() error {
+		_, err := createNamespace(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+		return err
+	})
 	if err != nil {
 		return err
 	}
-	fmt.Fprint(cmdOut, "done\n")
+	fmt.Fprintln(cmdOut, "done")
 
 	// 2.
-	fmt.Fprint(cmdOut, "Creating federation control plane objects (service, credentials, persistent volume claim)... ")
-	svc, ips, hostnames, err := createService(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.apiServerAdvertiseAddress, i.options.apiServerServiceType, i.options.dryRun)
+	fmt.Fprint(cmdOut, "Creating federation control plane service...")
+	glog.V(4).Info("Creating federation control plane service")
+	var svc *api.Service
+	var ips, hostnames []string
+	var innerErr error
+	err = runAndShowProgress(cmdOut, func() error {
+		svc, ips, hostnames, innerErr = createService(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.apiServerAdvertiseAddress, i.options.apiServerServiceType, i.options.dryRun)
+		return innerErr
+	})
 	if err != nil {
 		return err
 	}
+	fmt.Fprintln(cmdOut, "done")
 	glog.V(4).Infof("Created service named %s with IP addresses %v, hostnames %v", svc.Name, ips, hostnames)
 
 	// 3.
+	fmt.Fprint(cmdOut, "Creating federation control plane objects (credentials, persistent volume claim)...")
 	glog.V(4).Info("Generating TLS certificates and credentials for communicating with the federation API server")
 	entKeyPairs, err := genCerts(i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, HostClusterLocalDNSZoneName, ips, hostnames)
 	if err != nil {
@@ -295,12 +310,12 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	glog.V(4).Info("Certificates and credentials generated")
 
 	// 4.
-	glog.V(4).Info("Creating an entry in the kubeconfig file with the certificate and credential data")
+	glog.V(4).Info("Creating credentials secret for the federation controller manager")
 	_, err = createControllerManagerKubeconfigSecret(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmKubeconfigName, entKeyPairs, i.options.dryRun)
 	if err != nil {
 		return err
 	}
-	glog.V(4).Info("kubeconfig successfully updated")
+	glog.V(4).Info("Credentials secret successfully created")
 
 	// 5.
 	glog.V(4).Info("Creating a persistent volume and a claim to store the federation API server's state, including etcd data")
@@ -312,7 +327,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		}
 	}
 	glog.V(4).Info("Persistent volume and claim created")
-	fmt.Fprint(cmdOut, "done\n")
+	fmt.Fprintln(cmdOut, "done")
 
 	// Since only one IP address can be specified as advertise address,
 	// we arbitrarily pick the first available IP address
@@ -323,7 +338,8 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	}
 
 	// 6.
-	fmt.Fprint(cmdOut, "Creating federation component deployments...")
+	fmt.Fprint(cmdOut, "Creating federation control plane components...")
+	glog.V(4).Info("Creating federation control plane components")
 	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.image, serverCredName, advertiseAddress, i.options.storageBackend, i.options.apiServerOverrides, pvc, i.options.dryRun)
 	if err != nil {
 		return err
@@ -364,10 +380,11 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		return err
 	}
 	glog.V(4).Info("Successfully created federation controller manager deployment")
-	fmt.Fprint(cmdOut, "done\n")
+	fmt.Fprintln(cmdOut, "done")
 
 	// 8.
-	fmt.Fprint(cmdOut, "Updating kubeconfig... ")
+	fmt.Fprint(cmdOut, "Updating kubeconfig...")
+	glog.V(4).Info("Updating kubeconfig")
 	// Pick the first ip/hostname to update the api server endpoint in kubeconfig and also to give information to user
 	// In case of NodePort Service for api server, ips are node external ips.
 	endpoint := ""
@@ -383,26 +400,52 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	err = updateKubeconfig(config, i.commonOptions.Name, endpoint, i.commonOptions.Kubeconfig, entKeyPairs, i.options.dryRun)
 	if err != nil {
+		glog.V(4).Infof("Failed to update kubeconfig: %v", err)
 		return err
 	}
-	fmt.Fprint(cmdOut, "done\n")
+	fmt.Fprintln(cmdOut, "done")
+	glog.V(4).Info("Successfully updated kubeconfig")
 
 	if !i.options.dryRun {
-		fmt.Fprint(cmdOut, "Waiting for federation control plane to come up... ")
-		fedPods := []string{serverName, cmName}
-		err = waitForPods(hostClientset, fedPods, i.commonOptions.FederationSystemNamespace)
-		if err != nil {
-			return err
-		}
-		err = waitSrvHealthy(config, i.commonOptions.Name, i.commonOptions.Kubeconfig)
-		fmt.Fprint(cmdOut, "done\n")
+		fmt.Fprint(cmdOut, "Waiting for federation control plane to come up...")
+		glog.V(4).Info("Waiting for federation control plane to come up")
+		err = runAndShowProgress(cmdOut, func() error {
+			fedPods := []string{serverName, cmName}
+			innerErr := waitForPods(hostClientset, fedPods, i.commonOptions.FederationSystemNamespace)
+			if innerErr != nil {
+				return innerErr
+			}
+			return waitSrvHealthy(config, i.commonOptions.Name, i.commonOptions.Kubeconfig)
+		})
+		glog.V(4).Info("Federation control plane running")
+		fmt.Fprintln(cmdOut, "done")
 		if err != nil {
 			return err
 		}
 		return printSuccess(cmdOut, ips, hostnames, svc)
 	}
-	_, err = fmt.Fprintf(cmdOut, "Federation control plane runs (dry run)\n")
+	_, err = fmt.Fprintln(cmdOut, "Federation control plane runs (dry run)")
+	glog.V(4).Info("Federation control plan runs (dry run)")
 	return err
+}
+
+// runAndShowProgress runs f in a goroutine, displaying a progress indicator
+// as it runs.
+func runAndShowProgress(cmdOut io.Writer, f func() error) error {
+	done := false
+	var err error
+	go func() {
+		err = f()
+		done = true
+	}()
+
+	return wait.Poll(2*time.Second, initStepTimeout, func() (bool, error) {
+		fmt.Fprint(cmdOut, ".")
+		if !done {
+			return false, nil
+		}
+		return true, err
+	})
 }
 
 func createNamespace(clientset client.Interface, namespace string, dryRun bool) (*api.Namespace, error) {
