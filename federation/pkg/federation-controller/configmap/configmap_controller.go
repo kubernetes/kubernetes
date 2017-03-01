@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
@@ -87,6 +88,18 @@ type ConfigMapController struct {
 	clusterAvailableDelay time.Duration
 	smallDelay            time.Duration
 	updateTimeout         time.Duration
+}
+
+// StartConfigMapController starts a new config map controller
+func StartConfigMapController(config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
+	restclient.AddUserAgent(config, "configmap-controller")
+	client := federationclientset.NewForConfigOrDie(config)
+	controller := NewConfigMapController(client)
+	if minimizeLatency {
+		controller.minimizeLatency()
+	}
+	glog.Infof("Starting ConfigMap controller")
+	controller.Run(stopChan)
 }
 
 // NewConfigMapController returns a new configmap controller
@@ -189,6 +202,14 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 	)
 
 	return configmapcontroller
+}
+
+// minimizeLatency reduces delays and timeouts to make the controller more responsive (useful for testing).
+func (configmapcontroller *ConfigMapController) minimizeLatency() {
+	configmapcontroller.clusterAvailableDelay = time.Second
+	configmapcontroller.configmapReviewDelay = 50 * time.Millisecond
+	configmapcontroller.smallDelay = 20 * time.Millisecond
+	configmapcontroller.updateTimeout = 5 * time.Second
 }
 
 // hasFinalizerFunc returns true if the given object has the given finalizer in its ObjectMeta.

@@ -194,9 +194,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, configmapcontroller.ControllerName, configmapcontroller.RequiredResources, true) {
-		configmapcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "configmap-controller"))
-		configmapcontroller := configmapcontroller.NewConfigMapController(configmapcontrollerClientset)
-		configmapcontroller.Run(wait.NeverStop)
+		configmapcontroller.StartConfigMapController(restClientCfg, stopChan, minimizeLatency)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, daemonsetcontroller.ControllerName, daemonsetcontroller.RequiredResources, true) {
