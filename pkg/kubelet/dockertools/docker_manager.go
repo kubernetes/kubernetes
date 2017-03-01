@@ -1794,7 +1794,7 @@ func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container,
 		return kubecontainer.ContainerID{}, fmt.Errorf("InspectContainer: %v", err)
 	}
 
-	dockerLoggingDriver := dockerDefaultLoggingDriver
+	dockerLoggingDriver := ""
 	dockerInfo, err := dm.client.Info()
 	if err != nil {
 		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
@@ -1803,18 +1803,20 @@ func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container,
 		glog.V(10).Infof("Docker logging driver is %s", dockerLoggingDriver)
 	}
 
-	if dockerLoggingDriver != dockerDefaultLoggingDriver {
-		glog.V(5).Infof("Only need to create symbolic link when docker logging driver is %s, current is %s", dockerDefaultLoggingDriver, dockerLoggingDriver)
-	} else {
+	containerLogFile := containerInfo.LogPath
+	if containerLogFile != "" {
 		// Create a symbolic link to the Docker container log file using a name which captures the
 		// full pod name, the container name and the Docker container ID. Cluster level logging will
 		// capture these symbolic filenames which can be used for search terms in Elasticsearch or for
 		// labels for Cloud Logging.
-		containerLogFile := containerInfo.LogPath
 		symlinkFile := LogSymlink(dm.containerLogsDir, kubecontainer.GetPodFullName(pod), container.Name, id.ID)
 		if err = dm.os.Symlink(containerLogFile, symlinkFile); err != nil {
 			glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", format.Pod(pod), container.Name, err)
 		}
+	} else if dockerLoggingDriver == dockerDefaultLoggingDriver {
+		glog.Errorf("Cannot create symbolic link because container log file doesn't exist!")
+	} else {
+		glog.V(5).Infof("Unsupported logging driver: %s", dockerLoggingDriver)
 	}
 
 	// Check if current docker version is higher than 1.10. Otherwise, we have to apply OOMScoreAdj instead of using docker API.
