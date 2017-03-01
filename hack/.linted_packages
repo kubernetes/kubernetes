@@ -63,6 +63,7 @@ pkg/api/v1/service
 pkg/apis/abac/v0
 pkg/apis/abac/v1beta1
 pkg/apis/apps/install
+pkg/apis/apps/v1beta1
 pkg/apis/authentication/install
 pkg/apis/authorization/install
 pkg/apis/autoscaling/install

@@ -12606,6 +12606,7 @@ go_library(
 go_library(
     name = "k8s.io/client-go/informers/apps/v1beta1",
     srcs = [
+        "k8s.io/client-go/informers/apps/v1beta1/deployment.go",
         "k8s.io/client-go/informers/apps/v1beta1/interface.go",
         "k8s.io/client-go/informers/apps/v1beta1/statefulset.go",
     ],
@@ -13066,8 +13067,10 @@ go_library(
     name = "k8s.io/client-go/kubernetes/typed/apps/v1beta1",
     srcs = [
         "k8s.io/client-go/kubernetes/typed/apps/v1beta1/apps_client.go",
+        "k8s.io/client-go/kubernetes/typed/apps/v1beta1/deployment.go",
         "k8s.io/client-go/kubernetes/typed/apps/v1beta1/doc.go",
         "k8s.io/client-go/kubernetes/typed/apps/v1beta1/generated_expansion.go",
+        "k8s.io/client-go/kubernetes/typed/apps/v1beta1/scale.go",
         "k8s.io/client-go/kubernetes/typed/apps/v1beta1/statefulset.go",
     ],
     tags = ["automanaged"],
@@ -13087,6 +13090,8 @@ go_library(
     srcs = [
         "k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake/doc.go",
         "k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake/fake_apps_client.go",
+        "k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake/fake_deployment.go",
+        "k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake/fake_scale.go",
         "k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake/fake_statefulset.go",
     ],
     tags = ["automanaged"],
@@ -13801,7 +13806,9 @@ go_library(
 go_library(
     name = "k8s.io/client-go/listers/apps/v1beta1",
     srcs = [
+        "k8s.io/client-go/listers/apps/v1beta1/deployment.go",
         "k8s.io/client-go/listers/apps/v1beta1/expansion_generated.go",
+        "k8s.io/client-go/listers/apps/v1beta1/scale.go",
         "k8s.io/client-go/listers/apps/v1beta1/statefulset.go",
         "k8s.io/client-go/listers/apps/v1beta1/statefulset_expansion.go",
     ],
@@ -14151,6 +14158,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/apis/extensions",
     ],
 )
 
@@ -14186,6 +14194,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/ugorji/go/codec",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -14197,6 +14206,7 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/apis/apps",
+        "//vendor:k8s.io/client-go/pkg/apis/extensions",
     ],
 )
 

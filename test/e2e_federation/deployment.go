@@ -193,7 +193,7 @@ func waitForDeployment(c *fedclientset.Clientset, namespace string, deploymentNa
 		}
 		specReplicas, statusReplicas := int32(0), int32(0)
 		for _, cluster := range clusters {
-			dep, err := cluster.Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+			dep, err := cluster.Extensions().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				By(fmt.Sprintf("Failed getting deployment: %q/%q/%q, err: %v", cluster.name, namespace, deploymentName, err))
 				return false, err
