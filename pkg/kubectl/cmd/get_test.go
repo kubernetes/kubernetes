@@ -229,10 +229,11 @@ func TestGetObjectsFiltered(t *testing.T) {
 		{args: []string{"pods", "foo"}, flags: map[string]string{"show-all": "false"}, resp: first, expect: []runtime.Object{first}},
 		{args: []string{"pods"}, flags: map[string]string{"show-all": "true"}, resp: pods, expect: []runtime.Object{first, second}},
 		{args: []string{"pods/foo"}, resp: first, expect: []runtime.Object{first}},
-		{args: []string{"pods"}, flags: map[string]string{"output": "yaml"}, resp: pods, expect: []runtime.Object{first, second}},
+		{args: []string{"pods"}, flags: map[string]string{"output": "yaml"}, resp: pods, expect: []runtime.Object{second}},
 		{args: []string{}, flags: map[string]string{"filename": "../../../examples/storage/cassandra/cassandra-controller.yaml"}, resp: pods, expect: []runtime.Object{first, second}},
 
 		{args: []string{"pods"}, resp: pods, expect: []runtime.Object{second}},
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "true", "output": "yaml"}, resp: pods, expect: []runtime.Object{first, second}},
 		{args: []string{"pods"}, flags: map[string]string{"show-all": "false"}, resp: pods, expect: []runtime.Object{second}},
 	}
 
@@ -731,8 +732,8 @@ func TestGetByFormatForcesFlag(t *testing.T) {
 	cmd.Run(cmd, []string{"pods"})
 
 	showAllFlag, _ := cmd.Flags().GetBool("show-all")
-	if !showAllFlag {
-		t.Errorf("expected showAll to be true when getting resource by name")
+	if showAllFlag {
+		t.Errorf("expected showAll to not be true when getting resource")
 	}
 }
 
