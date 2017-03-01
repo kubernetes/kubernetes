@@ -308,12 +308,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {
-			glog.Infof("Started to log from %v for %v", ctx, req.Request.URL.RequestURI())
-			watcher, err := rw.Watch(ctx, &opts)
-			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
-				return
-			}
 			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
 			timeout := time.Duration(0)
 			if opts.TimeoutSeconds != nil {
@@ -321,6 +315,13 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 			if timeout == 0 && minRequestTimeout > 0 {
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
+			}
+			glog.V(2).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.Request.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
+
+			watcher, err := rw.Watch(ctx, &opts)
+			if err != nil {
+				scope.err(err, res.ResponseWriter, req.Request)
+				return
 			}
 			serveWatch(watcher, scope, req, res, timeout)
 			return
