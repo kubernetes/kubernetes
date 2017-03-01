@@ -424,7 +424,7 @@ func (asw *actualStateOfWorld) removeVolumeFromReportAsAttached(
 			return nil
 		}
 	}
-	return fmt.Errorf("volume %q or node %q does not exist in volumesToReportAsAttached list",
+	return fmt.Errorf("volume %q does not exist in volumesToReportAsAttached list or node %q does not exist in nodesToUpdateStatusFor list",
 		volumeName,
 		nodeName)
 
