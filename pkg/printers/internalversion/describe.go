@@ -2917,6 +2917,9 @@ func printTolerationsMultilineWithIndent(w *PrefixWriter, initialIndent, title, 
 				if len(toleration.Effect) != 0 {
 					w.Write(LEVEL_0, ":%s", toleration.Effect)
 				}
+				if toleration.TolerationSeconds != nil {
+					w.Write(LEVEL_0, " for %ds", *toleration.TolerationSeconds)
+				}
 				w.Write(LEVEL_0, "\n")
 				i++
 			}
