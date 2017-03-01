@@ -18,6 +18,7 @@ package framework
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -27,6 +28,15 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
+
+func EtcdUpgrade(target_storage, target_version string) error {
+	switch TestContext.Provider {
+	case "gce":
+		return etcdUpgradeGCE(target_storage, target_version)
+	default:
+		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", TestContext.Provider)
+	}
+}
 
 // The following upgrade functions are passed into the framework below and used
 // to do the actual upgrades.
@@ -39,6 +49,17 @@ var MasterUpgrade = func(v string) error {
 	default:
 		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", TestContext.Provider)
 	}
+}
+
+func etcdUpgradeGCE(target_storage, target_version string) error {
+	env := append(
+		os.Environ(),
+		"TEST_ETCD_VERSION="+target_version,
+		"STORAGE_BACKEND="+target_storage,
+		"TEST_ETCD_IMAGE=3.0.14")
+
+	_, _, err := RunCmdEnv(env, path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-l", "-M")
+	return err
 }
 
 func masterUpgradeGCE(rawV string) error {
@@ -66,8 +87,7 @@ var NodeUpgrade = func(f *Framework, v string, img string) error {
 	var err error
 	switch TestContext.Provider {
 	case "gce":
-		// TODO(maisem): add GCE support for upgrading to different images.
-		err = nodeUpgradeGCE(v)
+		err = nodeUpgradeGCE(v, img)
 	case "gke":
 		err = nodeUpgradeGKE(v, img)
 	default:
@@ -88,8 +108,13 @@ var NodeUpgrade = func(f *Framework, v string, img string) error {
 	return nil
 }
 
-func nodeUpgradeGCE(rawV string) error {
+func nodeUpgradeGCE(rawV, img string) error {
 	v := "v" + rawV
+	if img != "" {
+		env := append(os.Environ(), "KUBE_NODE_OS_DISTRIBUTION="+img)
+		_, _, err := RunCmdEnv(env, path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", "-o", v)
+		return err
+	}
 	_, _, err := RunCmd(path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", v)
 	return err
 }

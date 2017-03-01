@@ -26,29 +26,34 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	. "github.com/onsi/ginkgo"
 )
 
-// TODO(mikedanese): Add setup, validate, and teardown for:
-//  - secrets
-//  - volumes
-//  - persistent volumes
+var upgradeTests = []upgrades.Test{
+	&upgrades.ServiceUpgradeTest{},
+}
+
 var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
 
 	framework.KubeDescribe("master upgrade", func() {
-		It("should maintain responsive services [Feature:MasterUpgrade]", func() {
+		It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
 			cm := chaosmonkey.New(func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.MasterUpgrade(v))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, v))
 			})
-			cm.Register(func(sem *chaosmonkey.Semaphore) {
-				// Close over f.
-				testServiceRemainsUp(f, sem)
-			})
+			for _, t := range upgradeTests {
+				cm.RegisterInterface(&chaosMonkeyAdapter{
+					test:        t,
+					framework:   f,
+					upgradeType: upgrades.MasterUpgrade,
+				})
+			}
+
 			cm.Do()
 		})
 	})
@@ -61,24 +66,13 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
 			})
-			cm.Register(func(sem *chaosmonkey.Semaphore) {
-				// Close over f.
-				testServiceUpBeforeAndAfter(f, sem)
-			})
-			cm.Do()
-		})
-
-		It("should maintain responsive services [Feature:ExperimentalNodeUpgrade]", func() {
-			cm := chaosmonkey.New(func() {
-				v, err := realVersion(framework.TestContext.UpgradeTarget)
-				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
-				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
-			})
-			cm.Register(func(sem *chaosmonkey.Semaphore) {
-				// Close over f.
-				testServiceRemainsUp(f, sem)
-			})
+			for _, t := range upgradeTests {
+				cm.RegisterInterface(&chaosMonkeyAdapter{
+					test:        t,
+					framework:   f,
+					upgradeType: upgrades.NodeUpgrade,
+				})
+			}
 			cm.Do()
 		})
 	})
@@ -93,30 +87,57 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
 			})
-			cm.Register(func(sem *chaosmonkey.Semaphore) {
-				// Close over f.
-				testServiceUpBeforeAndAfter(f, sem)
-			})
-			cm.Do()
-		})
-
-		It("should maintain responsive services [Feature:ExperimentalClusterUpgrade]", func() {
-			cm := chaosmonkey.New(func() {
-				v, err := realVersion(framework.TestContext.UpgradeTarget)
-				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.MasterUpgrade(v))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, v))
-				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
-				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
-			})
-			cm.Register(func(sem *chaosmonkey.Semaphore) {
-				// Close over f.
-				testServiceRemainsUp(f, sem)
-			})
+			for _, t := range upgradeTests {
+				cm.RegisterInterface(&chaosMonkeyAdapter{
+					test:        t,
+					framework:   f,
+					upgradeType: upgrades.ClusterUpgrade,
+				})
+			}
 			cm.Do()
 		})
 	})
 })
+
+var _ = framework.KubeDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
+	f := framework.NewDefaultFramework("etcd-upgrade")
+
+	framework.KubeDescribe("etcd upgrade", func() {
+		It("should maintain a functioning cluster", func() {
+			cm := chaosmonkey.New(func() {
+				framework.ExpectNoError(framework.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
+				// TODO(mml): verify the etcd version
+			})
+			for _, t := range upgradeTests {
+				cm.RegisterInterface(&chaosMonkeyAdapter{
+					test:        t,
+					framework:   f,
+					upgradeType: upgrades.EtcdUpgrade,
+				})
+			}
+
+			cm.Do()
+		})
+	})
+})
+
+type chaosMonkeyAdapter struct {
+	test        upgrades.Test
+	framework   *framework.Framework
+	upgradeType upgrades.UpgradeType
+}
+
+func (cma *chaosMonkeyAdapter) Setup() {
+	cma.test.Setup(cma.framework)
+}
+
+func (cma *chaosMonkeyAdapter) Test(stopCh <-chan struct{}) {
+	cma.test.Test(cma.framework, stopCh, cma.upgradeType)
+}
+
+func (cma *chaosMonkeyAdapter) Teardown() {
+	cma.test.Teardown(cma.framework)
+}
 
 // realVersion turns a version constant s into a version string deployable on
 // GKE.  See hack/get-build.sh for more information.
@@ -128,67 +149,6 @@ func realVersion(s string) (string, error) {
 	}
 	framework.Logf("Version for %q is %q", s, v)
 	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil
-}
-
-func testServiceUpBeforeAndAfter(f *framework.Framework, sem *chaosmonkey.Semaphore) {
-	testService(f, sem, false)
-}
-
-func testServiceRemainsUp(f *framework.Framework, sem *chaosmonkey.Semaphore) {
-	testService(f, sem, true)
-}
-
-// testService is a helper for testServiceUpBeforeAndAfter and testServiceRemainsUp with a flag for testDuringDisruption
-//
-// TODO(ihmccreery) remove this abstraction once testServiceUpBeforeAndAfter is no longer needed, because node upgrades
-// maintain a responsive service.
-func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringDisruption bool) {
-	// Setup
-	serviceName := "service-test"
-
-	jig := NewServiceTestJig(f.ClientSet, serviceName)
-	// nodeIP := pickNodeIP(jig.Client) // for later
-
-	By("creating a TCP service " + serviceName + " with type=LoadBalancer in namespace " + f.Namespace.Name)
-	// TODO it's weird that we have to do this and then wait WaitForLoadBalancer which changes
-	// tcpService.
-	tcpService := jig.CreateTCPServiceOrFail(f.Namespace.Name, func(s *api.Service) {
-		s.Spec.Type = api.ServiceTypeLoadBalancer
-	})
-	tcpService = jig.WaitForLoadBalancerOrFail(f.Namespace.Name, tcpService.Name, loadBalancerCreateTimeoutDefault)
-	jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
-
-	// Get info to hit it with
-	tcpIngressIP := getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
-	svcPort := int(tcpService.Spec.Ports[0].Port)
-
-	By("creating pod to be part of service " + serviceName)
-	// TODO newRCTemplate only allows for the creation of one replica... that probably won't
-	// work so well.
-	jig.RunOrFail(f.Namespace.Name, nil)
-
-	// Hit it once before considering ourselves ready
-	By("hitting the pod through the service's LoadBalancer")
-	jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeoutDefault)
-
-	sem.Ready()
-
-	if testDuringDisruption {
-		// Continuous validation
-		wait.Until(func() {
-			By("hitting the pod through the service's LoadBalancer")
-			jig.TestReachableHTTP(tcpIngressIP, svcPort, framework.Poll)
-		}, framework.Poll, sem.StopCh)
-	} else {
-		// Block until chaosmonkey is done
-		By("waiting for upgrade to finish without checking if service remains up")
-		<-sem.StopCh
-	}
-
-	// Sanity check and hit it once more
-	By("hitting the pod through the service's LoadBalancer")
-	jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeoutDefault)
-	jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 }
 
 func checkMasterVersion(c clientset.Interface, want string) error {

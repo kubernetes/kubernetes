@@ -1,0 +1,503 @@
++e2e:3> FEDERATION='' FEDERATIONS_DOMAIN_MAP='federation=kube.5yetis.net' PROJECT=mml-e2e E2E_ZONES=us-central1-f KUBE_GCE_ZONE=us-central1-f FEDERATION_PUSH_REPO_BASE=gcr.io/mml-e2e KUBERNETES_PROVIDER=gce KUBE_FASTBUILD=true GINKGO_PARALLEL=y PROJECT=mml-e2e KUBE_GCE_INSTANCE_PREFIX=e2e KUBE_RELEASE_RUN_TESTS=n NUM_NODES=2 CLOUDSDK_CORE_PRINT_UNHANDLED_TRACEBACKS=1 DNS_ZONE_NAME=kube.5yetis.net. go run hack/e2e.go -- -v --test '--test_args=--ginkgo.focus=\[Feature:EtcdUpgrade\] --upgrade-target=ci/latest --upgrade-image=gci'
+2017/02/15 17:14:49 e2e.go:76: Calling kubetest -v --test --test_args=--ginkgo.focus=\[Feature:EtcdUpgrade\] --upgrade-target=ci/latest --upgrade-image=gci...
+2017/02/15 17:14:49 util.go:96: Running: ./cluster/kubectl.sh version --match-server-version=false
+Client Version: version.Info{Major:"1", Minor:"6+", GitVersion:"v1.6.0-alpha.2.232+16afa27e589305-dirty", GitCommit:"16afa27e5893057d559e15419b6b2f4a03ca6ea2", GitTreeState:"dirty", BuildDate:"2017-02-16T00:33:58Z", GoVersion:"go1.7.4", Compiler:"gc", Platform:"linux/amd64"}
+Server Version: version.Info{Major:"1", Minor:"6+", GitVersion:"v1.6.0-alpha.2.227+a1afc024cbfae3", GitCommit:"a1afc024cbfae3b480e9a216b375756603bf9d62", GitTreeState:"clean", BuildDate:"2017-02-15T23:57:11Z", GoVersion:"go1.7.4", Compiler:"gc", Platform:"linux/amd64"}
+2017/02/15 17:14:50 util.go:98: Step './cluster/kubectl.sh version --match-server-version=false' finished in 328.937227ms
+2017/02/15 17:14:50 util.go:96: Running: ./hack/e2e-internal/e2e-status.sh
+Project: mml-e2e
+Zone: us-central1-f
+Client Version: version.Info{Major:"1", Minor:"6+", GitVersion:"v1.6.0-alpha.2.232+16afa27e589305-dirty", GitCommit:"16afa27e5893057d559e15419b6b2f4a03ca6ea2", GitTreeState:"dirty", BuildDate:"2017-02-16T00:33:58Z", GoVersion:"go1.7.4", Compiler:"gc", Platform:"linux/amd64"}
+Server Version: version.Info{Major:"1", Minor:"6+", GitVersion:"v1.6.0-alpha.2.227+a1afc024cbfae3", GitCommit:"a1afc024cbfae3b480e9a216b375756603bf9d62", GitTreeState:"clean", BuildDate:"2017-02-15T23:57:11Z", GoVersion:"go1.7.4", Compiler:"gc", Platform:"linux/amd64"}
+2017/02/15 17:14:50 util.go:98: Step './hack/e2e-internal/e2e-status.sh' finished in 388.742125ms
+2017/02/15 17:14:50 util.go:96: Running: ./hack/ginkgo-e2e.sh --ginkgo.focus=\[Feature:EtcdUpgrade\] --upgrade-target=ci/latest --upgrade-image=gci
+Setting up for KUBERNETES_PROVIDER="gce".
+Project: mml-e2e
+Zone: us-central1-f
+Trying to find master named 'e2e-master'
+Looking for address 'e2e-master-ip'
+Using master: e2e-master (external IP: 104.154.182.166)
+Running Suite: Kubernetes e2e suite
+===================================
+Random Seed: [1m1487207691[0m - Will randomize all specs
+Will run [1m1[0m of [1m514[0m specs
+
+Running in parallel across [1m25[0m nodes
+
+Feb 15 17:14:52.511: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:52.511778   20743 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420c943c0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420a58000)}
+Feb 15 17:14:53.045: INFO: >>> kubeConfig: /usr/local/google/home/mml/.kube/config
+
+Feb 15 17:14:53.061: INFO: Waiting up to 4h0m0s for all (but 0) nodes to be schedulable
+Feb 15 17:14:53.303: INFO: Waiting up to 10m0s for all pods (need at least 0) in namespace 'kube-system' to be running and ready
+Feb 15 17:14:53.348: INFO: 2 / 2 pods in namespace "kube-system" are in Success state (0 seconds elapsed)
+Feb 15 17:14:53.480: INFO: e2e-image-puller-e2e-minion-group-kvwp in state Succeeded, ignoring
+Feb 15 17:14:53.480: INFO: e2e-image-puller-e2e-minion-group-rttr in state Succeeded, ignoring
+Feb 15 17:14:53.480: INFO: 21 / 23 pods in namespace 'kube-system' are running and ready (0 seconds elapsed)
+Feb 15 17:14:53.480: INFO: expected 6 pod replicas in namespace 'kube-system', 6 are Running and Ready.
+Feb 15 17:14:53.525: INFO: 2 / 2 pods in namespace "kube-system" are in Success state (0 seconds elapsed)
+Feb 15 17:14:53.525: INFO: Dumping network health container logs from all nodes
+[1mSTEP[0m: Logs of kube-system/e2e-image-puller-e2e-minion-group-kvwp:nethealth-check on node e2e-minion-group-kvwp
+Feb 15 17:14:53.616: INFO: nethealth : STARTLOG
+2017/02/16 00:45:40 HTTP HEAD reports content length: 67108864 - running GET
+2017/02/16 00:45:40 DOWNLOAD: 67108864 bytes 643 ms Bandwidth ~ 101922 KiB/sec
+2017/02/16 00:45:41 Hash Matches expected value
+
+ENDLOG for container kube-system:e2e-image-puller-e2e-minion-group-kvwp:nethealth-check
+[1mSTEP[0m: Logs of kube-system/e2e-image-puller-e2e-minion-group-rttr:nethealth-check on node e2e-minion-group-rttr
+Feb 15 17:14:53.663: INFO: nethealth : STARTLOG
+2017/02/16 00:45:42 HTTP HEAD reports content length: 67108864 - running GET
+2017/02/16 00:45:43 DOWNLOAD: 67108864 bytes 549 ms Bandwidth ~ 119373 KiB/sec
+2017/02/16 00:45:44 Hash Matches expected value
+
+ENDLOG for container kube-system:e2e-image-puller-e2e-minion-group-rttr:nethealth-check
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.666: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.666743   20849 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc42076f2c0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc4209a9f80)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.697: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.698085   20784 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420b21e30), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420cb24e0)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.689: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.689964   20838 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc4207cb5c0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420f8e420)}
+
+[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.702: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.703062   20833 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420a3f290), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420a53ec0)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.694: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.694875   20873 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420b0ca80), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420c72000)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.713: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.714460   20836 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420d9e090), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420fc5500)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.663: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.664107   20835 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc4203c31a0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420bab1a0)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.687: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.687882   20868 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420b65bc0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420f48120)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.702: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.703077   20780 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc42117b230), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc4211ff020)}
+
+[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.680: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.680828   20741 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420b69c20), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc42102d3e0)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.703: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.703849   20764 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc4211e8ae0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc4211da600)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.713: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.713649   20890 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc4210d14d0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc4210ff680)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.697: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.698129   20782 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420ab5590), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc42115b860)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.677: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.678232   20763 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc42074cdb0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc4210ac9c0)}
+
+
+Feb 15 17:14:53.679: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.679341   20846 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420334900), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420018f00)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.677: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.678175   20766 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420c0ae10), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc4211e47e0)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.683: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.683824   20865 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc4210a0e40), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420f9a5a0)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.704: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.704710   20770 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420f47560), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc42075c300)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.721: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.721539   20854 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc4208c54d0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc4206d4300)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.703: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.706978   20869 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420f2e210), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420d34540)}
+
+
+Feb 15 17:14:53.695: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.695751   20739 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420c620f0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc4202c0420)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.694: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.694869   20793 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420aabaa0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420e5f6e0)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.691: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.691414   20758 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc42072b320), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc420726d20)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+Feb 15 17:14:53.700: INFO: Fetching cloud provider for "gce"
+
+I0215 17:14:53.700456   20757 gce.go:327] Using DefaultTokenSource &oauth2.reuseTokenSource{new:(*oauth2.tokenRefresher)(0xc420357dd0), mu:sync.Mutex{state:0, sema:0x0}, t:(*oauth2.Token)(0xc4207e0d80)}
+
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+[90m------------------------------[0m
+[BeforeEach] [k8s.io] etcd Upgrade [Feature:EtcdUpgrade]
+  /go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/test/e2e/framework/framework.go:125
+[1mSTEP[0m: Creating a kubernetes client
+Feb 15 17:14:54.018: INFO: >>> kubeConfig: /usr/local/google/home/mml/.kube/config
+
+[1mSTEP[0m: Building a namespace api object
+[1mSTEP[0m: Waiting for a default service account to be provisioned in namespace
+[It] should maintain a functioning cluster
+  /go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/test/e2e/etcd_upgrade.go:50
+[1mSTEP[0m: Waiting for all async tests to be ready
+[1mSTEP[0m: Creating a secret
+[1mSTEP[0m: creating a TCP service service-test with type=LoadBalancer in namespace e2e-tests-service-upgrade-bg7fb
+[1mSTEP[0m: Making sure the secret is consumable
+[1mSTEP[0m: Creating a pod to test volume consume secrets
+Feb 15 17:14:54.506: INFO: Waiting up to 20m0s for service "service-test" to have a LoadBalancer
+Feb 15 17:14:54.538: INFO: Waiting up to 5m0s for pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 status to be success or failure
+Feb 15 17:14:54.579: INFO: Waiting for pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 in namespace 'e2e-tests-secret-upgrade-ph4dc' status to be 'success or failure'(found phase: "Pending", readiness: false) (41.717914ms elapsed)
+Feb 15 17:14:56.619: INFO: Waiting for pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 in namespace 'e2e-tests-secret-upgrade-ph4dc' status to be 'success or failure'(found phase: "Running", readiness: false) (2.081399822s elapsed)
+[1mSTEP[0m: Saw pod success
+Feb 15 17:14:58.699: INFO: Trying to get logs from node e2e-minion-group-kvwp pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 container secret-volume-test: <nil>
+[1mSTEP[0m: delete the pod
+Feb 15 17:14:58.795: INFO: Waiting for pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 to disappear
+Feb 15 17:14:58.836: INFO: Pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 no longer exists
+[1mSTEP[0m: Creating a pod to test env consume secrets
+Feb 15 17:14:58.944: INFO: Waiting up to 5m0s for pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 status to be success or failure
+Feb 15 17:14:58.993: INFO: Waiting for pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 in namespace 'e2e-tests-secret-upgrade-ph4dc' status to be 'success or failure'(found phase: "Pending", readiness: false) (48.470346ms elapsed)
+Feb 15 17:15:01.032: INFO: Waiting for pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 in namespace 'e2e-tests-secret-upgrade-ph4dc' status to be 'success or failure'(found phase: "Pending", readiness: false) (2.088190583s elapsed)
+[1mSTEP[0m: Saw pod success
+Feb 15 17:15:03.113: INFO: Trying to get logs from node e2e-minion-group-kvwp pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 container secret-env-test: <nil>
+[1mSTEP[0m: delete the pod
+Feb 15 17:15:03.217: INFO: Waiting for pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 to disappear
+Feb 15 17:15:03.257: INFO: Pod pod-secrets-52e10974-f3e5-11e6-b61e-40a8f055c9c7 no longer exists
+[1mSTEP[0m: creating pod to be part of service service-test
+Feb 15 17:15:42.643: INFO: Waiting up to 2m0s for 1 pods to be created
+Feb 15 17:15:42.685: INFO: Found all 1 pods
+Feb 15 17:15:42.685: INFO: Waiting up to 2m0s for 1 pods to be running and ready: [service-test-nz15f]
+Feb 15 17:15:42.685: INFO: Waiting up to 2m0s for pod service-test-nz15f status to be running and ready
+Feb 15 17:15:42.725: INFO: Waiting for pod service-test-nz15f in namespace 'e2e-tests-service-upgrade-bg7fb' status to be 'running and ready'(found phase: "Pending", readiness: false) (39.517624ms elapsed)
+Feb 15 17:15:44.764: INFO: Waiting for pod service-test-nz15f in namespace 'e2e-tests-service-upgrade-bg7fb' status to be 'running and ready'(found phase: "Running", readiness: false) (2.079044729s elapsed)
+Feb 15 17:15:46.804: INFO: Wanted all 1 pods to be running and ready. Result: true. Pods: [service-test-nz15f]
+[1mSTEP[0m: hitting the pod through the service's LoadBalancer
+Feb 15 17:15:46.804: INFO: Testing HTTP reachability of http://104.198.19.207:80/echo?msg=hello
+Feb 15 17:15:51.804: INFO: Got error testing for reachability of http://104.198.19.207:80/echo?msg=hello: Get http://104.198.19.207:80/echo?msg=hello: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)
+Feb 15 17:15:53.804: INFO: Testing HTTP reachability of http://104.198.19.207:80/echo?msg=hello
+[1mSTEP[0m: waiting for upgrade to finish without checking if service remains up
+[1mSTEP[0m: Starting disruption
+Feb 15 17:15:53.881: INFO: Running /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh []
+!!! EXPERIMENTAL !!!
+
+/usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh [-M | -N | -P] [-o] (-l | <version number or publication>)
+  Upgrades master and nodes by default
+  -M:  Upgrade master only
+  -N:  Upgrade nodes only
+  -P:  Node upgrade prerequisites only (create a new instance template)
+  -o:  Use os distro sepcified in KUBE_NODE_OS_DISTRIBUTION for new nodes. Options include 'debian' or 'gci'
+  -l:  Use local(dev) binaries. This is only supported for master upgrades.
+
+  Version number or publication is either a proper version number
+  (e.g. "v1.0.6", "v1.2.0-alpha.1.881+376438b69c7612") or a version
+  publication of the form <bucket>/<version> (e.g. "release/stable",
+  "ci/latest-1").  Some common ones are:
+    - "release/stable"
+    - "release/latest"
+    - "ci/latest"
+  See the docs on getting builds for more information about version publication.
+
+(... Fetching current release versions ...)
+
+Right now, versions are as follows:
+  release/stable: /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.5.3
+  release/latest: /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.6.0-alpha.2
+  ci/latest:      /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.6.0-alpha.2.239+c478d7282771a3
+Feb 15 17:15:57.915: INFO: Unexpected error occurred: error running /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh []; got error exit status 1, stdout "!!! EXPERIMENTAL !!!\n\n/usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh [-M | -N | -P] [-o] (-l | <version number or publication>)\n  Upgrades master and nodes by default\n  -M:  Upgrade master only\n  -N:  Upgrade nodes only\n  -P:  Node upgrade prerequisites only (create a new instance template)\n  -o:  Use os distro sepcified in KUBE_NODE_OS_DISTRIBUTION for new nodes. Options include 'debian' or 'gci'\n  -l:  Use local(dev) binaries. This is only supported for master upgrades.\n\n  Version number or publication is either a proper version number\n  (e.g. \"v1.0.6\", \"v1.2.0-alpha.1.881+376438b69c7612\") or a version\n  publication of the form <bucket>/<version> (e.g. \"release/stable\",\n  \"ci/latest-1\").  Some common ones are:\n    - \"release/stable\"\n    - \"release/latest\"\n    - \"ci/latest\"\n  See the docs on getting builds for more information about version publication.\n\n(... Fetching current release versions ...)\n\nRight now, versions are as follows:\n  release/stable: /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.5.3\n  release/latest: /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.6.0-alpha.2\n  ci/latest:      /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.6.0-alpha.2.239+c478d7282771a3\n", stderr ""
+[AfterEach] [k8s.io] etcd Upgrade [Feature:EtcdUpgrade]
+  /go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/test/e2e/framework/framework.go:126
+[1mSTEP[0m: Collecting events from namespace "e2e-tests-etcd-upgrade-kz06g".
+[1mSTEP[0m: Found 0 events.
+Feb 15 17:15:58.082: INFO: POD                                     NODE                   PHASE      GRACE  CONDITIONS
+Feb 15 17:15:58.082: INFO: service-test-nz15f                      e2e-minion-group-kvwp  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 17:15:42 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 17:15:45 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 17:15:42 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: e2e-image-puller-e2e-minion-group-kvwp  e2e-minion-group-kvwp  Succeeded         [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:30 -0800 PST PodCompleted } {Ready False 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:41 -0800 PST PodCompleted } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:37 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: e2e-image-puller-e2e-minion-group-rttr  e2e-minion-group-rttr  Succeeded         [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:33 -0800 PST PodCompleted } {Ready False 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:44 -0800 PST PodCompleted } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:40 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: etcd-empty-dir-cleanup-e2e-master       e2e-master             Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:54:26 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: etcd-server-e2e-master                  e2e-master             Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:58 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: etcd-server-events-e2e-master           e2e-master             Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:58 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: fluentd-gcp-v1.38-6mppv                 e2e-minion-group-kvwp  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:30 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:11 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:37 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: fluentd-gcp-v1.38-b48jv                 e2e-minion-group-rttr  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:33 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:13 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:40 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: heapster-v1.3.0-beta.0-864412088-hsktb  e2e-minion-group-rttr  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:58 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:47:03 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:58 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: kube-addon-manager-e2e-master           e2e-master             Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:54:09 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: kube-apiserver-e2e-master               e2e-master             Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:56 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: kube-controller-manager-e2e-master      e2e-master             Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:49 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: kube-dns-659902490-rm7p6                e2e-minion-group-rttr  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:30 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:50 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:30 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: kube-dns-autoscaler-3887590594-cq8k6    e2e-minion-group-kvwp  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:30 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:39 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:30 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: kube-proxy-e2e-minion-group-kvwp        e2e-minion-group-kvwp  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:30 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:37 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:37 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: kube-proxy-e2e-minion-group-rttr        e2e-minion-group-rttr  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:40 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:41 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:40 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: kube-scheduler-e2e-master               e2e-master             Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:48 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  }]
+Feb 15 17:15:58.082: INFO: kubernetes-dashboard-3345858451-lhmc3   e2e-minion-group-kvwp  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:30 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:45 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:30 -0800 PST  }]
+Feb 15 17:15:58.083: INFO: l7-default-backend-1270908455-wsvz4     e2e-minion-group-rttr  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:30 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:41 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:30 -0800 PST  }]
+Feb 15 17:15:58.083: INFO: l7-lb-controller-v0.9.1-e2e-master      e2e-master             Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:54:26 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  }]
+Feb 15 17:15:58.083: INFO: monitoring-influxdb-grafana-v4-2qmfs    e2e-minion-group-kvwp  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:30 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:47:22 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:46:30 -0800 PST  }]
+Feb 15 17:15:58.083: INFO: node-problem-detector-v0.1-lpt6z        e2e-minion-group-kvwp  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:30 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:40 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:37 -0800 PST  }]
+Feb 15 17:15:58.083: INFO: node-problem-detector-v0.1-p241n        e2e-minion-group-rttr  Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:33 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:43 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:45:40 -0800 PST  }]
+Feb 15 17:15:58.083: INFO: rescheduler-v0.2.1-e2e-master           e2e-master             Running           [{Initialized True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  } {Ready True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:54:21 -0800 PST  } {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2017-02-15 16:53:46 -0800 PST  }]
+Feb 15 17:15:58.083: INFO: 
+Feb 15 17:15:58.125: INFO: 
+Logging node info for node e2e-master
+Feb 15 17:15:58.165: INFO: Node Info: &Node{ObjectMeta:k8s_io_apimachinery_pkg_apis_meta_v1.ObjectMeta{Name:e2e-master,GenerateName:,Namespace:,SelfLink:/api/v1/nodese2e-master,UID:6f5e8a51-f3e2-11e6-ae62-42010af00002,ResourceVersion:3907,Generation:0,CreationTimestamp:2017-02-15 16:54:13.800402311 -0800 PST,DeletionTimestamp:<nil>,DeletionGracePeriodSeconds:nil,Labels:map[string]string{alpha.kubernetes.io/fluentd-ds-ready: true,beta.kubernetes.io/arch: amd64,beta.kubernetes.io/instance-type: n1-standard-1,beta.kubernetes.io/os: linux,failure-domain.beta.kubernetes.io/region: us-central1,failure-domain.beta.kubernetes.io/zone: us-central1-f,kubernetes.io/hostname: e2e-master,},Annotations:map[string]string{node.alpha.kubernetes.io/ttl: 0,scheduler.alpha.kubernetes.io/taints: [{"key":"node.alpha.kubernetes.io/ismaster","effect":"NoSchedule","timeAdded":null}],volumes.kubernetes.io/controller-managed-attach-detach: true,},OwnerReferences:[],Finalizers:[],ClusterName:,},Spec:NodeSpec{PodCIDR:10.180.0.0/24,ExternalID:8049310718350674298,ProviderID:gce://mml-e2e/us-central1-f/e2e-master,Unschedulable:true,},Status:NodeStatus{Capacity:ResourceList{alpha.kubernetes.io/nvidia-gpu: {{0 0} {<nil>} 0 DecimalSI},cpu: {{1 0} {<nil>} 1 DecimalSI},memory: {{3879407616 0} {<nil>} 3788484Ki BinarySI},pods: {{110 0} {<nil>} 110 DecimalSI},},Allocatable:ResourceList{alpha.kubernetes.io/nvidia-gpu: {{0 0} {<nil>} 0 DecimalSI},cpu: {{1 0} {<nil>} 1 DecimalSI},memory: {{3879407616 0} {<nil>} 3788484Ki BinarySI},pods: {{110 0} {<nil>} 110 DecimalSI},},Phase:,Conditions:[{NetworkUnavailable False 2017-02-15 16:54:17 -0800 PST 2017-02-15 16:54:17 -0800 PST RouteCreated RouteController created a route} {OutOfDisk False 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:54:13 -0800 PST KubeletHasSufficientDisk kubelet has sufficient disk space available} {MemoryPressure False 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:54:13 -0800 PST KubeletHasSufficientMemory kubelet has sufficient memory available} {DiskPressure False 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:54:13 -0800 PST KubeletHasNoDiskPressure kubelet has no disk pressure} {Ready True 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:54:36 -0800 PST KubeletReady kubelet is posting ready status. AppArmor enabled}],Addresses:[{InternalIP 10.240.0.2} {ExternalIP 104.154.182.166} {Hostname e2e-master}],DaemonEndpoints:NodeDaemonEndpoints{KubeletEndpoint:DaemonEndpoint{Port:10250,},},NodeInfo:NodeSystemInfo{MachineID:7d1798e59202708b83f2c955229db762,SystemUUID:7D1798E5-9202-708B-83F2-C955229DB762,BootID:ca82feb5-eb6d-46c2-bd4d-ed754f1463b5,KernelVersion:4.4.21+,OSImage:Container-Optimized OS from Google,ContainerRuntimeVersion:docker://0.1.0,KubeletVersion:v1.6.0-alpha.2.227+a1afc024cbfae3,KubeProxyVersion:v1.6.0-alpha.2.227+a1afc024cbfae3,OperatingSystem:linux,Architecture:amd64,},Images:[{[gcr.io/google_containers/glbc:0.9.1] 233825573} {[gcr.io/google_containers/etcd:3.0.14-alpha.1] 168809387} {[gcr.io/google_containers/kube-apiserver:7858902bfc90d549e9f2a7a058a8c690] 144275198} {[gcr.io/google_containers/kube-controller-manager:05e23c3d3f23cb63c75c7b1e30614d8d] 128027111} {[gcr.io/google_containers/rescheduler:v0.2.1] 117300467} {[gcr.io/google-containers/kube-addon-manager:v6.4-alpha.1] 67570205} {[gcr.io/google_containers/kube-scheduler:9258fab7bd1a5ee058a69c670bba0e29] 67214530} {[gcr.io/google_containers/etcd-empty-dir-cleanup:0.0.1] 20959104} {[gcr.io/google_containers/pause-amd64:3.0] 746888}],VolumesInUse:[],VolumesAttached:[],},}
+Feb 15 17:15:58.165: INFO: 
+Logging kubelet events for node e2e-master
+Feb 15 17:15:58.218: INFO: 
+Logging pods the kubelet thinks is on node e2e-master
+Feb 15 17:15:58.301: INFO: kube-scheduler-e2e-master started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.301: INFO: etcd-server-e2e-master started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.301: INFO: l7-lb-controller-v0.9.1-e2e-master started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.301: INFO: rescheduler-v0.2.1-e2e-master started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.301: INFO: etcd-empty-dir-cleanup-e2e-master started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.301: INFO: kube-apiserver-e2e-master started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.301: INFO: kube-controller-manager-e2e-master started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.301: INFO: kube-addon-manager-e2e-master started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.301: INFO: etcd-server-events-e2e-master started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.576: INFO: 
+Latency metrics for node e2e-master
+Feb 15 17:15:58.576: INFO: 
+Logging node info for node e2e-minion-group-kvwp
+Feb 15 17:15:58.616: INFO: Node Info: &Node{ObjectMeta:k8s_io_apimachinery_pkg_apis_meta_v1.ObjectMeta{Name:e2e-minion-group-kvwp,GenerateName:,Namespace:,SelfLink:/api/v1/nodese2e-minion-group-kvwp,UID:34b88531-f3e1-11e6-a2bd-42010af00002,ResourceVersion:3905,Generation:0,CreationTimestamp:2017-02-15 16:45:25.907790628 -0800 PST,DeletionTimestamp:<nil>,DeletionGracePeriodSeconds:nil,Labels:map[string]string{alpha.kubernetes.io/fluentd-ds-ready: true,beta.kubernetes.io/arch: amd64,beta.kubernetes.io/instance-type: n1-standard-2,beta.kubernetes.io/os: linux,failure-domain.beta.kubernetes.io/region: us-central1,failure-domain.beta.kubernetes.io/zone: us-central1-f,kubernetes.io/hostname: e2e-minion-group-kvwp,},Annotations:map[string]string{node.alpha.kubernetes.io/ttl: 0,volumes.kubernetes.io/controller-managed-attach-detach: true,},OwnerReferences:[],Finalizers:[],ClusterName:,},Spec:NodeSpec{PodCIDR:10.180.1.0/24,ExternalID:2940249731651685157,ProviderID:gce://mml-e2e/us-central1-f/e2e-minion-group-kvwp,Unschedulable:false,},Status:NodeStatus{Capacity:ResourceList{alpha.kubernetes.io/nvidia-gpu: {{0 0} {<nil>} 0 DecimalSI},cpu: {{2 0} {<nil>} 2 DecimalSI},memory: {{7864107008 0} {<nil>}  BinarySI},pods: {{110 0} {<nil>} 110 DecimalSI},},Allocatable:ResourceList{alpha.kubernetes.io/nvidia-gpu: {{0 0} {<nil>} 0 DecimalSI},cpu: {{2 0} {<nil>} 2 DecimalSI},memory: {{7864107008 0} {<nil>}  BinarySI},pods: {{110 0} {<nil>} 110 DecimalSI},},Phase:,Conditions:[{NetworkUnavailable False 2017-02-15 16:46:04 -0800 PST 2017-02-15 16:46:04 -0800 PST RouteCreated RouteController created a route} {OutOfDisk False 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:45:25 -0800 PST KubeletHasSufficientDisk kubelet has sufficient disk space available} {MemoryPressure False 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:45:25 -0800 PST KubeletHasSufficientMemory kubelet has sufficient memory available} {DiskPressure False 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:45:25 -0800 PST KubeletHasNoDiskPressure kubelet has no disk pressure} {Ready True 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:45:44 -0800 PST KubeletReady kubelet is posting ready status. WARNING: CPU hardcapping unsupported} {KernelDeadlock False 2017-02-15 17:15:45 -0800 PST 2017-02-15 16:45:40 -0800 PST KernelHasNoDeadlock kernel has no deadlock}],Addresses:[{InternalIP 10.240.0.4} {ExternalIP 104.197.71.141} {Hostname e2e-minion-group-kvwp}],DaemonEndpoints:NodeDaemonEndpoints{KubeletEndpoint:DaemonEndpoint{Port:10250,},},NodeInfo:NodeSystemInfo{MachineID:,SystemUUID:E23080FE-9136-A135-1E73-2F2C8CD7D3E0,BootID:3d51dfa9-3ca0-4579-b423-1b6ae2db4996,KernelVersion:3.16.0-4-amd64,OSImage:Debian GNU/Linux 7 (wheezy),ContainerRuntimeVersion:docker://0.1.0,KubeletVersion:v1.6.0-alpha.2.232+16afa27e589305-dirty,KubeProxyVersion:v1.6.0-alpha.2.232+16afa27e589305-dirty,OperatingSystem:linux,Architecture:amd64,},Images:[{[gcr.io/google_containers/volume-ceph:0.1] 675669191} {[gcr.io/google_containers/volume-rbd:0.1] 435408567} {[gcr.io/google_containers/redis:e2e] 419003740} {[gcr.io/google_containers/fluentd-gcp:1.38] 323115789} {[gcr.io/google_containers/heapster_grafana:v3.1.1] 279315095} {[gcr.io/google_containers/volume-nfs:0.6] 247274156} {[gcr.io/google_containers/volume-iscsi:0.1] 244442260} {[gcr.io/google_containers/heapster_influxdb:v0.7] 231210538} {[gcr.io/google_containers/volume-gluster:0.2] 212135622} {[gcr.io/google_containers/kube-proxy:af1353dac8c445087b03d53ec5dcce1f] 190535153} {[gcr.io/google_containers/jessie-dnsutils:e2e] 190148402} {[gcr.io/google_containers/ubuntu:14.04] 188300556} {[gcr.io/google_containers/redis:v1] 146000395} {[gcr.io/google_containers/resource_consumer:beta4] 133500077} {[gcr.io/google_containers/heapster:v1.3.0-beta.0] 119565077} {[gcr.io/google_containers/nginx-slim:0.8] 110487599} {[gcr.io/google_samples/gb-redisslave:v1] 109508753} {[gcr.io/google_containers/kubernetes-dashboard-amd64:v1.5.1] 103563297} {[gcr.io/google_containers/nginx-slim:0.7] 86864428} {[gcr.io/google_containers/iperf:e2e] 57996304} {[gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0] 48159325} {[gcr.io/google_containers/node-problem-detector:v0.1] 40113904} {[gcr.io/google_containers/addon-resizer:1.7] 38983736} {[gcr.io/google_containers/nettest:1.8] 25164808} {[gcr.io/google_containers/nettest:1.7] 24051275} {[gcr.io/google_containers/hostexec:1.2] 13209617} {[gcr.io/google_containers/dnsutils:e2e] 8897789} {[gcr.io/google_containers/netexec:1.7] 8016035} {[gcr.io/google_containers/n-way-http:1.0] 7522865} {[gcr.io/google_containers/netexec:1.4] 7297019} {[gcr.io/google_containers/resource_consumer/controller:beta4] 7034235} {[gcr.io/google_containers/kube-nethealth-amd64:1.0] 6589108} {[gcr.io/google_containers/serve_hostname:v1.4] 6222101} {[gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab] 5010921} {[gcr.io/google_containers/fakegitserver:0.1] 5007469} {[gcr.io/google_containers/update-demo:nautilus] 4555533} {[gcr.io/google_containers/update-demo:kitten] 4549069} {[gcr.io/google_containers/test-webserver:e2e] 4534272} {[gcr.io/google_containers/liveness:e2e] 4387474} {[gcr.io/google_containers/eptest:0.1] 2970692} {[gcr.io/google_containers/busybox:latest] 2433303} {[gcr.io/google_containers/mounttest:0.7] 2052704} {[gcr.io/google_containers/portforwardtester:1.2] 1892642} {[gcr.io/google_containers/mounttest:0.8] 1450761} {[gcr.io/google_containers/mounttest-user:0.5] 1450761} {[gcr.io/google_containers/busybox:1.24] 1113554} {[gcr.io/google_containers/pause-amd64:3.0] 746888} {[gcr.io/google_containers/pause:2.0] 350164}],VolumesInUse:[],VolumesAttached:[],},}
+Feb 15 17:15:58.617: INFO: 
+Logging kubelet events for node e2e-minion-group-kvwp
+Feb 15 17:15:58.664: INFO: 
+Logging pods the kubelet thinks is on node e2e-minion-group-kvwp
+Feb 15 17:15:58.755: INFO: monitoring-influxdb-grafana-v4-2qmfs started at 2017-02-15 16:46:30 -0800 PST (0+2 container statuses recorded)
+Feb 15 17:15:58.755: INFO: 	Container grafana ready: true, restart count 0
+Feb 15 17:15:58.755: INFO: 	Container influxdb ready: true, restart count 0
+Feb 15 17:15:58.755: INFO: kubernetes-dashboard-3345858451-lhmc3 started at 2017-02-15 16:46:30 -0800 PST (0+1 container statuses recorded)
+Feb 15 17:15:58.755: INFO: 	Container kubernetes-dashboard ready: true, restart count 0
+Feb 15 17:15:58.755: INFO: kube-proxy-e2e-minion-group-kvwp started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.755: INFO: node-problem-detector-v0.1-lpt6z started at 2017-02-15 16:45:30 -0800 PST (0+1 container statuses recorded)
+Feb 15 17:15:58.755: INFO: 	Container node-problem-detector ready: true, restart count 0
+Feb 15 17:15:58.755: INFO: kube-dns-autoscaler-3887590594-cq8k6 started at 2017-02-15 16:46:30 -0800 PST (0+1 container statuses recorded)
+Feb 15 17:15:58.755: INFO: 	Container autoscaler ready: true, restart count 0
+Feb 15 17:15:58.755: INFO: service-test-nz15f started at 2017-02-15 17:15:42 -0800 PST (0+1 container statuses recorded)
+Feb 15 17:15:58.755: INFO: 	Container netexec ready: true, restart count 0
+Feb 15 17:15:58.755: INFO: e2e-image-puller-e2e-minion-group-kvwp started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:58.755: INFO: fluentd-gcp-v1.38-6mppv started at 2017-02-15 16:45:30 -0800 PST (0+1 container statuses recorded)
+Feb 15 17:15:58.755: INFO: 	Container fluentd-gcp ready: true, restart count 0
+Feb 15 17:15:58.930: INFO: 
+Latency metrics for node e2e-minion-group-kvwp
+Feb 15 17:15:58.930: INFO: {Operation:sync Method:pod_worker_latency_microseconds Quantile:0.5 Latency:2m0.0006s}
+Feb 15 17:15:58.930: INFO: {Operation:sync Method:pod_worker_latency_microseconds Quantile:0.99 Latency:2m0.0006s}
+Feb 15 17:15:58.930: INFO: {Operation:sync Method:pod_worker_latency_microseconds Quantile:0.9 Latency:2m0.0006s}
+Feb 15 17:15:58.930: INFO: 
+Logging node info for node e2e-minion-group-rttr
+Feb 15 17:15:58.970: INFO: Node Info: &Node{ObjectMeta:k8s_io_apimachinery_pkg_apis_meta_v1.ObjectMeta{Name:e2e-minion-group-rttr,GenerateName:,Namespace:,SelfLink:/api/v1/nodese2e-minion-group-rttr,UID:365ae83b-f3e1-11e6-a2bd-42010af00002,ResourceVersion:3906,Generation:0,CreationTimestamp:2017-02-15 16:45:28.649731193 -0800 PST,DeletionTimestamp:<nil>,DeletionGracePeriodSeconds:nil,Labels:map[string]string{alpha.kubernetes.io/fluentd-ds-ready: true,beta.kubernetes.io/arch: amd64,beta.kubernetes.io/instance-type: n1-standard-2,beta.kubernetes.io/os: linux,failure-domain.beta.kubernetes.io/region: us-central1,failure-domain.beta.kubernetes.io/zone: us-central1-f,kubernetes.io/hostname: e2e-minion-group-rttr,},Annotations:map[string]string{node.alpha.kubernetes.io/ttl: 0,volumes.kubernetes.io/controller-managed-attach-detach: true,},OwnerReferences:[],Finalizers:[],ClusterName:,},Spec:NodeSpec{PodCIDR:10.180.2.0/24,ExternalID:7501856418522811173,ProviderID:gce://mml-e2e/us-central1-f/e2e-minion-group-rttr,Unschedulable:false,},Status:NodeStatus{Capacity:ResourceList{alpha.kubernetes.io/nvidia-gpu: {{0 0} {<nil>} 0 DecimalSI},cpu: {{2 0} {<nil>} 2 DecimalSI},memory: {{7864107008 0} {<nil>}  BinarySI},pods: {{110 0} {<nil>} 110 DecimalSI},},Allocatable:ResourceList{alpha.kubernetes.io/nvidia-gpu: {{0 0} {<nil>} 0 DecimalSI},cpu: {{2 0} {<nil>} 2 DecimalSI},memory: {{7864107008 0} {<nil>}  BinarySI},pods: {{110 0} {<nil>} 110 DecimalSI},},Phase:,Conditions:[{NetworkUnavailable False 2017-02-15 16:46:07 -0800 PST 2017-02-15 16:46:07 -0800 PST RouteCreated RouteController created a route} {OutOfDisk False 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:45:28 -0800 PST KubeletHasSufficientDisk kubelet has sufficient disk space available} {MemoryPressure False 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:45:28 -0800 PST KubeletHasSufficientMemory kubelet has sufficient memory available} {DiskPressure False 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:45:28 -0800 PST KubeletHasNoDiskPressure kubelet has no disk pressure} {Ready True 2017-02-15 17:15:49 -0800 PST 2017-02-15 16:45:45 -0800 PST KubeletReady kubelet is posting ready status. WARNING: CPU hardcapping unsupported} {KernelDeadlock False 2017-02-15 17:15:46 -0800 PST 2017-02-15 16:45:43 -0800 PST KernelHasNoDeadlock kernel has no deadlock}],Addresses:[{InternalIP 10.240.0.3} {ExternalIP 104.197.109.9} {Hostname e2e-minion-group-rttr}],DaemonEndpoints:NodeDaemonEndpoints{KubeletEndpoint:DaemonEndpoint{Port:10250,},},NodeInfo:NodeSystemInfo{MachineID:,SystemUUID:B8A0CC9C-2908-5321-75B2-DE8C3E70AE4A,BootID:34e77cae-0f29-4fb8-9b98-f31088b811f6,KernelVersion:3.16.0-4-amd64,OSImage:Debian GNU/Linux 7 (wheezy),ContainerRuntimeVersion:docker://0.1.0,KubeletVersion:v1.6.0-alpha.2.232+16afa27e589305-dirty,KubeProxyVersion:v1.6.0-alpha.2.232+16afa27e589305-dirty,OperatingSystem:linux,Architecture:amd64,},Images:[{[gcr.io/google_containers/volume-ceph:0.1] 675669191} {[gcr.io/google_containers/volume-rbd:0.1] 435408567} {[gcr.io/google_containers/redis:e2e] 419003740} {[gcr.io/google_containers/fluentd-gcp:1.38] 323115789} {[gcr.io/google_containers/volume-nfs:0.6] 247274156} {[gcr.io/google_containers/volume-iscsi:0.1] 244442260} {[gcr.io/google_containers/volume-gluster:0.2] 212135622} {[gcr.io/google_containers/kube-proxy:af1353dac8c445087b03d53ec5dcce1f] 190535153} {[gcr.io/google_containers/jessie-dnsutils:e2e] 190148402} {[gcr.io/google_containers/ubuntu:14.04] 188300556} {[gcr.io/google_containers/redis:v1] 146000395} {[gcr.io/google_containers/resource_consumer:beta4] 133500077} {[gcr.io/google_containers/heapster:v1.3.0-beta.0] 119565077} {[gcr.io/google_containers/nginx-slim:0.8] 110487599} {[gcr.io/google_samples/gb-redisslave:v1] 109508753} {[gcr.io/google_containers/nginx-slim:0.7] 86864428} {[gcr.io/google_containers/iperf:e2e] 57996304} {[gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.12.1] 52343736} {[gcr.io/google_containers/node-problem-detector:v0.1] 40113904} {[gcr.io/google_containers/addon-resizer:1.7] 38983736} {[gcr.io/google_containers/nettest:1.8] 25164808} {[gcr.io/google_containers/nettest:1.7] 24051275} {[gcr.io/google_containers/hostexec:1.2] 13209617} {[gcr.io/google_containers/k8s-dns-sidecar-amd64:1.12.1] 13002355} {[gcr.io/google_containers/dnsutils:e2e] 8897789} {[gcr.io/google_containers/netexec:1.7] 8016035} {[gcr.io/google_containers/n-way-http:1.0] 7522865} {[gcr.io/google_containers/defaultbackend:1.0] 7513643} {[gcr.io/google_containers/netexec:1.4] 7297019} {[gcr.io/google_containers/resource_consumer/controller:beta4] 7034235} {[gcr.io/google_containers/kube-nethealth-amd64:1.0] 6589108} {[gcr.io/google_containers/serve_hostname:v1.4] 6222101} {[gcr.io/google_containers/k8s-dns-dnsmasq-amd64:1.12.1] 5153422} {[gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab] 5010921} {[gcr.io/google_containers/fakegitserver:0.1] 5007469} {[gcr.io/google_containers/update-demo:nautilus] 4555533} {[gcr.io/google_containers/update-demo:kitten] 4549069} {[gcr.io/google_containers/test-webserver:e2e] 4534272} {[gcr.io/google_containers/liveness:e2e] 4387474} {[gcr.io/google_containers/eptest:0.1] 2970692} {[gcr.io/google_containers/busybox:latest] 2433303} {[gcr.io/google_containers/mounttest:0.7] 2052704} {[gcr.io/google_containers/portforwardtester:1.2] 1892642} {[gcr.io/google_containers/mounttest:0.8] 1450761} {[gcr.io/google_containers/mounttest-user:0.5] 1450761} {[gcr.io/google_containers/busybox:1.24] 1113554} {[gcr.io/google_containers/pause-amd64:3.0] 746888} {[gcr.io/google_containers/pause:2.0] 350164}],VolumesInUse:[],VolumesAttached:[],},}
+Feb 15 17:15:58.970: INFO: 
+Logging kubelet events for node e2e-minion-group-rttr
+Feb 15 17:15:59.016: INFO: 
+Logging pods the kubelet thinks is on node e2e-minion-group-rttr
+Feb 15 17:15:59.101: INFO: kube-dns-659902490-rm7p6 started at 2017-02-15 16:46:30 -0800 PST (0+3 container statuses recorded)
+Feb 15 17:15:59.101: INFO: 	Container dnsmasq ready: true, restart count 0
+Feb 15 17:15:59.101: INFO: 	Container kubedns ready: true, restart count 0
+Feb 15 17:15:59.101: INFO: 	Container sidecar ready: true, restart count 0
+Feb 15 17:15:59.101: INFO: e2e-image-puller-e2e-minion-group-rttr started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:59.101: INFO: kube-proxy-e2e-minion-group-rttr started at <nil> (0+0 container statuses recorded)
+Feb 15 17:15:59.101: INFO: fluentd-gcp-v1.38-b48jv started at 2017-02-15 16:45:33 -0800 PST (0+1 container statuses recorded)
+Feb 15 17:15:59.101: INFO: 	Container fluentd-gcp ready: true, restart count 0
+Feb 15 17:15:59.101: INFO: node-problem-detector-v0.1-p241n started at 2017-02-15 16:45:33 -0800 PST (0+1 container statuses recorded)
+Feb 15 17:15:59.101: INFO: 	Container node-problem-detector ready: true, restart count 0
+Feb 15 17:15:59.101: INFO: l7-default-backend-1270908455-wsvz4 started at 2017-02-15 16:46:30 -0800 PST (0+1 container statuses recorded)
+Feb 15 17:15:59.101: INFO: 	Container default-http-backend ready: true, restart count 0
+Feb 15 17:15:59.101: INFO: heapster-v1.3.0-beta.0-864412088-hsktb started at 2017-02-15 16:46:58 -0800 PST (0+4 container statuses recorded)
+Feb 15 17:15:59.101: INFO: 	Container eventer ready: true, restart count 0
+Feb 15 17:15:59.101: INFO: 	Container eventer-nanny ready: true, restart count 0
+Feb 15 17:15:59.101: INFO: 	Container heapster ready: true, restart count 0
+Feb 15 17:15:59.101: INFO: 	Container heapster-nanny ready: true, restart count 0
+Feb 15 17:15:59.291: INFO: 
+Latency metrics for node e2e-minion-group-rttr
+[1mSTEP[0m: Dumping a list of prepulled images on each node
+[1mSTEP[0m: Logs of kube-system/e2e-image-puller-e2e-minion-group-kvwp:image-puller on node e2e-minion-group-kvwp
+Feb 15 17:15:59.382: INFO: image-puller : STARTLOG
+00:45:38 pulling gcr.io/google_containers/busybox
+00:45:39 pulling gcr.io/google_containers/busybox:1.24
+00:45:40 pulling gcr.io/google_containers/dnsutils:e2e
+00:45:41 pulling gcr.io/google_containers/eptest:0.1
+00:45:41 pulling gcr.io/google_containers/fakegitserver:0.1
+00:45:42 pulling gcr.io/google_containers/hostexec:1.2
+00:45:43 pulling gcr.io/google_containers/iperf:e2e
+00:45:46 pulling gcr.io/google_containers/jessie-dnsutils:e2e
+00:45:56 pulling gcr.io/google_containers/liveness:e2e
+00:45:56 pulling gcr.io/google_containers/mounttest:0.8
+00:45:57 pulling gcr.io/google_containers/mounttest-user:0.5
+00:45:57 pulling gcr.io/google_containers/netexec:1.4
+00:45:58 pulling gcr.io/google_containers/netexec:1.7
+00:45:59 pulling gcr.io/google_containers/nettest:1.7
+00:46:01 pulling gcr.io/google_containers/nettest:1.8
+00:46:03 pulling gcr.io/google_containers/nginx-slim:0.7
+00:46:10 pulling gcr.io/google_containers/nginx-slim:0.8
+00:46:14 pulling gcr.io/google_containers/n-way-http:1.0
+00:46:15 pulling gcr.io/google_containers/pause:2.0
+00:46:15 pulling gcr.io/google_containers/pause-amd64:3.0
+00:46:15 pulling gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab
+00:46:16 pulling gcr.io/google_containers/portforwardtester:1.2
+00:46:16 pulling gcr.io/google_containers/redis:e2e
+00:46:43 pulling gcr.io/google_containers/resource_consumer:beta4
+00:47:02 pulling gcr.io/google_containers/resource_consumer/controller:beta4
+00:47:03 pulling gcr.io/google_containers/serve_hostname:v1.4
+00:47:04 pulling gcr.io/google_containers/test-webserver:e2e
+00:47:04 pulling gcr.io/google_containers/ubuntu:14.04
+00:47:05 pulling gcr.io/google_containers/update-demo:kitten
+00:47:05 pulling gcr.io/google_containers/update-demo:nautilus
+00:47:05 pulling gcr.io/google_containers/volume-ceph:0.1
+00:47:41 pulling gcr.io/google_containers/volume-gluster:0.2
+00:47:51 pulling gcr.io/google_containers/volume-iscsi:0.1
+00:48:04 pulling gcr.io/google_containers/volume-nfs:0.6
+00:48:16 pulling gcr.io/google_containers/volume-rbd:0.1
+00:48:28 pulling gcr.io/google_samples/gb-redisslave:v1
+00:48:37 pulling gcr.io/google_containers/redis:v1
+
+ENDLOG for container kube-system:e2e-image-puller-e2e-minion-group-kvwp:image-puller
+[1mSTEP[0m: Logs of kube-system/e2e-image-puller-e2e-minion-group-rttr:image-puller on node e2e-minion-group-rttr
+Feb 15 17:15:59.428: INFO: image-puller : STARTLOG
+00:45:41 pulling gcr.io/google_containers/busybox
+00:45:43 pulling gcr.io/google_containers/busybox:1.24
+00:45:43 pulling gcr.io/google_containers/dnsutils:e2e
+00:45:44 pulling gcr.io/google_containers/eptest:0.1
+00:45:44 pulling gcr.io/google_containers/fakegitserver:0.1
+00:45:45 pulling gcr.io/google_containers/hostexec:1.2
+00:45:46 pulling gcr.io/google_containers/iperf:e2e
+00:45:49 pulling gcr.io/google_containers/jessie-dnsutils:e2e
+00:46:00 pulling gcr.io/google_containers/liveness:e2e
+00:46:00 pulling gcr.io/google_containers/mounttest:0.8
+00:46:01 pulling gcr.io/google_containers/mounttest-user:0.5
+00:46:01 pulling gcr.io/google_containers/netexec:1.4
+00:46:02 pulling gcr.io/google_containers/netexec:1.7
+00:46:03 pulling gcr.io/google_containers/nettest:1.7
+00:46:05 pulling gcr.io/google_containers/nettest:1.8
+00:46:07 pulling gcr.io/google_containers/nginx-slim:0.7
+00:46:14 pulling gcr.io/google_containers/nginx-slim:0.8
+00:46:17 pulling gcr.io/google_containers/n-way-http:1.0
+00:46:17 pulling gcr.io/google_containers/pause:2.0
+00:46:18 pulling gcr.io/google_containers/pause-amd64:3.0
+00:46:18 pulling gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab
+00:46:18 pulling gcr.io/google_containers/portforwardtester:1.2
+00:46:19 pulling gcr.io/google_containers/redis:e2e
+00:46:46 pulling gcr.io/google_containers/resource_consumer:beta4
+00:46:53 pulling gcr.io/google_containers/resource_consumer/controller:beta4
+00:46:54 pulling gcr.io/google_containers/serve_hostname:v1.4
+00:46:55 pulling gcr.io/google_containers/test-webserver:e2e
+00:46:55 pulling gcr.io/google_containers/ubuntu:14.04
+00:46:55 pulling gcr.io/google_containers/update-demo:kitten
+00:46:56 pulling gcr.io/google_containers/update-demo:nautilus
+00:46:56 pulling gcr.io/google_containers/volume-ceph:0.1
+00:47:24 pulling gcr.io/google_containers/volume-gluster:0.2
+00:47:34 pulling gcr.io/google_containers/volume-iscsi:0.1
+00:47:47 pulling gcr.io/google_containers/volume-nfs:0.6
+00:47:58 pulling gcr.io/google_containers/volume-rbd:0.1
+00:48:09 pulling gcr.io/google_samples/gb-redisslave:v1
+00:48:20 pulling gcr.io/google_containers/redis:v1
+
+ENDLOG for container kube-system:e2e-image-puller-e2e-minion-group-rttr:image-puller
+Feb 15 17:15:59.428: INFO: Waiting up to 3m0s for all (but 0) nodes to be ready
+[1mSTEP[0m: Destroying namespace "e2e-tests-etcd-upgrade-kz06g" for this suite.
+Feb 15 17:16:10.448: INFO: namespace: e2e-tests-etcd-upgrade-kz06g, resource: bindings, ignored listing per whitelist
+[1mSTEP[0m: Destroying namespace "e2e-tests-secret-upgrade-ph4dc" for this suite.
+Feb 15 17:16:22.978: INFO: namespace: e2e-tests-secret-upgrade-ph4dc, resource: bindings, ignored listing per whitelist
+[1mSTEP[0m: Destroying namespace "e2e-tests-service-upgrade-bg7fb" for this suite.
+Feb 15 17:16:34.047: INFO: namespace: e2e-tests-service-upgrade-bg7fb, resource: bindings, ignored listing per whitelist
+
+
+[91m[1m• Failure [101.079 seconds][0m
+[k8s.io] etcd Upgrade [Feature:EtcdUpgrade]
+[90m/go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/test/e2e/framework/framework.go:656[0m
+  [k8s.io] etcd upgrade
+  [90m/go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/test/e2e/framework/framework.go:656[0m
+    [91m[1mshould maintain a functioning cluster [It][0m
+    [90m/go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/test/e2e/etcd_upgrade.go:50[0m
+
+    [91mExpected error:
+        <*errors.errorString | 0xc420e92180>: {
+            s: "error running /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh []; got error exit status 1, stdout \"!!! EXPERIMENTAL !!!\\n\\n/usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh [-M | -N | -P] [-o] (-l | <version number or publication>)\\n  Upgrades master and nodes by default\\n  -M:  Upgrade master only\\n  -N:  Upgrade nodes only\\n  -P:  Node upgrade prerequisites only (create a new instance template)\\n  -o:  Use os distro sepcified in KUBE_NODE_OS_DISTRIBUTION for new nodes. Options include 'debian' or 'gci'\\n  -l:  Use local(dev) binaries. This is only supported for master upgrades.\\n\\n  Version number or publication is either a proper version number\\n  (e.g. \\\"v1.0.6\\\", \\\"v1.2.0-alpha.1.881+376438b69c7612\\\") or a version\\n  publication of the form <bucket>/<version> (e.g. \\\"release/stable\\\",\\n  \\\"ci/latest-1\\\").  Some common ones are:\\n    - \\\"release/stable\\\"\\n    - \\\"release/latest\\\"\\n    - \\\"ci/latest\\\"\\n  See the docs on getting builds for more information about version publication.\\n\\n(... Fetching current release versions ...)\\n\\nRight now, versions are as follows:\\n  release/stable: /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.5.3\\n  release/latest: /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.6.0-alpha.2\\n  ci/latest:      /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.6.0-alpha.2.239+c478d7282771a3\\n\", stderr \"\"",
+        }
+        error running /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh []; got error exit status 1, stdout "!!! EXPERIMENTAL !!!\n\n/usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh [-M | -N | -P] [-o] (-l | <version number or publication>)\n  Upgrades master and nodes by default\n  -M:  Upgrade master only\n  -N:  Upgrade nodes only\n  -P:  Node upgrade prerequisites only (create a new instance template)\n  -o:  Use os distro sepcified in KUBE_NODE_OS_DISTRIBUTION for new nodes. Options include 'debian' or 'gci'\n  -l:  Use local(dev) binaries. This is only supported for master upgrades.\n\n  Version number or publication is either a proper version number\n  (e.g. \"v1.0.6\", \"v1.2.0-alpha.1.881+376438b69c7612\") or a version\n  publication of the form <bucket>/<version> (e.g. \"release/stable\",\n  \"ci/latest-1\").  Some common ones are:\n    - \"release/stable\"\n    - \"release/latest\"\n    - \"ci/latest\"\n  See the docs on getting builds for more information about version publication.\n\n(... Fetching current release versions ...)\n\nRight now, versions are as follows:\n  release/stable: /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.5.3\n  release/latest: /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.6.0-alpha.2\n  ci/latest:      /usr/local/google/home/mml/gocode/src/k8s.io/kubernetes/cluster/gce/upgrade.sh v1.6.0-alpha.2.239+c478d7282771a3\n", stderr ""
+    not to have occurred[0m
+
+    /go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/test/e2e/etcd_upgrade.go:38
+[90m------------------------------[0m
+[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m[36mS[0m
+
+[91m[1mSummarizing 1 Failure:[0m
+
+[91m[1m[Fail] [0m[90m[k8s.io] etcd Upgrade [Feature:EtcdUpgrade] [0m[0m[k8s.io] etcd upgrade [0m[91m[1m[It] should maintain a functioning cluster [0m
+[37m/go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/test/e2e/etcd_upgrade.go:38[0m
+
+[1m[91mRan 1 of 514 Specs in 102.619 seconds[0m
+[1m[91mFAIL![0m -- [32m[1m0 Passed[0m | [91m[1m1 Failed[0m | [33m[1m0 Pending[0m | [36m[1m513 Skipped[0m 
+
+Ginkgo ran 1 suite in 1m43.22258872s
+Test Suite Failed
+!!! Error in ./hack/ginkgo-e2e.sh:117
+  Error in ./hack/ginkgo-e2e.sh:117. '"${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- "${auth_config[@]:+${auth_config[@]}}" --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" --host="${KUBE_MASTER_URL}" --provider="${KUBERNETES_PROVIDER}" --gce-project="${PROJECT:-}" --gce-zone="${ZONE:-}" --gke-cluster="${CLUSTER_NAME:-}" --kube-master="${KUBE_MASTER:-}" --cluster-tag="${CLUSTER_ID:-}" --repo-root="${KUBE_ROOT}" --node-instance-group="${NODE_INSTANCE_GROUP:-}" --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" --federated-kube-context="${FEDERATION_KUBE_CONTEXT:-e2e-federation}" ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} ${E2E_CLEAN_START:+"--clean-start=true"} ${E2E_MIN_STARTUP_PODS:+"--minStartupPods=${E2E_MIN_STARTUP_PODS}"} ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} "${@:-}"' exited with status 1
+Call stack:
+  1: ./hack/ginkgo-e2e.sh:117 main(...)
+Exiting with status 1
+2017/02/15 17:16:35 util.go:98: Step './hack/ginkgo-e2e.sh --ginkgo.focus=\[Feature:EtcdUpgrade\] --upgrade-target=ci/latest --upgrade-image=gci' finished in 1m44.739891493s
+2017/02/15 17:16:35 e2e.go:126: Something went wrong: encountered 1 errors: [exit status 1]
+2017/02/15 17:16:35 e2e.go:78: err: exit status 1
+exit status 1
