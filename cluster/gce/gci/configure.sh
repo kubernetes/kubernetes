@@ -166,8 +166,8 @@ function install-kube-binary-config {
   dst_dir="${KUBE_HOME}/kube-docker-files"
   mkdir -p "${dst_dir}"
   cp "${src_dir}/"*.docker_tag "${dst_dir}"
+  cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
-    cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
       install-node-problem-detector
     fi
@@ -226,7 +226,7 @@ function install-kube-binary-config {
 
   # Install gci mounter related artifacts to allow mounting storage volumes in GCI
   install-gci-mounter-tools
-  
+
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
   rm -f "${KUBE_HOME}/${server_binary_tar}"

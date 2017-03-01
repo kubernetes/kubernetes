@@ -89,7 +89,7 @@ download_or_bust() {
 }
 
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
-# and places them into suitable directories. Files are placed in /home/kubernetes. 
+# and places them into suitable directories. Files are placed in /home/kubernetes.
 install_kube_binary_config() {
   # Upstart does not support shell array well. Put urls in a temp file with one
   # url at a line, and we will use 'read' command to get them one-by-one.
@@ -118,9 +118,8 @@ install_kube_binary_config() {
   dst_dir="${kube_home}/kube-docker-files"
   mkdir -p "${dst_dir}"
   cp "${src_dir}/"*.docker_tag "${dst_dir}"
-  if [ "${KUBERNETES_MASTER:-}" = "false" ]; then
-    cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
-  else
+  cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
+  if [ "${KUBERNETES_MASTER:-}" = "true" ]; then
     cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
     cp "${src_dir}/kube-controller-manager.tar" "${dst_dir}"
     cp "${src_dir}/kube-scheduler.tar" "${dst_dir}"

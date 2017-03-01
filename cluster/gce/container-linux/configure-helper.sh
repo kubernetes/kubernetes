@@ -29,9 +29,7 @@ function create-dirs {
   echo "Creating required directories"
   mkdir -p /var/lib/kubelet
   mkdir -p /etc/kubernetes/manifests
-  if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
-    mkdir -p /var/lib/kube-proxy
-  fi
+  mkdir -p /var/lib/kube-proxy
 }
 
 # Create directories referenced in the kube-controller-manager manifest for
@@ -485,9 +483,8 @@ function load-docker-images {
     try-load-docker-image "${img_dir}/kube-apiserver.tar"
     try-load-docker-image "${img_dir}/kube-controller-manager.tar"
     try-load-docker-image "${img_dir}/kube-scheduler.tar"
-  else
-    try-load-docker-image "${img_dir}/kube-proxy.tar"
   fi
+  try-load-docker-image "${img_dir}/kube-proxy.tar"
 }
 
 # This function assembles the kubelet systemd service file and starts it
@@ -1348,8 +1345,9 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   create-master-etcd-auth
 else
   create-kubelet-kubeconfig
-  create-kubeproxy-kubeconfig
 fi
+
+create-kubeproxy-kubeconfig
 
 if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
   systemctl stop docker
@@ -1376,8 +1374,11 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-lb-controller
   start-rescheduler
   start-fluentd-static-pod
-else
-  start-kube-proxy
+fi
+
+start-kube-proxy
+
+if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
   # Kube-registry-proxy.
   if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
     start-kube-registry-proxy

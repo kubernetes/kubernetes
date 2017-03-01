@@ -48,9 +48,7 @@ create_dirs() {
   # Create required directories.
   mkdir -p /var/lib/kubelet
   mkdir -p /etc/kubernetes/manifests
-  if [ "${KUBERNETES_MASTER:-}" = "false" ]; then
-    mkdir -p /var/lib/kube-proxy
-  fi
+  mkdir -p /var/lib/kube-proxy
 }
 
 create_kubelet_kubeconfig() {
