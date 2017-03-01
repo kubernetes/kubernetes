@@ -190,6 +190,19 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // Run spawns the http servers (secure and insecure). It only returns if stopCh is closed
 // or one of the ports cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
+	err := s.NonBlockingRun(stopCh)
+	if err != nil {
+		return err
+	}
+
+	<-stopCh
+	return nil
+}
+
+// NonBlockingRun spawns the http servers (secure and insecure). An error is returned if
+// either of the ports cannot be listened on.  On error the caller should close the channel
+// to ensure resource cleanup.
+func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		if err := s.serveSecurely(stopCh); err != nil {
 			return err
@@ -209,7 +222,6 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
-	<-stopCh
 	return nil
 }
 
