@@ -190,17 +190,42 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // Run spawns the http servers (secure and insecure). It only returns if stopCh is closed
 // or one of the ports cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
+	err := s.NonBlockingRun(stopCh)
+	if err != nil {
+		return err
+	}
+
+	<-stopCh
+	return nil
+}
+
+// NonBlockingRun spawns the http servers (secure and insecure). An error is
+// returned if either of the ports cannot be listened on.
+func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
+	// Use an internal stop channel to allow cleanup of the listeners on error.
+	internalStopCh := make(chan struct{})
+
 	if s.SecureServingInfo != nil && s.Handler != nil {
-		if err := s.serveSecurely(stopCh); err != nil {
+		if err := s.serveSecurely(internalStopCh); err != nil {
+			close(internalStopCh)
 			return err
 		}
 	}
 
 	if s.InsecureServingInfo != nil && s.InsecureHandler != nil {
-		if err := s.serveInsecurely(stopCh); err != nil {
+		if err := s.serveInsecurely(internalStopCh); err != nil {
+			close(internalStopCh)
 			return err
 		}
 	}
+
+	// Now that both listeners have bound successfully, it is the
+	// responsibility of the caller to close the provided channel to
+	// ensure cleanup.
+	go func() {
+		<-stopCh
+		close(internalStopCh)
+	}()
 
 	s.RunPostStartHooks()
 
@@ -209,7 +234,6 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
-	<-stopCh
 	return nil
 }
 
