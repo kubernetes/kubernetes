@@ -425,7 +425,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			if err != nil {
 				return err
 			}
-			if cloud == nil {
+			if s.CloudProvider != "external" && cloud == nil {
 				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
 			} else {
 				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
