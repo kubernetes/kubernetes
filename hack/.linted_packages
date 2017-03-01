@@ -342,6 +342,8 @@ staging/src/k8s.io/client-go/informers/policy/v1beta1
 staging/src/k8s.io/client-go/informers/rbac
 staging/src/k8s.io/client-go/informers/rbac/v1alpha1
 staging/src/k8s.io/client-go/informers/rbac/v1beta1
+staging/src/k8s.io/client-go/informers/settings
+staging/src/k8s.io/client-go/informers/settings/v1alpha1
 staging/src/k8s.io/client-go/informers/storage
 staging/src/k8s.io/client-go/informers/storage/v1beta1
 staging/src/k8s.io/client-go/listers/apps/v1beta1
@@ -355,6 +357,7 @@ staging/src/k8s.io/client-go/listers/extensions/v1beta1
 staging/src/k8s.io/client-go/listers/policy/v1beta1
 staging/src/k8s.io/client-go/listers/rbac/v1alpha1
 staging/src/k8s.io/client-go/listers/rbac/v1beta1
+staging/src/k8s.io/client-go/listers/settings/v1alpha1
 staging/src/k8s.io/client-go/listers/storage/v1beta1
 staging/src/k8s.io/client-go/plugin/pkg/client/auth
 staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp
