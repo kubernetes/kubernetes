@@ -38,6 +38,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/validation"
 )
 
@@ -286,7 +287,13 @@ type httpget func(url string) (int, string, io.ReadCloser, error)
 
 // httpgetImpl Implements a function to retrieve a url and return the results.
 func httpgetImpl(url string) (int, string, io.ReadCloser, error) {
-	resp, err := http.Get(url)
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 0, "", nil, err
+	}
+	req.Header.Set("User-Agent", rest.DefaultKubernetesUserAgent())
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, "", nil, err
 	}
