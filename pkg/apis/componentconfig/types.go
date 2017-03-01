@@ -173,11 +173,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization
-	// podInfraContainerImage is the image whose network/ipc namespaces
-	// containers in each pod will use.
-	PodInfraContainerImage string
-	// dockerEndpoint is the path to the docker endpoint to communicate with.
-	DockerEndpoint string
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string
@@ -270,22 +265,6 @@ type KubeletConfiguration struct {
 	LowDiskSpaceThresholdMB int32
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod metav1.Duration
-	// networkPluginName is the name of the network plugin to be invoked for
-	// various events in kubelet/pod lifecycle
-	NetworkPluginName string
-	// networkPluginMTU is the MTU to be passed to the network plugin,
-	// and overrides the default MTU for cases where it cannot be automatically
-	// computed (such as IPSEC).
-	NetworkPluginMTU int32
-	// networkPluginDir is the full path of the directory in which to search
-	// for network plugins (and, for backwards-compat, CNI config files)
-	NetworkPluginDir string
-	// CNIConfDir is the full path of the directory in which to search for
-	// CNI config files
-	CNIConfDir string
-	// CNIBinDir is the full path of the directory in which to search for
-	// CNI plugin binaries
-	CNIBinDir string
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string
@@ -367,10 +346,6 @@ type KubeletConfiguration struct {
 	BabysitDaemons bool
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32
-	// dockerExecHandlerName is the handler to use when executing a command
-	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
-	// 'native'.
-	DockerExecHandlerName string
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string

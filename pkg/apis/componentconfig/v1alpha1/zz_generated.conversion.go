@@ -271,8 +271,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := Convert_v1alpha1_KubeletAuthorization_To_componentconfig_KubeletAuthorization(&in.Authorization, &out.Authorization, s); err != nil {
 		return err
 	}
-	out.PodInfraContainerImage = in.PodInfraContainerImage
-	out.DockerEndpoint = in.DockerEndpoint
 	out.RootDirectory = in.RootDirectory
 	out.SeccompProfileRoot = in.SeccompProfileRoot
 	if err := v1.Convert_Pointer_bool_To_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
@@ -321,11 +319,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	}
 	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
-	out.NetworkPluginName = in.NetworkPluginName
-	out.NetworkPluginDir = in.NetworkPluginDir
-	out.CNIConfDir = in.CNIConfDir
-	out.CNIBinDir = in.CNIBinDir
-	out.NetworkPluginMTU = in.NetworkPluginMTU
 	out.VolumePluginDir = in.VolumePluginDir
 	out.CloudProvider = in.CloudProvider
 	out.CloudConfigFile = in.CloudConfigFile
@@ -353,7 +346,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.HairpinMode = in.HairpinMode
 	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
-	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
 	out.ResolverConfig = in.ResolverConfig
 	if err := v1.Convert_Pointer_bool_To_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
@@ -448,8 +440,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := Convert_componentconfig_KubeletAuthorization_To_v1alpha1_KubeletAuthorization(&in.Authorization, &out.Authorization, s); err != nil {
 		return err
 	}
-	out.PodInfraContainerImage = in.PodInfraContainerImage
-	out.DockerEndpoint = in.DockerEndpoint
 	out.RootDirectory = in.RootDirectory
 	out.SeccompProfileRoot = in.SeccompProfileRoot
 	if err := v1.Convert_bool_To_Pointer_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
@@ -514,11 +504,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	}
 	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
-	out.NetworkPluginName = in.NetworkPluginName
-	out.NetworkPluginMTU = in.NetworkPluginMTU
-	out.NetworkPluginDir = in.NetworkPluginDir
-	out.CNIConfDir = in.CNIConfDir
-	out.CNIBinDir = in.CNIBinDir
 	out.VolumePluginDir = in.VolumePluginDir
 	out.CloudProvider = in.CloudProvider
 	out.CloudConfigFile = in.CloudConfigFile
@@ -546,7 +531,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.HairpinMode = in.HairpinMode
 	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
-	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
 	out.ResolverConfig = in.ResolverConfig
 	if err := v1.Convert_bool_To_Pointer_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {

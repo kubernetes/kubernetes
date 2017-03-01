@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/integer"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -187,7 +188,7 @@ type KubeletBootstrap interface {
 }
 
 // create and initialize a Kubelet instance
-type KubeletBuilder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool, hostnameOverride string, nodeIP string) (KubeletBootstrap, error)
+type KubeletBuilder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, dockerOption *options.DockerOptions, standaloneMode bool, hostnameOverride string, nodeIP string) (KubeletBootstrap, error)
 
 // KubeletDeps is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -282,7 +283,7 @@ func getRuntimeAndImageServices(config *componentconfig.KubeletConfiguration) (i
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
-func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool, hostnameOverride string, nodeIP string) (*Kubelet, error) {
+func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, dockerOptions *options.DockerOptions, standaloneMode bool, hostnameOverride string, nodeIP string) (*Kubelet, error) {
 	if kubeCfg.RootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", kubeCfg.RootDirectory)
 	}
@@ -366,13 +367,13 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 
 	var dockerExecHandler dockertools.ExecHandler
-	switch kubeCfg.DockerExecHandlerName {
+	switch dockerOptions.ExecHandlerName {
 	case "native":
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	case "nsenter":
 		dockerExecHandler = &dockertools.NsenterExecHandler{}
 	default:
-		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", kubeCfg.DockerExecHandlerName)
+		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", dockerOptions.ExecHandlerName)
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
@@ -484,7 +485,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		glog.Infof("Experimental host user namespace defaulting is enabled.")
 	}
 
-	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, kubeCfg.NetworkPluginName); err != nil {
+	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, dockerOptions.NetworkPluginName); err != nil {
 		// This is a non-recoverable error. Returning it up the callstack will just
 		// lead to retries of the same failure, so just fail hard.
 		glog.Fatalf("Invalid hairpin mode: %v", err)
@@ -493,7 +494,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
 
-	if plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, kubeCfg.NetworkPluginName, &criNetworkHost{&networkHost{klet}, &network.NoopPortMappingGetter{}}, klet.hairpinMode, klet.nonMasqueradeCIDR, int(kubeCfg.NetworkPluginMTU)); err != nil {
+	if plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, dockerOptions.NetworkPluginName, &criNetworkHost{&networkHost{klet}, &network.NoopPortMappingGetter{}}, klet.hairpinMode, klet.nonMasqueradeCIDR, int(dockerOptions.NetworkPluginMTU)); err != nil {
 		return nil, err
 	} else {
 		klet.networkPlugin = plug
@@ -521,17 +522,17 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 
 	// TODO: These need to become arguments to a standalone docker shim.
-	binDir := kubeCfg.CNIBinDir
+	binDir := dockerOptions.CNIBinDir
 	if binDir == "" {
-		binDir = kubeCfg.NetworkPluginDir
+		binDir = dockerOptions.NetworkPluginDir
 	}
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       klet.hairpinMode,
 		NonMasqueradeCIDR: klet.nonMasqueradeCIDR,
-		PluginName:        kubeCfg.NetworkPluginName,
-		PluginConfDir:     kubeCfg.CNIConfDir,
+		PluginName:        dockerOptions.NetworkPluginName,
+		PluginConfDir:     dockerOptions.CNIConfDir,
 		PluginBinDir:      binDir,
-		MTU:               int(kubeCfg.NetworkPluginMTU),
+		MTU:               int(dockerOptions.NetworkPluginMTU),
 	}
 
 	// Remote runtime shim just cannot talk back to kubelet, so it doesn't
@@ -552,7 +553,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		case "docker":
 			// Create and start the CRI shim running as a grpc server.
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
-			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage,
+			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, dockerOptions.PodSandboxImage,
 				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, dockerExecHandler)
 			if err != nil {
 				return nil, err
@@ -624,7 +625,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				containerRefManager,
 				klet.podManager,
 				machineInfo,
-				kubeCfg.PodInfraContainerImage,
+				dockerOptions.PodSandboxImage,
 				float32(kubeCfg.RegistryPullQPS),
 				int(kubeCfg.RegistryBurst),
 				ContainerLogsDir,
@@ -645,7 +646,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				// If the kubelet is started with any other plugin we can't be
 				// sure it handles the hairpin case so we instruct the docker
 				// runtime to set the flag instead.
-				klet.hairpinMode == componentconfig.HairpinVeth && kubeCfg.NetworkPluginName != "kubenet",
+				klet.hairpinMode == componentconfig.HairpinVeth && dockerOptions.NetworkPluginName != "kubenet",
 				kubeCfg.SeccompProfileRoot,
 				kubeDeps.ContainerRuntimeOptions...,
 			)

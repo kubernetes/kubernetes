@@ -227,11 +227,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization `json:"authorization"`
-	// podInfraContainerImage is the image whose network/ipc namespaces
-	// containers in each pod will use.
-	PodInfraContainerImage string `json:"podInfraContainerImage"`
-	// dockerEndpoint is the path to the docker endpoint to communicate with.
-	DockerEndpoint string `json:"dockerEndpoint"`
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string `json:"rootDirectory"`
@@ -325,22 +320,6 @@ type KubeletConfiguration struct {
 	LowDiskSpaceThresholdMB int32 `json:"lowDiskSpaceThresholdMB"`
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod metav1.Duration `json:"volumeStatsAggPeriod"`
-	// networkPluginName is the name of the network plugin to be invoked for
-	// various events in kubelet/pod lifecycle
-	NetworkPluginName string `json:"networkPluginName"`
-	// networkPluginDir is the full path of the directory in which to search
-	// for network plugins (and, for backwards-compat, CNI config files)
-	NetworkPluginDir string `json:"networkPluginDir"`
-	// CNIConfDir is the full path of the directory in which to search for
-	// CNI config files
-	CNIConfDir string `json:"cniConfDir"`
-	// CNIBinDir is the full path of the directory in which to search for
-	// CNI plugin binaries
-	CNIBinDir string `json:"cniBinDir"`
-	// networkPluginMTU is the MTU to be passed to the network plugin,
-	// and overrides the default MTU for cases where it cannot be automatically
-	// computed (such as IPSEC).
-	NetworkPluginMTU int32 `json:"networkPluginMTU"`
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string `json:"volumePluginDir"`
@@ -412,10 +391,6 @@ type KubeletConfiguration struct {
 	BabysitDaemons bool `json:"babysitDaemons"`
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32 `json:"maxPods"`
-	// dockerExecHandlerName is the handler to use when executing a command
-	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
-	// 'native'.
-	DockerExecHandlerName string `json:"dockerExecHandlerName"`
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string `json:"podCIDR"`

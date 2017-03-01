@@ -220,12 +220,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CPUCFSQuota == nil {
 		obj.CPUCFSQuota = boolVar(true)
 	}
-	if obj.DockerExecHandlerName == "" {
-		obj.DockerExecHandlerName = "native"
-	}
-	if obj.DockerEndpoint == "" && runtime.GOOS != "windows" {
-		obj.DockerEndpoint = "unix:///var/run/docker.sock"
-	}
 	if obj.EventBurst == 0 {
 		obj.EventBurst = 10
 	}
@@ -309,9 +303,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.OOMScoreAdj == nil {
 		temp := int32(qos.KubeletOOMScoreAdj)
 		obj.OOMScoreAdj = &temp
-	}
-	if obj.PodInfraContainerImage == "" {
-		obj.PodInfraContainerImage = defaultPodInfraContainerImage
 	}
 	if obj.Port == 0 {
 		obj.Port = ports.KubeletPort

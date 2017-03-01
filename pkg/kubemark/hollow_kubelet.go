@@ -90,7 +90,7 @@ func NewHollowKubelet(
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, false, false)
+	kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, options.NewDockerOptions(), false, false)
 	select {}
 }
 
@@ -137,7 +137,6 @@ func GetHollowKubeletConfig(
 	c.MaxPods = int32(maxPods)
 	c.PodsPerCore = int32(podsPerCore)
 	c.ClusterDNS = []string{}
-	c.DockerExecHandlerName = "native"
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80
 	c.LowDiskSpaceThresholdMB = 256

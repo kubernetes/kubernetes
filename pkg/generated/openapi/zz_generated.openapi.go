@@ -13074,20 +13074,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeletAuthorization"),
 							},
 						},
-						"podInfraContainerImage": {
-							SchemaProps: spec.SchemaProps{
-								Description: "podInfraContainerImage is the image whose network/ipc namespaces containers in each pod will use.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"dockerEndpoint": {
-							SchemaProps: spec.SchemaProps{
-								Description: "dockerEndpoint is the path to the docker endpoint to communicate with.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
 						"rootDirectory": {
 							SchemaProps: spec.SchemaProps{
 								Description: "rootDirectory is the directory path to place kubelet files (volume mounts,etc).",
@@ -13321,41 +13307,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 							},
 						},
-						"networkPluginName": {
-							SchemaProps: spec.SchemaProps{
-								Description: "networkPluginName is the name of the network plugin to be invoked for various events in kubelet/pod lifecycle",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"networkPluginDir": {
-							SchemaProps: spec.SchemaProps{
-								Description: "networkPluginDir is the full path of the directory in which to search for network plugins (and, for backwards-compat, CNI config files)",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"cniConfDir": {
-							SchemaProps: spec.SchemaProps{
-								Description: "CNIConfDir is the full path of the directory in which to search for CNI config files",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"cniBinDir": {
-							SchemaProps: spec.SchemaProps{
-								Description: "CNIBinDir is the full path of the directory in which to search for CNI plugin binaries",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"networkPluginMTU": {
-							SchemaProps: spec.SchemaProps{
-								Description: "networkPluginMTU is the MTU to be passed to the network plugin, and overrides the default MTU for cases where it cannot be automatically computed (such as IPSEC).",
-								Type:        []string{"integer"},
-								Format:      "int32",
-							},
-						},
 						"volumePluginDir": {
 							SchemaProps: spec.SchemaProps{
 								Description: "volumePluginDir is the full path of the directory in which to search for additional third party volume plugins",
@@ -13513,13 +13464,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "maxPods is the number of pods that can run on this Kubelet.",
 								Type:        []string{"integer"},
 								Format:      "int32",
-							},
-						},
-						"dockerExecHandlerName": {
-							SchemaProps: spec.SchemaProps{
-								Description: "dockerExecHandlerName is the handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.",
-								Type:        []string{"string"},
-								Format:      "",
 							},
 						},
 						"podCIDR": {
@@ -13856,7 +13800,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "enableContentionProfiling", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "experimentalQOSReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "systemReserved", "kubeReserved"},
+					Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "enableContentionProfiling", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "experimentalQOSReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "systemReserved", "kubeReserved"},
 				},
 			},
 			Dependencies: []string{
