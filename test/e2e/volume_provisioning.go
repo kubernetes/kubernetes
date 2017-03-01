@@ -103,38 +103,40 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("DynamicProvisioner", func() {
-		It("should create and delete persistent volumes [Slow] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+	/*
+		TODO: enable when GKE is updated with the new API
+		framework.KubeDescribe("DynamicProvisioner", func() {
+			It("should create and delete persistent volumes [Slow] [Volume]", func() {
+				framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
 
-			By("creating a StorageClass")
-			class := newStorageClass("", "internal")
-			_, err := c.StorageV1beta1().StorageClasses().Create(class)
-			defer c.StorageV1beta1().StorageClasses().Delete(class.Name, nil)
-			Expect(err).NotTo(HaveOccurred())
+				By("creating a StorageClass")
+				class := newStorageClass("", "internal")
+				class, err := c.StorageV1beta1().StorageClasses().Create(class)
+				defer c.StorageV1beta1().StorageClasses().Delete(class.Name, nil)
+				Expect(err).NotTo(HaveOccurred())
 
-			By("creating a claim with a dynamic provisioning annotation")
-			claim := newClaim(ns)
-			claim.Spec.StorageClassName = &class.Name
+				By("creating a claim with a dynamic provisioning annotation")
+				claim := newClaim(ns)
+				claim.Spec.StorageClassName = &class.Name
 
-			defer func() {
-				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
-			}()
-			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
-			Expect(err).NotTo(HaveOccurred())
+				defer func() {
+					c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+				}()
+				claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
+				Expect(err).NotTo(HaveOccurred())
 
-			if framework.ProviderIs("vsphere") {
-				// vsphere provider does not allocate volumes in 1GiB chunks, so setting expected size
-				// equal to requestedSize
-				testDynamicProvisioning(c, claim, requestedSize)
-			} else {
-				// Expected size of the volume is 2GiB, because the other three supported cloud
-				// providers allocate volumes in 1GiB chunks.
-				testDynamicProvisioning(c, claim, "2Gi")
-			}
+				if framework.ProviderIs("vsphere") {
+					// vsphere provider does not allocate volumes in 1GiB chunks, so setting expected size
+					// equal to requestedSize
+					testDynamicProvisioning(c, claim, requestedSize)
+				} else {
+					// Expected size of the volume is 2GiB, because the other three supported cloud
+					// providers allocate volumes in 1GiB chunks.
+					testDynamicProvisioning(c, claim, "2Gi")
+				}
+			})
 		})
-	})
-
+	*/
 	framework.KubeDescribe("DynamicProvisioner Beta", func() {
 		It("should create and delete persistent volumes [Slow] [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
@@ -202,8 +204,11 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 			By("Creating a claim and expecting it to timeout")
 			pvc := newClaim(ns)
-			className := sc.Name
-			pvc.Spec.StorageClassName = &className
+			// TODO: switch to attribute when GKE is updated
+			pvc.Annotations = map[string]string{
+				v1.BetaStorageClassAnnotation: sc.Name,
+			}
+			//pvc.Spec.StorageClassName = &className
 			pvc, err = c.Core().PersistentVolumeClaims(ns).Create(pvc)
 			defer Expect(c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
@@ -262,7 +267,9 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			By("creating a claim with a dynamic provisioning annotation")
 			claim := newClaim(ns)
 			className := class.Name
-			claim.Spec.StorageClassName = &className
+			// TODO: switch to attribute when GKE is updated
+			claim.Annotations = map[string]string{v1.BetaStorageClassAnnotation: className}
+			//claim.Spec.StorageClassName = &className
 			defer func() {
 				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
 			}()
