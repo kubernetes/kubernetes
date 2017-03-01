@@ -876,7 +876,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint *v1.Ta
 // If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
 // any API calls.
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint, node *v1.Node) error {
-	// Short circuit for limiting amout of API calls.
+	// Short circuit for limiting amount of API calls.
 	if node != nil {
 		match := false
 		for i := range node.Spec.Taints {
