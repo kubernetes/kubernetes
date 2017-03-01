@@ -75,16 +75,9 @@ func TestRecycler(t *testing.T) {
 	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.VolumeConfig{}}}, pluginHost)
 
 	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/foo"}}}}}
-	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
+	_, err := plugMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
-	}
-	recycler, err := plug.NewRecycler("pv-name", spec, nil)
-	if err != nil {
-		t.Errorf("Failed to make a new Recycler: %v", err)
-	}
-	if recycler.GetPath() != spec.PersistentVolume.Spec.HostPath.Path {
-		t.Errorf("Expected %s but got %s", spec.PersistentVolume.Spec.HostPath.Path, recycler.GetPath())
 	}
 }
 

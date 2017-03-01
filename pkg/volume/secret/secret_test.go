@@ -241,7 +241,7 @@ func TestMakePayload(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		actualPayload, err := makePayload(tc.mappings, tc.secret, &tc.mode, tc.optional)
+		actualPayload, err := MakePayload(tc.mappings, tc.secret, &tc.mode, tc.optional)
 		if err != nil && tc.success {
 			t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 			continue

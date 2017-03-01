@@ -98,14 +98,14 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 	}
 
 	newUnstr := make(map[string]interface{})
-	err = unstructured.NewConverter().ToUnstructured(item, &newUnstr)
+	err = unstructured.DefaultConverter.ToUnstructured(item, &newUnstr)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
 	}
 
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	err = unstructured.NewConverter().FromUnstructured(newUnstr, newObj)
+	err = unstructured.DefaultConverter.FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
 		return
@@ -139,11 +139,11 @@ func BenchmarkToFromUnstructured(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		unstr := map[string]interface{}{}
-		if err := unstructured.NewConverter().ToUnstructured(&items[i%size], &unstr); err != nil {
+		if err := unstructured.DefaultConverter.ToUnstructured(&items[i%size], &unstr); err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 		obj := v1.Pod{}
-		if err := unstructured.NewConverter().FromUnstructured(unstr, &obj); err != nil {
+		if err := unstructured.DefaultConverter.FromUnstructured(unstr, &obj); err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 	}

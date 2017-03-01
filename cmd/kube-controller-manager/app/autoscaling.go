@@ -24,12 +24,37 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
+	"k8s.io/metrics/pkg/client/custom_metrics"
+
+	// install the APIs so that they're registered with the scheme for the clients
+	_ "k8s.io/metrics/pkg/apis/custom_metrics/install"
+	_ "k8s.io/metrics/pkg/apis/metrics/install"
 )
 
 func startHPAController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"}] {
 		return false, nil
 	}
+
+	if ctx.Options.HorizontalPodAutoscalerUseRESTClients {
+		// use the new-style clients if support for custom metrics is enabled
+		return startHPAControllerWithRESTClient(ctx)
+	}
+
+	return startHPAControllerWithLegacyClient(ctx)
+}
+
+func startHPAControllerWithRESTClient(ctx ControllerContext) (bool, error) {
+	clientConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
+	metricsClient := metrics.NewRESTMetricsClient(
+		resourceclient.NewForConfigOrDie(clientConfig),
+		custom_metrics.NewForConfigOrDie(clientConfig),
+	)
+	return startHPAControllerWithMetricsClient(ctx, metricsClient)
+}
+
+func startHPAControllerWithLegacyClient(ctx ControllerContext) (bool, error) {
 	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 	metricsClient := metrics.NewHeapsterMetricsClient(
 		hpaClient,
@@ -38,13 +63,18 @@ func startHPAController(ctx ControllerContext) (bool, error) {
 		metrics.DefaultHeapsterService,
 		metrics.DefaultHeapsterPort,
 	)
+	return startHPAControllerWithMetricsClient(ctx, metricsClient)
+}
+
+func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient metrics.MetricsClient) (bool, error) {
+	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 	replicaCalc := podautoscaler.NewReplicaCalculator(metricsClient, hpaClient.Core())
 	go podautoscaler.NewHorizontalController(
 		ctx.ClientBuilder.ClientGoClientOrDie("horizontal-pod-autoscaler").Core(),
 		hpaClient.Extensions(),
 		hpaClient.Autoscaling(),
 		replicaCalc,
-		ctx.NewInformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
+		ctx.InformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		ctx.Options.HorizontalPodAutoscalerSyncPeriod.Duration,
 	).Run(ctx.Stop)
 	return true, nil

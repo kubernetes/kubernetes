@@ -20,7 +20,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/client-go/pkg/api"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	rest "k8s.io/client-go/rest"
 )
@@ -99,7 +99,7 @@ func (c *roles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListO
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("roles").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +112,7 @@ func (c *roles) Get(name string, options v1.GetOptions) (result *v1alpha1.Role, 
 		Namespace(c.ns).
 		Resource("roles").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,7 +124,7 @@ func (c *roles) List(opts v1.ListOptions) (result *v1alpha1.RoleList, err error)
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("roles").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -132,11 +132,11 @@ func (c *roles) List(opts v1.ListOptions) (result *v1alpha1.RoleList, err error)
 
 // Watch returns a watch.Interface that watches the requested roles.
 func (c *roles) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("roles").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

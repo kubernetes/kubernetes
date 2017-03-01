@@ -59,9 +59,6 @@ spec:
         k8s-app: kube-discovery
         # TODO: I guess we can remove all these cluster-service labels...
         kubernetes.io/cluster-service: "true"
-      annotations:
-        # TODO: Move this to the beta tolerations field below as soon as the Tolerations field exists in PodSpec
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"dedicated","value":"master","effect":"NoSchedule"}]'
     spec:
       containers:
       - name: kube-discovery
@@ -78,10 +75,10 @@ spec:
           name: clusterinfo
           readOnly: true
       hostNetwork: true
+      # TODO: Why doesn't the Decoder recognize this new field and decode it properly? Right now it's ignored
       # tolerations:
-      # - key: dedicated
-      #   value: master
-      #   effect: NoSchedule
+      # - key: {{ .MasterTaintKey }}
+      #  effect: NoSchedule
       securityContext:
           seLinuxOptions:
             type: spc_t

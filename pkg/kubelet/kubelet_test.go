@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -48,6 +49,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	"k8s.io/kubernetes/pkg/kubelet/gpu"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -221,12 +223,6 @@ func newTestKubeletWithImageList(
 	kubelet.backOff.Clock = fakeClock
 	kubelet.podKillingCh = make(chan *kubecontainer.PodPair, 20)
 	kubelet.resyncInterval = 10 * time.Second
-	kubelet.reservation = kubetypes.Reservation{
-		Kubernetes: v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse(testReservationCPU),
-			v1.ResourceMemory: resource.MustParse(testReservationMemory),
-		},
-	}
 	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, clock.RealClock{})
@@ -248,7 +244,7 @@ func newTestKubeletWithImageList(
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 	// Add this as cleanup predicate pod admitter
-	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay))
+	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub()))
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr, err =
@@ -277,7 +273,7 @@ func newTestKubeletWithImageList(
 
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
-
+	kubelet.gpuManager = gpu.NewGPUManagerStub()
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
 }
 
@@ -401,26 +397,24 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 }
 
 type testNodeLister struct {
-	nodes []v1.Node
+	nodes []*v1.Node
 }
 
 type testNodeInfo struct {
-	nodes []v1.Node
+	nodes []*v1.Node
 }
 
 func (ls testNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 	for _, node := range ls.nodes {
 		if node.Name == id {
-			return &node, nil
+			return node, nil
 		}
 	}
 	return nil, fmt.Errorf("Node with name: %s does not exist", id)
 }
 
-func (ls testNodeLister) List() (v1.NodeList, error) {
-	return v1.NodeList{
-		Items: ls.nodes,
-	}, nil
+func (ls testNodeLister) List(selector labels.Selector) ([]*v1.Node, error) {
+	return ls.nodes, nil
 }
 
 // Tests that we handle port conflicts correctly by setting the failed status in status map.
@@ -432,7 +426,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	kl.nodeLister = testNodeLister{nodes: []v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -442,7 +436,7 @@ func TestHandlePortConflicts(t *testing.T) {
 			},
 		},
 	}}
-	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -487,7 +481,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	kl.nodeLister = testNodeLister{nodes: []v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
@@ -497,7 +491,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 			},
 		},
 	}}
-	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
@@ -535,7 +529,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	nodes := []v1.Node{
+	nodes := []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
 			Status: v1.NodeStatus{
@@ -576,7 +570,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	nodes := []v1.Node{
+	nodes := []*v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
@@ -1152,57 +1146,6 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	kubelet.podManager.SetPods(pods)
 	actual := kubelet.filterOutTerminatedPods(pods)
 	assert.Equal(t, expected, actual)
-}
-
-func TestMakePortMappings(t *testing.T) {
-	port := func(name string, protocol v1.Protocol, containerPort, hostPort int32, ip string) v1.ContainerPort {
-		return v1.ContainerPort{
-			Name:          name,
-			Protocol:      protocol,
-			ContainerPort: containerPort,
-			HostPort:      hostPort,
-			HostIP:        ip,
-		}
-	}
-	portMapping := func(name string, protocol v1.Protocol, containerPort, hostPort int, ip string) kubecontainer.PortMapping {
-		return kubecontainer.PortMapping{
-			Name:          name,
-			Protocol:      protocol,
-			ContainerPort: containerPort,
-			HostPort:      hostPort,
-			HostIP:        ip,
-		}
-	}
-
-	tests := []struct {
-		container            *v1.Container
-		expectedPortMappings []kubecontainer.PortMapping
-	}{
-		{
-			&v1.Container{
-				Name: "fooContainer",
-				Ports: []v1.ContainerPort{
-					port("", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-					port("", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
-					port("foo", v1.ProtocolUDP, 555, 5555, ""),
-					// Duplicated, should be ignored.
-					port("foo", v1.ProtocolUDP, 888, 8888, ""),
-					// Duplicated, should be ignored.
-					port("", v1.ProtocolTCP, 80, 8888, ""),
-				},
-			},
-			[]kubecontainer.PortMapping{
-				portMapping("fooContainer-TCP:80", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-				portMapping("fooContainer-TCP:443", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
-				portMapping("fooContainer-foo", v1.ProtocolUDP, 555, 5555, ""),
-			},
-		},
-	}
-
-	for i, tt := range tests {
-		actual := makePortMappings(tt.container)
-		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
-	}
 }
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
@@ -1874,7 +1817,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	kl.nodeLister = testNodeLister{nodes: []v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -1884,7 +1827,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 			},
 		},
 	}}
-	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{

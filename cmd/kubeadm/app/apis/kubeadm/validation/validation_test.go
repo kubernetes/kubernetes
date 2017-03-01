@@ -25,22 +25,45 @@ import (
 
 func TestValidateTokenDiscovery(t *testing.T) {
 	var tests = []struct {
-		c        *kubeadm.TokenDiscovery
+		c        *kubeadm.NodeConfiguration
 		f        *field.Path
 		expected bool
 	}{
-		{&kubeadm.TokenDiscovery{ID: "772ef5", Secret: "6b6baab1d4a0a171", Addresses: []string{"192.168.122.100:9898"}}, nil, true},
-		{&kubeadm.TokenDiscovery{ID: "", Secret: "6b6baab1d4a0a171", Addresses: []string{"192.168.122.100:9898"}}, nil, false},
-		{&kubeadm.TokenDiscovery{ID: "772ef5", Secret: "", Addresses: []string{"192.168.122.100:9898"}}, nil, false},
-		{&kubeadm.TokenDiscovery{ID: "772ef5", Secret: "6b6baab1d4a0a171", Addresses: []string{}}, nil, false},
+		{&kubeadm.NodeConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, true},
+		{&kubeadm.NodeConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, false},
+		{&kubeadm.NodeConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, false},
 	}
 	for _, rt := range tests {
-		err := ValidateTokenDiscovery(rt.c, rt.f).ToAggregate()
+		err := ValidateToken(rt.c.Token, rt.f).ToAggregate()
 		if (err == nil) != rt.expected {
 			t.Errorf(
 				"failed ValidateTokenDiscovery:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(err == nil),
+			)
+		}
+	}
+}
+
+func TestValidateAuthorizationMode(t *testing.T) {
+	var tests = []struct {
+		s        string
+		f        *field.Path
+		expected bool
+	}{
+		{"", nil, false},
+		{"rBAC", nil, false},      // not supported
+		{"not valid", nil, false}, // not supported
+		{"RBAC", nil, true},       // supported
+		{"Webhook", nil, true},    // supported
+	}
+	for _, rt := range tests {
+		actual := ValidateAuthorizationMode(rt.s, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateAuthorizationMode:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
 			)
 		}
 	}
@@ -71,6 +94,30 @@ func TestValidateServiceSubnet(t *testing.T) {
 	}
 }
 
+func TestValidateCloudProvider(t *testing.T) {
+	var tests = []struct {
+		s        string
+		f        *field.Path
+		expected bool
+	}{
+		{"", nil, true},      // if not provided, ok, it's optional
+		{"1234", nil, false}, // not supported
+		{"awws", nil, false}, // not supported
+		{"aws", nil, true},   // supported
+		{"gce", nil, true},   // supported
+	}
+	for _, rt := range tests {
+		actual := ValidateCloudProvider(rt.s, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateCloudProvider:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
 func TestValidateMasterConfiguration(t *testing.T) {
 	var tests = []struct {
 		s        *kubeadm.MasterConfiguration
@@ -80,23 +127,20 @@ func TestValidateMasterConfiguration(t *testing.T) {
 		{&kubeadm.MasterConfiguration{
 			Discovery: kubeadm.Discovery{
 				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
-				File:  &kubeadm.FileDiscovery{Path: "foo"},
-				Token: &kubeadm.TokenDiscovery{
-					ID:        "abcdef",
-					Secret:    "1234567890123456",
-					Addresses: []string{"foobar"},
-				},
 			},
-		}, false},
-		{&kubeadm.MasterConfiguration{
-			Discovery: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
+			AuthorizationMode: "RBAC",
+			Networking: kubeadm.Networking{
+				ServiceSubnet: "10.96.0.1/12",
 			},
 		}, true},
 		{&kubeadm.MasterConfiguration{
 			Discovery: kubeadm.Discovery{
 				File: &kubeadm.FileDiscovery{Path: "foo"},
 			},
+			AuthorizationMode: "RBAC",
+			Networking: kubeadm.Networking{
+				ServiceSubnet: "10.96.0.1/12",
+			},
 		}, true},
 		{&kubeadm.MasterConfiguration{
 			Discovery: kubeadm.Discovery{
@@ -105,6 +149,10 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					Secret:    "1234567890123456",
 					Addresses: []string{"foobar"},
 				},
+			},
+			AuthorizationMode: "RBAC",
+			Networking: kubeadm.Networking{
+				ServiceSubnet: "10.96.0.1/12",
 			},
 		}, true},
 	}
@@ -127,35 +175,10 @@ func TestValidateNodeConfiguration(t *testing.T) {
 	}{
 		{&kubeadm.NodeConfiguration{}, false},
 		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
-				File:  &kubeadm.FileDiscovery{Path: "foo"},
-				Token: &kubeadm.TokenDiscovery{
-					ID:        "abcdef",
-					Secret:    "1234567890123456",
-					Addresses: []string{"foobar"},
-				},
-			},
+			DiscoveryFile:  "foo",
+			DiscoveryToken: "abcdef.1234567890123456@foobar",
+			CACertPath:     "/some/cert.crt",
 		}, false},
-		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
-			},
-		}, true},
-		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				File: &kubeadm.FileDiscovery{Path: "foo"},
-			},
-		}, true},
-		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				Token: &kubeadm.TokenDiscovery{
-					ID:        "abcdef",
-					Secret:    "1234567890123456",
-					Addresses: []string{"foobar"},
-				},
-			},
-		}, true},
 	}
 	for _, rt := range tests {
 		actual := ValidateNodeConfiguration(rt.s)

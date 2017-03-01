@@ -114,9 +114,9 @@ func getPodFullName(pod *PodPortMapping) string {
 // gatherAllHostports returns all hostports that should be presented on node,
 // given the list of pods running on that node and ignoring host network
 // pods (which don't need hostport <-> container port mapping).
-func gatherAllHostports(activePodPortMapping []*PodPortMapping) (map[*PortMapping]targetPod, error) {
+func gatherAllHostports(activePodPortMappings []*PodPortMapping) (map[*PortMapping]targetPod, error) {
 	podHostportMap := make(map[*PortMapping]targetPod)
-	for _, pm := range activePodPortMapping {
+	for _, pm := range activePodPortMappings {
 		if pm.IP.To4() == nil {
 			return nil, fmt.Errorf("Invalid or missing pod %s IP", getPodFullName(pm))
 		}
@@ -126,7 +126,9 @@ func gatherAllHostports(activePodPortMapping []*PodPortMapping) (map[*PortMappin
 		}
 
 		for _, port := range pm.PortMappings {
-			podHostportMap[port] = targetPod{podFullName: getPodFullName(pm), podIP: pm.IP.String()}
+			if port.HostPort != 0 {
+				podHostportMap[port] = targetPod{podFullName: getPodFullName(pm), podIP: pm.IP.String()}
+			}
 		}
 	}
 	return podHostportMap, nil

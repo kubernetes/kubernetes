@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -26,17 +27,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts"
+	tokens3 "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/mitchellh/mapstructure"
-	"github.com/rackspace/gophercloud"
-	"github.com/rackspace/gophercloud/openstack"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
-	"github.com/rackspace/gophercloud/openstack/identity/v3/extensions/trust"
-	token3 "github.com/rackspace/gophercloud/openstack/identity/v3/tokens"
-	"github.com/rackspace/gophercloud/pagination"
 	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	netutil "k8s.io/apimachinery/pkg/util/net"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
@@ -110,13 +113,13 @@ type Config struct {
 		Username   string
 		UserId     string `gcfg:"user-id"`
 		Password   string
-		ApiKey     string `gcfg:"api-key"`
 		TenantId   string `gcfg:"tenant-id"`
 		TenantName string `gcfg:"tenant-name"`
 		TrustId    string `gcfg:"trust-id"`
 		DomainId   string `gcfg:"domain-id"`
 		DomainName string `gcfg:"domain-name"`
 		Region     string
+		CAFile     string `gcfg:"ca-file"`
 	}
 	LoadBalancer LoadBalancerOpts
 	BlockStorage BlockStorageOpts
@@ -139,7 +142,6 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 		Username:         cfg.Global.Username,
 		UserID:           cfg.Global.UserId,
 		Password:         cfg.Global.Password,
-		APIKey:           cfg.Global.ApiKey,
 		TenantID:         cfg.Global.TenantId,
 		TenantName:       cfg.Global.TenantName,
 		DomainID:         cfg.Global.DomainId,
@@ -147,6 +149,18 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 
 		// Persistent service, so we need to be able to renew tokens.
 		AllowReauth: true,
+	}
+}
+
+func (cfg Config) toAuth3Options() tokens3.AuthOptions {
+	return tokens3.AuthOptions{
+		IdentityEndpoint: cfg.Global.AuthUrl,
+		Username:         cfg.Global.Username,
+		UserID:           cfg.Global.UserId,
+		Password:         cfg.Global.Password,
+		DomainID:         cfg.Global.DomainId,
+		DomainName:       cfg.Global.DomainName,
+		AllowReauth:      true,
 	}
 }
 
@@ -204,12 +218,23 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cfg.Global.TrustId != "" {
-		authOptionsExt := trust.AuthOptionsExt{
-			TrustID:     cfg.Global.TrustId,
-			AuthOptions: token3.AuthOptions{AuthOptions: cfg.toAuthOptions()},
+	if cfg.Global.CAFile != "" {
+		roots, err := certutil.NewPool(cfg.Global.CAFile)
+		if err != nil {
+			return nil, err
 		}
-		err = trust.AuthenticateV3Trust(provider, authOptionsExt)
+		config := &tls.Config{}
+		config.RootCAs = roots
+		provider.HTTPClient.Transport = netutil.SetOldTransportDefaults(&http.Transport{TLSClientConfig: config})
+
+	}
+	if cfg.Global.TrustId != "" {
+		opts := cfg.toAuth3Options()
+		authOptsExt := trusts.AuthOptsExt{
+			TrustID:            cfg.Global.TrustId,
+			AuthOptionsBuilder: &opts,
+		}
+		err = openstack.AuthenticateV3(provider, authOptsExt, gophercloud.EndpointOpts{})
 	} else {
 		err = openstack.Authenticate(provider, cfg.toAuthOptions())
 	}
@@ -446,7 +471,7 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 }
 
 func isNotFound(err error) bool {
-	e, ok := err.(*gophercloud.UnexpectedResponseCodeError)
+	e, ok := err.(*gophercloud.ErrUnexpectedResponseCode)
 	return ok && e.Actual == http.StatusNotFound
 }
 

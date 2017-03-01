@@ -52,6 +52,13 @@ const (
 	nonExist = "NonExist"
 )
 
+func removePtr(replicas *int32) int32 {
+	if replicas == nil {
+		return 0
+	}
+	return *replicas
+}
+
 func WaitUntilPodIsScheduled(c clientset.Interface, name, namespace string, timeout time.Duration) (*v1.Pod, error) {
 	// Wait until it's scheduled
 	p, err := c.Core().Pods(namespace).Get(name, metav1.GetOptions{ResourceVersion: "0"})
@@ -306,7 +313,7 @@ func (config *DeploymentConfig) create() error {
 	if err != nil {
 		return fmt.Errorf("Error creating deployment: %v", err)
 	}
-	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, deployment.Spec.Replicas)
+	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, removePtr(deployment.Spec.Replicas))
 	return nil
 }
 
@@ -370,7 +377,7 @@ func (config *ReplicaSetConfig) create() error {
 	if err != nil {
 		return fmt.Errorf("Error creating replica set: %v", err)
 	}
-	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, rs.Spec.Replicas)
+	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, removePtr(rs.Spec.Replicas))
 	return nil
 }
 
@@ -527,7 +534,7 @@ func (config *RCConfig) create() error {
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
-	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, rc.Spec.Replicas)
+	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, removePtr(rc.Spec.Replicas))
 	return nil
 }
 

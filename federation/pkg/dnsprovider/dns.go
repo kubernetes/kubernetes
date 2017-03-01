@@ -59,6 +59,8 @@ type ResourceRecordSets interface {
 	New(name string, rrdatas []string, ttl int64, rrstype rrstype.RrsType) ResourceRecordSet
 	// StartChangeset begins a new batch operation of changes against the Zone
 	StartChangeset() ResourceRecordChangeset
+	// Zone returns the parent zone
+	Zone() Zone
 }
 
 // ResourceRecordChangeset accumulates a set of changes, that can then be applied with Apply
@@ -76,6 +78,8 @@ type ResourceRecordChangeset interface {
 	Apply() error
 	// IsEmpty returns true if there are no accumulated operations.
 	IsEmpty() bool
+	// ResourceRecordSets returns the parent ResourceRecordSets
+	ResourceRecordSets() ResourceRecordSets
 }
 
 type ResourceRecordSet interface {

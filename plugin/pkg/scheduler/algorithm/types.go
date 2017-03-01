@@ -17,7 +17,10 @@ limitations under the License.
 package algorithm
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -64,3 +67,80 @@ type PredicateFailureReason interface {
 }
 
 type GetEquivalencePodFunc func(pod *v1.Pod) interface{}
+
+// NodeLister interface represents anything that can list nodes for a scheduler.
+type NodeLister interface {
+	// We explicitly return []*v1.Node, instead of v1.NodeList, to avoid
+	// performing expensive copies that are unneeded.
+	List() ([]*v1.Node, error)
+}
+
+// PodLister interface represents anything that can list pods for a scheduler.
+type PodLister interface {
+	// We explicitly return []*v1.Pod, instead of v1.PodList, to avoid
+	// performing expensive copies that are unneeded.
+	List(labels.Selector) ([]*v1.Pod, error)
+}
+
+// ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.
+type ServiceLister interface {
+	// Lists all the services
+	List(labels.Selector) ([]*v1.Service, error)
+	// Gets the services for the given pod
+	GetPodServices(*v1.Pod) ([]*v1.Service, error)
+}
+
+// ControllerLister interface represents anything that can produce a list of ReplicationController; the list is consumed by a scheduler.
+type ControllerLister interface {
+	// Lists all the replication controllers
+	List(labels.Selector) ([]*v1.ReplicationController, error)
+	// Gets the services for the given pod
+	GetPodControllers(*v1.Pod) ([]*v1.ReplicationController, error)
+}
+
+// ReplicaSetLister interface represents anything that can produce a list of ReplicaSet; the list is consumed by a scheduler.
+type ReplicaSetLister interface {
+	// Gets the replicasets for the given pod
+	GetPodReplicaSets(*v1.Pod) ([]*extensions.ReplicaSet, error)
+}
+
+var _ ControllerLister = &EmptyControllerLister{}
+
+// EmptyControllerLister implements ControllerLister on []v1.ReplicationController returning empty data
+type EmptyControllerLister struct{}
+
+// List returns nil
+func (f EmptyControllerLister) List(labels.Selector) ([]*v1.ReplicationController, error) {
+	return nil, nil
+}
+
+// GetPodControllers returns nil
+func (f EmptyControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.ReplicationController, err error) {
+	return nil, nil
+}
+
+var _ ReplicaSetLister = &EmptyReplicaSetLister{}
+
+// EmptyReplicaSetLister implements ReplicaSetLister on []extensions.ReplicaSet returning empty data
+type EmptyReplicaSetLister struct{}
+
+// GetPodReplicaSets returns nil
+func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.ReplicaSet, err error) {
+	return nil, nil
+}
+
+// StatefulSetLister interface represents anything that can produce a list of StatefulSet; the list is consumed by a scheduler.
+type StatefulSetLister interface {
+	// Gets the StatefulSet for the given pod.
+	GetPodStatefulSets(*v1.Pod) ([]*apps.StatefulSet, error)
+}
+
+var _ StatefulSetLister = &EmptyStatefulSetLister{}
+
+// EmptyStatefulSetLister implements StatefulSetLister on []apps.StatefulSet returning empty data.
+type EmptyStatefulSetLister struct{}
+
+// GetPodStatefulSets of EmptyStatefulSetLister returns nil.
+func (f EmptyStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.StatefulSet, err error) {
+	return nil, nil
+}

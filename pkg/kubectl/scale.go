@@ -60,7 +60,7 @@ func ScalerFor(kind schema.GroupKind, c internalclientset.Interface) (Scaler, er
 		return &JobScaler{c.Batch()}, nil // Either kind of job can be scaled with Batch interface.
 	case apps.Kind("StatefulSet"):
 		return &StatefulSetScaler{c.Apps()}, nil
-	case extensions.Kind("Deployment"):
+	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		return &DeploymentScaler{c.Extensions()}, nil
 	}
 	return nil, fmt.Errorf("no scaler has been implemented for %q", kind)
@@ -336,22 +336,22 @@ type StatefulSetScaler struct {
 // ScaleSimple does a simple one-shot attempt at scaling. It returns the
 // resourceVersion of the statefulset if the update is successful.
 func (scaler *StatefulSetScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
-	ps, err := scaler.c.StatefulSets(namespace).Get(name, metav1.GetOptions{})
+	ss, err := scaler.c.StatefulSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", ScaleError{ScaleGetFailure, "Unknown", err}
 	}
 	if preconditions != nil {
-		if err := preconditions.ValidateStatefulSet(ps); err != nil {
+		if err := preconditions.ValidateStatefulSet(ss); err != nil {
 			return "", err
 		}
 	}
-	ps.Spec.Replicas = int32(newSize)
-	updatedStatefulSet, err := scaler.c.StatefulSets(namespace).Update(ps)
+	ss.Spec.Replicas = int32(newSize)
+	updatedStatefulSet, err := scaler.c.StatefulSets(namespace).Update(ss)
 	if err != nil {
 		if errors.IsConflict(err) {
-			return "", ScaleError{ScaleUpdateConflictFailure, ps.ResourceVersion, err}
+			return "", ScaleError{ScaleUpdateConflictFailure, ss.ResourceVersion, err}
 		}
-		return "", ScaleError{ScaleUpdateFailure, ps.ResourceVersion, err}
+		return "", ScaleError{ScaleUpdateFailure, ss.ResourceVersion, err}
 	}
 	return updatedStatefulSet.ResourceVersion, nil
 }
@@ -373,7 +373,7 @@ func (scaler *StatefulSetScaler) Scale(namespace, name string, newSize uint, pre
 		if err != nil {
 			return err
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.StatefulSetHasDesiredPets(scaler.c, job))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.StatefulSetHasDesiredReplicas(scaler.c, job))
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}

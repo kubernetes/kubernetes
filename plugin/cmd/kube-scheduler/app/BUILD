@@ -18,6 +18,10 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions/apps/v1beta1:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions/extensions/v1beta1:go_default_library",
         "//pkg/client/leaderelection:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/util/configz:go_default_library",

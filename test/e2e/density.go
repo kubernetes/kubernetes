@@ -339,9 +339,13 @@ var _ = framework.KubeDescribe("Density", func() {
 		}
 	})
 
+	options := framework.FrameworkOptions{
+		ClientQPS:   50.0,
+		ClientBurst: 100,
+	}
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
-	f := framework.NewDefaultFramework("density")
+	f := framework.NewFramework("density", options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
@@ -732,7 +736,7 @@ var _ = framework.KubeDescribe("Density", func() {
 					name := additionalPodsPrefix + "-" + strconv.Itoa(i+1)
 					framework.ExpectNoError(framework.DeleteRCAndWaitForGC(c, rcNameToNsMap[name], name))
 				}
-				workqueue.Parallelize(16, nodeCount, deleteRC)
+				workqueue.Parallelize(25, nodeCount, deleteRC)
 			}
 
 			cleanupDensityTest(dConfig)

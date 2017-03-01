@@ -25,6 +25,9 @@ spec:
       - '/bin/sh'
       - '-c'
       - '/run.sh $FLUENTD_ARGS 2>&1 >>/var/log/fluentd.log'
+    env:
+    - name: FLUENTD_ARGS
+      value: --no-supervisor
     resources:
       limits:
         memory: 200Mi

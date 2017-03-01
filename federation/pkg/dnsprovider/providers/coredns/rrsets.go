@@ -104,6 +104,11 @@ func (rrsets ResourceRecordSets) New(name string, rrdatas []string, ttl int64, r
 	}
 }
 
+// Zone returns the parent zone
+func (rrset ResourceRecordSets) Zone() dnsprovider.Zone {
+	return rrset.zone
+}
+
 func emptyResponse(resp *etcdc.Response) bool {
 	return resp == nil || resp.Node == nil || (len(resp.Node.Value) == 0 && len(resp.Node.Nodes) == 0)
 }

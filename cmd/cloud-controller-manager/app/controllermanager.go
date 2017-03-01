@@ -36,13 +36,12 @@ import (
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/cloud"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -135,9 +134,10 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 		var clientBuilder controller.ControllerClientBuilder
 		if len(s.ServiceAccountKeyFile) > 0 && s.UseServiceAccountCredentials {
 			clientBuilder = controller.SAControllerClientBuilder{
-				ClientConfig: restclient.AnonymousClientConfig(kubeconfig),
-				CoreClient:   kubeClient.Core(),
-				Namespace:    "kube-system",
+				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
+				CoreClient:           kubeClient.Core(),
+				AuthenticationClient: kubeClient.Authentication(),
+				Namespace:            "kube-system",
 			}
 		} else {
 			clientBuilder = rootClientBuilder
@@ -195,9 +195,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		return rootClientBuilder.ClientOrDie(serviceAccountName)
 	}
 	versionedClient := client("shared-informers")
-	// TODO replace sharedInformers with newSharedInformers
-	sharedInformers := informers.NewSharedInformerFactory(versionedClient, nil, resyncPeriod(s)())
-	newSharedInformers := newinformers.NewSharedInformerFactory(versionedClient, resyncPeriod(s)())
+	sharedInformers := informers.NewSharedInformerFactory(versionedClient, resyncPeriod(s)())
 
 	_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
 	if err != nil {
@@ -206,7 +204,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 
 	// Start the CloudNodeController
 	nodeController, err := nodecontroller.NewCloudNodeController(
-		newSharedInformers.Core().V1().Nodes(),
+		sharedInformers.Core().V1().Nodes(),
 		client("cloud-node-controller"), cloud,
 		s.NodeMonitorPeriod.Duration)
 	if err != nil {
@@ -216,11 +214,17 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the service controller
-	serviceController, err := servicecontroller.New(cloud, client("service-controller"), s.ClusterName)
+	serviceController, err := servicecontroller.New(
+		cloud,
+		client("service-controller"),
+		sharedInformers.Core().V1().Services(),
+		sharedInformers.Core().V1().Nodes(),
+		s.ClusterName,
+	)
 	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	} else {
-		serviceController.Run(int(s.ConcurrentServiceSyncs))
+		go serviceController.Run(stop, int(s.ConcurrentServiceSyncs))
 	}
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
@@ -229,7 +233,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
-			routeController := routecontroller.New(routes, client("route-controller"), newSharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
+			routeController := routecontroller.New(routes, client("route-controller"), sharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
 			routeController.Run(stop, s.RouteReconciliationPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
@@ -251,9 +255,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		glog.Fatalf("Failed to get api versions from server: %v", err)
 	}
 
-	// TODO replace sharedInformers with newSharedInformers
 	sharedInformers.Start(stop)
-	newSharedInformers.Start(stop)
 
 	select {}
 }

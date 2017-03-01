@@ -22,6 +22,7 @@ filegroup(
         "//cmd/genswaggertypedocs:all-srcs",
         "//cmd/genutils:all-srcs",
         "//cmd/genyaml:all-srcs",
+        "//cmd/gke-certificates-controller:all-srcs",
         "//cmd/hyperkube:all-srcs",
         "//cmd/kube-apiserver:all-srcs",
         "//cmd/kube-controller-manager:all-srcs",

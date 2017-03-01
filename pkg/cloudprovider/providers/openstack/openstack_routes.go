@@ -19,10 +19,10 @@ package openstack
 import (
 	"errors"
 
-	"github.com/rackspace/gophercloud"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers"
-	neutronports "github.com/rackspace/gophercloud/openstack/networking/v2/ports"
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
+	neutronports "github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"

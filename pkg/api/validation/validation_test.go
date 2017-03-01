@@ -31,6 +31,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -205,6 +206,30 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
 			}),
 		},
+		"volume with valid mount option for nfs": {
+			isExpectedFailure: false,
+			volume: testVolumeWithMountOption("good-nfs-mount-volume", "", "ro,nfsvers=3", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					NFS: &api.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
+				},
+			}),
+		},
+		"volume with mount option for host path": {
+			isExpectedFailure: true,
+			volume: testVolumeWithMountOption("bad-hostpath-mount-volume", "", "ro,nfsvers=3", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/a/.."},
+				},
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -238,6 +263,25 @@ func testVolumeClaimStorageClass(name string, namespace string, annval string, s
 			Annotations: annotations,
 		},
 		Spec: spec,
+	}
+}
+
+func testVolumeWithMountOption(name string, namespace string, mountOptions string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
+	annotations := map[string]string{
+		volume.MountOptionAnnotation: mountOptions,
+	}
+	objMeta := metav1.ObjectMeta{
+		Name:        name,
+		Annotations: annotations,
+	}
+
+	if namespace != "" {
+		objMeta.Namespace = namespace
+	}
+
+	return &api.PersistentVolume{
+		ObjectMeta: objMeta,
+		Spec:       spec,
 	}
 }
 
@@ -3177,6 +3221,15 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 }
 
+func extendPodSpecwithTolerations(in api.PodSpec, tolerations []api.Toleration) api.PodSpec {
+	var out api.PodSpec
+	out.Containers = in.Containers
+	out.RestartPolicy = in.RestartPolicy
+	out.DNSPolicy = in.DNSPolicy
+	out.Tolerations = tolerations
+	return out
+}
+
 func TestValidatePod(t *testing.T) {
 	validPodSpec := func(affinity *api.Affinity) api.PodSpec {
 		spec := api.PodSpec{
@@ -3382,64 +3435,27 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Exists",
-						"value": "",
-						"effect": "NoExecute",
-						"tolerationSeconds": 60
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Exists", Value: "", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}}),
 		},
 		{ // populate forgiveness tolerations with equal operator in annotations.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Equal",
-						"value": "bar",
-						"effect": "NoExecute",
-						"tolerationSeconds": 60
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}}),
 		},
 		{ // populate tolerations equal operator in annotations.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Equal",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		{ // populate tolerations exists operator in annotations.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Exists",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Spec: validPodSpec(nil),
 		},
@@ -3447,61 +3463,29 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"operator": "Exists",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Operator: "Exists", Effect: "NoSchedule"}}),
 		},
 		{ // empty operator is OK for toleration, defaults to Equal.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		{ // empty effect is OK for toleration, empty toleration effect means match all taint effects.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Equal",
-						"value": "bar"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Equal", Value: "bar"}}),
 		},
 		{ // negative tolerationSeconds is OK for toleration.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-forgiveness-invalid",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "node.alpha.kubernetes.io/notReady",
-						"operator": "Exists",
-						"effect": "NoExecute",
-						"tolerationSeconds": -2
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
 		},
 		{ // docker default seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
@@ -3918,81 +3902,37 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "nospecialchars^=@",
-						"operator": "Equal",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "nospecialchars^=@", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		"invalid toleration operator": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "In",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "In", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		"value must be empty when `operator` is 'Exists'": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "foo",
-						"operator": "Exists",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Exists", Value: "bar", Effect: "NoSchedule"}}),
 		},
 
 		"operator must be 'Exists' when `key` is empty": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"operator": "Equal",
-						"value": "bar",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		"effect must be 'NoExecute' when `TolerationSeconds` is set": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-forgiveness-invalid",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.TolerationsAnnotationKey: `
-					[{
-						"key": "node.alpha.kubernetes.io/notReady",
-						"operator": "Exists",
-						"effect": "NoSchedule",
-						"tolerationSeconds": 20
-					}]`,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
 		},
 		"must be a valid pod seccomp profile": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -4610,7 +4550,6 @@ func TestValidatePodUpdate(t *testing.T) {
 			false,
 			"activeDeadlineSeconds change to nil from positive",
 		},
-
 		{
 			api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -4690,6 +4629,157 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			true,
 			"bad label change",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value2"}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			false,
+			"existing toleration value modified in pod spec updates",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: nil}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
+				},
+			},
+			false,
+			"existing toleration value modified in pod spec updates with modified tolerationSeconds",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]}},
+				}},
+			true,
+			"modified tolerationSeconds in existing toleration value in pod spec updates",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value2"}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			false,
+			"toleration modified in updates to an unscheduled pod",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
+				},
+			},
+			true,
+			"tolerations unmodified in updates to a scheduled pod",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1",
+					Tolerations: []api.Toleration{
+						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
+						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{30}[0]},
+					},
+				}},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:    "node1",
+					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
+				},
+			},
+			true,
+			"added valid new toleration to existing tolerations in pod spec updates",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: api.PodSpec{
+					NodeName: "node1",
+					Tolerations: []api.Toleration{
+						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
+						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule", TolerationSeconds: &[]int64{30}[0]},
+					},
+				}},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1", Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
+				}},
+			false,
+			"added invalid new toleration to existing tolerations in pod spec updates",
 		},
 	}
 
@@ -5318,6 +5408,125 @@ func TestValidateService(t *testing.T) {
 	}
 }
 
+func TestValidateReplicationControllerStatus(t *testing.T) {
+	tests := []struct {
+		name string
+
+		replicas             int32
+		fullyLabeledReplicas int32
+		readyReplicas        int32
+		availableReplicas    int32
+		observedGeneration   int64
+
+		expectedErr bool
+	}{
+		{
+			name:                 "valid status",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        2,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          false,
+		},
+		{
+			name:                 "invalid replicas",
+			replicas:             -1,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        2,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid fullyLabeledReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: -1,
+			readyReplicas:        2,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid readyReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        -1,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid availableReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        3,
+			availableReplicas:    -1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid observedGeneration",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        3,
+			availableReplicas:    3,
+			observedGeneration:   -1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "fullyLabeledReplicas greater than replicas",
+			replicas:             3,
+			fullyLabeledReplicas: 4,
+			readyReplicas:        3,
+			availableReplicas:    3,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "readyReplicas greater than replicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        4,
+			availableReplicas:    3,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "availableReplicas greater than replicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        3,
+			availableReplicas:    4,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "availableReplicas greater than readyReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        2,
+			availableReplicas:    3,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+	}
+
+	for _, test := range tests {
+		status := api.ReplicationControllerStatus{
+			Replicas:             test.replicas,
+			FullyLabeledReplicas: test.fullyLabeledReplicas,
+			ReadyReplicas:        test.readyReplicas,
+			AvailableReplicas:    test.availableReplicas,
+			ObservedGeneration:   test.observedGeneration,
+		}
+
+		if hasErr := len(ValidateReplicationControllerStatus(status, field.NewPath("status"))) > 0; hasErr != test.expectedErr {
+			t.Errorf("%s: expected error: %t, got error: %t", test.name, test.expectedErr, hasErr)
+		}
+	}
+}
+
 func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -5826,15 +6035,6 @@ func TestValidateNode(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
-				// Add a valid taint to a node
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "GPU",
-						"value": "true",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
@@ -5847,6 +6047,8 @@ func TestValidateNode(t *testing.T) {
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a valid taint to a node
+				Taints: []api.Taint{{Key: "GPU", Value: "true", Effect: "NoSchedule"}},
 			},
 		},
 		{
@@ -5940,48 +6142,26 @@ func TestValidateNode(t *testing.T) {
 		"missing-taint-key": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
-				// Add a taint with an empty key to a node
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "",
-						"value": "special-user-1",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a taint with an empty key to a node
+				Taints: []api.Taint{{Key: "", Value: "special-user-1", Effect: "NoSchedule"}},
 			},
 		},
 		"bad-taint-key": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
-				// Add a taint with an empty key to a node
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "NoUppercaseOrSpecialCharsLike=Equals",
-						"value": "special-user-1",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a taint with an invalid  key to a node
+				Taints: []api.Taint{{Key: "NoUppercaseOrSpecialCharsLike=Equals", Value: "special-user-1", Effect: "NoSchedule"}},
 			},
 		},
 		"bad-taint-value": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node2",
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "dedicated",
-						"value": "some\\bad\\value",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
@@ -5992,23 +6172,15 @@ func TestValidateNode(t *testing.T) {
 					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
 				},
 			},
-			// Add a taint with an empty value to a node
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a taint with a bad value to a node
+				Taints: []api.Taint{{Key: "dedicated", Value: "some\\bad\\value", Effect: "NoSchedule"}},
 			},
 		},
 		"missing-taint-effect": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node3",
-				// Add a taint with an empty effect to a node
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "dedicated",
-						"value": "special-user-3",
-						"effect": ""
-					}]`,
-				},
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
@@ -6021,20 +6193,13 @@ func TestValidateNode(t *testing.T) {
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a taint with an empty effect to a node
+				Taints: []api.Taint{{Key: "dedicated", Value: "special-user-3", Effect: ""}},
 			},
 		},
 		"invalid-taint-effect": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node3",
-				// Add a taint with an empty effect to a node
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "dedicated",
-						"value": "special-user-3",
-						"effect": "NoScheduleNoAdmit"
-					}]`,
-				},
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
@@ -6047,27 +6212,21 @@ func TestValidateNode(t *testing.T) {
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add a taint with NoExecute effect to a node
+				Taints: []api.Taint{{Key: "dedicated", Value: "special-user-3", Effect: "NoScheduleNoAdmit"}},
 			},
 		},
 		"duplicated-taints-with-same-key-effect": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
-				// Add two taints to the node with the same key and effect; should be rejected.
-				Annotations: map[string]string{
-					api.TaintsAnnotationKey: `
-					[{
-						"key": "dedicated",
-						"value": "special-user-1",
-						"effect": "NoSchedule"
-					}, {
-						"key": "dedicated",
-						"value": "special-user-2",
-						"effect": "NoSchedule"
-					}]`,
-				},
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
+				// Add two taints to the node with the same key and effect; should be rejected.
+				Taints: []api.Taint{
+					{Key: "dedicated", Value: "special-user-1", Effect: "NoSchedule"},
+					{Key: "dedicated", Value: "special-user-2", Effect: "NoSchedule"},
+				},
 			},
 		},
 		"missing-podSignature": {
@@ -6145,9 +6304,9 @@ func TestValidateNode(t *testing.T) {
 				"metadata.annotations":                                                                                        true,
 				"metadata.namespace":                                                                                          true,
 				"spec.externalID":                                                                                             true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/taints[0].key":                                            true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/taints[0].value":                                          true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/taints[0].effect":                                         true,
+				"spec.taints[0].key":                                                                                          true,
+				"spec.taints[0].value":                                                                                        true,
+				"spec.taints[0].effect":                                                                                       true,
 				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature":                          true,
 				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature.PodController.Controller": true,
 			}
@@ -8658,5 +8817,88 @@ func TestEndpointAddressNodeNameCanBeAnIPAddress(t *testing.T) {
 	errList := ValidateEndpoints(endpoint)
 	if len(errList) != 0 {
 		t.Error("Endpoint should accept a NodeName that is an IP address")
+	}
+}
+
+func TestValidateFlexVolumeSource(t *testing.T) {
+	testcases := map[string]struct {
+		source       *api.FlexVolumeSource
+		expectedErrs map[string]string
+	}{
+		"valid": {
+			source:       &api.FlexVolumeSource{Driver: "foo"},
+			expectedErrs: map[string]string{},
+		},
+		"valid with options": {
+			source:       &api.FlexVolumeSource{Driver: "foo", Options: map[string]string{"foo": "bar"}},
+			expectedErrs: map[string]string{},
+		},
+		"no driver": {
+			source:       &api.FlexVolumeSource{Driver: ""},
+			expectedErrs: map[string]string{"driver": "Required value"},
+		},
+		"reserved option keys": {
+			source: &api.FlexVolumeSource{
+				Driver: "foo",
+				Options: map[string]string{
+					// valid options
+					"myns.io":               "A",
+					"myns.io/bar":           "A",
+					"myns.io/kubernetes.io": "A",
+
+					// invalid options
+					"KUBERNETES.IO":     "A",
+					"kubernetes.io":     "A",
+					"kubernetes.io/":    "A",
+					"kubernetes.io/foo": "A",
+
+					"alpha.kubernetes.io":     "A",
+					"alpha.kubernetes.io/":    "A",
+					"alpha.kubernetes.io/foo": "A",
+
+					"k8s.io":     "A",
+					"k8s.io/":    "A",
+					"k8s.io/foo": "A",
+
+					"alpha.k8s.io":     "A",
+					"alpha.k8s.io/":    "A",
+					"alpha.k8s.io/foo": "A",
+				},
+			},
+			expectedErrs: map[string]string{
+				"options[KUBERNETES.IO]":           "reserved",
+				"options[kubernetes.io]":           "reserved",
+				"options[kubernetes.io/]":          "reserved",
+				"options[kubernetes.io/foo]":       "reserved",
+				"options[alpha.kubernetes.io]":     "reserved",
+				"options[alpha.kubernetes.io/]":    "reserved",
+				"options[alpha.kubernetes.io/foo]": "reserved",
+				"options[k8s.io]":                  "reserved",
+				"options[k8s.io/]":                 "reserved",
+				"options[k8s.io/foo]":              "reserved",
+				"options[alpha.k8s.io]":            "reserved",
+				"options[alpha.k8s.io/]":           "reserved",
+				"options[alpha.k8s.io/foo]":        "reserved",
+			},
+		},
+	}
+
+	for k, tc := range testcases {
+		errs := validateFlexVolumeSource(tc.source, nil)
+		for _, err := range errs {
+			expectedErr, ok := tc.expectedErrs[err.Field]
+			if !ok {
+				t.Errorf("%s: unexpected err on field %s: %v", k, err.Field, err)
+				continue
+			}
+			if !strings.Contains(err.Error(), expectedErr) {
+				t.Errorf("%s: expected err on field %s to contain '%s', was %v", k, err.Field, expectedErr, err.Error())
+				continue
+			}
+		}
+		if len(errs) != len(tc.expectedErrs) {
+			t.Errorf("%s: expected errs %#v, got %#v", k, tc.expectedErrs, errs)
+			continue
+		}
 	}
 }

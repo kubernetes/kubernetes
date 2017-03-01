@@ -57,6 +57,7 @@ import (
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -249,15 +250,15 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		userspace.CleanupLeftovers(iptInterface)
 	} else {
 		glog.V(0).Info("Using userspace Proxier.")
-		// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
-		// our config.EndpointsConfigHandler.
-		loadBalancer := userspace.NewLoadBalancerRR()
-		// set EndpointsConfigHandler to our loadBalancer
-		endpointsHandler = loadBalancer
 
 		var proxierUserspace proxy.ProxyProvider
 
 		if runtime.GOOS == "windows" {
+			// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
+			// our config.EndpointsConfigHandler.
+			loadBalancer := winuserspace.NewLoadBalancerRR()
+			// set EndpointsConfigHandler to our loadBalancer
+			endpointsHandler = loadBalancer
 			proxierUserspace, err = winuserspace.NewProxier(
 				loadBalancer,
 				net.ParseIP(config.BindAddress),
@@ -268,10 +269,16 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 				config.UDPIdleTimeout.Duration,
 			)
 		} else {
+			// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
+			// our config.EndpointsConfigHandler.
+			loadBalancer := userspace.NewLoadBalancerRR()
+			// set EndpointsConfigHandler to our loadBalancer
+			endpointsHandler = loadBalancer
 			proxierUserspace, err = userspace.NewProxier(
 				loadBalancer,
 				net.ParseIP(config.BindAddress),
 				iptInterface,
+				execer,
 				*utilnet.ParsePortRangeOrDie(config.PortRange),
 				config.IPTablesSyncPeriod.Duration,
 				config.IPTablesMinSyncPeriod.Duration,
@@ -342,6 +349,7 @@ func (s *ProxyServer) Run() error {
 		http.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
+		http.Handle("/metrics", prometheus.Handler())
 		configz.InstallHandler(http.DefaultServeMux)
 		go wait.Until(func() {
 			err := http.ListenAndServe(s.Config.HealthzBindAddress+":"+strconv.Itoa(int(s.Config.HealthzPort)), nil)

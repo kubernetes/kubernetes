@@ -53,7 +53,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ClusterRoleBindingV1GeneratorName)
-	cmd.Flags().String("clusterrole", "", "ClusterRole this ClusterRoleBinding should reference")
+	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this ClusterRoleBinding should reference"))
 	cmd.Flags().StringSlice("user", []string{}, "usernames to bind to the role")
 	cmd.Flags().StringSlice("group", []string{}, "groups to bind to the role")
 	cmd.Flags().StringSlice("serviceaccount", []string{}, "service accounts to bind to the role")

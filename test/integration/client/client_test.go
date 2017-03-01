@@ -29,6 +29,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -267,14 +268,26 @@ func TestPatch(t *testing.T) {
 	pb := patchBodies[c.Core().RESTClient().APIVersion()]
 
 	execPatch := func(pt types.PatchType, body []byte) error {
-		return c.Core().RESTClient().Patch(pt).
+		result := c.Core().RESTClient().Patch(pt).
 			Resource(resource).
 			Namespace(ns.Name).
 			Name(name).
 			Body(body).
-			Do().
-			Error()
+			Do()
+		if result.Error() != nil {
+			return result.Error()
+		}
+
+		// trying to chase flakes, this should give us resource versions of objects as we step through
+		jsonObj, err := result.Raw()
+		if err != nil {
+			t.Log(err)
+		} else {
+			t.Logf("%v", string(jsonObj))
+		}
+		return nil
 	}
+
 	for k, v := range pb {
 		// add label
 		err := execPatch(k, v.AddLabelBody)
@@ -491,11 +504,11 @@ func TestSingleWatch(t *testing.T) {
 	}
 
 	w, err := client.Core().RESTClient().Get().
-		Prefix("watch").
 		Namespace(ns.Name).
 		Resource("events").
-		Name("event-9").
 		Param("resourceVersion", rv1).
+		Param("watch", "true").
+		FieldsSelectorParam(fields.OneTermEqualSelector("metadata.name", "event-9")).
 		Watch()
 
 	if err != nil {

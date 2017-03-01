@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
@@ -71,6 +72,15 @@ __kubectl_get_namespaces()
     local template kubectl_out
     template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
     if kubectl_out=$(kubectl get -o template --template="${template}" namespace 2>/dev/null); then
+        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
+    fi
+}
+
+__kubectl_get_contexts()
+{
+    local template kubectl_out
+    template="{{ range .contexts  }}{{ .name }} {{ end }}"
+    if kubectl_out=$(kubectl config $(__kubectl_override_flags) -o template --template="${template}" view 2>/dev/null); then
         COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
@@ -286,6 +296,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdPortForward(f, out, err),
 				NewCmdProxy(f, out),
 				NewCmdCp(f, in, out, err),
+				auth.NewCmdAuth(f, out, err),
 			},
 		},
 		{
@@ -321,6 +332,16 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		cmds.Flag("namespace").Annotations[cobra.BashCompCustom] = append(
 			cmds.Flag("namespace").Annotations[cobra.BashCompCustom],
 			"__kubectl_get_namespaces",
+		)
+	}
+
+	if cmds.Flag("context") != nil {
+		if cmds.Flag("context").Annotations == nil {
+			cmds.Flag("context").Annotations = map[string][]string{}
+		}
+		cmds.Flag("context").Annotations[cobra.BashCompCustom] = append(
+			cmds.Flag("context").Annotations[cobra.BashCompCustom],
+			"__kubectl_get_contexts",
 		)
 	}
 

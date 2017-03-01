@@ -203,6 +203,10 @@ func (plugin *FakeVolumePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *FakeVolumePlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *FakeVolumePlugin) NewMounter(spec *Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
@@ -275,8 +279,8 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	return plugin.NewDetacherCallCount
 }
 
-func (plugin *FakeVolumePlugin) NewRecycler(pvName string, spec *Spec, eventRecorder RecycleEventRecorder) (Recycler, error) {
-	return &fakeRecycler{"/attributesTransferredFromSpec", MetricsNil{}}, nil
+func (plugin *FakeVolumePlugin) Recycle(pvName string, spec *Spec, eventRecorder RecycleEventRecorder) error {
+	return nil
 }
 
 func (plugin *FakeVolumePlugin) NewDeleter(spec *Spec) (Deleter, error) {
@@ -445,20 +449,6 @@ func (fv *FakeVolume) UnmountDevice(globalMountPath string) error {
 	defer fv.Unlock()
 	fv.UnmountDeviceCallCount++
 	return nil
-}
-
-type fakeRecycler struct {
-	path string
-	MetricsNil
-}
-
-func (fr *fakeRecycler) Recycle() error {
-	// nil is success, else error
-	return nil
-}
-
-func (fr *fakeRecycler) GetPath() string {
-	return fr.path
 }
 
 type FakeDeleter struct {

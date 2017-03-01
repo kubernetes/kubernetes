@@ -32,7 +32,7 @@ func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       metav1.NamespaceSystem,
-			Name:            "secretName",
+			Name:            bootstrapapi.BootstrapTokenSecretPrefix + tokenID,
 			ResourceVersion: "1",
 		},
 		Type: bootstrapapi.SecretTypeBootstrapToken,

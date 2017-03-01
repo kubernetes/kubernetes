@@ -42,7 +42,7 @@ func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *s
 		affinity = priorityMeta.affinity
 	} else {
 		// We couldn't parse metadata - fallback to the podspec.
-		affinity = pod.Spec.Affinity
+		affinity = schedulercache.ReconcileAffinity(pod)
 	}
 
 	var count int32

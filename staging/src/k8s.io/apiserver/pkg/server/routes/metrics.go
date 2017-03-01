@@ -21,8 +21,8 @@ import (
 	"net/http"
 
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
-	etcdmetrics "k8s.io/apiserver/pkg/storage/etcd/metrics"
 	"k8s.io/apiserver/pkg/server/mux"
+	etcdmetrics "k8s.io/apiserver/pkg/storage/etcd/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"
 )

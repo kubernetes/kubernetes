@@ -73,11 +73,24 @@ func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
 	}
 	return obj.Object
 }
+
+// UnstructuredContent returns a map contain an overlay of the Items field onto
+// the Object field. Items always overwrites overlay. Changing "items" in the
+// returned object will affect items in the underlying Items field, but changing
+// the "items" slice itself will have no effect.
+// TODO: expose SetUnstructuredContent on runtime.Unstructured that allows
+// items to be changed.
 func (obj *UnstructuredList) UnstructuredContent() map[string]interface{} {
-	if obj.Object == nil {
-		obj.Object = make(map[string]interface{})
+	out := obj.Object
+	if out == nil {
+		out = make(map[string]interface{})
 	}
-	return obj.Object
+	items := make([]interface{}, len(obj.Items))
+	for i, item := range obj.Items {
+		items[i] = item.Object
+	}
+	out["items"] = items
+	return out
 }
 
 // MarshalJSON ensures that the unstructured object produces proper
@@ -191,21 +204,31 @@ func (u *Unstructured) setNestedMap(value map[string]string, fields ...string) {
 
 func extractOwnerReference(src interface{}) metav1.OwnerReference {
 	v := src.(map[string]interface{})
-	controllerPtr, ok := (getNestedField(v, "controller")).(*bool)
+	// though this field is a *bool, but when decoded from JSON, it's
+	// unmarshalled as bool.
+	var controllerPtr *bool
+	controller, ok := (getNestedField(v, "controller")).(bool)
 	if !ok {
 		controllerPtr = nil
 	} else {
-		if controllerPtr != nil {
-			controller := *controllerPtr
-			controllerPtr = &controller
-		}
+		controllerCopy := controller
+		controllerPtr = &controllerCopy
+	}
+	var blockOwnerDeletionPtr *bool
+	blockOwnerDeletion, ok := (getNestedField(v, "blockOwnerDeletion")).(bool)
+	if !ok {
+		blockOwnerDeletionPtr = nil
+	} else {
+		blockOwnerDeletionCopy := blockOwnerDeletion
+		blockOwnerDeletionPtr = &blockOwnerDeletionCopy
 	}
 	return metav1.OwnerReference{
-		Kind:       getNestedString(v, "kind"),
-		Name:       getNestedString(v, "name"),
-		APIVersion: getNestedString(v, "apiVersion"),
-		UID:        (types.UID)(getNestedString(v, "uid")),
-		Controller: controllerPtr,
+		Kind:               getNestedString(v, "kind"),
+		Name:               getNestedString(v, "name"),
+		APIVersion:         getNestedString(v, "apiVersion"),
+		UID:                (types.UID)(getNestedString(v, "uid")),
+		Controller:         controllerPtr,
+		BlockOwnerDeletion: blockOwnerDeletionPtr,
 	}
 }
 
@@ -216,11 +239,17 @@ func setOwnerReference(src metav1.OwnerReference) map[string]interface{} {
 		controller := *controllerPtr
 		controllerPtr = &controller
 	}
+	blockOwnerDeletionPtr := src.BlockOwnerDeletion
+	if blockOwnerDeletionPtr != nil {
+		blockOwnerDeletion := *blockOwnerDeletionPtr
+		blockOwnerDeletionPtr = &blockOwnerDeletion
+	}
 	setNestedField(ret, src.Kind, "kind")
 	setNestedField(ret, src.Name, "name")
 	setNestedField(ret, src.APIVersion, "apiVersion")
 	setNestedField(ret, string(src.UID), "uid")
 	setNestedField(ret, controllerPtr, "controller")
+	setNestedField(ret, blockOwnerDeletionPtr, "blockOwnerDeletion")
 	return ret
 }
 

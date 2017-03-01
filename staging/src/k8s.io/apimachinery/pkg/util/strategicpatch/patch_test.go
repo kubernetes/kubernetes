@@ -25,7 +25,9 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type SortMergeListTestCases struct {
@@ -92,6 +94,7 @@ type MergeItem struct {
 	NonMergingIntList []int
 	MergeItemPtr      *MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
 	SimpleMap         map[string]string
+	ReplacingItem     runtime.RawExtension `patchStrategy:"replace"`
 }
 
 var mergeItem MergeItem
@@ -2364,5 +2367,376 @@ func TestNumberConversion(t *testing.T) {
 			t.Errorf("%s: expected %s, got %s", k, tc.ExpectedResult, string(result))
 			continue
 		}
+	}
+}
+
+var replaceRawExtensionPatchTestCases = []StrategicMergePatchRawTestCase{
+	{
+		Description: "replace RawExtension field, rest unchanched",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+name: my-object
+value: some-value
+other: current-other
+replacingItem:
+  Some: Generic
+  Yaml: Inside
+  The: RawExtension
+  Field: Period
+`),
+			Current: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+  - name: 3
+replacingItem:
+  Some: Generic
+  Yaml: Inside
+  The: RawExtension
+  Field: Period
+`),
+			Modified: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+  - name: 3
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			TwoWay: []byte(`
+merginglist:
+  - name: 1
+  - name: 2
+  - name: 3
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			TwoWayResult: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+  - name: 3
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			ThreeWay: []byte(`
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			Result: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+  - name: 3
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+		},
+	},
+	{
+		Description: "replace RawExtension field and merge list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+replacingItem:
+  Some: Generic
+  Yaml: Inside
+  The: RawExtension
+  Field: Period
+`),
+			Current: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 3
+replacingItem:
+  Some: Generic
+  Yaml: Inside
+  The: RawExtension
+  Field: Period
+`),
+			Modified: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			TwoWay: []byte(`
+merginglist:
+  - name: 2
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			TwoWayResult: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 2
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			ThreeWay: []byte(`
+merginglist:
+  - name: 2
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+			Result: []byte(`
+name: my-object
+value: some-value
+other: current-other
+merginglist:
+  - name: 1
+  - name: 3
+  - name: 2
+replacingItem:
+  Newly: Modified
+  Yaml: Inside
+  The: RawExtension
+`),
+		},
+	},
+}
+
+func TestReplaceWithRawExtension(t *testing.T) {
+	for _, c := range replaceRawExtensionPatchTestCases {
+		testTwoWayPatchWithoutSorting(t, c)
+		testThreeWayPatchWithoutSorting(t, c)
+	}
+}
+
+func testTwoWayPatchWithoutSorting(t *testing.T, c StrategicMergePatchRawTestCase) {
+	original, expectedPatch, modified, expectedResult := twoWayRawTestCaseToJSONOrFail(t, c)
+
+	actualPatch, err := CreateTwoWayMergePatch(original, modified, mergeItem)
+	if err != nil {
+		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+		return
+	}
+
+	testPatchCreationWithoutSorting(t, expectedPatch, actualPatch, c.Description)
+	testPatchApplicationWithoutSorting(t, original, actualPatch, expectedResult, c.Description)
+}
+
+func testThreeWayPatchWithoutSorting(t *testing.T, c StrategicMergePatchRawTestCase) {
+	original, modified, current, expected, result := threeWayRawTestCaseToJSONOrFail(t, c)
+	actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, false)
+	if err != nil {
+		if !mergepatch.IsConflict(err) {
+			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+			return
+		}
+
+		if !strings.Contains(c.Description, "conflict") {
+			t.Errorf("unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+			return
+		}
+
+		if len(c.Result) > 0 {
+			actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, true)
+			if err != nil {
+				t.Errorf("error: %s\nin test case: %s\ncannot force three way patch application:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+					err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+				return
+			}
+
+			testPatchCreationWithoutSorting(t, expected, actual, c.Description)
+			testPatchApplicationWithoutSorting(t, current, actual, result, c.Description)
+		}
+
+		return
+	}
+
+	if strings.Contains(c.Description, "conflict") || len(c.Result) < 1 {
+		t.Errorf("error: %s\nin test case: %s\nexpected conflict did not occur:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
+		return
+	}
+
+	testPatchCreationWithoutSorting(t, expected, actual, c.Description)
+	testPatchApplicationWithoutSorting(t, current, actual, result, c.Description)
+}
+
+func testPatchCreationWithoutSorting(t *testing.T, expected, actual []byte, description string) {
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("error in test case: %s\nexpected patch:\n%s\ngot:\n%s\n",
+			description, jsonToYAMLOrError(expected), jsonToYAMLOrError(actual))
+		return
+	}
+}
+
+func testPatchApplicationWithoutSorting(t *testing.T, original, patch, expected []byte, description string) {
+	result, err := StrategicMergePatch(original, patch, mergeItem)
+	if err != nil {
+		t.Errorf("error: %s\nin test case: %s\ncannot apply patch:\n%s\nto original:\n%s\n",
+			err, description, jsonToYAMLOrError(patch), jsonToYAMLOrError(original))
+		return
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		format := "error in test case: %s\npatch application failed:\noriginal:\n%s\npatch:\n%s\nexpected:\n%s\ngot:\n%s\n"
+		t.Errorf(format, description,
+			jsonToYAMLOrError(original), jsonToYAMLOrError(patch),
+			jsonToYAMLOrError(expected), jsonToYAMLOrError(result))
+		return
+	}
+}
+
+func TestUnknownField(t *testing.T) {
+	testcases := map[string]struct {
+		Original string
+		Current  string
+		Modified string
+
+		ExpectedTwoWay         string
+		ExpectedTwoWayErr      string
+		ExpectedTwoWayResult   string
+		ExpectedThreeWay       string
+		ExpectedThreeWayErr    string
+		ExpectedThreeWayResult string
+	}{
+		// cases we can successfully strategically merge
+		"no diff": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+
+			ExpectedTwoWay:         `{}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+		},
+		"added only": {
+			Original: `{"name":"foo"}`,
+			Current:  `{"name":"foo"}`,
+			Modified: `{"name":"foo","scalar":true,"complex":{"nested":true},"array":[1,2,3]}`,
+
+			ExpectedTwoWay:         `{"array":[1,2,3],"complex":{"nested":true},"scalar":true}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{"array":[1,2,3],"complex":{"nested":true},"scalar":true}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+		},
+		"removed only": {
+			Original: `{"name":"foo","scalar":true,"complex":{"nested":true}}`,
+			Current:  `{"name":"foo","scalar":true,"complex":{"nested":true},"array":[1,2,3]}`,
+			Modified: `{"name":"foo"}`,
+
+			ExpectedTwoWay:         `{"complex":null,"scalar":null}`,
+			ExpectedTwoWayResult:   `{"name":"foo"}`,
+			ExpectedThreeWay:       `{"complex":null,"scalar":null}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"name":"foo"}`,
+		},
+
+		// cases we cannot successfully strategically merge (expect errors)
+		"diff": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":false},"name":"foo","scalar":true}`,
+
+			ExpectedTwoWayErr:   `unable to find api field`,
+			ExpectedThreeWayErr: `unable to find api field`,
+		},
+	}
+
+	for _, k := range sets.StringKeySet(testcases).List() {
+		tc := testcases[k]
+		func() {
+			twoWay, err := CreateTwoWayMergePatch([]byte(tc.Original), []byte(tc.Modified), &MergeItem{})
+			if err != nil {
+				if len(tc.ExpectedTwoWayErr) == 0 {
+					t.Errorf("%s: error making two-way patch: %v", k, err)
+				}
+				if !strings.Contains(err.Error(), tc.ExpectedTwoWayErr) {
+					t.Errorf("%s: expected error making two-way patch to contain '%s', got %s", k, tc.ExpectedTwoWayErr, err)
+				}
+				return
+			}
+
+			if string(twoWay) != tc.ExpectedTwoWay {
+				t.Errorf("%s: expected two-way patch:\n\t%s\ngot\n\t%s", k, string(tc.ExpectedTwoWay), string(twoWay))
+				return
+			}
+
+			twoWayResult, err := StrategicMergePatch([]byte(tc.Original), twoWay, MergeItem{})
+			if err != nil {
+				t.Errorf("%s: error applying two-way patch: %v", k, err)
+				return
+			}
+			if string(twoWayResult) != tc.ExpectedTwoWayResult {
+				t.Errorf("%s: expected two-way result:\n\t%s\ngot\n\t%s", k, string(tc.ExpectedTwoWayResult), string(twoWayResult))
+				return
+			}
+		}()
+
+		func() {
+			threeWay, err := CreateThreeWayMergePatch([]byte(tc.Original), []byte(tc.Modified), []byte(tc.Current), &MergeItem{}, false)
+			if err != nil {
+				if len(tc.ExpectedThreeWayErr) == 0 {
+					t.Errorf("%s: error making three-way patch: %v", k, err)
+				} else if !strings.Contains(err.Error(), tc.ExpectedThreeWayErr) {
+					t.Errorf("%s: expected error making three-way patch to contain '%s', got %s", k, tc.ExpectedThreeWayErr, err)
+				}
+				return
+			}
+
+			if string(threeWay) != tc.ExpectedThreeWay {
+				t.Errorf("%s: expected three-way patch:\n\t%s\ngot\n\t%s", k, string(tc.ExpectedThreeWay), string(threeWay))
+				return
+			}
+
+			threeWayResult, err := StrategicMergePatch([]byte(tc.Current), threeWay, MergeItem{})
+			if err != nil {
+				t.Errorf("%s: error applying three-way patch: %v", k, err)
+				return
+			} else if string(threeWayResult) != tc.ExpectedThreeWayResult {
+				t.Errorf("%s: expected three-way result:\n\t%s\ngot\n\t%s", k, string(tc.ExpectedThreeWayResult), string(threeWayResult))
+				return
+			}
+		}()
 	}
 }

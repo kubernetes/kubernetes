@@ -84,7 +84,7 @@ func IsServiceIPRequested(service *Service) bool {
 
 var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes),
-	metav1.FinalizerOrphan,
+	metav1.FinalizerOrphanDependents,
 )
 
 func IsStandardFinalizerName(str string) bool {
@@ -235,14 +235,6 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 }
 
 const (
-	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
-	// in the Annotations of a Pod.
-	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
-
-	// TaintsAnnotationKey represents the key of taints data (json serialized)
-	// in the Annotations of a Node.
-	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
-
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
@@ -277,40 +269,49 @@ const (
 	// an object (e.g. secret, config map) before fetching it again from apiserver.
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
+
+	// AffinityAnnotationKey represents the key of affinity data (json serialized)
+	// in the Annotations of a Pod.
+	// TODO: remove when alpha support for affinity is removed
+	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
 )
 
-// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
-// and converts it to the []Toleration type in api.
-func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
-	var tolerations []Toleration
-	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)
-		if err != nil {
-			return tolerations, err
+// Tries to add a toleration to annotations list. Returns true if something was updated
+// false otherwise.
+func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) (bool, error) {
+	podTolerations := pod.Spec.Tolerations
+
+	var newTolerations []Toleration
+	updated := false
+	for i := range podTolerations {
+		if toleration.MatchToleration(&podTolerations[i]) {
+			if api.Semantic.DeepEqual(toleration, podTolerations[i]) {
+				return false, nil
+			}
+			newTolerations = append(newTolerations, *toleration)
+			updated = true
+			continue
 		}
+
+		newTolerations = append(newTolerations, podTolerations[i])
 	}
-	return tolerations, nil
-}
 
-func GetPodTolerations(pod *Pod) ([]Toleration, error) {
-	return GetTolerationsFromPodAnnotations(pod.Annotations)
-}
-
-// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
-// and converts it to the []Taint type in api.
-func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
-	var taints []Taint
-	if len(annotations) > 0 && annotations[TaintsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TaintsAnnotationKey]), &taints)
-		if err != nil {
-			return []Taint{}, err
-		}
+	if !updated {
+		newTolerations = append(newTolerations, *toleration)
 	}
-	return taints, nil
+
+	pod.Spec.Tolerations = newTolerations
+	return true, nil
 }
 
-func GetNodeTaints(node *Node) ([]Taint, error) {
-	return GetTaintsFromNodeAnnotations(node.Annotations)
+// MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
+// if the two tolerations have same <key,effect,operator,value> combination, regard as they match.
+// TODO: uniqueness check for tolerations in api validations.
+func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
+	return t.Key == tolerationToMatch.Key &&
+		t.Effect == tolerationToMatch.Effect &&
+		t.Operator == tolerationToMatch.Operator &&
+		t.Value == tolerationToMatch.Value
 }
 
 // ToleratesTaint checks if the toleration tolerates the taint.
@@ -520,39 +521,28 @@ func AddOrUpdateTaint(node *Node, taint *Taint) (*Node, bool, error) {
 		return nil, false, err
 	}
 	newNode := objCopy.(*Node)
-	nodeTaints, err := GetTaintsFromNodeAnnotations(newNode.Annotations)
-	if err != nil {
-		return newNode, false, err
-	}
+	nodeTaints := newNode.Spec.Taints
 
-	var newTaints []*Taint
+	var newTaints []Taint
 	updated := false
 	for i := range nodeTaints {
 		if taint.MatchTaint(&nodeTaints[i]) {
 			if api.Semantic.DeepEqual(taint, nodeTaints[i]) {
 				return newNode, false, nil
 			}
-			newTaints = append(newTaints, taint)
+			newTaints = append(newTaints, *taint)
 			updated = true
 			continue
 		}
 
-		newTaints = append(newTaints, &nodeTaints[i])
+		newTaints = append(newTaints, nodeTaints[i])
 	}
 
 	if !updated {
-		newTaints = append(newTaints, taint)
+		newTaints = append(newTaints, *taint)
 	}
 
-	taintsData, err := json.Marshal(newTaints)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if newNode.Annotations == nil {
-		newNode.Annotations = make(map[string]string)
-	}
-	newNode.Annotations[TaintsAnnotationKey] = string(taintsData)
+	newNode.Spec.Taints = newTaints
 	return newNode, true, nil
 }
 
@@ -573,10 +563,7 @@ func RemoveTaint(node *Node, taint *Taint) (*Node, bool, error) {
 		return nil, false, err
 	}
 	newNode := objCopy.(*Node)
-	nodeTaints, err := GetTaintsFromNodeAnnotations(newNode.Annotations)
-	if err != nil {
-		return newNode, false, err
-	}
+	nodeTaints := newNode.Spec.Taints
 	if len(nodeTaints) == 0 {
 		return newNode, false, nil
 	}
@@ -586,14 +573,21 @@ func RemoveTaint(node *Node, taint *Taint) (*Node, bool, error) {
 	}
 
 	newTaints, _ := DeleteTaint(nodeTaints, taint)
-	if len(newTaints) == 0 {
-		delete(newNode.Annotations, TaintsAnnotationKey)
-	} else {
-		taintsData, err := json.Marshal(newTaints)
-		if err != nil {
-			return newNode, false, err
-		}
-		newNode.Annotations[TaintsAnnotationKey] = string(taintsData)
-	}
+	newNode.Spec.Taints = newTaints
 	return newNode, true, nil
+}
+
+// GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
+// and converts it to the Affinity type in api.
+// TODO: remove when alpha support for affinity is removed
+func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, error) {
+	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
+		var affinity Affinity
+		err := json.Unmarshal([]byte(annotations[AffinityAnnotationKey]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
 }

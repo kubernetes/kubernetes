@@ -112,6 +112,10 @@ func (p *flockerPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (p *flockerPlugin) SupportsMountOption() bool {
+	return false
+}
+
 func (plugin *flockerPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

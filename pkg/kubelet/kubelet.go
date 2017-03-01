@@ -34,7 +34,6 @@ import (
 	clientgoclientset "k8s.io/client-go/kubernetes"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -55,7 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -68,6 +67,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	"k8s.io/kubernetes/pkg/kubelet/gpu"
+	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -75,6 +76,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/preemption"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
@@ -358,11 +360,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		KernelMemcgNotification:  kubeCfg.ExperimentalKernelMemcgNotification,
 	}
 
-	reservation, err := ParseReservation(kubeCfg.KubeReserved, kubeCfg.SystemReserved)
-	if err != nil {
-		return nil, err
-	}
-
 	var dockerExecHandler dockertools.ExecHandler
 	switch kubeCfg.DockerExecHandlerName {
 	case "native":
@@ -374,21 +371,21 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
-	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeDeps.KubeClient != nil {
 		serviceLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "services", metav1.NamespaceAll, fields.Everything())
-		cache.NewReflector(serviceLW, &v1.Service{}, serviceStore, 0).Run()
+		cache.NewReflector(serviceLW, &v1.Service{}, serviceIndexer, 0).Run()
 	}
-	serviceLister := &listers.StoreToServiceLister{Indexer: serviceStore}
+	serviceLister := corelisters.NewServiceLister(serviceIndexer)
 
-	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	nodeIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 	if kubeDeps.KubeClient != nil {
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
 		nodeLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
-		cache.NewReflector(nodeLW, &v1.Node{}, nodeStore, 0).Run()
+		cache.NewReflector(nodeLW, &v1.Node{}, nodeIndexer, 0).Run()
 	}
-	nodeLister := &listers.StoreToNodeLister{Store: nodeStore}
-	nodeInfo := &predicates.CachedNodeInfo{StoreToNodeLister: nodeLister}
+	nodeLister := corelisters.NewNodeLister(nodeIndexer)
+	nodeInfo := &predicates.CachedNodeInfo{NodeLister: nodeLister}
 
 	// TODO: get the real node object of ourself,
 	// and use the real node name and UID.
@@ -455,7 +452,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
 		maxPods:           int(kubeCfg.MaxPods),
 		podsPerCore:       int(kubeCfg.PodsPerCore),
-		nvidiaGPUs:        int(kubeCfg.NvidiaGPUs),
 		syncLoopMonitor:   atomic.Value{},
 		resolverConfig:    kubeCfg.ResolverConfig,
 		cpuCFSQuota:       kubeCfg.CPUCFSQuota,
@@ -464,7 +460,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		nodeIP:            net.ParseIP(kubeCfg.NodeIP),
 		clock:             clock.RealClock{},
 		outOfDiskTransitionFrequency:            kubeCfg.OutOfDiskTransitionFrequency.Duration,
-		reservation:                             *reservation,
 		enableCustomMetrics:                     kubeCfg.EnableCustomMetrics,
 		babysitDaemons:                          kubeCfg.BabysitDaemons,
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
@@ -783,7 +778,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	klet.AddPodSyncHandler(activeDeadlineHandler)
 
-	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay))
+	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.getActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
+	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, criticalPodAdmissionHandler))
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
 		opt(klet)
@@ -791,7 +787,16 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	klet.appArmorValidator = apparmor.NewValidator(kubeCfg.ContainerRuntime)
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
-
+	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
+		if kubeCfg.ContainerRuntime != "docker" {
+			return nil, fmt.Errorf("Accelerators feature is supported with docker runtime only.")
+		}
+		if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, klet.dockerClient); err != nil {
+			return nil, err
+		}
+	} else {
+		klet.gpuManager = gpu.NewGPUManagerStub()
+	}
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
@@ -803,7 +808,7 @@ type serviceLister interface {
 }
 
 type nodeLister interface {
-	List() (machines v1.NodeList, err error)
+	List(labels.Selector) ([]*v1.Node, error)
 }
 
 // Kubelet is the main kubelet implementation.
@@ -986,9 +991,6 @@ type Kubelet struct {
 	// Maximum Number of Pods which can be run by this Kubelet
 	maxPods int
 
-	// Number of NVIDIA GPUs on this node
-	nvidiaGPUs int
-
 	// Monitor Kubelet's sync loop
 	syncLoopMonitor atomic.Value
 
@@ -1031,10 +1033,6 @@ type Kubelet struct {
 	// not-out-of-disk. This prevents a pod that causes out-of-disk condition from repeatedly
 	// getting rescheduled onto the node.
 	outOfDiskTransitionFrequency time.Duration
-
-	// reservation specifies resources which are reserved for non-pod usage, including kubernetes and
-	// non-kubernetes system processes.
-	reservation kubetypes.Reservation
 
 	// support gathering custom metrics.
 	enableCustomMetrics bool
@@ -1098,6 +1096,9 @@ type Kubelet struct {
 	// This should only be enabled when the container runtime is performing user remapping AND if the
 	// experimental behavior is desired.
 	experimentalHostUserNamespaceDefaulting bool
+
+	// GPU Manager
+	gpuManager gpu.GPUManager
 }
 
 // setupDataDirs creates:
@@ -1182,7 +1183,7 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Kubelet failed to get node info: %v", err)
 	}
 
-	if err := kl.containerManager.Start(node); err != nil {
+	if err := kl.containerManager.Start(node, kl.getActivePods); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
@@ -1191,7 +1192,10 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
 
-	// Step 7: Start resource analyzer
+	// Step 7: Initialize GPUs
+	kl.gpuManager.Start()
+
+	// Step 8: Start resource analyzer
 	kl.resourceAnalyzer.Start()
 
 	return nil
@@ -1264,22 +1268,22 @@ func (kl *Kubelet) GetKubeClient() clientset.Interface {
 
 // GetClusterDNS returns a list of the DNS servers and a list of the DNS search
 // domains of the cluster.
-func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
+func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) {
 	var hostDNS, hostSearch []string
 	// Get host DNS settings
 	if kl.resolverConfig != "" {
 		f, err := os.Open(kl.resolverConfig)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 		defer f.Close()
 
 		hostDNS, hostSearch, err = kl.parseResolvConf(f)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 	}
-	useClusterFirstPolicy := pod.Spec.DNSPolicy == v1.DNSClusterFirst
+	useClusterFirstPolicy := ((pod.Spec.DNSPolicy == v1.DNSClusterFirst && !kubecontainer.IsHostNetworkPod(pod)) || pod.Spec.DNSPolicy == v1.DNSClusterFirstWithHostNet)
 	if useClusterFirstPolicy && len(kl.clusterDNS) == 0 {
 		// clusterDNS is not known.
 		// pod with ClusterDNSFirst Policy cannot be created
@@ -1305,7 +1309,7 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
 		} else {
 			hostSearch = kl.formDNSSearchForDNSDefault(hostSearch, pod)
 		}
-		return hostDNS, hostSearch, nil
+		return hostDNS, hostSearch, useClusterFirstPolicy, nil
 	}
 
 	// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
@@ -1317,7 +1321,7 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
 	}
 	dnsSearch := kl.formDNSSearch(hostSearch, pod)
 
-	return dns, dnsSearch, nil
+	return dns, dnsSearch, useClusterFirstPolicy, nil
 }
 
 // syncPod is the transaction script for the sync of a single pod.
@@ -1477,8 +1481,13 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		// they are not expected to run again.
 		// We don't create and apply updates to cgroup if its a run once pod and was killed above
 		if !(podKilled && pod.Spec.RestartPolicy == v1.RestartPolicyNever) {
-			if err := pcm.EnsureExists(pod); err != nil {
-				return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+			if !pcm.Exists(pod) {
+				if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
+					glog.V(2).Infof("Failed to update QoS cgroups while syncing pod: %v", err)
+				}
+				if err := pcm.EnsureExists(pod); err != nil {
+					return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+				}
 			}
 		}
 	}
@@ -2037,7 +2046,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 			glog.Errorf("Container runtime network not ready: %v", networkReady)
 			kl.runtimeState.setNetworkState(fmt.Errorf("runtime network not ready: %v", networkReady))
 		} else {
-			// Set nil if the containe runtime network is ready.
+			// Set nil if the container runtime network is ready.
 			kl.runtimeState.setNetworkState(nil)
 		}
 		// TODO(random-liu): Add runtime error in runtimeState, and update it
@@ -2115,47 +2124,6 @@ func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID str
 func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 	// ContatnerRemoved doesn't affect pod state
 	return event.Type != pleg.ContainerRemoved
-}
-
-// parseResourceList parses the given configuration map into an API
-// ResourceList or returns an error.
-func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, error) {
-	rl := make(v1.ResourceList)
-	for k, v := range m {
-		switch v1.ResourceName(k) {
-		// Only CPU and memory resources are supported.
-		case v1.ResourceCPU, v1.ResourceMemory:
-			q, err := resource.ParseQuantity(v)
-			if err != nil {
-				return nil, err
-			}
-			if q.Sign() == -1 {
-				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
-			}
-			rl[v1.ResourceName(k)] = q
-		default:
-			return nil, fmt.Errorf("cannot reserve %q resource", k)
-		}
-	}
-	return rl, nil
-}
-
-// ParseReservation parses the given kubelet- and system- reservations
-// configuration maps into an internal Reservation instance or returns an
-// error.
-func ParseReservation(kubeReserved, systemReserved componentconfig.ConfigurationMap) (*kubetypes.Reservation, error) {
-	reservation := new(kubetypes.Reservation)
-	if rl, err := parseResourceList(kubeReserved); err != nil {
-		return nil, err
-	} else {
-		reservation.Kubernetes = rl
-	}
-	if rl, err := parseResourceList(systemReserved); err != nil {
-		return nil, err
-	} else {
-		reservation.System = rl
-	}
-	return reservation, nil
 }
 
 // Gets the streaming server configuration to use with in-process CRI shims.

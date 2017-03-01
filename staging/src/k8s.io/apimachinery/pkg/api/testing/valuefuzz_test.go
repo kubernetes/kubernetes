@@ -27,17 +27,17 @@ func TestValueFuzz(t *testing.T) {
 			U uint
 		}
 		X struct {
-			Ptr *X
-			Y Y
-			Map map[string]int
+			Ptr   *X
+			Y     Y
+			Map   map[string]int
 			Slice []int
 		}
 	)
 
 	x := X{
-		Ptr: &X{},
-		Map: map[string]int{"foo": 42},
-		Slice: []int{1,2,3},
+		Ptr:   &X{},
+		Map:   map[string]int{"foo": 42},
+		Slice: []int{1, 2, 3},
 	}
 
 	p := x.Ptr

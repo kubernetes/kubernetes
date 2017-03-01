@@ -38,7 +38,7 @@ var updateConflictError = fmt.Errorf("aborting update after %d attempts", maxUpd
 
 // overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.
 // Generally used to tie break between StatefulSets that have overlapping selectors.
-type overlappingStatefulSets []apps.StatefulSet
+type overlappingStatefulSets []*apps.StatefulSet
 
 func (o overlappingStatefulSets) Len() int { return len(o) }
 
@@ -91,6 +91,7 @@ func getPodName(set *apps.StatefulSet, ordinal int) string {
 // getPersistentVolumeClaimName getsthe name of PersistentVolumeClaim for a Pod with an ordinal index of ordinal. claim
 // must be a PersistentVolumeClaim from set's VolumeClaims template.
 func getPersistentVolumeClaimName(set *apps.StatefulSet, claim *v1.PersistentVolumeClaim, ordinal int) string {
+	// NOTE: This name format is used by the heuristics for zone spreading in ChooseZoneForVolume
 	return fmt.Sprintf("%s-%s-%d", claim.Name, set.Name, ordinal)
 }
 

@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	authorizationapiv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
@@ -79,6 +79,8 @@ const (
 
 type Config struct {
 	GenericConfig *genericapiserver.Config
+
+	ClientCARegistrationHook ClientCARegistrationHook
 
 	APIResourceConfigSource  serverstorage.APIResourceConfigSource
 	StorageFactory           serverstorage.StorageFactory
@@ -135,6 +137,8 @@ type EndpointReconcilerConfig struct {
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
+
+	ClientCARegistrationHook ClientCARegistrationHook
 }
 
 type completedConfig struct {
@@ -251,6 +255,10 @@ func (c completedConfig) New() (*Master, error) {
 		m.installTunneler(c.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
 	}
 
+	if err := m.GenericAPIServer.AddPostStartHook("ca-registration", c.ClientCARegistrationHook.PostStartHook); err != nil {
+		glog.Fatalf("Error registering PostStartHook %q: %v", "ca-registration", err)
+	}
+
 	return m, nil
 }
 
@@ -359,7 +367,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		authenticationv1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
-		appsapi.SchemeGroupVersion,
+		appsv1beta1.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
 		rbacapi.SchemeGroupVersion,

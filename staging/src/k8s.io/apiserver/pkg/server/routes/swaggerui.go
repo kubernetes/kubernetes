@@ -21,8 +21,8 @@ import (
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 
-	"k8s.io/apiserver/pkg/server/routes/data/swagger"
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes/data/swagger"
 )
 
 // SwaggerUI exposes files in third_party/swagger-ui/ under /swagger-ui.

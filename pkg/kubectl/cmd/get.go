@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"github.com/golang/glog"
+	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
@@ -42,7 +44,8 @@ import (
 type GetOptions struct {
 	resource.FilenameOptions
 
-	Raw string
+	IgnoreNotFound bool
+	Raw            string
 }
 
 var (
@@ -93,7 +96,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, kubectl.PrintOptions{
+	p, err := f.Printer(nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 	})
 	cmdutil.CheckErr(err)
@@ -121,6 +124,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().Bool("show-kind", false, "If present, list the resource type for the requested object(s).")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Treat \"resource not found\" as a successful retrieval.")
 	cmd.Flags().StringSliceP("label-columns", "L", []string{}, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
 	cmd.Flags().Bool("export", false, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
 	usage := "identifying the resource to get from a server."
@@ -159,9 +163,6 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	filterFuncs := f.DefaultResourceFilterFunc()
-	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
-
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -183,19 +184,17 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return cmdutil.UsageError(cmd, usageString)
 	}
 
-	argsHasNames, err := resource.HasNames(args)
-	if err != nil {
-		return err
-	}
-
 	// always show resources when getting by name or filename, or if the output
 	// is machine-consumable, or if multiple resource kinds were requested.
-	if len(options.Filenames) > 0 || argsHasNames || cmdutil.OutputsRawFormat(cmd) {
+	if cmdutil.OutputsRawFormat(cmd) {
 		if !cmd.Flag("show-all").Changed {
 			cmd.Flag("show-all").Value.Set("true")
 		}
 	}
 	export := cmdutil.GetFlagBool(cmd, "export")
+
+	filterFuncs := f.DefaultResourceFilterFunc()
+	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
 
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
@@ -219,6 +218,9 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 		if len(infos) != 1 {
 			return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
+		}
+		if r.TargetsSingleItems() {
+			filterFuncs = nil
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
@@ -300,9 +302,15 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return err
 	}
 
-	printer, generic, err := cmdutil.PrinterForCommand(cmd)
+	printer, generic, err := f.PrinterForCommand(cmd)
 	if err != nil {
 		return err
+	}
+	if r.TargetsSingleItems() {
+		filterFuncs = nil
+	}
+	if options.IgnoreNotFound {
+		r.IgnoreErrors(kapierrors.IsNotFound)
 	}
 
 	if generic {
@@ -318,6 +326,10 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				return err
 			}
 			errs = append(errs, err)
+		}
+
+		if len(infos) == 0 && options.IgnoreNotFound {
+			return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 		}
 
 		res := ""
@@ -395,7 +407,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	if err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if len(infos) == 0 && len(allErrs) == 0 {
+	if len(infos) == 0 && len(allErrs) == 0 && !options.IgnoreNotFound {
 		outputEmptyListWarning(errOut)
 	}
 
@@ -419,7 +431,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	// use the default printer for each object
 	printer = nil
 	var lastMapping *meta.RESTMapping
-	w := kubectl.GetNewTabWriter(out)
+	w := printers.GetNewTabWriter(out)
 	filteredResourceCount := 0
 
 	if resource.MultipleTypesRequested(args) || cmdutil.MustPrintWithKinds(objs, infos, sorter) {
@@ -475,7 +487,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 		}
 
-		if resourcePrinter, found := printer.(*kubectl.HumanReadablePrinter); found {
+		if resourcePrinter, found := printer.(*printers.HumanReadablePrinter); found {
 			resourceName := resourcePrinter.GetResourceKind()
 			if mapping != nil {
 				if resourceName == "" {

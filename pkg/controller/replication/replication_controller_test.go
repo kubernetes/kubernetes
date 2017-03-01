@@ -102,7 +102,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 }
 
 // create a pod with the given phase for the given rc (same selectors and namespace).
-func newPod(name string, rc *v1.ReplicationController, status v1.PodPhase, lastTransitionTime *metav1.Time) *v1.Pod {
+func newPod(name string, rc *v1.ReplicationController, status v1.PodPhase, lastTransitionTime *metav1.Time, properlyOwned bool) *v1.Pod {
 	var conditions []v1.PodCondition
 	if status == v1.PodRunning {
 		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
@@ -111,11 +111,18 @@ func newPod(name string, rc *v1.ReplicationController, status v1.PodPhase, lastT
 		}
 		conditions = append(conditions, condition)
 	}
+	var controllerReference metav1.OwnerReference
+	if properlyOwned {
+		var trueVar = true
+		controllerReference = metav1.OwnerReference{UID: rc.UID, APIVersion: "v1beta1", Kind: "ReplicaSet", Name: rc.Name, Controller: &trueVar}
+	}
+
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Labels:    rc.Spec.Selector,
-			Namespace: rc.Namespace,
+			Name:            name,
+			Labels:          rc.Spec.Selector,
+			Namespace:       rc.Namespace,
+			OwnerReferences: []metav1.OwnerReference{controllerReference},
 		},
 		Status: v1.PodStatus{Phase: status, Conditions: conditions},
 	}
@@ -127,7 +134,7 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, rc *v1.Replica
 	var trueVar = true
 	controllerReference := metav1.OwnerReference{UID: rc.UID, APIVersion: "v1", Kind: "ReplicationController", Name: rc.Name, Controller: &trueVar}
 	for i := 0; i < count; i++ {
-		pod := newPod(fmt.Sprintf("%s%d", name, i), rc, status, nil)
+		pod := newPod(fmt.Sprintf("%s%d", name, i), rc, status, nil, false)
 		pod.OwnerReferences = []metav1.OwnerReference{controllerReference}
 		if store != nil {
 			store.Add(pod)
@@ -164,7 +171,7 @@ func NewReplicationManagerFromClient(kubeClient clientset.Interface, burstReplic
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	rcInformer := informerFactory.Core().V1().ReplicationControllers()
-	rm := NewReplicationManager(podInformer, rcInformer, kubeClient, burstReplicas, lookupCacheSize, false)
+	rm := NewReplicationManager(podInformer, rcInformer, kubeClient, burstReplicas, lookupCacheSize)
 	rm.podListerSynced = alwaysReady
 	rm.rcListerSynced = alwaysReady
 	return rm, podInformer, rcInformer
@@ -459,7 +466,7 @@ func TestWatchControllers(t *testing.T) {
 	informers := informers.NewSharedInformerFactory(c, controller.NoResyncPeriodFunc())
 	podInformer := informers.Core().V1().Pods()
 	rcInformer := informers.Core().V1().ReplicationControllers()
-	manager := NewReplicationManager(podInformer, rcInformer, c, BurstReplicas, 0, false)
+	manager := NewReplicationManager(podInformer, rcInformer, c, BurstReplicas, 0)
 	informers.Start(stopCh)
 
 	var testControllerSpec v1.ReplicationController
@@ -1114,12 +1121,11 @@ func BenchmarkGetPodControllerSingleNS(b *testing.B) {
 	}
 }
 
-// setupManagerWithGCEnabled creates a RC manager with a fakePodControl and with garbageCollectorEnabled set to true
+// setupManagerWithGCEnabled creates a RC manager with a fakePodControl
 func setupManagerWithGCEnabled(objs ...runtime.Object) (manager *ReplicationManager, fakePodControl *controller.FakePodControl, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer) {
 	c := fakeclientset.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
 	manager, podInformer, rcInformer = NewReplicationManagerFromClient(c, BurstReplicas, 0)
-	manager.garbageCollectorEnabled = true
 	manager.podControl = fakePodControl
 	return manager, fakePodControl, podInformer, rcInformer
 }
@@ -1131,7 +1137,7 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 	var trueVar = true
 	otherControllerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "v1", Kind: "ReplicationController", Name: "AnotherRC", Controller: &trueVar}
 	// add to podLister a matching Pod controlled by another controller. Expect no patch.
-	pod := newPod("pod", rc, v1.PodRunning, nil)
+	pod := newPod("pod", rc, v1.PodRunning, nil, false)
 	pod.OwnerReferences = []metav1.OwnerReference{otherControllerReference}
 	podInformer.Informer().GetIndexer().Add(pod)
 	err := manager.syncReplicationController(getKey(rc, t))
@@ -1150,7 +1156,7 @@ func TestPatchPodWithOtherOwnerRef(t *testing.T) {
 	// ref, but has an owner ref pointing to other object. Expect a patch to
 	// take control of it.
 	unrelatedOwnerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "batch/v1", Kind: "Job", Name: "Job"}
-	pod := newPod("pod", rc, v1.PodRunning, nil)
+	pod := newPod("pod", rc, v1.PodRunning, nil, false)
 	pod.OwnerReferences = []metav1.OwnerReference{unrelatedOwnerReference}
 	podInformer.Informer().GetIndexer().Add(pod)
 
@@ -1169,7 +1175,7 @@ func TestPatchPodWithCorrectOwnerRef(t *testing.T) {
 	// add to podLister a matching pod that has an ownerRef pointing to the rc,
 	// but ownerRef.Controller is false. Expect a patch to take control it.
 	rcOwnerReference := metav1.OwnerReference{UID: rc.UID, APIVersion: "v1", Kind: "ReplicationController", Name: rc.Name}
-	pod := newPod("pod", rc, v1.PodRunning, nil)
+	pod := newPod("pod", rc, v1.PodRunning, nil, false)
 	pod.OwnerReferences = []metav1.OwnerReference{rcOwnerReference}
 	podInformer.Informer().GetIndexer().Add(pod)
 
@@ -1187,17 +1193,23 @@ func TestPatchPodFails(t *testing.T) {
 	rcInformer.Informer().GetIndexer().Add(rc)
 	// add to podLister two matching pods. Expect two patches to take control
 	// them.
-	podInformer.Informer().GetIndexer().Add(newPod("pod1", rc, v1.PodRunning, nil))
-	podInformer.Informer().GetIndexer().Add(newPod("pod2", rc, v1.PodRunning, nil))
+	podInformer.Informer().GetIndexer().Add(newPod("pod1", rc, v1.PodRunning, nil, false))
+	podInformer.Informer().GetIndexer().Add(newPod("pod2", rc, v1.PodRunning, nil, false))
 	// let both patches fail. The rc manager will assume it fails to take
-	// control of the pods and create new ones.
+	// control of the pods and requeue to try again.
 	fakePodControl.Err = fmt.Errorf("Fake Error")
-	err := manager.syncReplicationController(getKey(rc, t))
-	if err == nil || err.Error() != "Fake Error" {
+	rcKey := getKey(rc, t)
+	err := manager.syncReplicationController(rcKey)
+	if err == nil || !strings.Contains(err.Error(), "Fake Error") {
 		t.Fatalf("expected Fake Error, got %v", err)
 	}
-	// 2 patches to take control of pod1 and pod2 (both fail), 2 creates.
-	validateSyncReplication(t, fakePodControl, 2, 0, 2)
+	// 2 patches to take control of pod1 and pod2 (both fail).
+	validateSyncReplication(t, fakePodControl, 0, 0, 2)
+	// RC should requeue itself.
+	queueRC, _ := manager.queue.Get()
+	if queueRC != rcKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rcKey, queueRC)
+	}
 }
 
 func TestPatchExtraPodsThenDelete(t *testing.T) {
@@ -1206,9 +1218,9 @@ func TestPatchExtraPodsThenDelete(t *testing.T) {
 	rcInformer.Informer().GetIndexer().Add(rc)
 	// add to podLister three matching pods. Expect three patches to take control
 	// them, and later delete one of them.
-	podInformer.Informer().GetIndexer().Add(newPod("pod1", rc, v1.PodRunning, nil))
-	podInformer.Informer().GetIndexer().Add(newPod("pod2", rc, v1.PodRunning, nil))
-	podInformer.Informer().GetIndexer().Add(newPod("pod3", rc, v1.PodRunning, nil))
+	podInformer.Informer().GetIndexer().Add(newPod("pod1", rc, v1.PodRunning, nil, false))
+	podInformer.Informer().GetIndexer().Add(newPod("pod2", rc, v1.PodRunning, nil, false))
+	podInformer.Informer().GetIndexer().Add(newPod("pod3", rc, v1.PodRunning, nil, false))
 	err := manager.syncReplicationController(getKey(rc, t))
 	if err != nil {
 		t.Fatal(err)
@@ -1222,7 +1234,7 @@ func TestUpdateLabelsRemoveControllerRef(t *testing.T) {
 	rc := newReplicationController(2)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	// put one pod in the podLister
-	pod := newPod("pod", rc, v1.PodRunning, nil)
+	pod := newPod("pod", rc, v1.PodRunning, nil, false)
 	pod.ResourceVersion = "1"
 	var trueVar = true
 	rcOwnerReference := metav1.OwnerReference{UID: rc.UID, APIVersion: "v1", Kind: "ReplicationController", Name: rc.Name, Controller: &trueVar}
@@ -1294,7 +1306,7 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	now := metav1.Now()
 	rc.DeletionTimestamp = &now
 	rcInformer.Informer().GetIndexer().Add(rc)
-	pod1 := newPod("pod1", rc, v1.PodRunning, nil)
+	pod1 := newPod("pod1", rc, v1.PodRunning, nil, false)
 	podInformer.Informer().GetIndexer().Add(pod1)
 
 	// no patch, no create
@@ -1365,12 +1377,12 @@ func TestAvailableReplicas(t *testing.T) {
 
 	// First pod becomes ready 20s ago
 	moment := metav1.Time{Time: time.Now().Add(-2e10)}
-	pod := newPod("pod", rc, v1.PodRunning, &moment)
+	pod := newPod("pod", rc, v1.PodRunning, &moment, true)
 	podInformer.Informer().GetIndexer().Add(pod)
 
 	// Second pod becomes ready now
 	otherMoment := metav1.Now()
-	otherPod := newPod("otherPod", rc, v1.PodRunning, &otherMoment)
+	otherPod := newPod("otherPod", rc, v1.PodRunning, &otherMoment, true)
 	podInformer.Informer().GetIndexer().Add(otherPod)
 
 	// This response body is just so we don't err out decoding the http response

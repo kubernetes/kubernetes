@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 )
 
@@ -98,7 +98,7 @@ func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubead
 
 // creates a set of clients for this endpoint
 func createClients(caCert []byte, endpoint, token string, nodeName types.NodeName) (*apiClient, error) {
-	clientConfig := kubeconfigphase.MakeClientConfigWithToken(
+	clientConfig := kubeconfigutil.CreateWithToken(
 		endpoint,
 		"kubernetes",
 		fmt.Sprintf("kubelet-%s", nodeName),

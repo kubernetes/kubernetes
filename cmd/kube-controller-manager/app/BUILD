@@ -52,7 +52,6 @@ go_library(
         "//pkg/controller/endpoint:go_default_library",
         "//pkg/controller/garbagecollector:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
-        "//pkg/controller/informers:go_default_library",
         "//pkg/controller/job:go_default_library",
         "//pkg/controller/namespace:go_default_library",
         "//pkg/controller/node:go_default_library",
@@ -85,6 +84,7 @@ go_library(
         "//pkg/volume/host_path:go_default_library",
         "//pkg/volume/nfs:go_default_library",
         "//pkg/volume/photon_pd:go_default_library",
+        "//pkg/volume/portworx:go_default_library",
         "//pkg/volume/quobyte:go_default_library",
         "//pkg/volume/rbd:go_default_library",
         "//pkg/volume/vsphere_volume:go_default_library",
@@ -107,6 +107,10 @@ go_library(
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/record",
         "//vendor:k8s.io/client-go/util/cert",
+        "//vendor:k8s.io/metrics/pkg/apis/custom_metrics/install",
+        "//vendor:k8s.io/metrics/pkg/apis/metrics/install",
+        "//vendor:k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+        "//vendor:k8s.io/metrics/pkg/client/custom_metrics",
     ],
 )
 

@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmfuzzer "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -267,6 +267,16 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 			mode &= 0777
 			d.DefaultMode = &mode
 		},
+		func(s *api.ProjectedVolumeSource, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+
+			// DefaultMode should always be set, it has a default
+			// value and it is expected to be between 0 and 0777
+			var mode int32
+			c.Fuzz(&mode)
+			mode &= 0777
+			s.DefaultMode = &mode
+		},
 		func(k *api.KeyToPath, c fuzz.Continue) {
 			c.FuzzNoCustom(k) // fuzz self without calling this function again
 			k.Key = c.RandString()
@@ -464,6 +474,13 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 
 func extensionFuncs(t apitesting.TestingCommon) []interface{} {
 	return []interface{}{
+		func(j *extensions.DeploymentSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			rhl := int32(c.Rand.Int31())
+			pds := int32(c.Rand.Int31())
+			j.RevisionHistoryLimit = &rhl
+			j.ProgressDeadlineSeconds = &pds
+		},
 		func(j *extensions.DeploymentStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			// Ensure that strategyType is one of valid values.
@@ -508,6 +525,25 @@ func extensionFuncs(t apitesting.TestingCommon) []interface{} {
 				}
 			}
 		},
+		func(j *extensions.DaemonSetUpdateStrategy, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			// Ensure that strategyType is one of valid values.
+			strategyTypes := []extensions.DaemonSetUpdateStrategyType{extensions.RollingUpdateDaemonSetStrategyType, extensions.OnDeleteDaemonSetStrategyType}
+			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
+			if j.Type != extensions.RollingUpdateDaemonSetStrategyType {
+				j.RollingUpdate = nil
+			} else {
+				rollingUpdate := extensions.RollingUpdateDaemonSet{}
+				if c.RandBool() {
+					if c.RandBool() {
+						rollingUpdate.MaxUnavailable = intstr.FromInt(1 + int(c.Rand.Int31()))
+					} else {
+						rollingUpdate.MaxUnavailable = intstr.FromString(fmt.Sprintf("%d%%", 1+c.Rand.Int31()))
+					}
+				}
+				j.RollingUpdate = &rollingUpdate
+			}
+		},
 	}
 }
 
@@ -532,6 +568,14 @@ func batchFuncs(t apitesting.TestingCommon) []interface{} {
 			sds := int64(c.RandUint64())
 			sj.StartingDeadlineSeconds = &sds
 			sj.Schedule = c.RandString()
+			if hasSuccessLimit := c.RandBool(); hasSuccessLimit {
+				successfulJobsHistoryLimit := int32(c.Rand.Int31())
+				sj.SuccessfulJobsHistoryLimit = &successfulJobsHistoryLimit
+			}
+			if hasFailedLimit := c.RandBool(); hasFailedLimit {
+				failedJobsHistoryLimit := int32(c.Rand.Int31())
+				sj.FailedJobsHistoryLimit = &failedJobsHistoryLimit
+			}
 		},
 		func(cp *batch.ConcurrencyPolicy, c fuzz.Continue) {
 			policies := []batch.ConcurrencyPolicy{batch.AllowConcurrent, batch.ForbidConcurrent, batch.ReplaceConcurrent}
@@ -547,11 +591,23 @@ func autoscalingFuncs(t apitesting.TestingCommon) []interface{} {
 			minReplicas := int32(c.Rand.Int31())
 			s.MinReplicas = &minReplicas
 
-			// NB: since this is used for round-tripping, we can only fuzz
-			// fields that round-trip successfully, so only the resource source
-			// type is usable here
+			randomQuantity := func() resource.Quantity {
+				var q resource.Quantity
+				c.Fuzz(&q)
+				// precalc the string for benchmarking purposes
+				_ = q.String()
+				return q
+			}
+
 			targetUtilization := int32(c.RandUint64())
 			s.Metrics = []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.PodsMetricSourceType,
+					Pods: &autoscaling.PodsMetricSource{
+						MetricName:         c.RandString(),
+						TargetAverageValue: randomQuantity(),
+					},
+				},
 				{
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricSource{
@@ -563,11 +619,22 @@ func autoscalingFuncs(t apitesting.TestingCommon) []interface{} {
 		},
 		func(s *autoscaling.HorizontalPodAutoscalerStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
-			// NB: since this is used for round-tripping, we can only fuzz
-			// fields that round-trip successfully, so only the resource status
-			// type is usable here
+			randomQuantity := func() resource.Quantity {
+				var q resource.Quantity
+				c.Fuzz(&q)
+				// precalc the string for benchmarking purposes
+				_ = q.String()
+				return q
+			}
 			currentUtilization := int32(c.RandUint64())
 			s.CurrentMetrics = []autoscaling.MetricStatus{
+				{
+					Type: autoscaling.PodsMetricSourceType,
+					Pods: &autoscaling.PodsMetricStatus{
+						MetricName:          c.RandString(),
+						CurrentAverageValue: randomQuantity(),
+					},
+				},
 				{
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricStatus{
@@ -637,7 +704,7 @@ func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFacto
 		batchFuncs(t),
 		autoscalingFuncs(t),
 		rbacFuncs(t),
-		kubeadm.KubeadmFuzzerFuncs(t),
+		kubeadmfuzzer.KubeadmFuzzerFuncs(t),
 		policyFuncs(t),
 		certificateFuncs(t),
 	)

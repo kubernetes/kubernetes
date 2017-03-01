@@ -14,7 +14,6 @@ cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "feature_gates"
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
-cluster/gce/configure-vm.sh:  local -r client_ca_file="/srv/salt-overlay/salt/kubelet/ca.crt"
 cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",ABAC"
 cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",Webhook"
 cluster/gce/container-linux/configure-helper.sh:    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
@@ -40,12 +39,14 @@ cluster/gce/trusty/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:            context['pillar'] = {'num_nodes': get_node_count()}
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ca_cert_path = layer_options.get('ca_certificate_path')
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    cluster_dns.set_dns_info(53, hookenv.config('dns_domain'), dns_ip)
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:def send_cluster_dns_detail(cluster_dns):
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:def service_cidr():
 cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    context.update({'kube_api_endpoint': ','.join(api_servers),
+cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    context['ca_cert_path'] = layer_options.get('ca_certificate_path')
 cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:def render_init_scripts(api_servers):
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:    local source_file=${BASH_SOURCE[$stack_skip]}
@@ -63,10 +64,11 @@ cluster/saltbase/salt/cluster-autoscaler/cluster-autoscaler.manifest:{% set para
 cluster/saltbase/salt/etcd/etcd.manifest:        "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
 cluster/saltbase/salt/etcd/etcd.manifest:{% if pillar.get('storage_backend', 'etcd3') == 'etcd3' -%}
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read + " " + audit_log -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + storage_backend + " " + storage_media_type + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read + " " + audit_log -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar.get('enable_hostpath_provisioner', '').lower() == 'true' -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + enable_garbage_collector + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = params + " " + feature_gates -%}
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:    - echo -998 > /proc/$$$/oom_score_adj && kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
@@ -88,7 +90,10 @@ cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e 
 cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
+examples/storage/cassandra/image/files/jvm.options:# information in cassandra.yaml (such as listen_address).
+examples/storage/cassandra/image/files/jvm.options:#-Dcassandra.replace_address=listen_address or broadcast_address of dead node
 examples/storage/cassandra/image/files/run.sh:  cluster_name \
+examples/storage/cassandra/image/files/run.sh:  listen_address \
 examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)
 federation/cluster/common.sh:  local cert_dir="${kube_temp}/easy-rsa-master/easyrsa3"
 federation/deploy/config.json.sample:      "cloud_provider": "gce",
@@ -100,12 +105,12 @@ federation/deploy/config.json.sample:      "cluster_cidr": "10.188.0.0/14",
 federation/deploy/config.json.sample:      "cluster_name": "cluster1-kubernetes",
 federation/deploy/config.json.sample:      "cluster_name": "cluster2-kubernetes",
 federation/deploy/config.json.sample:      "cluster_name": "cluster3-kubernetes",
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
-hack/e2e.go:.phase1.cloud_provider="gce"
-hack/e2e.go:.phase1.cluster_name="{{.Cluster}}"
-hack/e2e.go:.phase1.num_nodes=4
 hack/lib/util.sh:    local api_port=$5
 hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST_IP}"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
@@ -147,6 +152,14 @@ test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePat
 test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
 test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volume/data-1"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volumes/create/data-1"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volumes/delete/data-1"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volumes/update/data-3"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-secret-volumes/create/data-1"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-secret-volumes/delete/data-1"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-secret-volumes/update/data-3"},
+test/e2e/common/projected.go:			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
 test/e2e/common/secrets.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
 test/e2e/common/secrets.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
 test/e2e/common/secrets.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
@@ -156,6 +169,8 @@ test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's o
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("failed to get oom_score_adj for %d", pid)
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("failed to get oom_score_adj for %d: %v", pid, err)
 test/e2e_node/container_manager_test.go:	procfsPath := path.Join("/proc", strconv.Itoa(pid), "oom_score_adj")
+test/e2e_node/node_container_manager_test.go:	kubeReservedCgroup   = "/kube_reserved"
+test/e2e_node/node_container_manager_test.go:	systemReservedCgroup = "/system_reserved"
 test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
 test/images/mount-tester/mt.go:	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")

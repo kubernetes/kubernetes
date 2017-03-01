@@ -189,16 +189,16 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 
 // Run spawns the http servers (secure and insecure). It only returns if stopCh is closed
 // or one of the ports cannot be listened on initially.
-func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) {
+func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		if err := s.serveSecurely(stopCh); err != nil {
-			glog.Fatal(err)
+			return err
 		}
 	}
 
 	if s.InsecureServingInfo != nil && s.InsecureHandler != nil {
 		if err := s.serveInsecurely(stopCh); err != nil {
-			glog.Fatal(err)
+			return err
 		}
 	}
 
@@ -210,6 +210,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
+	return nil
 }
 
 // EffectiveSecurePort returns the secure port we bound to.
@@ -335,12 +336,13 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		GroupVersion:     groupVersion,
 		MetaGroupVersion: apiGroupInfo.MetaGroupVersion,
 
-		ParameterCodec: apiGroupInfo.ParameterCodec,
-		Serializer:     apiGroupInfo.NegotiatedSerializer,
-		Creater:        apiGroupInfo.Scheme,
-		Convertor:      apiGroupInfo.Scheme,
-		Copier:         apiGroupInfo.Scheme,
-		Typer:          apiGroupInfo.Scheme,
+		ParameterCodec:  apiGroupInfo.ParameterCodec,
+		Serializer:      apiGroupInfo.NegotiatedSerializer,
+		Creater:         apiGroupInfo.Scheme,
+		Convertor:       apiGroupInfo.Scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
+		Copier:          apiGroupInfo.Scheme,
+		Typer:           apiGroupInfo.Scheme,
 		SubresourceGroupVersionKind: apiGroupInfo.SubresourceGroupVersionKind,
 		Linker: apiGroupInfo.GroupMeta.SelfLinker,
 		Mapper: apiGroupInfo.GroupMeta.RESTMapper,

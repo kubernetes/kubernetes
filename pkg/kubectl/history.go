@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"text/tabwriter"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,9 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	sliceutil "k8s.io/kubernetes/pkg/util/slice"
 )
 
@@ -44,7 +47,7 @@ type HistoryViewer interface {
 
 func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryViewer, error) {
 	switch kind {
-	case extensions.Kind("Deployment"):
+	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		return &DeploymentHistoryViewer{c}, nil
 	}
 	return nil, fmt.Errorf("no history viewer has been implemented for %q", kind)
@@ -55,6 +58,7 @@ type DeploymentHistoryViewer struct {
 }
 
 // ViewHistory returns a revision-to-replicaset map as the revision history of a deployment
+// TODO: this should be a describer
 func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
 	versionedClient := versionedClientsetForDeployment(h.c)
 	deployment, err := versionedClient.Extensions().Deployments(namespace).Get(name, metav1.GetOptions{})
@@ -101,7 +105,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 		}
-		DescribePodTemplate(internalTemplate, buf)
+		printersinternal.DescribePodTemplate(internalTemplate, buf)
 		return buf.String(), nil
 	}
 
@@ -124,6 +128,22 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		}
 		return nil
 	})
+}
+
+// TODO: copied here until this becomes a describer
+func tabbedString(f func(io.Writer) error) (string, error) {
+	out := new(tabwriter.Writer)
+	buf := &bytes.Buffer{}
+	out.Init(buf, 0, 8, 1, '\t', 0)
+
+	err := f(out)
+	if err != nil {
+		return "", err
+	}
+
+	out.Flush()
+	str := string(buf.String())
+	return str, nil
 }
 
 // getChangeCause returns the change-cause annotation of the input object

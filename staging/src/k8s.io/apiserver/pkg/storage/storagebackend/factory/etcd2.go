@@ -26,8 +26,8 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/etcd"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
 func newETCD2Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {

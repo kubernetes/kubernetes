@@ -810,7 +810,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 	}
 
 	// TODO: determine how this should be handled for rkt
-	opts, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
+	opts, _, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
 	if err != nil {
 		return err
 	}
@@ -1009,7 +1009,7 @@ func (r *Runtime) generateRunCommand(pod *v1.Pod, uuid, netnsName string) (strin
 		}
 	} else {
 		// Setup DNS.
-		dnsServers, dnsSearches, err := r.runtimeHelper.GetClusterDNS(pod)
+		dnsServers, dnsSearches, _, err := r.runtimeHelper.GetClusterDNS(pod)
 		if err != nil {
 			return "", err
 		}
@@ -1116,6 +1116,18 @@ func (r *Runtime) getSelinuxContext(opt *v1.SELinuxOptions) (string, error) {
 	return strings.Join(ctx, ":"), nil
 }
 
+// From the generateName or the podName return a basename for improving the logging with the Journal
+// journalctl -t podBaseName
+func constructSyslogIdentifier(generateName string, podName string) string {
+	if len(generateName) > 1 && generateName[len(generateName)-1] == '-' {
+		return generateName[0 : len(generateName)-1]
+	}
+	if len(generateName) > 0 {
+		return generateName
+	}
+	return podName
+}
+
 // preparePod will:
 //
 // 1. Invoke 'rkt prepare' to prepare the pod, and get the rkt pod uuid.
@@ -1182,6 +1194,9 @@ func (r *Runtime) preparePod(pod *v1.Pod, podIP string, pullSecrets []v1.Secret,
 		// This enables graceful stop.
 		newUnitOption("Service", "KillMode", "mixed"),
 		newUnitOption("Service", "TimeoutStopSec", fmt.Sprintf("%ds", getPodTerminationGracePeriodInSecond(pod))),
+		// Ops helpers
+		newUnitOption("Unit", "Description", pod.Name),
+		newUnitOption("Service", "SyslogIdentifier", constructSyslogIdentifier(pod.GenerateName, pod.Name)),
 		// Track pod info for garbage collection
 		newUnitOption(unitKubernetesSection, unitPodUID, string(pod.UID)),
 		newUnitOption(unitKubernetesSection, unitPodName, pod.Name),
@@ -1282,7 +1297,7 @@ func (r *Runtime) setupPodNetwork(pod *v1.Pod) (string, string, error) {
 
 	// Set up networking with the network plugin
 	containerID := kubecontainer.ContainerID{ID: string(pod.UID)}
-	err = r.network.SetUpPod(pod.Namespace, pod.Name, containerID)
+	err = r.network.SetUpPod(pod.Namespace, pod.Name, containerID, pod.Annotations)
 	if err != nil {
 		return "", "", err
 	}

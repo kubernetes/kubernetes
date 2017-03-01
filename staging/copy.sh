@@ -18,9 +18,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
+
 FAIL_ON_CHANGES=false
 DRY_RUN=false
-while getopts ":fd" opt; do
+RUN_FROM_UPDATE_SCRIPT=false
+while getopts ":fdu" opt; do
   case $opt in
     f)
       FAIL_ON_CHANGES=true
@@ -28,24 +34,30 @@ while getopts ":fd" opt; do
     d)
       DRY_RUN=true
       ;;
+    u)
+      RUN_FROM_UPDATE_SCRIPT=true
+      ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
+      exit 1
       ;;
   esac
 done
 readonly FAIL_ON_CHANGES DRY_RUN
 
-echo "**PLEASE** run \"godep restore\" before running this script"
+if [ "${RUN_FROM_UPDATE_SCRIPT}" != true ]; then
+  echo "Do not run this script directly, but via hack/update-staging-client-go.sh."
+  exit 1
+fi
+
 # PREREQUISITES: run `godep restore` in the main repo before calling this script.
 CLIENTSET="clientset"
 MAIN_REPO_FROM_SRC="k8s.io/kubernetes"
-MAIN_REPO="${GOPATH%:*}/src/${MAIN_REPO_FROM_SRC}"
+MAIN_REPO="$(cd "${KUBE_ROOT}"; pwd)" # absolute path
 CLIENT_REPO_FROM_SRC="k8s.io/client-go"
 CLIENT_REPO_TEMP_FROM_SRC="k8s.io/_tmp"
 CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
 CLIENT_REPO_TEMP="${MAIN_REPO}/staging/src/${CLIENT_REPO_TEMP_FROM_SRC}"
-
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if LANG=C sed --help 2>&1 | grep -q GNU; then
   SED="sed"
@@ -57,7 +69,7 @@ else
 fi
 
 cleanup() {
-    rm -rf "${CLIENT_REPO_TEMP}"
+  rm -rf "${CLIENT_REPO_TEMP}"
 }
 
 trap cleanup EXIT SIGINT
@@ -76,8 +88,8 @@ cd "${CLIENT_REPO}"
 # save copies code from client-go into the temp folder to make sure we don't lose it by accident
 # TODO this is temporary until everything in certain directories is authoritative
 function save() {
-    mkdir -p "$(dirname "${CLIENT_REPO_TEMP}/$1")"
-    cp -r "${CLIENT_REPO}/$1"* "${CLIENT_REPO_TEMP}/"
+  mkdir -p "$(dirname "${CLIENT_REPO_TEMP}/$1")"
+  cp -r "${CLIENT_REPO}/$1"* "${CLIENT_REPO_TEMP}/"
 }
 
 # save everything for which the staging directory is the source of truth
@@ -95,7 +107,7 @@ save "OWNERS"
 
 # mkcp copies file from the main repo to the client repo, it creates the directory if it doesn't exist in the client repo.
 function mkcp() {
-    mkdir -p "${CLIENT_REPO_TEMP}/$2" && cp -r "${MAIN_REPO}/$1" "${CLIENT_REPO_TEMP}/$2"
+  mkdir -p "${CLIENT_REPO_TEMP}/$2" && cp -r "${MAIN_REPO}/$1" "${CLIENT_REPO_TEMP}/$2"
 }
 
 # assemble all the other parts of the staging directory
@@ -107,6 +119,12 @@ find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT
 # need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/informers/informers_generated"
+
+# safety check that we don't have another apimachinery in the GOPATH
+if go list -f '{{.Dir}}' k8s.io/apimachinery/pkg/runtime &>/dev/null; then
+  echo "ERROR: unexpected k8s.io/apimachinery in GOPATH '$GOPATH'" 1>&2
+  exit 1
+fi
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
 echo "generating vendor/"
@@ -127,13 +145,13 @@ rm -rf "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes
 mv "${CLIENT_REPO_TEMP}"/vendor "${CLIENT_REPO_TEMP}"/_vendor
 
 echo "rewriting Godeps.json"
-go run "${DIR}/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
+go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
 
 echo "rewriting imports"
 grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
-    grep "\.go" | \
-    grep -v "vendor/" | \
-    xargs ${SED} -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
+  grep "\.go" | \
+  grep -v "vendor/" | \
+  xargs ${SED} -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
 
 echo "rewrite proto names in proto.RegisterType"
 find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 ${SED} -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
@@ -148,37 +166,37 @@ find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i '/^
 echo "rearranging directory layout"
 # $1 and $2 are relative to ${CLIENT_REPO_TEMP}
 function mvfolder {
-    local src=${1%/#/}
-    local dst=${2%/#/}
-    mkdir -p "${CLIENT_REPO_TEMP}/${dst}"
-    # move
-    mv "${CLIENT_REPO_TEMP}/${src}"/* "${CLIENT_REPO_TEMP}/${dst}"
-    # rewrite package
-    local src_package="${src##*/}"
-    local dst_package="${dst##*/}"
-    find "${CLIENT_REPO_TEMP}/${dst}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i "s,package ${src_package},package ${dst_package},g"
+  local src=${1%/#/}
+  local dst=${2%/#/}
+  mkdir -p "${CLIENT_REPO_TEMP}/${dst}"
+  # move
+  mv "${CLIENT_REPO_TEMP}/${src}"/* "${CLIENT_REPO_TEMP}/${dst}"
+  # rewrite package
+  local src_package="${src##*/}"
+  local dst_package="${dst##*/}"
+  find "${CLIENT_REPO_TEMP}/${dst}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i "s,package ${src_package},package ${dst_package},g"
 
-    { grep -Rl "\"${CLIENT_REPO_FROM_SRC}/${src}" "${CLIENT_REPO_TEMP}" || true ; } | while read -r target ; do
-        # rewrite imports
-        # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
-        # where a package alias is the same the package name.
-        ${SED} -i "s,\<${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
-        ${SED} -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
-        # rewrite import invocation
-        if [ "${src_package}" != "${dst_package}" ]; then
-            ${SED} -i "s,\<${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g" "${target}"
-        fi
-    done
+  { grep -Rl "\"${CLIENT_REPO_FROM_SRC}/${src}" "${CLIENT_REPO_TEMP}" || true ; } | while read -r target ; do
+    # rewrite imports
+    # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
+    # where a package alias is the same the package name.
+    ${SED} -i "s,\<${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
+    ${SED} -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
+    # rewrite import invocation
+    if [ "${src_package}" != "${dst_package}" ]; then
+      ${SED} -i "s,\<${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g" "${target}"
+    fi
+  done
 }
 
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
 mvfolder "pkg/client/informers/informers_generated/externalversions" informers
 mvfolder "pkg/client/listers" listers
 if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
-    echo "${CLIENT_REPO_TEMP}/pkg/client is expected to be empty"
-    exit 1
+  echo "${CLIENT_REPO_TEMP}/pkg/client is expected to be empty"
+  exit 1
 else
-    rm -r "${CLIENT_REPO_TEMP}"/pkg/client
+  rm -r "${CLIENT_REPO_TEMP}"/pkg/client
 fi
 
 echo "running gofmt"
@@ -186,12 +204,12 @@ find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 gofmt -w
 
 echo "remove black listed files"
 find "${CLIENT_REPO_TEMP}" -type f \( \
-    -name "*BUILD" -o \
-    -name "*.json" -not -name "Godeps.json" -o \
-    -name "*.yaml" -o \
-    -name "*.yml" -o \
-    -name "*.sh" \
-    \) -delete
+  -name "*BUILD" -o \
+  -name "*.json" -not -name "Godeps.json" -o \
+  -name "*.yaml" -o \
+  -name "*.yml" -o \
+  -name "*.sh" \
+  \) -delete
 
 echo "remove cyclical godep"
 rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/client-go"
@@ -204,24 +222,24 @@ rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/client-go"
 rm -rf "${CLIENT_REPO_TEMP}/staging"
 
 if [ "${FAIL_ON_CHANGES}" = true ]; then
-    echo "running FAIL_ON_CHANGES"
-    ret=0
-    if diff -NauprB -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
-      echo "${CLIENT_REPO} up to date."
-      cleanup
-      exit 0
-    else
-      echo "${CLIENT_REPO} is out of date. Please run hack/update-client-go.sh"
-      cleanup
-      exit 1
-    fi
+  echo "running FAIL_ON_CHANGES"
+  ret=0
+  if diff --ignore-matching-lines='^\s*\"Comment\"' -NauprB -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
+    echo "${CLIENT_REPO} up to date."
+    cleanup
+    exit 0
+  else
+    echo "${CLIENT_REPO} is out of date. Please run hack/update-staging-client-go.sh"
+    cleanup
+    exit 1
+  fi
 fi
 
 # clean the ${CLIENT_REPO}
 echo "move to the client repo"
 if [ "${DRY_RUN}" = false ]; then
-    ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
-    mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
+  ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
+  mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
 fi
 
 cleanup

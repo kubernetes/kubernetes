@@ -22,6 +22,7 @@ go_test(
     deps = [
         "//pkg/bootstrap/api:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/client-go/kubernetes/fake",

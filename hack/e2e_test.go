@@ -267,7 +267,7 @@ func TestGetKubetest(t *testing.T) {
 
 			stat:     pk,
 			path:     true,
-			age:      100,
+			age:      time.Second,
 			upgraded: true,
 			touched:  true,
 			goPath:   gp,
@@ -281,7 +281,7 @@ func TestGetKubetest(t *testing.T) {
 
 			stat:     pk,
 			path:     true,
-			age:      100,
+			age:      time.Second,
 			upgraded: false,
 			touched:  false,
 			goPath:   gpk,
@@ -295,7 +295,7 @@ func TestGetKubetest(t *testing.T) {
 
 			stat:     pk,
 			path:     true,
-			age:      100,
+			age:      time.Second,
 			upgraded: true,
 			touched:  false,
 			goPath:   gpk,
@@ -314,7 +314,7 @@ func TestGetKubetest(t *testing.T) {
 				if p != c.stat {
 					return nil, fmt.Errorf("Failed to find %s", p)
 				}
-				return FileInfo{time.Now().Add(c.age)}, nil
+				return FileInfo{time.Now().Add(c.age * -1)}, nil
 			},
 			func(name string) (string, error) {
 				if c.path {

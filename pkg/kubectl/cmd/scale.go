@@ -80,7 +80,7 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
-	cmd.Flags().String("resource-version", "", "Precondition for resource version. Requires that the current resource version match this value in order to scale.")
+	cmd.Flags().String("resource-version", "", i18n.T("Precondition for resource version. Requires that the current resource version match this value in order to scale."))
 	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the resource match this value in order to scale.")
 	cmd.Flags().Int("replicas", -1, "The new desired number of replicas. Required.")
 	cmd.MarkFlagRequired("replicas")
@@ -164,7 +164,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
-			patchBytes, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command())
+			patchBytes, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command(cmd, true))
 			if err != nil {
 				return err
 			}

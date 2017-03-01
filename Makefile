@@ -53,6 +53,10 @@ KUBE_GOFLAGS := $(GOFLAGS)
 KUBE_GOLDFLAGS := $(GOLDFLAGS)
 KUBE_GOGCFLAGS = $(GOGCFLAGS)
 
+# Extra options for the release or quick-release options:
+KUBE_RELEASE_RUN_TESTS := $(KUBE_RELEASE_RUN_TESTS) 
+KUBE_FASTBUILD := $(KUBE_FASTBUILD)
+
 # This controls the verbosity of the build.  Higher numbers mean more output.
 KUBE_VERBOSE ?= 1
 
@@ -350,17 +354,24 @@ endif
 
 define RELEASE_SKIP_TESTS_HELP_INFO
 # Build a release, but skip tests
+# 
+# Args:
+#   KUBE_RELEASE_RUN_TESTS: Whether to run tests. Set to 'y' to run tests anyways.
+#   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'true' to do so.
 #
 # Example:
 #   make release-skip-tests
+#   make quick-release
 endef
 .PHONY: release-skip-tests quick-release
 ifeq ($(PRINT_HELP),y)
 release-skip-tests quick-release:
 	@echo "$$RELEASE_SKIP_TESTS_HELP_INFO"
 else
+release-skip-tests quick-release: KUBE_RELEASE_RUN_TESTS = n
+release-skip-tests quick-release: KUBE_FASTBUILD = true
 release-skip-tests quick-release:
-	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
+	build/release.sh
 endif
 
 define CROSS_HELP_INFO
@@ -490,13 +501,13 @@ endif
 
 
 ifeq ($(PRINT_HELP),y)
-bazel-test:
 define BAZEL_TEST_HELP_INFO
 # Test with bazel
 #
 # Example:
 # make bazel-test
 endef
+bazel-test:
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
 bazel-test:

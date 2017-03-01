@@ -77,7 +77,6 @@ func testScheme(t *testing.T) (*runtime.Scheme, serializer.CodecFactory) {
 	scheme := runtime.NewScheme()
 	scheme.Log(t)
 	scheme.AddKnownTypes(schema.GroupVersion{Version: runtime.APIVersionInternal}, &storagetesting.TestResource{})
-	scheme.AddKnownTypes(schema.GroupVersion{Version: runtime.APIVersionInternal}, &storagetesting.TestResource{})
 	example.AddToScheme(scheme)
 	examplev1.AddToScheme(scheme)
 	if err := scheme.AddConversionFuncs(

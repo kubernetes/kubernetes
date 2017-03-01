@@ -70,7 +70,7 @@ const (
 )
 
 // Config is a structure used to configure a GenericAPIServer.
-// It's members are sorted rougly in order of importance for composers.
+// It's members are sorted roughly in order of importance for composers.
 type Config struct {
 	// SecureServingInfo is required to serve https
 	SecureServingInfo *SecureServingInfo
@@ -193,7 +193,7 @@ type SecureServingInfo struct {
 // NewConfig returns a Config struct with the default values
 func NewConfig() *Config {
 	return &Config{
-		ReadWritePort:               6443,
+		ReadWritePort:               443,
 		RequestContextMapper:        apirequest.NewRequestContextMapper(),
 		BuildHandlerChainsFunc:      DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),

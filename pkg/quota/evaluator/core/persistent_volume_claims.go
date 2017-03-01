@@ -139,7 +139,7 @@ func (p *pvcEvaluator) GroupKind() schema.GroupKind {
 	return api.Kind("PersistentVolumeClaim")
 }
 
-// Handles returns true if the evalutor should handle the specified operation.
+// Handles returns true if the evaluator should handle the specified operation.
 func (p *pvcEvaluator) Handles(operation admission.Operation) bool {
 	return admission.Create == operation
 }

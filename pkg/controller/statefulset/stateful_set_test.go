@@ -24,12 +24,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 )
+
+func alwaysReady() bool { return true }
 
 func TestStatefulSetControllerCreates(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
@@ -343,15 +346,19 @@ func TestStatefulSetControllerGetStatefulSetForPodOverlapping(t *testing.T) {
 }
 
 func newFakeStatefulSetController() (*StatefulSetController, *fakeStatefulPodControl) {
-	fpc := newFakeStatefulPodControl()
-	ssc := &StatefulSetController{
-		kubeClient:     nil,
-		podStoreSynced: func() bool { return true },
-		setStore:       fpc.setsLister,
-		podStore:       fpc.podsLister,
-		control:        NewDefaultStatefulSetControl(fpc),
-		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
-	}
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
+	ssc := NewStatefulSetController(
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		client,
+	)
+	ssc.podListerSynced = alwaysReady
+	ssc.setListerSynced = alwaysReady
+	ssc.control = NewDefaultStatefulSetControl(fpc)
+
 	return ssc, fpc
 }
 

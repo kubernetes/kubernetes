@@ -277,7 +277,9 @@ func (e *BootstrapSigner) getTokens() map[string]string {
 
 		// Check and warn for duplicate secrets. Behavior here will be undefined.
 		if _, ok := ret[tokenID]; ok {
-			glog.V(3).Infof("Duplicate bootstrap tokens found for id %s, ignoring on in %s/%s", tokenID, secret.Namespace, secret.Name)
+			// This should never happen as we ensure a consistent secret name.
+			// But leave this in here just in case.
+			glog.V(1).Infof("Duplicate bootstrap tokens found for id %s, ignoring on in %s/%s", tokenID, secret.Namespace, secret.Name)
 			continue
 		}
 

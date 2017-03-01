@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrap
 
 import (
+	"regexp"
 	"time"
 
 	"github.com/golang/glog"
@@ -24,6 +25,9 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
+
+var namePattern = `^` + regexp.QuoteMeta(bootstrapapi.BootstrapTokenSecretPrefix) + `([a-z0-9]{6})$`
+var nameRegExp = regexp.MustCompile(namePattern)
 
 // getSecretString gets a string value from a secret.  If there is an error or
 // if the key doesn't exist, an empty string is returned.
@@ -36,10 +40,30 @@ func getSecretString(secret *v1.Secret, key string) string {
 	return string(data)
 }
 
+// parseSecretName parses the name of the secret to extract the secret ID.
+func parseSecretName(name string) (secretID string, ok bool) {
+	r := nameRegExp.FindStringSubmatch(name)
+	if r == nil {
+		return "", false
+	}
+	return r[1], true
+}
+
 func validateSecretForSigning(secret *v1.Secret) (tokenID, tokenSecret string, ok bool) {
+	nameTokenID, ok := parseSecretName(secret.Name)
+	if !ok {
+		glog.V(3).Infof("Invalid secret name: %s. Must be of form %s<secret-id>.", secret.Name, bootstrapapi.BootstrapTokenSecretPrefix)
+		return "", "", false
+	}
+
 	tokenID = getSecretString(secret, bootstrapapi.BootstrapTokenIDKey)
 	if len(tokenID) == 0 {
 		glog.V(3).Infof("No %s key in %s/%s Secret", bootstrapapi.BootstrapTokenIDKey, secret.Namespace, secret.Name)
+		return "", "", false
+	}
+
+	if nameTokenID != tokenID {
+		glog.V(3).Infof("Token ID (%s) doesn't match secret name: %s", tokenID, nameTokenID)
 		return "", "", false
 	}
 

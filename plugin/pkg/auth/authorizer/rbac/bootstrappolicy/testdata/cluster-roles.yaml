@@ -81,6 +81,9 @@ items:
   - apiGroups:
     - apps
     resources:
+    - deployments
+    - deployments/rollback
+    - deployments/scale
     - statefulsets
     verbs:
     - create
@@ -124,6 +127,7 @@ items:
     resources:
     - daemonsets
     - deployments
+    - deployments/rollback
     - deployments/scale
     - ingresses
     - replicasets
@@ -259,6 +263,9 @@ items:
   - apiGroups:
     - apps
     resources:
+    - deployments
+    - deployments/rollback
+    - deployments/scale
     - statefulsets
     verbs:
     - create
@@ -302,6 +309,7 @@ items:
     resources:
     - daemonsets
     - deployments
+    - deployments/rollback
     - deployments/scale
     - ingresses
     - replicasets
@@ -369,6 +377,7 @@ items:
     - /api/*
     - /apis
     - /apis/*
+    - /healthz
     - /swaggerapi
     - /swaggerapi/*
     - /version
@@ -462,6 +471,12 @@ items:
     verbs:
     - update
   - apiGroups:
+    - authentication.k8s.io
+    resources:
+    - tokenreviews
+    verbs:
+    - create
+  - apiGroups:
     - ""
     resources:
     - configmaps
@@ -483,7 +498,15 @@ items:
     resources:
     - daemonsets
     - deployments
+    - podsecuritypolicies
     - replicasets
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - apps
+    resources:
+    - deployments
     verbs:
     - list
     - watch
@@ -520,6 +543,31 @@ items:
     - certificates.k8s.io
     resources:
     - certificatesigningrequests
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - storageclasses
+    verbs:
+    - list
+    - watch
+- apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:kube-dns
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - endpoints
+    - services
     verbs:
     - list
     - watch
@@ -904,6 +952,8 @@ items:
   - apiGroups:
     - apps
     resources:
+    - deployments
+    - deployments/scale
     - statefulsets
     verbs:
     - get

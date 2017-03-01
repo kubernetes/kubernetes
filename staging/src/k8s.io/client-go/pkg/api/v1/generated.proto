@@ -309,6 +309,31 @@ message ConfigMapList {
   repeated ConfigMap items = 2;
 }
 
+// Adapts a ConfigMap into a projected volume.
+// 
+// The contents of the target ConfigMap's Data field will be presented in a
+// projected volume as files using the keys in the Data field as the file names,
+// unless the items element is populated with specific mappings of keys to paths.
+// Note that this is identical to a configmap volume source without the default
+// mode.
+message ConfigMapProjection {
+  optional LocalObjectReference localObjectReference = 1;
+
+  // If unspecified, each key-value pair in the Data field of the referenced
+  // ConfigMap will be projected into the volume as a file whose name is the
+  // key and content is the value. If specified, the listed keys will be
+  // projected into the specified paths, and unlisted keys will not be
+  // present. If a key is specified which is not present in the ConfigMap,
+  // the volume setup will error unless it is marked optional. Paths must be
+  // relative and may not contain the '..' path or start with '..'.
+  // +optional
+  repeated KeyToPath items = 2;
+
+  // Specify whether the ConfigMap or it's keys must be defined
+  // +optional
+  optional bool optional = 4;
+}
+
 // Adapts a ConfigMap into a volume.
 // 
 // The contents of the target ConfigMap's Data field will be presented in a
@@ -655,10 +680,27 @@ message DeleteOptions {
   // +optional
   optional Preconditions preconditions = 2;
 
+  // Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7.
   // Should the dependent objects be orphaned. If true/false, the "orphan"
   // finalizer will be added to/removed from the object's finalizers list.
+  // Either this field or PropagationPolicy may be set, but not both.
   // +optional
   optional bool orphanDependents = 3;
+
+  // Whether and how garbage collection will be performed.
+  // Defaults to Default.
+  // Either this field or OrphanDependents may be set, but not both.
+  // +optional
+  optional string propagationPolicy = 4;
+}
+
+// Represents downward API info for projecting into a projected volume.
+// Note that this is identical to a downwardAPI volume source without the default
+// mode.
+message DownwardAPIProjection {
+  // Items is a list of DownwardAPIVolume file
+  // +optional
+  repeated DownwardAPIVolumeFile items = 1;
 }
 
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
@@ -1179,6 +1221,11 @@ message ISCSIVolumeSource {
   // Defaults to false.
   // +optional
   optional bool readOnly = 6;
+
+  // iSCSI target portal List. The portal is either an IP or ip_addr:port if the port
+  // is other than default (typically TCP ports 860 and 3260).
+  // +optional
+  repeated string portals = 7;
 }
 
 // Maps a string key to a path within a volume.
@@ -1583,6 +1630,10 @@ message NodeSpec {
   // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration
   // +optional
   optional bool unschedulable = 4;
+
+  // If specified, the node's taints.
+  // +optional
+  repeated Taint taints = 5;
 }
 
 // NodeStatus is information about the current status of a node.
@@ -1950,6 +2001,11 @@ message PersistentVolumeClaimSpec {
   // VolumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
   optional string volumeName = 3;
+
+  // Name of the StorageClass required by the claim.
+  // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
+  // +optional
+  optional string storageClassName = 5;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2080,6 +2136,10 @@ message PersistentVolumeSource {
 
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 17;
+
+  // PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+  // +optional
+  optional PortworxVolumeSource portworxVolume = 18;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2110,6 +2170,11 @@ message PersistentVolumeSpec {
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy
   // +optional
   optional string persistentVolumeReclaimPolicy = 5;
+
+  // Name of StorageClass to which this persistent volume belongs. Empty value
+  // means that this volume does not belong to any StorageClass.
+  // +optional
+  optional string storageClassName = 6;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -2542,8 +2607,9 @@ message PodSpec {
   optional int64 activeDeadlineSeconds = 5;
 
   // Set DNS policy for containers within the pod.
-  // One of 'ClusterFirst' or 'Default'.
+  // One of 'ClusterFirstWithHostNet', 'ClusterFirst' or 'Default'.
   // Defaults to "ClusterFirst".
+  // To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.
   // +optional
   optional string dnsPolicy = 6;
 
@@ -2563,6 +2629,10 @@ message PodSpec {
   // +k8s:conversion-gen=false
   // +optional
   optional string serviceAccount = 9;
+
+  // AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.
+  // +optional
+  optional bool automountServiceAccountToken = 21;
 
   // NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
   // the scheduler simply schedules this pod onto that node, assuming that it fits resource
@@ -2619,6 +2689,10 @@ message PodSpec {
   // If not specified, the pod will be dispatched by default scheduler.
   // +optional
   optional string schedulername = 19;
+
+  // If specified, the pod's tolerations.
+  // +optional
+  repeated Toleration tolerations = 22;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -2729,6 +2803,22 @@ message PodTemplateSpec {
   optional PodSpec spec = 2;
 }
 
+// PortworxVolumeSource represents a Portworx volume resource.
+message PortworxVolumeSource {
+  // VolumeID uniquely identifies a Portworx volume
+  optional string volumeID = 1;
+
+  // FSType represents the filesystem type to mount
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
+  optional string fsType = 2;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 3;
+}
+
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 // +k8s:openapi-gen=false
 message Preconditions {
@@ -2796,6 +2886,20 @@ message Probe {
   // Defaults to 3. Minimum value is 1.
   // +optional
   optional int32 failureThreshold = 6;
+}
+
+// Represents a projected volume source
+message ProjectedVolumeSource {
+  // list of volume projections
+  repeated VolumeProjection sources = 1;
+
+  // Mode bits to use on created files by default. Must be a value between
+  // 0 and 0777.
+  // Directories within the path are not affected by this setting.
+  // This might be in conflict with other options that affect the file
+  // mode, like fsGroup, and the result can be other mode bits set.
+  // +optional
+  optional int32 defaultMode = 2;
 }
 
 // Represents a Quobyte mount that lasts the lifetime of a pod.
@@ -3174,6 +3278,30 @@ message SecretList {
   repeated Secret items = 2;
 }
 
+// Adapts a secret into a projected volume.
+// 
+// The contents of the target Secret's Data field will be presented in a
+// projected volume as files using the keys in the Data field as the file names.
+// Note that this is identical to a secret volume source without the default
+// mode.
+message SecretProjection {
+  optional LocalObjectReference localObjectReference = 1;
+
+  // If unspecified, each key-value pair in the Data field of the referenced
+  // Secret will be projected into the volume as a file whose name is the
+  // key and content is the value. If specified, the listed keys will be
+  // projected into the specified paths, and unlisted keys will not be
+  // present. If a key is specified which is not present in the Secret,
+  // the volume setup will error unless it is marked optional. Paths must be
+  // relative and may not contain the '..' path or start with '..'.
+  // +optional
+  repeated KeyToPath items = 2;
+
+  // Specify whether the Secret or its key must be defined
+  // +optional
+  optional bool optional = 4;
+}
+
 // Adapts a Secret into a volume.
 // 
 // The contents of the target Secret's Data field will be presented in a volume
@@ -3302,6 +3430,11 @@ message ServiceAccount {
   // More info: http://kubernetes.io/docs/user-guide/secrets#manually-specifying-an-imagepullsecret
   // +optional
   repeated LocalObjectReference imagePullSecrets = 3;
+
+  // AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
+  // Can be overridden at the pod level.
+  // +optional
+  optional bool automountServiceAccountToken = 4;
 }
 
 // ServiceAccountList is a list of ServiceAccount objects
@@ -3577,6 +3710,18 @@ message VolumeMount {
   optional string subPath = 4;
 }
 
+// Projection that may be projected along with other supported volume types
+message VolumeProjection {
+  // information about the secret data to project
+  optional SecretProjection secret = 1;
+
+  // information about the downwardAPI data to project
+  optional DownwardAPIProjection downwardAPI = 2;
+
+  // information about the configMap data to project
+  optional ConfigMapProjection configMap = 3;
+}
+
 // Represents the source of a volume to mount.
 // Only one of its members may be specified.
 message VolumeSource {
@@ -3693,6 +3838,13 @@ message VolumeSource {
 
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
+
+  // Items for all in one resources secrets, configmaps, and downward API
+  optional ProjectedVolumeSource projected = 25;
+
+  // PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+  // +optional
+  optional PortworxVolumeSource portworxVolume = 24;
 }
 
 // Represents a vSphere volume resource.

@@ -17,10 +17,11 @@ limitations under the License.
 package object
 
 import (
+	"context"
+
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type HostConfigManager struct {
@@ -96,6 +97,11 @@ func (m HostConfigManager) VsanSystem(ctx context.Context) (*HostVsanSystem, err
 		return nil, err
 	}
 
+	// Added in 5.5
+	if h.ConfigManager.VsanSystem == nil {
+		return nil, ErrNotSupported
+	}
+
 	return NewHostVsanSystem(m.c, *h.ConfigManager.VsanSystem), nil
 }
 
@@ -107,7 +113,21 @@ func (m HostConfigManager) AccountManager(ctx context.Context) (*HostAccountMana
 		return nil, err
 	}
 
-	return NewHostAccountManager(m.c, *h.ConfigManager.AccountManager), nil
+	ref := h.ConfigManager.AccountManager // Added in 6.0
+	if ref == nil {
+		// Versions < 5.5 can use the ServiceContent ref,
+		// but we can only use it when connected directly to ESX.
+		c := m.Client()
+		if !c.IsVC() {
+			ref = c.ServiceContent.AccountManager
+		}
+
+		if ref == nil {
+			return nil, ErrNotSupported
+		}
+	}
+
+	return NewHostAccountManager(m.c, *ref), nil
 }
 
 func (m HostConfigManager) OptionManager(ctx context.Context) (*OptionManager, error) {
@@ -130,4 +150,31 @@ func (m HostConfigManager) ServiceSystem(ctx context.Context) (*HostServiceSyste
 	}
 
 	return NewHostServiceSystem(m.c, *h.ConfigManager.ServiceSystem), nil
+}
+
+func (m HostConfigManager) CertificateManager(ctx context.Context) (*HostCertificateManager, error) {
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.certificateManager"}, &h)
+	if err != nil {
+		return nil, err
+	}
+
+	// Added in 6.0
+	if h.ConfigManager.CertificateManager == nil {
+		return nil, ErrNotSupported
+	}
+
+	return NewHostCertificateManager(m.c, *h.ConfigManager.CertificateManager, m.Reference()), nil
+}
+
+func (m HostConfigManager) DateTimeSystem(ctx context.Context) (*HostDateTimeSystem, error) {
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.dateTimeSystem"}, &h)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewHostDateTimeSystem(m.c, *h.ConfigManager.DateTimeSystem), nil
 }

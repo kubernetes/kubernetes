@@ -39,27 +39,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	clusters string = "clusters"
+	secrets  string = "secrets"
+)
+
 func TestSecretController(t *testing.T) {
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
 	fakeClient := &fakefedclientset.Clientset{}
-	RegisterFakeList("clusters", &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
-	RegisterFakeList("secrets", &fakeClient.Fake, &apiv1.SecretList{Items: []apiv1.Secret{}})
-	secretWatch := RegisterFakeWatch("secrets", &fakeClient.Fake)
-	secretUpdateChan := RegisterFakeCopyOnUpdate("secrets", &fakeClient.Fake, secretWatch)
-	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
+	RegisterFakeList(clusters, &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
+	RegisterFakeList(secrets, &fakeClient.Fake, &apiv1.SecretList{Items: []apiv1.Secret{}})
+	secretWatch := RegisterFakeWatch(secrets, &fakeClient.Fake)
+	secretUpdateChan := RegisterFakeCopyOnUpdate(secrets, &fakeClient.Fake, secretWatch)
+	clusterWatch := RegisterFakeWatch(clusters, &fakeClient.Fake)
 
 	cluster1Client := &fakekubeclientset.Clientset{}
-	cluster1Watch := RegisterFakeWatch("secrets", &cluster1Client.Fake)
-	RegisterFakeList("secrets", &cluster1Client.Fake, &apiv1.SecretList{Items: []apiv1.Secret{}})
-	cluster1CreateChan := RegisterFakeCopyOnCreate("secrets", &cluster1Client.Fake, cluster1Watch)
-	cluster1UpdateChan := RegisterFakeCopyOnUpdate("secrets", &cluster1Client.Fake, cluster1Watch)
+	cluster1Watch := RegisterFakeWatch(secrets, &cluster1Client.Fake)
+	RegisterFakeList(secrets, &cluster1Client.Fake, &apiv1.SecretList{Items: []apiv1.Secret{}})
+	cluster1CreateChan := RegisterFakeCopyOnCreate(secrets, &cluster1Client.Fake, cluster1Watch)
+	cluster1UpdateChan := RegisterFakeCopyOnUpdate(secrets, &cluster1Client.Fake, cluster1Watch)
 
 	cluster2Client := &fakekubeclientset.Clientset{}
-	cluster2Watch := RegisterFakeWatch("secrets", &cluster2Client.Fake)
-	RegisterFakeList("secrets", &cluster2Client.Fake, &apiv1.SecretList{Items: []apiv1.Secret{}})
-	cluster2CreateChan := RegisterFakeCopyOnCreate("secrets", &cluster2Client.Fake, cluster2Watch)
+	cluster2Watch := RegisterFakeWatch(secrets, &cluster2Client.Fake)
+	RegisterFakeList(secrets, &cluster2Client.Fake, &apiv1.SecretList{Items: []apiv1.Secret{}})
+	cluster2CreateChan := RegisterFakeCopyOnCreate(secrets, &cluster2Client.Fake, cluster2Watch)
 
 	secretController := NewSecretController(fakeClient)
 	informerClientFactory := func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
@@ -100,7 +105,7 @@ func TestSecretController(t *testing.T) {
 	// There should be an update to add both the finalizers.
 	updatedSecret := GetSecretFromChan(secretUpdateChan)
 	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, metav1.FinalizerOrphan))
+	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, metav1.FinalizerOrphanDependents))
 	secret1 = *updatedSecret
 
 	// Verify that the secret is created in underlying cluster1.
@@ -185,8 +190,11 @@ func secretsEqual(a, b apiv1.Secret) bool {
 }
 
 func GetSecretFromChan(c chan runtime.Object) *apiv1.Secret {
-	secret := GetObjectFromChan(c).(*apiv1.Secret)
-	return secret
+	if secret := GetObjectFromChan(c); secret == nil {
+		return nil
+	} else {
+		return secret.(*apiv1.Secret)
+	}
 }
 
 // Wait till the store is updated with latest secret.

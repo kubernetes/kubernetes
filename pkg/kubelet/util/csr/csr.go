@@ -29,10 +29,13 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 )
 
-// RequestNodeCertificate will create a certificate signing request and send it to API server,
-// then it will watch the object's status, once approved by API server, it will return the API
-// server's issued certificate (pem-encoded). If there is any errors, or the watch timeouts,
-// it will return an error. This is intended for use on nodes (kubelet and kubeadm).
+// RequestNodeCertificate will create a certificate signing request for a node
+// (Organization and CommonName for the CSR will be set as expected for node
+// certificates) and send it to API server, then it will watch the object's
+// status, once approved by API server, it will return the API server's issued
+// certificate (pem-encoded). If there is any errors, or the watch timeouts, it
+// will return an error. This is intended for use on nodes (kubelet and
+// kubeadm).
 func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestInterface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
 	subject := &pkix.Name{
 		Organization: []string{"system:nodes"},
@@ -43,23 +46,31 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 	if err != nil {
 		return nil, fmt.Errorf("invalid private key for certificate request: %v", err)
 	}
-	csr, err := certutil.MakeCSR(privateKey, subject, nil, nil)
+	csrData, err := certutil.MakeCSR(privateKey, subject, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate certificate request: %v", err)
 	}
+	return RequestCertificate(client, csrData, []certificates.KeyUsage{
+		certificates.UsageDigitalSignature,
+		certificates.UsageKeyEncipherment,
+		certificates.UsageClientAuth,
+	})
+}
 
+// RequestCertificate will create a certificate signing request using the PEM
+// encoded CSR and send it to API server, then it will watch the object's
+// status, once approved by API server, it will return the API server's issued
+// certificate (pem-encoded). If there is any errors, or the watch timeouts, it
+// will return an error.
+func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, usages []certificates.KeyUsage) (certData []byte, err error) {
 	req, err := client.Create(&certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta:   metav1.TypeMeta{Kind: "CertificateSigningRequest"},
 		ObjectMeta: metav1.ObjectMeta{GenerateName: "csr-"},
 
 		Spec: certificates.CertificateSigningRequestSpec{
-			Request: csr,
-			Usages: []certificates.KeyUsage{
-				certificates.UsageDigitalSignature,
-				certificates.UsageKeyEncipherment,
-				certificates.UsageClientAuth,
-			},
+			Request: csrData,
+			Usages:  usages,
 		},
 	})
 	if err != nil {

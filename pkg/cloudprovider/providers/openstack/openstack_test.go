@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rackspace/gophercloud"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -247,14 +247,13 @@ func configFromEnv() (cfg Config, ok bool) {
 
 	cfg.Global.Username = os.Getenv("OS_USERNAME")
 	cfg.Global.Password = os.Getenv("OS_PASSWORD")
-	cfg.Global.ApiKey = os.Getenv("OS_API_KEY")
 	cfg.Global.Region = os.Getenv("OS_REGION_NAME")
 	cfg.Global.DomainId = os.Getenv("OS_DOMAIN_ID")
 	cfg.Global.DomainName = os.Getenv("OS_DOMAIN_NAME")
 
 	ok = (cfg.Global.AuthUrl != "" &&
 		cfg.Global.Username != "" &&
-		(cfg.Global.Password != "" || cfg.Global.ApiKey != "") &&
+		cfg.Global.Password != "" &&
 		(cfg.Global.TenantId != "" || cfg.Global.TenantName != "" ||
 			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
 

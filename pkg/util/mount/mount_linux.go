@@ -63,23 +63,23 @@ type Mounter struct {
 // currently come from mount(8), e.g. "ro", "remount", "bind", etc. If no more option is
 // required, call Mount with an empty string list or nil.
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	// Path to mounter binary. Set to mount accessible via $PATH by default.
+	// Path to mounter binary if containerized mounter is needed. Otherwise, it is set to empty.
 	// All Linux distros are expected to be shipped with a mount utility that an support bind mounts.
-	mounterPath := defaultMountCommand
+	mounterPath := ""
 	bind, bindRemountOpts := isBind(options)
 	if bind {
-		err := doMount(mounterPath, source, target, fstype, []string{"bind"})
+		err := doMount(mounterPath, defaultMountCommand, source, target, fstype, []string{"bind"})
 		if err != nil {
 			return err
 		}
-		return doMount(mounterPath, source, target, fstype, bindRemountOpts)
+		return doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
-	fsTypesNeedMounter := sets.NewString("nfs", "glusterfs")
+	fsTypesNeedMounter := sets.NewString("nfs", "glusterfs", "ceph", "cifs")
 	if fsTypesNeedMounter.Has(fstype) {
 		mounterPath = mounter.mounterPath
 	}
-	return doMount(mounterPath, source, target, fstype, options)
+	return doMount(mounterPath, defaultMountCommand, source, target, fstype, options)
 }
 
 // isBind detects whether a bind mount is being requested and makes the remount options to
@@ -107,10 +107,13 @@ func isBind(options []string) (bool, []string) {
 	return bind, bindRemountOpts
 }
 
-// doMount runs the mount command.
-func doMount(mountCmd string, source string, target string, fstype string, options []string) error {
-	glog.V(4).Infof("Mounting %s %s %s %v with command: %q", source, target, fstype, options, mountCmd)
+// doMount runs the mount command. mounterPath is the path to mounter binary if containerized mounter is used.
+func doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string) error {
 	mountArgs := makeMountArgs(source, target, fstype, options)
+	if len(mounterPath) > 0 {
+		mountArgs = append([]string{mountCmd}, mountArgs...)
+		mountCmd = mounterPath
+	}
 
 	glog.V(4).Infof("Mounting cmd (%s) with arguments (%s)", mountCmd, mountArgs)
 	command := exec.Command(mountCmd, mountArgs...)
@@ -347,17 +350,22 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 	// Try to mount the disk
 	glog.V(4).Infof("Attempting to mount disk: %s %s %s", fstype, source, target)
-	err = mounter.Interface.Mount(source, target, fstype, options)
-	if err != nil {
-		// It is possible that this disk is not formatted. Double check using diskLooksUnformatted
-		notFormatted, err := mounter.diskLooksUnformatted(source)
-		if err == nil && notFormatted {
-			args = []string{source}
+	mountErr := mounter.Interface.Mount(source, target, fstype, options)
+	if mountErr != nil {
+		// Mount failed. This indicates either that the disk is unformatted or
+		// it contains an unexpected filesystem.
+		existingFormat, err := mounter.getDiskFormat(source)
+		if err != nil {
+			return err
+		}
+		if existingFormat == "" {
 			// Disk is unformatted so format it.
+			args = []string{source}
 			// Use 'ext4' as the default
 			if len(fstype) == 0 {
 				fstype = "ext4"
 			}
+
 			if fstype == "ext4" || fstype == "ext3" {
 				args = []string{"-F", source}
 			}
@@ -371,13 +379,22 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			}
 			glog.Errorf("format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", source, fstype, target, options, err)
 			return err
+		} else {
+			// Disk is already formatted and failed to mount
+			if len(fstype) == 0 || fstype == existingFormat {
+				// This is mount error
+				return mountErr
+			} else {
+				// Block device is formatted with unexpected filesystem, let the user know
+				return fmt.Errorf("failed to mount the volume as %q, it's already formatted with %q. Mount error: %v", fstype, existingFormat, mountErr)
+			}
 		}
 	}
-	return err
+	return mountErr
 }
 
 // diskLooksUnformatted uses 'lsblk' to see if the given disk is unformated
-func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
+func (mounter *SafeFormatAndMount) getDiskFormat(disk string) (string, error) {
 	args := []string{"-nd", "-o", "FSTYPE", disk}
 	cmd := mounter.Runner.Command("lsblk", args...)
 	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
@@ -389,8 +406,8 @@ func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, erro
 
 	if err != nil {
 		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
-		return false, err
+		return "", err
 	}
 
-	return output == "", nil
+	return strings.TrimSpace(output), nil
 }

@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ const (
 
 func TestInitFederation(t *testing.T) {
 	cmdErrMsg := ""
-	dnsProvider := ""
+	dnsProvider := "google-clouddns"
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
 		cmdErrMsg = str
 	})
@@ -89,8 +90,7 @@ func TestInitFederation(t *testing.T) {
 		etcdPVCapacity        string
 		etcdPersistence       string
 		expectedErr           string
-		dnsProvider           string
-		storageBackend        string
+		dnsProviderConfig     string
 		dryRun                string
 		apiserverArgOverrides string
 		cmArgOverrides        string
@@ -106,8 +106,7 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:        "5Gi",
 			etcdPersistence:       "true",
 			expectedErr:           "",
-			dnsProvider:           "test-dns-provider",
-			storageBackend:        "etcd2",
+			dnsProviderConfig:     "dns-provider.conf",
 			dryRun:                "",
 			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
 			cmArgOverrides:        "--dns-provider=override,--log-dir=override",
@@ -123,8 +122,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:       "", //test for default value of pvc-size
 			etcdPersistence:      "true",
 			expectedErr:          "",
-			dnsProvider:          "", //test for default value of dns provider
-			storageBackend:       "etcd2",
 			dryRun:               "",
 		},
 		{
@@ -138,8 +135,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:       "",
 			etcdPersistence:      "true",
 			expectedErr:          "",
-			dnsProvider:          "test-dns-provider",
-			storageBackend:       "etcd2",
 			dryRun:               "valid-run",
 		},
 		{
@@ -153,8 +148,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:       "5Gi",
 			etcdPersistence:      "false",
 			expectedErr:          "",
-			dnsProvider:          "test-dns-provider",
-			storageBackend:       "etcd3",
 			dryRun:               "",
 		},
 		{
@@ -167,8 +160,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:       "5Gi",
 			etcdPersistence:      "true",
 			expectedErr:          "",
-			dnsProvider:          "test-dns-provider",
-			storageBackend:       "etcd3",
 			dryRun:               "",
 		},
 		{
@@ -182,8 +173,6 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:       "5Gi",
 			etcdPersistence:      "true",
 			expectedErr:          "",
-			dnsProvider:          "test-dns-provider",
-			storageBackend:       "etcd3",
 			dryRun:               "",
 		},
 	}
@@ -192,20 +181,22 @@ func TestInitFederation(t *testing.T) {
 
 	for i, tc := range testCases {
 		cmdErrMsg = ""
-		dnsProvider = ""
 		buf := bytes.NewBuffer([]byte{})
 
-		if "" != tc.dnsProvider {
-			dnsProvider = tc.dnsProvider
-		} else {
-			dnsProvider = "google-clouddns" //default value of dns-provider
+		if tc.dnsProviderConfig != "" {
+			tmpfile, err := ioutil.TempFile("", tc.dnsProviderConfig)
+			if err != nil {
+				t.Fatalf("[%d] unexpected error: %v", i, err)
+			}
+			tc.dnsProviderConfig = tmpfile.Name()
+			defer os.Remove(tmpfile.Name())
 		}
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPersistence, tc.etcdPVCapacity, tc.storageBackend, tc.apiserverArgOverrides, tc.cmArgOverrides)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
+		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, nil, "", tc.kubeconfigGlobal)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -216,14 +207,12 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
+		cmd.Flags().Set("dns-provider", dnsProvider)
 		cmd.Flags().Set("apiserver-arg-overrides", tc.apiserverArgOverrides)
 		cmd.Flags().Set("controllermanager-arg-overrides", tc.cmArgOverrides)
 
-		if tc.storageBackend != "" {
-			cmd.Flags().Set("storage-backend", tc.storageBackend)
-		}
-		if tc.dnsProvider != "" {
-			cmd.Flags().Set("dns-provider", tc.dnsProvider)
+		if tc.dnsProviderConfig != "" {
+			cmd.Flags().Set("dns-provider-config", tc.dnsProviderConfig)
 		}
 		if tc.etcdPVCapacity != "" {
 			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
@@ -565,7 +554,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, etcdPersistence, etcdPVCapacity, storageProvider, apiserverOverrideArg, cmOverrideArg string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, apiserverOverrideArg, cmOverrideArg string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -645,6 +634,18 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmKubeconfigSecretName,
+			Namespace: namespaceName,
+		},
+		Data: nil,
+	}
+
+	cmDNSProviderSecret := v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: testapi.Default.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dnsProviderSecretName,
 			Namespace: namespaceName,
 		},
 		Data: nil,
@@ -771,7 +772,6 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
 		"--admission-control=NamespaceLifecycle",
-		fmt.Sprintf("--storage-backend=%s", storageProvider),
 		fmt.Sprintf("--advertise-address=%s", address),
 	}
 
@@ -785,7 +785,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	sort.Strings(apiserverArgs)
 	apiserverCommand = append(apiserverCommand, apiserverArgs...)
 
-	apiserver := v1beta1.Deployment{
+	apiserver := &v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
@@ -829,7 +829,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 						},
 						{
 							Name:  "etcd",
-							Image: "gcr.io/google_containers/etcd:3.0.14-alpha.1",
+							Image: "gcr.io/google_containers/etcd:3.0.17",
 							Command: []string{
 								"/usr/local/bin/etcd",
 								"--data-dir",
@@ -881,7 +881,6 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 
 	cmArgs := []string{
 		"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
-		"--dns-provider-config=",
 		fmt.Sprintf("--federation-name=%s", federationName),
 		fmt.Sprintf("--zone-name=%s", dnsZoneName),
 		fmt.Sprintf("--master=https://%s", svcName),
@@ -898,7 +897,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	cmCommand = append(cmCommand, cmArgs...)
 
 	cmName := federationName + "-controller-manager"
-	cm := v1beta1.Deployment{
+	cm := &v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
@@ -907,6 +906,9 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			Name:      cmName,
 			Namespace: namespaceName,
 			Labels:    componentLabel,
+			Annotations: map[string]string{
+				util.FedDomainMapKey: fmt.Sprintf("%s=%s", federationName, dnsZoneName),
+			},
 		},
 		Spec: v1beta1.DeploymentSpec{
 			Replicas: &replicas,
@@ -956,6 +958,9 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				},
 			},
 		},
+	}
+	if dnsProviderConfig != "" {
+		cm = addDNSProviderConfigTest(cm, cmDNSProviderSecret.Name)
 	}
 
 	podList := v1.PodList{}
@@ -1060,6 +1065,8 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					want = credSecret
 				case cmKubeconfigSecretName:
 					want = cmKubeconfigSecret
+				case dnsProviderSecretName:
+					want = cmDNSProviderSecret
 				}
 				if !apiequality.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
@@ -1091,9 +1098,9 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				}
 				switch got.Name {
 				case svcName:
-					want = apiserver
+					want = *apiserver
 				case cmName:
-					want = cm
+					want = *cm
 				}
 				if !apiequality.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected deployment object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
@@ -1352,4 +1359,34 @@ func getEndpoint(apiserverServiceType v1.ServiceType, lbIP, advertiseAddress str
 		}
 	}
 	return endpoint
+}
+
+// TODO: Reuse the function addDNSProviderConfig once that function is converted to use versioned objects.
+func addDNSProviderConfigTest(dep *v1beta1.Deployment, secretName string) *v1beta1.Deployment {
+	const (
+		dnsProviderConfigVolume    = "config-volume"
+		dnsProviderConfigMountPath = "/etc/federation/dns-provider"
+	)
+
+	// Create a volume from dns-provider secret
+	volume := v1.Volume{
+		Name: dnsProviderConfigVolume,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: secretName,
+			},
+		},
+	}
+	dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, volume)
+
+	// Mount dns-provider secret volume to controller-manager container
+	volumeMount := v1.VolumeMount{
+		Name:      dnsProviderConfigVolume,
+		MountPath: dnsProviderConfigMountPath,
+		ReadOnly:  true,
+	}
+	dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(dep.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMount)
+	dep.Spec.Template.Spec.Containers[0].Command = append(dep.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("--dns-provider-config=%s/%s", dnsProviderConfigMountPath, secretName))
+
+	return dep
 }

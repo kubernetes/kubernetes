@@ -28,13 +28,17 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["compatibility_test.go"],
+    srcs = [
+        "compatibility_test.go",
+        "defaults_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/api/latest:go_default_library",
         "//plugin/pkg/scheduler/factory:go_default_library",

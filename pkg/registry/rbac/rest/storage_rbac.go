@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -131,15 +132,24 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 	err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
 		clientset, err := rbacclient.NewForConfig(hookContext.LoopbackClientConfig)
 		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))
+			return false, nil
+		}
+		// Make sure etcd is responding before we start reconciling
+		if _, err := clientset.ClusterRoles().List(metav1.ListOptions{}); err != nil {
 			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
+			return false, nil
+		}
+		if _, err := clientset.ClusterRoleBindings().List(metav1.ListOptions{}); err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
 			return false, nil
 		}
 
 		// ensure bootstrap roles are created or reconciled
 		for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
 			opts := reconciliation.ReconcileClusterRoleOptions{
-				Role:    &clusterRole,
-				Client:  clientset.ClusterRoles(),
+				Role:    reconciliation.ClusterRoleRuleOwner{ClusterRole: &clusterRole},
+				Client:  reconciliation.ClusterRoleModifier{Client: clientset.ClusterRoles()},
 				Confirm: true,
 			}
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -165,7 +175,6 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 
 		// ensure bootstrap rolebindings are created or reconciled
 		for _, clusterRoleBinding := range append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...) {
-
 			opts := reconciliation.ReconcileClusterRoleBindingOptions{
 				RoleBinding: &clusterRoleBinding,
 				Client:      clientset.ClusterRoleBindings(),
@@ -191,6 +200,36 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 			if err != nil {
 				// don't fail on failures, try to create as many as you can
 				utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrolebinding.%s/%s: %v", rbac.GroupName, clusterRoleBinding.Name, err))
+			}
+		}
+
+		// ensure bootstrap namespaced roles are created or reconciled
+		for namespace, roles := range bootstrappolicy.NamespaceRoles() {
+			for _, role := range roles {
+				opts := reconciliation.ReconcileClusterRoleOptions{
+					Role:    reconciliation.RoleRuleOwner{Role: &role},
+					Client:  reconciliation.RoleModifier{Client: clientset},
+					Confirm: true,
+				}
+				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					result, err := opts.Run()
+					if err != nil {
+						return err
+					}
+					switch {
+					case result.Protected && result.Operation != reconciliation.ReconcileNone:
+						glog.Warningf("skipped reconcile-protected role.%s/%s in %v with missing permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
+					case result.Operation == reconciliation.ReconcileUpdate:
+						glog.Infof("updated role.%s/%s in %v with additional permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
+					case result.Operation == reconciliation.ReconcileCreate:
+						glog.Infof("created role.%s/%s in %v ", rbac.GroupName, role.Name, namespace)
+					}
+					return nil
+				})
+				if err != nil {
+					// don't fail on failures, try to create as many as you can
+					utilruntime.HandleError(fmt.Errorf("unable to reconcile role.%s/%s in %v: %v", rbac.GroupName, role.Name, namespace, err))
+				}
 			}
 		}
 
