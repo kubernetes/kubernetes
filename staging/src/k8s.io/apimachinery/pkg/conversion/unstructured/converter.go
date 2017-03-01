@@ -82,6 +82,9 @@ var (
 )
 
 func parseBool(key string) bool {
+	if len(key) == 0 {
+		return false
+	}
 	value, err := strconv.ParseBool(key)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't parse '%s' as bool for unstructured mismatch detection", key))
