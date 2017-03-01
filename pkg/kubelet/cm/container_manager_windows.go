@@ -33,7 +33,7 @@ type containerManagerImpl struct {
 
 var _ ContainerManager = &containerManagerImpl{}
 
-func (cm *containerManagerImpl) Start(_ *v1.Node) error {
+func (cm *containerManagerImpl) Start(_ *v1.Node, _ ActivePodsFunc) error {
 	glog.V(2).Infof("Starting Windows stub container manager")
 	return nil
 }

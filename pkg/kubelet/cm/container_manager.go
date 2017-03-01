@@ -23,12 +23,14 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
+type ActivePodsFunc func() []*v1.Pod
+
 // Manages the containers running on a machine.
 type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(*v1.Node) error
+	Start(*v1.Node, ActivePodsFunc) error
 
 	// Returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -52,6 +54,10 @@ type ContainerManager interface {
 
 	// GetNodeAllocatable returns the amount of compute resources that have to be reserved from scheduling.
 	GetNodeAllocatableReservation() v1.ResourceList
+
+	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
+	// level QoS containers have their desired state in a thread-safe way
+	UpdateQOSCgroups() error
 }
 
 type NodeConfig struct {
