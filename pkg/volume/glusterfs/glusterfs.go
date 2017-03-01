@@ -68,8 +68,7 @@ const (
 	glusterfsPluginName         = "kubernetes.io/glusterfs"
 	volPrefix                   = "vol_"
 	dynamicEpSvcPrefix          = "glusterfs-dynamic-"
-	replicaCount                = 3
-	durabilityType              = "replicate"
+	defaultReplicaCount         = 3
 	secretKeyName               = "key" // key name used in secret
 	gciGlusterMountBinariesPath = "/sbin/mount.glusterfs"
 	defaultGidMin               = 2000
@@ -928,7 +927,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	}
 
 	if len(parseVolumeType) == 0 {
-		cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityReplicate, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}
+		cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityReplicate, Replicate: gapi.ReplicaDurability{Replica: defaultReplicaCount}}
 	} else {
 		parseVolumeTypeInfo := dstrings.Split(parseVolumeType, ":")
 
@@ -941,7 +940,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 				}
 				cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityReplicate, Replicate: gapi.ReplicaDurability{Replica: newReplicaCount}}
 			} else {
-				cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityReplicate, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}
+				cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityReplicate, Replicate: gapi.ReplicaDurability{Replica: defaultReplicaCount}}
 			}
 		case "disperse":
 			if len(parseVolumeTypeInfo) >= 3 {
