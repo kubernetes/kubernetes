@@ -81,7 +81,6 @@ func TestAggregatedAPIServer(t *testing.T) {
 	defer os.RemoveAll(certDir)
 	_, defaultServiceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
 	proxySigningKey, err := cert.NewPrivateKey()
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,6 +90,18 @@ func TestAggregatedAPIServer(t *testing.T) {
 	}
 	proxyCACertFile, _ := ioutil.TempFile(certDir, "proxy-ca.crt")
 	if err := ioutil.WriteFile(proxyCACertFile.Name(), cert.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+		t.Fatal(err)
+	}
+	clientSigningKey, err := cert.NewPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "client-ca"}, clientSigningKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientCACertFile, _ := ioutil.TempFile(certDir, "client-ca.crt")
+	if err := ioutil.WriteFile(clientCACertFile.Name(), cert.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,6 +117,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	kubeAPIServerOptions.Authentication.RequestHeader.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
 	kubeAPIServerOptions.Authentication.RequestHeader.AllowedNames = []string{"kube-aggregator"}
 	kubeAPIServerOptions.Authentication.RequestHeader.ClientCAFile = proxyCACertFile.Name()
+	kubeAPIServerOptions.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
 	kubeAPIServerOptions.Authorization.Mode = "RBAC"
 
 	config, sharedInformers, err := app.BuildMasterConfig(kubeAPIServerOptions)

@@ -118,6 +118,7 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer
 		batch.Kind("Job"):                              &JobDescriber{c},
 		batch.Kind("CronJob"):                          &CronJobDescriber{c},
 		apps.Kind("StatefulSet"):                       &StatefulSetDescriber{c},
+		apps.Kind("Deployment"):                        &DeploymentDescriber{c, versionedClientsetForDeployment(c)},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
 		policy.Kind("PodDisruptionBudget"):             &PodDisruptionBudgetDescriber{c},
@@ -623,6 +624,8 @@ func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
 			printCinderVolumeSource(volume.VolumeSource.Cinder, w)
 		case volume.VolumeSource.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, w)
+		case volume.VolumeSource.PortworxVolume != nil:
+			printPortworxVolumeSource(volume.VolumeSource.PortworxVolume, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -694,6 +697,12 @@ func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, w *PrefixWriter)
 		"    Volume:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		quobyte.Registry, quobyte.Volume, quobyte.ReadOnly)
+}
+
+func printPortworxVolumeSource(pwxVolume *api.PortworxVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tPortworxVolume (a Portworx Volume resource)\n"+
+		"    VolumeID:\t%v\n",
+		pwxVolume.VolumeID)
 }
 
 func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w *PrefixWriter) {
@@ -841,6 +850,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printAzureDiskVolumeSource(pv.Spec.AzureDisk, w)
 		case pv.Spec.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, w)
+		case pv.Spec.PortworxVolume != nil:
+			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
 		}
 
 		if events != nil {
@@ -2906,6 +2917,9 @@ func printTolerationsMultilineWithIndent(w *PrefixWriter, initialIndent, title, 
 				}
 				if len(toleration.Effect) != 0 {
 					w.Write(LEVEL_0, ":%s", toleration.Effect)
+				}
+				if toleration.TolerationSeconds != nil {
+					w.Write(LEVEL_0, " for %ds", *toleration.TolerationSeconds)
 				}
 				w.Write(LEVEL_0, "\n")
 				i++

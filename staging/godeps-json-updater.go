@@ -31,7 +31,6 @@ var (
 
 type Dependency struct {
 	ImportPath string
-	Comment    string `json:",omitempty"`
 	Rev        string
 }
 

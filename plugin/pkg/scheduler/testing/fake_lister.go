@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	. "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
@@ -136,5 +137,32 @@ func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.
 		err = fmt.Errorf("Could not find ReplicaSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 
+	return
+}
+
+var _ StatefulSetLister = &FakeStatefulSetLister{}
+
+// FakeStatefulSetLister implements ControllerLister on []apps.StatefulSet for testing purposes.
+type FakeStatefulSetLister []*apps.StatefulSet
+
+// GetPodStatefulSets gets the StatefulSets that have the selector that match the labels on the given pod.
+func (f FakeStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.StatefulSet, err error) {
+	var selector labels.Selector
+
+	for _, ss := range f {
+		if ss.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err = metav1.LabelSelectorAsSelector(ss.Spec.Selector)
+		if err != nil {
+			return
+		}
+		if selector.Matches(labels.Set(pod.Labels)) {
+			sss = append(sss, ss)
+		}
+	}
+	if len(sss) == 0 {
+		err = fmt.Errorf("Could not find StatefulSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
 	return
 }

@@ -154,7 +154,9 @@ disable-attach-detach-reconcile-sync
 disable-filter
 disable-kubenet
 disable-log-dump
+discovery-file
 discovery-port
+discovery-token
 dns-bind-address
 dns-port
 dns-provider
@@ -629,7 +631,6 @@ start-services
 static-pods-config
 stats-port
 stop-services
-storage-backend
 storage-media-type
 storage-version
 storage-versions
@@ -647,6 +648,7 @@ tcp-services
 terminated-pod-gc-threshold
 test-flags
 test-timeout
+tls-bootstrap-token
 tls-ca-file
 tls-cert-file
 tls-private-key-file
@@ -666,6 +668,8 @@ upgrade-image
 upgrade-target
 use-kubernetes-cluster-service
 use-kubernetes-version
+use-service-account-credentials
+use-taint-based-evictions
 user-whitelist
 use-service-account-credentials
 use-service-account-credentials
@@ -686,3 +690,4 @@ windows-line-endings
 www-prefix
 zone-id
 zone-name
+

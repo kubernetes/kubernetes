@@ -308,12 +308,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {
-			glog.Infof("Started to log from %v for %v", ctx, req.Request.URL.RequestURI())
-			watcher, err := rw.Watch(ctx, &opts)
-			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
-				return
-			}
 			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
 			timeout := time.Duration(0)
 			if opts.TimeoutSeconds != nil {
@@ -321,6 +315,13 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 			if timeout == 0 && minRequestTimeout > 0 {
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
+			}
+			glog.V(2).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.Request.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
+
+			watcher, err := rw.Watch(ctx, &opts)
+			if err != nil {
+				scope.err(err, res.ResponseWriter, req.Request)
+				return
 			}
 			serveWatch(watcher, scope, req, res, timeout)
 			return
@@ -564,11 +565,12 @@ func patchResource(
 	namespace := request.NamespaceValue(ctx)
 
 	var (
-		originalObjJS        []byte
-		originalPatchedObjJS []byte
-		originalObjMap       map[string]interface{}
-		originalPatchMap     map[string]interface{}
-		lastConflictErr      error
+		originalObjJS           []byte
+		originalPatchedObjJS    []byte
+		originalObjMap          map[string]interface{}
+		originalPatchMap        map[string]interface{}
+		lastConflictErr         error
+		originalResourceVersion string
 	)
 
 	// applyPatch is called every time GuaranteedUpdate asks for the updated object,
@@ -581,12 +583,18 @@ func patchResource(
 			return nil, errors.NewNotFound(resource.GroupResource(), name)
 		}
 
+		currentResourceVersion := ""
+		if currentMetadata, err := meta.Accessor(currentObject); err == nil {
+			currentResourceVersion = currentMetadata.GetResourceVersion()
+		}
+
 		switch {
 		case originalObjJS == nil && originalObjMap == nil:
 			// first time through,
 			// 1. apply the patch
 			// 2. save the original and patched to detect whether there were conflicting changes on retries
 
+			originalResourceVersion = currentResourceVersion
 			objToUpdate := patcher.New()
 
 			// For performance reasons, in case of strategicpatch, we avoid json
@@ -689,11 +697,12 @@ func patchResource(
 			if err != nil {
 				return nil, err
 			}
+
 			if hasConflicts {
 				diff1, _ := json.Marshal(currentPatchMap)
 				diff2, _ := json.Marshal(originalPatchMap)
-				patchDiffErr := fmt.Errorf("there is a meaningful conflict:\n diff1=%v\n, diff2=%v\n", diff1, diff2)
-				glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict.\n diff1=%v\n, diff2=%v\n", name, diff1, diff2)
+				patchDiffErr := fmt.Errorf("there is a meaningful conflict (firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
+				glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict(firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", name, originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
 
 				// Return the last conflict error we got if we have one
 				if lastConflictErr != nil {

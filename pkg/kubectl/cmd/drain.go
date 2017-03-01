@@ -49,7 +49,7 @@ import (
 type DrainOptions struct {
 	client             internalclientset.Interface
 	restClient         *restclient.RESTClient
-	factory            cmdutil.Factory
+	Factory            cmdutil.Factory
 	Force              bool
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
@@ -58,8 +58,8 @@ type DrainOptions struct {
 	DeleteLocalData    bool
 	mapper             meta.RESTMapper
 	nodeInfo           *resource.Info
-	out                io.Writer
-	errOut             io.Writer
+	Out                io.Writer
+	ErrOut             io.Writer
 	typer              runtime.ObjectTyper
 }
 
@@ -96,7 +96,7 @@ var (
 )
 
 func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &DrainOptions{factory: f, out: out}
+	options := &DrainOptions{Factory: f, Out: out}
 
 	cmd := &cobra.Command{
 		Use:     "cordon NODE",
@@ -121,7 +121,7 @@ var (
 )
 
 func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &DrainOptions{factory: f, out: out}
+	options := &DrainOptions{Factory: f, Out: out}
 
 	cmd := &cobra.Command{
 		Use:     "uncordon NODE",
@@ -171,7 +171,7 @@ var (
 )
 
 func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &DrainOptions{factory: f, out: out, errOut: errOut, backOff: clockwork.NewRealClock()}
+	options := &DrainOptions{Factory: f, Out: out, ErrOut: errOut, backOff: clockwork.NewRealClock()}
 
 	cmd := &cobra.Command{
 		Use:     "drain NODE",
@@ -199,23 +199,23 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
 	}
 
-	if o.client, err = o.factory.ClientSet(); err != nil {
+	if o.client, err = o.Factory.ClientSet(); err != nil {
 		return err
 	}
 
-	o.restClient, err = o.factory.RESTClient()
+	o.restClient, err = o.Factory.RESTClient()
 	if err != nil {
 		return err
 	}
 
-	o.mapper, o.typer = o.factory.Object()
+	o.mapper, o.typer = o.Factory.Object()
 
-	cmdNamespace, _, err := o.factory.DefaultNamespace()
+	cmdNamespace, _, err := o.Factory.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	r := o.factory.NewBuilder().
+	r := o.Factory.NewBuilder().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		ResourceNames("node", args[0]).
 		Do()
@@ -241,7 +241,7 @@ func (o *DrainOptions) RunDrain() error {
 
 	err := o.deleteOrEvictPodsSimple()
 	if err == nil {
-		cmdutil.PrintSuccess(o.mapper, false, o.out, "node", o.nodeInfo.Name, false, "drained")
+		cmdutil.PrintSuccess(o.mapper, false, o.Out, "node", o.nodeInfo.Name, false, "drained")
 	}
 	return err
 }
@@ -258,9 +258,9 @@ func (o *DrainOptions) deleteOrEvictPodsSimple() error {
 		if newErr != nil {
 			return newErr
 		}
-		fmt.Fprintf(o.errOut, "There are pending pods when an error occurred: %v\n", err)
+		fmt.Fprintf(o.ErrOut, "There are pending pods when an error occurred: %v\n", err)
 		for _, pendingPod := range pendingPods {
-			fmt.Fprintf(o.errOut, "%s/%s\n", "pod", pendingPod.Name)
+			fmt.Fprintf(o.ErrOut, "%s/%s\n", "pod", pendingPod.Name)
 		}
 	}
 	return err
@@ -289,7 +289,7 @@ func (o *DrainOptions) getPodCreator(pod api.Pod) (*api.SerializedReference, err
 	}
 	// Now verify that the specified creator actually exists.
 	sr := &api.SerializedReference{}
-	if err := runtime.DecodeInto(o.factory.Decoder(true), []byte(creatorRef), sr); err != nil {
+	if err := runtime.DecodeInto(o.Factory.Decoder(true), []byte(creatorRef), sr); err != nil {
 		return nil, err
 	}
 	// We assume the only reason for an error is because the controller is
@@ -426,7 +426,7 @@ func (o *DrainOptions) getPodsForDeletion() (pods []api.Pod, err error) {
 		return []api.Pod{}, errors.New(fs.Message())
 	}
 	if len(ws) > 0 {
-		fmt.Fprintf(o.errOut, "WARNING: %s\n", ws.Message())
+		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", ws.Message())
 	}
 	return pods, nil
 }
@@ -564,7 +564,7 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 		for i, pod := range pods {
 			p, err := getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, false, verbStr)
+				cmdutil.PrintSuccess(o.mapper, false, o.Out, "pod", pod.Name, false, verbStr)
 				continue
 			} else if err != nil {
 				return false, err
@@ -616,7 +616,7 @@ func SupportEviction(clientset internalclientset.Interface) (string, error) {
 // RunCordonOrUncordon runs either Cordon or Uncordon.  The desired value for
 // "Unschedulable" is passed as the first arg.
 func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
-	cmdNamespace, _, err := o.factory.DefaultNamespace()
+	cmdNamespace, _, err := o.Factory.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -624,7 +624,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 	if o.nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
 		unsched := reflect.ValueOf(o.nodeInfo.Object).Elem().FieldByName("Spec").FieldByName("Unschedulable")
 		if unsched.Bool() == desired {
-			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, already(desired))
+			cmdutil.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, already(desired))
 		} else {
 			helper := resource.NewHelper(o.restClient, o.nodeInfo.Mapping)
 			unsched.SetBool(desired)
@@ -646,10 +646,10 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			if err != nil {
 				return err
 			}
-			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, changed(desired))
+			cmdutil.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, changed(desired))
 		}
 	} else {
-		cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, "skipped")
+		cmdutil.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, "skipped")
 	}
 
 	return nil

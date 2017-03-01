@@ -41,13 +41,27 @@ type Result struct {
 	err     error
 	visitor Visitor
 
-	sources           []Visitor
-	singleItemImplied bool
+	sources            []Visitor
+	singleItemImplied  bool
+	targetsSingleItems bool
 
 	ignoreErrors []utilerrors.Matcher
 
 	// populated by a call to Infos
 	info []*Info
+}
+
+// withError allows a fluent style for internal result code.
+func (r *Result) withError(err error) *Result {
+	r.err = err
+	return r
+}
+
+// TargetsSingleItems returns true if any of the builder arguments pointed
+// to non-list calls (if the user explicitly asked for any object by name).
+// This includes directories, streams, URLs, and resource name tuples.
+func (r *Result) TargetsSingleItems() bool {
+	return r.targetsSingleItems
 }
 
 // IgnoreErrors will filter errors that occur when by visiting the result

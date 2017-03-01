@@ -405,6 +405,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 
 	// default to the image ID, but try and inspect for the RepoDigests
 	imageID := DockerPrefix + iResult.Image
+	imageName := iResult.Config.Image
 	imgInspectResult, err := dm.client.InspectImageByID(iResult.Image)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", iResult.Image, containerName, err))
@@ -416,12 +417,12 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		if len(imgInspectResult.RepoDigests) > 0 {
 			imageID = DockerPullablePrefix + imgInspectResult.RepoDigests[0]
 		}
+
+		if len(imgInspectResult.RepoTags) > 0 {
+			imageName = imgInspectResult.RepoTags[0]
+		}
 	}
 
-	imageName := iResult.Config.Image
-	if len(imgInspectResult.RepoTags) > 0 {
-		imageName = imgInspectResult.RepoTags[0]
-	}
 	status := kubecontainer.ContainerStatus{
 		Name:         containerName,
 		RestartCount: containerInfo.RestartCount,
@@ -695,7 +696,7 @@ func (dm *DockerManager) runContainer(
 		// here we just add a unique container id to make the path unique for different instances
 		// of the same container.
 		containerLogPath := path.Join(opts.PodContainerDir, cid)
-		fs, err := os.Create(containerLogPath)
+		fs, err := dm.os.Create(containerLogPath)
 		if err != nil {
 			// TODO: Clean up the previously created dir? return the error?
 			utilruntime.HandleError(fmt.Errorf("error creating termination-log file %q: %v", containerLogPath, err))
@@ -706,7 +707,7 @@ func (dm *DockerManager) runContainer(
 			// open(2) to create the file, so the final mode used is "mode &
 			// ~umask". But we want to make sure the specified mode is used
 			// in the file no matter what the umask is.
-			if err := os.Chmod(containerLogPath, 0666); err != nil {
+			if err := dm.os.Chmod(containerLogPath, 0666); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %v", containerLogPath, err))
 			}
 

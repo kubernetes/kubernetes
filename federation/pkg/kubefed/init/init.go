@@ -141,7 +141,6 @@ type initFederationOptions struct {
 	etcdPVCapacity                   string
 	etcdPersistentStorage            bool
 	dryRun                           bool
-	storageBackend                   string
 	apiServerOverridesString         string
 	apiServerOverrides               map[string]string
 	controllerManagerOverridesString string
@@ -161,7 +160,6 @@ func (o *initFederationOptions) Bind(flags *pflag.FlagSet) {
 	flags.StringVar(&o.etcdPVCapacity, "etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
 	flags.BoolVar(&o.etcdPersistentStorage, "etcd-persistent-storage", true, "Use persistent volume for etcd. Defaults to 'true'.")
 	flags.BoolVar(&o.dryRun, "dry-run", false, "dry run without sending commands to server.")
-	flags.StringVar(&o.storageBackend, "storage-backend", "etcd2", "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
 	flags.StringVar(&o.apiServerOverridesString, "apiserver-arg-overrides", "", "comma separated list of federation-apiserver arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
 	flags.StringVar(&o.controllerManagerOverridesString, "controllermanager-arg-overrides", "", "comma separated list of federation-controller-manager arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
 	flags.StringVar(&o.apiServerServiceTypeString, apiserverServiceTypeFlag, string(v1.ServiceTypeLoadBalancer), "The type of service to create for federation API server. Options: 'LoadBalancer' (default), 'NodePort'.")
@@ -313,7 +311,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.image, serverCredName, advertiseAddress, i.options.storageBackend, i.options.apiServerOverrides, pvc, i.options.dryRun)
+	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.options.image, serverCredName, advertiseAddress, i.options.apiServerOverrides, pvc, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -593,7 +591,7 @@ func createPVC(clientset client.Interface, namespace, svcName, etcdPVCapacity st
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset client.Interface, namespace, name, image, credentialsName, advertiseAddress, storageBackend string, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
+func createAPIServer(clientset client.Interface, namespace, name, image, credentialsName, advertiseAddress string, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -608,7 +606,6 @@ func createAPIServer(clientset client.Interface, namespace, name, image, credent
 		"--admission-control":    "NamespaceLifecycle",
 	}
 
-	argsMap["--storage-backend"] = storageBackend
 	if advertiseAddress != "" {
 		argsMap["--advertise-address"] = advertiseAddress
 	}
@@ -655,7 +652,7 @@ func createAPIServer(clientset client.Interface, namespace, name, image, credent
 						},
 						{
 							Name:  "etcd",
-							Image: "gcr.io/google_containers/etcd:3.0.17-alpha.1",
+							Image: "gcr.io/google_containers/etcd:3.0.17",
 							Command: []string{
 								"/usr/local/bin/etcd",
 								"--data-dir",

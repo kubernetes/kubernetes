@@ -103,6 +103,10 @@ func (plugin *azureDataDiskPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *azureDataDiskPlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *azureDataDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

@@ -126,7 +126,7 @@ var (
 		    $ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.
 
     That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to
-		authenticate to the registry.
+		authenticate to the registry. The email address is optional.
 
 		When creating applications, you may have a Docker registry that requires authentication.  In order for the
 		nodes to pull images on your behalf, they have to have the credentials.  You can provide this information
@@ -158,7 +158,6 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobr
 	cmd.Flags().String("docker-password", "", i18n.T("Password for Docker registry authentication"))
 	cmd.MarkFlagRequired("docker-password")
 	cmd.Flags().String("docker-email", "", i18n.T("Email for Docker registry"))
-	cmd.MarkFlagRequired("docker-email")
 	cmd.Flags().String("docker-server", "https://index.docker.io/v1/", i18n.T("Server location for Docker registry"))
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd

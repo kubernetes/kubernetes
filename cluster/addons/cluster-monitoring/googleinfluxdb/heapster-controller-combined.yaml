@@ -34,7 +34,6 @@ spec:
         version: v1.3.0-beta.1
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
       containers:
         - image: gcr.io/google_containers/heapster-amd64:v1.3.0-beta.1
@@ -136,3 +135,6 @@ spec:
         - name: usr-ca-certs
           hostPath:
             path: "/usr/share/ca-certificates"
+      tolerations:
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"

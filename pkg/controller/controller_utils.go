@@ -483,6 +483,9 @@ func (r RealPodControl) CreatePodsWithControllerRef(namespace string, template *
 	if controllerRef.Controller == nil || *controllerRef.Controller != true {
 		return fmt.Errorf("controllerRef.Controller is not set")
 	}
+	if controllerRef.BlockOwnerDeletion == nil || *controllerRef.BlockOwnerDeletion != true {
+		return fmt.Errorf("controllerRef.BlockOwnerDeletion is not set")
+	}
 	return r.createPods("", namespace, template, controllerObject, controllerRef)
 }
 

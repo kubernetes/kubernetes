@@ -45,10 +45,10 @@ spec:
       - name: node-problem-detector
         image: gcr.io/google_containers/node-problem-detector:v0.3.0-alpha.1
         command:
-        - /node-problem-detector
-        - --logtostderr
+        - "/bin/sh"
+        - "-c"
         # Pass both config to support both journald and syslog.
-        - --system-log-monitors=/config/kernel-monitor.json,/config/kernel-monitor-filelog.json
+        - "/node-problem-detector --logtostderr --system-log-monitors=/config/kernel-monitor.json,/config/kernel-monitor-filelog.json >>/var/log/node-problem-detector.log 2>&1"
         securityContext:
           privileged: true
         resources:
@@ -66,7 +66,6 @@ spec:
         volumeMounts:
         - name: log
           mountPath: /var/log
-          readOnly: true
         - name: localtime
           mountPath: /etc/localtime
           readOnly: true
