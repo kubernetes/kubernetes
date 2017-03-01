@@ -353,7 +353,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.HairpinMode = in.HairpinMode
 	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
-	out.NvidiaGPUs = in.NvidiaGPUs
 	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
 	out.ResolverConfig = in.ResolverConfig
@@ -531,7 +530,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.HairpinMode = in.HairpinMode
 	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
-	out.NvidiaGPUs = in.NvidiaGPUs
 	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
 	out.ResolverConfig = in.ResolverConfig
