@@ -211,6 +211,59 @@ func TestGetObjects(t *testing.T) {
 	}
 }
 
+func TestGetObjectsFiltered(t *testing.T) {
+	initTestErrorHandler(t)
+
+	pods, _, _ := testData()
+	pods.Items[0].Status.Phase = api.PodFailed
+	first := &pods.Items[0]
+	second := &pods.Items[1]
+
+	testCases := []struct {
+		args   []string
+		resp   runtime.Object
+		flags  map[string]string
+		expect []runtime.Object
+	}{
+		{args: []string{"pods", "foo"}, resp: first, expect: []runtime.Object{first}},
+		{args: []string{"pods", "foo"}, flags: map[string]string{"show-all": "false"}, resp: first, expect: []runtime.Object{first}},
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "true"}, resp: pods, expect: []runtime.Object{first, second}},
+		{args: []string{"pods/foo"}, resp: first, expect: []runtime.Object{first}},
+		{args: []string{"pods"}, flags: map[string]string{"output": "yaml"}, resp: pods, expect: []runtime.Object{first, second}},
+		{args: []string{}, flags: map[string]string{"filename": "../../../examples/storage/cassandra/cassandra-controller.yaml"}, resp: pods, expect: []runtime.Object{first, second}},
+
+		{args: []string{"pods"}, resp: pods, expect: []runtime.Object{second}},
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "false"}, resp: pods, expect: []runtime.Object{second}},
+	}
+
+	for i, test := range testCases {
+		t.Logf("%d", i)
+		f, tf, codec, _ := cmdtesting.NewAPIFactory()
+		tf.Printer = &testPrinter{}
+		tf.UnstructuredClient = &fake.RESTClient{
+			APIRegistry:          api.Registry,
+			NegotiatedSerializer: unstructuredSerializer,
+			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.resp)},
+		}
+		tf.Namespace = "test"
+		buf := bytes.NewBuffer([]byte{})
+		errBuf := bytes.NewBuffer([]byte{})
+
+		cmd := NewCmdGet(f, buf, errBuf)
+		cmd.SetOutput(buf)
+		for k, v := range test.flags {
+			cmd.Flags().Lookup(k).Value.Set(v)
+		}
+		cmd.Run(cmd, test.args)
+
+		verifyObjects(t, test.expect, tf.Printer.(*testPrinter).Objects)
+
+		if len(buf.String()) == 0 {
+			t.Errorf("%d: unexpected empty output", i)
+		}
+	}
+}
+
 func TestGetObjectIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
 
@@ -313,7 +366,7 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 	var err error
 
 	if len(actual) != len(expected) {
-		t.Fatal(actual)
+		t.Fatalf("expected %d, got %d", len(expected), len(actual))
 	}
 	for i, obj := range actual {
 		switch obj.(type) {
@@ -330,7 +383,7 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 			t.Fatal(err)
 		}
 		if !apiequality.Semantic.DeepEqual(expected[i], actualObj) {
-			t.Errorf("unexpected object: \n%#v\n%#v", expected[i], actualObj)
+			t.Errorf("unexpected object: %d \n%#v\n%#v", i, expected[i], actualObj)
 		}
 	}
 }
@@ -658,7 +711,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	}
 }
 
-func TestGetByNameForcesFlag(t *testing.T) {
+func TestGetByFormatForcesFlag(t *testing.T) {
 	pods, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
@@ -674,7 +727,8 @@ func TestGetByNameForcesFlag(t *testing.T) {
 
 	cmd := NewCmdGet(f, buf, errBuf)
 	cmd.SetOutput(buf)
-	cmd.Run(cmd, []string{"pods", "foo"})
+	cmd.Flags().Lookup("output").Value.Set("yaml")
+	cmd.Run(cmd, []string{"pods"})
 
 	showAllFlag, _ := cmd.Flags().GetBool("show-all")
 	if !showAllFlag {
