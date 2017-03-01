@@ -135,7 +135,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 		// NOTE: Slow!  The test will wait up to 5 minutes (framework.ClaimProvisionTimeout) when there is
 		// no regression.
-		It("should not provision a volume in an unmanaged GCE zone. [Slow]", func() {
+		It("should not provision a volume in an unmanaged GCE zone. [Slow] [Volume]", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			var suffix string = "unmananged"
 
@@ -207,7 +207,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	})
 
 	framework.KubeDescribe("DynamicProvisioner External", func() {
-		It("should let an external dynamic provisioner create and delete persistent volumes [Slow]", func() {
+		It("should let an external dynamic provisioner create and delete persistent volumes [Slow] [Volume]", func() {
 			// external dynamic provisioner pods need additional permissions provided by the
 			// persistent-volume-provisioner role
 			framework.BindClusterRole(c.Rbac(), "system:persistent-volume-provisioner", ns,
@@ -241,7 +241,108 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			testDynamicProvisioning(c, claim, requestedSize)
 		})
 	})
+
+	framework.KubeDescribe("DynamicProvisioner Default", func() {
+		It("should create and delete default persistent volumes [Slow] [Volume]", func() {
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+
+			By("creating a claim with no annotation")
+			claim := newClaim(ns, "", false)
+			// todo: remove after syncing
+			claim.Annotations = map[string]string{}
+			defer c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+
+			if framework.ProviderIs("vsphere") {
+				testDynamicProvisioning(c, claim, requestedSize)
+			} else {
+				testDynamicProvisioning(c, claim, "2Gi")
+			}
+		})
+
+		// Modifying the default storage class can be disruptive to other tests that depend on it
+		It("should be disabled by changing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+
+			By("setting the is-default StorageClass annotation to false")
+			verifyDefaultStorageClass(c, true)
+			defer updateDefaultStorageClass(c, "true")
+			updateDefaultStorageClass(c, "false")
+
+			By("creating a claim with default storageclass and expecting it to timeout")
+			claim := newClaim(ns, "", false)
+			// todo: remove after syncing
+			claim.Annotations = map[string]string{}
+			defer c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+
+			// The claim should timeout phase:Pending
+			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionTimeout)
+			Expect(err).To(HaveOccurred())
+			framework.Logf(err.Error())
+			claim, err = c.Core().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
+		})
+
+		// Modifying the default storage class can be disruptive to other tests that depend on it
+		It("should be disabled by removing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+
+			By("removing the is-default StorageClass annotation")
+			verifyDefaultStorageClass(c, true)
+			defer updateDefaultStorageClass(c, "true")
+			updateDefaultStorageClass(c, "")
+
+			By("creating a claim with default storageclass and expecting it to timeout")
+			claim := newClaim(ns, "", false)
+			// todo: remove after syncing
+			claim.Annotations = map[string]string{}
+			defer c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+
+			// The claim should timeout phase:Pending
+			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionTimeout)
+			Expect(err).To(HaveOccurred())
+			framework.Logf(err.Error())
+			claim, err = c.Core().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
+		})
+	})
 })
+
+func verifyDefaultStorageClass(c clientset.Interface, expectedDefault bool) {
+	sc, err := c.Storage().StorageClasses().Get("default", metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	Expect(storageutil.IsDefaultAnnotation(sc.ObjectMeta)).To(Equal(expectedDefault))
+}
+
+func updateDefaultStorageClass(c clientset.Interface, defaultStr string) {
+	sc, err := c.Storage().StorageClasses().Get("default", metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	if defaultStr == "" {
+		delete(sc.Annotations, storageutil.IsDefaultStorageClassAnnotation)
+	} else {
+		if sc.Annotations == nil {
+			sc.Annotations = make(map[string]string)
+		}
+		sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = defaultStr
+	}
+
+	sc, err = c.Storage().StorageClasses().Update(sc)
+	Expect(err).NotTo(HaveOccurred())
+
+	expectedDefault := false
+	if defaultStr == "true" {
+		expectedDefault = true
+	}
+	verifyDefaultStorageClass(c, expectedDefault)
+}
 
 func newClaim(ns, suffix string, alpha bool) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
