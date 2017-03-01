@@ -1046,11 +1046,17 @@ run_kubectl_run_tests() {
   # Pre-Condition: no Deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run nginx "--image=$IMAGE_NGINX" --generator=deployment/v1beta1 "${kube_flags[@]}"
+  kubectl run nginx-extensions "--image=$IMAGE_NGINX" --generator=deployment/v1beta1 "${kube_flags[@]}"
   # Post-Condition: Deployment "nginx" is created
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
+  kube::test::get_object_assert deployment.extensions "{{range.items}}{{$id_field}}:{{end}}" 'nginx-extensions:'
   # Clean up
-  kubectl delete deployment nginx "${kube_flags[@]}"
+  kubectl delete deployment nginx-extensions "${kube_flags[@]}"
+  # Command
+  kubectl run nginx-apps "--image=$IMAGE_NGINX" --generator=deployment/apps.v1beta1 "${kube_flags[@]}"
+  # Post-Condition: Deployment "nginx" is created
+  kube::test::get_object_assert deployment.apps "{{range.items}}{{$id_field}}:{{end}}" 'nginx-apps:'
+  # Clean up
+  kubectl delete deployment nginx-apps "${kube_flags[@]}"
 }
 
 run_kubectl_get_tests() {
