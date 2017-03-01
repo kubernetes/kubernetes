@@ -21,7 +21,6 @@ spec:
       # Note that this does not guarantee admission on the nodes (#40573).
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key": "node.alpha.kubernetes.io/ismaster", "effect": "NoSchedule"}]'
     spec:
       dnsPolicy: Default
       containers:
@@ -88,6 +87,9 @@ spec:
               fi;
       nodeSelector:
         alpha.kubernetes.io/fluentd-ds-ready: "true"
+      tolerations:
+      - key: "node.alpha.kubernetes.io/ismaster"
+        effect: "NoSchedule"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog
