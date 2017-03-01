@@ -178,6 +178,8 @@ etcd-quorum-read
 etcd-server
 etcd-servers
 etcd-servers-overrides
+etcd-upgrade-storage
+etcd-upgrade-version
 event-burst
 event-qps
 event-ttl
