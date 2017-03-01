@@ -59,6 +59,7 @@ func TestCreate(t *testing.T) {
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
@@ -88,6 +89,7 @@ func TestCreateFromConfig(t *testing.T) {
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
@@ -140,6 +142,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
@@ -194,6 +197,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
@@ -302,6 +306,7 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
@@ -314,6 +319,7 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
@@ -381,6 +387,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		-1,
 	)
@@ -424,6 +431,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 			informerFactory.Core().V1().PersistentVolumeClaims(),
 			informerFactory.Core().V1().ReplicationControllers(),
 			informerFactory.Extensions().V1beta1().ReplicaSets(),
+			informerFactory.Apps().V1beta1().StatefulSets(),
 			informerFactory.Core().V1().Services(),
 			test.hardPodAffinitySymmetricWeight,
 		)

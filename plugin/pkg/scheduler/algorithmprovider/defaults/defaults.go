@@ -94,7 +94,7 @@ func init() {
 		"ServiceSpreadingPriority",
 		factory.PriorityConfigFactory{
 			Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-				return priorities.NewSelectorSpreadPriority(args.ServiceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{})
+				return priorities.NewSelectorSpreadPriority(args.ServiceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{}, algorithm.EmptyStatefulSetLister{})
 			},
 			Weight: 1,
 		},
@@ -181,7 +181,7 @@ func defaultPriorities() sets.String {
 			"SelectorSpreadPriority",
 			factory.PriorityConfigFactory{
 				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-					return priorities.NewSelectorSpreadPriority(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister)
+					return priorities.NewSelectorSpreadPriority(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister)
 				},
 				Weight: 1,
 			},

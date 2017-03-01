@@ -33,8 +33,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
+	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
@@ -74,6 +76,8 @@ type ConfigFactory struct {
 	controllerLister corelisters.ReplicationControllerLister
 	// a means to list all replicasets
 	replicaSetLister extensionslisters.ReplicaSetLister
+	// a means to list all statefulsets
+	statefulSetLister appslisters.StatefulSetLister
 
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
@@ -105,6 +109,7 @@ func NewConfigFactory(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	replicationControllerInformer coreinformers.ReplicationControllerInformer,
 	replicaSetInformer extensionsinformers.ReplicaSetInformer,
+	statefulSetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	hardPodAffinitySymmetricWeight int,
 ) scheduler.Configurator {
@@ -120,6 +125,7 @@ func NewConfigFactory(
 		serviceLister:                  serviceInformer.Lister(),
 		controllerLister:               replicationControllerInformer.Lister(),
 		replicaSetLister:               replicaSetInformer.Lister(),
+		statefulSetLister:              statefulSetInformer.Lister(),
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  schedulerName,
@@ -426,10 +432,11 @@ func (f *ConfigFactory) GetPredicates(predicateKeys sets.String) (map[string]alg
 
 func (f *ConfigFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 	return &PluginFactoryArgs{
-		PodLister:        f.podLister,
-		ServiceLister:    f.serviceLister,
-		ControllerLister: f.controllerLister,
-		ReplicaSetLister: f.replicaSetLister,
+		PodLister:         f.podLister,
+		ServiceLister:     f.serviceLister,
+		ControllerLister:  f.controllerLister,
+		ReplicaSetLister:  f.replicaSetLister,
+		StatefulSetLister: f.statefulSetLister,
 		// All fit predicates only need to consider schedulable nodes.
 		NodeLister: &nodePredicateLister{f.nodeLister},
 		NodeInfo:   &predicates.CachedNodeInfo{NodeLister: f.nodeLister},
