@@ -21,14 +21,15 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 func TestDeploymentGenerate(t *testing.T) {
+	one := int32(1)
 	tests := []struct {
 		params    map[string]interface{}
-		expected  *extensions.Deployment
+		expected  *extensionsv1beta1.Deployment
 		expectErr bool
 	}{
 		{
@@ -36,20 +37,20 @@ func TestDeploymentGenerate(t *testing.T) {
 				"name":  "foo",
 				"image": []string{"abc/app:v4"},
 			},
-			expected: &extensions.Deployment{
+			expected: &extensionsv1beta1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"app": "foo"},
 				},
-				Spec: extensions.DeploymentSpec{
-					Replicas: 1,
+				Spec: extensionsv1beta1.DeploymentSpec{
+					Replicas: &one,
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
-					Template: api.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"app": "foo"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{{Name: "app", Image: "abc/app:v4"}},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{{Name: "app", Image: "abc/app:v4"}},
 						},
 					},
 				},
@@ -61,20 +62,20 @@ func TestDeploymentGenerate(t *testing.T) {
 				"name":  "foo",
 				"image": []string{"abc/app:v4", "zyx/ape"},
 			},
-			expected: &extensions.Deployment{
+			expected: &extensionsv1beta1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"app": "foo"},
 				},
-				Spec: extensions.DeploymentSpec{
-					Replicas: 1,
+				Spec: extensionsv1beta1.DeploymentSpec{
+					Replicas: &one,
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
-					Template: api.PodTemplateSpec{
+					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"app": "foo"},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{{Name: "app", Image: "abc/app:v4"},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{{Name: "app", Image: "abc/app:v4"},
 								{Name: "ape", Image: "zyx/ape"}},
 						},
 					},
@@ -128,8 +129,8 @@ func TestDeploymentGenerate(t *testing.T) {
 		case !test.expectErr && err == nil:
 			// do nothing and drop through
 		}
-		if !reflect.DeepEqual(obj.(*extensions.Deployment), test.expected) {
-			t.Errorf("expected:\n%#v\nsaw:\n%#v", test.expected, obj.(*extensions.Deployment))
+		if !reflect.DeepEqual(obj.(*extensionsv1beta1.Deployment), test.expected) {
+			t.Errorf("expected:\n%#v\nsaw:\n%#v", test.expected, obj.(*extensionsv1beta1.Deployment))
 		}
 	}
 }
