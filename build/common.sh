@@ -86,6 +86,7 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
   debian_iptables_version=v6
+  alpine_iptables_version=v6
   case $1 in
     "amd64")
         local targets=(
@@ -93,7 +94,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,busybox
           kube-scheduler,busybox
           kube-aggregator,busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:${debian_iptables_version}
+          kube-proxy,gcr.io/google_containers/alpine-iptables-amd64:${alpine_iptables_version}
         );;
     "arm")
         local targets=(
@@ -101,7 +102,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
           kube-aggregator,armel/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm:${debian_iptables_version}
+          kube-proxy,gcr.io/google_containers/alpine-iptables-arm:${alpine_iptables_version}
         );;
     "arm64")
         local targets=(
@@ -109,7 +110,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
           kube-aggregator,aarch64/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:${debian_iptables_version}
+          kube-proxy,gcr.io/google_containers/alpine-iptables-arm64:${alpine_iptables_version}
         );;
     "ppc64le")
         local targets=(
@@ -126,7 +127,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-scheduler,s390x/busybox
           kube-aggregator,s390x/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-s390x:${debian_iptables_version}
-        );;		
+        );;
   esac
 
   echo "${targets[@]}"
