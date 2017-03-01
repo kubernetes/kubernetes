@@ -75,7 +75,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	}
 
 	if !kubecontainer.IsHostNetworkPod(pod) {
-		dnsServers, dnsSearches, err := m.runtimeHelper.GetClusterDNS(pod)
+		dnsServers, dnsSearches, _, err := m.runtimeHelper.GetClusterDNS(pod)
 		if err != nil {
 			return nil, err
 		}

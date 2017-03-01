@@ -33,20 +33,20 @@ type FakeRuntimeHelper struct {
 	Err             error
 }
 
-func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
+func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
 	var opts kubecontainer.RunContainerOptions
 	if len(container.TerminationMessagePath) != 0 {
 		opts.PodContainerDir = f.PodContainerDir
 	}
-	return &opts, nil
+	return &opts, false, nil
 }
 
 func (f *FakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
 	return "", ""
 }
 
-func (f *FakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
-	return f.DNSServers, f.DNSSearches, f.Err
+func (f *FakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) {
+	return f.DNSServers, f.DNSSearches, false, f.Err
 }
 
 // This is not used by docker runtime.
