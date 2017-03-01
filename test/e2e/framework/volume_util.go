@@ -40,15 +40,19 @@ limitations under the License.
 package framework
 
 import (
-
 	"fmt"
+	"os/exec"
+	"strconv"
+	"time"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // Current supported images for e2e volume testing to be assigned to VolumeTestConfig.serverImage
@@ -64,15 +68,15 @@ const (
 // - server pod - runs serverImage, exports ports[]
 // - client pod - does not need any special configuration
 type VolumeTestConfig struct {
-	Namespace     string
+	Namespace string
 	// Prefix of all pods. Typically the test name.
-	Prefix        string
+	Prefix string
 	// Name of container image for the server pod.
-	ServerImage   string
+	ServerImage string
 	// Ports to export from the server pod. TCP only.
-	ServerPorts   []int
+	ServerPorts []int
 	// Arguments to pass to the container image.
-	ServerArgs    []string
+	ServerArgs []string
 	// Volumes needed to be mounted to the server container from the host
 	// map <host (source) path> -> <container (dst.) path>
 	ServerVolumes map[string]string
@@ -172,4 +176,204 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	}
 
 	return pod
+}
+
+// VolumeTest contains a volumes to mount into a client pod and its
+// expected content.
+type VolumeTest struct {
+	Volume          v1.VolumeSource
+	File            string
+	ExpectedContent string
+}
+
+// Clean both server and client pods.
+func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
+	By(fmt.Sprint("cleaning the environment after ", config.Prefix))
+
+	defer GinkgoRecover()
+
+	client := f.ClientSet
+	podClient := client.Core().Pods(config.Namespace)
+
+	err := podClient.Delete(config.Prefix+"-client", nil)
+	if err != nil {
+		// Log the error before failing test: if the test has already failed,
+		// framework.ExpectNoError() won't print anything to logs!
+		glog.Warningf("Failed to delete client pod: %v", err)
+		ExpectNoError(err, "Failed to delete client pod: %v", err)
+	}
+
+	if config.ServerImage != "" {
+		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
+			ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		}
+		// See issue #24100.
+		// Prevent umount errors by making sure making sure the client pod exits cleanly *before* the volume server pod exits.
+		By("sleeping a bit so client can stop and unmount")
+		time.Sleep(20 * time.Second)
+
+		err = podClient.Delete(config.Prefix+"-server", nil)
+		if err != nil {
+			glog.Warningf("Failed to delete server pod: %v", err)
+			ExpectNoError(err, "Failed to delete server pod: %v", err)
+		}
+	}
+}
+
+// Start a client pod using given VolumeSource (exported by startVolumeServer())
+// and check that the pod sees expected data, e.g. from the server pod.
+// Multiple VolumeTests can be specified to mount multiple volumes to a single
+// pod.
+func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, tests []VolumeTest) {
+	By(fmt.Sprint("starting ", config.Prefix, " client"))
+	clientPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Prefix + "-client",
+			Labels: map[string]string{
+				"role": config.Prefix + "-client",
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:       config.Prefix + "-client",
+					Image:      "gcr.io/google_containers/busybox:1.24",
+					WorkingDir: "/opt",
+					// An imperative and easily debuggable container which reads vol contents for
+					// us to scan in the tests or by eye.
+					// We expect that /opt is empty in the minimal containers which we use in this test.
+					Command: []string{
+						"/bin/sh",
+						"-c",
+						"while true ; do cat /opt/0/index.html ; sleep 2 ; ls -altrh /opt/  ; sleep 2 ; done ",
+					},
+					VolumeMounts: []v1.VolumeMount{},
+				},
+			},
+			SecurityContext: &v1.PodSecurityContext{
+				SELinuxOptions: &v1.SELinuxOptions{
+					Level: "s0:c0,c1",
+				},
+			},
+			Volumes: []v1.Volume{},
+		},
+	}
+	podsNamespacer := client.Core().Pods(config.Namespace)
+
+	if fsGroup != nil {
+		clientPod.Spec.SecurityContext.FSGroup = fsGroup
+	}
+
+	for i, test := range tests {
+		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
+		clientPod.Spec.Containers[0].VolumeMounts = append(clientPod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      volumeName,
+			MountPath: fmt.Sprintf("/opt/%d", i),
+		})
+		clientPod.Spec.Volumes = append(clientPod.Spec.Volumes, v1.Volume{
+			Name:         volumeName,
+			VolumeSource: test.Volume,
+		})
+	}
+	clientPod, err := podsNamespacer.Create(clientPod)
+	if err != nil {
+		Failf("Failed to create %s pod: %v", clientPod.Name, err)
+	}
+	ExpectNoError(WaitForPodRunningInNamespace(client, clientPod))
+
+	By("Checking that text file contents are perfect.")
+	for i, test := range tests {
+		fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
+		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"cat", fileName}, test.ExpectedContent, time.Minute)
+		Expect(err).NotTo(HaveOccurred(), "failed: finding the contents of the mounted file %s.", fileName)
+	}
+
+	if fsGroup != nil {
+		By("Checking fsGroup is correct.")
+		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", "/opt/0"}, strconv.Itoa(int(*fsGroup)), time.Minute)
+		Expect(err).NotTo(HaveOccurred(), "failed: getting the right priviliges in the file %v", int(*fsGroup))
+	}
+}
+
+// Insert index.html with given content into given volume. It does so by
+// starting and auxiliary pod which writes the file there.
+// The volume must be writable.
+func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.VolumeSource, content string) {
+	By(fmt.Sprint("starting ", config.Prefix, " injector"))
+	podClient := client.Core().Pods(config.Namespace)
+
+	injectPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Prefix + "-injector",
+			Labels: map[string]string{
+				"role": config.Prefix + "-injector",
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    config.Prefix + "-injector",
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "echo '" + content + "' > /mnt/index.html && chmod o+rX /mnt /mnt/index.html"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      config.Prefix + "-volume",
+							MountPath: "/mnt",
+						},
+					},
+				},
+			},
+			SecurityContext: &v1.PodSecurityContext{
+				SELinuxOptions: &v1.SELinuxOptions{
+					Level: "s0:c0,c1",
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name:         config.Prefix + "-volume",
+					VolumeSource: volume,
+				},
+			},
+		},
+	}
+
+	defer func() {
+		podClient.Delete(config.Prefix+"-injector", nil)
+	}()
+
+	injectPod, err := podClient.Create(injectPod)
+	ExpectNoError(err, "Failed to create injector pod: %v", err)
+	err = WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func DeleteCinderVolume(name string) error {
+	// Try to delete the volume for several seconds - it takes
+	// a while for the plugin to detach it.
+	var output []byte
+	var err error
+	timeout := time.Second * 120
+
+	Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
+		if err == nil {
+			Logf("Cinder volume %s deleted", name)
+			return nil
+		} else {
+			Logf("Failed to delete volume %s: %v", name, err)
+		}
+	}
+	Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
+	return err
 }
