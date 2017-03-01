@@ -866,7 +866,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes and StorageClasses).
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
-	defer testClient.Storage().StorageClasses().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.StorageV1beta1().StorageClasses().DeleteCollection(nil, metav1.ListOptions{})
 
 	storageClass := storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
@@ -877,7 +877,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 		},
 		Provisioner: provisionerPluginName,
 	}
-	testClient.Storage().StorageClasses().Create(&storageClass)
+	testClient.StorageV1beta1().StorageClasses().Create(&storageClass)
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)

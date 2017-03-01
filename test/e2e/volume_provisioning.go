@@ -110,8 +110,8 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 			By("creating a StorageClass")
 			class := newStorageClass("", "internal")
-			_, err := c.Storage().StorageClasses().Create(class)
-			defer c.Storage().StorageClasses().Delete(class.Name, nil)
+			_, err := c.StorageV1beta1().StorageClasses().Create(class)
+			defer c.StorageV1beta1().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating a claim with a dynamic provisioning annotation")
@@ -169,8 +169,8 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			sc := newStorageClass("kubernetes.io/gce-pd", suffix)
 			// Set an unmanaged zone.
 			sc.Parameters = map[string]string{"zone": unmanagedZone}
-			sc, err = c.Storage().StorageClasses().Create(sc)
-			defer Expect(c.Storage().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
+			sc, err = c.StorageV1beta1().StorageClasses().Create(sc)
+			defer Expect(c.StorageV1beta1().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Creating a claim and expecting it to timeout")
@@ -224,8 +224,8 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 			By("creating a StorageClass")
 			class := newStorageClass(externalPluginName, "external")
-			_, err = c.Storage().StorageClasses().Create(class)
-			defer c.Storage().StorageClasses().Delete(class.Name, nil)
+			_, err = c.StorageV1beta1().StorageClasses().Create(class)
+			defer c.StorageV1beta1().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating a claim with a dynamic provisioning annotation")
