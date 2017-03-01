@@ -155,7 +155,13 @@ func (rc *reconciler) reconcile() {
 
 			// Before triggering volume detach, mark volume as detached and update the node status
 			// If it fails to update node status, skip detach volume
-			rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
+			err = rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
+			if err != nil {
+				glog.Errorf("RemoveVolumeFromReportAsAttached failed while removing volume %q from node %q with: %v",
+					attachedVolume.VolumeName,
+					attachedVolume.NodeName,
+					err)
+			}
 
 			// Update Node Status to indicate volume is no longer safe to mount.
 			err = rc.nodeStatusUpdater.UpdateNodeStatuses()
