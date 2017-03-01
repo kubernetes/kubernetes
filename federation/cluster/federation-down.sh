@@ -33,17 +33,6 @@ function unjoin_clusters() {
         "${context}" \
         --context="${FEDERATION_KUBE_CONTEXT}" \
         --host-cluster-context="${HOST_CLUSTER_CONTEXT}"
-
-    # Delete kube-dns configmap that contains federation
-    # configuration from each cluster.
-    # TODO: This shouldn't be required after
-    # https://github.com/kubernetes/kubernetes/pull/39338.
-    # Remove this after the PR is merged.
-    kube::log::status "Deleting \"kube-dns\" ConfigMap from \"kube-system\" namespace in cluster \"${context}\""
-    "${KUBE_ROOT}/cluster/kubectl.sh" delete configmap \
-        --context="${context}" \
-        --namespace="${KUBEDNS_CONFIGMAP_NAMESPACE}" \
-        "${KUBEDNS_CONFIGMAP_NAME}"
   done
 }
 
