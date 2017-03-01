@@ -474,6 +474,13 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 
 func extensionFuncs(t apitesting.TestingCommon) []interface{} {
 	return []interface{}{
+		func(j *extensions.DeploymentSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			rhl := int32(c.Rand.Int31())
+			pds := int32(c.Rand.Int31())
+			j.RevisionHistoryLimit = &rhl
+			j.ProgressDeadlineSeconds = &pds
+		},
 		func(j *extensions.DeploymentStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			// Ensure that strategyType is one of valid values.
