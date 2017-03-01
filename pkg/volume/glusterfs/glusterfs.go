@@ -116,6 +116,10 @@ func (plugin *glusterfsPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *glusterfsPlugin) SupportsMountOption() bool {
+	return true
+}
+
 func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -161,10 +165,12 @@ func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endp
 			pod:     pod,
 			plugin:  plugin,
 		},
-		hosts:    ep,
-		path:     source.Path,
-		readOnly: readOnly,
-		exe:      exe}, nil
+		hosts:        ep,
+		path:         source.Path,
+		readOnly:     readOnly,
+		exe:          exe,
+		mountOptions: volume.MountOptionFromSpec(spec),
+	}, nil
 }
 
 func (plugin *glusterfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -209,10 +215,11 @@ type glusterfs struct {
 
 type glusterfsMounter struct {
 	*glusterfs
-	hosts    *v1.Endpoints
-	path     string
-	readOnly bool
-	exe      exec.Interface
+	hosts        *v1.Endpoints
+	path         string
+	readOnly     bool
+	exe          exec.Interface
+	mountOptions []string
 }
 
 var _ volume.Mounter = &glusterfsMounter{}
@@ -322,7 +329,8 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 		// Avoid mount storm, pick a host randomly.
 		// Iterate all hosts until mount succeeds.
 		for _, ip := range addrlist {
-			errs = b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", options)
+			mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+			errs = b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", mountOptions)
 			if errs == nil {
 				glog.Infof("glusterfs: successfully mounted %s", dir)
 				return nil
