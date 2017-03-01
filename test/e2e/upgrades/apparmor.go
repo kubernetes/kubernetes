@@ -17,8 +17,6 @@ limitations under the License.
 package upgrades
 
 import (
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/common"
@@ -52,10 +50,8 @@ func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 // Test waits for the upgrade to complete, and then verifies that a
 // pod can still consume the secret.
 func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
-	if upgrade == MasterUpgrade {
-		t.verifyPodStaysUp(f, done)
-	}
 	<-done
+	t.verifyPodStaysUp(f)
 	t.verifyNodesAppArmorEnabled(f)
 	t.verifyNewPodSucceeds(f)
 }
@@ -67,38 +63,13 @@ func (t *AppArmorUpgradeTest) Teardown(f *framework.Framework) {
 	framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 }
 
-func (t *AppArmorUpgradeTest) verifyPodStaysUp(f *framework.Framework, done <-chan struct{}) {
+func (t *AppArmorUpgradeTest) verifyPodStaysUp(f *framework.Framework) {
 	By("Verifying an AppArmor profile is continuously enforced for a pod")
-	const maxRetries = 3
-	verifyState := func() {
-		var pod *api.Pod
-		var err error
-		for i := 0; i < maxRetries; i++ {
-			pod, err = f.PodClient().Get(t.pod.Name, metav1.GetOptions{})
-			if pod != nil {
-				break
-			}
-			time.Sleep(5 * time.Second)
-		}
-		framework.ExpectNoError(err, "Should be able to get pod")
-
-		Expect(pod.Status.Phase).To(Equal(api.PodRunning), "Pod should stay running")
-		Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(BeNil(), "Container should be running")
-		Expect(pod.Status.ContainerStatuses[0].RestartCount).To(BeZero(), "Container should not need to be restarted")
-	}
-
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			verifyState()
-		case <-done:
-			verifyState() // Ensure we succeed at least once after completion.
-			return
-		}
-	}
+	pod, err := f.PodClient().Get(t.pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Should be able to get pod")
+	Expect(pod.Status.Phase).To(Equal(api.PodRunning), "Pod should stay running")
+	Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(BeNil(), "Container should be running")
+	Expect(pod.Status.ContainerStatuses[0].RestartCount).To(BeZero(), "Container should not need to be restarted")
 }
 
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
