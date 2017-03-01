@@ -56,37 +56,35 @@ func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	}
 
 	var routes []*cloudprovider.Route
-	var instanceIDs []*string
+	var instanceIDs []awsInstanceID
 
 	for _, r := range table.Routes {
-		instanceID := orEmpty(r.InstanceId)
-
+		instanceID := aws.StringValue(r.InstanceId)
 		if instanceID == "" {
 			continue
 		}
 
-		instanceIDs = append(instanceIDs, &instanceID)
+		instanceIDs = append(instanceIDs, awsInstanceID(instanceID))
 	}
 
-	instances, err := c.getInstancesByIDs(instanceIDs)
+	nodeNames, err := c.instanceCache.GetNodeNames(instanceIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, r := range table.Routes {
-		instanceID := orEmpty(r.InstanceId)
+		instanceID := awsInstanceID(aws.StringValue(r.InstanceId))
 		destinationCIDR := orEmpty(r.DestinationCidrBlock)
 
 		if instanceID == "" || destinationCIDR == "" {
 			continue
 		}
 
-		instance, found := instances[instanceID]
+		nodeName, found := nodeNames[instanceID]
 		if !found {
 			glog.Warningf("unable to find instance ID %s in the list of instances being routed to", instanceID)
 			continue
 		}
-		nodeName := mapInstanceToNodeName(instance)
 		routeName := clusterName + "-" + destinationCIDR
 		routes = append(routes, &cloudprovider.Route{Name: routeName, TargetNode: nodeName, DestinationCIDR: destinationCIDR})
 	}
