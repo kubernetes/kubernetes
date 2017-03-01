@@ -1106,6 +1106,10 @@ run_kubectl_get_tests() {
   # Post-condition: The text "No resources found" should be part of the output
   kube::test::if_has_string "${output_message}" 'No resources found'
   # Command
+  output_message=$(kubectl get pods --ignore-not-found 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
   output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o wide)
   # Post-condition: The text "No resources found" should be part of the output
   kube::test::if_has_string "${output_message}" 'No resources found'
