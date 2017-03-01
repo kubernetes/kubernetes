@@ -29,6 +29,7 @@ filegroup(
         "//plugin/pkg/admission/namespace/lifecycle:all-srcs",
         "//plugin/pkg/admission/persistentvolume/label:all-srcs",
         "//plugin/pkg/admission/podnodeselector:all-srcs",
+        "//plugin/pkg/admission/podpreset:all-srcs",
         "//plugin/pkg/admission/resourcequota:all-srcs",
         "//plugin/pkg/admission/security:all-srcs",
         "//plugin/pkg/admission/securitycontext/scdeny:all-srcs",
