@@ -185,6 +185,14 @@ type SecureServingInfo struct {
 
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA *x509.CertPool
+
+	// MinTLSVersion optionally overrides the minimum TLS version supported.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	MinTLSVersion uint16
+
+	// CipherSuites optionally overrides the list of allowed cipher suites for the server.
+	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
+	CipherSuites []uint16
 }
 
 // NewConfig returns a Config struct with the default values
