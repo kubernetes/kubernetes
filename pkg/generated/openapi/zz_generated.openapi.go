@@ -2280,7 +2280,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"data": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
+								Description: "Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'.",
 								Type:        []string{"object"},
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
@@ -7758,7 +7758,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"data": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
+								Description: "Data contains the secret data. Each key must consist of alphanumeric characters, '-', '_' or '.'. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
 								Type:        []string{"object"},
 								AdditionalProperties: &spec.SchemaOrBool{
 									Schema: &spec.Schema{
