@@ -2747,6 +2747,7 @@ runTests() {
   hpa_max_field=".spec.maxReplicas"
   hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
   statefulset_replicas_field=".spec.replicas"
+  statefulset_observed_generation=".status.observedGeneration"
   job_parallelism_field=".spec.parallelism"
   deployment_replicas=".spec.replicas"
   secret_data=".data"
@@ -3180,10 +3181,12 @@ runTests() {
     ### Scale statefulset test with current-replicas and replicas
     # Pre-condition: 0 replicas
     kube::test::get_object_assert 'statefulset nginx' "{{$statefulset_replicas_field}}" '0'
+    kube::test::wait_object_assert 'statefulset nginx' "{{$statefulset_observed_generation}}" '1'
     # Command: Scale up
     kubectl scale --current-replicas=0 --replicas=1 statefulset nginx "${kube_flags[@]}"
     # Post-condition: 1 replica, named nginx-0
     kube::test::get_object_assert 'statefulset nginx' "{{$statefulset_replicas_field}}" '1'
+    kube::test::wait_object_assert 'statefulset nginx' "{{$statefulset_observed_generation}}" '2'
     # Typically we'd wait and confirm that N>1 replicas are up, but this framework
     # doesn't start  the scheduler, so pet-0 will block all others.
     # TODO: test robust scaling in an e2e.
