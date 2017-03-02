@@ -1617,7 +1617,7 @@ func TestGetMatchingPolicies(t *testing.T) {
 			// (ie. a request hitting the unsecure port)
 			expectedPolicies: sets.NewString("policy1", "policy2", "policy3"),
 		},
-		"policies are allowed for nil sa info": {
+		"policies are not allowed for nil sa info": {
 			user: &user.DefaultInfo{Name: "user"},
 			sa:   nil,
 			disallowedPolicies: map[string][]string{
@@ -1629,9 +1629,8 @@ func TestGetMatchingPolicies(t *testing.T) {
 				policyWithName("policy2"),
 				policyWithName("policy3"),
 			},
-			// all policies are allowed regardless of the permissions when sa info is nil
-			// (ie. a request hitting the unsecure port)
-			expectedPolicies: sets.NewString("policy1", "policy2", "policy3"),
+			// only the policies for the user are allowed when sa info is nil
+			expectedPolicies: sets.NewString("policy2"),
 		},
 	}
 	for k, v := range tests {
