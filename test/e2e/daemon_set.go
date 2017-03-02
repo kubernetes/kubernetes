@@ -427,10 +427,25 @@ func checkRunningOnAllNodes(f *framework.Framework, selector map[string]string) 
 		framework.ExpectNoError(err)
 		nodeNames := make([]string, 0)
 		for _, node := range nodeList.Items {
+			if taintedNoSchedule(node) {
+				// Ignore nodes with NoSchedule taint, since we don't set toleration in the
+				// DaemonSet template in this test.
+				continue
+			}
 			nodeNames = append(nodeNames, node.Name)
 		}
 		return checkDaemonPodOnNodes(f, selector, nodeNames)()
 	}
+}
+
+// taintedNoSchedule checks if the node contains any taint with "NoSchedule" effect
+func taintedNoSchedule(node v1.Node) bool {
+	for _, taint := range node.Spec.Taints {
+		if taint.Effect == v1.TaintEffectNoSchedule {
+			return true
+		}
+	}
+	return false
 }
 
 func checkRunningOnNoNodes(f *framework.Framework, selector map[string]string) func() (bool, error) {
