@@ -1331,7 +1331,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	// by storage.AlphaStorageClassAnnotation
 	// TODO: remove this check in 1.5, storage.StorageClassAnnotation will be always non-empty there.
 	if claimClass != "" {
-		metav1.SetMetaDataAnnotation(&volume.ObjectMeta, v1.BetaStorageClassAnnotation, claimClass)
+		volume.Spec.StorageClassName = claimClass
 	}
 
 	// Try to create the PV object several times
