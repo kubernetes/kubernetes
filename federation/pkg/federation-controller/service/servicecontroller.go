@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -78,6 +79,11 @@ const (
 	updateTimeout         = 30 * time.Second
 	allClustersKey        = "ALL_CLUSTERS"
 	clusterAvailableDelay = time.Second * 20
+	ControllerName        = "services"
+)
+
+var (
+	RequiredResources = []schema.GroupVersionResource{v1.SchemeGroupVersion.WithResource("services")}
 )
 
 type cachedService struct {
