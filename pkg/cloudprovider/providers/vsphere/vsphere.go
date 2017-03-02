@@ -28,6 +28,8 @@ import (
 	"strings"
 	"sync"
 
+	"gopkg.in/gcfg.v1"
+
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
