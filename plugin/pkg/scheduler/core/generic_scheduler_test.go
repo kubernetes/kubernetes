@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	algorithmpredicates "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -518,7 +519,8 @@ func TestZeroRequest(t *testing.T) {
 				Function: algorithmpriorities.NewSelectorSpreadPriority(
 					schedulertesting.FakeServiceLister([]*v1.Service{}),
 					schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
-					schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{})),
+					schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
+					schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{})),
 				Weight: 1,
 			},
 		}

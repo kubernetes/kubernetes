@@ -104,7 +104,7 @@ func TestConfigMapController(t *testing.T) {
 	// There should be 2 updates to add both the finalizers.
 	updatedConfigMap := GetConfigMapFromChan(configmapUpdateChan)
 	assert.True(t, configmapController.hasFinalizerFunc(updatedConfigMap, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	assert.True(t, configmapController.hasFinalizerFunc(updatedConfigMap, metav1.FinalizerOrphan))
+	assert.True(t, configmapController.hasFinalizerFunc(updatedConfigMap, metav1.FinalizerOrphanDependents))
 
 	// Verify that the configmap is created in underlying cluster1.
 	createdConfigMap := GetConfigMapFromChan(cluster1CreateChan)

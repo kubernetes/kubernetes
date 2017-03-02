@@ -147,6 +147,7 @@ func (l *libcontainerAdapter) revertName(name string) CgroupName {
 		panic(err)
 	}
 	driverName = strings.TrimSuffix(driverName, ".slice")
+	driverName = strings.Replace(driverName, "-", "/", -1)
 	driverName = strings.Replace(driverName, "_", "-", -1)
 	return CgroupName(driverName)
 }

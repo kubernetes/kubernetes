@@ -19,8 +19,10 @@ import socket
 import subprocess
 
 from charms import layer
-from charms.reactive import when
+from charms.reactive import when, when_any, when_not
+from charms.reactive import set_state, remove_state
 from charmhelpers.core import hookenv
+from charmhelpers.contrib.charmsupport import nrpe
 
 from charms.layer import nginx
 
@@ -111,3 +113,41 @@ def provide_loadbalancing(loadbalancer):
     the subordinates can get the public address of this loadbalancer.'''
     loadbalancer.set_address_port(hookenv.unit_get('public-address'),
                                   hookenv.config('port'))
+
+
+@when('nrpe-external-master.available')
+@when_not('nrpe-external-master.initial-config')
+def initial_nrpe_config(nagios=None):
+    set_state('nrpe-external-master.initial-config')
+    update_nrpe_config(nagios)
+
+
+@when('nginx.available')
+@when('nrpe-external-master.available')
+@when_any('config.changed.nagios_context',
+          'config.changed.nagios_servicegroups')
+def update_nrpe_config(unused=None):
+    services = ('nginx',)
+
+    hostname = nrpe.get_nagios_hostname()
+    current_unit = nrpe.get_nagios_unit_name()
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+    nrpe.add_init_service_checks(nrpe_setup, services, current_unit)
+    nrpe_setup.write()
+
+
+@when_not('nrpe-external-master.available')
+@when('nrpe-external-master.initial-config')
+def remove_nrpe_config(nagios=None):
+    remove_state('nrpe-external-master.initial-config')
+
+    # List of systemd services for which the checks will be removed
+    services = ('nginx',)
+
+    # The current nrpe-external-master interface doesn't handle a lot of logic,
+    # use the charm-helpers code for now.
+    hostname = nrpe.get_nagios_hostname()
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+
+    for service in services:
+        nrpe_setup.remove_check(shortname=service)

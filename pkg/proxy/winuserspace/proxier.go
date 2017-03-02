@@ -19,7 +19,6 @@ package winuserspace
 import (
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,7 +27,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api"
@@ -36,8 +34,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/netsh"
 )
 
+const allAvailableInterfaces string = ""
+const stickyMaxAgeMinutes int = 180 // TODO: parameterize this in the API.
+
 type portal struct {
-	ip         net.IP
+	ip         string
 	port       int
 	isExternal bool
 }
@@ -46,16 +47,11 @@ type serviceInfo struct {
 	isAliveAtomic       int32 // Only access this with atomic ops
 	portal              portal
 	protocol            api.Protocol
-	proxyPort           int
 	socket              proxySocket
 	timeout             time.Duration
 	activeClients       *clientCache
-	nodePort            int
-	loadBalancerStatus  api.LoadBalancerStatus
+	dnsClients          *dnsClientCache
 	sessionAffinityType api.ServiceAffinity
-	stickyMaxAgeMinutes int
-	// Deprecated, but required for back-compat (including e2e)
-	externalIPs []string
 }
 
 func (info *serviceInfo) setAlive(b bool) {
@@ -85,16 +81,14 @@ func logTimeout(err error) bool {
 type Proxier struct {
 	loadBalancer   LoadBalancer
 	mu             sync.Mutex // protects serviceMap
-	serviceMap     map[proxy.ServicePortName]*serviceInfo
+	serviceMap     map[ServicePortPortalName]*serviceInfo
 	syncPeriod     time.Duration
 	udpIdleTimeout time.Duration
 	portMapMutex   sync.Mutex
 	portMap        map[portMapKey]*portMapValue
 	numProxyLoops  int32 // use atomic ops to access this; mostly for testing
-	listenIP       net.IP
 	netsh          netsh.Interface
 	hostIP         net.IP
-	proxyPorts     PortAllocator
 }
 
 // assert Proxier is a ProxyProvider
@@ -114,7 +108,7 @@ func (k *portMapKey) String() string {
 
 // A value for the portMap
 type portMapValue struct {
-	owner  proxy.ServicePortName
+	owner  ServicePortPortalName
 	socket interface {
 		Close() error
 	}
@@ -153,33 +147,24 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Interfac
 		return nil, fmt.Errorf("failed to select a host interface: %v", err)
 	}
 
-	proxyPorts := newPortAllocator(pr)
-
 	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
-	return createProxier(loadBalancer, listenIP, netsh, hostIP, proxyPorts, syncPeriod, udpIdleTimeout)
+	return createProxier(loadBalancer, listenIP, netsh, hostIP, syncPeriod, udpIdleTimeout)
 }
 
-func createProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
-	// convenient to pass nil for tests..
-	if proxyPorts == nil {
-		proxyPorts = newPortAllocator(utilnet.PortRange{})
-	}
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Interface, hostIP net.IP, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
 	return &Proxier{
 		loadBalancer:   loadBalancer,
-		serviceMap:     make(map[proxy.ServicePortName]*serviceInfo),
+		serviceMap:     make(map[ServicePortPortalName]*serviceInfo),
 		portMap:        make(map[portMapKey]*portMapValue),
 		syncPeriod:     syncPeriod,
 		udpIdleTimeout: udpIdleTimeout,
-		listenIP:       listenIP,
 		netsh:          netsh,
 		hostIP:         hostIP,
-		proxyPorts:     proxyPorts,
 	}, nil
 }
 
-// Sync is called to immediately synchronize the proxier state to iptables
+// Sync is called to immediately synchronize the proxier state
 func (proxier *Proxier) Sync() {
-	proxier.ensurePortals()
 	proxier.cleanupStaleStickySessions()
 }
 
@@ -194,97 +179,139 @@ func (proxier *Proxier) SyncLoop() {
 	}
 }
 
-// Ensure that portals exist for all services.
-func (proxier *Proxier) ensurePortals() {
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	// NB: This does not remove rules that should not be present.
-	for name, info := range proxier.serviceMap {
-		err := proxier.openPortal(name, info)
-		if err != nil {
-			glog.Errorf("Failed to ensure portal for %q: %v", name, err)
-		}
-	}
-}
-
 // cleanupStaleStickySessions cleans up any stale sticky session records in the hash map.
 func (proxier *Proxier) cleanupStaleStickySessions() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
+	servicePortNameMap := make(map[proxy.ServicePortName]bool)
 	for name := range proxier.serviceMap {
-		proxier.loadBalancer.CleanupStaleStickySessions(name)
+		servicePortName := proxy.ServicePortName{
+			NamespacedName: types.NamespacedName{
+				Namespace: name.Namespace,
+				Name:      name.Name,
+			},
+			Port: name.Port,
+		}
+		if servicePortNameMap[servicePortName] == false {
+			// ensure cleanup sticky sessions only gets called once per serviceportname
+			servicePortNameMap[servicePortName] = true
+			proxier.loadBalancer.CleanupStaleStickySessions(servicePortName)
+		}
 	}
 }
 
 // This assumes proxier.mu is not locked.
-func (proxier *Proxier) stopProxy(service proxy.ServicePortName, info *serviceInfo) error {
+func (proxier *Proxier) stopProxy(service ServicePortPortalName, info *serviceInfo) error {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	return proxier.stopProxyInternal(service, info)
 }
 
 // This assumes proxier.mu is locked.
-func (proxier *Proxier) stopProxyInternal(service proxy.ServicePortName, info *serviceInfo) error {
+func (proxier *Proxier) stopProxyInternal(service ServicePortPortalName, info *serviceInfo) error {
 	delete(proxier.serviceMap, service)
 	info.setAlive(false)
 	err := info.socket.Close()
-	port := info.socket.ListenPort()
-	proxier.proxyPorts.Release(port)
 	return err
 }
 
-func (proxier *Proxier) getServiceInfo(service proxy.ServicePortName) (*serviceInfo, bool) {
+func (proxier *Proxier) getServiceInfo(service ServicePortPortalName) (*serviceInfo, bool) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	info, ok := proxier.serviceMap[service]
 	return info, ok
 }
 
-func (proxier *Proxier) setServiceInfo(service proxy.ServicePortName, info *serviceInfo) {
+func (proxier *Proxier) setServiceInfo(service ServicePortPortalName, info *serviceInfo) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	proxier.serviceMap[service] = info
 }
 
-// addServiceOnPort starts listening for a new service, returning the serviceInfo.
-// Pass proxyPort=0 to allocate a random port. The timeout only applies to UDP
-// connections, for now.
-func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol api.Protocol, proxyPort int, timeout time.Duration) (*serviceInfo, error) {
-	sock, err := newProxySocket(protocol, proxier.listenIP, proxyPort)
-	if err != nil {
-		return nil, err
+// addServicePortPortal starts listening for a new service, returning the serviceInfo.
+// The timeout only applies to UDP connections, for now.
+func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPortalName, protocol api.Protocol, listenIP string, port int, timeout time.Duration) (*serviceInfo, error) {
+	var serviceIP net.IP
+	if listenIP != allAvailableInterfaces {
+		if serviceIP = net.ParseIP(listenIP); serviceIP == nil {
+			return nil, fmt.Errorf("could not parse ip '%q'", listenIP)
+		}
+		// add the IP address.  Node port binds to all interfaces.
+		args := proxier.netshIpv4AddressAddArgs(serviceIP)
+		if existed, err := proxier.netsh.EnsureIPAddress(args, serviceIP); err != nil {
+			return nil, err
+		} else if !existed {
+			glog.V(3).Infof("Added ip address to fowarder interface for service %q at %s:%d/%s", servicePortPortalName, listenIP, port, protocol)
+		}
 	}
-	_, portStr, err := net.SplitHostPort(sock.Addr().String())
+
+	// add the listener, proxy
+	sock, err := newProxySocket(protocol, serviceIP, port)
 	if err != nil {
-		sock.Close()
-		return nil, err
-	}
-	portNum, err := strconv.Atoi(portStr)
-	if err != nil {
-		sock.Close()
 		return nil, err
 	}
 	si := &serviceInfo{
-		isAliveAtomic:       1,
-		proxyPort:           portNum,
+		isAliveAtomic: 1,
+		portal: portal{
+			ip:         listenIP,
+			port:       port,
+			isExternal: false,
+		},
 		protocol:            protocol,
 		socket:              sock,
 		timeout:             timeout,
 		activeClients:       newClientCache(),
+		dnsClients:          newDnsClientCache(),
 		sessionAffinityType: api.ServiceAffinityNone, // default
-		stickyMaxAgeMinutes: 180,                     // TODO: parameterize this in the API.
 	}
-	proxier.setServiceInfo(service, si)
+	proxier.setServiceInfo(servicePortPortalName, si)
 
-	glog.V(2).Infof("Proxying for service %q on %s port %d", service, protocol, portNum)
-	go func(service proxy.ServicePortName, proxier *Proxier) {
+	glog.V(2).Infof("Proxying for service %q at %s:%d/%s", servicePortPortalName, listenIP, port, protocol)
+	go func(service ServicePortPortalName, proxier *Proxier) {
 		defer runtime.HandleCrash()
 		atomic.AddInt32(&proxier.numProxyLoops, 1)
 		sock.ProxyLoop(service, si, proxier)
 		atomic.AddInt32(&proxier.numProxyLoops, -1)
-	}(service, proxier)
+	}(servicePortPortalName, proxier)
 
 	return si, nil
+}
+
+func (proxier *Proxier) closeServicePortPortal(servicePortPortalName ServicePortPortalName, info *serviceInfo) error {
+	// turn off the proxy
+	if err := proxier.stopProxy(servicePortPortalName, info); err != nil {
+		return err
+	}
+
+	// close the PortalProxy by deleting the service IP address
+	if info.portal.ip != allAvailableInterfaces {
+		serviceIP := net.ParseIP(info.portal.ip)
+		args := proxier.netshIpv4AddressDeleteArgs(serviceIP)
+		if err := proxier.netsh.DeleteIPAddress(args); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// getListenIPPortMap returns a slice of all listen IPs for a service.
+func getListenIPPortMap(service *api.Service, listenPort int, nodePort int) map[string]int {
+	listenIPPortMap := make(map[string]int)
+	listenIPPortMap[service.Spec.ClusterIP] = listenPort
+
+	for _, ip := range service.Spec.ExternalIPs {
+		listenIPPortMap[ip] = listenPort
+	}
+
+	for _, ingress := range service.Status.LoadBalancer.Ingress {
+		listenIPPortMap[ingress.IP] = listenPort
+	}
+
+	if nodePort != 0 {
+		listenIPPortMap[allAvailableInterfaces] = nodePort
+	}
+
+	return listenIPPortMap
 }
 
 // OnServiceUpdate manages the active set of service proxies.
@@ -292,7 +319,7 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 // shutdown if missing from the update set.
 func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 	glog.V(4).Infof("Received update notice: %+v", services)
-	activeServices := make(map[proxy.ServicePortName]bool) // use a map as a set
+	activeServicePortPortals := make(map[ServicePortPortalName]bool) // use a map as a set
 	for i := range services {
 		service := &services[i]
 
@@ -304,322 +331,91 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]
-			serviceName := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: servicePort.Name}
-			activeServices[serviceName] = true
-			serviceIP := net.ParseIP(service.Spec.ClusterIP)
-			info, exists := proxier.getServiceInfo(serviceName)
-			// TODO: check health of the socket?  What if ProxyLoop exited?
-			if exists && sameConfig(info, service, servicePort) {
-				// Nothing changed.
-				continue
-			}
-			if exists {
-				glog.V(4).Infof("Something changed for service %q: stopping it", serviceName)
-				err := proxier.closePortal(serviceName, info)
-				if err != nil {
-					glog.Errorf("Failed to close portal for %q: %v", serviceName, err)
+			// create a slice of all the source IPs to use for service port portals
+			listenIPPortMap := getListenIPPortMap(service, int(servicePort.Port), int(servicePort.NodePort))
+			protocol := servicePort.Protocol
+
+			for listenIP, listenPort := range listenIPPortMap {
+				servicePortPortalName := ServicePortPortalName{
+					NamespacedName: types.NamespacedName{
+						Namespace: service.Namespace,
+						Name:      service.Name,
+					},
+					Port:         servicePort.Name,
+					PortalIPName: listenIP,
 				}
-				err = proxier.stopProxy(serviceName, info)
-				if err != nil {
-					glog.Errorf("Failed to stop service %q: %v", serviceName, err)
+				activeServicePortPortals[servicePortPortalName] = true
+				info, exists := proxier.getServiceInfo(servicePortPortalName)
+				if exists && sameConfig(info, service, protocol, listenPort) {
+					// Nothing changed.
+					continue
 				}
+				if exists {
+					glog.V(4).Infof("Something changed for service %q: stopping it", servicePortPortalName)
+					if err := proxier.closeServicePortPortal(servicePortPortalName, info); err != nil {
+						glog.Errorf("Failed to close service port portal %q: %v", servicePortPortalName, err)
+					}
+				}
+				glog.V(1).Infof("Adding new service %q at %s:%d/%s", servicePortPortalName, listenIP, listenPort, protocol)
+				info, err := proxier.addServicePortPortal(servicePortPortalName, protocol, listenIP, listenPort, proxier.udpIdleTimeout)
+				if err != nil {
+					glog.Errorf("Failed to start proxy for %q: %v", servicePortPortalName, err)
+					continue
+				}
+				info.sessionAffinityType = service.Spec.SessionAffinity
+				glog.V(10).Infof("info: %#v", info)
 			}
-
-			proxyPort, err := proxier.proxyPorts.AllocateNext()
-			if err != nil {
-				glog.Errorf("failed to allocate proxy port for service %q: %v", serviceName, err)
-				continue
+			if len(listenIPPortMap) > 0 {
+				// only one loadbalancer per service port portal
+				servicePortName := proxy.ServicePortName{
+					NamespacedName: types.NamespacedName{
+						Namespace: service.Namespace,
+						Name:      service.Name,
+					},
+					Port: servicePort.Name,
+				}
+				proxier.loadBalancer.NewService(servicePortName, service.Spec.SessionAffinity, stickyMaxAgeMinutes)
 			}
-
-			glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, serviceIP, servicePort.Port, servicePort.Protocol)
-			info, err = proxier.addServiceOnPort(serviceName, servicePort.Protocol, proxyPort, proxier.udpIdleTimeout)
-			if err != nil {
-				glog.Errorf("Failed to start proxy for %q: %v", serviceName, err)
-				continue
-			}
-			info.portal.ip = serviceIP
-			info.portal.port = int(servicePort.Port)
-			info.externalIPs = service.Spec.ExternalIPs
-			// Deep-copy in case the service instance changes
-			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
-			info.nodePort = int(servicePort.NodePort)
-			info.sessionAffinityType = service.Spec.SessionAffinity
-			glog.V(4).Infof("info: %#v", info)
-
-			err = proxier.openPortal(serviceName, info)
-			if err != nil {
-				glog.Errorf("Failed to open portal for %q: %v", serviceName, err)
-			}
-			proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeMinutes)
 		}
 	}
+
+	for name, info := range proxier.serviceMap {
+		if !activeServicePortPortals[name] {
+			glog.V(1).Infof("Stopping service %q", name)
+
+			if err := proxier.closeServicePortPortal(name, info); err != nil {
+				glog.Errorf("Failed to close service port portal %q: %v", name, err)
+			}
+		}
+	}
+
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-	for name, info := range proxier.serviceMap {
-		if !activeServices[name] {
-			glog.V(1).Infof("Stopping service %q", name)
-			err := proxier.closePortal(name, info)
-			if err != nil {
-				glog.Errorf("Failed to close portal for %q: %v", name, err)
-			}
-			err = proxier.stopProxyInternal(name, info)
-			if err != nil {
-				glog.Errorf("Failed to stop service %q: %v", name, err)
-			}
+
+	// servicePortNameMap tracks all service port portals with the same name/port.
+	// A value of true means there is one or more service port portals with name/port pair.
+	servicePortNameMap := make(map[proxy.ServicePortName]bool)
+	for name := range proxier.serviceMap {
+		servicePortName := proxy.ServicePortName{
+			NamespacedName: types.NamespacedName{
+				Namespace: name.Namespace,
+				Name:      name.Name,
+			},
+			Port: name.Port,
+		}
+		servicePortNameMap[servicePortName] = servicePortNameMap[servicePortName] || activeServicePortPortals[name]
+	}
+
+	// Only delete load balancer if all listen ips per name/port show inactive.
+	for name := range servicePortNameMap {
+		if !servicePortNameMap[name] {
 			proxier.loadBalancer.DeleteService(name)
 		}
 	}
 }
 
-func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) bool {
-	if info.protocol != port.Protocol || info.portal.port != int(port.Port) || info.nodePort != int(port.NodePort) {
-		return false
-	}
-	if !info.portal.ip.Equal(net.ParseIP(service.Spec.ClusterIP)) {
-		return false
-	}
-	if !ipsEqual(info.externalIPs, service.Spec.ExternalIPs) {
-		return false
-	}
-	if !api.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
-		return false
-	}
-	if info.sessionAffinityType != service.Spec.SessionAffinity {
-		return false
-	}
-	return true
-}
-
-func ipsEqual(lhs, rhs []string) bool {
-	if len(lhs) != len(rhs) {
-		return false
-	}
-	for i := range lhs {
-		if lhs[i] != rhs[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *serviceInfo) error {
-	err := proxier.openOnePortal(info.portal, info.protocol, proxier.listenIP, info.proxyPort, service)
-	if err != nil {
-		return err
-	}
-	for _, publicIP := range info.externalIPs {
-		err = proxier.openOnePortal(portal{net.ParseIP(publicIP), info.portal.port, true}, info.protocol, proxier.listenIP, info.proxyPort, service)
-		if err != nil {
-			return err
-		}
-	}
-	for _, ingress := range info.loadBalancerStatus.Ingress {
-		if ingress.IP != "" {
-			err = proxier.openOnePortal(portal{net.ParseIP(ingress.IP), info.portal.port, false}, info.protocol, proxier.listenIP, info.proxyPort, service)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	if info.nodePort != 0 {
-		err = proxier.openNodePort(info.nodePort, info.protocol, proxier.listenIP, info.proxyPort, service)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	if protocol == api.ProtocolUDP {
-		glog.Warningf("Not adding rule for %q on %s:%d as UDP protocol is not supported by netsh portproxy", name, portal.ip, portal.port)
-		return nil
-	}
-
-	// Add IP address to "vEthernet (HNSTransparent)" so that portproxy could be used to redirect the traffic
-	args := proxier.netshIpv4AddressAddArgs(portal.ip)
-	existed, err := proxier.netsh.EnsureIPAddress(args, portal.ip)
-
-	if err != nil {
-		glog.Errorf("Failed to add ip address for service %q, args:%v", name, args)
-		return err
-	}
-	if !existed {
-		glog.V(3).Infof("Added ip address to HNSTransparent interface for service %q on %s %s:%d", name, protocol, portal.ip, portal.port)
-	}
-
-	args = proxier.netshPortProxyAddArgs(portal.ip, portal.port, proxyIP, proxyPort, name)
-	existed, err = proxier.netsh.EnsurePortProxyRule(args)
-
-	if err != nil {
-		glog.Errorf("Failed to run portproxy rule for service %q, args:%v", name, args)
-		return err
-	}
-	if !existed {
-		glog.V(3).Infof("Added portproxy rule for service %q on %s %s:%d", name, protocol, portal.ip, portal.port)
-	}
-
-	return nil
-}
-
-// claimNodePort marks a port as being owned by a particular service, or returns error if already claimed.
-// Idempotent: reclaiming with the same owner is not an error
-func (proxier *Proxier) claimNodePort(ip net.IP, port int, protocol api.Protocol, owner proxy.ServicePortName) error {
-	proxier.portMapMutex.Lock()
-	defer proxier.portMapMutex.Unlock()
-
-	// TODO: We could pre-populate some reserved ports into portMap and/or blacklist some well-known ports
-
-	key := portMapKey{ip: ip.String(), port: port, protocol: protocol}
-	existing, found := proxier.portMap[key]
-	if !found {
-		// Hold the actual port open, even though we use iptables to redirect
-		// it.  This ensures that a) it's safe to take and b) that stays true.
-		// NOTE: We should not need to have a real listen()ing socket - bind()
-		// should be enough, but I can't figure out a way to e2e test without
-		// it.  Tools like 'ss' and 'netstat' do not show sockets that are
-		// bind()ed but not listen()ed, and at least the default debian netcat
-		// has no way to avoid about 10 seconds of retries.
-		socket, err := newProxySocket(protocol, ip, port)
-		if err != nil {
-			return fmt.Errorf("can't open node port for %s: %v", key.String(), err)
-		}
-		proxier.portMap[key] = &portMapValue{owner: owner, socket: socket}
-		glog.V(2).Infof("Claimed local port %s", key.String())
-		return nil
-	}
-	if existing.owner == owner {
-		// We are idempotent
-		return nil
-	}
-	return fmt.Errorf("Port conflict detected on port %s.  %v vs %v", key.String(), owner, existing)
-}
-
-// releaseNodePort releases a claim on a port.  Returns an error if the owner does not match the claim.
-// Tolerates release on an unclaimed port, to simplify .
-func (proxier *Proxier) releaseNodePort(ip net.IP, port int, protocol api.Protocol, owner proxy.ServicePortName) error {
-	proxier.portMapMutex.Lock()
-	defer proxier.portMapMutex.Unlock()
-
-	key := portMapKey{ip: ip.String(), port: port, protocol: protocol}
-	existing, found := proxier.portMap[key]
-	if !found {
-		// We tolerate this, it happens if we are cleaning up a failed allocation
-		glog.Infof("Ignoring release on unowned port: %v", key)
-		return nil
-	}
-	if existing.owner != owner {
-		return fmt.Errorf("Port conflict detected on port %v (unowned unlock).  %v vs %v", key, owner, existing)
-	}
-	delete(proxier.portMap, key)
-	existing.socket.Close()
-	return nil
-}
-
-func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	if protocol == api.ProtocolUDP {
-		glog.Warningf("Not adding node port rule for %q on port %d as UDP protocol is not supported by netsh portproxy", name, nodePort)
-		return nil
-	}
-
-	err := proxier.claimNodePort(nil, nodePort, protocol, name)
-	if err != nil {
-		return err
-	}
-
-	args := proxier.netshPortProxyAddArgs(nil, nodePort, proxyIP, proxyPort, name)
-	existed, err := proxier.netsh.EnsurePortProxyRule(args)
-
-	if err != nil {
-		glog.Errorf("Failed to run portproxy rule for service %q", name)
-		return err
-	}
-	if !existed {
-		glog.Infof("Added portproxy rule for service %q on %s port %d", name, protocol, nodePort)
-	}
-
-	return nil
-}
-
-func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *serviceInfo) error {
-	// Collect errors and report them all at the end.
-	el := proxier.closeOnePortal(info.portal, info.protocol, proxier.listenIP, info.proxyPort, service)
-	for _, publicIP := range info.externalIPs {
-		el = append(el, proxier.closeOnePortal(portal{net.ParseIP(publicIP), info.portal.port, true}, info.protocol, proxier.listenIP, info.proxyPort, service)...)
-	}
-	for _, ingress := range info.loadBalancerStatus.Ingress {
-		if ingress.IP != "" {
-			el = append(el, proxier.closeOnePortal(portal{net.ParseIP(ingress.IP), info.portal.port, false}, info.protocol, proxier.listenIP, info.proxyPort, service)...)
-		}
-	}
-	if info.nodePort != 0 {
-		el = append(el, proxier.closeNodePort(info.nodePort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
-	}
-	if len(el) == 0 {
-		glog.V(3).Infof("Closed iptables portals for service %q", service)
-	} else {
-		glog.Errorf("Some errors closing iptables portals for service %q", service)
-	}
-	return utilerrors.NewAggregate(el)
-}
-
-func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
-	el := []error{}
-
-	if local, err := isLocalIP(portal.ip); err != nil {
-		el = append(el, fmt.Errorf("can't determine if IP is local, assuming not: %v", err))
-	} else if local {
-		if err := proxier.releaseNodePort(portal.ip, portal.port, protocol, name); err != nil {
-			el = append(el, err)
-		}
-	}
-
-	args := proxier.netshIpv4AddressDeleteArgs(portal.ip)
-	if err := proxier.netsh.DeleteIPAddress(args); err != nil {
-		glog.Errorf("Failed to delete IP address for service %q", name)
-		el = append(el, err)
-	}
-
-	args = proxier.netshPortProxyDeleteArgs(portal.ip, portal.port, proxyIP, proxyPort, name)
-	if err := proxier.netsh.DeletePortProxyRule(args); err != nil {
-		glog.Errorf("Failed to delete portproxy rule for service %q", name)
-		el = append(el, err)
-	}
-
-	return el
-}
-
-func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
-	el := []error{}
-
-	args := proxier.netshPortProxyDeleteArgs(nil, nodePort, proxyIP, proxyPort, name)
-	if err := proxier.netsh.DeletePortProxyRule(args); err != nil {
-		glog.Errorf("Failed to delete portproxy rule for service %q", name)
-		el = append(el, err)
-	}
-
-	if err := proxier.releaseNodePort(nil, nodePort, protocol, name); err != nil {
-		el = append(el, err)
-	}
-
-	return el
-}
-
-func isLocalIP(ip net.IP) (bool, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return false, err
-	}
-	for i := range addrs {
-		intf, _, err := net.ParseCIDR(addrs[i].String())
-		if err != nil {
-			return false, err
-		}
-		if ip.Equal(intf) {
-			return true, nil
-		}
-	}
-	return false, nil
+func sameConfig(info *serviceInfo, service *api.Service, protocol api.Protocol, listenPort int) bool {
+	return info.protocol == protocol && info.portal.port == listenPort && info.sessionAffinityType == service.Spec.SessionAffinity
 }
 
 func isTooManyFDsError(err error) bool {
@@ -633,38 +429,12 @@ func isClosedError(err error) bool {
 	return strings.HasSuffix(err.Error(), "use of closed network connection")
 }
 
-func (proxier *Proxier) netshPortProxyAddArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
-	args := []string{
-		"interface", "portproxy", "set", "v4tov4",
-		"listenPort=" + strconv.Itoa(destPort),
-		"connectaddress=" + proxyIP.String(),
-		"connectPort=" + strconv.Itoa(proxyPort),
-	}
-	if destIP != nil {
-		args = append(args, "listenaddress="+destIP.String())
-	}
-
-	return args
-}
-
 func (proxier *Proxier) netshIpv4AddressAddArgs(destIP net.IP) []string {
 	intName := proxier.netsh.GetInterfaceToAddIP()
 	args := []string{
 		"interface", "ipv4", "add", "address",
 		"name=" + intName,
 		"address=" + destIP.String(),
-	}
-
-	return args
-}
-
-func (proxier *Proxier) netshPortProxyDeleteArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
-	args := []string{
-		"interface", "portproxy", "delete", "v4tov4",
-		"listenPort=" + strconv.Itoa(destPort),
-	}
-	if destIP != nil {
-		args = append(args, "listenaddress="+destIP.String())
 	}
 
 	return args

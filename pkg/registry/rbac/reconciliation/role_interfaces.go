@@ -79,7 +79,7 @@ func (c RoleModifier) Create(in RuleOwner) (RuleOwner, error) {
 }
 
 func (c RoleModifier) Update(in RuleOwner) (RuleOwner, error) {
-	ret, err := c.Client.Roles(in.GetNamespace()).Create(in.(RoleRuleOwner).Role)
+	ret, err := c.Client.Roles(in.GetNamespace()).Update(in.(RoleRuleOwner).Role)
 	if err != nil {
 		return nil, err
 	}

@@ -41,12 +41,13 @@ var (
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&Deployment{},
+		&DeploymentList{},
+		&DeploymentRollback{},
+		&Scale{},
 		&StatefulSet{},
 		&StatefulSetList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
-
-func (obj *StatefulSet) GetObjectKind() schema.ObjectKind     { return &obj.TypeMeta }
-func (obj *StatefulSetList) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

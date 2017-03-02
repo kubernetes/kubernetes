@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -29,27 +30,34 @@ import (
 )
 
 // For identifies and executes the desired discovery mechanism.
-func For(d kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
+func For(d *kubeadmapi.NodeConfiguration) (*clientcmdapi.Config, error) {
 	switch {
-	case d.File != nil:
-		return runFileDiscovery(d.File)
-	case d.HTTPS != nil:
-		return runHTTPSDiscovery(d.HTTPS)
-	case d.Token != nil:
-		return runTokenDiscovery(d.Token)
+	case len(d.DiscoveryFile) != 0:
+		if isHTTPSURL(d.DiscoveryFile) {
+			return runHTTPSDiscovery(d.DiscoveryFile)
+		}
+		return runFileDiscovery(d.DiscoveryFile)
+	case len(d.DiscoveryToken) != 0:
+		return runTokenDiscovery(d.DiscoveryToken, d.DiscoveryTokenAPIServers)
 	default:
 		return nil, fmt.Errorf("couldn't find a valid discovery configuration.")
 	}
 }
 
+// isHTTPSURL checks whether the string is parsable as an URL
+func isHTTPSURL(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && u.Scheme == "https"
+}
+
 // runFileDiscovery executes file-based discovery.
-func runFileDiscovery(fd *kubeadmapi.FileDiscovery) (*clientcmdapi.Config, error) {
-	return clientcmd.LoadFromFile(fd.Path)
+func runFileDiscovery(fd string) (*clientcmdapi.Config, error) {
+	return clientcmd.LoadFromFile(fd)
 }
 
 // runHTTPSDiscovery executes HTTPS-based discovery.
-func runHTTPSDiscovery(hd *kubeadmapi.HTTPSDiscovery) (*clientcmdapi.Config, error) {
-	response, err := http.Get(hd.URL)
+func runHTTPSDiscovery(hd string) (*clientcmdapi.Config, error) {
+	response, err := http.Get(hd)
 	if err != nil {
 		return nil, err
 	}
@@ -64,17 +72,23 @@ func runHTTPSDiscovery(hd *kubeadmapi.HTTPSDiscovery) (*clientcmdapi.Config, err
 }
 
 // runTokenDiscovery executes token-based discovery.
-func runTokenDiscovery(td *kubeadmapi.TokenDiscovery) (*clientcmdapi.Config, error) {
-	if valid, err := tokenutil.ValidateToken(td); valid == false {
+func runTokenDiscovery(td string, m []string) (*clientcmdapi.Config, error) {
+	id, secret, err := tokenutil.ParseToken(td)
+	if err != nil {
+		return nil, err
+	}
+	t := &kubeadmapi.TokenDiscovery{ID: id, Secret: secret, Addresses: m}
+
+	if valid, err := tokenutil.ValidateToken(t); valid == false {
 		return nil, err
 	}
 
-	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(td)
+	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(t)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, err := kubenode.EstablishMasterConnection(td, clusterInfo)
+	cfg, err := kubenode.EstablishMasterConnection(t, clusterInfo)
 	if err != nil {
 		return nil, err
 	}

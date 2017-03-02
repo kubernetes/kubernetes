@@ -320,3 +320,19 @@ func getSecurityOptSeparator(v *semver.Version) rune {
 		return dockertools.SecurityOptSeparatorNew
 	}
 }
+
+// ensureSandboxImageExists pulls the sandbox image when it's not present.
+func ensureSandboxImageExists(client dockertools.DockerInterface, image string) error {
+	_, err := client.InspectImageByRef(image)
+	if err == nil {
+		return nil
+	}
+	if !dockertools.IsImageNotFoundError(err) {
+		return fmt.Errorf("failed to inspect sandbox image %q: %v", image, err)
+	}
+	err = client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to pull sandbox image %q: %v", image, err)
+	}
+	return nil
+}

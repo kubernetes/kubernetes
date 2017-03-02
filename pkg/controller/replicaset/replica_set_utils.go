@@ -33,7 +33,7 @@ import (
 )
 
 // updateReplicaSetStatus attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
-func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs *extensions.ReplicaSet, newStatus extensions.ReplicaSetStatus) (updateErr error) {
+func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs *extensions.ReplicaSet, newStatus extensions.ReplicaSetStatus) (*extensions.ReplicaSet, error) {
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
@@ -43,14 +43,14 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs *ext
 		rs.Status.AvailableReplicas == newStatus.AvailableReplicas &&
 		rs.Generation == rs.Status.ObservedGeneration &&
 		reflect.DeepEqual(rs.Status.Conditions, newStatus.Conditions) {
-		return nil
+		return rs, nil
 	}
 
 	// deep copy to avoid mutation now.
 	// TODO this method need some work.  Retry on conflict probably, though I suspect this is stomping status to something it probably shouldn't
 	copyObj, err := api.Scheme.DeepCopy(rs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	rs = copyObj.(*extensions.ReplicaSet)
 
@@ -60,9 +60,10 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs *ext
 	// same status.
 	newStatus.ObservedGeneration = rs.Generation
 
-	var getErr error
+	var getErr, updateErr error
+	var updatedRS *extensions.ReplicaSet
 	for i, rs := 0, rs; ; i++ {
-		glog.V(4).Infof(fmt.Sprintf("Updating replica count for ReplicaSet: %s/%s, ", rs.Namespace, rs.Name) +
+		glog.V(4).Infof(fmt.Sprintf("Updating status for ReplicaSet: %s/%s, ", rs.Namespace, rs.Name) +
 			fmt.Sprintf("replicas %d->%d (need %d), ", rs.Status.Replicas, newStatus.Replicas, *(rs.Spec.Replicas)) +
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rs.Status.FullyLabeledReplicas, newStatus.FullyLabeledReplicas) +
 			fmt.Sprintf("readyReplicas %d->%d, ", rs.Status.ReadyReplicas, newStatus.ReadyReplicas) +
@@ -70,17 +71,23 @@ func updateReplicaSetStatus(c unversionedextensions.ReplicaSetInterface, rs *ext
 			fmt.Sprintf("sequence No: %v->%v", rs.Status.ObservedGeneration, newStatus.ObservedGeneration))
 
 		rs.Status = newStatus
-		_, updateErr = c.UpdateStatus(rs)
-		if updateErr == nil || i >= statusUpdateRetries {
-			return updateErr
+		updatedRS, updateErr = c.UpdateStatus(rs)
+		if updateErr == nil {
+			return updatedRS, nil
+		}
+		// Stop retrying if we exceed statusUpdateRetries - the replicaSet will be requeued with a rate limit.
+		if i >= statusUpdateRetries {
+			break
 		}
 		// Update the ReplicaSet with the latest resource version for the next poll
 		if rs, getErr = c.Get(rs.Name, metav1.GetOptions{}); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
-			return getErr
+			return nil, getErr
 		}
 	}
+
+	return nil, updateErr
 }
 
 func calculateStatus(rs *extensions.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) extensions.ReplicaSetStatus {

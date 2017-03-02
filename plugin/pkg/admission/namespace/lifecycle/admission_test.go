@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -88,6 +89,24 @@ func newPod(namespace string) api.Pod {
 			Volumes:    []api.Volume{{Name: "vol"}},
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
+	}
+}
+
+func TestAccessReviewCheckOnMissingNamespace(t *testing.T) {
+	namespace := "test"
+	mockClient := newMockClientForTest(map[string]api.NamespacePhase{})
+	mockClient.AddReactor("get", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, fmt.Errorf("nope, out of luck")
+	})
+	handler, informerFactory, err := newHandlerForTest(mockClient)
+	if err != nil {
+		t.Errorf("unexpected error initializing handler: %v", err)
+	}
+	informerFactory.Start(wait.NeverStop)
+
+	err = handler.Admit(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "authorization.k8s.io", Version: "v1", Kind: "LocalSubjectAccesReview"}, namespace, "", schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1", Resource: "localsubjectaccessreviews"}, "", admission.Create, nil))
+	if err != nil {
+		t.Error(err)
 	}
 }
 

@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"github.com/golang/glog"
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -163,9 +163,6 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	filterFuncs := f.DefaultResourceFilterFunc()
-	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
-
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -187,19 +184,17 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return cmdutil.UsageError(cmd, usageString)
 	}
 
-	argsHasNames, err := resource.HasNames(args)
-	if err != nil {
-		return err
-	}
-
 	// always show resources when getting by name or filename, or if the output
 	// is machine-consumable, or if multiple resource kinds were requested.
-	if len(options.Filenames) > 0 || argsHasNames || cmdutil.OutputsRawFormat(cmd) {
+	if cmdutil.OutputsRawFormat(cmd) {
 		if !cmd.Flag("show-all").Changed {
 			cmd.Flag("show-all").Value.Set("true")
 		}
 	}
 	export := cmdutil.GetFlagBool(cmd, "export")
+
+	filterFuncs := f.DefaultResourceFilterFunc()
+	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
 
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
@@ -223,6 +218,9 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 		if len(infos) != 1 {
 			return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
+		}
+		if r.TargetsSingleItems() {
+			filterFuncs = nil
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
@@ -308,7 +306,9 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-
+	if r.TargetsSingleItems() {
+		filterFuncs = nil
+	}
 	if options.IgnoreNotFound {
 		r.IgnoreErrors(kapierrors.IsNotFound)
 	}

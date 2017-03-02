@@ -23,12 +23,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
@@ -38,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestApplyExtraArgsFail(t *testing.T) {
@@ -68,6 +71,9 @@ const (
 	filenameRCPatchTest    = "../../../test/fixtures/pkg/kubectl/cmd/apply/patch.json"
 	dirName                = "../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
 	filenameRCJSON         = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
+
+	filenameWidgetClientside = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget-clientside.yaml"
+	filenameWidgetServerside = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
 )
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
@@ -109,6 +115,15 @@ func readReplicationControllerFromFile(t *testing.T, filename string) *api.Repli
 	return &rc
 }
 
+func readUnstructuredFromFile(t *testing.T, filename string) *unstructured.Unstructured {
+	data := readBytesFromFile(t, filename)
+	unst := unstructured.Unstructured{}
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &unst); err != nil {
+		t.Fatal(err)
+	}
+	return &unst
+}
+
 func readServiceFromFile(t *testing.T, filename string) *api.Service {
 	data := readBytesFromFile(t, filename)
 	svc := api.Service{}
@@ -125,6 +140,12 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 		t.Fatal(err)
 	}
 
+	// The return value of this function is used in the body of the GET
+	// request in the unit tests. Here we are adding a misc label to the object.
+	// In tests, the validatePatchApplication() gets called in PATCH request
+	// handler in fake round tripper. validatePatchApplication call
+	// checks that this DELETE_ME label was deleted by the apply implementation in
+	// kubectl.
 	originalLabels := originalAccessor.GetLabels()
 	originalLabels["DELETE_ME"] = "DELETE_ME"
 	originalAccessor.SetLabels(originalLabels)
@@ -162,6 +183,12 @@ func readAndAnnotateService(t *testing.T, filename string) (string, []byte) {
 	svc1 := readServiceFromFile(t, filename)
 	svc2 := readServiceFromFile(t, filename)
 	return annotateRuntimeObject(t, svc1, svc2, "Service")
+}
+
+func readAndAnnotateUnstructured(t *testing.T, filename string) (string, []byte) {
+	obj1 := readUnstructuredFromFile(t, filename)
+	obj2 := readUnstructuredFromFile(t, filename)
+	return annotateRuntimeObject(t, obj1, obj2, "Widget")
 }
 
 func validatePatchApplication(t *testing.T, req *http.Request) {
@@ -405,6 +432,65 @@ func TestApplyObject(t *testing.T) {
 	expectRC := "replicationcontroller/" + nameRC + "\n"
 	if buf.String() != expectRC {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
+	}
+}
+
+func TestApplyObjectOutput(t *testing.T) {
+	initTestErrorHandler(t)
+	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+
+	// Add some extra data to the post-patch object
+	postPatchObj := &unstructured.Unstructured{}
+	if err := json.Unmarshal(currentRC, &postPatchObj.Object); err != nil {
+		t.Fatal(err)
+	}
+	postPatchLabels := postPatchObj.GetLabels()
+	if postPatchLabels == nil {
+		postPatchLabels = map[string]string{}
+	}
+	postPatchLabels["post-patch"] = "value"
+	postPatchObj.SetLabels(postPatchLabels)
+	postPatchData, err := json.Marshal(postPatchObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.CommandPrinter = &printers.YAMLPrinter{}
+	tf.GenericPrinter = true
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == pathRC && m == "GET":
+				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+			case p == pathRC && m == "PATCH":
+				validatePatchApplication(t, req)
+				bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply(f, buf, errBuf)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("output", "yaml")
+	cmd.Run(cmd, []string{})
+
+	if !strings.Contains(buf.String(), "name: test-rc") {
+		t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "name: test-rc")
+	}
+	if !strings.Contains(buf.String(), "post-patch: value") {
+		t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "post-patch: value")
 	}
 }
 
@@ -655,7 +741,152 @@ func TestApplyNULLPreservation(t *testing.T) {
 	if buf.String() != expected {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 	}
+	if !verifiedPatch {
+		t.Fatal("No server-side patch call detected")
+	}
+}
 
+// TestUnstructuredApply checks apply operations on an unstructured object
+func TestUnstructuredApply(t *testing.T) {
+	initTestErrorHandler(t)
+	name, curr := readAndAnnotateUnstructured(t, filenameWidgetClientside)
+	path := "/namespaces/test/widgets/" + name
+
+	verifiedPatch := false
+
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == path && m == "GET":
+				body := ioutil.NopCloser(bytes.NewReader(curr))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       body}, nil
+			case p == path && m == "PATCH":
+				contentType := req.Header.Get("Content-Type")
+				if contentType != "application/merge-patch+json" {
+					t.Fatalf("Unexpected Content-Type: %s", contentType)
+				}
+				validatePatchApplication(t, req)
+				verifiedPatch = true
+
+				body := ioutil.NopCloser(bytes.NewReader(curr))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       body}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply(f, buf, errBuf)
+	cmd.Flags().Set("filename", filenameWidgetClientside)
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{})
+
+	expected := "widget/" + name + "\n"
+	if buf.String() != expected {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
+	}
+	if !verifiedPatch {
+		t.Fatal("No server-side patch call detected")
+	}
+}
+
+// TestUnstructuredIdempotentApply checks repeated apply operation on an unstructured object
+func TestUnstructuredIdempotentApply(t *testing.T) {
+	initTestErrorHandler(t)
+
+	serversideObject := readUnstructuredFromFile(t, filenameWidgetServerside)
+	serversideData, err := runtime.Encode(testapi.Default.Codec(), serversideObject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "/namespaces/test/widgets/widget"
+
+	verifiedPatch := false
+
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == path && m == "GET":
+				body := ioutil.NopCloser(bytes.NewReader(serversideData))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       body}, nil
+			case p == path && m == "PATCH":
+				// In idempotent updates, kubectl sends a logically empty
+				// request body with the PATCH request.
+				// Should look like this:
+				// Request Body: {"metadata":{"annotations":{}}}
+
+				patch, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				contentType := req.Header.Get("Content-Type")
+				if contentType != "application/merge-patch+json" {
+					t.Fatalf("Unexpected Content-Type: %s", contentType)
+				}
+
+				patchMap := map[string]interface{}{}
+				if err := json.Unmarshal(patch, &patchMap); err != nil {
+					t.Fatal(err)
+				}
+				if len(patchMap) != 1 {
+					t.Fatalf("Unexpected Patch. Has more than 1 entry. path: %s", patch)
+				}
+
+				annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+				if len(annotationsMap) != 0 {
+					t.Fatalf("Unexpected Patch. Found unexpected annotation: %s", patch)
+				}
+
+				verifiedPatch = true
+
+				body := ioutil.NopCloser(bytes.NewReader(serversideData))
+				return &http.Response{
+					StatusCode: 200,
+					Header:     defaultHeader(),
+					Body:       body}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply(f, buf, errBuf)
+	cmd.Flags().Set("filename", filenameWidgetClientside)
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{})
+
+	expected := "widget/widget\n"
+	if buf.String() != expected {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
+	}
 	if !verifiedPatch {
 		t.Fatal("No server-side patch call detected")
 	}

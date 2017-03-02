@@ -64,6 +64,8 @@ type StatefulSetController struct {
 	setLister appslisters.StatefulSetLister
 	// setListerSynced returns true if the stateful set shared informer has synced at least once
 	setListerSynced cache.InformerSynced
+	// pvcListerSynced returns true if the pvc shared informer has synced at least once
+	pvcListerSynced cache.InformerSynced
 	// StatefulSets that need to be synced.
 	queue workqueue.RateLimitingInterface
 }
@@ -91,7 +93,8 @@ func NewStatefulSetController(
 				recorder,
 			),
 		),
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
+		pvcListerSynced: pvcInformer.Informer().HasSynced,
+		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
 	}
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -134,7 +137,7 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 
 	glog.Infof("Starting statefulset controller")
 
-	if !cache.WaitForCacheSync(stopCh, ssc.podListerSynced, ssc.setListerSynced) {
+	if !cache.WaitForCacheSync(stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}

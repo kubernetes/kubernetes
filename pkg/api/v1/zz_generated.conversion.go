@@ -275,6 +275,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_PodTemplateList_To_v1_PodTemplateList,
 		Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec,
 		Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec,
+		Convert_v1_PortworxVolumeSource_To_api_PortworxVolumeSource,
+		Convert_api_PortworxVolumeSource_To_v1_PortworxVolumeSource,
 		Convert_v1_Preconditions_To_api_Preconditions,
 		Convert_api_Preconditions_To_v1_Preconditions,
 		Convert_v1_PreferAvoidPodsEntry_To_api_PreferAvoidPodsEntry,
@@ -1064,6 +1066,7 @@ func autoConvert_v1_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *a
 	out.GracePeriodSeconds = (*int64)(unsafe.Pointer(in.GracePeriodSeconds))
 	out.Preconditions = (*api.Preconditions)(unsafe.Pointer(in.Preconditions))
 	out.OrphanDependents = (*bool)(unsafe.Pointer(in.OrphanDependents))
+	out.PropagationPolicy = (*api.DeletionPropagation)(unsafe.Pointer(in.PropagationPolicy))
 	return nil
 }
 
@@ -1075,6 +1078,7 @@ func autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, ou
 	out.GracePeriodSeconds = (*int64)(unsafe.Pointer(in.GracePeriodSeconds))
 	out.Preconditions = (*Preconditions)(unsafe.Pointer(in.Preconditions))
 	out.OrphanDependents = (*bool)(unsafe.Pointer(in.OrphanDependents))
+	out.PropagationPolicy = (*DeletionPropagation)(unsafe.Pointer(in.PropagationPolicy))
 	return nil
 }
 
@@ -2708,6 +2712,7 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	out.Quobyte = (*api.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.AzureDisk = (*api.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.PortworxVolume = (*api.PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	return nil
 }
 
@@ -2733,6 +2738,7 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 	out.VsphereVolume = (*VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
 	out.AzureDisk = (*AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.PortworxVolume = (*PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	return nil
 }
 
@@ -3341,6 +3347,28 @@ func autoConvert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSp
 		return err
 	}
 	return nil
+}
+
+func autoConvert_v1_PortworxVolumeSource_To_api_PortworxVolumeSource(in *PortworxVolumeSource, out *api.PortworxVolumeSource, s conversion.Scope) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_v1_PortworxVolumeSource_To_api_PortworxVolumeSource(in *PortworxVolumeSource, out *api.PortworxVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_PortworxVolumeSource_To_api_PortworxVolumeSource(in, out, s)
+}
+
+func autoConvert_api_PortworxVolumeSource_To_v1_PortworxVolumeSource(in *api.PortworxVolumeSource, out *PortworxVolumeSource, s conversion.Scope) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_api_PortworxVolumeSource_To_v1_PortworxVolumeSource(in *api.PortworxVolumeSource, out *PortworxVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_PortworxVolumeSource_To_v1_PortworxVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_Preconditions_To_api_Preconditions(in *Preconditions, out *api.Preconditions, s conversion.Scope) error {
@@ -4460,6 +4488,7 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	out.AzureDisk = (*api.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
 	out.Projected = (*api.ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
+	out.PortworxVolume = (*api.PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	return nil
 }
 
@@ -4492,6 +4521,7 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.AzureDisk = (*AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
 	out.Projected = (*ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
+	out.PortworxVolume = (*PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	return nil
 }
 

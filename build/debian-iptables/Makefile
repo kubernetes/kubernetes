@@ -14,32 +14,27 @@
 
 .PHONY:	build push
 
-REGISTRY?="gcr.io/google_containers"
+REGISTRY?="gcr.io/google-containers"
 IMAGE=debian-iptables
-TAG=v6
+TAG=v7
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 QEMUVERSION=v2.7.0
 
-ifeq ($(ARCH),amd64)
-	BASEIMAGE?=debian:jessie
-endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=armhf/debian:jessie
 	QEMUARCH=arm
 endif
 ifeq ($(ARCH),arm64)
-	BASEIMAGE?=aarch64/debian:jessie
 	QEMUARCH=aarch64
 endif
 ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/debian:jessie
 	QEMUARCH=ppc64le
 endif
 ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/debian:jessie
 	QEMUARCH=s390x
 endif
+
+BASEIMAGE=gcr.io/google-containers/debian-base-$(ARCH):0.1
 
 build:
 	cp ./* $(TEMP_DIR)

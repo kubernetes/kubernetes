@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -890,6 +892,83 @@ func setNodeTaint(node *v1.Node, taints []v1.Taint) {
 
 func setDaemonSetToleration(ds *extensions.DaemonSet, tolerations []v1.Toleration) {
 	ds.Spec.Template.Spec.Tolerations = tolerations
+}
+
+// DaemonSet should launch a critical pod even when the node is OutOfDisk.
+func TestOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("not-enough-disk", nil)
+	node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
+	manager.nodeStore.Add(node)
+
+	// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
+	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
+	ds := newDaemonSet("critical")
+	setDaemonSetCritical(ds)
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+
+	// Enabling critical pod annotation feature gate should create critical pod
+	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSet should launch a critical pod even when the node has insufficient free resource.
+func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
+	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
+	manager, podControl, _ := newTestController()
+	node := newNode("too-much-mem", nil)
+	node.Status.Allocatable = allocatableResources("100M", "200m")
+	manager.nodeStore.Add(node)
+	manager.podStore.Add(&v1.Pod{
+		Spec: podSpec,
+	})
+
+	// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
+	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
+	ds := newDaemonSet("critical")
+	ds.Spec.Template.Spec = podSpec
+	setDaemonSetCritical(ds)
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+
+	// Enabling critical pod annotation feature gate should create critical pod
+	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
+// DaemonSets should NOT launch a critical pod when there are port conflicts.
+func TestPortConflictNodeDaemonDoesNotLaunchCriticalPod(t *testing.T) {
+	podSpec := v1.PodSpec{
+		NodeName: "port-conflict",
+		Containers: []v1.Container{{
+			Ports: []v1.ContainerPort{{
+				HostPort: 666,
+			}},
+		}},
+	}
+	manager, podControl, _ := newTestController()
+	node := newNode("port-conflict", nil)
+	manager.nodeStore.Add(node)
+	manager.podStore.Add(&v1.Pod{
+		Spec: podSpec,
+	})
+
+	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
+	ds := newDaemonSet("critical")
+	ds.Spec.Template.Spec = podSpec
+	setDaemonSetCritical(ds)
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+}
+
+func setDaemonSetCritical(ds *extensions.DaemonSet) {
+	ds.Namespace = api.NamespaceSystem
+	if ds.Spec.Template.ObjectMeta.Annotations == nil {
+		ds.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+	}
+	ds.Spec.Template.ObjectMeta.Annotations[kubelettypes.CriticalPodAnnotationKey] = ""
 }
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {

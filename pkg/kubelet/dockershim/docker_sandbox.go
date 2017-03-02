@@ -61,8 +61,9 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 
 	// NOTE: To use a custom sandbox image in a private repository, users need to configure the nodes with credentials properly.
 	// see: http://kubernetes.io/docs/user-guide/images/#configuring-nodes-to-authenticate-to-a-private-repository
-	if err := ds.client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{}); err != nil {
-		return "", fmt.Errorf("unable to pull image for the sandbox container: %v", err)
+	// Only pull sandbox image when it's not present - v1.PullIfNotPresent.
+	if err := ensureSandboxImageExists(ds.client, image); err != nil {
+		return "", err
 	}
 
 	// Step 2: Create the sandbox container.
@@ -103,7 +104,7 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 	// on the host as well, to satisfy parts of the pod spec that aren't
 	// recognized by the CNI standard yet.
 	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
-	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID)
+	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations)
 	// TODO: Do we need to teardown on failure or can we rely on a StopPodSandbox call with the given ID?
 	return createResp.ID, err
 }
@@ -297,6 +298,8 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 				Network: netNS,
 				Options: &runtimeapi.NamespaceOption{
 					HostNetwork: hostNetwork,
+					HostPid:     sharesHostPid(r),
+					HostIpc:     sharesHostIpc(r),
 				},
 			},
 		},
@@ -489,11 +492,29 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	return createConfig, nil
 }
 
-// sharesHostNetwork true if the given container is sharing the hosts's
+// sharesHostNetwork returns true if the given container is sharing the host's
 // network namespace.
 func sharesHostNetwork(container *dockertypes.ContainerJSON) bool {
 	if container != nil && container.HostConfig != nil {
 		return string(container.HostConfig.NetworkMode) == namespaceModeHost
+	}
+	return false
+}
+
+// sharesHostPid returns true if the given container is sharing the host's pid
+// namespace.
+func sharesHostPid(container *dockertypes.ContainerJSON) bool {
+	if container != nil && container.HostConfig != nil {
+		return string(container.HostConfig.PidMode) == namespaceModeHost
+	}
+	return false
+}
+
+// sharesHostIpc returns true if the given container is sharing the host's ipc
+// namespace.
+func sharesHostIpc(container *dockertypes.ContainerJSON) bool {
+	if container != nil && container.HostConfig != nil {
+		return string(container.HostConfig.IpcMode) == namespaceModeHost
 	}
 	return false
 }

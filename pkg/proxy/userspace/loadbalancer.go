@@ -31,4 +31,5 @@ type LoadBalancer interface {
 	NewService(service proxy.ServicePortName, sessionAffinityType api.ServiceAffinity, stickyMaxAgeMinutes int) error
 	DeleteService(service proxy.ServicePortName)
 	CleanupStaleStickySessions(service proxy.ServicePortName)
+	ServiceHasEndpoints(service proxy.ServicePortName) bool
 }

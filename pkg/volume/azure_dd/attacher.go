@@ -195,21 +195,9 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 	}
 
 	if notMnt {
-		volumeSource, err := getVolumeSource(spec)
-		if err != nil {
-			return err
-		}
-		options := []string{}
-
-		if *(volumeSource.ReadOnly) {
-			options = append(options, "ro")
-		}
-
-		// Because we are formatting during attach, the
-		//following call will perform device mount and
-		// will never format
-		diskMounter := &mount.SafeFormatAndMount{Interface: m, Runner: exec.New()}
-		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, options)
+		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
+		mountOptions := volume.MountOptionFromSpec(spec, options...)
+		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, mountOptions)
 		if err != nil {
 			glog.Infof("azureDisk - mountDevice:FormatAndMount failed with %s", err)
 			_ = os.Remove(deviceMountPath)

@@ -9,7 +9,6 @@ pkg_tar(
         "gci/configure-helper.sh",
         "gci/health-monitor.sh",
         "gci/mounter/mounter",
-        "trusty/configure-helper.sh",
     ],
     mode = "0755",
     strip_prefix = ".",

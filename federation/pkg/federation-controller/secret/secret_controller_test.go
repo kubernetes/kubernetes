@@ -105,7 +105,7 @@ func TestSecretController(t *testing.T) {
 	// There should be an update to add both the finalizers.
 	updatedSecret := GetSecretFromChan(secretUpdateChan)
 	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, metav1.FinalizerOrphan))
+	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, metav1.FinalizerOrphanDependents))
 	secret1 = *updatedSecret
 
 	// Verify that the secret is created in underlying cluster1.

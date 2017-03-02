@@ -44,10 +44,10 @@ import (
 	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // TODO: delete this global variable when we enable the validation of common
@@ -64,6 +64,11 @@ var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), bo
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = genericvalidation.BannedOwners
+var volumePlugins []volume.VolumePlugin
+
+func init() {
+	volumePlugins = probeVolumePlugins()
+}
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -242,6 +247,11 @@ var ValidateEndpointsName = NameIsDNSSubdomain
 // ValidateClusterName can be used to check whether the given cluster name is valid.
 var ValidateClusterName = genericvalidation.ValidateClusterName
 
+// ValidateClassName can be used to check whether the given class name is valid.
+// It is defined here to avoid import cycle between pkg/apis/storage/validation
+// (where it should be) and this file.
+var ValidateClassName = NameIsDNSSubdomain
+
 // TODO update all references to these functions to point to the genericvalidation ones
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) []string {
@@ -295,7 +305,6 @@ func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn 
 	for i := range meta.Finalizers {
 		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
 	}
-
 	return allErrs
 }
 
@@ -314,7 +323,7 @@ func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fld
 	return genericvalidation.ValidateNoNewFinalizers(newFinalizers, oldFinalizers, fldPath)
 }
 
-func validateVolumes(volumes []api.Volume, fldPath *field.Path) (sets.String, field.ErrorList) {
+func ValidateVolumes(volumes []api.Volume, fldPath *field.Path) (sets.String, field.ErrorList) {
 	allErrs := field.ErrorList{}
 
 	allNames := sets.String{}
@@ -515,6 +524,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validatePhotonPersistentDiskVolumeSource(source.PhotonPersistentDisk, fldPath.Child("photonPersistentDisk"))...)
+		}
+	}
+	if source.PortworxVolume != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("portworxVolume"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validatePortworxVolumeSource(source.PortworxVolume, fldPath.Child("portworxVolume"))...)
 		}
 	}
 	if source.AzureDisk != nil {
@@ -930,6 +947,19 @@ func validateFlexVolumeSource(fv *api.FlexVolumeSource, fldPath *field.Path) fie
 	if len(fv.Driver) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
 	}
+
+	// Make sure user-specified options don't use kubernetes namespaces
+	for k := range fv.Options {
+		namespace := k
+		if parts := strings.SplitN(k, "/", 2); len(parts) == 2 {
+			namespace = parts[0]
+		}
+		normalized := "." + strings.ToLower(namespace)
+		if strings.HasSuffix(normalized, ".kubernetes.io") || strings.HasSuffix(normalized, ".k8s.io") {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("options").Key(k), k, "kubernetes.io and k8s.io namespaces are reserved"))
+		}
+	}
+
 	return allErrs
 }
 
@@ -999,6 +1029,14 @@ func validatePhotonPersistentDiskVolumeSource(cd *api.PhotonPersistentDiskVolume
 	return allErrs
 }
 
+func validatePortworxVolumeSource(pwx *api.PortworxVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(pwx.VolumeID) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
+	}
+	return allErrs
+}
+
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
 var ValidatePersistentVolumeName = NameIsDNSSubdomain
@@ -1034,6 +1072,20 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	if len(string(pv.Spec.PersistentVolumeReclaimPolicy)) > 0 {
 		if !supportedReclaimPolicy.Has(string(pv.Spec.PersistentVolumeReclaimPolicy)) {
 			allErrs = append(allErrs, field.NotSupported(specPath.Child("persistentVolumeReclaimPolicy"), pv.Spec.PersistentVolumeReclaimPolicy, supportedReclaimPolicy.List()))
+		}
+	}
+
+	volumePlugin := findPluginBySpec(volumePlugins, pv)
+	mountOptions := volume.MountOptionFromApiPV(pv)
+
+	metaField := field.NewPath("metadata")
+	if volumePlugin == nil && len(mountOptions) > 0 {
+		allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", volume.MountOptionAnnotation), "may not specify mount options for this volume type"))
+	}
+
+	if volumePlugin != nil {
+		if !volumePlugin.SupportsMountOption() && len(mountOptions) > 0 {
+			allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", volume.MountOptionAnnotation), "may not specify mount options for this volume type"))
 		}
 	}
 
@@ -1164,7 +1216,14 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, validatePhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, specPath.Child("photonPersistentDisk"))...)
 		}
 	}
-
+	if pv.Spec.PortworxVolume != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("portworxVolume"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validatePortworxVolumeSource(pv.Spec.PortworxVolume, specPath.Child("portworxVolume"))...)
+		}
+	}
 	if pv.Spec.AzureDisk != nil {
 		if numVolumes > 0 {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("azureDisk"), "may not specify more than 1 volume type"))
@@ -1181,6 +1240,12 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	// do not allow hostPath mounts of '/' to have a 'recycle' reclaim policy
 	if pv.Spec.HostPath != nil && path.Clean(pv.Spec.HostPath.Path) == "/" && pv.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRecycle {
 		allErrs = append(allErrs, field.Forbidden(specPath.Child("persistentVolumeReclaimPolicy"), "may not be 'recycle' for a hostPath mount of '/'"))
+	}
+
+	if len(pv.Spec.StorageClassName) > 0 {
+		for _, msg := range ValidateClassName(pv.Spec.StorageClassName, false) {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("storageClassName"), pv.Spec.StorageClassName, msg))
+		}
 	}
 
 	return allErrs
@@ -1233,6 +1298,12 @@ func ValidatePersistentVolumeClaimSpec(spec *api.PersistentVolumeClaimSpec, fldP
 	} else {
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(api.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(api.ResourceStorage)))...)
 	}
+
+	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {
+		for _, msg := range ValidateClassName(*spec.StorageClassName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("storageClassName"), *spec.StorageClassName, msg))
+		}
+	}
 	return allErrs
 }
 
@@ -1255,7 +1326,8 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 	}
 
 	// storageclass annotation should be immutable after creation
-	allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[storageutil.StorageClassAnnotation], oldPvc.ObjectMeta.Annotations[storageutil.StorageClassAnnotation], storageutil.StorageClassAnnotation, field.NewPath("metadata"))...)
+	// TODO: remove Beta when no longer needed
+	allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], v1.BetaStorageClassAnnotation, field.NewPath("metadata"))...)
 
 	newPvc.Status = oldPvc.Status
 	return allErrs
@@ -1318,7 +1390,7 @@ func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) fiel
 	return allErrs
 }
 
-func validateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
+func ValidateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for i, ev := range vars {
@@ -1410,7 +1482,7 @@ func validateContainerResourceFieldSelector(fs *api.ResourceFieldSelector, expre
 	return allErrs
 }
 
-func validateEnvFrom(vars []api.EnvFromSource, fldPath *field.Path) field.ErrorList {
+func ValidateEnvFrom(vars []api.EnvFromSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, ev := range vars {
 		idxPath := fldPath.Index(i)
@@ -1511,7 +1583,7 @@ func validateSecretKeySelector(s *api.SecretKeySelector, fldPath *field.Path) fi
 	return allErrs
 }
 
-func validateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath *field.Path) field.ErrorList {
+func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	mountpoints := sets.NewString()
 
@@ -1766,8 +1838,8 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 
 		allErrs = append(allErrs, validateProbe(ctr.ReadinessProbe, idxPath.Child("readinessProbe"))...)
 		allErrs = append(allErrs, validateContainerPorts(ctr.Ports, idxPath.Child("ports"))...)
-		allErrs = append(allErrs, validateEnv(ctr.Env, idxPath.Child("env"))...)
-		allErrs = append(allErrs, validateVolumeMounts(ctr.VolumeMounts, volumes, idxPath.Child("volumeMounts"))...)
+		allErrs = append(allErrs, ValidateEnv(ctr.Env, idxPath.Child("env"))...)
+		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volumes, idxPath.Child("volumeMounts"))...)
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
 		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
 		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"))...)
@@ -1796,12 +1868,12 @@ func validateRestartPolicy(restartPolicy *api.RestartPolicy, fldPath *field.Path
 func validateDNSPolicy(dnsPolicy *api.DNSPolicy, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	switch *dnsPolicy {
-	case api.DNSClusterFirst, api.DNSDefault:
+	case api.DNSClusterFirstWithHostNet, api.DNSClusterFirst, api.DNSDefault:
 		break
 	case "":
 		allErrors = append(allErrors, field.Required(fldPath, ""))
 	default:
-		validValues := []string{string(api.DNSClusterFirst), string(api.DNSDefault)}
+		validValues := []string{string(api.DNSClusterFirstWithHostNet), string(api.DNSClusterFirst), string(api.DNSDefault)}
 		allErrors = append(allErrors, field.NotSupported(fldPath, dnsPolicy, validValues))
 	}
 	return allErrors
@@ -1976,7 +2048,7 @@ func ValidatePod(pod *api.Pod) field.ErrorList {
 func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allVolumes, vErrs := validateVolumes(spec.Volumes, fldPath.Child("volumes"))
+	allVolumes, vErrs := ValidateVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
 	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes, fldPath.Child("containers"))...)
 	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, allVolumes, fldPath.Child("initContainers"))...)

@@ -51,13 +51,15 @@ if [ "${RUN_FROM_UPDATE_SCRIPT}" != true ]; then
 fi
 
 # PREREQUISITES: run `godep restore` in the main repo before calling this script.
+kube::util::ensure-temp-dir
+TMP_GOPATH="${KUBE_TEMP}/go"
+mkdir -p "${TMP_GOPATH}/src/k8s.io"
 CLIENTSET="clientset"
 MAIN_REPO_FROM_SRC="k8s.io/kubernetes"
 MAIN_REPO="$(cd "${KUBE_ROOT}"; pwd)" # absolute path
 CLIENT_REPO_FROM_SRC="k8s.io/client-go"
-CLIENT_REPO_TEMP_FROM_SRC="k8s.io/_tmp"
 CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
-CLIENT_REPO_TEMP="${MAIN_REPO}/staging/src/${CLIENT_REPO_TEMP_FROM_SRC}"
+CLIENT_REPO_TEMP="${TMP_GOPATH}/src/k8s.io/construct-client-go"
 
 if LANG=C sed --help 2>&1 | grep -q GNU; then
   SED="sed"
@@ -67,12 +69,6 @@ else
   echo "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
   exit 1
 fi
-
-cleanup() {
-  rm -rf "${CLIENT_REPO_TEMP}"
-}
-
-trap cleanup EXIT SIGINT
 
 # working in the ${CLIENT_REPO_TEMP} so 'godep save' won't complain about dirty working tree.
 echo "creating the tmp directory"
@@ -120,32 +116,38 @@ find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/informers/informers_generated"
 
-# safety check that we don't have another apimachinery in the GOPATH
-if go list -f '{{.Dir}}' k8s.io/apimachinery/pkg/runtime &>/dev/null; then
-  echo "ERROR: unexpected k8s.io/apimachinery in GOPATH '$GOPATH'" 1>&2
-  exit 1
-fi
-
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
-echo "generating vendor/"
-# client-go depends on some apimachinery packages. Adding staging/ to the GOPATH
-# so that if client-go has new dependencies on apimachinery, `godep save` can
-# find the dependent packages in staging/, instead of failing. Note that all
-# k8s.io/apimachinery dependencies will be updated later by the robot to point
-# to the real k8s.io/apimachinery commit and vendor the real code.
-GOPATH="${GOPATH}:${MAIN_REPO}/staging"
-GO15VENDOREXPERIMENT=1 godep save ./...
+  echo "generating vendor/"
+  # make snapshots for repos in staging/"
+  for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
+    cp -a "${KUBE_ROOT}/staging/src/k8s.io/${repo}" "${TMP_GOPATH}/src/k8s.io/"
+    pushd "${TMP_GOPATH}/src/k8s.io/${repo}" >/dev/null
+      git init >/dev/null
+      git config --local user.email "nobody@k8s.io"
+      git config --local user.name "$0"
+      git add . >/dev/null
+      git commit -q -m "Snapshot" >/dev/null
+    popd >/dev/null
+  done
+  # client-go depends on some apimachinery packages. Adding ${TMP_GOPATH} to the
+  # GOPATH so that if client-go has new dependencies on apimachinery, `godep save`
+  # can find the dependent packages from ${TMP_GOPATH}, instead of failing. Note
+  # that in Godeps.json, the "Rev"s of the entries for k8s.io/apimachinery will be
+  # invalid, they will be updated later by the publish robot to point to the real
+  # k8s.io/apimachinery commit.
+  GOPATH="${TMP_GOPATH}:${GOPATH}" godep save ./...
 popd > /dev/null
 
 echo "moving vendor/k8s.io/kubernetes"
 cp -r "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes/* "${CLIENT_REPO_TEMP}"/
-rm -rf "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes
-# client-go will share the vendor of the main repo for now. When client-go
-# becomes a standalone repo, it will have its own vendor
-mv "${CLIENT_REPO_TEMP}"/vendor "${CLIENT_REPO_TEMP}"/_vendor
+# the publish robot will refill the vendor/
+rm -rf "${CLIENT_REPO_TEMP}"/vendor
 
 echo "rewriting Godeps.json"
-go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
+# The entries for k8s.io/apimahcinery are not removed from Godeps.json, though
+# they contain the invalid commit revision. The publish robot will set the
+# correct commit revision.
+go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}" --ignored-prefixes="k8s.io/client-go,k8s.io/kubernetes" --rewritten-prefixes="k8s.io/apimachinery"
 
 echo "rewriting imports"
 grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
@@ -211,26 +213,14 @@ find "${CLIENT_REPO_TEMP}" -type f \( \
   -name "*.sh" \
   \) -delete
 
-echo "remove cyclical godep"
-rm -rf "${CLIENT_REPO_TEMP}/_vendor/k8s.io/client-go"
-# If godep cannot find dependent packages in the primary GOPATH, it will search
-# in the secondary GOPATH staging/. If successful, godep will wrongly copy the
-# dependents relative to the primary GOPATH (looks like a godep bug), creating
-# the ${CLIENT_REPO_TEMP}/staging dir. These copies will not be recognized by
-# the Go compiler, so we just remove them. Note that the publishing robot will
-# correctly resolve these dependencies later.
-rm -rf "${CLIENT_REPO_TEMP}/staging"
-
 if [ "${FAIL_ON_CHANGES}" = true ]; then
   echo "running FAIL_ON_CHANGES"
   ret=0
   if diff --ignore-matching-lines='^\s*\"Comment\"' -NauprB -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
     echo "${CLIENT_REPO} up to date."
-    cleanup
     exit 0
   else
     echo "${CLIENT_REPO} is out of date. Please run hack/update-staging-client-go.sh"
-    cleanup
     exit 1
   fi
 fi
@@ -241,5 +231,3 @@ if [ "${DRY_RUN}" = false ]; then
   ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
   mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
 fi
-
-cleanup

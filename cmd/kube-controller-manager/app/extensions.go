@@ -63,7 +63,6 @@ func startReplicaSetController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
-		int(ctx.Options.LookupCacheSizeForRS),
 	).Run(int(ctx.Options.ConcurrentRSSyncs), ctx.Stop)
 	return true, nil
 }

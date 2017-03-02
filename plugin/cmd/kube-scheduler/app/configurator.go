@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
@@ -79,6 +80,7 @@ func createScheduler(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	replicationControllerInformer coreinformers.ReplicationControllerInformer,
 	replicaSetInformer extensionsinformers.ReplicaSetInformer,
+	statefulSetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	recorder record.EventRecorder,
 ) (*scheduler.Scheduler, error) {
@@ -90,6 +92,7 @@ func createScheduler(
 		pvcInformer,
 		replicationControllerInformer,
 		replicaSetInformer,
+		statefulSetInformer,
 		serviceInformer,
 		s.HardPodAffinitySymmetricWeight,
 	)

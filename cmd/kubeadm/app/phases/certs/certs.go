@@ -57,14 +57,6 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
 	altNames.DNSNames = append(cfg.API.ExternalDNSNames, hostname)
 	altNames.DNSNames = append(altNames.DNSNames, internalAPIServerFQDN...)
 
-	// then, add all IP addresses we're bound to
-	for _, a := range cfg.API.AdvertiseAddresses {
-		if ip := net.ParseIP(a); ip != nil {
-			altNames.IPs = append(altNames.IPs, ip)
-		} else {
-			return fmt.Errorf("could not parse ip %q", a)
-		}
-	}
 	// and lastly, extract the internal IP address for the API server
 	_, n, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
 	if err != nil {
@@ -75,7 +67,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
 		return fmt.Errorf("unable to allocate IP address for the API server from the given CIDR (%q) [%v]", &cfg.Networking.ServiceSubnet, err)
 	}
 
-	altNames.IPs = append(altNames.IPs, internalAPIServerVirtualIP)
+	altNames.IPs = append(altNames.IPs, internalAPIServerVirtualIP, net.ParseIP(cfg.API.AdvertiseAddress))
 
 	var caCert *x509.Certificate
 	var caKey *rsa.PrivateKey

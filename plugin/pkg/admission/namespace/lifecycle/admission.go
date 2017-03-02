@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	utilcache "k8s.io/apiserver/pkg/util/cache"
@@ -100,6 +101,11 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 		if a.GetOperation() == admission.Delete {
 			l.forceLiveLookupCache.Add(a.GetName(), true, forceLiveLookupTTL)
 		}
+		return nil
+	}
+
+	// always allow access review checks.  Returning status about the namespace would be leaking information
+	if isAccessReview(a) {
 		return nil
 	}
 
@@ -205,4 +211,14 @@ func (l *lifecycle) Validate() error {
 		return fmt.Errorf("missing client")
 	}
 	return nil
+}
+
+// accessReviewResources are resources which give a view into permissions in a namespace.  Users must be allowed to create these
+// resources because returning "not found" errors allows someone to search for the "people I'm going to fire in 2017" namespace.
+var accessReviewResources = map[schema.GroupResource]bool{
+	schema.GroupResource{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"}: true,
+}
+
+func isAccessReview(a admission.Attributes) bool {
+	return accessReviewResources[a.GetResource().GroupResource()]
 }

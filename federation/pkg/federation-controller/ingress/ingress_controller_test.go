@@ -133,20 +133,20 @@ func TestIngressController(t *testing.T) {
 	t.Log("Adding Ingress UID ConfigMap to cluster 1")
 	cluster1ConfigMapWatch.Add(cfg1)
 
-	// Test add federated ingress.
-	t.Log("Adding Federated Ingress")
-	fedIngressWatch.Add(&fedIngress)
-
-	t.Log("Checking that UID annotation on Cluster 1 annotation was correctly updated after adding Federated Ingress")
+	t.Log("Checking that UID annotation on Cluster 1 annotation was correctly updated prior to adding Federated Ingress")
 	cluster := GetClusterFromChan(fedClusterUpdateChan)
 	assert.NotNil(t, cluster)
 	assert.Equal(t, cluster.ObjectMeta.Annotations[uidAnnotationKey], cfg1.Data[uidKey])
+
+	// Test add federated ingress.
+	t.Log("Adding Federated Ingress")
+	fedIngressWatch.Add(&fedIngress)
 
 	t.Logf("Checking that appropriate finalizers are added")
 	// There should be an update to add both the finalizers.
 	updatedIngress := GetIngressFromChan(t, fedIngressUpdateChan)
 	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, metav1.FinalizerOrphan), fmt.Sprintf("ingress does not have the orphan finalizer: %v", updatedIngress))
+	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, metav1.FinalizerOrphanDependents), fmt.Sprintf("ingress does not have the orphan finalizer: %v", updatedIngress))
 	fedIngress = *updatedIngress
 
 	t.Log("Checking that Ingress was correctly created in cluster 1")
@@ -319,7 +319,7 @@ func WaitForFinalizersInFederationStore(ingressController *IngressController, st
 			return false, err
 		}
 		ingress := obj.(*extensionsv1beta1.Ingress)
-		if ingressController.hasFinalizerFunc(ingress, metav1.FinalizerOrphan) &&
+		if ingressController.hasFinalizerFunc(ingress, metav1.FinalizerOrphanDependents) &&
 			ingressController.hasFinalizerFunc(ingress, deletionhelper.FinalizerDeleteFromUnderlyingClusters) {
 			return true, nil
 		}

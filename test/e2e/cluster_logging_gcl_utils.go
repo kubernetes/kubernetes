@@ -64,6 +64,10 @@ func newGclLogsProvider(f *framework.Framework) (*gclLogsProvider, error) {
 	return provider, nil
 }
 
+func (logsProvider *gclLogsProvider) FluentdApplicationName() string {
+	return "fluentd-gcp"
+}
+
 // Since GCL API is not easily available from the outside of cluster
 // we use gcloud command to perform search with filter
 func (gclLogsProvider *gclLogsProvider) ReadEntries(pod *loggingPod) []*logEntry {

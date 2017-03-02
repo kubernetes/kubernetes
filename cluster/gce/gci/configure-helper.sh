@@ -48,6 +48,13 @@ function config-ip-firewall {
     iptables -A FORWARD -w -p UDP -j ACCEPT
     iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
+
+  iptables -N KUBE-METADATA-SERVER
+  iptables -A FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
+
+  if [[ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]]; then
+    iptables -A KUBE-METADATA-SERVER -j DROP
+  fi
 }
 
 function create-dirs {
@@ -197,9 +204,10 @@ function create-node-pki {
 
   if [[ -z "${CA_CERT_BUNDLE:-}" ]]; then
     CA_CERT_BUNDLE="${CA_CERT}"
-    CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
-    echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
   fi
+
+  CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
+  echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
 
   if [[ ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
     KUBELET_CERT_PATH="${pki_dir}/kubelet.crt"
@@ -227,43 +235,53 @@ function create-master-pki {
 
   if [[ -z "${APISERVER_SERVER_CERT:-}" || -z "${APISERVER_SERVER_KEY:-}" ]]; then
     APISERVER_SERVER_CERT="${MASTER_CERT}"
-    APISERVER_SERVER_CERT_PATH="${pki_dir}/apiserver.crt"
-    echo "${APISERVER_SERVER_CERT}" | base64 --decode > "${APISERVER_SERVER_CERT_PATH}"
-
     APISERVER_SERVER_KEY="${MASTER_KEY}"
-    APISERVER_SERVER_KEY_PATH="${pki_dir}/apiserver.key"
-    echo "${APISERVER_SERVER_KEY}" | base64 --decode > "${APISERVER_SERVER_KEY_PATH}"
   fi
+
+  APISERVER_SERVER_CERT_PATH="${pki_dir}/apiserver.crt"
+  echo "${APISERVER_SERVER_CERT}" | base64 --decode > "${APISERVER_SERVER_CERT_PATH}"
+
+  APISERVER_SERVER_KEY_PATH="${pki_dir}/apiserver.key"
+  echo "${APISERVER_SERVER_KEY}" | base64 --decode > "${APISERVER_SERVER_KEY_PATH}"
 
   if [[ -z "${APISERVER_CLIENT_CERT:-}" || -z "${APISERVER_CLIENT_KEY:-}" ]]; then
     APISERVER_CLIENT_CERT="${KUBEAPISERVER_CERT}"
-    APISERVER_CLIENT_CERT_PATH="${pki_dir}/apiserver-client.crt"
-    echo "${APISERVER_CLIENT_CERT}" | base64 --decode > "${APISERVER_CLIENT_CERT_PATH}"
-
     APISERVER_CLIENT_KEY="${KUBEAPISERVER_KEY}"
-    APISERVER_CLIENT_KEY_PATH="${pki_dir}/apiserver-client.key"
-    echo "${APISERVER_CLIENT_KEY}" | base64 --decode > "${APISERVER_CLIENT_KEY_PATH}"
   fi
+
+  APISERVER_CLIENT_CERT_PATH="${pki_dir}/apiserver-client.crt"
+  echo "${APISERVER_CLIENT_CERT}" | base64 --decode > "${APISERVER_CLIENT_CERT_PATH}"
+
+  APISERVER_CLIENT_KEY_PATH="${pki_dir}/apiserver-client.key"
+  echo "${APISERVER_CLIENT_KEY}" | base64 --decode > "${APISERVER_CLIENT_KEY_PATH}"
 
   if [[ -z "${SERVICEACCOUNT_CERT:-}" || -z "${SERVICEACCOUNT_KEY:-}" ]]; then
     SERVICEACCOUNT_CERT="${MASTER_CERT}"
-    SERVICEACCOUNT_CERT_PATH="${pki_dir}/serviceaccount.crt"
-    echo "${SERVICEACCOUNT_CERT}" | base64 --decode > "${SERVICEACCOUNT_CERT_PATH}"
-
     SERVICEACCOUNT_KEY="${MASTER_KEY}"
-    SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
-    echo "${SERVICEACCOUNT_KEY}" | base64 --decode > "${SERVICEACCOUNT_KEY_PATH}"
   fi
+
+  SERVICEACCOUNT_CERT_PATH="${pki_dir}/serviceaccount.crt"
+  echo "${SERVICEACCOUNT_CERT}" | base64 --decode > "${SERVICEACCOUNT_CERT_PATH}"
+
+  SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
+  echo "${SERVICEACCOUNT_KEY}" | base64 --decode > "${SERVICEACCOUNT_KEY_PATH}"
 }
 
 # After the first boot and on upgrade, these files exist on the master-pd
 # and should never be touched again (except perhaps an additional service
-# account, see NB below.)
+# account, see NB below.) One exception is if METADATA_CLOBBERS_CONFIG is
+# enabled. In that case the basic_auth.csv file will be rewritten to make
+# sure it matches the metadata source of truth. 
 function create-master-auth {
   echo "Creating master auth files"
   local -r auth_dir="/etc/srv/kubernetes"
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
+    if [[ -e "${basic_auth_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
+      sed -i "/,${KUBE_USER},admin,system:masters$/d" "${basic_auth_csv}"
+      # The following is for the legacy form of the password line.
+      sed -i "/,${KUBE_USER},admin$/d" "${basic_auth_csv}"
+    fi
     replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
@@ -277,7 +295,7 @@ function create-master-auth {
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
   fi
   if [[ -n "${KUBELET_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "system:node:node-name,uid:kubelet,system:nodes"
+    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "kubelet,uid:kubelet,system:nodes"
   fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
@@ -645,7 +663,7 @@ function start-kubelet {
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --pod-manifest-path=/etc/kubernetes/manifests"
-  flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
+  flags+=" --experimental-mounter-path=${CONTAINERIZED_MOUNTER_HOME}/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
@@ -921,6 +939,18 @@ function compute-master-manifest-variables {
   fi
 }
 
+# A helper function that bind mounts kubelet dirs for running mount in a chroot
+function prepare-mounter-rootfs {
+  echo "Prepare containerized mounter"
+  mount --bind "${CONTAINERIZED_MOUNTER_HOME}" "${CONTAINERIZED_MOUNTER_HOME}"
+  mount -o remount,exec "${CONTAINERIZED_MOUNTER_HOME}"
+  CONTAINERIZED_MOUNTER_ROOTFS="${CONTAINERIZED_MOUNTER_HOME}/rootfs"
+  mount --rbind /var/lib/kubelet/ "${CONTAINERIZED_MOUNTER_ROOTFS}/var/lib/kubelet"
+  mount --make-rshared "${CONTAINERIZED_MOUNTER_ROOTFS}/var/lib/kubelet"
+  mount --bind -o ro /proc "${CONTAINERIZED_MOUNTER_ROOTFS}/proc"
+  mount --bind -o ro /dev "${CONTAINERIZED_MOUNTER_ROOTFS}/dev"
+}
+
 # A helper function for removing salt configuration and comments from a file.
 # This is mainly for preparing a manifest file.
 #
@@ -1051,6 +1081,21 @@ function start-kube-apiserver {
 
 
   local authorization_mode="RBAC"
+
+  # Create the ABAC file only if it's explicitly requested.
+  if [[ -n "${ENABLE_LEGACY_ABAC_16_ONLY:-}" ]]; then
+    if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
+      local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
+      remove-salt-config-comments "${abac_policy_json}"
+      if [[ -n "${KUBE_USER:-}" ]]; then
+        sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
+      else
+        sed -i -e "/{{kube_user}}/d" "${abac_policy_json}"
+      fi
+      cp "${abac_policy_json}" /etc/srv/kubernetes/
+    fi
+  fi
+
   # Load existing ABAC policy files written by versions < 1.6 of this script
   # TODO: only default to this legacy path when in upgrade mode
   ABAC_AUTHZ_FILE="${ABAC_AUTHZ_FILE:-/etc/srv/kubernetes/abac-authz-policy.jsonl}"
@@ -1472,15 +1517,11 @@ function override-kubectl {
     echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
 }
 
-function pre-warm-mounter {
-    echo "prewarming mounter"
-    ${KUBE_HOME}/bin/mounter &> /dev/null
-}
-
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
 
 KUBE_HOME="/home/kubernetes"
+CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
 if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
   echo "The ${KUBE_HOME}/kube-env file does not exist!! Terminate cluster initialization."
   exit 1
@@ -1527,7 +1568,6 @@ fi
 
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
-pre-warm-mounter
 assemble-docker-flags
 load-docker-images
 start-kubelet
@@ -1558,4 +1598,5 @@ else
   fi
 fi
 reset-motd
+prepare-mounter-rootfs
 echo "Done for the configuration for kubernetes"

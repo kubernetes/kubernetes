@@ -21,6 +21,7 @@ CASSANDRA_CFG=$CASSANDRA_CONF_DIR/cassandra.yaml
 # we are doing StatefulSet or just setting our seeds
 if [ -z "$CASSANDRA_SEEDS" ]; then
   HOSTNAME=$(hostname -f)
+  CASSANDRA_SEEDS=$(hostname -f)
 fi
 
 # The following vars relate to there counter parts in $CASSANDRA_CFG
@@ -167,5 +168,9 @@ if [[ $CASSANDRA_OPEN_JMX == 'true' ]]; then
   sed -ri 's/ -Dcom\.sun\.management\.jmxremote\.password\.file=\/etc\/cassandra\/jmxremote\.password//' $CASSANDRA_CONF_DIR/cassandra-env.sh
 fi
 
+chmod 700 "${CASSANDRA_DATA}"
+chown -c -R cassandra "${CASSANDRA_DATA}" "${CASSANDRA_CONF_DIR}"
+
 export CLASSPATH=/kubernetes-cassandra.jar
-cassandra -R -f
+
+su cassandra -c "$CASSANDRA_HOME/bin/cassandra -f"

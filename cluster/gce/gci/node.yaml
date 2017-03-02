@@ -34,7 +34,6 @@ write_files:
       Type=oneshot
       RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure-helper.sh
-      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/mounter
       ExecStart=/home/kubernetes/bin/configure-helper.sh
 
       [Install]

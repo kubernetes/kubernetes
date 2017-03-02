@@ -761,5 +761,21 @@ func testDynamicResources() []*discovery.APIGroupResources {
 				},
 			},
 		},
+		{
+			Group: metav1.APIGroup{
+				Name: "unit-test.test.com",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{GroupVersion: "unit-test.test.com/v1", Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{
+					GroupVersion: "unit-test.test.com/v1",
+					Version:      "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1": {
+					{Name: "widgets", Namespaced: true, Kind: "Widget"},
+				},
+			},
+		},
 	}
 }
