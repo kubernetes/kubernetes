@@ -48,6 +48,13 @@ function config-ip-firewall {
     iptables -A FORWARD -w -p UDP -j ACCEPT
     iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
+
+  iptables -N KUBE-METADATA-SERVER
+  iptables -A FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
+
+  if [[ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]]; then
+    iptables -A KUBE-METADATA-SERVER -j DROP
+  fi
 }
 
 function create-dirs {
