@@ -1931,7 +1931,7 @@ func TestValidateVolumes(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		names, errs := validateVolumes([]api.Volume{tc.vol}, field.NewPath("field"))
+		names, errs := ValidateVolumes([]api.Volume{tc.vol}, field.NewPath("field"))
 		if len(errs) > 0 && tc.errtype == "" {
 			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
 		} else if len(errs) > 1 {
@@ -1957,7 +1957,7 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "abc", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 		{Name: "abc", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 	}
-	_, errs := validateVolumes(dupsCase, field.NewPath("field"))
+	_, errs := ValidateVolumes(dupsCase, field.NewPath("field"))
 	if len(errs) == 0 {
 		t.Errorf("expected error")
 	} else if len(errs) != 1 {
@@ -2121,7 +2121,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 	}
-	if errs := validateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -2303,7 +2303,7 @@ func TestValidateEnv(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCases {
-		if errs := validateEnv(tc.envs, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateEnv(tc.envs, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
@@ -2341,7 +2341,7 @@ func TestValidateEnvFrom(t *testing.T) {
 			},
 		},
 	}
-	if errs := validateEnvFrom(successCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateEnvFrom(successCase, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -2413,7 +2413,7 @@ func TestValidateEnvFrom(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCases {
-		if errs := validateEnvFrom(tc.envs, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateEnvFrom(tc.envs, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
@@ -2439,7 +2439,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
 		{Name: "abc", MountPath: "c:/foo/bar"},
 	}
-	if errs := validateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -2454,7 +2454,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"subpath ends in ..":  {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
 	}
 	for k, v := range errorCases {
-		if errs := validateVolumeMounts(v, volumes, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, volumes, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
