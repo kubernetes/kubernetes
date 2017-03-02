@@ -45,7 +45,7 @@ func TestCreatePKIAssets(t *testing.T) {
 		{
 			// CIDR too small
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadmapi.API{AdvertiseAddresses: []string{"10.0.0.1"}},
+				API:        kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
 				Networking: kubeadmapi.Networking{ServiceSubnet: "10.0.0.1/1"},
 			},
 			expected: false,
@@ -53,14 +53,14 @@ func TestCreatePKIAssets(t *testing.T) {
 		{
 			// CIDR invalid
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadmapi.API{AdvertiseAddresses: []string{"10.0.0.1"}},
+				API:        kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
 				Networking: kubeadmapi.Networking{ServiceSubnet: "invalid"},
 			},
 			expected: false,
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadmapi.API{AdvertiseAddresses: []string{"10.0.0.1"}},
+				API:        kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
 				Networking: kubeadmapi.Networking{ServiceSubnet: "10.0.0.1/24"},
 			},
 			expected: true,

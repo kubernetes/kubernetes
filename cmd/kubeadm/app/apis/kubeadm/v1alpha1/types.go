@@ -41,9 +41,10 @@ type MasterConfiguration struct {
 }
 
 type API struct {
-	AdvertiseAddresses []string `json:"advertiseAddresses"`
-	ExternalDNSNames   []string `json:"externalDNSNames"`
-	Port               int32    `json:"port"`
+	// The address for the API server to advertise.
+	AdvertiseAddress string   `json:"advertiseAddress"`
+	ExternalDNSNames []string `json:"externalDNSNames"`
+	BindPort         int32    `json:"bindPort"`
 }
 
 type Discovery struct {

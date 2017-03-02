@@ -28,7 +28,8 @@ func KubeadmFuzzerFuncs(t apitesting.TestingCommon) []interface{} {
 		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.KubernetesVersion = "v10"
-			obj.API.Port = 20
+			obj.API.BindPort = 20
+			obj.API.AdvertiseAddress = "foo"
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
 			obj.AuthorizationMode = "foo"

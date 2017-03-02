@@ -380,7 +380,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 	}{
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadm.API{Port: 123},
+				API:        kubeadm.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
 			},
 			expected: []string{
@@ -405,12 +405,13 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/front-proxy-ca.crt",
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=RBAC",
+				"--advertise-address=1.2.3.4",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadm.API{Port: 123, AdvertiseAddresses: []string{"foo"}},
+				API:        kubeadm.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
 				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
 			},
 			expected: []string{
@@ -435,13 +436,13 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/front-proxy-ca.crt",
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=RBAC",
-				"--advertise-address=foo",
+				"--advertise-address=4.3.2.1",
 				"--etcd-servers=http://127.0.0.1:2379",
 			},
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadm.API{Port: 123},
+				API:        kubeadm.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
 				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
 				Etcd:       kubeadm.Etcd{CertFile: "fiz", KeyFile: "faz"},
 			},
@@ -467,6 +468,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-client-ca-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/front-proxy-ca.crt",
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=RBAC",
+				"--advertise-address=4.3.2.1",
 				"--etcd-servers=http://127.0.0.1:2379",
 				"--etcd-certfile=fiz",
 				"--etcd-keyfile=faz",
