@@ -193,7 +193,6 @@ func (dc *DeploymentController) deleteDeployment(obj interface{}) {
 // addReplicaSet enqueues the deployment that manages a ReplicaSet when the ReplicaSet is created.
 func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 	rs := obj.(*extensions.ReplicaSet)
-	glog.V(4).Infof("ReplicaSet %s added.", rs.Name)
 
 	if rs.DeletionTimestamp != nil {
 		// On a restart of the controller manager, it's possible for an object to
@@ -208,6 +207,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 			// It's controller by a different type of controller.
 			return
 		}
+		glog.V(4).Infof("ReplicaSet %s added.", rs.Name)
 		d, err := dc.dLister.Deployments(rs.Namespace).Get(controllerRef.Name)
 		if err != nil {
 			return
@@ -218,7 +218,12 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 
 	// Otherwise, it's an orphan. Get a list of all matching Deployments and sync
 	// them to see if anyone wants to adopt it.
-	for _, d := range dc.getDeploymentsForReplicaSet(rs) {
+	ds := dc.getDeploymentsForReplicaSet(rs)
+	if len(ds) == 0 {
+		return
+	}
+	glog.V(4).Infof("Orphan ReplicaSet %s added.", rs.Name)
+	for _, d := range ds {
 		dc.enqueueDeployment(d)
 	}
 }
@@ -228,7 +233,6 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *extensions.ReplicaSet) []*extensions.Deployment {
 	deployments, err := dc.dLister.GetDeploymentsForReplicaSet(rs)
 	if err != nil || len(deployments) == 0 {
-		glog.V(4).Infof("Error: %v. No deployment found for ReplicaSet %v, deployment controller will avoid syncing.", err, rs.Name)
 		return nil
 	}
 	// Because all ReplicaSet's belonging to a deployment should have a unique label key,
@@ -256,7 +260,6 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 		// Two different versions of the same replica set will always have different RVs.
 		return
 	}
-	glog.V(4).Infof("ReplicaSet %s updated.", curRS.Name)
 
 	labelChanged := !reflect.DeepEqual(curRS.Labels, oldRS.Labels)
 
@@ -278,6 +281,7 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 			// It's controlled by a different type of controller.
 			return
 		}
+		glog.V(4).Infof("ReplicaSet %s updated.", curRS.Name)
 		d, err := dc.dLister.Deployments(curRS.Namespace).Get(curControllerRef.Name)
 		if err != nil {
 			return
@@ -288,8 +292,13 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
+	ds := dc.getDeploymentsForReplicaSet(curRS)
+	if len(ds) == 0 {
+		return
+	}
+	glog.V(4).Infof("Orphan ReplicaSet %s updated.", curRS.Name)
 	if labelChanged || controllerRefChanged {
-		for _, d := range dc.getDeploymentsForReplicaSet(curRS) {
+		for _, d := range ds {
 			dc.enqueueDeployment(d)
 		}
 	}
@@ -317,7 +326,6 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 			return
 		}
 	}
-	glog.V(4).Infof("ReplicaSet %s deleted.", rs.Name)
 
 	controllerRef := controller.GetControllerOf(rs)
 	if controllerRef == nil {
@@ -328,6 +336,7 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 		// It's controlled by a different type of controller.
 		return
 	}
+	glog.V(4).Infof("ReplicaSet %s deleted.", rs.Name)
 
 	d, err := dc.dLister.Deployments(rs.Namespace).Get(controllerRef.Name)
 	if err != nil {
