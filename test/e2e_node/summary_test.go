@@ -116,6 +116,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"MajorPageFaults": bounded(0, 10),
 						}),
 						"Rootfs": ptrMatchAllFields(gstruct.Fields{
+							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 10*mb),
@@ -124,6 +125,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"InodesUsed":     bounded(0, 1E8),
 						}),
 						"Logs": ptrMatchAllFields(gstruct.Fields{
+							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 10*mb),
@@ -145,6 +147,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
 						"Name": Equal("test-empty-dir"),
 						"FsStats": gstruct.MatchAllFields(gstruct.Fields{
+							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 1*mb),
@@ -183,6 +186,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"TxErrors": bounded(0, 100000),
 					})),
 					"Fs": ptrMatchAllFields(gstruct.Fields{
+						"Time":           recent(maxStatsAge),
 						"AvailableBytes": fsCapacityBounds,
 						"CapacityBytes":  fsCapacityBounds,
 						"UsedBytes":      bounded(kb, 10*gb),
@@ -192,6 +196,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					}),
 					"Runtime": ptrMatchAllFields(gstruct.Fields{
 						"ImageFs": ptrMatchAllFields(gstruct.Fields{
+							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 10*gb),
