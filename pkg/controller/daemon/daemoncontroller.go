@@ -968,13 +968,15 @@ func daemonSetPredicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, 
 
 // newControllerRef creates a ControllerRef pointing to the given DaemonSet.
 func newControllerRef(ds *extensions.DaemonSet) *metav1.OwnerReference {
+	blockOwnerDeletion := true
 	isController := true
 	return &metav1.OwnerReference{
-		APIVersion: controllerKind.GroupVersion().String(),
-		Kind:       controllerKind.Kind,
-		Name:       ds.Name,
-		UID:        ds.UID,
-		Controller: &isController,
+		APIVersion:         controllerKind.GroupVersion().String(),
+		Kind:               controllerKind.Kind,
+		Name:               ds.Name,
+		UID:                ds.UID,
+		BlockOwnerDeletion: &blockOwnerDeletion,
+		Controller:         &isController,
 	}
 }
 
