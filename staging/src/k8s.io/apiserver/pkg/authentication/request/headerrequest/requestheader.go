@@ -18,6 +18,7 @@ package headerrequest
 
 import (
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -106,12 +107,32 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 
 func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	name := headerValue(req.Header, a.nameHeaders)
-	if len(name) == 0 {
-		return nil, false, nil
-	}
 	groups := allHeaderValues(req.Header, a.groupHeaders)
 	extra := newExtra(req.Header, a.extraHeaderPrefixes)
 
+	if len(name) != 0 {
+		a.clearHeaders(req, extra)
+		return &user.DefaultInfo{
+			Name:   name,
+			Groups: groups,
+			Extra:  extra,
+		}, true, nil
+	}
+
+	if len(groups) != 0 || len(extra) != 0 {
+		return nil, false, errors.New("cannot provide group or extra information without a user")
+	}
+
+	a.clearHeaders(req, extra)
+	return &user.DefaultInfo{
+		Name:   user.Anonymous,
+		Groups: []string{user.AllUnauthenticated},
+		Extra:  map[string][]string{},
+	}, true, nil
+
+}
+
+func (a *requestHeaderAuthRequestHandler) clearHeaders(req *http.Request, extra map[string][]string) {
 	// clear headers used for authentication
 	for _, headerName := range a.nameHeaders {
 		req.Header.Del(headerName)
@@ -119,17 +140,12 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 	for _, headerName := range a.groupHeaders {
 		req.Header.Del(headerName)
 	}
+
 	for k := range extra {
 		for _, prefix := range a.extraHeaderPrefixes {
 			req.Header.Del(prefix + k)
 		}
 	}
-
-	return &user.DefaultInfo{
-		Name:   name,
-		Groups: groups,
-		Extra:  extra,
-	}, true, nil
 }
 
 func headerValue(h http.Header, headerNames []string) string {

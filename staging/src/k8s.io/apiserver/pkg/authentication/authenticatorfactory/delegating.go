@@ -27,10 +27,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
-	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
-	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
+	"k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
-	"k8s.io/apiserver/pkg/authentication/user"
 	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	"k8s.io/client-go/util/cert"
@@ -56,20 +54,9 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	authenticators := []authenticator.Request{}
 	securityDefinitions := spec.SecurityDefinitions{}
 
-	// front-proxy first, then remote
-	// Add the front proxy authenticator if requested
-	if c.RequestHeaderConfig != nil {
-		requestHeaderAuthenticator, err := headerrequest.NewSecure(
-			c.RequestHeaderConfig.ClientCA,
-			c.RequestHeaderConfig.AllowedClientNames,
-			c.RequestHeaderConfig.UsernameHeaders,
-			c.RequestHeaderConfig.GroupHeaders,
-			c.RequestHeaderConfig.ExtraHeaderPrefixes,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		authenticators = append(authenticators, requestHeaderAuthenticator)
+	requestHeaderAuthenticator, err := c.RequestHeaderConfig.ToAuthenticator()
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// x509 client cert auth
@@ -100,16 +87,21 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 		}
 	}
 
-	if len(authenticators) == 0 {
-		if c.Anonymous {
-			return anonymous.NewAuthenticator(), &securityDefinitions, nil
-		}
-		return nil, nil, errors.New("No authentication method configured")
+	topLevelAuthenticators := []authenticator.Request{}
+	if requestHeaderAuthenticator != nil {
+		topLevelAuthenticators = append(topLevelAuthenticators, requestHeaderAuthenticator)
+	}
+	if len(authenticators) > 0 {
+		topLevelAuthenticators = append(topLevelAuthenticators, union.New(authenticators...))
+	}
+	if c.Anonymous {
+		topLevelAuthenticators = append(topLevelAuthenticators, anonymous.NewAuthenticator())
 	}
 
-	authenticator := group.NewGroupAdder(unionauth.New(authenticators...), []string{user.AllAuthenticated})
-	if c.Anonymous {
-		authenticator = unionauth.NewFailOnError(authenticator, anonymous.NewAuthenticator())
+	if len(topLevelAuthenticators) == 0 {
+		return nil, &securityDefinitions, errors.New("No authentication method configured")
+
 	}
-	return authenticator, &securityDefinitions, nil
+
+	return group.NewAuthenticatedGroupAdder(union.NewFailOnError(topLevelAuthenticators...)), &securityDefinitions, nil
 }
