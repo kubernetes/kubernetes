@@ -54,6 +54,7 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
+        "//pkg/client/retry:go_default_library",
         "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
