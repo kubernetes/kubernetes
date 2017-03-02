@@ -84,7 +84,7 @@ func IsServiceIPRequested(service *Service) bool {
 
 var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes),
-	metav1.FinalizerOrphan,
+	metav1.FinalizerOrphanDependents,
 )
 
 func IsStandardFinalizerName(str string) bool {
@@ -590,4 +590,43 @@ func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, er
 		return &affinity, nil
 	}
 	return nil, nil
+}
+
+// GetPersistentVolumeClass returns StorageClassName.
+func GetPersistentVolumeClass(volume *PersistentVolume) string {
+	// Use beta annotation first
+	if class, found := volume.Annotations[BetaStorageClassAnnotation]; found {
+		return class
+	}
+
+	return volume.Spec.StorageClassName
+}
+
+// GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
+// requested, it returns "".
+func GetPersistentVolumeClaimClass(claim *PersistentVolumeClaim) string {
+	// Use beta annotation first
+	if class, found := claim.Annotations[BetaStorageClassAnnotation]; found {
+		return class
+	}
+
+	if claim.Spec.StorageClassName != nil {
+		return *claim.Spec.StorageClassName
+	}
+
+	return ""
+}
+
+// PersistentVolumeClaimHasClass returns true if given claim has set StorageClassName field.
+func PersistentVolumeClaimHasClass(claim *PersistentVolumeClaim) bool {
+	// Use beta annotation first
+	if _, found := claim.Annotations[BetaStorageClassAnnotation]; found {
+		return true
+	}
+
+	if claim.Spec.StorageClassName != nil {
+		return true
+	}
+
+	return false
 }

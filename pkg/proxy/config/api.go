@@ -17,10 +17,13 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -28,48 +31,145 @@ import (
 // NewSourceAPI creates config source that watches for changes to the services and endpoints.
 func NewSourceAPI(c cache.Getter, period time.Duration, servicesChan chan<- ServiceUpdate, endpointsChan chan<- EndpointsUpdate) {
 	servicesLW := cache.NewListWatchFromClient(c, "services", metav1.NamespaceAll, fields.Everything())
-	cache.NewReflector(servicesLW, &api.Service{}, NewServiceStore(nil, servicesChan), period).Run()
-
 	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", metav1.NamespaceAll, fields.Everything())
-	cache.NewReflector(endpointsLW, &api.Endpoints{}, NewEndpointsStore(nil, endpointsChan), period).Run()
+	newSourceAPI(servicesLW, endpointsLW, period, servicesChan, endpointsChan, wait.NeverStop)
 }
 
-// NewServiceStore creates an undelta store that expands updates to the store into
-// ServiceUpdate events on the channel. If no store is passed, a default store will
-// be initialized. Allows reuse of a cache store across multiple components.
-func NewServiceStore(store cache.Store, ch chan<- ServiceUpdate) cache.Store {
-	fn := func(objs []interface{}) {
-		var services []api.Service
-		for _, o := range objs {
-			services = append(services, *(o.(*api.Service)))
+func newSourceAPI(
+	servicesLW cache.ListerWatcher,
+	endpointsLW cache.ListerWatcher,
+	period time.Duration,
+	servicesChan chan<- ServiceUpdate,
+	endpointsChan chan<- EndpointsUpdate,
+	stopCh <-chan struct{}) {
+	serviceController := NewServiceController(servicesLW, period, servicesChan)
+	go serviceController.Run(stopCh)
+
+	endpointsController := NewEndpointsController(endpointsLW, period, endpointsChan)
+	go endpointsController.Run(stopCh)
+
+	if !cache.WaitForCacheSync(stopCh, serviceController.HasSynced, endpointsController.HasSynced) {
+		utilruntime.HandleError(fmt.Errorf("source controllers not synced"))
+		return
+	}
+	servicesChan <- ServiceUpdate{Op: SYNCED}
+	endpointsChan <- EndpointsUpdate{Op: SYNCED}
+}
+
+func sendAddService(servicesChan chan<- ServiceUpdate) func(obj interface{}) {
+	return func(obj interface{}) {
+		service, ok := obj.(*api.Service)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Service: %v", obj))
+			return
 		}
-		ch <- ServiceUpdate{Op: SET, Services: services}
-	}
-	if store == nil {
-		store = cache.NewStore(cache.MetaNamespaceKeyFunc)
-	}
-	return &cache.UndeltaStore{
-		Store:    store,
-		PushFunc: fn,
+		servicesChan <- ServiceUpdate{Op: ADD, Service: service}
 	}
 }
 
-// NewEndpointsStore creates an undelta store that expands updates to the store into
-// EndpointsUpdate events on the channel. If no store is passed, a default store will
-// be initialized. Allows reuse of a cache store across multiple components.
-func NewEndpointsStore(store cache.Store, ch chan<- EndpointsUpdate) cache.Store {
-	fn := func(objs []interface{}) {
-		var endpoints []api.Endpoints
-		for _, o := range objs {
-			endpoints = append(endpoints, *(o.(*api.Endpoints)))
+func sendUpdateService(servicesChan chan<- ServiceUpdate) func(oldObj, newObj interface{}) {
+	return func(_, newObj interface{}) {
+		service, ok := newObj.(*api.Service)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Service: %v", newObj))
+			return
 		}
-		ch <- EndpointsUpdate{Op: SET, Endpoints: endpoints}
+		servicesChan <- ServiceUpdate{Op: UPDATE, Service: service}
 	}
-	if store == nil {
-		store = cache.NewStore(cache.MetaNamespaceKeyFunc)
+}
+
+func sendDeleteService(servicesChan chan<- ServiceUpdate) func(obj interface{}) {
+	return func(obj interface{}) {
+		var service *api.Service
+		switch t := obj.(type) {
+		case *api.Service:
+			service = t
+		case cache.DeletedFinalStateUnknown:
+			var ok bool
+			service, ok = t.Obj.(*api.Service)
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Service: %v", t.Obj))
+				return
+			}
+		default:
+			utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Service: %v", t))
+			return
+		}
+		servicesChan <- ServiceUpdate{Op: REMOVE, Service: service}
 	}
-	return &cache.UndeltaStore{
-		Store:    store,
-		PushFunc: fn,
+}
+
+func sendAddEndpoints(endpointsChan chan<- EndpointsUpdate) func(obj interface{}) {
+	return func(obj interface{}) {
+		endpoints, ok := obj.(*api.Endpoints)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Endpoints: %v", obj))
+			return
+		}
+		endpointsChan <- EndpointsUpdate{Op: ADD, Endpoints: endpoints}
 	}
+}
+
+func sendUpdateEndpoints(endpointsChan chan<- EndpointsUpdate) func(oldObj, newObj interface{}) {
+	return func(_, newObj interface{}) {
+		endpoints, ok := newObj.(*api.Endpoints)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Endpoints: %v", newObj))
+			return
+		}
+		endpointsChan <- EndpointsUpdate{Op: UPDATE, Endpoints: endpoints}
+	}
+}
+
+func sendDeleteEndpoints(endpointsChan chan<- EndpointsUpdate) func(obj interface{}) {
+	return func(obj interface{}) {
+		var endpoints *api.Endpoints
+		switch t := obj.(type) {
+		case *api.Endpoints:
+			endpoints = t
+		case cache.DeletedFinalStateUnknown:
+			var ok bool
+			endpoints, ok = t.Obj.(*api.Endpoints)
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Endpoints: %v", t.Obj))
+				return
+			}
+		default:
+			utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Endpoints: %v", obj))
+			return
+		}
+		endpointsChan <- EndpointsUpdate{Op: REMOVE, Endpoints: endpoints}
+	}
+}
+
+// NewServiceController creates a controller that is watching services and sending
+// updates into ServiceUpdate channel.
+func NewServiceController(lw cache.ListerWatcher, period time.Duration, ch chan<- ServiceUpdate) cache.Controller {
+	_, serviceController := cache.NewInformer(
+		lw,
+		&api.Service{},
+		period,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    sendAddService(ch),
+			UpdateFunc: sendUpdateService(ch),
+			DeleteFunc: sendDeleteService(ch),
+		},
+	)
+	return serviceController
+}
+
+// NewEndpointsController creates a controller that is watching endpoints and sending
+// updates into EndpointsUpdate channel.
+func NewEndpointsController(lw cache.ListerWatcher, period time.Duration, ch chan<- EndpointsUpdate) cache.Controller {
+	_, endpointsController := cache.NewInformer(
+		lw,
+		&api.Endpoints{},
+		period,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    sendAddEndpoints(ch),
+			UpdateFunc: sendUpdateEndpoints(ch),
+			DeleteFunc: sendDeleteEndpoints(ch),
+		},
+	)
+	return endpointsController
 }

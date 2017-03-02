@@ -810,7 +810,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 	}
 
 	// TODO: determine how this should be handled for rkt
-	opts, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
+	opts, _, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
 	if err != nil {
 		return err
 	}
@@ -1009,7 +1009,7 @@ func (r *Runtime) generateRunCommand(pod *v1.Pod, uuid, netnsName string) (strin
 		}
 	} else {
 		// Setup DNS.
-		dnsServers, dnsSearches, err := r.runtimeHelper.GetClusterDNS(pod)
+		dnsServers, dnsSearches, _, err := r.runtimeHelper.GetClusterDNS(pod)
 		if err != nil {
 			return "", err
 		}
@@ -1297,7 +1297,7 @@ func (r *Runtime) setupPodNetwork(pod *v1.Pod) (string, string, error) {
 
 	// Set up networking with the network plugin
 	containerID := kubecontainer.ContainerID{ID: string(pod.UID)}
-	err = r.network.SetUpPod(pod.Namespace, pod.Name, containerID)
+	err = r.network.SetUpPod(pod.Namespace, pod.Name, containerID, pod.Annotations)
 	if err != nil {
 		return "", "", err
 	}

@@ -78,7 +78,7 @@ func TestDescribePodTolerations(t *testing.T) {
 		Spec: api.PodSpec{
 			Tolerations: []api.Toleration{
 				{Key: "key1", Value: "value1"},
-				{Key: "key2", Value: "value2"},
+				{Key: "key2", Value: "value2", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{300}[0]},
 			},
 		},
 	})
@@ -88,7 +88,7 @@ func TestDescribePodTolerations(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "key1=value1") || !strings.Contains(out, "key2=value2") || !strings.Contains(out, "Tolerations:") {
+	if !strings.Contains(out, "key1=value1") || !strings.Contains(out, "key2=value2:NoExecute for 300s") || !strings.Contains(out, "Tolerations:") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -670,7 +670,13 @@ func TestDescribeDeployment(t *testing.T) {
 		Spec: v1beta1.DeploymentSpec{
 			Replicas: util.Int32Ptr(1),
 			Selector: &metav1.LabelSelector{},
-			Template: v1.PodTemplateSpec{},
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Image: "mytest-image:latest"},
+					},
+				},
+			},
 		},
 	})
 	d := DeploymentDescriber{fake, versionedFake}
@@ -678,7 +684,7 @@ func TestDescribeDeployment(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") {
+	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") || !strings.Contains(out, "Containers:") || !strings.Contains(out, "mytest-image:latest") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -1262,6 +1268,40 @@ func TestDescribeEvents(t *testing.T) {
 		}
 		if strings.Contains(out, "Events:") {
 			t.Errorf("events found for %q when ShowEvents=false: %s", name, out)
+		}
+	}
+}
+
+func TestPrintLabelsMultiline(t *testing.T) {
+	var maxLenAnnotationStr string = "MaxLenAnnotation=Multicast addressing can be used in the link layer (Layer 2 in the OSI model), such as Ethernet multicast, and at the internet layer (Layer 3 for OSI) for Internet Protocol Version 4 "
+	testCases := []struct {
+		annotations map[string]string
+		expectPrint string
+	}{
+		{
+			annotations: map[string]string{"col1": "asd", "COL2": "zxc"},
+			expectPrint: "Annotations:\tCOL2=zxc\n\tcol1=asd\n",
+		},
+		{
+			annotations: map[string]string{"MaxLenAnnotation": maxLenAnnotationStr[17:]},
+			expectPrint: "Annotations:\t" + maxLenAnnotationStr + "\n",
+		},
+		{
+			annotations: map[string]string{"MaxLenAnnotation": maxLenAnnotationStr[17:] + "1"},
+			expectPrint: "Annotations:\t" + maxLenAnnotationStr + "...\n",
+		},
+		{
+			annotations: map[string]string{},
+			expectPrint: "Annotations:\t<none>\n",
+		},
+	}
+	for i, testCase := range testCases {
+		out := new(bytes.Buffer)
+		writer := &PrefixWriter{out}
+		printAnnotationsMultiline(writer, "Annotations", testCase.annotations)
+		output := out.String()
+		if output != testCase.expectPrint {
+			t.Errorf("Test case %d: expected to find %q in output: %q", i, testCase.expectPrint, output)
 		}
 	}
 }

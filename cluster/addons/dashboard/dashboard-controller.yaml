@@ -17,7 +17,6 @@ spec:
         k8s-app: kubernetes-dashboard
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
       containers:
       - name: kubernetes-dashboard
@@ -38,3 +37,6 @@ spec:
             port: 9090
           initialDelaySeconds: 30
           timeoutSeconds: 30
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"

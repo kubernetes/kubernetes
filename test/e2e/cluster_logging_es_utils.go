@@ -46,6 +46,10 @@ func newEsLogsProvider(f *framework.Framework) (*esLogsProvider, error) {
 	return &esLogsProvider{Framework: f}, nil
 }
 
+func (logsProvider *esLogsProvider) FluentdApplicationName() string {
+	return "fluentd-es"
+}
+
 // Ensures that elasticsearch is running and ready to serve requests
 func (logsProvider *esLogsProvider) EnsureWorking() error {
 	f := logsProvider.Framework

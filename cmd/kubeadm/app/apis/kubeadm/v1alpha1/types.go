@@ -34,12 +34,17 @@ type MasterConfiguration struct {
 	// controller manager are managed by Kubernetes itself. This option is likely to
 	// become the default in the future.
 	SelfHosted bool `json:"selfHosted"`
+
+	APIServerExtraArgs         map[string]string `json:"apiServerExtraArgs"`
+	ControllerManagerExtraArgs map[string]string `json:"controllerManagerExtraArgs"`
+	SchedulerExtraArgs         map[string]string `json:"schedulerExtraArgs"`
 }
 
 type API struct {
-	AdvertiseAddresses []string `json:"advertiseAddresses"`
-	ExternalDNSNames   []string `json:"externalDNSNames"`
-	Port               int32    `json:"port"`
+	// The address for the API server to advertise.
+	AdvertiseAddress string   `json:"advertiseAddress"`
+	ExternalDNSNames []string `json:"externalDNSNames"`
+	BindPort         int32    `json:"bindPort"`
 }
 
 type Discovery struct {
@@ -78,8 +83,12 @@ type Etcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	Discovery  Discovery `json:"discovery"`
-	CACertPath string    `json:"caCertPath"`
+	CACertPath               string   `json:"caCertPath"`
+	DiscoveryFile            string   `json:"discoveryFile"`
+	DiscoveryToken           string   `json:"discoveryToken"`
+	DiscoveryTokenAPIServers []string `json:"discoveryTokenAPIServers"`
+	TLSBootstrapToken        string   `json:"tlsBootstrapToken"`
+	Token                    string   `json:"token"`
 }
 
 // ClusterInfo TODO add description

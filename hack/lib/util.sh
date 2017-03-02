@@ -470,7 +470,7 @@ kube::util::ensure_godep_version() {
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
 
-  GOPATH="${KUBE_TEMP}/go" go get -u github.com/tools/godep 2>/dev/null
+  GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep 2>/dev/null
   pushd "${KUBE_TEMP}/go/src/github.com/tools/godep" >/dev/null
     git checkout "${1:-v74}"
     GOPATH="${KUBE_TEMP}/go" go install .

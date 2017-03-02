@@ -43,13 +43,17 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/preflight"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -65,6 +69,9 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
+
+const etcdRetryLimit = 60
+const etcdRetryInterval = 1 * time.Second
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
@@ -85,26 +92,47 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
+	config, sharedInformers, err := BuildMasterConfig(s)
+	if err != nil {
+		return err
+	}
+
+	return RunServer(config, sharedInformers, wait.NeverStop)
+}
+
+// RunServer uses the provided config and shared informers to run the apiserver.  It does not return.
+func RunServer(config *master.Config, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) error {
+	m, err := config.Complete().New()
+	if err != nil {
+		return err
+	}
+
+	sharedInformers.Start(stopCh)
+	return m.GenericAPIServer.PrepareRun().Run(stopCh)
+}
+
+// BuildMasterConfig creates all the resources for running the API server, but runs none of them
+func BuildMasterConfig(s *options.ServerRunOptions) (*master.Config, informers.SharedInformerFactory, error) {
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
-		return err
+		return nil, nil, err
 	}
 	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
 	if err != nil {
-		return fmt.Errorf("error determining service IP ranges: %v", err)
+		return nil, nil, fmt.Errorf("error determining service IP ranges: %v", err)
 	}
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), apiServerServiceIP); err != nil {
-		return fmt.Errorf("error creating self-signed certificates: %v", err)
+		return nil, nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
-		return fmt.Errorf("error setting the external host value: %v", err)
+		return nil, nil, fmt.Errorf("error setting the external host value: %v", err)
 	}
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
 
 	// validate options
 	if errs := s.Validate(); len(errs) != 0 {
-		return utilerrors.NewAggregate(errs)
+		return nil, nil, utilerrors.NewAggregate(errs)
 	}
 
 	// create config from options
@@ -112,22 +140,25 @@ func Run(s *options.ServerRunOptions) error {
 		WithSerializer(api.Codecs)
 
 	if err := s.GenericServerRunOptions.ApplyTo(genericConfig); err != nil {
-		return err
+		return nil, nil, err
 	}
 	if err := s.InsecureServing.ApplyTo(genericConfig); err != nil {
-		return err
+		return nil, nil, err
 	}
 	if err := s.SecureServing.ApplyTo(genericConfig); err != nil {
-		return err
+		return nil, nil, err
 	}
 	if err := s.Authentication.ApplyTo(genericConfig); err != nil {
-		return err
+		return nil, nil, err
 	}
 	if err := s.Audit.ApplyTo(genericConfig); err != nil {
-		return err
+		return nil, nil, err
 	}
 	if err := s.Features.ApplyTo(genericConfig); err != nil {
-		return err
+		return nil, nil, err
+	}
+	if err := utilwait.PollImmediate(etcdRetryInterval, etcdRetryLimit*etcdRetryInterval, preflight.EtcdConnection{ServerList: s.Etcd.StorageConfig.ServerList}.CheckEtcdServers); err != nil {
+		return nil, nil, fmt.Errorf("error waiting for etcd connection: %v", err)
 	}
 
 	// Use protobufs for self-communication.
@@ -155,7 +186,7 @@ func Run(s *options.ServerRunOptions) error {
 		var installSSHKey tunneler.InstallSSHKey
 		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
 		if err != nil {
-			return fmt.Errorf("cloud provider could not be initialized: %v", err)
+			return nil, nil, fmt.Errorf("cloud provider could not be initialized: %v", err)
 		}
 		if cloud != nil {
 			if instances, supported := cloud.Instances(); supported {
@@ -163,10 +194,10 @@ func Run(s *options.ServerRunOptions) error {
 			}
 		}
 		if s.KubeletConfig.Port == 0 {
-			return fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
+			return nil, nil, fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
 		}
 		if s.KubeletConfig.ReadOnlyPort == 0 {
-			return fmt.Errorf("must enable kubelet readonly port if proxy ssh-tunneling is specified")
+			return nil, nil, fmt.Errorf("must enable kubelet readonly port if proxy ssh-tunneling is specified")
 		}
 		// Set up the nodeTunneler
 		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
@@ -211,7 +242,7 @@ func Run(s *options.ServerRunOptions) error {
 
 	storageGroupsToEncodingVersion, err := s.StorageSerialization.StorageGroupsToEncodingVersion()
 	if err != nil {
-		return fmt.Errorf("error generating storage version map: %s", err)
+		return nil, nil, fmt.Errorf("error generating storage version map: %s", err)
 	}
 	storageFactory, err := kubeapiserver.NewStorageFactory(
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, api.Codecs,
@@ -220,8 +251,10 @@ func Run(s *options.ServerRunOptions) error {
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
 		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {
-		return fmt.Errorf("error in initializing storage factory: %s", err)
+		return nil, nil, fmt.Errorf("error in initializing storage factory: %s", err)
 	}
+	// keep Deployments in extensions for backwards compatibility, we'll have to migrate at some point, eventually
+	storageFactory.AddCohabitatingResources(extensions.Resource("deployments"), apps.Resource("deployments"))
 	for _, override := range s.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		if len(tokens) != 2 {
@@ -257,7 +290,7 @@ func Run(s *options.ServerRunOptions) error {
 		// go directly to etcd to avoid recursive auth insanity
 		storageConfig, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
 		if err != nil {
-			return fmt.Errorf("unable to get serviceaccounts storage: %v", err)
+			return nil, nil, fmt.Errorf("unable to get serviceaccounts storage: %v", err)
 		}
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
@@ -266,7 +299,7 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
 		if len(kubeAPIVersions) == 0 {
-			return fmt.Errorf("failed to create clientset: %v", err)
+			return nil, nil, fmt.Errorf("failed to create clientset: %v", err)
 		}
 
 		// KUBE_API_VERSIONS is used in test-update-storage-objects.sh, disabling a number of API
@@ -289,24 +322,24 @@ func Run(s *options.ServerRunOptions) error {
 
 	apiAuthenticator, securityDefinitions, err := authenticatorConfig.New()
 	if err != nil {
-		return fmt.Errorf("invalid authentication config: %v", err)
+		return nil, nil, fmt.Errorf("invalid authentication config: %v", err)
 	}
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizationConfig.New()
 	if err != nil {
-		return fmt.Errorf("invalid Authorization Config: %v", err)
+		return nil, nil, fmt.Errorf("invalid Authorization Config: %v", err)
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
 	pluginInitializer := kubeadmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
 	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
 	if err != nil {
-		return fmt.Errorf("failed to read plugin config: %v", err)
+		return nil, nil, fmt.Errorf("failed to read plugin config: %v", err)
 	}
 	admissionController, err := admission.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
 	if err != nil {
-		return fmt.Errorf("failed to initialize plugins: %v", err)
+		return nil, nil, fmt.Errorf("failed to initialize plugins: %v", err)
 	}
 
 	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
@@ -331,16 +364,16 @@ func Run(s *options.ServerRunOptions) error {
 	)
 
 	if err := s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	clientCA, err := readCAorNil(s.Authentication.ClientCert.ClientCA)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	requestHeaderProxyCA, err := readCAorNil(s.Authentication.RequestHeader.ClientCAFile)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	config := &master.Config{
 		GenericConfig: genericConfig,
@@ -381,14 +414,7 @@ func Run(s *options.ServerRunOptions) error {
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
 	}
 
-	m, err := config.Complete().New()
-	if err != nil {
-		return err
-	}
-
-	sharedInformers.Start(wait.NeverStop)
-	m.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
-	return nil
+	return config, sharedInformers, nil
 }
 
 func readCAorNil(file string) ([]byte, error) {

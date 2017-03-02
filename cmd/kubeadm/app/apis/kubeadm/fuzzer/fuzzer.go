@@ -28,7 +28,8 @@ func KubeadmFuzzerFuncs(t apitesting.TestingCommon) []interface{} {
 		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.KubernetesVersion = "v10"
-			obj.API.Port = 20
+			obj.API.BindPort = 20
+			obj.API.AdvertiseAddress = "foo"
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
 			obj.AuthorizationMode = "foo"
@@ -37,7 +38,12 @@ func KubeadmFuzzerFuncs(t apitesting.TestingCommon) []interface{} {
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.CACertPath = "foo"
-			obj.Discovery.Token = &kubeadm.TokenDiscovery{}
+			obj.CACertPath = "foo"
+			obj.DiscoveryFile = "foo"
+			obj.DiscoveryToken = "foo"
+			obj.DiscoveryTokenAPIServers = []string{"foo"}
+			obj.TLSBootstrapToken = "foo"
+			obj.Token = "foo"
 		},
 	}
 }

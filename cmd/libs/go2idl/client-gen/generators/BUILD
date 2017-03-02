@@ -14,7 +14,6 @@ go_library(
         "generator_for_clientset.go",
         "generator_for_expansion.go",
         "generator_for_group.go",
-        "generator_for_scheme.go",
         "generator_for_type.go",
         "tags.go",
     ],
@@ -22,6 +21,7 @@ go_library(
     deps = [
         "//cmd/libs/go2idl/client-gen/args:go_default_library",
         "//cmd/libs/go2idl/client-gen/generators/fake:go_default_library",
+        "//cmd/libs/go2idl/client-gen/generators/scheme:go_default_library",
         "//cmd/libs/go2idl/client-gen/types:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/gengo/args",
@@ -43,6 +43,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/libs/go2idl/client-gen/generators/fake:all-srcs",
+        "//cmd/libs/go2idl/client-gen/generators/scheme:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -49,8 +49,8 @@ type HandlerRunner interface {
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*RunContainerOptions, error)
-	GetClusterDNS(pod *v1.Pod) (dnsServers []string, dnsSearches []string, err error)
+	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (contOpts *RunContainerOptions, useClusterFirstPolicy bool, err error)
+	GetClusterDNS(pod *v1.Pod) (dnsServers []string, dnsSearches []string, useClusterFirstPolicy bool, err error)
 	// GetPodCgroupParent returns the the CgroupName identifer, and its literal cgroupfs form on the host
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string)
@@ -119,8 +119,31 @@ func EnvVarsToMap(envs []EnvVar) map[string]string {
 	for _, env := range envs {
 		result[env.Name] = env.Value
 	}
+	return result
+}
+
+// V1EnvVarsToMap constructs a map of environment name to value from a slice
+// of env vars.
+func V1EnvVarsToMap(envs []v1.EnvVar) map[string]string {
+	result := map[string]string{}
+	for _, env := range envs {
+		result[env.Name] = env.Value
+	}
 
 	return result
+}
+
+// ExpandContainerCommandOnlyStatic substitutes only static environment variable values from the
+// container environment definitions. This does *not* include valueFrom substitutions.
+// TODO: callers should use ExpandContainerCommandAndArgs with a fully resolved list of environment.
+func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVar) (command []string) {
+	mapping := expansion.MappingFuncFor(V1EnvVarsToMap(envs))
+	if len(containerCommand) != 0 {
+		for _, cmd := range containerCommand {
+			command = append(command, expansion.Expand(cmd, mapping))
+		}
+	}
+	return command
 }
 
 func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (command []string, args []string) {

@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/v1beta1"
@@ -244,7 +243,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: no volume found", claimToClaimKey(claim))
 			// No PV could be found
 			// OBSERVATION: pvc is "Pending", will retry
-			if storageutil.GetClaimStorageClass(claim) != "" || metav1.HasAnnotation(claim.ObjectMeta, storageutil.AlphaStorageClassAnnotation) {
+			if v1.GetPersistentVolumeClaimClass(claim) != "" || metav1.HasAnnotation(claim.ObjectMeta, v1.AlphaStorageClassAnnotation) {
 				if err = ctrl.provisionClaim(claim); err != nil {
 					return err
 				}
@@ -1224,7 +1223,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		return
 	}
 
-	claimClass := storageutil.GetClaimStorageClass(claim)
+	claimClass := v1.GetPersistentVolumeClaimClass(claim)
 	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
@@ -1332,7 +1331,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	// by storage.AlphaStorageClassAnnotation
 	// TODO: remove this check in 1.5, storage.StorageClassAnnotation will be always non-empty there.
 	if claimClass != "" {
-		metav1.SetMetaDataAnnotation(&volume.ObjectMeta, storageutil.StorageClassAnnotation, claimClass)
+		volume.Spec.StorageClassName = claimClass
 	}
 
 	// Try to create the PV object several times
@@ -1439,12 +1438,12 @@ func (ctrl *PersistentVolumeController) newRecyclerEventRecorder(volume *v1.Pers
 // provisioner is requested.
 func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.PersistentVolumeClaim) (vol.ProvisionableVolumePlugin, *storage.StorageClass, error) {
 	// TODO: remove this alpha behavior in 1.5
-	alpha := metav1.HasAnnotation(claim.ObjectMeta, storageutil.AlphaStorageClassAnnotation)
-	beta := metav1.HasAnnotation(claim.ObjectMeta, storageutil.BetaStorageClassAnnotation)
-	if alpha && beta {
-		// Both Alpha and Beta annotations are set. Do beta.
+	alpha := metav1.HasAnnotation(claim.ObjectMeta, v1.AlphaStorageClassAnnotation)
+	if alpha && v1.PersistentVolumeClaimHasClass(claim) {
+		// Both Alpha annotation and storage class name is set. Use the storage
+		// class name.
 		alpha = false
-		msg := fmt.Sprintf("both %q and %q annotations are present, using %q", storageutil.AlphaStorageClassAnnotation, storageutil.BetaStorageClassAnnotation, storageutil.BetaStorageClassAnnotation)
+		msg := fmt.Sprintf("both %q annotation and storageClassName are present, using storageClassName", v1.AlphaStorageClassAnnotation)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ProvisioningIgnoreAlpha", msg)
 	}
 	if alpha {
@@ -1454,7 +1453,7 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.Persis
 
 	// provisionClaim() which leads here is never called with claimClass=="", we
 	// can save some checks.
-	claimClass := storageutil.GetClaimStorageClass(claim)
+	claimClass := v1.GetPersistentVolumeClaimClass(claim)
 	class, err := ctrl.classLister.Get(claimClass)
 	if err != nil {
 		return nil, nil, err

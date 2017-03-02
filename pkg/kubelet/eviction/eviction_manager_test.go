@@ -29,6 +29,7 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -180,18 +181,18 @@ func TestMemoryPressure(t *testing.T) {
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
 		PressureTransitionPeriod: time.Minute * 5,
-		Thresholds: []Threshold{
+		Thresholds: []evictionapi.Threshold{
 			{
-				Signal:   SignalMemoryAvailable,
-				Operator: OpLessThan,
-				Value: ThresholdValue{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
 			},
 			{
-				Signal:   SignalMemoryAvailable,
-				Operator: OpLessThan,
-				Value: ThresholdValue{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("2Gi"),
 				},
 				GracePeriod: time.Minute * 2,
@@ -397,18 +398,18 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
 		PressureTransitionPeriod: time.Minute * 5,
-		Thresholds: []Threshold{
+		Thresholds: []evictionapi.Threshold{
 			{
-				Signal:   SignalNodeFsAvailable,
-				Operator: OpLessThan,
-				Value: ThresholdValue{
+				Signal:   evictionapi.SignalNodeFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
 			},
 			{
-				Signal:   SignalNodeFsAvailable,
-				Operator: OpLessThan,
-				Value: ThresholdValue{
+				Signal:   evictionapi.SignalNodeFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("2Gi"),
 				},
 				GracePeriod: time.Minute * 2,
@@ -594,14 +595,14 @@ func TestMinReclaim(t *testing.T) {
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
 		PressureTransitionPeriod: time.Minute * 5,
-		Thresholds: []Threshold{
+		Thresholds: []evictionapi.Threshold{
 			{
-				Signal:   SignalMemoryAvailable,
-				Operator: OpLessThan,
-				Value: ThresholdValue{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
-				MinReclaim: &ThresholdValue{
+				MinReclaim: &evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("500Mi"),
 				},
 			},
@@ -733,14 +734,14 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
 		PressureTransitionPeriod: time.Minute * 5,
-		Thresholds: []Threshold{
+		Thresholds: []evictionapi.Threshold{
 			{
-				Signal:   SignalNodeFsAvailable,
-				Operator: OpLessThan,
-				Value: ThresholdValue{
+				Signal:   evictionapi.SignalNodeFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
-				MinReclaim: &ThresholdValue{
+				MinReclaim: &evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("500Mi"),
 				},
 			},
@@ -925,18 +926,18 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
 		PressureTransitionPeriod: time.Minute * 5,
-		Thresholds: []Threshold{
+		Thresholds: []evictionapi.Threshold{
 			{
-				Signal:   SignalNodeFsInodesFree,
-				Operator: OpLessThan,
-				Value: ThresholdValue{
+				Signal:   evictionapi.SignalNodeFsInodesFree,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("1Mi"),
 				},
 			},
 			{
-				Signal:   SignalNodeFsInodesFree,
-				Operator: OpLessThan,
-				Value: ThresholdValue{
+				Signal:   evictionapi.SignalNodeFsInodesFree,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("2Mi"),
 				},
 				GracePeriod: time.Minute * 2,
@@ -1127,18 +1128,18 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
 		PressureTransitionPeriod: time.Minute * 5,
-		Thresholds: []Threshold{
+		Thresholds: []evictionapi.Threshold{
 			{
-				Signal:   SignalMemoryAvailable,
-				Operator: OpLessThan,
-				Value: ThresholdValue{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
 			},
 			{
-				Signal:   SignalMemoryAvailable,
-				Operator: OpLessThan,
-				Value: ThresholdValue{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("2Gi"),
 				},
 				GracePeriod: time.Minute * 2,

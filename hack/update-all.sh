@@ -51,33 +51,38 @@ if ! $ALL ; then
 fi
 
 BASH_TARGETS="
-	generated-protobuf
-	codegen
-	codecgen
-	generated-docs
-	generated-swagger-docs
-	swagger-spec
-	openapi-spec
-	api-reference-docs
-	bazel
-	federation-openapi-spec"
-# TODO: (caesarxuchao) uncomment after 1.5 code freeze.
-#	staging-client-go"
-
+	update-generated-protobuf
+	update-codegen
+	update-codecgen
+	update-generated-docs
+	update-generated-swagger-docs
+	update-swagger-spec
+	update-openapi-spec
+	update-api-reference-docs
+	update-bazel
+	update-federation-openapi-spec
+	verify-staging-client-go
+	verify-staging-godeps"
 
 for t in $BASH_TARGETS
 do
-	echo -e "${color_yellow}Updating $t${color_norm}"
+	echo -e "${color_yellow}Running $t${color_norm}"
 	if $SILENT ; then
-		if ! bash "$KUBE_ROOT/hack/update-$t.sh" 1> /dev/null; then
-			echo -e "${color_red}Updating $t FAILED${color_norm}"
+		if ! bash "$KUBE_ROOT/hack/$t.sh" 1> /dev/null; then
+			echo -e "${color_red}Running $t FAILED${color_norm}"
+			if [[ $t == "verify"* ]]; then
+				echo -e "${color_red}Run ./hack/update-all-staging.sh to fix it"
+			fi
 			if ! $ALL; then
 				exit 1
 			fi
 		fi
 	else
-		if ! bash "$KUBE_ROOT/hack/update-$t.sh"; then
-			echo -e "${color_red}Updating $t FAILED${color_norm}"
+		if ! bash "$KUBE_ROOT/hack/$t.sh"; then
+			echo -e "${color_red}Running $t FAILED${color_norm}"
+			if [[ $t == "verify"* ]]; then
+				echo -e "${color_red}Run ./hack/update-all-staging.sh to fix it"
+			fi
 			if ! $ALL; then
 				exit 1
 			fi

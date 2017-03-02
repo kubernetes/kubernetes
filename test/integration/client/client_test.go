@@ -268,14 +268,26 @@ func TestPatch(t *testing.T) {
 	pb := patchBodies[c.Core().RESTClient().APIVersion()]
 
 	execPatch := func(pt types.PatchType, body []byte) error {
-		return c.Core().RESTClient().Patch(pt).
+		result := c.Core().RESTClient().Patch(pt).
 			Resource(resource).
 			Namespace(ns.Name).
 			Name(name).
 			Body(body).
-			Do().
-			Error()
+			Do()
+		if result.Error() != nil {
+			return result.Error()
+		}
+
+		// trying to chase flakes, this should give us resource versions of objects as we step through
+		jsonObj, err := result.Raw()
+		if err != nil {
+			t.Log(err)
+		} else {
+			t.Logf("%v", string(jsonObj))
+		}
+		return nil
 	}
+
 	for k, v := range pb {
 		// add label
 		err := execPatch(k, v.AddLabelBody)

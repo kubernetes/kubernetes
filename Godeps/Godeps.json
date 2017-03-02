@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v78",
+	"GodepVersion": "v79",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -1664,6 +1664,30 @@
 			"Rev": "f7ee69f31298ecbe5d2b349c711e2547a617d398"
 		},
 		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api/client",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api/client/volume",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/api/spec",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/pkg/units",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/volume",
+			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+		},
+		{
 			"ImportPath": "github.com/lpabon/godbc",
 			"Comment": "v1.0-1-g9577782",
 			"Rev": "9577782540c1398b710ddae1b86268ba03a19b0c"
@@ -2394,6 +2418,10 @@
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
 		},
 		{
+			"ImportPath": "go.pedge.io/pb/go/google/protobuf",
+			"Rev": "f3c84f58974dc53d460d0855337cad85843bf0df"
+		},
+		{
 			"ImportPath": "go4.org/errorutil",
 			"Rev": "03efcb870d84809319ea509714dd6d19a1498483"
 		},
@@ -2761,6 +2789,62 @@
 			"ImportPath": "k8s.io/heapster/metrics/apis/metrics/v1alpha1",
 			"Comment": "v1.2.0-beta.1",
 			"Rev": "c2ac40f1adf8c42a79badddb2a2acd673cae3bcb"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/custom_metrics",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/custom_metrics/install",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/metrics",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/metrics/install",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/metrics/v1alpha1",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/custom_metrics",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/custom_metrics/fake",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "vbom.ml/util/sortorder",
+			"Rev": "db5cfe13f5cc80a4990d98e2e1b0707a4d1a5394"
 		}
 	]
 }

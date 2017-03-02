@@ -57,7 +57,7 @@ func (t *Trace) Log() {
 		buffer.WriteString(fmt.Sprintf("[%v] [%v] %v\n", step.stepTime.Sub(t.startTime), step.stepTime.Sub(lastStepTime), step.msg))
 		lastStepTime = step.stepTime
 	}
-	buffer.WriteString(fmt.Sprintf("[%v] [%v] END\n", endTime.Sub(t.startTime), endTime.Sub(lastStepTime)))
+	buffer.WriteString(fmt.Sprintf("%q [%v] [%v] END\n", t.name, endTime.Sub(t.startTime), endTime.Sub(lastStepTime)))
 	glog.Info(buffer.String())
 }
 

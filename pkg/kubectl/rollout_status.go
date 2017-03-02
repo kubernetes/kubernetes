@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
@@ -34,7 +35,7 @@ type StatusViewer interface {
 
 func StatusViewerFor(kind schema.GroupKind, c internalclientset.Interface) (StatusViewer, error) {
 	switch kind {
-	case extensions.Kind("Deployment"):
+	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		return &DeploymentStatusViewer{c.Extensions()}, nil
 	case extensions.Kind("DaemonSet"):
 		return &DaemonSetStatusViewer{c.Extensions()}, nil

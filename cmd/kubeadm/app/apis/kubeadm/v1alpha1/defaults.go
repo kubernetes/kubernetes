@@ -16,7 +16,11 @@ limitations under the License.
 
 package v1alpha1
 
-import "k8s.io/apimachinery/pkg/runtime"
+import (
+	"net/url"
+
+	"k8s.io/apimachinery/pkg/runtime"
+)
 
 const (
 	DefaultServiceDNSDomain  = "cluster.local"
@@ -43,8 +47,8 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.KubernetesVersion = DefaultKubernetesVersion
 	}
 
-	if obj.API.Port == 0 {
-		obj.API.Port = DefaultAPIBindPort
+	if obj.API.BindPort == 0 {
+		obj.API.BindPort = DefaultAPIBindPort
 	}
 
 	if obj.Networking.ServiceSubnet == "" {
@@ -67,5 +71,18 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath
+	}
+	if len(obj.TLSBootstrapToken) == 0 {
+		obj.TLSBootstrapToken = obj.Token
+	}
+	if len(obj.DiscoveryToken) == 0 && len(obj.DiscoveryFile) == 0 {
+		obj.DiscoveryToken = obj.Token
+	}
+	// Make sure file URLs become paths
+	if len(obj.DiscoveryFile) != 0 {
+		u, err := url.Parse(obj.DiscoveryFile)
+		if err == nil && u.Scheme == "file" {
+			obj.DiscoveryFile = u.Path
+		}
 	}
 }

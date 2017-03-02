@@ -24,40 +24,37 @@ import (
 
 func TestFor(t *testing.T) {
 	tests := []struct {
-		d      kubeadm.Discovery
+		d      kubeadm.NodeConfiguration
 		expect bool
 	}{
-		{d: kubeadm.Discovery{}, expect: false},
+		{d: kubeadm.NodeConfiguration{}, expect: false},
 		{
-			d: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "notnil"},
+			d: kubeadm.NodeConfiguration{
+				DiscoveryFile: "notnil",
 			},
 			expect: false,
 		},
 		{
-			d: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "http://localhost"},
+			d: kubeadm.NodeConfiguration{
+				DiscoveryFile: "https://localhost",
 			},
 			expect: false,
 		},
 		{
-			d: kubeadm.Discovery{
-				File: &kubeadm.FileDiscovery{Path: "notnil"},
+			d: kubeadm.NodeConfiguration{
+				DiscoveryFile: "notnil",
 			},
 			expect: false,
 		},
 		{
-			d: kubeadm.Discovery{
-				Token: &kubeadm.TokenDiscovery{
-					ID:        "foo",
-					Secret:    "bar",
-					Addresses: []string{"foobar"},
-				},
-			}, expect: false,
+			d: kubeadm.NodeConfiguration{
+				DiscoveryToken: "foo.bar@foobar",
+			},
+			expect: false,
 		},
 	}
 	for _, rt := range tests {
-		_, actual := For(rt.d)
+		_, actual := For(&rt.d)
 		if (actual == nil) != rt.expect {
 			t.Errorf(
 				"failed For:\n\texpected: %t\n\t  actual: %t",

@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -84,49 +83,6 @@ type fakeHTTP struct {
 func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 	f.url = url
 	return nil, f.err
-}
-
-// fakeRuntimeHelper implementes kubecontainer.RuntimeHelper inter
-// faces for testing purposes.
-// TODO(random-liu): Move this into pkg/kubelet/container/testing
-type fakeRuntimeHelper struct{}
-
-var _ kubecontainer.RuntimeHelper = &fakeRuntimeHelper{}
-
-var testPodContainerDir string
-
-func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
-	var opts kubecontainer.RunContainerOptions
-	var err error
-	if len(container.TerminationMessagePath) != 0 {
-		testPodContainerDir, err = ioutil.TempDir(testTempDir, "fooPodContainerDir")
-		if err != nil {
-			return nil, err
-		}
-		opts.PodContainerDir = testPodContainerDir
-	}
-	return &opts, nil
-}
-
-func (f *fakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
-	return "", ""
-}
-
-func (f *fakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
-	return nil, nil, fmt.Errorf("not implemented")
-}
-
-// This is not used by docker runtime.
-func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
-	return "", "", nil
-}
-
-func (f *fakeRuntimeHelper) GetPodDir(kubetypes.UID) string {
-	return ""
-}
-
-func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
-	return nil
 }
 
 type fakeImageManager struct{}
@@ -166,7 +122,7 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 		0, 0, "",
 		&containertest.FakeOS{},
 		networkPlugin,
-		&fakeRuntimeHelper{},
+		&containertest.FakeRuntimeHelper{},
 		fakeHTTPClient,
 		flowcontrol.NewBackOff(time.Second, 300*time.Second))
 
@@ -1275,6 +1231,9 @@ func TestPortForwardNoSuchContainer(t *testing.T) {
 
 func TestSyncPodWithTerminationLog(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
+	// Set test pod container directory.
+	testPodContainerDir := "test/pod/container/dir"
+	dm.runtimeHelper.(*containertest.FakeRuntimeHelper).PodContainerDir = testPodContainerDir
 	container := v1.Container{
 		Name: "bar",
 		TerminationMessagePath: "/dev/somepath",
@@ -1292,8 +1251,6 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 		// Create container.
 		"create", "start", "inspect_container",
 	})
-
-	defer os.Remove(testPodContainerDir)
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 2 ||
