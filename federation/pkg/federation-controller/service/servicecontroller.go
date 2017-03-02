@@ -78,6 +78,8 @@ const (
 	updateTimeout         = 30 * time.Second
 	allClustersKey        = "ALL_CLUSTERS"
 	clusterAvailableDelay = time.Second * 20
+	ControllerName        = "services"
+	RequiredResources     = []schema.GroupVersionResource{v1.SchemeGroupVersion.WithResource("services")}
 )
 
 type cachedService struct {

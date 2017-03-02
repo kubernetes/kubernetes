@@ -44,7 +44,9 @@ import (
 )
 
 const (
-	allClustersKey = "ALL_CLUSTERS"
+	allClustersKey    = "ALL_CLUSTERS"
+	ControllerName    = "daemonsets"
+	RequiredResources = []schema.GroupVersionResource{v1.SchemeGroupVersion.WithResource("daemonsets")}
 )
 
 type DaemonSetController struct {

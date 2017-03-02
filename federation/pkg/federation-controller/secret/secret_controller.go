@@ -43,7 +43,9 @@ import (
 )
 
 const (
-	allClustersKey = "ALL_CLUSTERS"
+	allClustersKey    = "ALL_CLUSTERS"
+	ControllerName    = "secrets"
+	RequiredResources = []schema.GroupVersionResource{v1.SchemeGroupVersion.WithResource("secrets")}
 )
 
 type SecretController struct {

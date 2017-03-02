@@ -44,7 +44,9 @@ import (
 )
 
 const (
-	allClustersKey = "ALL_CLUSTERS"
+	allClustersKey    = "ALL_CLUSTERS"
+	ControllerName    = "namespaces"
+	RequiredResources = []schema.GroupVersionResource{v1.SchemeGroupVersion.WithResource("namespaces")}
 )
 
 type NamespaceController struct {

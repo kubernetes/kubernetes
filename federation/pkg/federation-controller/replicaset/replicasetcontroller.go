@@ -57,6 +57,8 @@ const (
 	FedReplicaSetPreferencesAnnotation = "federation.kubernetes.io/replica-set-preferences"
 	allClustersKey                     = "THE_ALL_CLUSTER_KEY"
 	UserAgentName                      = "Federation-replicaset-Controller"
+	ControllerName                     = "replicasets"
+	RequiredResources                  = []schema.GroupVersionResource{v1.SchemeGroupVersion.WithResource("replicasets")}
 )
 
 var (

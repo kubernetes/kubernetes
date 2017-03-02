@@ -54,6 +54,8 @@ const (
 	FedDeploymentPreferencesAnnotation = "federation.kubernetes.io/deployment-preferences"
 	allClustersKey                     = "THE_ALL_CLUSTER_KEY"
 	UserAgentName                      = "Federation-Deployment-Controller"
+	ControllerName                     = "deployments"
+	RequiredResources                  = []schema.GroupVersionResource{v1.SchemeGroupVersion.WithResource("deployments")}
 )
 
 var (
