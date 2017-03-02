@@ -85,6 +85,8 @@ type DaemonSetsController struct {
 
 	// To allow injection of syncDaemonSet for testing.
 	syncHandler func(dsKey string) error
+	// used for unit testing
+	enqueueDaemonSet func(ds *extensions.DaemonSet)
 	// A TTLCache of pod creates/deletes each ds expects to see
 	expectations controller.ControllerExpectationsInterface
 	// dsLister can list/get daemonsets from the shared informer's store
@@ -181,6 +183,7 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 	dsc.nodeLister = nodeInformer.Lister()
 
 	dsc.syncHandler = dsc.syncDaemonSet
+	dsc.enqueueDaemonSet = dsc.enqueue
 	dsc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
 	return dsc
 }
@@ -248,7 +251,7 @@ func (dsc *DaemonSetsController) processNextWorkItem() bool {
 	return true
 }
 
-func (dsc *DaemonSetsController) enqueueDaemonSet(ds *extensions.DaemonSet) {
+func (dsc *DaemonSetsController) enqueue(ds *extensions.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
@@ -432,8 +435,8 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	oldNode := old.(*v1.Node)
 	curNode := cur.(*v1.Node)
-	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) {
-		// If node labels didn't change, we can ignore this update.
+	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) && reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) {
+		// If node labels and taints didn't change, we can ignore this update.
 		return
 	}
 	dsList, err := dsc.dsLister.List(labels.Everything())
