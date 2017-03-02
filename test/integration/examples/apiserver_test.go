@@ -55,25 +55,11 @@ var groupVersionForDiscovery = metav1.GroupVersionForDiscovery{
 	Version:      groupVersion.Version,
 }
 
-func localPort() (int, error) {
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return 0, err
-	}
-	defer l.Close()
-	addr := strings.Split(l.Addr().String(), ":")
-	port, err := strconv.Atoi(addr[len(addr)-1])
-	if err != nil {
-		return 0, err
-	}
-	return port, nil
-}
-
 func TestAggregatedAPIServer(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	kubePort, err := localPort()
+	kubePort, err := framework.GetLocalPort()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +141,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	clientcmd.WriteToFile(*adminKubeConfig, kubeconfigFile.Name())
 
 	// start the wardle server to prove we can aggregate it
-	wardlePort, err := localPort()
+	wardlePort, err := framework.GetLocalPort()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +195,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	}
 
 	// start the aggregator
-	aggregatorPort, err := localPort()
+	aggregatorPort, err := framework.GetLocalPort()
 	if err != nil {
 		t.Fatal(err)
 	}
