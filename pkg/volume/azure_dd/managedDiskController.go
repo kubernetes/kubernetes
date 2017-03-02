@@ -39,7 +39,6 @@ func newManagedDiskController(common *controllerCommon) (ManagedDiskController, 
 }
 
 func (c *managedDiskController) AttachDisk(nodeName string, diskUri string, cacheMode string) (int, error) {
-
 	// We don't need to validate if the disk is already attached
 	// to a different VM. The VM update call below will fail if
 	// it was attached somewhere else
@@ -97,19 +96,17 @@ func (c *managedDiskController) AttachDisk(nodeName string, diskUri string, cach
 		return -1, err
 	}
 
-	err = c.common.updateArmVm(nodeName, payload)
-
-	if err != nil {
+	if err = c.common.updateArmVm(nodeName, payload); err != nil {
 		return -1, err
 	}
 
 	// We don't need to poll ARM here, since WaitForAttach (running on node) will
 	// be looping on the node to get devicepath /dev/sd* by lun#
-	glog.V(2).Infof("azureMd - Attached disk %s to node %s", diskUri, nodeName)
+	glog.V(2).Infof("azureDisk - Attached disk %s to node %s", diskUri, nodeName)
 
 	return lun, err
-
 }
+
 func (c *managedDiskController) DetachDisk(nodeName string, hashedDiskId string) error {
 	diskId := ""
 	var vmData interface{}
@@ -271,6 +268,7 @@ func (c *managedDiskController) CreateDataDisk(diskName string, storageAccountTy
 
 	return diskId, nil
 }
+
 func (c *managedDiskController) DeleteDataDisk(diskUri string) error {
 	diskName := path.Base(diskUri)
 	uri := fmt.Sprintf(diskEndPointTemplate, c.common.managementEndpoint, c.common.subscriptionId, c.common.resourceGroup, diskName, apiversion)
@@ -302,8 +300,8 @@ func (c *managedDiskController) DeleteDataDisk(diskUri string) error {
 
 	return nil
 }
-func (c *managedDiskController) getDisk(diskName string) (bool, string, string, error) {
 
+func (c *managedDiskController) getDisk(diskName string) (bool, string, string, error) {
 	uri := fmt.Sprintf(diskEndPointTemplate, c.common.managementEndpoint, c.common.subscriptionId, c.common.resourceGroup, diskName, apiversion)
 
 	client := &http.Client{}
@@ -353,5 +351,4 @@ func (c *managedDiskController) getDisk(diskName string) (bool, string, string, 
 	}
 
 	return true, provisioningState, diskState, nil
-
 }

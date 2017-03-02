@@ -77,8 +77,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	if !mountPoint {
-		glog.Infof("azureDisk - Not a mounting point for disk %s on %s %v", diskName, dir, err)
-		return nil
+		return fmt.Errorf("azureDisk - Not a mounting point for disk %s on %s", diskName, dir)
 	}
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
@@ -100,33 +99,39 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	err = mounter.Mount(globalPDPath, dir, *volumeSource.FSType, options)
-	if err != nil {
+	mountErr := mounter.Mount(globalPDPath, dir, *volumeSource.FSType, options)
+	// Everything in the following control flow is meant as an
+	// attempt cleanup a failed setupAt (bind mount)
+	if mountErr != nil {
+		glog.Infof("azureDisk - SetupAt:Mount disk:%s at dir:%s failed during mounting with error:%v, will attempt to clean up", diskName, dir, mountErr)
 		mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 		if err != nil {
-			glog.Infof("azureDisk - IsLikelyNotMountPoint check failed: %v", err)
-			return err
+			return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup IsLikelyNotMountPoint check failed for disk:%s on dir:%s with error %v original-mountErr:%v", diskName, dir, err, mountErr)
 		}
+
 		if !mountPoint {
 			if err = mounter.Unmount(dir); err != nil {
-				glog.Infof("azureDisk - failed to unmount: %v", err)
-				return err
+				return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup failed to unmount disk:%s on dir:%s with error:%v original-mountErr:%v", diskName, dir, err, mountErr)
 			}
 			mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 			if err != nil {
-				glog.Infof("azureDisk - IsLikelyNotMountPoint check failed: %v", err)
-				return err
+				return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup IsLikelyNotMountPoint for disk:%s on dir:%s check failed with error:%v original-mountErr:%v", diskName, dir, err, mountErr)
 			}
 			if !mountPoint {
 				// not cool. leave for next sync loop.
-				glog.Infof("azureDisk - %s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
-				return err
+				return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup disk %s is still mounted on %s during cleanup original-mountErr:%v, despite call to unmount(). Will try again next sync loop.", diskName, dir, mountErr)
 			}
 		}
-		_ = os.Remove(dir)
-		glog.Errorf("azureDisk - Mount of disk %s on %s failed: %v", diskName, dir, err)
-		return err
+
+		if err = os.Remove(dir); err != nil {
+			return fmt.Errorf("azureDisk - SetupAt:Mount:Failure error cleaning up (removing dir:%s) with error:%v original-mountErr:%v", dir, err, mountErr)
+		}
+
+		glog.V(2).Infof("azureDisk - Mount of disk:%s on dir:%s failed with mount error:%v post failure clean up was completed", diskName, dir, err, mountErr)
+		return mountErr
 	}
+
+	// we didn't fail
 	//TODO: do we need to do this? the bind-mount performs ro mount
 	if !*volumeSource.ReadOnly {
 		volume.SetVolumeOwnership(m, fsGroup)
@@ -134,7 +139,6 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	glog.V(2).Infof("azureDisk - successfully mounted disk %s on %s", diskName, dir)
 	return nil
-
 }
 
 func (u *azureDiskUnmounter) TearDown() error {
@@ -147,33 +151,26 @@ func (u *azureDiskUnmounter) TearDownAt(dir string) error {
 	mounter := u.plugin.host.GetMounter()
 	mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		glog.Infof("azureDisk - TearDownAt: %s failed to do IsLikelyNotMountPoint %s", dir, err)
-		return err
+		return fmt.Errorf("azureDisk - TearDownAt: %s failed to do IsLikelyNotMountPoint %s", dir, err)
 	}
 	if mountPoint {
-		err := os.Remove(dir)
-		if err != nil {
-			glog.Infof("azureDisk - TearDownAt: %s failed to do os.Remove %s", dir, err)
+		if err := os.Remove(dir); err != nil {
+			return fmt.Errorf("azureDisk - TearDownAt: %s failed to do os.Remove %s", dir, err)
 		}
-
-		return err
 	}
 	if err := mounter.Unmount(dir); err != nil {
-		if err != nil {
-			glog.Infof("azureDisk - TearDownAt: %s failed to do mounter.Unmount %s", dir, err)
-		}
-		return err
+		return fmt.Errorf("azureDisk - TearDownAt: %s failed to do mounter.Unmount %s", dir, err)
 	}
 	mountPoint, err = mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		glog.Infof("azureDisk - TearTownAt:IsLikelyNotMountPoint check failed: %v", err)
-		return err
+		return fmt.Errorf("azureDisk - TearTownAt:IsLikelyNotMountPoint check failed: %v", err)
 	}
+
 	if mountPoint {
 		return os.Remove(dir)
 	}
-	return fmt.Errorf("azureDisk - failed to un-bind-mount volume dir")
 
+	return fmt.Errorf("azureDisk - failed to un-bind-mount volume dir")
 }
 
 func (u *azureDiskUnmounter) GetPath() string {

@@ -68,19 +68,18 @@ func newBlobDiskController(common *controllerCommon) (BlobDiskController, error)
 	}
 
 	return &c, nil
-
 }
 
 // attaches a disk to node and return lun # as string
 func (c *blobDiskController) AttachDisk(nodeName string, diskUri string, cacheMode string) (int, error) {
-
 	// K8s in case of existing pods evication, will automatically attepmt to attach volumes
 	// to a different node. Though it *knows* which disk attached to which node.
 	// the following guards against this behaviour
 
 	// avoid:
 	// Azure in case of blob disks, does not maintain a list of vhd:attached-to:node
-	// The who attach-to will fail after it was OK on the ARM VM endpoint
+	// The call  attach-to will fail after it was OK on the ARM VM endpoint
+	// possibly putting the entire VM in *failed* state
 	noLease, e := c.diskHasNoLease(diskUri)
 	if e != nil {
 		return -1, e
@@ -91,7 +90,6 @@ func (c *blobDiskController) AttachDisk(nodeName string, diskUri string, cacheMo
 	}
 
 	var vmData interface{}
-
 	_, diskName, err := diskNameandSANameFromUri(diskUri, false)
 	if err != nil {
 		return -1, err
@@ -248,11 +246,9 @@ func (c *blobDiskController) DetachDisk(nodeName string, hashedDiskUri string) e
 	}
 
 	return nil
-
 }
 
 func (c *blobDiskController) CreateDataDisk(dataDiskName string, storageAccountType string, sizeGB int, forceStandAlone bool) (string, error) {
-
 	glog.V(4).Infof("azureDisk - creating blob data disk named:%s on StorageAccountType:%s StandAlone:%v", dataDiskName, storageAccountType, forceStandAlone)
 
 	var storageAccountName = ""
@@ -339,7 +335,7 @@ func (c *blobDiskController) DeleteDataDisk(diskUri string, wasForced bool) erro
 		if diskCount, err := c.getDiskCount(storageAccountName); err != nil {
 			c.accounts[storageAccountName].diskCount = int32(diskCount)
 		} else {
-			glog.Warning("azureDisk - failed to get disk count for %s however the delete disk operation was ok", storageAccountName)
+			glog.Warningf("azureDisk - failed to get disk count for %s however the delete disk operation was ok", storageAccountName)
 			return nil // we have failed to aquire a new count. not an error condition
 		}
 	}
@@ -376,13 +372,11 @@ func (c *blobDiskController) diskHasNoLease(diskUri string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
-
 }
 
 // Init tries best effort to ensure that 2 accounts standard/premium were craeted
 // to be used by shared blob disks. This to increase the speed pvc provisioning (in most of cases)
 func (c *blobDiskController) init() error {
-
 	if !c.shouldInit() {
 		return nil
 	}
@@ -436,7 +430,6 @@ func (c *blobDiskController) init() error {
 
 //Sets unique strings to be used as accountnames && || blob containers names
 func (c *blobDiskController) setUniqueStrings() {
-
 	uniqueString := c.common.resourceGroup + c.common.location + c.common.subscriptionId
 	hash := makeCRC32(uniqueString)
 	//used to generate a unqie container name used by this cluster PVC
@@ -447,10 +440,8 @@ func (c *blobDiskController) setUniqueStrings() {
 	storageAccountNameMatch = storageAccountNamePrefix
 	// Used as a template to create new names for relevant accounts
 	storageAccountNamePrefix = storageAccountNamePrefix + "%s"
-
 }
 func (c *blobDiskController) getStorageAccountKey(SAName string) (string, error) {
-
 	if account, exists := c.accounts[SAName]; exists && account.key != "" {
 		return c.accounts[SAName].key, nil
 	}
@@ -530,10 +521,9 @@ func (c *blobDiskController) getBlobSvcClient(SAName string) (azstorage.BlobStor
 
 	blobSvc = client.GetBlobService()
 	return blobSvc, nil
-
 }
-func (c *blobDiskController) ensureDefaultContainer(storageAccountName string) error {
 
+func (c *blobDiskController) ensureDefaultContainer(storageAccountName string) error {
 	var bExist bool
 	var provisionState string
 	var err error
@@ -545,7 +535,7 @@ func (c *blobDiskController) ensureDefaultContainer(storageAccountName string) e
 		return nil
 	}
 
-	// not cache, check existance and reaciness
+	// not cached, check existance and readiness
 	bExist, provisionState, _ = c.getStorageAccount(storageAccountName)
 
 	// account does not exist
@@ -555,14 +545,12 @@ func (c *blobDiskController) ensureDefaultContainer(storageAccountName string) e
 
 	// account exists but not ready yet
 	if provisionState != "Succeeded" {
-
 		// we don't want many attempts to validate the account readiness
 		// here hence we are locking
 		counter := 1
 		for swapped := atomic.CompareAndSwapInt32(&c.accounts[storageAccountName].isValidating, 0, 1); swapped != true; {
 			time.Sleep(3 * time.Second)
 			counter = counter + 1
-
 			// check if we passed the max sleep
 			if counter >= 20 {
 				return fmt.Errorf("azureDisk - timeout waiting to aquire lock to validate account:%s readiness", storageAccountName)
@@ -596,13 +584,11 @@ func (c *blobDiskController) ensureDefaultContainer(storageAccountName string) e
 				return false, fmt.Errorf("azureDisk - Account %s has not been flagged Succeeded by ARM", storageAccountName)
 			}
 		})
-
 		// we have failed to ensure that account is ready for us to create
 		// the default vhd container
 		if err != nil {
 			return err
 		}
-
 	}
 
 	if blobSvc, err = c.getBlobSvcClient(storageAccountName); err != nil {
@@ -624,7 +610,6 @@ func (c *blobDiskController) ensureDefaultContainer(storageAccountName string) e
 
 // Gets Disk counts per storage account
 func (c *blobDiskController) getDiskCount(SAName string) (int, error) {
-
 	// if we have it in cache
 	if c.accounts[SAName].diskCount != -1 {
 		return int(c.accounts[SAName].diskCount), nil
@@ -641,7 +626,6 @@ func (c *blobDiskController) getDiskCount(SAName string) (int, error) {
 		return 0, err
 	}
 	params := azstorage.ListBlobsParameters{}
-
 	if response, err := blobSvc.ListBlobs(defaultContainerName, params); err != nil {
 		return 0, err
 	} else {
@@ -665,12 +649,10 @@ func (c *blobDiskController) shouldInit() bool {
 	}
 	return false
 }
+
 func (c *blobDiskController) getAllStorageAccounts() (map[string]*storageAccountState, error) {
-
 	uri := fmt.Sprintf(storageAccountEndPointTemplate, c.common.managementEndpoint, c.common.subscriptionId, c.common.resourceGroup, "")
-
 	client := &http.Client{}
-
 	r, err := http.NewRequest("GET", uri, nil)
 
 	if err != nil {
@@ -735,7 +717,6 @@ func (c *blobDiskController) getAllStorageAccounts() (map[string]*storageAccount
 }
 
 func (c *blobDiskController) createStorageAccount(storageAccountName string, storageAccountType string, checkMaxAccounts bool) error {
-
 	bExist, _, _ := c.getStorageAccount(storageAccountName)
 	if bExist {
 		newAccountState := &storageAccountState{
@@ -749,7 +730,7 @@ func (c *blobDiskController) createStorageAccount(storageAccountName string, sto
 	// Account Does not exist
 	if !bExist {
 		if len(c.accounts) == maxStorageAccounts && checkMaxAccounts {
-			return fmt.Errorf("azureDisk - can not create new storage account, current storage accounts:%v Max is:%v", len(c.accounts), maxStorageAccounts)
+			return fmt.Errorf("azureDisk - can not create new storage account, current storage accounts count:%v Max is:%v", len(c.accounts), maxStorageAccounts)
 		}
 
 		glog.V(2).Infof("azureDisk - Creating storage account %s type %s \n", storageAccountName, storageAccountType)
@@ -905,7 +886,6 @@ func (c *blobDiskController) getNextAccountNum() int {
 }
 
 func (c *blobDiskController) deleteStorageAccount(storageAccountName string) error {
-
 	uri := fmt.Sprintf(storageAccountEndPointTemplate,
 		c.common.managementEndpoint,
 		c.common.subscriptionId,
@@ -941,7 +921,6 @@ func (c *blobDiskController) deleteStorageAccount(storageAccountName string) err
 //Gets storage account exist, provisionStatus, Error if any
 func (c *blobDiskController) getStorageAccount(storageAccountName string) (bool, string, error) {
 	// should be get or create storage accounts and should return keys (from cache)
-
 	uri := fmt.Sprintf(storageAccountEndPointTemplate,
 		c.common.managementEndpoint,
 		c.common.subscriptionId,
@@ -992,7 +971,6 @@ func (c *blobDiskController) getStorageAccount(storageAccountName string) (bool,
 	provisionState := props["provisioningState"].(string)
 
 	return true, provisionState, nil
-
 }
 
 func (c *blobDiskController) addAccountState(key string, state *storageAccountState) {
@@ -1012,7 +990,6 @@ func (c *blobDiskController) removeAccountState(key string) {
 		accountsLock.Unlock()
 	}()
 	delete(c.accounts, key)
-
 }
 
 // pads account num with zeros as needed
@@ -1022,14 +999,11 @@ func getAccountNameForNum(num int) string {
 	strZero := ""
 	for missingZeros > 0 {
 		strZero = strZero + "0"
-
 		missingZeros = missingZeros - 1
 	}
 
 	sNum = strZero + sNum
-
 	return fmt.Sprintf(storageAccountNamePrefix, sNum)
-
 }
 
 func getAccountNumFromName(accountName string) int {
@@ -1037,7 +1011,6 @@ func getAccountNumFromName(accountName string) int {
 	num, _ := strconv.Atoi(accountName[nameLen-3:])
 
 	return num
-
 }
 
 func createVHDHeader(size uint64) ([]byte, error) {

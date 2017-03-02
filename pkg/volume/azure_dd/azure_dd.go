@@ -46,11 +46,9 @@ const (
 
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&azureDataDiskPlugin{}}
-
 }
 
 func (plugin *azureDataDiskPlugin) Init(host volume.VolumeHost) error {
-
 	cloudProvider := host.GetCloudProvider()
 	az, ok := cloudProvider.(*azure.Cloud)
 
@@ -100,7 +98,6 @@ func (plugin *azureDataDiskPlugin) GetPluginName() string {
 }
 
 func (plugin *azureDataDiskPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -149,11 +146,9 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	return &azureDiskDetacher{
 		plugin: plugin,
 	}, nil
-
 }
 
 func (plugin *azureDataDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -166,7 +161,6 @@ func (plugin *azureDataDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter
 		plugin:   plugin,
 		dataDisk: disk,
 	}, nil
-
 }
 
 func (plugin *azureDataDiskPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
@@ -178,7 +172,6 @@ func (plugin *azureDataDiskPlugin) NewProvisioner(options volume.VolumeOptions) 
 		plugin:  plugin,
 		options: options,
 	}, nil
-
 }
 
 func (plugin *azureDataDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, options volume.VolumeOptions) (volume.Mounter, error) {
@@ -194,7 +187,6 @@ func (plugin *azureDataDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, op
 		options:  options,
 		dataDisk: disk,
 	}, nil
-
 }
 
 func (plugin *azureDataDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -204,7 +196,6 @@ func (plugin *azureDataDiskPlugin) NewUnmounter(volName string, podUID types.UID
 		plugin:   plugin,
 		dataDisk: disk,
 	}, nil
-
 }
 
 func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -225,11 +216,9 @@ func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath str
 		},
 	}
 	return volume.NewSpecFromVolume(azureVolume), nil
-
 }
 
 func (plugin *azureDataDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-
 	m := plugin.host.GetMounter()
 	return mount.GetMountRefs(m, deviceMountPath)
 }

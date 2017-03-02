@@ -61,7 +61,6 @@ func makeCRC32(str string) string {
 	crc.Write([]byte(str))
 	hash := crc.Sum32()
 	return strconv.FormatUint(uint64(hash), 10)
-
 }
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -105,20 +104,15 @@ func diskNameandSANameFromUri(diskUri string, trimVhd bool) (string, string, err
 	if trimVhd {
 		diskName := STRINGS.Split(diskNameVhd, ".")[0]
 		return storageAccountName, diskName, nil
-	} else {
-		return storageAccountName, diskNameVhd, nil
 	}
 
+	return storageAccountName, diskNameVhd, nil
 }
 
 func makeDataDisk(volumeName string, podUID types.UID, diskName string, host volume.VolumeHost) *dataDisk {
-
 	var metricProvider volume.MetricsProvider
 	if podUID != "" {
 		metricProvider = volume.NewMetricsStatFS(getPath(podUID, volumeName, host))
-
-	} else {
-		metricProvider = nil
 	}
 
 	return &dataDisk{
@@ -133,6 +127,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.AzureDiskVolumeSource, error) {
 	if spec.Volume != nil && spec.Volume.AzureDisk != nil {
 		return spec.Volume.AzureDisk, nil
 	}
+
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureDisk != nil {
 		return spec.PersistentVolume.Spec.AzureDisk, nil
 	}
@@ -143,9 +138,9 @@ func getVolumeSource(spec *volume.Spec) (*v1.AzureDiskVolumeSource, error) {
 func normalizeFsType(fsType string) string {
 	if fsType == "" {
 		return default_fstype
-	} else {
-		return fsType
 	}
+
+	return fsType
 }
 
 func normalizeKind(kind v1.AzureDataDiskKind) (v1.AzureDataDiskKind, error) {
@@ -156,6 +151,7 @@ func normalizeKind(kind v1.AzureDataDiskKind) (v1.AzureDataDiskKind, error) {
 	if !supportedDiskKinds.Has(string(kind)) {
 		return "", fmt.Errorf("azureDisk - %s is not supported disk kind. Supported values are %s", kind, supportedDiskKinds.List())
 	}
+
 	return v1.AzureDataDiskKind(kind), nil
 }
 
@@ -167,6 +163,7 @@ func normalizeStorageAccountType(storageAccountType string) (string, error) {
 	if !supportedStorageAccountTypes.Has(storageAccountType) {
 		return "", fmt.Errorf("azureDisk - %s is not supported sku/storageaccounttype. Supported values are %s", storageAccountType, supportedStorageAccountTypes.List())
 	}
+
 	return storageAccountType, nil
 }
 
@@ -178,6 +175,7 @@ func normalizeCachingMode(cachingMode v1.AzureDataDiskCachingMode) (v1.AzureData
 	if !supportedCachingModes.Has(string(cachingMode)) {
 		return "", fmt.Errorf("azureDisk - %s is not supported cachingmode. Supported values are %s", cachingMode, supportedCachingModes.List())
 	}
+
 	return cachingMode, nil
 }
 
@@ -193,12 +191,12 @@ type osIOHandler struct{}
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(dirname)
 }
+
 func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return ioutil.WriteFile(filename, data, perm)
 }
 
 func scsiHostRescan(io ioHandler) {
-
 	scsi_path := "/sys/class/scsi_host/"
 	if dirs, err := io.ReadDir(scsi_path); err == nil {
 		for _, f := range dirs {
@@ -299,18 +297,18 @@ func formatIfNotFormatted(disk string, fstype string) {
 			glog.Infof("azureDisk - Disk %s already formatted, will not format", disk)
 		}
 	}
-
 }
+
 func diskLooksUnformatted(disk string) (bool, error) {
 	args := []string{"-nd", "-o", "FSTYPE", disk}
 	runner := exec.New()
 	cmd := runner.Command("lsblk", args...)
 	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
 	dataOut, err := cmd.CombinedOutput()
-	output := STRINGS.TrimSpace(string(dataOut))
 	if err != nil {
 		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return false, err
 	}
+	output := STRINGS.TrimSpace(string(dataOut))
 	return output == "", nil
 }

@@ -43,6 +43,7 @@ var _ volume.Deleter = &azureDiskDeleter{}
 func (d *azureDiskDeleter) GetPath() string {
 	return getPath(d.podUID, d.dataDisk.diskName, d.plugin.host)
 }
+
 func (d *azureDiskDeleter) Delete() error {
 	volumeSource, err := getVolumeSource(d.spec)
 	if err != nil {
@@ -54,17 +55,15 @@ func (d *azureDiskDeleter) Delete() error {
 
 	if managed {
 		return d.plugin.managedDiskController.DeleteDataDisk(volumeSource.DataDiskURI)
-	} else {
-		return d.plugin.blobDiskController.DeleteDataDisk(volumeSource.DataDiskURI, wasStandAlone)
 	}
 
+	return d.plugin.blobDiskController.DeleteDataDisk(volumeSource.DataDiskURI, wasStandAlone)
 }
 
 func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 	supportedModes := p.plugin.GetAccessModes()
 
 	// perform static validation first
-
 	if p.options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("azureDisk - claim.Spec.Selector is not supported for dynamic provisioning on Azure disk")
 	}
@@ -137,7 +136,6 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 		}
 	} else {
 		diskUri, err = p.plugin.blobDiskController.CreateDataDisk(name, storageAccountType, requestGB, forceStandAlone)
-
 		if err != nil {
 			return nil, err
 		}

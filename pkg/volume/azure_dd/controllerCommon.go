@@ -217,6 +217,7 @@ func (c *controllerCommon) isManagedArmVm(storageProfile map[string]interface{})
 	return false
 
 }
+
 func (c *controllerCommon) getAttachedDisks(nodeName string) ([]string, error) {
 	var disks []string
 	var vmData interface{}
@@ -255,10 +256,9 @@ func (c *controllerCommon) getAttachedDisks(nodeName string) ([]string, error) {
 }
 
 // if disk attached returns bool + lun attached to
-func (c *controllerCommon) isDiskAttached(hashedDiskUri, nodeName string, isManaged bool) (bool, int, error) { //attached, lun (string), error
-
-	attached := false
-	lun := -1
+func (c *controllerCommon) isDiskAttached(hashedDiskUri, nodeName string, isManaged bool) (attached bool, lun int, err error) {
+	attached = false
+	lun = -1
 
 	var vmData interface{}
 
@@ -305,41 +305,31 @@ func (c *controllerCommon) isDiskAttached(hashedDiskUri, nodeName string, isMana
 
 // Updates an arm VM based on the payload
 func (c *controllerCommon) updateArmVm(armVmName string, buffer *bytes.Buffer) error {
-
 	uri := fmt.Sprintf(vMEndPointTemplate, c.managementEndpoint, c.subscriptionId, c.resourceGroup, armVmName, apiversion)
-
 	client := &http.Client{}
-
 	r, err := http.NewRequest("PUT", uri, buffer)
-
 	if err != nil {
 		return err
 	}
 
 	token, err := c.getToken()
-
 	if err != nil {
 		return err
 	}
 
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+token)
-
 	resp, err := client.Do(r)
 
 	if err != nil || resp.StatusCode != 200 {
 		return getRestError(fmt.Sprintf("Update ARM VM: %s", armVmName), err, 200, resp.StatusCode, resp.Body)
-
 	}
 	return nil
 }
 
-// Gets Arm VM
-
+// Gets ARM VM
 func (c *controllerCommon) getArmVm(armVmName string) ([]byte, error) {
-
 	uri := fmt.Sprintf(vMEndPointTemplate, c.managementEndpoint, c.subscriptionId, c.resourceGroup, armVmName, apiversion)
-
 	client := &http.Client{}
 	r, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
@@ -352,14 +342,12 @@ func (c *controllerCommon) getArmVm(armVmName string) ([]byte, error) {
 	}
 
 	r.Header.Add("Authorization", "Bearer "+token)
-
 	resp, err := client.Do(r)
 	if err != nil {
 		return nil, err
 	}
 
 	defer resp.Body.Close()
-
 	if err != nil || resp.StatusCode != 200 {
 		return nil, getRestError(fmt.Sprintf("Get ARM VM: %s", armVmName), err, 200, resp.StatusCode, resp.Body)
 	}
@@ -370,19 +358,16 @@ func (c *controllerCommon) getArmVm(armVmName string) ([]byte, error) {
 	}
 
 	return body, nil
-
 }
-func (c *controllerCommon) getToken() (string, error) {
 
+func (c *controllerCommon) getToken() (token string, err error) {
 	if c.aadToken != "" && time.Now().UTC().Sub(c.expires_on).Seconds() <= 10 {
 		// token cached and is valid.
 		return c.aadToken, nil
-
 	}
 
 	apiUrl := c.tokenEndPoint
 	resource := fmt.Sprintf(aadTokenEndPointPath, c.tenantId)
-
 	// create form urlencoded post data
 	formData := url.Values{}
 
@@ -392,14 +377,15 @@ func (c *controllerCommon) getToken() (string, error) {
 	formData.Add("resource", c.aadResourceEndPoint)
 
 	urlStr := ""
-	if u, err := url.ParseRequestURI(apiUrl); err != nil {
+	u := &url.URL{}
+	if u, err = url.ParseRequestURI(apiUrl); err != nil {
 		return "", err
-	} else {
-		u.Path = resource
-		urlStr = fmt.Sprintf("%v", u)
 	}
 
+	u.Path = resource
+	urlStr = fmt.Sprintf("%v", u)
 	client := &http.Client{}
+
 	r, err := http.NewRequest("POST", urlStr, bytes.NewBufferString(formData.Encode()))
 	if err != nil {
 		return "", err
@@ -408,12 +394,10 @@ func (c *controllerCommon) getToken() (string, error) {
 	// add headers
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Add("Content-Length", strconv.Itoa(len(formData.Encode())))
-
 	resp, err := client.Do(r)
 	if err != nil {
 		return "", err
 	}
-
 	defer resp.Body.Close()
 
 	payload, err := ioutil.ReadAll(resp.Body)
@@ -422,36 +406,33 @@ func (c *controllerCommon) getToken() (string, error) {
 	}
 
 	c.aadToken, c.expires_on, err = parseAADToken(payload)
-
 	return c.aadToken, err
 }
 
 func parseAADToken(payload []byte) (string, time.Time, error) {
-
 	var f interface{}
 	var sToken string
 	var expiresOn time.Time
 	var expiresSec int
 	var ok bool
+	var expires string
+
 	if err := json.Unmarshal(payload, &f); err != nil {
 		return "", expiresOn, err
 	}
 
 	fragment := f.(map[string]interface{})
-
 	if sToken, ok = fragment["access_token"].(string); ok != true {
 		return "", expiresOn, fmt.Errorf("Disk controller (ARM Client) cannot parse AAD token - access_token field")
 	}
-
-	if expires, ok := fragment["expires_on"].(string); ok != true {
+	if expires, ok = fragment["expires_on"].(string); ok != true {
 		return "", expiresOn, fmt.Errorf("Disk controller (ARM Client) cannot parse AAD token - expires_on field")
-	} else {
-		expiresSec, _ = strconv.Atoi(expires)
 	}
 
+	expiresSec, _ = strconv.Atoi(expires)
 	// expires_on is seconds since 1970-01-01T0:0:0Z UTC
-
 	expiresOn = time1970.UTC().Add(time.Duration(expiresSec) * time.Second)
+
 	return sToken, expiresOn, nil
 }
 
@@ -466,7 +447,6 @@ func getLunMapForVm(vmSize string) map[int]bool {
 	}
 
 	m = make(map[int]bool)
-
 	// OS Disk is always at lun 0
 	for index := 1; index <= count; index++ {
 		m[index] = false
@@ -504,17 +484,15 @@ func findEmptyLun(vmSize string, dataDisks []interface{}) (int, error) {
 
 func getRestError(operation string, restError error, expectedStatus int, actualStatus int, body io.ReadCloser) error {
 	if restError != nil {
-		return fmt.Errorf("AzureMd - %s - Rest Error: %s", operation, restError)
-	} else {
-		bodystr := ""
-
-		if body != nil {
-			bodyBytes, _ := ioutil.ReadAll(body)
-			if bodyBytes != nil {
-				bodystr = string(bodyBytes)
-			}
-		}
-
-		return fmt.Errorf("AzureDisk - %s - Rest Status Error:\n Expected: %v\n Got: %v\n ResponseBody:%s\n\n", operation, expectedStatus, actualStatus, bodystr)
+		return fmt.Errorf("AzureDisk - %s - Rest Error: %s", operation, restError)
 	}
+
+	bodystr := ""
+	if body != nil {
+		bodyBytes, _ := ioutil.ReadAll(body)
+		if bodyBytes != nil {
+			bodystr = string(bodyBytes)
+		}
+	}
+	return fmt.Errorf("AzureDisk - %s - Rest Status Error:\n Expected: %v\n Got: %v\n ResponseBody:%s\n\n", operation, expectedStatus, actualStatus, bodystr)
 }

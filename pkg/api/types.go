@@ -1033,7 +1033,7 @@ type AzureDiskVolumeSource struct {
 	// +optional
 	ReadOnly *bool
 	// Defaults to shared
-	// shared: mulitple blob disks per storage account
+	// shared: multiple blob disks per storage account
 	// dedicated: single blob disk per storage account
 	// managed: azure managed data disk (only in managed availability set)
 	Kind *AzureDataDiskKind

@@ -86,7 +86,6 @@ func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 	}
 
 	return strconv.Itoa(lun), nil
-
 }
 
 func (a *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
@@ -111,12 +110,10 @@ func (a *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 			}
 		}
 	}
-
 	return specsMap, nil
 }
 
 func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
-
 	ticker := time.NewTicker(time.Second * 2)
 	timer := time.NewTimer(timeout)
 	defer ticker.Stop()
@@ -154,13 +151,11 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 					return newDevicePath, nil
 				}
 			}
-
 		case <-timer.C:
 			glog.Infof("azureDisk - WaitForAttach ticker timeout finding attached disk node (%s) disk (%s) lun(%v)", nodeName, diskName, lun)
 			return "", fmt.Errorf("azureDisk - WaitForAttach failed within timeout node (%s) diskId:(%s) lun:(%v)", nodeName, diskName, lun)
 		}
 	}
-
 }
 
 // to avoid name conflicts (similar *.vhd name)
@@ -183,7 +178,6 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 }
 
 func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-
 	m := attacher.plugin.host.GetMounter()
 	notMnt, err := m.IsLikelyNotMountPoint(deviceMountPath)
 
@@ -227,7 +221,6 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 }
 
 func (d *azureDiskDetacher) Detach(deviceName string, nodeName types.NodeName) error {
-
 	isManagedDisk, diskHash := diskKindHashfromPDName(deviceName)
 
 	attached, _, err := d.plugin.commonController.isDiskAttached(diskHash, string(nodeName), isManagedDisk)
@@ -257,7 +250,6 @@ func (d *azureDiskDetacher) Detach(deviceName string, nodeName types.NodeName) e
 
 	glog.V(2).Infof("azureDisk - disk:%s managed:%v was detached from node:%v", deviceName, isManagedDisk, nodeName)
 	return nil
-
 }
 
 // UnmountDevice unmounts the volume on the node
