@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -32,6 +31,9 @@ import (
 )
 
 func TestAdmission(t *testing.T) {
+	empty := ""
+	foo := "foo"
+
 	defaultClass1 := &storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
@@ -100,9 +102,9 @@ func TestAdmission(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claimWithClass",
 			Namespace: "ns",
-			Annotations: map[string]string{
-				v1.BetaStorageClassAnnotation: "foo",
-			},
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			StorageClassName: &foo,
 		},
 	}
 	claimWithEmptyClass := &api.PersistentVolumeClaim{
@@ -112,9 +114,9 @@ func TestAdmission(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claimWithEmptyClass",
 			Namespace: "ns",
-			Annotations: map[string]string{
-				v1.BetaStorageClassAnnotation: "",
-			},
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			StorageClassName: &empty,
 		},
 	}
 	claimWithNoClass := &api.PersistentVolumeClaim{
@@ -222,10 +224,8 @@ func TestAdmission(t *testing.T) {
 		}
 
 		class := ""
-		if claim.Annotations != nil {
-			if value, ok := claim.Annotations[v1.BetaStorageClassAnnotation]; ok {
-				class = value
-			}
+		if claim.Spec.StorageClassName != nil {
+			class = *claim.Spec.StorageClassName
 		}
 		if test.expectedClassName != "" && test.expectedClassName != class {
 			t.Errorf("Test %q: expected class name %q, got %q", test.name, test.expectedClassName, class)
