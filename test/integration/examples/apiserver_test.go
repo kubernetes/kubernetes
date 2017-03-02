@@ -56,20 +56,6 @@ var groupVersionForDiscovery = metav1.GroupVersionForDiscovery{
 	Version:      groupVersion.Version,
 }
 
-func localPort() (int, error) {
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return 0, err
-	}
-	defer l.Close()
-	addr := strings.Split(l.Addr().String(), ":")
-	port, err := strconv.Atoi(addr[len(addr)-1])
-	if err != nil {
-		return 0, err
-	}
-	return port, nil
-}
-
 func TestAggregatedAPIServer(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -106,7 +92,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	go func() {
 		for {
 			// always get a fresh port in case something claimed the old one
-			kubePort, err := localPort()
+			kubePort, err := framework.FindFreeLocalPort()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -179,7 +165,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	go func() {
 		for {
 			// always get a fresh port in case something claimed the old one
-			wardlePortInt, err := localPort()
+			wardlePortInt, err := framework.FindFreeLocalPort()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -256,7 +242,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	go func() {
 		for {
 			// always get a fresh port in case something claimed the old one
-			aggregatorPortInt, err := localPort()
+			aggregatorPortInt, err := framework.FindFreeLocalPort()
 			if err != nil {
 				t.Fatal(err)
 			}
