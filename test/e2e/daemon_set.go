@@ -33,7 +33,9 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -109,12 +111,12 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
-		_, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
+		ds, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods launch on every node of the cluster.")
 		Expect(err).NotTo(HaveOccurred())
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 		err = checkDaemonStatus(f, dsName)
 		Expect(err).NotTo(HaveOccurred())
@@ -124,7 +126,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		pod := podList.Items[0]
 		err = c.Core().Pods(ns).Delete(pod.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
 	})
 
@@ -212,12 +214,12 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		By(fmt.Sprintf("Creating a simple DaemonSet %q", dsName))
-		_, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
+		ds, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods launch on every node of the cluster.")
 		Expect(err).NotTo(HaveOccurred())
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 		err = checkDaemonStatus(f, dsName)
 		Expect(err).NotTo(HaveOccurred())
@@ -229,7 +231,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		pod.Status.Phase = v1.PodFailed
 		_, err = c.Core().Pods(ns).UpdateStatus(&pod)
 		Expect(err).NotTo(HaveOccurred(), "error failing a daemon pod")
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
 	})
 
@@ -237,16 +239,16 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating simple daemon set %s", dsName)
-		_, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
+		ds, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods launch on every node of the cluster.")
 		Expect(err).NotTo(HaveOccurred())
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 
 		By("Update daemon pods image.")
-		ds, err := c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
+		ds, err = c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
 		ds.Spec.Template.Spec.Containers[0].Image = redisImage
 		_, err = c.Extensions().DaemonSets(ns).Update(ds)
 		Expect(err).NotTo(HaveOccurred())
@@ -257,7 +259,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 
 		By("Check that daemon pods are still running on every node of the cluster.")
 		Expect(err).NotTo(HaveOccurred())
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 	})
 
@@ -265,16 +267,16 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating simple daemon set %s", dsName)
-		_, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
+		ds, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods launch on every node of the cluster.")
 		Expect(err).NotTo(HaveOccurred())
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 
 		By("Update daemon pods image.")
-		ds, err := c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
+		ds, err = c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
 		ds.Spec.Template.Spec.Containers[0].Image = redisImage
 		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
 		_, err = c.Extensions().DaemonSets(ns).Update(ds)
@@ -286,7 +288,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 
 		By("Check that daemon pods are still running on every node of the cluster.")
 		Expect(err).NotTo(HaveOccurred())
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 	})
 
@@ -421,16 +423,33 @@ func checkDaemonPodOnNodes(f *framework.Framework, selector map[string]string, n
 	}
 }
 
-func checkRunningOnAllNodes(f *framework.Framework, selector map[string]string) func() (bool, error) {
+func checkRunningOnAllNodes(f *framework.Framework, selector map[string]string, ds *extensions.DaemonSet) func() (bool, error) {
 	return func() (bool, error) {
 		nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		nodeNames := make([]string, 0)
 		for _, node := range nodeList.Items {
+			if !canScheduleOnNode(node, ds) {
+				framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node, node.Spec.Taints)
+				continue
+			}
 			nodeNames = append(nodeNames, node.Name)
 		}
 		return checkDaemonPodOnNodes(f, selector, nodeNames)()
 	}
+}
+
+// canScheduleOnNode checks if a given DaemonSet can schedule pods on the given node
+func canScheduleOnNode(node v1.Node, ds *extensions.DaemonSet) bool {
+	newPod := daemon.NewPod(ds, node.Name)
+	nodeInfo := schedulercache.NewNodeInfo()
+	nodeInfo.SetNode(&node)
+	fit, _, err := daemon.Predicates(newPod, nodeInfo)
+	if err != nil {
+		framework.Failf("Can't test DaemonSet predicates for node %s: %v", node.Name, err)
+		return false
+	}
+	return fit
 }
 
 func checkRunningOnNoNodes(f *framework.Framework, selector map[string]string) func() (bool, error) {
