@@ -39,6 +39,7 @@ var upgradeTests = []upgrades.Test{
 	&upgrades.HPAUpgradeTest{},
 	&upgrades.PersistentVolumeUpgradeTest{},
 	&upgrades.DaemonSetUpgradeTest{},
+	&upgrades.IngressUpgradeTest{},
 }
 
 var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {

@@ -253,6 +253,7 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	// here. Let's correct it before updating.
 	if oldLeaderElectionRecord.HolderIdentity == le.config.Lock.Identity() {
 		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
+		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions
 	} else {
 		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions + 1
 	}

@@ -1,21 +1,20 @@
-# please keep this file synchronized with cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: fluentd-gcp-v1.38
+  name: fluentd-gcp-v2.0
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v1.38
+    version: v2.0
 spec:
   template:
     metadata:
       labels:
         k8s-app: fluentd-gcp
         kubernetes.io/cluster-service: "true"
-        version: v1.38
+        version: v2.0
       # This annotation ensures that fluentd does not get evicted if the node
       # supports critical pod annotation based priority scheme.
       # Note that this does not guarantee admission on the nodes (#40573).
@@ -25,7 +24,7 @@ spec:
       dnsPolicy: Default
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google_containers/fluentd-gcp:1.38
+        image: gcr.io/google-containers/fluentd-gcp:2.0
         # If fluentd consumes its own logs, the following situation may happen:
         # fluentd fails to send a chunk to the server => writes it to the log =>
         # tries to send this message to the server => fails to send a chunk and so on.
@@ -53,6 +52,8 @@ spec:
         - name: libsystemddir
           mountPath: /host/lib
           readOnly: true
+        - name: config-volume
+          mountPath: /etc/fluent/config.d
         # Liveness probe is aimed to help in situarions where fluentd
         # silently hangs for no apparent reasons until manual restart.
         # The idea of this probe is that if fluentd is not queueing or
@@ -101,3 +102,6 @@ spec:
       - name: libsystemddir
         hostPath:
           path: /usr/lib64
+      - name: config-volume
+        configMap:
+          name: fluentd-gcp-config

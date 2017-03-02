@@ -2791,6 +2791,58 @@
 			"Rev": "c2ac40f1adf8c42a79badddb2a2acd673cae3bcb"
 		},
 		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/custom_metrics",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/custom_metrics/install",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/metrics",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/metrics/install",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/metrics/v1alpha1",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/custom_metrics",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/custom_metrics/fake",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
 			"ImportPath": "vbom.ml/util/sortorder",
 			"Rev": "db5cfe13f5cc80a4990d98e2e1b0707a4d1a5394"
 		}

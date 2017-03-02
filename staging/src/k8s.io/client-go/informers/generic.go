@@ -32,6 +32,8 @@ import (
 	policy_v1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	rbac_v1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
+	settings_v1alpha1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
+	storage_v1 "k8s.io/client-go/pkg/apis/storage/v1"
 	storage_v1beta1 "k8s.io/client-go/pkg/apis/storage/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -161,6 +163,14 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1beta1().Roles().Informer()}, nil
 	case rbac_v1beta1.SchemeGroupVersion.WithResource("rolebindings"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1beta1().RoleBindings().Informer()}, nil
+
+		// Group=Settings, Version=V1alpha1
+	case settings_v1alpha1.SchemeGroupVersion.WithResource("podpresets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Settings().V1alpha1().PodPresets().Informer()}, nil
+
+		// Group=Storage, Version=V1
+	case storage_v1.SchemeGroupVersion.WithResource("storageclasses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1().StorageClasses().Informer()}, nil
 
 		// Group=Storage, Version=V1beta1
 	case storage_v1beta1.SchemeGroupVersion.WithResource("storageclasses"):

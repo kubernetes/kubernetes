@@ -107,6 +107,10 @@ go_library(
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/record",
         "//vendor:k8s.io/client-go/util/cert",
+        "//vendor:k8s.io/metrics/pkg/apis/custom_metrics/install",
+        "//vendor:k8s.io/metrics/pkg/apis/metrics/install",
+        "//vendor:k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+        "//vendor:k8s.io/metrics/pkg/client/custom_metrics",
     ],
 )
 

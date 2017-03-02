@@ -90,6 +90,17 @@ ensure-local-disks() {
   done
 }
 
+function config-ip-firewall {
+  echo "Configuring IP firewall rules"
+
+  iptables -N KUBE-METADATA-SERVER
+  iptables -A FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
+
+  if [[ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]]; then
+    iptables -A KUBE-METADATA-SERVER -j DROP
+  fi
+}
+
 function ensure-install-dir() {
   INSTALL_DIR="/var/cache/kubernetes-install"
   mkdir -p ${INSTALL_DIR}
@@ -1136,6 +1147,7 @@ function create-salt-master-etcd-auth {
 if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config starting =="
   set-broken-motd
+  config-ip-firewall
   ensure-basic-networking
   fix-apt-sources
   ensure-install-dir

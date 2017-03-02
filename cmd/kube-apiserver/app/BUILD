@@ -16,6 +16,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
+        "//cmd/kube-apiserver/app/preflight:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
@@ -49,6 +50,7 @@ go_library(
         "//plugin/pkg/admission/namespace/lifecycle:go_default_library",
         "//plugin/pkg/admission/persistentvolume/label:go_default_library",
         "//plugin/pkg/admission/podnodeselector:go_default_library",
+        "//plugin/pkg/admission/podpreset:go_default_library",
         "//plugin/pkg/admission/resourcequota:go_default_library",
         "//plugin/pkg/admission/security/podsecuritypolicy:go_default_library",
         "//plugin/pkg/admission/securitycontext/scdeny:go_default_library",
@@ -85,6 +87,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kube-apiserver/app/options:all-srcs",
+        "//cmd/kube-apiserver/app/preflight:all-srcs",
     ],
     tags = ["automanaged"],
 )

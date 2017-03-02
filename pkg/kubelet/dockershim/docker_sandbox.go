@@ -298,6 +298,8 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 				Network: netNS,
 				Options: &runtimeapi.NamespaceOption{
 					HostNetwork: hostNetwork,
+					HostPid:     sharesHostPid(r),
+					HostIpc:     sharesHostIpc(r),
 				},
 			},
 		},
@@ -490,11 +492,29 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	return createConfig, nil
 }
 
-// sharesHostNetwork true if the given container is sharing the hosts's
+// sharesHostNetwork returns true if the given container is sharing the host's
 // network namespace.
 func sharesHostNetwork(container *dockertypes.ContainerJSON) bool {
 	if container != nil && container.HostConfig != nil {
 		return string(container.HostConfig.NetworkMode) == namespaceModeHost
+	}
+	return false
+}
+
+// sharesHostPid returns true if the given container is sharing the host's pid
+// namespace.
+func sharesHostPid(container *dockertypes.ContainerJSON) bool {
+	if container != nil && container.HostConfig != nil {
+		return string(container.HostConfig.PidMode) == namespaceModeHost
+	}
+	return false
+}
+
+// sharesHostIpc returns true if the given container is sharing the host's ipc
+// namespace.
+func sharesHostIpc(container *dockertypes.ContainerJSON) bool {
+	if container != nil && container.HostConfig != nil {
+		return string(container.HostConfig.IpcMode) == namespaceModeHost
 	}
 	return false
 }

@@ -79,6 +79,8 @@ pkg/apis/imagepolicy/install
 pkg/apis/policy/install
 pkg/apis/rbac/install
 pkg/apis/rbac/v1alpha1
+pkg/apis/settings/install
+pkg/apis/settings/validation
 pkg/apis/storage/install
 pkg/apis/storage/validation
 pkg/bootstrap/api
@@ -103,7 +105,10 @@ pkg/client/informers/informers_generated/externalversions/policy/v1beta1
 pkg/client/informers/informers_generated/externalversions/rbac
 pkg/client/informers/informers_generated/externalversions/rbac/v1alpha1
 pkg/client/informers/informers_generated/externalversions/rbac/v1beta1
+pkg/client/informers/informers_generated/externalversions/settings
+pkg/client/informers/informers_generated/externalversions/settings/v1alpha1
 pkg/client/informers/informers_generated/externalversions/storage
+pkg/client/informers/informers_generated/externalversions/storage/v1
 pkg/client/informers/informers_generated/externalversions/storage/v1beta1
 pkg/client/informers/informers_generated/internalversion
 pkg/client/informers/informers_generated/internalversion/apps
@@ -122,6 +127,8 @@ pkg/client/informers/informers_generated/internalversion/policy
 pkg/client/informers/informers_generated/internalversion/policy/internalversion
 pkg/client/informers/informers_generated/internalversion/rbac
 pkg/client/informers/informers_generated/internalversion/rbac/internalversion
+pkg/client/informers/informers_generated/internalversion/settings
+pkg/client/informers/informers_generated/internalversion/settings/internalversion
 pkg/client/informers/informers_generated/internalversion/storage
 pkg/client/informers/informers_generated/internalversion/storage/internalversion
 pkg/client/listers/apps/internalversion
@@ -152,7 +159,10 @@ pkg/client/listers/policy/v1beta1
 pkg/client/listers/rbac/internalversion
 pkg/client/listers/rbac/v1alpha1
 pkg/client/listers/rbac/v1beta1
+pkg/client/listers/settings/internalversion
+pkg/client/listers/settings/v1alpha1
 pkg/client/listers/storage/internalversion
+pkg/client/listers/storage/v1
 pkg/client/listers/storage/v1beta1
 pkg/client/metrics
 pkg/client/metrics/prometheus
@@ -334,7 +344,10 @@ staging/src/k8s.io/client-go/informers/policy/v1beta1
 staging/src/k8s.io/client-go/informers/rbac
 staging/src/k8s.io/client-go/informers/rbac/v1alpha1
 staging/src/k8s.io/client-go/informers/rbac/v1beta1
+staging/src/k8s.io/client-go/informers/settings
+staging/src/k8s.io/client-go/informers/settings/v1alpha1
 staging/src/k8s.io/client-go/informers/storage
+staging/src/k8s.io/client-go/informers/storage/v1
 staging/src/k8s.io/client-go/informers/storage/v1beta1
 staging/src/k8s.io/client-go/listers/apps/v1beta1
 staging/src/k8s.io/client-go/listers/autoscaling/v1
@@ -347,6 +360,8 @@ staging/src/k8s.io/client-go/listers/extensions/v1beta1
 staging/src/k8s.io/client-go/listers/policy/v1beta1
 staging/src/k8s.io/client-go/listers/rbac/v1alpha1
 staging/src/k8s.io/client-go/listers/rbac/v1beta1
+staging/src/k8s.io/client-go/listers/settings/v1alpha1
+staging/src/k8s.io/client-go/listers/storage/v1
 staging/src/k8s.io/client-go/listers/storage/v1beta1
 staging/src/k8s.io/client-go/plugin/pkg/client/auth
 staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp

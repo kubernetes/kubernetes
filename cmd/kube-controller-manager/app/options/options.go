@@ -94,18 +94,19 @@ func NewCMServer() *CMServer {
 				},
 				FlexVolumePluginDir: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 			},
-			ContentType:              "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:               20.0,
-			KubeAPIBurst:             30,
-			LeaderElection:           leaderelection.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval:  metav1.Duration{Duration: 0 * time.Second},
-			EnableGarbageCollector:   true,
-			ConcurrentGCSyncs:        20,
-			ClusterSigningCertFile:   "/etc/kubernetes/ca/ca.pem",
-			ClusterSigningKeyFile:    "/etc/kubernetes/ca/ca.key",
-			ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 60 * time.Second},
-			EnableTaintManager:       true,
-			UseTaintBasedEvictions:   false,
+			ContentType:                           "application/vnd.kubernetes.protobuf",
+			KubeAPIQPS:                            20.0,
+			KubeAPIBurst:                          30,
+			LeaderElection:                        leaderelection.DefaultLeaderElectionConfiguration(),
+			ControllerStartInterval:               metav1.Duration{Duration: 0 * time.Second},
+			EnableGarbageCollector:                true,
+			ConcurrentGCSyncs:                     20,
+			ClusterSigningCertFile:                "/etc/kubernetes/ca/ca.pem",
+			ClusterSigningKeyFile:                 "/etc/kubernetes/ca/ca.key",
+			ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 60 * time.Second},
+			EnableTaintManager:                    true,
+			UseTaintBasedEvictions:                false,
+			HorizontalPodAutoscalerUseRESTClients: false,
 		},
 	}
 	s.LeaderElection.LeaderElect = true
@@ -200,6 +201,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.DurationVar(&s.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", s.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
 	fs.BoolVar(&s.EnableTaintManager, "enable-taint-manager", s.EnableTaintManager, "WARNING: Beta feature. If set to true enables NoExecute Taints and will evict all not-tolerating Pod running on Nodes tainted with this kind of Taints.")
 	fs.BoolVar(&s.UseTaintBasedEvictions, "use-taint-based-evictions", s.UseTaintBasedEvictions, "WARNING: Alpha feature. If set to true NodeController will use taints to evict Pods from notReady and unreachable Nodes.")
+	fs.BoolVar(&s.HorizontalPodAutoscalerUseRESTClients, "horizontal-pod-autoscaler-use-rest-clients", s.HorizontalPodAutoscalerUseRESTClients, "WARNING: alpha feature.  If set to true, causes the horizontal pod autoscaler controller to use REST clients through the kube-aggregator, instead of using the legacy metrics client through the API server proxy.  This is required for custom metrics support in the horizonal pod autoscaler.")
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 

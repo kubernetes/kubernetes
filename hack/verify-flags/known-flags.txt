@@ -11,15 +11,15 @@ allowed-not-ready-nodes
 allow-missing-template-keys
 allow-privileged
 anonymous-auth
-api-advertise-addresses
 api-burst
 api-external-dns-names
-api-port
 api-prefix
 api-rate
 api-server-advertise-address
+apiserver-advertise-address
 apiserver-arg-overrides
 apiserver-arg-overrides
+apiserver-bind-port
 apiserver-count
 apiserver-count
 apiserver-count
@@ -691,3 +691,4 @@ www-prefix
 zone-id
 zone-name
 
+horizontal-pod-autoscaler-use-rest-clients
