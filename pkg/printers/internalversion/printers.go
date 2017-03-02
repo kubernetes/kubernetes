@@ -1867,6 +1867,10 @@ func printNetworkPolicyList(list *extensions.NetworkPolicyList, w io.Writer, opt
 func printStorageClass(sc *storage.StorageClass, w io.Writer, options printers.PrintOptions) error {
 	name := sc.Name
 
+	if options.WithNamespace {
+		return fmt.Errorf("storageclass is not namespaced")
+	}
+
 	if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
 		name += " (default)"
 	}
