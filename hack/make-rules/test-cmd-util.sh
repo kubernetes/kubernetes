@@ -2036,7 +2036,7 @@ run_rc_tests() {
   # Post-condition: frontend replication controller is created
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # Describe command should print detailed information
-  kube::test::describe_object_assert rc 'frontend' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  kube::test::describe_object_assert rc 'frontend' "Name:" "Pod Template:" "Labels:" "Selector:" "Replicas:" "Pods Status:" "Volumes:" "GET_HOSTS_FROM:"
   # Describe command should print events information by default
   kube::test::describe_object_events_assert rc 'frontend'
   # Describe command should not print events information when show-events=false
@@ -2044,7 +2044,7 @@ run_rc_tests() {
   # Describe command should print events information when show-events=true
   kube::test::describe_object_events_assert rc 'frontend' true
   # Describe command (resource only) should print detailed information
-  kube::test::describe_resource_assert rc "Name:" "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  kube::test::describe_resource_assert rc "Name:" "Name:" "Pod Template:" "Labels:" "Selector:" "Replicas:" "Pods Status:" "Volumes:" "GET_HOSTS_FROM:"
   # Describe command should print events information by default
   kube::test::describe_resource_events_assert rc
   # Describe command should not print events information when show-events=false
@@ -2444,7 +2444,7 @@ run_rs_tests() {
   # Post-condition: frontend replica set is created
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # Describe command should print detailed information
-  kube::test::describe_object_assert rs 'frontend' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  kube::test::describe_object_assert rs 'frontend' "Name:" "Pod Template:" "Labels:" "Selector:" "Replicas:" "Pods Status:" "Volumes:"
   # Describe command should print events information by default
   kube::test::describe_object_events_assert rs 'frontend'
   # Describe command should not print events information when show-events=false
@@ -2452,7 +2452,7 @@ run_rs_tests() {
   # Describe command should print events information when show-events=true
   kube::test::describe_object_events_assert rs 'frontend' true
   # Describe command (resource only) should print detailed information
-  kube::test::describe_resource_assert rs "Name:" "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  kube::test::describe_resource_assert rs "Name:" "Pod Template:" "Labels:" "Selector:" "Replicas:" "Pods Status:" "Volumes:"
   # Describe command should print events information by default
   kube::test::describe_resource_events_assert rs
   # Describe command should not print events information when show-events=false
