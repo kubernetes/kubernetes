@@ -28,7 +28,8 @@ import (
 
 const (
 	// TODO(crassirostris): Once test is stable, decrease allowed loses
-	loadTestMaxAllowedLostFraction = 0.1
+	loadTestMaxAllowedLostFraction    = 0.1
+	loadTestMaxAllowedFluentdRestarts = 1
 )
 
 // TODO(crassirostris): Remove Flaky once test is stable
@@ -58,7 +59,14 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		time.Sleep(loggingDuration)
 
 		By("Waiting for all log lines to be ingested")
-		err = waitForLogsIngestion(gclLogsProvider, pods, ingestionTimeout, loadTestMaxAllowedLostFraction)
+		config := &loggingTestConfig{
+			LogsProvider:              gclLogsProvider,
+			Pods:                      pods,
+			IngestionTimeout:          ingestionTimeout,
+			MaxAllowedLostFraction:    loadTestMaxAllowedLostFraction,
+			MaxAllowedFluentdRestarts: loadTestMaxAllowedFluentdRestarts,
+		}
+		err = waitForLogsIngestion(f, config)
 		if err != nil {
 			framework.Failf("Failed to ingest logs: %v", err)
 		} else {
@@ -96,7 +104,14 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		time.Sleep(jobDuration)
 
 		By("Waiting for all log lines to be ingested")
-		err = waitForLogsIngestion(gclLogsProvider, pods, ingestionTimeout, loadTestMaxAllowedLostFraction)
+		config := &loggingTestConfig{
+			LogsProvider:              gclLogsProvider,
+			Pods:                      pods,
+			IngestionTimeout:          ingestionTimeout,
+			MaxAllowedLostFraction:    loadTestMaxAllowedLostFraction,
+			MaxAllowedFluentdRestarts: loadTestMaxAllowedFluentdRestarts,
+		}
+		err = waitForLogsIngestion(f, config)
 		if err != nil {
 			framework.Failf("Failed to ingest logs: %v", err)
 		} else {

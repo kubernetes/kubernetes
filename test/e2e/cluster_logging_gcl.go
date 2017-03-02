@@ -50,11 +50,14 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Flaky]", func()
 		framework.ExpectNoError(err, fmt.Sprintf("Should've successfully waited for pod %s to succeed", podName))
 
 		By("Waiting for logs to ingest")
-		err = waitForLogsIngestion(gclLogsProvider, []*loggingPod{pod}, 10*time.Minute, 0)
-		framework.ExpectNoError(err, "Failed to ingest logs")
-
-		if err != nil {
-			reportLogsFromFluentdPod(f, pod)
+		config := &loggingTestConfig{
+			LogsProvider:              gclLogsProvider,
+			Pods:                      []*loggingPod{pod},
+			IngestionTimeout:          10 * time.Minute,
+			MaxAllowedLostFraction:    0,
+			MaxAllowedFluentdRestarts: 0,
 		}
+		err = waitForLogsIngestion(f, config)
+		framework.ExpectNoError(err, "Failed to ingest logs")
 	})
 })
