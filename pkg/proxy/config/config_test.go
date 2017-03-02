@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config_test
+package config
 
 import (
 	"reflect"
@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
-	. "k8s.io/kubernetes/pkg/proxy/config"
 )
 
 const TomcatPort int = 8080
@@ -140,6 +139,7 @@ func CreateEndpointsUpdate(op Operation, endpoints *api.Endpoints) EndpointsUpda
 
 func TestNewServiceAddedAndNotified(t *testing.T) {
 	config := NewServiceConfig()
+	config.store.synced = true
 	channel := config.Channel("one")
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
@@ -153,6 +153,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 
 func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 	config := NewServiceConfig()
+	config.store.synced = true
 	channel := config.Channel("one")
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
@@ -181,6 +182,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 
 func TestNewMultipleSourcesServicesAddedAndNotified(t *testing.T) {
 	config := NewServiceConfig()
+	config.store.synced = true
 	channelOne := config.Channel("one")
 	channelTwo := config.Channel("two")
 	if channelOne == channelTwo {
@@ -204,6 +206,7 @@ func TestNewMultipleSourcesServicesAddedAndNotified(t *testing.T) {
 
 func TestNewMultipleSourcesServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 	config := NewServiceConfig()
+	config.store.synced = true
 	channelOne := config.Channel("one")
 	channelTwo := config.Channel("two")
 	handler := NewServiceHandlerMock()
@@ -227,6 +230,7 @@ func TestNewMultipleSourcesServicesMultipleHandlersAddedAndNotified(t *testing.T
 
 func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 	config := NewEndpointsConfig()
+	config.store.synced = true
 	channelOne := config.Channel("one")
 	channelTwo := config.Channel("two")
 	handler := NewEndpointsHandlerMock()
@@ -257,6 +261,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 
 func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 	config := NewEndpointsConfig()
+	config.store.synced = true
 	channelOne := config.Channel("one")
 	channelTwo := config.Channel("two")
 	handler := NewEndpointsHandlerMock()
