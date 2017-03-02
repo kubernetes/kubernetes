@@ -1335,7 +1335,7 @@ var map_PodSpec = map[string]string{
 	"hostname":                      "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value.",
 	"subdomain":                     "If specified, the fully qualified Pod hostname will be \"<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>\". If not specified, the pod will not have a domainname at all.",
 	"affinity":                      "If specified, the pod's scheduling constraints",
-	"schedulername":                 "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
+	"schedulerName":                 "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
 	"tolerations":                   "If specified, the pod's tolerations.",
 }
 
