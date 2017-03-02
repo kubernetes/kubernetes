@@ -119,8 +119,8 @@ func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer 
 	dc.rsLister = rsInformer.Lister()
 	dc.podLister = podInformer.Lister()
 	dc.dListerSynced = dInformer.Informer().HasSynced
-	dc.rsListerSynced = dInformer.Informer().HasSynced
-	dc.podListerSynced = dInformer.Informer().HasSynced
+	dc.rsListerSynced = rsInformer.Informer().HasSynced
+	dc.podListerSynced = podInformer.Informer().HasSynced
 	return dc
 }
 
