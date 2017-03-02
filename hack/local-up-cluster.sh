@@ -66,6 +66,9 @@ FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
 # enable swagger ui
 ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
 
+# enable audit log
+ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
+
 # RBAC Mode options
 ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
 ENABLE_RBAC=${ENABLE_RBAC:-false}
@@ -377,6 +380,23 @@ function start_apiserver {
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
 
+    audit_arg=""
+    APISERVER_BASIC_AUDIT_LOG=/tmp/kube-apiserver-audit.log
+    if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" = true ]]; then
+        # We currently only support enabling with a fixed path and with built-in log
+        # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
+        # External log rotation should be set up the same as for kube-apiserver.log.
+        audit_arg=" --audit-log-path=${APISERVER_BASIC_AUDIT_LOG}"
+        audit_arg+=" --audit-log-maxage=0"
+        audit_arg+=" --audit-log-maxbackup=0"
+        # Lumberjack doesn't offer any way to disable size-based rotation. It also
+        # has an in-memory counter that doesn't notice if you truncate the file.
+        # 2000000000 (in MiB) is a large number that fits in 31 bits. If the log
+        # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
+        # never restarts. Please manually restart apiserver before this time.
+        audit_arg+=" --audit-log-maxsize=2000000000"
+    fi
+
     swagger_arg=""
     if [[ "${ENABLE_SWAGGER_UI}" = true ]]; then
       swagger_arg="--enable-swagger-ui=true "
@@ -432,7 +452,7 @@ function start_apiserver {
 
 
     APISERVER_LOG=/tmp/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
@@ -713,6 +733,7 @@ Local Kubernetes cluster is running. Press Ctrl-C to shut it down.
 
 Logs:
   ${APISERVER_LOG:-}
+  ${APISERVER_BASIC_AUDIT_LOG:-}
   ${CTLRMGR_LOG:-}
   ${PROXY_LOG:-}
   ${SCHEDULER_LOG:-}
