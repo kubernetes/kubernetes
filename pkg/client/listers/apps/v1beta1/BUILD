@@ -10,9 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "deployment.go",
         "expansion_generated.go",
-        "scale.go",
         "statefulset.go",
         "statefulset_expansion.go",
     ],

@@ -539,3 +539,15 @@ func newInt32(val int32) *int32 {
 	*p = val
 	return p
 }
+
+func newString(val string) *string {
+	p := new(string)
+	*p = val
+	return p
+}
+
+func newBool(val bool) *bool {
+	b := new(bool)
+	*b = val
+	return b
+}
