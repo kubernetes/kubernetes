@@ -18,7 +18,6 @@ go_library(
         "cluster_logging_es_utils.go",
         "cluster_logging_gcl.go",
         "cluster_logging_gcl_load.go",
-        "cluster_logging_gcl_utils.go",
         "cluster_logging_utils.go",
         "cluster_size_autoscaling.go",
         "cluster_upgrade.go",
