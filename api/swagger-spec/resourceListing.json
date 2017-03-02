@@ -120,6 +120,14 @@
    {
     "path": "/apis/storage.k8s.io",
     "description": "get information of a group"
+   },
+   {
+    "path": "/apis/settings.k8s.io/v1alpha1",
+    "description": "API at /apis/settings.k8s.io/v1alpha1"
+   },
+   {
+    "path": "/apis/settings.k8s.io",
+    "description": "get information of a group"
    }
   ],
   "apiVersion": "",
