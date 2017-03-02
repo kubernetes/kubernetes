@@ -529,6 +529,14 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		By("Waiting for pd to detach from host0")
 		framework.ExpectNoError(waitForPDDetach(diskName, host0Name), "Timed out waiting for detach pd")
 	})
+
+	It("should be able to delete a non exist PD without error", func() {
+		framework.SkipUnlessProviderIs("gce")
+
+		By("delete a PD")
+		err := deletePD("non-exist")
+		framework.ExpectNoError(err, "Unable to delete pd")
+	})
 })
 
 func createPDWithRetry() (string, error) {

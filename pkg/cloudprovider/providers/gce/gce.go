@@ -18,6 +18,7 @@ package gce
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -82,6 +83,10 @@ const (
 	gceHcHealthyThreshold = int64(1)
 	// Defaults to 5 * 2 = 10 seconds before the LB will steer traffic away
 	gceHcUnhealthyThreshold = int64(5)
+)
+
+var (
+	diskNotFoundErr = errors.New("disk is not found")
 )
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
@@ -2511,6 +2516,10 @@ func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
 	if isGCEError(err, "resourceInUseByAnotherResource") {
 		return volume.NewDeletedVolumeInUseError(err.Error())
 	}
+
+	if err == diskNotFoundErr {
+		return nil
+	}
 	return err
 }
 
@@ -2742,7 +2751,8 @@ func (gce *GCECloud) getDiskByNameUnknownZone(diskName string) (*gceDisk, error)
 	if found != nil {
 		return found, nil
 	}
-	return nil, fmt.Errorf("GCE persistent disk %q not found in managed zones (%s)", diskName, strings.Join(gce.managedZones, ","))
+	glog.Warningf("GCE persistent disk %q not found in managed zones (%s)", diskName, strings.Join(gce.managedZones, ","))
+	return nil, diskNotFoundErr
 }
 
 // GetGCERegion returns region of the gce zone. Zone names
