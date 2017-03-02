@@ -247,6 +247,11 @@ var ValidateEndpointsName = NameIsDNSSubdomain
 // ValidateClusterName can be used to check whether the given cluster name is valid.
 var ValidateClusterName = genericvalidation.ValidateClusterName
 
+// ValidateClassName can be used to check whether the given class name is valid.
+// It is defined here to avoid import cycle between pkg/apis/storage/validation
+// (where it should be) and this file.
+var ValidateClassName = NameIsDNSSubdomain
+
 // TODO update all references to these functions to point to the genericvalidation ones
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) []string {
@@ -1194,6 +1199,12 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(specPath.Child("persistentVolumeReclaimPolicy"), "may not be 'recycle' for a hostPath mount of '/'"))
 	}
 
+	if len(pv.Spec.StorageClassName) > 0 {
+		for _, msg := range ValidateClassName(pv.Spec.StorageClassName, false) {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("storageClassName"), pv.Spec.StorageClassName, msg))
+		}
+	}
+
 	return allErrs
 }
 
@@ -1243,6 +1254,12 @@ func ValidatePersistentVolumeClaimSpec(spec *api.PersistentVolumeClaimSpec, fldP
 		allErrs = append(allErrs, field.Required(fldPath.Child("resources").Key(string(api.ResourceStorage)), ""))
 	} else {
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(api.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(api.ResourceStorage)))...)
+	}
+
+	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {
+		for _, msg := range ValidateClassName(*spec.StorageClassName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("storageClassName"), *spec.StorageClassName, msg))
+		}
 	}
 	return allErrs
 }
