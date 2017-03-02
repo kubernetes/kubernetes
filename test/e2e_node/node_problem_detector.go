@@ -392,7 +392,7 @@ func getNodeTime() (time.Time, time.Time, error) {
 	// Get node boot time. NOTE that because we get node current time before uptime, the boot time
 	// calculated will be a little earlier than the real boot time. This won't affect the correctness
 	// of the test result.
-	bootTime := nodeTime.Add(-time.Duration(info.Uptime * int64(time.Second)))
+	bootTime := nodeTime.Add(-time.Duration(info.Uptime) * time.Second)
 
 	return nodeTime, bootTime, nil
 }
