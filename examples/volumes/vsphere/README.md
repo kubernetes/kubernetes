@@ -5,6 +5,7 @@
     - [Volumes](#volumes)
     - [Persistent Volumes](#persistent-volumes)
     - [Storage Class](#storage-class)
+    - [Stateful Set](#stateful-set)
 
 ## Prerequisites
 
@@ -194,7 +195,7 @@
       ``` bash
       $ kubectl get pod pvpod
       NAME      READY     STATUS    RESTARTS   AGE
-      pvpod       1/1     Running   0          48m        
+      pvpod       1/1     Running   0          48m
       ```
 
 ### Storage Class
@@ -220,7 +221,7 @@
       This field is optional. If not specified as shown in example 1, the volume will be created on the datastore specified in the vsphere config file used to initialize the vSphere Cloud Provider.
 
       Example 2:
- 
+
       ```yaml
       kind: StorageClass
       apiVersion: storage.k8s.io/v1beta1
@@ -242,12 +243,12 @@
       Verifying storage class is created:
 
       ``` bash
-      $ kubectl describe storageclass fast 
+      $ kubectl describe storageclass fast
       Name:		fast
       Annotations:	<none>
       Provisioner:	kubernetes.io/vsphere-volume
       Parameters:	diskformat=zeroedthick
-      No events.        
+      No events.
       ```
 
   2. Create Persistent Volume Claim.
@@ -350,9 +351,82 @@
       ``` bash
       $ kubectl get pod pvpod
       NAME      READY     STATUS    RESTARTS   AGE
-      pvpod       1/1     Running   0          48m        
+      pvpod       1/1     Running   0          48m
+      ```
+###  Stateful Set
+
+vSphere volumes can be consumed by Stateful Sets.
+
+  1. Create a storage class that will be used by the ```volumeClaimTemplates``` of a Stateful Set.
+
+      See example:
+
+      ```yaml
+      kind: StorageClass
+      apiVersion: storage.k8s.io/v1beta1
+      metadata:
+        name: thin-disk
+      provisioner: kubernetes.io/vsphere-volume
+      parameters:
+          diskformat: thin
       ```
 
+      [Download example](simple-storageclass.yaml)
+
+  2. Create a Stateful set that consumes storage from the Storage Class created.
+
+     See example:
+     ```yaml
+     ---
+     apiVersion: v1
+     kind: Service
+     metadata:
+       name: nginx
+       labels:
+         app: nginx
+     spec:
+       ports:
+       - port: 80
+         name: web
+       clusterIP: None
+       selector:
+         app: nginx
+     ---
+     apiVersion: apps/v1beta1
+     kind: StatefulSet
+     metadata:
+       name: web
+     spec:
+       serviceName: "nginx"
+       replicas: 14
+       template:
+         metadata:
+           labels:
+             app: nginx
+         spec:
+           containers:
+           - name: nginx
+             image: gcr.io/google_containers/nginx-slim:0.8
+             ports:
+             - containerPort: 80
+               name: web
+             volumeMounts:
+             - name: www
+               mountPath: /usr/share/nginx/html
+       volumeClaimTemplates:
+       - metadata:
+           name: www
+           annotations:
+             volume.beta.kubernetes.io/storage-class: thin-disk
+         spec:
+           accessModes: [ "ReadWriteOnce" ]
+           resources:
+             requests:
+               storage: 1Gi
+     ```
+     This will create Persistent Volume Claims for each replica and provision a volume for each claim if an existing volume could be bound to the claim.
+
+     [Download example](simple-statefulset.yaml)
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/vsphere/README.md?pixel)]()
