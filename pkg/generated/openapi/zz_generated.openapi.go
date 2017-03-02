@@ -6598,7 +6598,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.Affinity"),
 							},
 						},
-						"schedulername": {
+						"schedulerName": {
 							SchemaProps: spec.SchemaProps{
 								Description: "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
 								Type:        []string{"string"},

@@ -2599,7 +2599,7 @@
       "$ref": "v1.Affinity",
       "description": "If specified, the pod's scheduling constraints"
      },
-     "schedulername": {
+     "schedulerName": {
       "type": "string",
       "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler."
      },
