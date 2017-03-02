@@ -421,6 +421,17 @@ type PersistentVolumeSource struct {
 	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty" protobuf:"bytes,18,opt,name=portworxVolume"`
 }
 
+const (
+	// AlphaStorageClassAnnotation represents the previous alpha storage class
+	// annotation.  It's currently still used and will be held for backwards
+	// compatibility
+	AlphaStorageClassAnnotation = "volume.alpha.kubernetes.io/storage-class"
+
+	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
+	// It's currently still used and will be held for backwards compatibility
+	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
+)
+
 // +genclient=true
 // +nonNamespaced=true
 

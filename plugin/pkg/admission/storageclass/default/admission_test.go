@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -100,7 +101,7 @@ func TestAdmission(t *testing.T) {
 			Name:      "claimWithClass",
 			Namespace: "ns",
 			Annotations: map[string]string{
-				storageutil.StorageClassAnnotation: "foo",
+				v1.BetaStorageClassAnnotation: "foo",
 			},
 		},
 	}
@@ -112,7 +113,7 @@ func TestAdmission(t *testing.T) {
 			Name:      "claimWithEmptyClass",
 			Namespace: "ns",
 			Annotations: map[string]string{
-				storageutil.StorageClassAnnotation: "",
+				v1.BetaStorageClassAnnotation: "",
 			},
 		},
 	}
@@ -222,7 +223,7 @@ func TestAdmission(t *testing.T) {
 
 		class := ""
 		if claim.Annotations != nil {
-			if value, ok := claim.Annotations[storageutil.StorageClassAnnotation]; ok {
+			if value, ok := claim.Annotations[v1.BetaStorageClassAnnotation]; ok {
 				class = value
 			}
 		}

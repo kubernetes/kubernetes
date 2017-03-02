@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes
@@ -93,7 +92,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 	var smallestVolumeSize int64
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestedSize := requestedQty.Value()
-	requestedClass := storageutil.GetClaimStorageClass(claim)
+	requestedClass := v1.GetPersistentVolumeClaimClass(claim)
 
 	var selector labels.Selector
 	if claim.Spec.Selector != nil {
@@ -134,7 +133,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 			// with existing PVs, findByClaim must find only PVs that are
 			// pre-bound to the claim (by dynamic provisioning). TODO: remove in
 			// 1.5
-			if metav1.HasAnnotation(claim.ObjectMeta, storageutil.AlphaStorageClassAnnotation) {
+			if metav1.HasAnnotation(claim.ObjectMeta, v1.AlphaStorageClassAnnotation) {
 				continue
 			}
 
@@ -147,7 +146,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 			} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 				continue
 			}
-			if storageutil.GetVolumeStorageClass(volume) != requestedClass {
+			if v1.GetPersistentVolumeClass(volume) != requestedClass {
 				continue
 			}
 
