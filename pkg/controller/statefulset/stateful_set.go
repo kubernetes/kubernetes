@@ -159,7 +159,6 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 // addPod adds the statefulset for the pod to the sync queue
 func (ssc *StatefulSetController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	glog.V(4).Infof("Pod %s created, labels: %+v", pod.Name, pod.Labels)
 
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
@@ -174,6 +173,7 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 			// It's controlled by a different type of controller.
 			return
 		}
+		glog.V(4).Infof("Pod %s created, labels: %+v", pod.Name, pod.Labels)
 		set, err := ssc.setLister.StatefulSets(pod.Namespace).Get(controllerRef.Name)
 		if err != nil {
 			return
@@ -184,7 +184,12 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 
 	// Otherwise, it's an orphan. Get a list of all matching controllers and sync
 	// them to see if anyone wants to adopt it.
-	for _, set := range ssc.getStatefulSetsForPod(pod) {
+	sets := ssc.getStatefulSetsForPod(pod)
+	if len(sets) == 0 {
+		return
+	}
+	glog.V(4).Infof("Orphan Pod %s created, labels: %+v", pod.Name, pod.Labels)
+	for _, set := range sets {
 		ssc.enqueueStatefulSet(set)
 	}
 }
@@ -198,7 +203,6 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
 
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 
@@ -220,6 +224,7 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 			// It's controlled by a different type of controller.
 			return
 		}
+		glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
 		set, err := ssc.setLister.StatefulSets(curPod.Namespace).Get(curControllerRef.Name)
 		if err != nil {
 			return
@@ -231,7 +236,12 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
 	if labelChanged || controllerRefChanged {
-		for _, set := range ssc.getStatefulSetsForPod(curPod) {
+		sets := ssc.getStatefulSetsForPod(curPod)
+		if len(sets) == 0 {
+			return
+		}
+		glog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		for _, set := range sets {
 			ssc.enqueueStatefulSet(set)
 		}
 	}
@@ -257,7 +267,6 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 			return
 		}
 	}
-	glog.V(4).Infof("Pod %s/%s deleted through %v.", pod.Namespace, pod.Name, utilruntime.GetCaller())
 
 	controllerRef := controller.GetControllerOf(pod)
 	if controllerRef == nil {
@@ -268,6 +277,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 		// It's controlled by a different type of controller.
 		return
 	}
+	glog.V(4).Infof("Pod %s/%s deleted through %v.", pod.Namespace, pod.Name, utilruntime.GetCaller())
 
 	set, err := ssc.setLister.StatefulSets(pod.Namespace).Get(controllerRef.Name)
 	if err != nil {
@@ -303,7 +313,6 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*apps.StatefulSet {
 	sets, err := ssc.setLister.GetPodStatefulSets(pod)
 	if err != nil {
-		glog.V(4).Infof("No StatefulSets found for pod %v, StatefulSet controller will avoid syncing", pod.Name)
 		return nil
 	}
 	// More than one set is selecting the same Pod
