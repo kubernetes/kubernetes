@@ -812,7 +812,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(w, "Labels", pv.Labels)
 		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pv.ObjectMeta))
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", api.GetPersistentVolumeClass(pv))
 		w.Write(LEVEL_0, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
 			w.Write(LEVEL_0, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
@@ -889,7 +889,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pvc.ObjectMeta))
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", api.GetPersistentVolumeClaimClass(pvc))
 		w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
 		w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		printLabelsMultiline(w, "Labels", pvc.Labels)
