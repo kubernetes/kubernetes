@@ -80,13 +80,13 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().StringSliceVar(
-		&cfg.API.AdvertiseAddresses, "api-advertise-addresses", cfg.API.AdvertiseAddresses,
-		"The IP addresses to advertise, in case autodetection fails",
+	cmd.PersistentFlags().StringVar(
+		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
+		"The IP address the API Server will advertise it's listening on. 0.0.0.0 means the default network interface's address.",
 	)
 	cmd.PersistentFlags().Int32Var(
-		&cfg.API.Port, "api-port", cfg.API.Port,
-		"Port for API to bind to",
+		&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort,
+		"Port for the API Server to bind to",
 	)
 	cmd.PersistentFlags().StringSliceVar(
 		&cfg.API.ExternalDNSNames, "api-external-dns-names", cfg.API.ExternalDNSNames,
@@ -189,7 +189,7 @@ func (i *Init) Run(out io.Writer) error {
 	// TODO this is not great, but there is only one address we can use here
 	// so we'll pick the first one, there is much of chance to have an empty
 	// slice by the time this gets called
-	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddresses[0], i.cfg.API.Port)
+	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
 	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmapi.GlobalEnvParams.KubernetesDir)
 	if err != nil {
 		return err

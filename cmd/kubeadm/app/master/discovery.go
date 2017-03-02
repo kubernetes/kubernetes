@@ -46,18 +46,13 @@ const (
 
 func encodeKubeDiscoverySecretData(dcfg *kubeadmapi.TokenDiscovery, apicfg kubeadmapi.API, caCert *x509.Certificate) map[string][]byte {
 	var (
-		data         = map[string][]byte{}
-		endpointList = []string{}
-		tokenMap     = map[string]string{}
+		data     = map[string][]byte{}
+		tokenMap = map[string]string{}
 	)
-
-	for _, addr := range apicfg.AdvertiseAddresses {
-		endpointList = append(endpointList, fmt.Sprintf("https://%s:%d", addr, apicfg.Port))
-	}
 
 	tokenMap[dcfg.ID] = dcfg.Secret
 
-	data["endpoint-list.json"], _ = json.Marshal(endpointList)
+	data["endpoint-list.json"], _ = json.Marshal([]string{fmt.Sprintf("https://%s:%d", apicfg.AdvertiseAddress, apicfg.BindPort)})
 	data["token-map.json"], _ = json.Marshal(tokenMap)
 	data["ca.pem"] = certutil.EncodeCertPEM(caCert)
 
