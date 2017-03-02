@@ -577,7 +577,7 @@ func printControllers(annotation map[string]string) string {
 
 func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
 	if volumes == nil || len(volumes) == 0 {
-		w.Write(LEVEL_0, "%sNo volumes.\n", space)
+		w.Write(LEVEL_0, "%sVolumes:\t<none>\n", space)
 		return
 	}
 	w.Write(LEVEL_0, "%sVolumes:\n", space)
@@ -917,14 +917,16 @@ func describeContainers(label string, containers []api.Container, containerStatu
 		status, ok := statuses[container.Name]
 		describeContainerBasicInfo(container, status, ok, space, w)
 		describeContainerCommand(container, w)
-		describeContainerResource(container, w)
 		if ok {
 			describeContainerState(status, w)
 		}
+		describeContainerResource(container, w)
 		describeContainerProbe(container, w)
-		describeContainerVolumes(container, w)
-		describeContainerEnvFrom(container, resolverFn, w)
+		if len(container.EnvFrom) > 0 {
+			describeContainerEnvFrom(container, resolverFn, w)
+		}
 		describeContainerEnvVars(container, resolverFn, w)
+		describeContainerVolumes(container, w)
 	}
 }
 
@@ -1024,7 +1026,7 @@ func describeContainerVolumes(container api.Container, w *PrefixWriter) {
 	if len(container.VolumeMounts) == 0 {
 		none = "\t<none>"
 	}
-	w.Write(LEVEL_2, "Volume Mounts:%s\n", none)
+	w.Write(LEVEL_2, "Mounts:%s\n", none)
 	sort.Sort(SortableVolumeMounts(container.VolumeMounts))
 	for _, mount := range container.VolumeMounts {
 		flags := []string{}
@@ -1045,7 +1047,7 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 	if len(container.Env) == 0 {
 		none = "\t<none>"
 	}
-	w.Write(LEVEL_2, "Environment Variables:%s\n", none)
+	w.Write(LEVEL_2, "Environment:%s\n", none)
 
 	for _, e := range container.Env {
 		if e.ValueFrom == nil {
@@ -1178,6 +1180,26 @@ func describeStatus(stateName string, state api.ContainerState, w *PrefixWriter)
 	}
 }
 
+func describeVolumeClaimTemplates(templates []api.PersistentVolumeClaim, w *PrefixWriter) {
+	if len(templates) == 0 {
+		w.Write(LEVEL_0, "Volume Claims:\t<none>\n")
+		return
+	}
+	w.Write(LEVEL_0, "Volume Claims:\n")
+	for _, pvc := range templates {
+		w.Write(LEVEL_1, "Name:\t%s\n", pvc.Name)
+		w.Write(LEVEL_1, "StorageClass:\t%s\n", api.GetPersistentVolumeClaimClass(&pvc))
+		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.NewString())
+		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.NewString())
+		if capacity, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; ok {
+			w.Write(LEVEL_1, "Capacity:\t%s\n", capacity)
+		} else {
+			w.Write(LEVEL_1, "Capacity:\t%s\n", "<default>")
+		}
+		w.Write(LEVEL_1, "Access Modes:\t%s\n", pvc.Spec.AccessModes)
+	}
+}
+
 func printBoolPtr(value *bool) string {
 	if value != nil {
 		return printBool(*value)
@@ -1227,20 +1249,13 @@ func describeReplicationController(controller *api.ReplicationController, events
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", controller.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", controller.Namespace)
-		if controller.Spec.Template != nil {
-			w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&controller.Spec.Template.Spec))
-		} else {
-			w.Write(LEVEL_0, "Image(s):\t%s\n", "<unset>")
-		}
 		w.Write(LEVEL_0, "Selector:\t%s\n", labels.FormatLabels(controller.Spec.Selector))
 		printLabelsMultiline(w, "Labels", controller.Labels)
 		printAnnotationsMultiline(w, "Annotations", controller.Annotations)
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 
-		if controller.Spec.Template != nil {
-			describeVolumes(controller.Spec.Template.Spec.Volumes, w, "")
-		}
+		DescribePodTemplate(controller.Spec.Template, out)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1250,6 +1265,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 
 func DescribePodTemplate(template *api.PodTemplateSpec, out io.Writer) {
 	w := &PrefixWriter{out}
+	w.Write(LEVEL_0, "Pod Template:\n")
 	if template == nil {
 		w.Write(LEVEL_1, "<unset>")
 		return
@@ -1302,7 +1318,6 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", rs.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", rs.Namespace)
-		w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&rs.Spec.Template.Spec))
 		w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(rs.Spec.Selector))
 		printLabelsMultiline(w, "Labels", rs.Labels)
 		printAnnotationsMultiline(w, "Annotations", rs.Annotations)
@@ -1313,7 +1328,7 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		} else {
 			w.Write(LEVEL_0, "%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		}
-		describeVolumes(rs.Spec.Template.Spec.Volumes, w, "")
+		DescribePodTemplate(&rs.Spec.Template, out)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1345,9 +1360,10 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", job.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", job.Namespace)
-		w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&job.Spec.Template.Spec))
 		selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		printLabelsMultiline(w, "Labels", job.Labels)
+		printAnnotationsMultiline(w, "Annotations", job.Annotations)
 		w.Write(LEVEL_0, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		if job.Spec.Completions != nil {
 			w.Write(LEVEL_0, "Completions:\t%d\n", *job.Spec.Completions)
@@ -1360,10 +1376,8 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		if job.Spec.ActiveDeadlineSeconds != nil {
 			w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *job.Spec.ActiveDeadlineSeconds)
 		}
-		printLabelsMultiline(w, "Labels", job.Labels)
-		printAnnotationsMultiline(w, "Annotations", job.Annotations)
 		w.Write(LEVEL_0, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
-		describeVolumes(job.Spec.Template.Spec.Volumes, w, "")
+		DescribePodTemplate(&job.Spec.Template, out)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1395,6 +1409,8 @@ func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", scheduledJob.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", scheduledJob.Namespace)
+		printLabelsMultiline(w, "Labels", scheduledJob.Labels)
+		printAnnotationsMultiline(w, "Annotations", scheduledJob.Annotations)
 		w.Write(LEVEL_0, "Schedule:\t%s\n", scheduledJob.Spec.Schedule)
 		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", scheduledJob.Spec.ConcurrencyPolicy)
 		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(scheduledJob.Spec.Suspend))
@@ -1404,8 +1420,6 @@ func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string
 			w.Write(LEVEL_0, "Starting Deadline Seconds:\t<unset>\n")
 		}
 		describeJobTemplate(scheduledJob.Spec.JobTemplate, w)
-		printLabelsMultiline(w, "Labels", scheduledJob.Labels)
-		printAnnotationsMultiline(w, "Annotations", scheduledJob.Annotations)
 		if scheduledJob.Status.LastScheduleTime != nil {
 			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", scheduledJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
 		} else {
@@ -1420,7 +1434,6 @@ func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string
 }
 
 func describeJobTemplate(jobTemplate batch.JobTemplateSpec, w *PrefixWriter) {
-	w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&jobTemplate.Spec.Template.Spec))
 	if jobTemplate.Spec.Selector != nil {
 		selector, _ := metav1.LabelSelectorAsSelector(jobTemplate.Spec.Selector)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
@@ -1440,7 +1453,7 @@ func describeJobTemplate(jobTemplate batch.JobTemplateSpec, w *PrefixWriter) {
 	if jobTemplate.Spec.ActiveDeadlineSeconds != nil {
 		w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *jobTemplate.Spec.ActiveDeadlineSeconds)
 	}
-	describeVolumes(jobTemplate.Spec.Template.Spec.Volumes, w, "")
+	DescribePodTemplate(&jobTemplate.Spec.Template, w.out)
 }
 
 func printActiveJobs(w *PrefixWriter, title string, jobs []api.ObjectReference) {
@@ -1494,7 +1507,6 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", daemon.Name)
-		w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&daemon.Spec.Template.Spec))
 		selector, err := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
 		if err != nil {
 			// this shouldn't happen if LabelSelector passed validation
@@ -1508,6 +1520,7 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 		w.Write(LEVEL_0, "Current Number of Nodes Scheduled: %d\n", daemon.Status.CurrentNumberScheduled)
 		w.Write(LEVEL_0, "Number of Nodes Misscheduled: %d\n", daemon.Status.NumberMisscheduled)
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		DescribePodTemplate(&daemon.Spec.Template, out)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -2079,16 +2092,16 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
-		w.Write(LEVEL_0, "Name:\t%s\n", ps.Name)
-		w.Write(LEVEL_0, "Namespace:\t%s\n", ps.Namespace)
-		w.Write(LEVEL_0, "Image(s):\t%s\n", makeImageList(&ps.Spec.Template.Spec))
-		w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(ps.Spec.Selector))
-		w.Write(LEVEL_0, "Labels:\t%s\n", labels.FormatLabels(ps.Labels))
-		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", ps.Status.Replicas, ps.Spec.Replicas)
-		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(ps.Annotations))
+		w.Write(LEVEL_0, "Name:\t%s\n", ps.ObjectMeta.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", ps.ObjectMeta.Namespace)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", ps.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
+		printLabelsMultiline(w, "Labels", ps.Labels)
+		printAnnotationsMultiline(w, "Annotations", ps.Annotations)
+		w.Write(LEVEL_0, "Replicas:\t%d desired | %d total\n", ps.Spec.Replicas, ps.Status.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
-		describeVolumes(ps.Spec.Template.Spec.Volumes, w, "")
+		DescribePodTemplate(&ps.Spec.Template, out)
+		describeVolumeClaimTemplates(ps.Spec.VolumeClaimTemplates, w)
 		if describerSettings.ShowEvents {
 			events, _ := p.client.Core().Events(namespace).Search(api.Scheme, ps)
 			if events != nil {
@@ -2339,7 +2352,7 @@ func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceN
 
 func DescribeEvents(el *api.EventList, w *PrefixWriter) {
 	if len(el.Items) == 0 {
-		w.Write(LEVEL_0, "No events.\n")
+		w.Write(LEVEL_0, "Events:\t<none>\n")
 		return
 	}
 	sort.Sort(events.SortableEvents(el.Items))
@@ -2373,6 +2386,10 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
+	internalDeployment := &extensions.Deployment{}
+	if err := api.Scheme.Convert(d, internalDeployment, extensions.SchemeGroupVersion); err != nil {
+		return "", err
+	}
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", d.ObjectMeta.Name)
@@ -2388,6 +2405,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 			ru := d.Spec.Strategy.RollingUpdate
 			w.Write(LEVEL_0, "RollingUpdateStrategy:\t%s max unavailable, %s max surge\n", ru.MaxUnavailable.String(), ru.MaxSurge.String())
 		}
+		DescribePodTemplate(&internalDeployment.Spec.Template, out)
 		if len(d.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tReason\n")
 			w.Write(LEVEL_1, "----\t------\t------\n")
@@ -3003,18 +3021,6 @@ func SortedQoSResourceNames(list qos.QOSList) []api.ResourceName {
 	}
 	sort.Sort(SortableResourceNames(resources))
 	return resources
-}
-
-func listOfImages(spec *api.PodSpec) []string {
-	images := make([]string, 0, len(spec.Containers))
-	for _, container := range spec.Containers {
-		images = append(images, container.Image)
-	}
-	return images
-}
-
-func makeImageList(spec *api.PodSpec) string {
-	return strings.Join(listOfImages(spec), ",")
 }
 
 func versionedClientsetForDeployment(internalClient clientset.Interface) versionedclientset.Interface {
