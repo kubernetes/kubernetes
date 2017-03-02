@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/client-go/pkg/apis/autoscaling/v1"
 	v2alpha1 "k8s.io/client-go/pkg/apis/autoscaling/v2alpha1"
 	batch_v1 "k8s.io/client-go/pkg/apis/batch/v1"
+	batch_v1beta1 "k8s.io/client-go/pkg/apis/batch/v1beta1"
 	batch_v2alpha1 "k8s.io/client-go/pkg/apis/batch/v2alpha1"
 	certificates_v1beta1 "k8s.io/client-go/pkg/apis/certificates/v1beta1"
 	extensions_v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
@@ -79,6 +80,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=Batch, Version=V1
 	case batch_v1.SchemeGroupVersion.WithResource("jobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1().Jobs().Informer()}, nil
+
+		// Group=Batch, Version=V1beta1
+	case batch_v1beta1.SchemeGroupVersion.WithResource("cronjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1beta1().CronJobs().Informer()}, nil
 
 		// Group=Batch, Version=V2alpha1
 	case batch_v2alpha1.SchemeGroupVersion.WithResource("cronjobs"):
