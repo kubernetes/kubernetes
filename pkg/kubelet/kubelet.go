@@ -570,6 +570,15 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			if err := server.Start(); err != nil {
 				return nil, err
 			}
+
+			// Create dockerLegacyService when the logging driver is not supported.
+			supported, err := dockershim.IsCRISupportedLogDriver(klet.dockerClient)
+			if err != nil {
+				return nil, err
+			}
+			if !supported {
+				klet.dockerLegacyService = dockershim.NewDockerLegacyService(klet.dockerClient)
+			}
 		case "remote":
 			// No-op.
 			break
@@ -1099,6 +1108,10 @@ type Kubelet struct {
 
 	// GPU Manager
 	gpuManager gpu.GPUManager
+
+	// dockerLegacyService contains some legacy methods for backward compatibility.
+	// It should be set only when docker is using non json-file logging driver.
+	dockerLegacyService dockershim.DockerLegacyService
 }
 
 // setupDataDirs creates:
