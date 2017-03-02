@@ -41,10 +41,17 @@ Container Lifecycle Hook when create a pod with lifecycle hook when it is exec h
 Container Lifecycle Hook when create a pod with lifecycle hook when it is exec hook should execute prestop exec hook properly,rrati,0,node
 Container Lifecycle Hook when create a pod with lifecycle hook when it is http hook should execute poststart http hook properly,vishh,1,node
 Container Lifecycle Hook when create a pod with lifecycle hook when it is http hook should execute prestop http hook properly,freehan,1,node
+Container Manager Misc Validate OOM score adjustments once the node is setup Kubelet's oom-score-adj should be -999,vishh,1,
+"Container Manager Misc Validate OOM score adjustments once the node is setup burstable container's oom-score-adj should be between [2, 1000)",vishh,1,
+Container Manager Misc Validate OOM score adjustments once the node is setup docker daemon's oom-score-adj should be -999,vishh,1,
+Container Manager Misc Validate OOM score adjustments once the node is setup guaranteed container's oom-score-adj should be -998,vishh,1,
+Container Manager Misc Validate OOM score adjustments once the node is setup pod infra containers oom-score-adj should be -998 and best effort container's should be 1000,vishh,1,
 Container Runtime Conformance Test container runtime conformance blackbox test when running a container with a new image *,Random-Liu,0,node
 Container Runtime Conformance Test container runtime conformance blackbox test when starting a container that exits it should run with the expected status,luxas,1,node
 Container Runtime Conformance Test container runtime conformance blackbox test when starting a container that exits should report termination message *,alex-mohr,1,node
 ContainerLogPath Pod with a container printed log to stdout should print log to correct log path,resouer,0,node
+CriticalPod when we need to admit a critical pod should be able to create and delete a critical pod,vishh,1,
+CronJob should delete successful finished jobs with limit of one successful job,soltysh,1,
 CronJob should not emit unexpected warnings,soltysh,1,apps
 CronJob should not schedule jobs when suspended,soltysh,1,apps
 CronJob should not schedule new jobs when ForbidConcurrent,soltysh,1,apps
@@ -58,6 +65,8 @@ DNS should provide DNS for ExternalName services,rmmh,1,network
 DNS should provide DNS for pods for Hostname and Subdomain Annotation,mtaufen,1,network
 DNS should provide DNS for services,roberthbailey,1,network
 DNS should provide DNS for the cluster,roberthbailey,1,network
+Daemon set Should not update pod when spec was updated and update strategy is on delete,janetkuo,1,apps
+Daemon set Should update pod when spec was updated and update strategy is RollingUpdate,janetkuo,1,apps
 Daemon set should retry creating failed daemon pods,yifan-gu,1,apps
 Daemon set should run and stop complex daemon,jlowdermilk,1,apps
 Daemon set should run and stop complex daemon with node affinity,erictune,1,apps
@@ -193,12 +202,17 @@ Federation secrets Secret objects should not be deleted from underlying clusters
 Firewall rule should create valid firewall rules for LoadBalancer type service,rkouj,0,network
 Firewall rule should have correct firewall rules for e2e cluster,rkouj,0,network
 GCP Volumes GlusterFS should be mountable,nikhiljindal,0,storage
+GCP Volumes NFSv3 should be mountable for NFSv3,nikhiljindal,0,storage
 GCP Volumes NFSv4 should be mountable for NFSv4,nikhiljindal,0,storage
 GKE local SSD should write and read from node local SSD,fabioy,0,storage
 GKE node pools should create a cluster with multiple node pools,fabioy,1,cluster-lifecycle
+GPU attempt to use GPUs if available setup the node and create pods to test gpus,vishh,1,
 Garbage Collection Test: * Should eventually garbage collect containers when we exceed the number of dead containers per container,Random-Liu,0,cluster-lifecycle
 Garbage collector should delete RS created by deployment when not orphaning,rkouj,0,cluster-lifecycle
 Garbage collector should delete pods created by rc when not orphaning,justinsb,1,cluster-lifecycle
+Garbage collector should keep the rc around until all its pods are deleted if the deleteOptions says so,justinsb,1,cluster-lifecycle
+Garbage collector should not be blocked by dependency circle,justinsb,1,cluster-lifecycle
+Garbage collector should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted,justinsb,1,cluster-lifecycle
 Garbage collector should orphan RS created by deployment when deleteOptions.OrphanDependents is true,rkouj,0,cluster-lifecycle
 Garbage collector should orphan pods created by rc if delete options say so,fabioy,1,cluster-lifecycle
 Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil,zmerlynn,1,cluster-lifecycle
@@ -270,11 +284,6 @@ Kubelet Cgroup Manager Pod containers On scheduling a BestEffort Pod Pod contain
 Kubelet Cgroup Manager Pod containers On scheduling a Burstable Pod Pod containers should have been created under the Burstable cgroup,derekwaynecarr,0,node
 Kubelet Cgroup Manager Pod containers On scheduling a Guaranteed Pod Pod containers should have been created under the cgroup-root,derekwaynecarr,0,node
 Kubelet Cgroup Manager QOS containers On enabling QOS cgroup hierarchy Top level QoS containers should have been created,davidopp,1,node
-Kubelet Container Manager Validate OOM score adjustments once the node is setup Kubelet's oom-score-adj should be -999,kargakis,1,node
-"Kubelet Container Manager Validate OOM score adjustments once the node is setup burstable container's oom-score-adj should be between [2, 1000)",derekwaynecarr,1,node
-Kubelet Container Manager Validate OOM score adjustments once the node is setup docker daemon's oom-score-adj should be -999,thockin,1,node
-Kubelet Container Manager Validate OOM score adjustments once the node is setup guaranteed container's oom-score-adj should be -998,kargakis,1,node
-Kubelet Container Manager Validate OOM score adjustments once the node is setup pod infra containers oom-score-adj should be -998 and best effort container's should be 1000,timothysc,1,node
 Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,rkouj,0,node
 Kubelet Volume Manager Volume Manager On terminatation of pod with memory backed volume should remove the volume from the node,rkouj,0,node
 Kubelet experimental resource usage tracking resource tracking for * pods per node,yujuhong,0,node
@@ -311,6 +320,7 @@ Namespaces should delete fast enough (90 percent of 100 namespaces in 150 second
 Namespaces should ensure that all pods are removed when a namespace is deleted.,xiang90,1,api-machinery
 Namespaces should ensure that all services are removed when a namespace is deleted.,pmorie,1,api-machinery
 Network Partition *,foxish,0,network
+Network Partition Pods should be evicted from unready Node *,foxish,0,network
 Network Partition Pods should return to running and ready state after network partition is healed *,foxish,0,network
 Network Partition should come back up if node goes down,foxish,0,network
 Network Partition should create new pods when node is partitioned,foxish,0,network
@@ -339,8 +349,9 @@ NoExecuteTaintManager doesn't evict pod with tolerations from tainted nodes,free
 NoExecuteTaintManager eventually evict pod with finite tolerations from tainted nodes,freehan,0,scheduling
 NoExecuteTaintManager evicts pods from tainted nodes,freehan,0,scheduling
 NoExecuteTaintManager removing taint cancels eviction,freehan,0,scheduling
+Node Container Manager Validate Node Allocatable set's up the node and runs the test,freehan,0,
 NodeOutOfDisk runs out of disk space,vishh,0,node
-NodeProblemDetector KernelMonitor should generate node condition and events for corresponding errors,Random-Liu,0,node
+NodeProblemDetector SystemLogMonitor should generate node condition and events for corresponding errors,freehan,0,
 Nodes Resize should be able to add nodes,piosz,1,cluster-lifecycle
 Nodes Resize should be able to delete nodes,zmerlynn,1,cluster-lifecycle
 Opaque resources should account opaque integer resources in pods with multiple containers.,ConnorDoyle,0,node
@@ -565,7 +576,9 @@ Volumes NFS should be mountable,rrati,0,storage
 Volumes PD should be mountable,caesarxuchao,1,storage
 Volumes iSCSI should be mountable,jsafrane,1,storage
 Volumes vsphere should be mountable,jsafrane,0,storage
+etcd Upgrade etcd upgrade should maintain a functioning cluster,krousey,0,
 k8s.io/kubernetes/cmd/genutils,rmmh,1,
+k8s.io/kubernetes/cmd/gke-certificates-controller/app,mikedanese,1,
 k8s.io/kubernetes/cmd/hyperkube,jbeda,0,
 k8s.io/kubernetes/cmd/kube-apiserver/app/options,nikhiljindal,0,
 k8s.io/kubernetes/cmd/kube-controller-manager/app,dchen1107,1,
@@ -623,6 +636,7 @@ k8s.io/kubernetes/pkg/api,Q-Lee,1,
 k8s.io/kubernetes/pkg/api/endpoints,cjcullen,1,
 k8s.io/kubernetes/pkg/api/events,jlowdermilk,1,
 k8s.io/kubernetes/pkg/api/install,timothysc,1,
+k8s.io/kubernetes/pkg/api/pod,mikedanese,1,
 k8s.io/kubernetes/pkg/api/service,spxtr,1,
 k8s.io/kubernetes/pkg/api/testapi,caesarxuchao,1,
 k8s.io/kubernetes/pkg/api/util,rkouj,0,
@@ -634,13 +648,15 @@ k8s.io/kubernetes/pkg/api/validation,smarterclayton,1,
 k8s.io/kubernetes/pkg/apimachinery/tests,rkouj,0,
 k8s.io/kubernetes/pkg/apis/abac/v0,liggitt,0,
 k8s.io/kubernetes/pkg/apis/abac/v1beta1,liggitt,0,
+k8s.io/kubernetes/pkg/apis/apps/v1beta1,soltysh,1,
 k8s.io/kubernetes/pkg/apis/apps/validation,derekwaynecarr,1,
 k8s.io/kubernetes/pkg/apis/authorization/validation,erictune,0,
 k8s.io/kubernetes/pkg/apis/autoscaling/v1,yarntime,0,
 k8s.io/kubernetes/pkg/apis/autoscaling/validation,mtaufen,1,
-k8s.io/kubernetes/pkg/apis/batch/v1,vishh,1,
-k8s.io/kubernetes/pkg/apis/batch/v2alpha1,jlowdermilk,1,
-k8s.io/kubernetes/pkg/apis/batch/validation,erictune,0,
+k8s.io/kubernetes/pkg/apis/batch/v1,soltysh,1,
+k8s.io/kubernetes/pkg/apis/batch/v1beta1,soltysh,1,
+k8s.io/kubernetes/pkg/apis/batch/v2alpha1,soltysh,1,
+k8s.io/kubernetes/pkg/apis/batch/validation,soltysh,1,
 k8s.io/kubernetes/pkg/apis/componentconfig,jbeda,1,
 k8s.io/kubernetes/pkg/apis/extensions,bgrant0607,1,
 k8s.io/kubernetes/pkg/apis/extensions/v1beta1,madhusudancs,1,
@@ -652,7 +668,6 @@ k8s.io/kubernetes/pkg/apis/storage/validation,caesarxuchao,1,
 k8s.io/kubernetes/pkg/auth/authorizer/abac,liggitt,0,
 k8s.io/kubernetes/pkg/client/chaosclient,deads2k,1,
 k8s.io/kubernetes/pkg/client/leaderelection,xiang90,1,
-k8s.io/kubernetes/pkg/client/legacylisters,jsafrane,1,
 k8s.io/kubernetes/pkg/client/listers/batch/internalversion,mqliang,0,
 k8s.io/kubernetes/pkg/client/listers/extensions/internalversion,eparis,1,
 k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1,jszczepkowski,1,
@@ -676,6 +691,7 @@ k8s.io/kubernetes/pkg/controller/certificates,rkouj,0,
 k8s.io/kubernetes/pkg/controller/cloud,rkouj,0,
 k8s.io/kubernetes/pkg/controller/cronjob,soltysh,1,
 k8s.io/kubernetes/pkg/controller/daemon,Q-Lee,1,
+k8s.io/kubernetes/pkg/controller/daemon/util,Q-Lee,1,
 k8s.io/kubernetes/pkg/controller/deployment,asalkeld,0,
 k8s.io/kubernetes/pkg/controller/deployment/util,saad-ali,1,
 k8s.io/kubernetes/pkg/controller/disruption,fabioy,1,
@@ -708,9 +724,11 @@ k8s.io/kubernetes/pkg/fieldpath,childsb,1,
 k8s.io/kubernetes/pkg/kubeapiserver,piosz,1,
 k8s.io/kubernetes/pkg/kubeapiserver/admission,rkouj,0,
 k8s.io/kubernetes/pkg/kubeapiserver/authorizer,rkouj,0,
+k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes,rkouj,0,
 k8s.io/kubernetes/pkg/kubeapiserver/options,thockin,1,
 k8s.io/kubernetes/pkg/kubectl,madhusudancs,1,
 k8s.io/kubernetes/pkg/kubectl/cmd,rmmh,1,
+k8s.io/kubernetes/pkg/kubectl/cmd/auth,deads2k,1,
 k8s.io/kubernetes/pkg/kubectl/cmd/config,asalkeld,0,
 k8s.io/kubernetes/pkg/kubectl/cmd/set,erictune,1,
 k8s.io/kubernetes/pkg/kubectl/cmd/util,asalkeld,0,
@@ -729,6 +747,7 @@ k8s.io/kubernetes/pkg/kubelet/dockertools,deads2k,1,
 k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext,yifan-gu,1,
 k8s.io/kubernetes/pkg/kubelet/envvars,rrati,0,
 k8s.io/kubernetes/pkg/kubelet/eviction,childsb,1,
+k8s.io/kubernetes/pkg/kubelet/gpu/nvidia,vishh,1,
 k8s.io/kubernetes/pkg/kubelet/images,caesarxuchao,1,
 k8s.io/kubernetes/pkg/kubelet/kuberuntime,yifan-gu,1,
 k8s.io/kubernetes/pkg/kubelet/lifecycle,yujuhong,1,
@@ -739,6 +758,7 @@ k8s.io/kubernetes/pkg/kubelet/network/kubenet,freehan,0,
 k8s.io/kubernetes/pkg/kubelet/network/testing,spxtr,1,
 k8s.io/kubernetes/pkg/kubelet/pleg,yujuhong,0,
 k8s.io/kubernetes/pkg/kubelet/pod,alex-mohr,1,
+k8s.io/kubernetes/pkg/kubelet/preemption,vishh,1,
 k8s.io/kubernetes/pkg/kubelet/prober,alex-mohr,1,
 k8s.io/kubernetes/pkg/kubelet/prober/results,krousey,1,
 k8s.io/kubernetes/pkg/kubelet/qos,vishh,0,
@@ -761,6 +781,8 @@ k8s.io/kubernetes/pkg/kubelet/volumemanager/cache,janetkuo,1,
 k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler,timstclair,1,
 k8s.io/kubernetes/pkg/master,fabioy,1,
 k8s.io/kubernetes/pkg/master/tunneler,jsafrane,1,
+k8s.io/kubernetes/pkg/printers,smarterclayton,1,
+k8s.io/kubernetes/pkg/printers/internalversion,smarterclayton,1,
 k8s.io/kubernetes/pkg/probe/exec,bgrant0607,1,
 k8s.io/kubernetes/pkg/probe/http,mtaufen,1,
 k8s.io/kubernetes/pkg/probe/tcp,mtaufen,1,
@@ -870,6 +892,7 @@ k8s.io/kubernetes/pkg/util/goroutinemap,saad-ali,0,
 k8s.io/kubernetes/pkg/util/hash,timothysc,1,
 k8s.io/kubernetes/pkg/util/i18n,brendandburns,0,
 k8s.io/kubernetes/pkg/util/io,mtaufen,1,
+k8s.io/kubernetes/pkg/util/ipconfig,brendandburns,1,
 k8s.io/kubernetes/pkg/util/iptables,rrati,0,
 k8s.io/kubernetes/pkg/util/keymutex,saad-ali,0,
 k8s.io/kubernetes/pkg/util/labels,rmmh,1,
@@ -907,6 +930,7 @@ k8s.io/kubernetes/pkg/volume/host_path,jbeda,1,
 k8s.io/kubernetes/pkg/volume/iscsi,cjcullen,1,
 k8s.io/kubernetes/pkg/volume/nfs,justinsb,1,
 k8s.io/kubernetes/pkg/volume/photon_pd,luomiao,0,
+k8s.io/kubernetes/pkg/volume/portworx,madhusudancs,1,
 k8s.io/kubernetes/pkg/volume/projected,kevin-wangzefeng,1,
 k8s.io/kubernetes/pkg/volume/quobyte,yujuhong,1,
 k8s.io/kubernetes/pkg/volume/rbd,piosz,1,
@@ -937,6 +961,7 @@ k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy,maisem,1,
 k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny,rrati,0,
 k8s.io/kubernetes/plugin/pkg/admission/serviceaccount,liggitt,0,
 k8s.io/kubernetes/plugin/pkg/admission/storageclass/default,pmorie,1,
+k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap,liggitt,1,
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac,rrati,0,
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy,mml,1,
 k8s.io/kubernetes/plugin/pkg/scheduler,fgrzadkowski,0,
@@ -953,6 +978,7 @@ k8s.io/kubernetes/test/e2e,kevin-wangzefeng,1,
 k8s.io/kubernetes/test/e2e/chaosmonkey,pmorie,1,
 k8s.io/kubernetes/test/e2e_node,mml,1,
 k8s.io/kubernetes/test/e2e_node/system,Random-Liu,0,
+k8s.io/kubernetes/test/integration/apiserver,nikhiljindal,1,
 k8s.io/kubernetes/test/integration/auth,jbeda,1,
 k8s.io/kubernetes/test/integration/client,Q-Lee,1,
 k8s.io/kubernetes/test/integration/configmap,Q-Lee,1,
@@ -960,7 +986,6 @@ k8s.io/kubernetes/test/integration/evictions,brendandburns,0,
 k8s.io/kubernetes/test/integration/examples,maisem,1,
 k8s.io/kubernetes/test/integration/federation,rrati,0,
 k8s.io/kubernetes/test/integration/garbagecollector,jlowdermilk,1,
-k8s.io/kubernetes/test/integration/kubeaggregator,deads2k,1,
 k8s.io/kubernetes/test/integration/kubectl,rrati,0,
 k8s.io/kubernetes/test/integration/master,fabioy,1,
 k8s.io/kubernetes/test/integration/metrics,lavalamp,1,
