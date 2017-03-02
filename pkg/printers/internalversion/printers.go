@@ -1179,7 +1179,7 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, options printe
 		aSize, modesStr, reclaimPolicyStr,
 		pv.Status.Phase,
 		claimRefUID,
-		storageutil.GetStorageClassAnnotation(pv.ObjectMeta),
+		api.GetPersistentVolumeClass(pv),
 		pv.Status.Reason,
 		translateTimestamp(pv.CreationTimestamp),
 	); err != nil {
@@ -1222,7 +1222,7 @@ func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, opt
 		capacity = storage.String()
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s", name, phase, pvc.Spec.VolumeName, capacity, accessModes, storageutil.GetStorageClassAnnotation(pvc.ObjectMeta), translateTimestamp(pvc.CreationTimestamp)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s", name, phase, pvc.Spec.VolumeName, capacity, accessModes, api.GetPersistentVolumeClaimClass(pvc), translateTimestamp(pvc.CreationTimestamp)); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, AppendLabels(pvc.Labels, options.ColumnLabels)); err != nil {
