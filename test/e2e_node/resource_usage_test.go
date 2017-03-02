@@ -145,7 +145,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 	pods := newTestPods(testArg.podsNr, true, framework.GetPauseImageNameForHostArch(), "test_pod")
 
 	rc.Start()
-	// Explicitly delete pods to prevent namespace controller cleanning up timeout
+	// Explicitly delete pods to prevent namespace controller cleaning up timeout
 	defer deletePodsSync(f, append(pods, getCadvisorPod()))
 	defer rc.Stop()
 
