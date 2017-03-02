@@ -173,14 +173,14 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 func (rm *ReplicationManager) getPodController(pod *v1.Pod) *v1.ReplicationController {
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := rm.lookupCache.GetMatchingObject(pod); cached {
-		controller, ok := obj.(*v1.ReplicationController)
+		rc, ok := obj.(*v1.ReplicationController)
 		if !ok {
 			// This should not happen
 			utilruntime.HandleError(fmt.Errorf("lookup cache does not return a ReplicationController object"))
 			return nil
 		}
-		if cached && rm.isCacheValid(pod, controller) {
-			return controller
+		if cached && rm.isCacheValid(pod, rc) {
+			return rc
 		}
 	}
 
