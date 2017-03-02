@@ -136,7 +136,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 					By("creating a guaranteed pod, a burstable pod, and a besteffort pod.")
 
 					// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
-					guaranteed := createMemhogPod(f, "guaranteed-", "guaranteed", v1.ResourceRequirements{
+					guaranteed := getMemhogPod("guaranteed-pod", "guaranteed", v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							"cpu":    resource.MustParse("100m"),
 							"memory": resource.MustParse("100Mi"),
@@ -145,16 +145,22 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 							"cpu":    resource.MustParse("100m"),
 							"memory": resource.MustParse("100Mi"),
 						}})
+					guaranteed = f.PodClient().CreateSync(guaranteed)
+					glog.Infof("pod created with name: %s", guaranteed.Name)
 
 					// A pod is burstable if limits and requests do not match across all containers.
-					burstable := createMemhogPod(f, "burstable-", "burstable", v1.ResourceRequirements{
+					burstable := getMemhogPod("burstable-pod", "burstable", v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							"cpu":    resource.MustParse("100m"),
 							"memory": resource.MustParse("100Mi"),
 						}})
+					burstable = f.PodClient().CreateSync(burstable)
+					glog.Infof("pod created with name: %s", burstable.Name)
 
-					// A pod is besteffort if none of its containers have specified any requests or limits.
-					besteffort := createMemhogPod(f, "besteffort-", "besteffort", v1.ResourceRequirements{})
+					// A pod is besteffort if none of its containers have specified any requests or limits	.
+					besteffort := getMemhogPod("besteffort-pod", "besteffort", v1.ResourceRequirements{})
+					besteffort = f.PodClient().CreateSync(besteffort)
+					glog.Infof("pod created with name: %s", besteffort.Name)
 
 					// We poll until timeout or all pods are killed.
 					// Inside the func, we check that all pods are in a valid phase with
@@ -232,7 +238,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 
 })
 
-func createMemhogPod(f *framework.Framework, genName string, ctnName string, res v1.ResourceRequirements) *v1.Pod {
+func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *v1.Pod {
 	env := []v1.EnvVar{
 		{
 			Name: "MEMORY_LIMIT",
@@ -256,9 +262,9 @@ func createMemhogPod(f *framework.Framework, genName string, ctnName string, res
 		memLimit = "$(MEMORY_LIMIT)"
 	}
 
-	pod := &v1.Pod{
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: genName,
+			Name: podName,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyNever,
@@ -277,8 +283,4 @@ func createMemhogPod(f *framework.Framework, genName string, ctnName string, res
 			},
 		},
 	}
-	// The generated pod.Name will be on the pod spec returned by CreateSync
-	pod = f.PodClient().CreateSync(pod)
-	glog.Infof("pod created with name: %s", pod.Name)
-	return pod
 }
