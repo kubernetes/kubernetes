@@ -31,6 +31,11 @@ api-servers
 api-server-service-type
 api-token
 api-version
+apiserver-arg-overrides
+apiserver-count
+apiserver-count
+apiserver-enable-basic-auth
+apiserver-enable-token-auth
 attach-detach-reconcile-sync-period
 audit-log-maxage
 audit-log-maxbackup
