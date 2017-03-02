@@ -766,7 +766,15 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName k8stypes.NodeName) (di
 			return "", "", err
 		}
 
-		scsiController = getSCSIController(vmDevices, vs.cfg.Disk.SCSIControllerType)
+		// Get VM device list
+		_, vmDevices, _, _, err := getVirtualMachineDevices(vs.cfg, ctx, vs.client, vSphereInstance)
+		if err != nil {
+			glog.Errorf("cannot get vmDevices for VM")
+			return "", "", fmt.Errorf("cannot get vmDevices for VM")
+		}
+
+		scsiControllersOfRequiredType := getSCSIControllersOfType(vmDevices, diskControllerType)
+		scsiController := getAvailableSCSIController(scsiControllersOfRequiredType)
 		if scsiController == nil {
 			glog.Errorf("cannot find SCSI controller in VM")
 			// attempt clean up of scsi controller
@@ -1009,7 +1017,7 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 }
 
 func checkDiskAttached(volPath string, vmdevices object.VirtualDeviceList, dc *object.Datacenter, client *govmomi.Client) (bool, error) {
-	virtualDiskControllerKey, err := getVirtualDiskControllerKey(volPath, vmdevices, dc, client)
+	_, err := getVirtualDiskControllerKey(volPath, vmdevices, dc, client)
 	if err != nil {
 		if err == ErrNoDevicesFound {
 			return false, nil
@@ -1017,14 +1025,7 @@ func checkDiskAttached(volPath string, vmdevices object.VirtualDeviceList, dc *o
 		glog.Errorf("Failed to check whether disk is attached. err: %s", err)
 		return false, err
 	}
-	for _, controllerType := range supportedSCSIControllerType {
-		controllerkey, _ := getControllerKey(controllerType, vmdevices)
-		if controllerkey == virtualDiskControllerKey {
-			return true, nil
-		}
-	}
-	return false, ErrNonSupportedControllerType
-
+	return true, nil
 }
 
 // Returns the object key that denotes the controller object to which vmdk is attached.
