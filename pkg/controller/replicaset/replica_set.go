@@ -445,7 +445,7 @@ func (rsc *ReplicaSetController) processNextWorkItem() bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Sync %q failed with %v", key, err))
+	utilruntime.HandleError(fmt.Errorf("sync %q failed: %v", key, err))
 	rsc.queue.AddRateLimited(key)
 
 	return true
@@ -595,9 +595,6 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	cm := controller.NewPodControllerRefManager(rsc.podControl, rs, selector, getRSKind())
 	filteredPods, err = cm.ClaimPods(pods)
 	if err != nil {
-		// Something went wrong with adoption or release.
-		// Requeue and try again so we don't leave orphans sitting around.
-		rsc.queue.Add(key)
 		return err
 	}
 
