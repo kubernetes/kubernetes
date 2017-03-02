@@ -19,7 +19,6 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authentication/group",
         "//vendor:k8s.io/apiserver/pkg/authentication/request/anonymous",
         "//vendor:k8s.io/apiserver/pkg/authentication/request/bearertoken",
-        "//vendor:k8s.io/apiserver/pkg/authentication/request/headerrequest",
         "//vendor:k8s.io/apiserver/pkg/authentication/request/union",
         "//vendor:k8s.io/apiserver/pkg/authentication/request/x509",
         "//vendor:k8s.io/apiserver/pkg/authentication/token/tokenfile",

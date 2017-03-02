@@ -16,6 +16,11 @@ limitations under the License.
 
 package authenticatorfactory
 
+import (
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
+)
+
 type RequestHeaderConfig struct {
 	// UsernameHeaders are the headers to check (in order, case-insensitively) for an identity. The first header with a value wins.
 	UsernameHeaders []string
@@ -28,4 +33,18 @@ type RequestHeaderConfig struct {
 	ClientCA string
 	// AllowedClientNames is a list of common names that may be presented by the authenticating front proxy.  Empty means: accept any.
 	AllowedClientNames []string
+}
+
+func (c *RequestHeaderConfig) ToAuthenticator() (authenticator.Request, error) {
+	if c == nil {
+		return nil, nil
+	}
+
+	return headerrequest.NewSecure(
+		c.ClientCA,
+		c.AllowedClientNames,
+		c.UsernameHeaders,
+		c.GroupHeaders,
+		c.ExtraHeaderPrefixes,
+	)
 }
