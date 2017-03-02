@@ -111,24 +111,20 @@ func TestMatchVolume(t *testing.T) {
 		"successful-match-with-class": {
 			expectedMatch: "gce-pd-silver1",
 			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.ObjectMeta.Annotations = map[string]string{
-					v1.BetaStorageClassAnnotation: "silver",
-				}
 				pvc.Spec.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"should-exist": "true",
 					},
 				}
 				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classSilver
 			}),
 		},
 		"successful-match-with-class-and-labels": {
 			expectedMatch: "gce-pd-silver2",
 			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
-				pvc.ObjectMeta.Annotations = map[string]string{
-					v1.BetaStorageClassAnnotation: "silver",
-				}
 				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classSilver
 			}),
 		},
 	}
@@ -541,9 +537,6 @@ func createTestVolumes() []*v1.PersistentVolume {
 				Labels: map[string]string{
 					"should-exist": "true",
 				},
-				Annotations: map[string]string{
-					v1.BetaStorageClassAnnotation: "silver",
-				},
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -555,15 +548,13 @@ func createTestVolumes() []*v1.PersistentVolume {
 				AccessModes: []v1.PersistentVolumeAccessMode{
 					v1.ReadWriteOnce,
 				},
+				StorageClassName: classSilver,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				UID:  "gce-pd-silver2",
 				Name: "gce0024",
-				Annotations: map[string]string{
-					v1.BetaStorageClassAnnotation: "silver",
-				},
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -575,15 +566,13 @@ func createTestVolumes() []*v1.PersistentVolume {
 				AccessModes: []v1.PersistentVolumeAccessMode{
 					v1.ReadWriteOnce,
 				},
+				StorageClassName: classSilver,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				UID:  "gce-pd-gold",
 				Name: "gce0025",
-				Annotations: map[string]string{
-					v1.BetaStorageClassAnnotation: "gold",
-				},
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -595,6 +584,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 				AccessModes: []v1.PersistentVolumeAccessMode{
 					v1.ReadWriteOnce,
 				},
+				StorageClassName: classGold,
 			},
 		},
 	}
