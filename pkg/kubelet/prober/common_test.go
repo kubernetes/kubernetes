@@ -125,7 +125,7 @@ type fakeExecProber struct {
 	err    error
 }
 
-func (p fakeExecProber) Probe(_ exec.Cmd) (probe.Result, string, error) {
+func (p fakeExecProber) Probe(c exec.Cmd) (probe.Result, string, error) {
 	return p.result, "", p.err
 }
 
