@@ -48,6 +48,9 @@ function config-ip-firewall {
     iptables -A FORWARD -w -p UDP -j ACCEPT
     iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
+  if [[ -n "${BLACKHOLE_MDS}" ]]; then
+    iptables -t nat -I PREROUTING -p tcp -d 169.254.169.254 --dport 80 -j DNAT --to-destination 127.0.0.1:2020
+  fi
 }
 
 function create-dirs {
