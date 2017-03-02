@@ -84,8 +84,15 @@ func TestNewManagerNoRotation(t *testing.T) {
 		t.Fatalf("Unable to initialize a certificate: %v", err)
 	}
 
-	store := &fakeStore{cert: &cert}
-	if _, err := NewManager(nil, &x509.CertificateRequest{}, []certificates.KeyUsage{}, store, 0); err != nil {
+	store := &fakeStore{
+		cert: &cert,
+	}
+	if _, err := NewManager(&Config{
+		Template:                   &x509.CertificateRequest{},
+		Usages:                     []certificates.KeyUsage{},
+		CertificateStore:           store,
+		CertificateRotationPercent: 0,
+	}); err != nil {
 		t.Fatalf("Failed to initialize the certificate manager: %v", err)
 	}
 }
@@ -107,8 +114,8 @@ func TestShouldRotate(t *testing.T) {
 		m := manager{
 			cert: &tls.Certificate{
 				Leaf: &x509.Certificate{
-					NotAfter:  test.notAfter,
 					NotBefore: test.notBefore,
+					NotAfter:  test.notAfter,
 				},
 			},
 			template:            &x509.CertificateRequest{},
@@ -132,8 +139,8 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 	m := manager{
 		cert: &tls.Certificate{
 			Leaf: &x509.Certificate{
-				NotAfter:  now.Add(-1 * time.Hour),
 				NotBefore: now.Add(-2 * time.Hour),
+				NotAfter:  now.Add(-1 * time.Hour),
 			},
 		},
 		template: &x509.CertificateRequest{},
@@ -153,8 +160,8 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 	m := manager{
 		cert: &tls.Certificate{
 			Leaf: &x509.Certificate{
-				NotAfter:  now.Add(-1 * time.Hour),
 				NotBefore: now.Add(-2 * time.Hour),
+				NotAfter:  now.Add(-1 * time.Hour),
 			},
 		},
 		template: &x509.CertificateRequest{},
@@ -166,6 +173,75 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 
 	if err := m.rotateCerts(); err == nil {
 		t.Errorf("Expected an error receiving results from the CSR request but nothing was received.")
+	}
+}
+
+func TestNewManagerBootstrap(t *testing.T) {
+	store := &fakeStore{}
+
+	cm, err := NewManager(&Config{
+		Template:                   &x509.CertificateRequest{},
+		Usages:                     []certificates.KeyUsage{},
+		CertificateStore:           store,
+		CertificateRotationPercent: 1,
+		BootstrapCertificatePEM:    []byte(certificateData),
+		BootstrapKeyPEM:            []byte(privateKeyData),
+	})
+
+	if err != nil {
+		t.Fatalf("Failed to initialize the certificate manager: %v", err)
+	}
+
+	cert := cm.Current()
+
+	if cert == nil {
+		t.Errorf("Certificate was nil, expected something.")
+	}
+
+	if m, ok := cm.(*manager); !ok {
+		t.Errorf("Expected a '*manager' from 'NewManager'")
+	} else if !m.shouldRotate() {
+		t.Errorf("Expected rotation should happen during bootstrap, but it won't.")
+	}
+}
+
+func TestNewManagerNoBootstrap(t *testing.T) {
+	now := time.Now()
+	cert, err := tls.X509KeyPair([]byte(certificateData), []byte(privateKeyData))
+	cert.Leaf = &x509.Certificate{
+		NotBefore: now.Add(-24 * time.Hour),
+		NotAfter:  now.Add(24 * time.Hour),
+	}
+	if err != nil {
+		t.Fatalf("Unable to initialize a certificate: %v", err)
+	}
+	store := &fakeStore{
+		cert: &cert,
+	}
+
+	cm, err := NewManager(&Config{
+		Template:                   &x509.CertificateRequest{},
+		Usages:                     []certificates.KeyUsage{},
+		CertificateStore:           store,
+		CertificateRotationPercent: 1,
+		BootstrapCertificatePEM:    []byte(certificateData),
+		BootstrapKeyPEM:            []byte(privateKeyData),
+	})
+
+	if err != nil {
+		t.Fatalf("Failed to initialize the certificate manager: %v", err)
+	}
+
+	currentCert := cm.Current()
+
+	if currentCert == nil {
+		t.Errorf("Certificate was nil, expected something.")
+	}
+
+	if m, ok := cm.(*manager); !ok {
+		t.Errorf("Expected a '*manager' from 'NewManager'")
+	} else if m.shouldRotate() {
+		t.Errorf("Expected rotation should happen during bootstrap, but it won't.")
 	}
 }
 
@@ -243,6 +319,9 @@ type fakeStore struct {
 }
 
 func (s *fakeStore) Current() (*tls.Certificate, error) {
+	if s.cert == nil {
+		return nil, &NoCertKeyError{}
+	}
 	return s.cert, nil
 }
 
@@ -254,6 +333,11 @@ func (s *fakeStore) Update(certPEM, keyPEM []byte) (*tls.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
+	now := time.Now()
 	s.cert = &cert
+	s.cert.Leaf = &x509.Certificate{
+		NotBefore: now.Add(-24 * time.Hour),
+		NotAfter:  now.Add(24 * time.Hour),
+	}
 	return s.cert, nil
 }
