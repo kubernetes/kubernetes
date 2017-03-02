@@ -13,6 +13,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/informers/informers_generated/externalversions/batch/v1:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions/batch/v1beta1:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/batch/v2alpha1:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/internalinterfaces:go_default_library",
     ],
@@ -30,6 +31,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/client/informers/informers_generated/externalversions/batch/v1:all-srcs",
+        "//pkg/client/informers/informers_generated/externalversions/batch/v1beta1:all-srcs",
         "//pkg/client/informers/informers_generated/externalversions/batch/v2alpha1:all-srcs",
     ],
     tags = ["automanaged"],

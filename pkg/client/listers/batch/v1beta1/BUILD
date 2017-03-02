@@ -9,17 +9,17 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["install.go"],
+    srcs = [
+        "cronjob.go",
+        "expansion_generated.go",
+    ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/batch/v1beta1:go_default_library",
-        "//pkg/apis/batch/v2alpha1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 

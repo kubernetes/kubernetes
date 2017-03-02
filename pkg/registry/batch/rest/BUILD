@@ -15,6 +15,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
+        "//pkg/apis/batch/v1beta1:go_default_library",
         "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/registry/batch/cronjob/storage:go_default_library",
         "//pkg/registry/batch/job/storage:go_default_library",

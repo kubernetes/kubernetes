@@ -12014,6 +12014,244 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.Time", "k8s.io/kubernetes/pkg/apis/batch/v1.JobCondition"},
 		},
+		"k8s.io/kubernetes/pkg/apis/batch/v1beta1.CronJob": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "CronJob represents the configuration of a single cron job.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v1beta1.CronJobSpec"),
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v1beta1.CronJobStatus"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/batch/v1beta1.CronJobSpec", "k8s.io/kubernetes/pkg/apis/batch/v1beta1.CronJobStatus"},
+		},
+		"k8s.io/kubernetes/pkg/apis/batch/v1beta1.CronJobList": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "CronJobList is a collection of cron jobs.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Items is the list of CronJob.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/apis/batch/v1beta1.CronJob"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"items"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/pkg/apis/batch/v1beta1.CronJob"},
+		},
+		"k8s.io/kubernetes/pkg/apis/batch/v1beta1.CronJobSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "CronJobSpec describes how the job execution will look like and when it will actually run.",
+					Properties: map[string]spec.Schema{
+						"schedule": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"startingDeadlineSeconds": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
+								Type:        []string{"integer"},
+								Format:      "int64",
+							},
+						},
+						"concurrencyPolicy": {
+							SchemaProps: spec.SchemaProps{
+								Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job. Defaults to Allow.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"suspend": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"jobTemplate": {
+							SchemaProps: spec.SchemaProps{
+								Description: "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v1beta1.JobTemplateSpec"),
+							},
+						},
+						"successfulJobsHistoryLimit": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"failedJobsHistoryLimit": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+					},
+					Required: []string{"schedule", "jobTemplate"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/apis/batch/v1beta1.JobTemplateSpec"},
+		},
+		"k8s.io/kubernetes/pkg/apis/batch/v1beta1.CronJobStatus": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "CronJobStatus represents the current state of a cron job.",
+					Properties: map[string]spec.Schema{
+						"active": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Active holds pointers to currently running jobs.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/kubernetes/pkg/api/v1.ObjectReference"),
+										},
+									},
+								},
+							},
+						},
+						"lastScheduleTime": {
+							SchemaProps: spec.SchemaProps{
+								Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Time", "k8s.io/kubernetes/pkg/api/v1.ObjectReference"},
+		},
+		"k8s.io/kubernetes/pkg/apis/batch/v1beta1.JobTemplate": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "JobTemplate describes a template for creating copies of a predefined pod.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"template": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Template defines jobs that will be created from this template http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v1beta1.JobTemplateSpec"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/batch/v1beta1.JobTemplateSpec"},
+		},
+		"k8s.io/kubernetes/pkg/apis/batch/v1beta1.JobTemplateSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "JobTemplateSpec describes the data a Job should have when created from a template",
+					Properties: map[string]spec.Schema{
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard object's metadata of the jobs created from this template. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Specification of the desired behavior of the job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/batch/v1.JobSpec"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/kubernetes/pkg/apis/batch/v1.JobSpec"},
+		},
 		"k8s.io/kubernetes/pkg/apis/batch/v2alpha1.CronJob": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -12123,7 +12361,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"concurrencyPolicy": {
 							SchemaProps: spec.SchemaProps{
-								Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+								Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job. Defaults to Allow.",
 								Type:        []string{"string"},
 								Format:      "",
 							},

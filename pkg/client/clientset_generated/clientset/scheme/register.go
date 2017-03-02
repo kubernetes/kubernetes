@@ -30,6 +30,7 @@ import (
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	autoscalingv2alpha1 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv1beta1 "k8s.io/kubernetes/pkg/apis/batch/v1beta1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	certificatesv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -72,6 +73,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	autoscalingv1.AddToScheme(scheme)
 	autoscalingv2alpha1.AddToScheme(scheme)
 	batchv1.AddToScheme(scheme)
+	batchv1beta1.AddToScheme(scheme)
 	batchv2alpha1.AddToScheme(scheme)
 	certificatesv1beta1.AddToScheme(scheme)
 	extensionsv1beta1.AddToScheme(scheme)
