@@ -32,6 +32,7 @@ const (
 	DefaultDiscoveryBindPort         = 9898
 	DefaultAuthorizationMode         = "RBAC"
 	DefaultCACertPath                = "/etc/kubernetes/pki/ca.crt"
+	DefaultCertificatesDir           = "/etc/kubernetes/pki"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -65,6 +66,10 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.AuthorizationMode == "" {
 		obj.AuthorizationMode = DefaultAuthorizationMode
+	}
+
+	if obj.CertificatesDir == "" {
+		obj.CertificatesDir = DefaultCertificatesDir
 	}
 }
 
