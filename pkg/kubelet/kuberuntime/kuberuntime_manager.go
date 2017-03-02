@@ -225,7 +225,7 @@ func (m *kubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
 		return nil, err
 	}
 
-	return newRuntimeVersion(typedVersion.Version)
+	return newRuntimeVersion(typedVersion.RuntimeVersion)
 }
 
 // APIVersion returns the cached API version information of the container
