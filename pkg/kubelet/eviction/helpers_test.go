@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/quota"
 )
@@ -40,6 +41,7 @@ func quantityMustParse(value string) *resource.Quantity {
 func TestParseThresholdConfig(t *testing.T) {
 	gracePeriod, _ := time.ParseDuration("30s")
 	testCases := map[string]struct {
+		allocatableConfig       []string
 		evictionHard            string
 		evictionSoft            string
 		evictionSoftGracePeriod string
@@ -48,6 +50,7 @@ func TestParseThresholdConfig(t *testing.T) {
 		expectThresholds        []evictionapi.Threshold
 	}{
 		"no values": {
+			allocatableConfig:       []string{},
 			evictionHard:            "",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
@@ -56,12 +59,23 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"all flag values": {
+			allocatableConfig:       []string{cm.NodeAllocatableEnforcementKey},
 			evictionHard:            "memory.available<150Mi",
 			evictionSoft:            "memory.available<300Mi",
 			evictionSoftGracePeriod: "memory.available=30s",
 			evictionMinReclaim:      "memory.available=0",
 			expectErr:               false,
 			expectThresholds: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
 				{
 					Signal:   evictionapi.SignalMemoryAvailable,
 					Operator: evictionapi.OpLessThan,
@@ -86,6 +100,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			},
 		},
 		"all flag values in percentages": {
+			allocatableConfig:       []string{},
 			evictionHard:            "memory.available<10%",
 			evictionSoft:            "memory.available<30%",
 			evictionSoftGracePeriod: "memory.available=30s",
@@ -116,6 +131,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			},
 		},
 		"disk flag values": {
+			allocatableConfig:       []string{},
 			evictionHard:            "imagefs.available<150Mi,nodefs.available<100Mi",
 			evictionSoft:            "imagefs.available<300Mi,nodefs.available<200Mi",
 			evictionSoftGracePeriod: "imagefs.available=30s,nodefs.available=30s",
@@ -167,6 +183,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			},
 		},
 		"disk flag values in percentages": {
+			allocatableConfig:       []string{},
 			evictionHard:            "imagefs.available<15%,nodefs.available<10.5%",
 			evictionSoft:            "imagefs.available<30%,nodefs.available<20.5%",
 			evictionSoftGracePeriod: "imagefs.available=30s,nodefs.available=30s",
@@ -218,6 +235,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			},
 		},
 		"inode flag values": {
+			allocatableConfig:       []string{},
 			evictionHard:            "imagefs.inodesFree<150Mi,nodefs.inodesFree<100Mi",
 			evictionSoft:            "imagefs.inodesFree<300Mi,nodefs.inodesFree<200Mi",
 			evictionSoftGracePeriod: "imagefs.inodesFree=30s,nodefs.inodesFree=30s",
@@ -269,6 +287,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			},
 		},
 		"invalid-signal": {
+			allocatableConfig:       []string{},
 			evictionHard:            "mem.available<150Mi",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
@@ -277,6 +296,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"hard-signal-negative": {
+			allocatableConfig:       []string{},
 			evictionHard:            "memory.available<-150Mi",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
@@ -285,6 +305,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"hard-signal-negative-percentage": {
+			allocatableConfig:       []string{},
 			evictionHard:            "memory.available<-15%",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
@@ -293,6 +314,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"soft-signal-negative": {
+			allocatableConfig:       []string{},
 			evictionHard:            "",
 			evictionSoft:            "memory.available<-150Mi",
 			evictionSoftGracePeriod: "",
@@ -301,6 +323,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"duplicate-signal": {
+			allocatableConfig:       []string{},
 			evictionHard:            "memory.available<150Mi,memory.available<100Mi",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
@@ -309,6 +332,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"valid-and-invalid-signal": {
+			allocatableConfig:       []string{},
 			evictionHard:            "memory.available<150Mi,invalid.foo<150Mi",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
@@ -317,6 +341,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"soft-no-grace-period": {
+			allocatableConfig:       []string{},
 			evictionHard:            "",
 			evictionSoft:            "memory.available<150Mi",
 			evictionSoftGracePeriod: "",
@@ -325,6 +350,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"soft-neg-grace-period": {
+			allocatableConfig:       []string{},
 			evictionHard:            "",
 			evictionSoft:            "memory.available<150Mi",
 			evictionSoftGracePeriod: "memory.available=-30s",
@@ -333,6 +359,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"neg-reclaim": {
+			allocatableConfig:       []string{},
 			evictionHard:            "",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
@@ -341,6 +368,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectThresholds:        []evictionapi.Threshold{},
 		},
 		"duplicate-reclaim": {
+			allocatableConfig:       []string{},
 			evictionHard:            "",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
@@ -350,7 +378,7 @@ func TestParseThresholdConfig(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		thresholds, err := ParseThresholdConfig(testCase.evictionHard, testCase.evictionSoft, testCase.evictionSoftGracePeriod, testCase.evictionMinReclaim)
+		thresholds, err := ParseThresholdConfig(testCase.allocatableConfig, testCase.evictionHard, testCase.evictionSoft, testCase.evictionSoftGracePeriod, testCase.evictionMinReclaim)
 		if testCase.expectErr != (err != nil) {
 			t.Errorf("Err not as expected, test: %v, error expected: %v, actual: %v", testName, testCase.expectErr, err)
 		}
@@ -699,6 +727,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	}
 	nodeAvailableBytes := uint64(1024 * 1024 * 1024)
 	nodeWorkingSetBytes := uint64(1024 * 1024 * 1024)
+	allocatableMemoryCapacity := uint64(5 * 1024 * 1024 * 1024)
 	imageFsAvailableBytes := uint64(1024 * 1024)
 	imageFsCapacityBytes := uint64(1024 * 1024 * 2)
 	nodeFsAvailableBytes := uint64(1024)
@@ -738,14 +767,30 @@ func TestMakeSignalObservations(t *testing.T) {
 		podMaker("pod1", "ns2", "uuid2", 1),
 		podMaker("pod3", "ns3", "uuid3", 1),
 	}
-	containerWorkingSetBytes := int64(1024 * 1024)
+	containerWorkingSetBytes := int64(1024 * 1024 * 1024)
 	for _, pod := range pods {
 		fakeStats.Pods = append(fakeStats.Pods, newPodStats(pod, containerWorkingSetBytes))
 	}
-	actualObservations, statsFunc, err := makeSignalObservations(provider)
+	res := quantityMustParse("5Gi")
+	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *res})
+	// Allocatable thresholds are always 100%.  Verify that Threshold == Capacity.
+	if res.CmpInt64(int64(allocatableMemoryCapacity)) != 0 {
+		t.Errorf("Expected Threshold %v to be equal to value %v", res.Value(), allocatableMemoryCapacity)
+	}
+	actualObservations, statsFunc, err := makeSignalObservations(provider, nodeProvider)
 
 	if err != nil {
 		t.Errorf("Unexpected err: %v", err)
+	}
+	allocatableMemQuantity, found := actualObservations[evictionapi.SignalAllocatableMemoryAvailable]
+	if !found {
+		t.Errorf("Expected allocatable memory observation, but didnt find one")
+	}
+	if allocatableMemQuantity.available.Value() != 2*containerWorkingSetBytes {
+		t.Errorf("Expected %v, actual: %v", containerWorkingSetBytes, allocatableMemQuantity.available.Value())
+	}
+	if expectedBytes := int64(allocatableMemoryCapacity); allocatableMemQuantity.capacity.Value() != expectedBytes {
+		t.Errorf("Expected %v, actual: %v", expectedBytes, allocatableMemQuantity.capacity.Value())
 	}
 	memQuantity, found := actualObservations[evictionapi.SignalMemoryAvailable]
 	if !found {

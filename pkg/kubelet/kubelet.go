@@ -349,7 +349,12 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		RootFreeDiskMB:   int(kubeCfg.LowDiskSpaceThresholdMB),
 	}
 
-	thresholds, err := eviction.ParseThresholdConfig(kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
+	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
+	if kubeCfg.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
+		// Do not provide kubeCfg.EnforceNodeAllocatable to eviction threshold parsing if we are not enforcing Evictions
+		enforceNodeAllocatable = []string{}
+	}
+	thresholds, err := eviction.ParseThresholdConfig(enforceNodeAllocatable, kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
 	if err != nil {
 		return nil, err
 	}
@@ -1209,7 +1214,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		glog.Fatalf("Failed to start cAdvisor %v", err)
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl, kl.getActivePods, evictionMonitoringPeriod)
+	kl.evictionManager.Start(kl, kl.getActivePods, kl, evictionMonitoringPeriod)
 }
 
 // Run starts the kubelet reacting to config updates
