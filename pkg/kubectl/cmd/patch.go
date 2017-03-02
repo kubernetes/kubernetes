@@ -180,6 +180,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		if !options.Local {
 			dataChangedMsg := "not patched"
 			helper := resource.NewHelper(client, mapping)
+			emptyPatchObj, err := helper.Patch(namespace, name, patchType, []byte("{}"))
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes)
 			if err != nil {
 				return err
@@ -200,11 +201,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 			count++
 
-			if err := info.Refresh(patchedObj, true); err != nil {
-				return err
-			}
-
-			oldData, err := json.Marshal(info.Object)
+			oldData, err := json.Marshal(emptyPatchObj)
 			if err != nil {
 				return err
 			}
@@ -214,6 +211,10 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 			if !reflect.DeepEqual(oldData, newData) {
 				dataChangedMsg = "patched"
+			}
+
+			if err := info.Refresh(patchedObj, true); err != nil {
+				return err
 			}
 
 			if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
