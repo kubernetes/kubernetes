@@ -3476,10 +3476,10 @@ type Secret struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Data contains the secret data. Each key must consist of alphanumeric
-	// characters, '-', '_' or '.'. The serialized form of the secret data is a
-	// base64 encoded string, representing the arbitrary (possibly non-string)
-	// data value here.
+    // Data contains the secret data. Each key must consist of alphanumeric
+    // characters, '-', '_' or '.'. The serialized form of the secret data is a
+    // base64 encoded string, representing the arbitrary (possibly non-string)
+    // data value here.
 	// +optional
 	Data map[string][]byte
 
