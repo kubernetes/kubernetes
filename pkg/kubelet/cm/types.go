@@ -47,12 +47,13 @@ type CgroupConfig struct {
 	ResourceParameters *ResourceConfig
 }
 
+// MemoryStats holds the on-demand stastistics from the memory cgroup
 type MemoryStats struct {
 	// Memory usage (in bytes).
 	Usage int64
 }
 
-// ResourceConfig holds information about all the supported cgroup resource parameters.
+// ResourceStats holds on-demand stastistics from various cgroup subsystems
 type ResourceStats struct {
 	// Memory statistics.
 	MemoryStats *MemoryStats

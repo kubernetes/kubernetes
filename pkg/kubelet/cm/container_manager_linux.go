@@ -274,7 +274,6 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	if cm.NodeConfig.CgroupsPerQOS {
 		return &podContainerManagerImpl{
 			qosContainersInfo: cm.GetQOSContainersInfo(),
-			nodeInfo:          cm.nodeInfo,
 			subsystems:        cm.subsystems,
 			cgroupManager:     cm.cgroupManager,
 		}
@@ -366,7 +365,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 		if err := cm.createNodeAllocatableCgroups(); err != nil {
 			return err
 		}
-		err = cm.qosContainerManager.Start(cm.nodeInfo, activePods)
+		err = cm.qosContainerManager.Start(cm.GetNodeAllocatableReservation, activePods)
 		if err != nil {
 			return fmt.Errorf("failed to initialise top level QOS containers: %v", err)
 		}
@@ -534,9 +533,6 @@ func (cm *containerManagerImpl) Status() Status {
 }
 
 func (cm *containerManagerImpl) Start(node *v1.Node, activePods ActivePodsFunc) error {
-	// cache the node Info including resource capacity and
-	// allocatable of the node
-	cm.nodeInfo = node
 	// Setup the node
 	if err := cm.setupNode(activePods); err != nil {
 		return err

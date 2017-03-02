@@ -36,20 +36,21 @@ const (
 )
 
 type QOSContainerManager interface {
-	Start(*v1.Node, ActivePodsFunc) error
+	Start(func() v1.ResourceList, ActivePodsFunc) error
 	GetQOSContainersInfo() QOSContainersInfo
 	UpdateCgroups() error
 }
 
 type qosContainerManagerImpl struct {
 	sync.Mutex
-	nodeInfo          *v1.Node
-	qosContainersInfo QOSContainersInfo
-	subsystems        *CgroupSubsystems
-	cgroupManager     CgroupManager
-	activePods        ActivePodsFunc
-	cgroupRoot        string
-	qosReserved       map[v1.ResourceName]int64
+	nodeInfo           *v1.Node
+	qosContainersInfo  QOSContainersInfo
+	subsystems         *CgroupSubsystems
+	cgroupManager      CgroupManager
+	activePods         ActivePodsFunc
+	getNodeAllocatable func() v1.ResourceList
+	cgroupRoot         string
+	qosReserved        map[v1.ResourceName]int64
 }
 
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot string, nodeConfig NodeConfig) (QOSContainerManager, error) {
@@ -71,7 +72,7 @@ func (m *qosContainerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 	return m.qosContainersInfo
 }
 
-func (m *qosContainerManagerImpl) Start(nodeInfo *v1.Node, activePods ActivePodsFunc) error {
+func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc) error {
 	cm := m.cgroupManager
 	rootContainer := m.cgroupRoot
 	if !cm.Exists(CgroupName(rootContainer)) {
@@ -116,7 +117,7 @@ func (m *qosContainerManagerImpl) Start(nodeInfo *v1.Node, activePods ActivePods
 		Burstable:  path.Join(rootContainer, string(v1.PodQOSBurstable)),
 		BestEffort: path.Join(rootContainer, string(v1.PodQOSBestEffort)),
 	}
-	m.nodeInfo = nodeInfo
+	m.getNodeAllocatable = getNodeAllocatable
 	m.activePods = activePods
 
 	// update qos cgroup tiers on startup and in periodic intervals
@@ -181,15 +182,26 @@ func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*C
 			// limits are not set for Best Effort pods
 			continue
 		}
-		for _, container := range pod.Spec.Containers {
-			podMemoryRequest += container.Resources.Requests.Memory().Value()
+		req, _, err := v1.PodRequestsAndLimits(pod)
+		if err != nil {
+			glog.V(2).Infof("[Container Manager] Pod resource requests/limits could not be determined.  Not setting QOS memory limts.")
+			return
+		}
+		if request, found := req[v1.ResourceMemory]; found {
+			podMemoryRequest += request.MilliValue()
 		}
 		qosMemoryRequests[qosClass] += podMemoryRequest
 	}
 
-	allocatable := m.nodeInfo.Status.Allocatable.Memory().Value()
+	resources := m.getNodeAllocatable()
+	allocatableResource, ok := resources[v1.ResourceMemory]
+	if !ok {
+		glog.V(2).Infof("[Container Manager] Allocatable memory value could not be determined.  Not setting QOS memory limts.")
+		return
+	}
+	allocatable := allocatableResource.Value()
 	if allocatable == 0 {
-		glog.V(2).Infof("[Container Manager] Memory capacity reported as 0, might be in standalone mode.  Not setting QOS memory limts.")
+		glog.V(2).Infof("[Container Manager] Memory allocatable reported as 0, might be in standalone mode.  Not setting QOS memory limts.")
 		return
 	}
 
@@ -301,7 +313,7 @@ func (m *qosContainerManagerNoop) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
-func (m *qosContainerManagerNoop) Start(_ *v1.Node, _ ActivePodsFunc) error {
+func (m *qosContainerManagerNoop) Start(_ func() v1.ResourceList, _ ActivePodsFunc) error {
 	return nil
 }
 
