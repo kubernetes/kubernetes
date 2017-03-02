@@ -44,7 +44,6 @@ import (
 	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -247,6 +246,11 @@ var ValidateEndpointsName = NameIsDNSSubdomain
 
 // ValidateClusterName can be used to check whether the given cluster name is valid.
 var ValidateClusterName = genericvalidation.ValidateClusterName
+
+// ValidateClassName can be used to check whether the given class name is valid.
+// It is defined here to avoid import cycle between pkg/apis/storage/validation
+// (where it should be) and this file.
+var ValidateClassName = NameIsDNSSubdomain
 
 // TODO update all references to these functions to point to the genericvalidation ones
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
@@ -1195,6 +1199,12 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(specPath.Child("persistentVolumeReclaimPolicy"), "may not be 'recycle' for a hostPath mount of '/'"))
 	}
 
+	if len(pv.Spec.StorageClassName) > 0 {
+		for _, msg := range ValidateClassName(pv.Spec.StorageClassName, false) {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("storageClassName"), pv.Spec.StorageClassName, msg))
+		}
+	}
+
 	return allErrs
 }
 
@@ -1245,6 +1255,12 @@ func ValidatePersistentVolumeClaimSpec(spec *api.PersistentVolumeClaimSpec, fldP
 	} else {
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(api.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(api.ResourceStorage)))...)
 	}
+
+	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {
+		for _, msg := range ValidateClassName(*spec.StorageClassName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("storageClassName"), *spec.StorageClassName, msg))
+		}
+	}
 	return allErrs
 }
 
@@ -1267,7 +1283,8 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 	}
 
 	// storageclass annotation should be immutable after creation
-	allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[storageutil.StorageClassAnnotation], oldPvc.ObjectMeta.Annotations[storageutil.StorageClassAnnotation], storageutil.StorageClassAnnotation, field.NewPath("metadata"))...)
+	// TODO: remove Beta when no longer needed
+	allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], v1.BetaStorageClassAnnotation, field.NewPath("metadata"))...)
 
 	newPvc.Status = oldPvc.Status
 	return allErrs

@@ -108,6 +108,7 @@ pkg/client/informers/informers_generated/externalversions/rbac/v1beta1
 pkg/client/informers/informers_generated/externalversions/settings
 pkg/client/informers/informers_generated/externalversions/settings/v1alpha1
 pkg/client/informers/informers_generated/externalversions/storage
+pkg/client/informers/informers_generated/externalversions/storage/v1
 pkg/client/informers/informers_generated/externalversions/storage/v1beta1
 pkg/client/informers/informers_generated/internalversion
 pkg/client/informers/informers_generated/internalversion/apps
@@ -161,6 +162,7 @@ pkg/client/listers/rbac/v1beta1
 pkg/client/listers/settings/internalversion
 pkg/client/listers/settings/v1alpha1
 pkg/client/listers/storage/internalversion
+pkg/client/listers/storage/v1
 pkg/client/listers/storage/v1beta1
 pkg/client/metrics
 pkg/client/metrics/prometheus
@@ -345,6 +347,7 @@ staging/src/k8s.io/client-go/informers/rbac/v1beta1
 staging/src/k8s.io/client-go/informers/settings
 staging/src/k8s.io/client-go/informers/settings/v1alpha1
 staging/src/k8s.io/client-go/informers/storage
+staging/src/k8s.io/client-go/informers/storage/v1
 staging/src/k8s.io/client-go/informers/storage/v1beta1
 staging/src/k8s.io/client-go/listers/apps/v1beta1
 staging/src/k8s.io/client-go/listers/autoscaling/v1
@@ -358,6 +361,7 @@ staging/src/k8s.io/client-go/listers/policy/v1beta1
 staging/src/k8s.io/client-go/listers/rbac/v1alpha1
 staging/src/k8s.io/client-go/listers/rbac/v1beta1
 staging/src/k8s.io/client-go/listers/settings/v1alpha1
+staging/src/k8s.io/client-go/listers/storage/v1
 staging/src/k8s.io/client-go/listers/storage/v1beta1
 staging/src/k8s.io/client-go/plugin/pkg/client/auth
 staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp
