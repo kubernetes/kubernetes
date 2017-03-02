@@ -233,13 +233,15 @@ func isHealthy(pod *v1.Pod) bool {
 
 // newControllerRef returns an ControllerRef pointing to a given StatefulSet.
 func newControllerRef(set *apps.StatefulSet) *metav1.OwnerReference {
+	blockOwnerDeletion := true
 	isController := true
 	return &metav1.OwnerReference{
-		APIVersion: controllerKind.GroupVersion().String(),
-		Kind:       controllerKind.Kind,
-		Name:       set.Name,
-		UID:        set.UID,
-		Controller: &isController,
+		APIVersion:         controllerKind.GroupVersion().String(),
+		Kind:               controllerKind.Kind,
+		Name:               set.Name,
+		UID:                set.UID,
+		BlockOwnerDeletion: &blockOwnerDeletion,
+		Controller:         &isController,
 	}
 }
 
