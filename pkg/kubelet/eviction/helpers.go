@@ -698,9 +698,6 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider 
 				memoryAllocatableAvailable.Sub(mu[v1.ResourceMemory])
 			}
 		}
-		if memoryAllocatableAvailable.Cmp(*resource.NewQuantity(int64(0), resource.BinarySI)) < 0 {
-			memoryAllocatableAvailable = resource.NewQuantity(int64(0), resource.BinarySI)
-		}
 		result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
 			available: memoryAllocatableAvailable,
 			capacity:  memoryAllocatableCapacity.Copy(),
