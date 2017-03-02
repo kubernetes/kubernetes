@@ -616,12 +616,14 @@ func (dc *DeploymentController) isScalingEvent(d *extensions.Deployment, rsList 
 
 // newControllerRef returns a ControllerRef pointing to the deployment.
 func newControllerRef(d *extensions.Deployment) *metav1.OwnerReference {
+	blockOwnerDeletion := true
 	isController := true
 	return &metav1.OwnerReference{
-		APIVersion: controllerKind.GroupVersion().String(),
-		Kind:       controllerKind.Kind,
-		Name:       d.Name,
-		UID:        d.UID,
-		Controller: &isController,
+		APIVersion:         controllerKind.GroupVersion().String(),
+		Kind:               controllerKind.Kind,
+		Name:               d.Name,
+		UID:                d.UID,
+		BlockOwnerDeletion: &blockOwnerDeletion,
+		Controller:         &isController,
 	}
 }
