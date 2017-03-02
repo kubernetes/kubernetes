@@ -262,7 +262,6 @@ func (dsc *DaemonSetsController) enqueueDaemonSetAfter(obj interface{}, after ti
 func (dsc *DaemonSetsController) getPodDaemonSets(pod *v1.Pod) []*extensions.DaemonSet {
 	sets, err := dsc.dsLister.GetPodDaemonSets(pod)
 	if err != nil {
-		glog.V(4).Infof("No daemon sets found for pod %v, daemon set controller will avoid syncing", pod.Name)
 		return nil
 	}
 	if len(sets) > 1 {
@@ -275,7 +274,6 @@ func (dsc *DaemonSetsController) getPodDaemonSets(pod *v1.Pod) []*extensions.Dae
 
 func (dsc *DaemonSetsController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	glog.V(4).Infof("Pod %s added.", pod.Name)
 
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
@@ -290,6 +288,7 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 			// It's controlled by a different type of controller.
 			return
 		}
+		glog.V(4).Infof("Pod %s added.", pod.Name)
 		ds, err := dsc.dsLister.DaemonSets(pod.Namespace).Get(controllerRef.Name)
 		if err != nil {
 			return
@@ -307,7 +306,12 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 	// them to see if anyone wants to adopt it.
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
-	for _, ds := range dsc.getPodDaemonSets(pod) {
+	dss := dsc.getPodDaemonSets(pod)
+	if len(dss) == 0 {
+		return
+	}
+	glog.V(4).Infof("Orphan Pod %s added.", pod.Name)
+	for _, ds := range dss {
 		dsc.enqueueDaemonSet(ds)
 	}
 }
@@ -323,7 +327,6 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	glog.V(4).Infof("Pod %s updated.", curPod.Name)
 	changedToReady := !v1.IsPodReady(oldPod) && v1.IsPodReady(curPod)
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 
@@ -345,6 +348,7 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 			// It's controlled by a different type of controller.
 			return
 		}
+		glog.V(4).Infof("Pod %s updated.", curPod.Name)
 		ds, err := dsc.dsLister.DaemonSets(curPod.Namespace).Get(curControllerRef.Name)
 		if err != nil {
 			return
@@ -359,8 +363,13 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
+	dss := dsc.getPodDaemonSets(curPod)
+	if len(dss) == 0 {
+		return
+	}
+	glog.V(4).Infof("Orphan Pod %s updated.", curPod.Name)
 	if labelChanged || controllerRefChanged {
-		for _, ds := range dsc.getPodDaemonSets(curPod) {
+		for _, ds := range dss {
 			dsc.enqueueDaemonSet(ds)
 		}
 	}
@@ -385,7 +394,6 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 			return
 		}
 	}
-	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 
 	controllerRef := controller.GetControllerOf(pod)
 	if controllerRef == nil {
@@ -396,6 +404,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 		// It's controlled by a different type of controller.
 		return
 	}
+	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 
 	ds, err := dsc.dsLister.DaemonSets(pod.Namespace).Get(controllerRef.Name)
 	if err != nil {
