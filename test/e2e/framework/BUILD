@@ -32,6 +32,7 @@ go_library(
         "statefulset_utils.go",
         "test_context.go",
         "util.go",
+        "volume_util.go",
     ],
     tags = ["automanaged"],
     deps = [

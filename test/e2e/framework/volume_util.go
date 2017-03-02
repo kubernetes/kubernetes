@@ -41,7 +41,6 @@ package framework
 
 import (
 	"fmt"
-	"os/exec"
 	"strconv"
 	"time"
 
@@ -62,6 +61,7 @@ const (
 	GlusterfsServerImage string = "gcr.io/google_containers/volume-gluster:0.2"
 	CephServerImage      string = "gcr.io/google_containers/volume-ceph:0.1"
 	RbdServerImage       string = "gcr.io/google_containers/volume-rbd:0.1"
+	BusyBoxImage         string = "gcr.io/google_containers/busybox:1.24"
 )
 
 // Configuration of one tests. The test consist of:
@@ -80,6 +80,15 @@ type VolumeTestConfig struct {
 	// Volumes needed to be mounted to the server container from the host
 	// map <host (source) path> -> <container (dst.) path>
 	ServerVolumes map[string]string
+}
+
+
+// VolumeTest contains a volume to mount into a client pod and its
+// expected content.
+type VolumeTest struct {
+	Volume          v1.VolumeSource
+	File            string
+	ExpectedContent string
 }
 
 // Starts a container specified by config.serverImage and exports all
@@ -178,13 +187,6 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	return pod
 }
 
-// VolumeTest contains a volumes to mount into a client pod and its
-// expected content.
-type VolumeTest struct {
-	Volume          v1.VolumeSource
-	File            string
-	ExpectedContent string
-}
 
 // Clean both server and client pods.
 func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
@@ -355,25 +357,4 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 	ExpectNoError(err, "Failed to create injector pod: %v", err)
 	err = WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
 	Expect(err).NotTo(HaveOccurred())
-}
-
-func DeleteCinderVolume(name string) error {
-	// Try to delete the volume for several seconds - it takes
-	// a while for the plugin to detach it.
-	var output []byte
-	var err error
-	timeout := time.Second * 120
-
-	Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
-		if err == nil {
-			Logf("Cinder volume %s deleted", name)
-			return nil
-		} else {
-			Logf("Failed to delete volume %s: %v", name, err)
-		}
-	}
-	Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
-	return err
 }

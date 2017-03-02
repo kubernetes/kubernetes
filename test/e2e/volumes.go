@@ -55,6 +55,28 @@ import (
 )
 
 
+func DeleteCinderVolume(name string) error {
+	// Try to delete the volume for several seconds - it takes
+	// a while for the plugin to detach it.
+	var output []byte
+	var err error
+	timeout := time.Second * 120
+
+	framework.Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
+		if err == nil {
+			framework.Logf("Cinder volume %s deleted", name)
+			return nil
+		} else {
+			framework.Logf("Failed to delete volume %s: %v", name, err)
+		}
+	}
+	framework.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
+	return err
+}
+
+
 // These tests need privileged containers, which are disabled by default.  Run
 // the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
 var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
@@ -423,7 +445,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			defer func() {
 				// Ignore any cleanup errors, there is not much we can do about
 				// them. They were already logged.
-				framework.DeleteCinderVolume(volumeName)
+				DeleteCinderVolume(volumeName)
 			}()
 
 			// Parse 'id'' from stdout. Expected format:
