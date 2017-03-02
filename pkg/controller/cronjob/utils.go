@@ -183,13 +183,15 @@ func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]tim
 }
 
 func newControllerRef(sj *batchv2alpha1.CronJob) *metav1.OwnerReference {
+	blockOwnerDeletion := true
 	isController := true
 	return &metav1.OwnerReference{
-		APIVersion: controllerKind.GroupVersion().String(),
-		Kind:       controllerKind.Kind,
-		Name:       sj.Name,
-		UID:        sj.UID,
-		Controller: &isController,
+		APIVersion:         controllerKind.GroupVersion().String(),
+		Kind:               controllerKind.Kind,
+		Name:               sj.Name,
+		UID:                sj.UID,
+		BlockOwnerDeletion: &blockOwnerDeletion,
+		Controller:         &isController,
 	}
 }
 
