@@ -147,7 +147,7 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 
 		// ensure bootstrap roles are created or reconciled
 		for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
-			opts := reconciliation.ReconcileClusterRoleOptions{
+			opts := reconciliation.ReconcileRoleOptions{
 				Role:    reconciliation.ClusterRoleRuleOwner{ClusterRole: &clusterRole},
 				Client:  reconciliation.ClusterRoleModifier{Client: clientset.ClusterRoles()},
 				Confirm: true,
@@ -175,9 +175,9 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 
 		// ensure bootstrap rolebindings are created or reconciled
 		for _, clusterRoleBinding := range append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...) {
-			opts := reconciliation.ReconcileClusterRoleBindingOptions{
-				RoleBinding: &clusterRoleBinding,
-				Client:      clientset.ClusterRoleBindings(),
+			opts := reconciliation.ReconcileRoleBindingOptions{
+				RoleBinding: reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: &clusterRoleBinding},
+				Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: clientset.ClusterRoleBindings()},
 				Confirm:     true,
 			}
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -206,7 +206,7 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 		// ensure bootstrap namespaced roles are created or reconciled
 		for namespace, roles := range bootstrappolicy.NamespaceRoles() {
 			for _, role := range roles {
-				opts := reconciliation.ReconcileClusterRoleOptions{
+				opts := reconciliation.ReconcileRoleOptions{
 					Role:    reconciliation.RoleRuleOwner{Role: &role},
 					Client:  reconciliation.RoleModifier{Client: clientset},
 					Confirm: true,
@@ -229,6 +229,38 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 				if err != nil {
 					// don't fail on failures, try to create as many as you can
 					utilruntime.HandleError(fmt.Errorf("unable to reconcile role.%s/%s in %v: %v", rbac.GroupName, role.Name, namespace, err))
+				}
+			}
+		}
+
+		// ensure bootstrap namespaced rolebindings are created or reconciled
+		for namespace, roleBindings := range bootstrappolicy.NamespaceRoleBindings() {
+			for _, roleBinding := range roleBindings {
+				opts := reconciliation.ReconcileRoleBindingOptions{
+					RoleBinding: reconciliation.RoleBindingAdapter{RoleBinding: &roleBinding},
+					Client:      reconciliation.RoleBindingClientAdapter{Client: clientset},
+					Confirm:     true,
+				}
+				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					result, err := opts.Run()
+					if err != nil {
+						return err
+					}
+					switch {
+					case result.Protected && result.Operation != reconciliation.ReconcileNone:
+						glog.Warningf("skipped reconcile-protected rolebinding.%s/%s in %v with missing subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
+					case result.Operation == reconciliation.ReconcileUpdate:
+						glog.Infof("updated rolebinding.%s/%s in %v with additional subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
+					case result.Operation == reconciliation.ReconcileCreate:
+						glog.Infof("created rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
+					case result.Operation == reconciliation.ReconcileRecreate:
+						glog.Infof("recreated rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
+					}
+					return nil
+				})
+				if err != nil {
+					// don't fail on failures, try to create as many as you can
+					utilruntime.HandleError(fmt.Errorf("unable to reconcile rolebinding.%s/%s in %v: %v", rbac.GroupName, roleBinding.Name, namespace, err))
 				}
 			}
 		}
