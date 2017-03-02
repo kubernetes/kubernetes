@@ -79,22 +79,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	hasBasicAuth := false
 	hasTokenAuth := false
 
-	// front-proxy, BasicAuth methods, local first, then remote
-	// Add the front proxy authenticator if requested
-	if config.RequestHeaderConfig != nil {
-		requestHeaderAuthenticator, err := headerrequest.NewSecure(
-			config.RequestHeaderConfig.ClientCA,
-			config.RequestHeaderConfig.AllowedClientNames,
-			config.RequestHeaderConfig.UsernameHeaders,
-			config.RequestHeaderConfig.GroupHeaders,
-			config.RequestHeaderConfig.ExtraHeaderPrefixes,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		authenticators = append(authenticators, requestHeaderAuthenticator)
-	}
-
+	// BasicAuth methods, local first, then remote
 	if len(config.BasicAuthFile) > 0 {
 		basicAuth, err := newAuthenticatorFromBasicAuthFile(config.BasicAuthFile)
 		if err != nil {
@@ -212,6 +197,23 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	if config.Anonymous {
 		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token anonymous).
 		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator())
+	}
+
+	// front proxies go first, but since they provide group information, we need to ensure that we don't add *more*
+	// group information.  Otherwise, a front proxy that wants to allow the system:anonymous user, would end up as
+	// both anonmyous and group=system:authenticated
+	if config.RequestHeaderConfig != nil {
+		requestHeaderAuthenticator, err := headerrequest.NewSecure(
+			config.RequestHeaderConfig.ClientCA,
+			config.RequestHeaderConfig.AllowedClientNames,
+			config.RequestHeaderConfig.UsernameHeaders,
+			config.RequestHeaderConfig.GroupHeaders,
+			config.RequestHeaderConfig.ExtraHeaderPrefixes,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		authenticator = union.NewFailOnError(requestHeaderAuthenticator, authenticator)
 	}
 
 	return authenticator, &securityDefinitions, nil

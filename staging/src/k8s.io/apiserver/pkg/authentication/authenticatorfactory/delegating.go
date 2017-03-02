@@ -56,22 +56,6 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	authenticators := []authenticator.Request{}
 	securityDefinitions := spec.SecurityDefinitions{}
 
-	// front-proxy first, then remote
-	// Add the front proxy authenticator if requested
-	if c.RequestHeaderConfig != nil {
-		requestHeaderAuthenticator, err := headerrequest.NewSecure(
-			c.RequestHeaderConfig.ClientCA,
-			c.RequestHeaderConfig.AllowedClientNames,
-			c.RequestHeaderConfig.UsernameHeaders,
-			c.RequestHeaderConfig.GroupHeaders,
-			c.RequestHeaderConfig.ExtraHeaderPrefixes,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		authenticators = append(authenticators, requestHeaderAuthenticator)
-	}
-
 	// x509 client cert auth
 	if len(c.ClientCAFile) > 0 {
 		clientCAs, err := cert.NewPool(c.ClientCAFile)
@@ -111,5 +95,23 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	if c.Anonymous {
 		authenticator = unionauth.NewFailOnError(authenticator, anonymous.NewAuthenticator())
 	}
+
+	// front proxies go first, but since they provide group information, we need to ensure that we don't add *more*
+	// group information.  Otherwise, a front proxy that wants to allow the system:anonymous user, would end up as
+	// both anonmyous and group=system:authenticated
+	if c.RequestHeaderConfig != nil {
+		requestHeaderAuthenticator, err := headerrequest.NewSecure(
+			c.RequestHeaderConfig.ClientCA,
+			c.RequestHeaderConfig.AllowedClientNames,
+			c.RequestHeaderConfig.UsernameHeaders,
+			c.RequestHeaderConfig.GroupHeaders,
+			c.RequestHeaderConfig.ExtraHeaderPrefixes,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		authenticator = unionauth.NewFailOnError(requestHeaderAuthenticator, authenticator)
+	}
+
 	return authenticator, &securityDefinitions, nil
 }

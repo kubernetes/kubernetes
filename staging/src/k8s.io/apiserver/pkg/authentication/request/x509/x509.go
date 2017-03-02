@@ -106,7 +106,8 @@ func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCom
 	return &Verifier{opts, auth, allowedCommonNames}
 }
 
-// AuthenticateRequest verifies the presented client certificate, then delegates to the wrapped auth
+// AuthenticateRequest verifies the presented client certificate.  If the cert and subject matches, then delegates to the wrapped auth.
+// If the cert or subject don't match, then it returns without a user as unauthenticated.
 func (a *Verifier) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	if req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
 		return nil, false, nil
@@ -122,10 +123,13 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (user.Info, bool, erro
 	}
 
 	if _, err := req.TLS.PeerCertificates[0].Verify(optsCopy); err != nil {
-		return nil, false, err
+		if invalidCertErr, ok := err.(x509.CertificateInvalidError); ok && invalidCertErr.Reason == x509.Expired {
+			return nil, false, err
+		}
+		return nil, false, nil
 	}
 	if err := a.verifySubject(req.TLS.PeerCertificates[0].Subject); err != nil {
-		return nil, false, err
+		return nil, false, nil
 	}
 	return a.auth.AuthenticateRequest(req)
 }
