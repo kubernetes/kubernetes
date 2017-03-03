@@ -844,13 +844,9 @@ func (t *ServiceTestFixture) Cleanup() []error {
 	for rcName := range t.rcs {
 		By("stopping RC " + rcName + " in namespace " + t.Namespace)
 		// First, resize the RC to 0.
-		old, err := t.Client.Core().ReplicationControllers(t.Namespace).Get(rcName, metav1.GetOptions{})
+		patch := `{"spec":{"replicas":0}}`
+		_, err := t.Client.Core().ReplicationControllers(t.Namespace).Patch(rcName, types.StrategicMergePatchType, []byte(patch))
 		if err != nil {
-			errs = append(errs, err)
-		}
-		x := int32(0)
-		old.Spec.Replicas = &x
-		if _, err := t.Client.Core().ReplicationControllers(t.Namespace).Update(old); err != nil {
 			errs = append(errs, err)
 		}
 		// TODO(mikedanese): Wait.
