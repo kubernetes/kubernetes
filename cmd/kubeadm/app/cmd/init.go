@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"strconv"
 	"text/template"
@@ -212,6 +213,12 @@ func (i *Init) Run(out io.Writer) error {
 	// PHASE 3: Bootstrap the control plane
 	if err := kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
 		return err
+	}
+
+	logDir := kubeadmapi.GlobalEnvParams.KubernetesLogDir
+	fmt.Printf("[log] Creating log directory: %s\n", logDir)
+	if err := os.MkdirAll(logDir, 0700); err != nil {
+		return fmt.Errorf("[log] Failed to create directory %q [%v]", logDir, err)
 	}
 
 	adminKubeConfigPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)

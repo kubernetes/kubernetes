@@ -27,6 +27,12 @@ const (
 	// KubernetesDir is the directory kubernetes owns for storing various configuration files
 	KubernetesDir = "/etc/kubernetes"
 
+	KubernetesLogDir = "/var/log/kubernetes"
+
+	APIServerLogName         = "kube-apiserver.log"
+	ControllerManagerLogName = "kube-controller-manager.log"
+	SchedulerLogName         = "kube-scheduler.log"
+
 	CACertAndKeyBaseName = "ca"
 	CACertName           = "ca.crt"
 	CAKeyName            = "ca.key"

@@ -24,6 +24,7 @@ import (
 
 type EnvParams struct {
 	KubernetesDir    string
+	KubernetesLogDir string
 	HostEtcdPath     string
 	HyperkubeImage   string
 	RepositoryPrefix string
