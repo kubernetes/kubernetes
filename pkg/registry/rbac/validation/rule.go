@@ -60,7 +60,6 @@ func ConfirmNoEscalation(ctx genericapirequest.Context, ruleResolver Authorizati
 
 	ownerRightsCover, missingRights := Covers(ownerRules, rules)
 	if !ownerRightsCover {
-		user, _ := genericapirequest.UserFrom(ctx)
 		return apierrors.NewUnauthorized(fmt.Sprintf("attempt to grant extra privileges: %v user=%v ownerrules=%v ruleResolutionErrors=%v", missingRights, user, ownerRules, ruleResolutionErrors))
 	}
 	return nil
