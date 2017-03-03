@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
+	"time"
 
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/spf13/cobra"
@@ -224,6 +226,7 @@ type TestFactory struct {
 	Err                error
 	Command            string
 	GenericPrinter     bool
+	TmpDir             string
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -565,6 +568,19 @@ func (f *fakeAPIFactory) RESTClient() (*restclient.RESTClient, error) {
 	}
 	restClient.Client = fakeClient.Client
 	return restClient, f.tf.Err
+}
+
+func (f *fakeAPIFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	fakeClient := f.tf.Client.(*fake.RESTClient)
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(f.tf.ClientConfig)
+	discoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+
+	cacheDir := filepath.Join(f.tf.TmpDir, ".kube", "cache", "discovery")
+	return cmdutil.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+}
+
+func (f *fakeAPIFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
+	return f.ClientSet()
 }
 
 func (f *fakeAPIFactory) ClientConfig() (*restclient.Config, error) {
