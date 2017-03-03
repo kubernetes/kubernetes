@@ -36,6 +36,9 @@ func (gms *gpuManagerStub) AllocateGPU(_ *v1.Pod, _ *v1.Container) ([]string, er
 	return nil, fmt.Errorf("GPUs are not supported")
 }
 
+func (gms *gpuManagerStub) UpdateDevices(podUID string, exitedContainerID string) {
+	fmt.Printf("update GPUs devices mapping.")
+}
 func NewGPUManagerStub() GPUManager {
 	return &gpuManagerStub{}
 }
