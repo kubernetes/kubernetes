@@ -43,7 +43,7 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
 		framework.ExpectNoError(err, "GCL is not working")
 
 		By("Running synthetic logger")
-		pod := createLoggingPod(f, podName, 10*60, 10*time.Minute)
+		pod := createLoggingPod(f, podName, "", 10*60, 10*time.Minute)
 		defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
 		err = framework.WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
 		framework.ExpectNoError(err, fmt.Sprintf("Should've successfully waited for pod %s to be running", podName))
