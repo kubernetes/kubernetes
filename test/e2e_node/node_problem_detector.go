@@ -14,27 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_node
 
 import (
 	"fmt"
+	"os"
+	"path"
 	"path/filepath"
-	"strconv"
-	"strings"
+	"syscall"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -61,32 +58,19 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		configName = "node-problem-detector-config-" + uid
 		// There is no namespace for Node, event recorder will set default namespace for node events.
 		eventNamespace = metav1.NamespaceDefault
-
-		// this test wants extra permissions.  Since the namespace names are unique, we can leave this
-		// lying around so we don't have to race any caches
-		framework.BindClusterRole(f.ClientSet.Rbac(), "cluster-admin", f.Namespace.Name,
-			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
-
-		err := framework.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
-			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
-			"", "create", schema.GroupResource{Resource: "pods"}, true)
-		framework.ExpectNoError(err)
 	})
 
 	// Test system log monitor. We may add other tests if we have more problem daemons in the future.
 	framework.KubeDescribe("SystemLogMonitor", func() {
 		const (
-			// Use test condition to avoid conflict with real node problem detector
+			// Use test condition to avoid changing the real node condition in use.
 			// TODO(random-liu): Now node condition could be arbitrary string, consider wether we need to
 			// add TestCondition when switching to predefined condition list.
-			condition    = v1.NodeConditionType("TestCondition")
-			startPattern = "test reboot"
+			condition = v1.NodeConditionType("TestCondition")
 
 			// File paths used in the test.
-			logDir       = "/log"
-			logFile      = "test.log"
-			configDir    = "/config"
-			configFile   = "testconfig.json"
+			logFile      = "/log/test.log"
+			configFile   = "/config/testconfig.json"
 			etcLocaltime = "/etc/localtime"
 
 			// Volumes used in the test.
@@ -104,40 +88,20 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			permReason2    = "Permanent2"
 			permMessage2   = "permanent error 2"
 		)
-		var source, config, tmpDir string
+		var source, config, tmpLogFile string
 		var lookback time.Duration
-		var node *v1.Node
 		var eventListOptions metav1.ListOptions
-		injectCommand := func(timestamp time.Time, log string, num int) string {
-			var commands []string
-			for i := 0; i < num; i++ {
-				commands = append(commands, fmt.Sprintf("echo \"%s kernel: [0.000000] %s\" >> %s/%s",
-					timestamp.Format(time.Stamp), log, tmpDir, logFile))
-			}
-			return strings.Join(commands, ";")
-		}
 
 		BeforeEach(func() {
-			framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-			By("Get a non master node to run the pod")
-			nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			node = nil
-			for _, n := range nodes.Items {
-				if !system.IsMasterNode(n.Name) {
-					node = &n
-					break
-				}
-			}
-			Expect(node).NotTo(BeNil())
 			By("Calculate Lookback duration")
-			nodeTime, bootTime, err = getNodeTime(node)
+			var err error
+			nodeTime, bootTime, err = getNodeTime()
 			Expect(err).To(BeNil())
 			// Set lookback duration longer than node up time.
 			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
 			lookback = nodeTime.Sub(bootTime) + time.Hour
 
-			// Randomize the source name to avoid conflict with real node problem detector
+			// Randomize the source name
 			source = "kernel-monitor-" + uid
 			config = `
 			{
@@ -147,7 +111,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 					"message": "kernel: \\[.*\\] (.*)",
 					"timestampFormat": "` + time.Stamp + `"
 				},
-				"logPath": "` + filepath.Join(logDir, logFile) + `",
+				"logPath": "` + logFile + `",
 				"lookback": "` + lookback.String() + `",
 				"bufferSize": 10,
 				"source": "` + source + `",
@@ -181,30 +145,29 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			By("Generate event list options")
 			selector := fields.Set{
 				"involvedObject.kind":      "Node",
-				"involvedObject.name":      node.Name,
+				"involvedObject.name":      framework.TestContext.NodeName,
 				"involvedObject.namespace": metav1.NamespaceAll,
 				"source":                   source,
 			}.AsSelector().String()
 			eventListOptions = metav1.ListOptions{FieldSelector: selector}
 			By("Create the test log file")
-			tmpDir = "/tmp/" + name
-			cmd := fmt.Sprintf("mkdir %s; > %s/%s", tmpDir, tmpDir, logFile)
-			Expect(framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)).To(Succeed())
+			tmpLogFile = filepath.Join("/tmp", name, path.Base(logFile))
+			os.MkdirAll(path.Dir(tmpLogFile), 755)
+			_, err = os.Create(tmpLogFile)
+			Expect(err).NotTo(HaveOccurred())
 			By("Create config map for the node problem detector")
 			_, err = c.Core().ConfigMaps(ns).Create(&v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: configName,
-				},
-				Data: map[string]string{configFile: config},
+				ObjectMeta: metav1.ObjectMeta{Name: configName},
+				Data:       map[string]string{path.Base(configFile): config},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			By("Create the node problem detector")
-			_, err = c.Core().Pods(ns).Create(&v1.Pod{
+			f.PodClient().CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
 				Spec: v1.PodSpec{
-					NodeName:        node.Name,
+					HostNetwork:     true,
 					SecurityContext: &v1.PodSecurityContext{},
 					Volumes: []v1.Volume{
 						{
@@ -218,7 +181,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 						{
 							Name: logVolume,
 							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{Path: tmpDir},
+								HostPath: &v1.HostPathVolumeSource{Path: path.Dir(tmpLogFile)},
 							},
 						},
 						{
@@ -230,10 +193,9 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 					},
 					Containers: []v1.Container{
 						{
-							Name:            name,
-							Image:           image,
-							Command:         []string{"/node-problem-detector", "--system-log-monitors=" + filepath.Join(configDir, configFile), "--logtostderr"},
-							ImagePullPolicy: v1.PullAlways,
+							Name:    name,
+							Image:   image,
+							Command: []string{"/node-problem-detector", "--logtostderr", "--system-log-monitors=" + configFile, fmt.Sprintf("--apiserver-override=%s?inClusterConfig=false", framework.TestContext.Host)},
 							Env: []v1.EnvVar{
 								{
 									Name: "NODE_NAME",
@@ -248,7 +210,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 							VolumeMounts: []v1.VolumeMount{
 								{
 									Name:      logVolume,
-									MountPath: logDir,
+									MountPath: path.Dir(logFile),
 								},
 								{
 									Name:      localtimeVolume,
@@ -256,16 +218,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 								},
 								{
 									Name:      configVolume,
-									MountPath: configDir,
+									MountPath: path.Dir(configFile),
 								},
 							},
 						},
 					},
 				},
 			})
-			Expect(err).NotTo(HaveOccurred())
-			By("Wait for node problem detector running")
-			Expect(f.WaitForPodRunning(name)).To(Succeed())
 		})
 
 		It("should generate node condition and events for corresponding errors", func() {
@@ -357,8 +316,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				By(test.description)
 				if test.messageNum > 0 {
 					By(fmt.Sprintf("Inject %d logs: %q", test.messageNum, test.message))
-					cmd := injectCommand(test.timestamp, test.message, test.messageNum)
-					Expect(framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)).To(Succeed())
+					err := injectLog(tmpLogFile, test.timestamp, test.message, test.messageNum)
+					Expect(err).NotTo(HaveOccurred())
 				}
 
 				By(fmt.Sprintf("Wait for %d events generated", test.events))
@@ -372,11 +331,11 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 
 				By(fmt.Sprintf("Make sure node condition %q is set", condition))
 				Eventually(func() error {
-					return verifyCondition(c.Core().Nodes(), node.Name, condition, test.conditionType, test.conditionReason, test.conditionMessage)
+					return verifyNodeCondition(c.Core().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
 				}, pollTimeout, pollInterval).Should(Succeed())
 				By(fmt.Sprintf("Make sure node condition %q is stable", condition))
 				Consistently(func() error {
-					return verifyCondition(c.Core().Nodes(), node.Name, condition, test.conditionType, test.conditionReason, test.conditionMessage)
+					return verifyNodeCondition(c.Core().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
 				}, pollConsistent, pollInterval).Should(Succeed())
 			}
 		})
@@ -389,7 +348,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				framework.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			By("Delete the node problem detector")
-			c.Core().Pods(ns).Delete(name, metav1.NewDeleteOptions(0))
+			f.PodClient().Delete(name, metav1.NewDeleteOptions(0))
 			By("Wait for the node problem detector to disappear")
 			Expect(framework.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
 			By("Delete the config map")
@@ -398,49 +357,43 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(c.Core().Events(eventNamespace).DeleteCollection(metav1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
 			By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
-			c.Core().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(node.Name).SubResource("status").Body(patch).Do()
+			c.Core().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do()
 			By("Clean up the temporary directory")
-			framework.IssueSSHCommand(fmt.Sprintf("rm -r %s", tmpDir), framework.TestContext.Provider, node)
+			Expect(os.RemoveAll(path.Dir(tmpLogFile))).To(Succeed())
 		})
 	})
 })
 
-// getNodeTime gets node boot time and current time by running ssh command on the node.
-func getNodeTime(node *v1.Node) (time.Time, time.Time, error) {
-	nodeIP := framework.GetNodeExternalIP(node)
+// injectLog injects kernel log into specified file.
+func injectLog(file string, timestamp time.Time, log string, num int) error {
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < num; i++ {
+		_, err := f.WriteString(fmt.Sprintf("%s kernel: [0.000000] %s\n", timestamp.Format(time.Stamp), log))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
+// getNodeTime gets node boot time and current time.
+func getNodeTime() (time.Time, time.Time, error) {
 	// Get node current time.
-	result, err := framework.SSH("date '+%FT%T.%N%:z'", nodeIP, framework.TestContext.Provider)
-	if err != nil {
-		return time.Time{}, time.Time{}, fmt.Errorf("failed to run ssh command to get node time: %v", err)
-	}
-	if result.Code != 0 {
-		return time.Time{}, time.Time{}, fmt.Errorf("failed to run ssh command with error code: %d", result.Code)
-	}
-	timestamp := strings.TrimSpace(result.Stdout)
-	nodeTime, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		return time.Time{}, time.Time{}, fmt.Errorf("failed to parse node time %q: %v", timestamp, err)
-	}
+	nodeTime := time.Now()
 
 	// Get system uptime.
-	result, err = framework.SSH(`cat /proc/uptime | cut -d " " -f 1`, nodeIP, framework.TestContext.Provider)
-	if err != nil {
-		return time.Time{}, time.Time{}, fmt.Errorf("failed to run ssh command to get node boot time: %v", err)
+	var info syscall.Sysinfo_t
+	if err := syscall.Sysinfo(&info); err != nil {
+		return time.Time{}, time.Time{}, err
 	}
-	if result.Code != 0 {
-		return time.Time{}, time.Time{}, fmt.Errorf("failed to run ssh command with error code: %d, stdout: %q, stderr: %q",
-			result.Code, result.Stdout, result.Stderr)
-	}
-	uptime, err := strconv.ParseFloat(strings.TrimSpace(result.Stdout), 64)
-	if err != nil {
-		return time.Time{}, time.Time{}, fmt.Errorf("failed to parse node uptime %q: %v", result.Stdout, err)
-	}
-
 	// Get node boot time. NOTE that because we get node current time before uptime, the boot time
 	// calculated will be a little earlier than the real boot time. This won't affect the correctness
 	// of the test result.
-	bootTime := nodeTime.Add(-time.Duration(uptime * float64(time.Second)))
+	bootTime := nodeTime.Add(-time.Duration(info.Uptime * int64(time.Second)))
+
 	return nodeTime, bootTime, nil
 }
 
@@ -475,9 +428,9 @@ func verifyNoEvents(e coreclientset.EventInterface, options metav1.ListOptions) 
 	return nil
 }
 
-// verifyCondition verifies specific node condition is generated, if reason and message are empty, they will not be checked
-func verifyCondition(n coreclientset.NodeInterface, nodeName string, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
-	node, err := n.Get(nodeName, metav1.GetOptions{})
+// verifyNodeCondition verifies specific node condition is generated, if reason and message are empty, they will not be checked
+func verifyNodeCondition(n coreclientset.NodeInterface, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
+	node, err := n.Get(framework.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
