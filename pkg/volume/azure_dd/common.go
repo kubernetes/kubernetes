@@ -89,7 +89,7 @@ func diskKindHashfromPDName(diskName string) (bool, string) {
 	return (diskKind == "m"), diskHash
 }
 
-func diskNameandSANameFromUri(diskUri string, trimVhd bool) (string, string, error) {
+func diskNameandSANameFromUri(diskUri string) (string, string, error) {
 	uri, err := url.Parse(diskUri)
 	if err != nil {
 		return "", "", err
@@ -100,11 +100,6 @@ func diskNameandSANameFromUri(diskUri string, trimVhd bool) (string, string, err
 
 	segments := STRINGS.Split(uri.Path, "/")
 	diskNameVhd := segments[len(segments)-1]
-
-	if trimVhd {
-		diskName := STRINGS.Split(diskNameVhd, ".")[0]
-		return storageAccountName, diskName, nil
-	}
 
 	return storageAccountName, diskNameVhd, nil
 }

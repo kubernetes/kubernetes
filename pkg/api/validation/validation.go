@@ -982,8 +982,6 @@ func validateAzureDisk(azure *api.AzureDiskVolumeSource, fldPath *field.Path) fi
 	diskUriSupportedblob := []string{"https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd"}
 
 	allErrs := field.ErrorList{}
-	// this is left here for backward compat
-	// in reality it is not used any more by the plugin
 	if azure.DiskName == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("diskName"), ""))
 	}

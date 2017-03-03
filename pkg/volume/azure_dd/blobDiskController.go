@@ -90,7 +90,7 @@ func (c *blobDiskController) AttachDisk(nodeName string, diskUri string, cacheMo
 	}
 
 	var vmData interface{}
-	_, diskName, err := diskNameandSANameFromUri(diskUri, false)
+	_, diskName, err := diskNameandSANameFromUri(diskUri)
 	if err != nil {
 		return -1, err
 	}
@@ -312,7 +312,7 @@ func (c *blobDiskController) CreateDataDisk(dataDiskName string, storageAccountT
 }
 
 func (c *blobDiskController) DeleteDataDisk(diskUri string, wasForced bool) error {
-	storageAccountName, vhdName, err := diskNameandSANameFromUri(diskUri, false)
+	storageAccountName, vhdName, err := diskNameandSANameFromUri(diskUri)
 	if err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (c *blobDiskController) diskHasNoLease(diskUri string) (bool, error) {
 		return true, nil
 	}
 
-	diskStorageAccount, vhdName, err := diskNameandSANameFromUri(diskUri, false)
+	diskStorageAccount, vhdName, err := diskNameandSANameFromUri(diskUri)
 	if err != nil {
 		glog.Infof("azureDisk - could not check if disk %s has a lease on it (diskNameandSANameFromUri):%s", diskUri, err.Error())
 		return false, err
