@@ -30,18 +30,15 @@ import (
 
 // shortcutExpander is a RESTMapper that can be used for Kubernetes resources.   It expands the resource first, then invokes the wrapped
 type shortcutExpander struct {
-	RESTMapper meta.RESTMapper
-
-	All []schema.GroupResource
-
+	RESTMapper      meta.RESTMapper
 	discoveryClient discovery.DiscoveryInterface
 }
 
 var _ meta.RESTMapper = &shortcutExpander{}
 
-type NamespacedResources struct{}
+type namespacedResources struct{}
 
-func (ns NamespacedResources) Match(groupVersion string, r *metav1.APIResource) bool {
+func (ns namespacedResources) Match(groupVersion string, r *metav1.APIResource) bool {
 	return r.Namespaced
 }
 
@@ -49,54 +46,7 @@ func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInt
 	if client == nil {
 		return shortcutExpander{}, errors.New("Please provide discovery client to shortcut expander")
 	}
-	return ShortcutExpander{All: UserResources, RESTMapper: delegate, discoveryClient: client}, nil
-}
-
-func (e ShortcutExpander) getAll() ([]schema.GroupResource, []schema.GroupResource) {
-	availableServerResources := []schema.GroupResource{}
-
-	if e.discoveryClient == nil {
-		return e.All, availableServerResources
-	}
-
-	// Check if we have access to server resources
-	apiResources, err := e.discoveryClient.ServerResources()
-	if err != nil {
-		return e.All, availableServerResources
-	}
-
-	availableResources, err := discovery.GroupVersionResources(apiResources)
-	if err != nil {
-		return e.All, availableServerResources
-	}
-
-	availableAll := []schema.GroupResource{}
-	for _, requestedResource := range e.All {
-		for availableResource := range availableResources {
-			if requestedResource.Group == availableResource.Group &&
-				requestedResource.Resource == availableResource.Resource {
-				availableAll = append(availableAll, requestedResource)
-				break
-			}
-		}
-	}
-
-	filteredServerList := discovery.FilteredBy(NamespacedResources{}, apiResources)
-	filteredServerResources, err := discovery.GroupVersionResources(filteredServerList)
-
-	// populate all "discovered" resources from the server
-	for availableResource := range filteredServerResources {
-		r := availableResource.GroupResource()
-
-		rSplit := strings.Split(r.Resource, "/")
-		if len(rSplit) > 1 {
-			continue
-		}
-
-		availableServerResources = append(availableServerResources, availableResource.GroupResource())
-	}
-
-	return availableAll, availableServerResources
+	return shortcutExpander{RESTMapper: delegate, discoveryClient: client}, nil
 }
 
 func (e shortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
@@ -142,30 +92,88 @@ var UserResources = []schema.GroupResource{
 	{Group: "extensions", Resource: "replicasets"},
 }
 
-// AliasesForResource returns whether a resource has an alias or not
+// AliasesForResource returns the aliases for a resource, and whether it has an alias or not
 func (e shortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 	if strings.ToLower(resource) == "all" {
-		var resources []schema.GroupResource
-		var serverResources []schema.GroupResource
-		if resources, serverResources = e.getAll(); len(resources) == 0 {
-			resources = serverResources
+		// first try to check the user resources wanted by the client that are also known by the server
+		userResources := e.filterKnownUserResources(UserResources)
+
+		// if none of the wanted resources is known by the server, try to discover all the ones available there
+		if len(userResources) == 0 {
+			userResources = e.userResourcesOnServer()
 		}
 
-		// used as a last resort, if none of the UserResources are defined in
-		// the server, and the server returned zero available resources, fallback
-		// to our client-defined list of UserResources
-		if len(resources) == 0 {
-			resources = UserResources
+		// as a last resort, just try to use the list of resources initially wanted by the client
+		if len(userResources) == 0 {
+			userResources = UserResources
 		}
 
 		aliases := []string{}
-		for _, r := range resources {
+		for _, r := range userResources {
 			aliases = append(aliases, r.Resource)
 		}
 		return aliases, true
 	}
 	expanded := e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource
 	return []string{expanded}, (expanded != resource)
+}
+
+// filterKnownUserResources takes a list of resource types and return the ones also known by the server.
+// This doesn't error out, if we can't access the server the original list is returned.
+func (e shortcutExpander) filterKnownUserResources(wantedUserResources []schema.GroupResource) []schema.GroupResource {
+	serverResources, err := e.discoveryClient.ServerResources()
+	if err != nil {
+		return wantedUserResources
+	}
+
+	groupedServerResources, err := discovery.GroupVersionResources(serverResources)
+	if err != nil {
+		return wantedUserResources
+	}
+
+	knownUserResources := []schema.GroupResource{}
+
+	// only take the user resources known by the server
+	for _, wantedUserResource := range wantedUserResources {
+		for serverResource := range groupedServerResources {
+			if wantedUserResource.Group == serverResource.Group &&
+				wantedUserResource.Resource == serverResource.Resource {
+				knownUserResources = append(knownUserResources, wantedUserResource)
+				break
+			}
+		}
+	}
+
+	return knownUserResources
+}
+
+// userResourcesOnServer tries to discover all user resource types available on the server.
+// This doesn't error out, if we can't access the server an empty list is returned.
+func (e shortcutExpander) userResourcesOnServer() []schema.GroupResource {
+	serverResources, err := e.discoveryClient.ServerResources()
+	if err != nil {
+		return []schema.GroupResource{}
+	}
+
+	// only take the namespaced resources
+	namespacedServerResources := discovery.FilteredBy(namespacedResources{}, serverResources)
+	namespacedGroupedServerResources, err := discovery.GroupVersionResources(namespacedServerResources)
+	if err != nil {
+		return []schema.GroupResource{}
+	}
+
+	// filters out additional api endpoints for the given resources
+	discoveredUserResources := []schema.GroupResource{}
+	for resource := range namespacedGroupedServerResources {
+		r := resource.GroupResource()
+		rSplit := strings.Split(r.Resource, "/")
+		if len(rSplit) > 1 {
+			continue
+		}
+		discoveredUserResources = append(discoveredUserResources, r)
+	}
+
+	return discoveredUserResources
 }
 
 // getShortcutMappings returns a set of tuples which holds short names for resources.

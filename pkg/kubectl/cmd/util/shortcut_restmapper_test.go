@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -87,6 +88,46 @@ func TestReplaceAliases(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:     "all: uses server user resources if none of the wanted resources is available on server",
+			arg:      "all",
+			expected: "knowntype",
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "knowntype",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "all: server user resources are namespaced",
+			arg:      "all",
+			expected: "knowntype",
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "knowntype",
+							Namespaced: true,
+						},
+					},
+				},
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name: "unknown",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	ds := &fakeDiscoveryClient{}
@@ -107,6 +148,42 @@ func TestReplaceAliases(t *testing.T) {
 		if strings.Join(resources, ",") != test.expected {
 			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, resources)
 		}
+	}
+}
+
+func TestFilterKnownUserResources(t *testing.T) {
+	wantedUserResources := []schema.GroupResource{
+		{Group: "", Resource: "pods"},
+		{Group: "", Resource: "unknown"},
+	}
+
+	availableUserResources := []schema.GroupResource{
+		{Group: "", Resource: "pods"},
+	}
+
+	serverUserResources := []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:       "pods",
+					Namespaced: true,
+				},
+			},
+		},
+	}
+
+	ds := &fakeDiscoveryClient{}
+	ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
+		return serverUserResources, nil
+	}
+	mapper, err := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
+	if err != nil {
+		t.Fatalf("Unable to create shortcut expander, err %s", err.Error())
+	}
+	filtered := mapper.filterKnownUserResources(wantedUserResources)
+	if !reflect.DeepEqual(availableUserResources, filtered) {
+		t.Errorf("expected %s, got %s", availableUserResources, filtered)
 	}
 }
 
