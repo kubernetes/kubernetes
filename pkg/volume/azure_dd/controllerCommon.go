@@ -341,47 +341,39 @@ func parseAADToken(payload []byte) (string, time.Time, error) {
 	return sToken, expiresOn, nil
 }
 
-// Creats a map of luns based on the VM size, used the static map declared on this package
-func getLunMapForVm(vmSize string) map[int]bool {
-	var m map[int]bool
+// Creats a slice  luns based on the VM size, used the static map declared on this package
+func getLunMapForVm(vmSize string) []bool {
 	count, ok := dataDisksPerVM[vmSize]
-
 	if !ok {
-		glog.Warning("azureDisk - VM Size %s found no static lun count will use default which  %v", vmSize, defaultDataDiskCount)
+		glog.Warningf("azureDisk - VM Size %s found no static lun count will use default which  %v", vmSize, defaultDataDiskCount)
 		count = defaultDataDiskCount
 	}
 
-	m = make(map[int]bool)
-	// OS Disk is always at lun 0
-	for index := 1; index <= count; index++ {
-		m[index] = false
-	}
-
+	m := make([]bool, count)
 	return m
 }
 
 // finds an empty based on VM size and current attached disks
 func findEmptyLun(vmSize string, dataDisks []interface{}) (int, error) {
-	lunMap := getLunMapForVm(vmSize)
+	vmLuns := getLunMapForVm(vmSize)
 	selectedLun := -1
 
 	for _, v := range dataDisks {
-
 		current := v.(map[string]interface{})
 		lun := int(current["lun"].(float64))
-
-		lunMap[lun] = true
+		vmLuns[lun] = true
 	}
 
-	for k, v := range lunMap {
+	//find first empty lun
+	for i, v := range vmLuns {
 		if v == false {
-			selectedLun = k
+			selectedLun = i
 			break
 		}
 	}
 
 	if selectedLun == -1 {
-		return selectedLun, fmt.Errorf("AzureMd - failed to find empty lun on VM type:%s total-luns-checked:%v", vmSize, len(lunMap))
+		return selectedLun, fmt.Errorf("azureDisk - failed to find empty lun on VM type:%s total-luns-checked:%v", vmSize, len(vmLuns))
 	}
 
 	return selectedLun, nil
@@ -389,7 +381,7 @@ func findEmptyLun(vmSize string, dataDisks []interface{}) (int, error) {
 
 func getRestError(operation string, restError error, expectedStatus int, actualStatus int, body io.ReadCloser) error {
 	if restError != nil {
-		return fmt.Errorf("AzureDisk - %s - Rest Error: %s", operation, restError)
+		return fmt.Errorf("azureDisk - %s - Rest Error: %s", operation, restError)
 	}
 
 	bodystr := ""
@@ -399,5 +391,5 @@ func getRestError(operation string, restError error, expectedStatus int, actualS
 			bodystr = string(bodyBytes)
 		}
 	}
-	return fmt.Errorf("AzureDisk - %s - Rest Status Error:\n Expected: %v\n Got: %v\n ResponseBody:%s\n\n", operation, expectedStatus, actualStatus, bodystr)
+	return fmt.Errorf("azureDisk - %s - Rest Status Error:\n Expected: %v\n Got: %v\n ResponseBody:%s\n\n", operation, expectedStatus, actualStatus, bodystr)
 }
