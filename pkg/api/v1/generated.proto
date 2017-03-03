@@ -2688,7 +2688,7 @@ message PodSpec {
   // If specified, the pod will be dispatched by specified scheduler.
   // If not specified, the pod will be dispatched by default scheduler.
   // +optional
-  optional string schedulername = 19;
+  optional string schedulerName = 19;
 
   // If specified, the pod's tolerations.
   // +optional
