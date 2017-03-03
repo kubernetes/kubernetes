@@ -802,13 +802,16 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.appArmorValidator = apparmor.NewValidator(kubeCfg.ContainerRuntime)
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
-		if kubeCfg.ContainerRuntime != "docker" {
-			return nil, fmt.Errorf("Accelerators feature is supported with docker runtime only.")
+		if kubeCfg.ContainerRuntime == "docker" {
+			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, klet.dockerClient); err != nil {
+				return nil, err
+			}
+		} else {
+			glog.Errorf("Accelerators feature is supported with docker runtime only. Disabling this feature internally.")
 		}
-		if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, klet.dockerClient); err != nil {
-			return nil, err
-		}
-	} else {
+	}
+	// Set GPU manager to a stub implementation if it is not enabled or cannot be supported.
+	if klet.gpuManager == nil {
 		klet.gpuManager = gpu.NewGPUManagerStub()
 	}
 	// Finally, put the most recent version of the config on the Kubelet, so
