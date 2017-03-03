@@ -243,6 +243,7 @@ KUBE_APISERVER_OPTS="\
  --insecure-port=8080\
  --etcd-servers=http://127.0.0.1:4001\
  --logtostderr=true\
+ --storage-backend=etcd2\
  --service-cluster-ip-range=${1}\
  --admission-control=${2}\
  --service-node-port-range=${3}\
