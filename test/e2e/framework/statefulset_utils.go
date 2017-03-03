@@ -408,7 +408,9 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		}
 		sst.WaitForStatus(&ss, 0)
 		Logf("Deleting statefulset %v", ss.Name)
-		if err := c.Apps().StatefulSets(ss.Namespace).Delete(ss.Name, nil); err != nil {
+		// Use OrphanDependents=false so it's deleted synchronously.
+		// We already made sure the Pods are gone inside Scale().
+		if err := c.Apps().StatefulSets(ss.Namespace).Delete(ss.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
 	}
