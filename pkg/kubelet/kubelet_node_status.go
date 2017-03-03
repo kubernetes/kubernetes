@@ -209,7 +209,6 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			}
 		}
 		node.Spec.Taints = taints
-
 	}
 	// Initially, set NodeNetworkUnavailable to true.
 	if kl.providerRequiresNetworkingConfiguration() {
