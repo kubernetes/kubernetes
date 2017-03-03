@@ -51,7 +51,9 @@ func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 // pod can still consume the secret.
 func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	<-done
-	t.verifyPodStaysUp(f)
+	if upgrade == MasterUpgrade {
+		t.verifyPodStaysUp(f)
+	}
 	t.verifyNodesAppArmorEnabled(f)
 	t.verifyNewPodSucceeds(f)
 }
