@@ -77,4 +77,11 @@ if grep -rq '// import "k8s.io/kubernetes/' 'staging/'; then
 	exit 1
 fi
 
+IN_CLUSTER_EXAMPLE=vendor/k8s.io/client-go/examples/in-cluster
+test -d "${IN_CLUSTER_EXAMPLE}" # make sure example is still there
+if go list -f '{{ join .Deps "\n" }}' "./${IN_CLUSTER_EXAMPLE}/..." | sort | uniq | grep -q k8s.io/client-go/plugin; then
+	echo "${IN_CLUSTER_EXAMPLE} imports client-go plugins by default, but shouldn't."
+	exit 1
+fi
+
 exit 0
