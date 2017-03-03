@@ -48,7 +48,7 @@ grep -q "^${FLANNEL_VERSION}\$" binaries/.flannel 2>/dev/null || {
 }
 
 # ectd
-ETCD_VERSION=${ETCD_VERSION:-"2.3.1"}
+ETCD_VERSION=${ETCD_VERSION:-"3.0.17"}
 ETCD="etcd-v${ETCD_VERSION}-linux-amd64"
 echo "Prepare etcd ${ETCD_VERSION} release ..."
 grep -q "^${ETCD_VERSION}\$" binaries/.etcd 2>/dev/null || {
