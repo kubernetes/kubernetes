@@ -2130,6 +2130,9 @@ func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID str
 			removeAll = eviction.PodIsEvicted(syncedPod.Status)
 		}
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
+		if kl.gpuManager != nil {
+			kl.gpuManager.UpdateDevices(string(podId), exitedContainerID)
+		}
 	}
 }
 
