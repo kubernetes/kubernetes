@@ -33,7 +33,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -865,7 +865,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes and StorageClasses).
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
-	defer testClient.StorageV1beta1().StorageClasses().DeleteCollection(nil, metav1.ListOptions{})
+	defer testClient.StorageV1().StorageClasses().DeleteCollection(nil, metav1.ListOptions{})
 
 	storageClass := storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
@@ -876,7 +876,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 		},
 		Provisioner: provisionerPluginName,
 	}
-	testClient.StorageV1beta1().StorageClasses().Create(&storageClass)
+	testClient.StorageV1().StorageClasses().Create(&storageClass)
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -1135,7 +1135,7 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 			Cloud:                     cloud,
 			VolumeInformer:            informers.Core().V1().PersistentVolumes(),
 			ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
-			ClassInformer:             informers.Storage().V1beta1().StorageClasses(),
+			ClassInformer:             informers.Storage().V1().StorageClasses(),
 			EnableDynamicProvisioning: true,
 		})
 
