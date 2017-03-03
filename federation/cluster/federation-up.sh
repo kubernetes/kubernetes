@@ -101,18 +101,6 @@ function join_clusters() {
         --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
         --context="${FEDERATION_NAME}" \
         --secret-name="${context//_/-}"    # Replace "_" by "-"
-
-    # Create kube-dns configmap in each cluster for kube-dns to accept
-    # federation queries.
-    # TODO: This shouldn't be required after
-    # https://github.com/kubernetes/kubernetes/pull/39338.
-    # Remove this after the PR is merged.
-    kube::log::status "Creating \"kube-dns\" ConfigMap in \"kube-system\" namespace in cluster \"${context}\""
-    "${KUBE_ROOT}/cluster/kubectl.sh" create configmap \
-        --context="${context}" \
-        --namespace="${KUBEDNS_CONFIGMAP_NAMESPACE}" \
-        "${KUBEDNS_CONFIGMAP_NAME}" \
-        --from-literal="${KUBEDNS_FEDERATION_FLAG}"="${FEDERATIONS_DOMAIN_MAP}"
   done
 }
 
