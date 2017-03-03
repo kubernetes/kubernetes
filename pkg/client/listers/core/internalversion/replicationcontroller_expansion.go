@@ -33,9 +33,7 @@ type ReplicationControllerListerExpansion interface {
 // ReplicationControllerNamespaeLister.
 type ReplicationControllerNamespaceListerExpansion interface{}
 
-// GetPodControllers returns a list of ReplicationControllers that potentially match a pod.
-// Only the one specified in the Pod's ControllerRef will actually manage it.
-// Returns an error only if no matching ReplicationControllers are found.
+// GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
 func (s *replicationControllerLister) GetPodControllers(pod *api.Pod) ([]*api.ReplicationController, error) {
 	if len(pod.Labels) == 0 {
 		return nil, fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
