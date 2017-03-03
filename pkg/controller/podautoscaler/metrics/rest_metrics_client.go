@@ -49,7 +49,7 @@ type restMetricsClient struct {
 }
 
 // resourceMetricsClient implements the resource-metrics-related parts of MetricsClient,
-// using data from the reosurce metrics API.
+// using data from the resource metrics API.
 type resourceMetricsClient struct {
 	client resourceclient.PodMetricsesGetter
 }
