@@ -388,4 +388,4 @@ metadata:
   name: fluentd-gcp-config
   namespace: kube-system
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
