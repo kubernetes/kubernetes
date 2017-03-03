@@ -301,7 +301,8 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		observeCreation(w)
 
 		By("deleting the cronJob")
-		if err := cronJobClient.Delete(cronJob.Name, nil); err != nil {
+		// Use OrphanDependents=false so the delete is synchronous.
+		if err := cronJobClient.Delete(cronJob.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
 			framework.Failf("Failed to delete cronJob: %v", err)
 		}
 
