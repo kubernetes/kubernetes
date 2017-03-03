@@ -33,6 +33,7 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 
 	"k8s.io/client-go/util/clock"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 type calledDetail struct {
@@ -798,4 +799,22 @@ func (f *FakeDockerClient) InjectImageHistory(data map[string][]dockertypes.Imag
 	f.Lock()
 	defer f.Unlock()
 	f.ImageHistoryMap = data
+}
+
+// FakeDockerPuller is meant to be a simple wrapper around FakeDockerClient.
+// Please do not add more functionalities to it.
+type FakeDockerPuller struct {
+	client DockerInterface
+}
+
+func (f *FakeDockerPuller) Pull(image string, _ []v1.Secret) error {
+	return f.client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
+}
+
+func (f *FakeDockerPuller) GetImageRef(image string) (string, error) {
+	_, err := f.client.InspectImageByRef(image)
+	if err != nil && IsImageNotFoundError(err) {
+		return "", nil
+	}
+	return image, err
 }
