@@ -75,7 +75,6 @@ type manager struct {
 	certStore                Store
 	certAccessLock           sync.RWMutex
 	cert                     *tls.Certificate
-	shouldRotatePercent      uint
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -85,16 +84,11 @@ func NewManager(
 	certSigningRequestClient certificatesclient.CertificateSigningRequestInterface,
 	template *x509.CertificateRequest,
 	usages []certificates.KeyUsage,
-	certificateStore Store,
-	certRotationPercent uint) (Manager, error) {
+	certificateStore Store) (Manager, error) {
 
 	cert, err := certificateStore.Current()
 	if err != nil {
 		return nil, err
-	}
-
-	if certRotationPercent > 100 {
-		certRotationPercent = 100
 	}
 
 	m := manager{
@@ -103,7 +97,6 @@ func NewManager(
 		usages:                   usages,
 		certStore:                certificateStore,
 		cert:                     cert,
-		shouldRotatePercent:      certRotationPercent,
 	}
 
 	return &m, nil
@@ -129,15 +122,10 @@ func (m *manager) GetCertificate(clientHello *tls.ClientHelloInfo) (*tls.Certifi
 
 // Start will start the background work of rotating the certificates.
 func (m *manager) Start() {
-	if m.shouldRotatePercent < 1 {
-		glog.V(2).Infof("Certificate rotation is not enabled.")
-		return
-	}
-
 	// Certificate rotation depends on access to the API server certificate
 	// signing API, so don't start the certificate manager if we don't have a
-	// client. This will happen on the master, where the kubelet is responsible
-	// for bootstrapping the pods of the master components.
+	// client. This will happen on the cluster master, where the kubelet is
+	// responsible for bootstrapping the pods of the master components.
 	if m.certSigningRequestClient == nil {
 		glog.V(2).Infof("Certificate rotation is not enabled, no connection to the apiserver.")
 		return
@@ -160,9 +148,17 @@ func (m *manager) shouldRotate() bool {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
 	notAfter := m.cert.Leaf.NotAfter
-	total := notAfter.Sub(m.cert.Leaf.NotBefore)
-	remaining := notAfter.Sub(time.Now())
-	return remaining < 0 || uint(remaining*100/total) < m.shouldRotatePercent
+	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
+
+	// Use some jitter to set the rotation threshold so each node will rotate
+	// at approximately 70-90% of the total lifetime of the certificate.  With
+	// jitter, if a number of nodes are added to a cluster at approximately the
+	// same time (such as cluster creation time), they won't all try to rotate
+	// certificates at the same time for the rest of the life of the cluster.
+	jitteryDuration := wait.Jitter(time.Duration(totalDuration), 0.2) - time.Duration(totalDuration*0.3)
+
+	rotationThreshold := m.cert.Leaf.NotBefore.Add(jitteryDuration)
+	return time.Now().After(rotationThreshold)
 }
 
 func (m *manager) rotateCerts() error {
