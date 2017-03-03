@@ -815,7 +815,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			}
 
 			By("creating a test gce pd volume")
-			volumeName, err := framework.CreatePDWithRetry()
+			volumeName, err := framework.CreatePDWithRetry("")
 			Expect(err).NotTo(HaveOccurred())
 
 			defer func() {

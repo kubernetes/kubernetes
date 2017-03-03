@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
-		diskName, err := framework.CreatePDWithRetry()
+		diskName, err := framework.CreatePDWithRetry("")
 		framework.ExpectNoError(err, "Error creating PD")
 
 		host0Pod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
@@ -141,7 +141,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
-		diskName, err := framework.CreatePDWithRetry()
+		diskName, err := framework.CreatePDWithRetry("")
 		framework.ExpectNoError(err, "Error creating PD")
 
 		host0Pod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
@@ -205,7 +205,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		By("creating PD")
-		diskName, err := framework.CreatePDWithRetry()
+		diskName, err := framework.CreatePDWithRetry("")
 		framework.ExpectNoError(err, "Error creating PD")
 
 		rwPod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
@@ -257,7 +257,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		By("creating PD")
-		diskName, err := framework.CreatePDWithRetry()
+		diskName, err := framework.CreatePDWithRetry("")
 		framework.ExpectNoError(err, "Error creating PD")
 
 		rwPod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
@@ -309,7 +309,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD")
-		diskName, err := framework.CreatePDWithRetry()
+		diskName, err := framework.CreatePDWithRetry("")
 		framework.ExpectNoError(err, "Error creating PD")
 		numContainers := 4
 		var host0Pod *v1.Pod
@@ -362,10 +362,10 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		By("creating PD1")
-		disk1Name, err := framework.CreatePDWithRetry()
+		disk1Name, err := framework.CreatePDWithRetry("")
 		framework.ExpectNoError(err, "Error creating PD1")
 		By("creating PD2")
-		disk2Name, err := framework.CreatePDWithRetry()
+		disk2Name, err := framework.CreatePDWithRetry("")
 		framework.ExpectNoError(err, "Error creating PD2")
 		var host0Pod *v1.Pod
 
@@ -425,7 +425,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.ExpectNoError(err, "Error getting group size")
 
 		By("Creating a pd")
-		diskName, err := framework.CreatePDWithRetry()
+		diskName, err := framework.CreatePDWithRetry("")
 		framework.ExpectNoError(err, "Error creating a pd")
 
 		host0Pod := testPDPod([]string{diskName}, host0Name, false, 1)
@@ -478,7 +478,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		initialGroupSize, err := GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
 		framework.ExpectNoError(err, "Error getting group size")
 		By("Creating a pd")
-		diskName, err := framework.CreatePDWithRetry()
+		diskName, err := framework.CreatePDWithRetry("")
 		framework.ExpectNoError(err, "Error creating a pd")
 
 		host0Pod := testPDPod([]string{diskName}, host0Name, false, 1)

@@ -37,31 +37,17 @@ const (
 	pvReadCmd  string = "cat " + pvTestFile
 )
 
-func (t *PersistentVolumeUpgradeTest) createGCEVolume() *v1.PersistentVolumeSource {
-	diskName, err := framework.CreatePDWithRetry()
-	framework.ExpectNoError(err)
-	return &v1.PersistentVolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:   diskName,
-			FSType:   "ext3",
-			ReadOnly: false,
-		},
-	}
-}
-func (t *PersistentVolumeUpgradeTest) deleteGCEVolume(pvSource *v1.PersistentVolumeSource) {
-	framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
-}
-
 // Setup creates a pv and then verifies that a pod can consume it.  The pod writes data to the volume.
 func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
-
-	// TODO: generalize this to other providers
+	// TODO: add AWS
 	framework.SkipUnlessProviderIs("gce", "gke")
 
+	var err error
 	ns := f.Namespace.Name
 
 	By("Initializing PV source")
-	t.pvSource = t.createGCEVolume()
+	t.pvSource, err = framework.CreatePVSource("")
+	framework.ExpectNoError(err)
 	pvConfig := framework.PersistentVolumeConfig{
 		NamePrefix: "pv-upgrade",
 		PVSource:   *t.pvSource,
@@ -87,7 +73,7 @@ func (t *PersistentVolumeUpgradeTest) Test(f *framework.Framework, done <-chan s
 // Teardown cleans up any remaining resources.
 func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
 	framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, t.pv, t.pvc)
-	t.deleteGCEVolume(t.pvSource)
+	framework.DeletePVSource(t.pvSource)
 }
 
 // testPod creates a pod that consumes a pv and prints it out. The output is then verified.

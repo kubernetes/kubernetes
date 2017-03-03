@@ -310,7 +310,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			framework.SkipUnlessProviderIs("gce")
 			By("Initializing Test Spec")
 			if diskName == "" {
-				diskName, err = framework.CreatePDWithRetry()
+				diskName, err = framework.CreatePDWithRetry("")
 				Expect(err).NotTo(HaveOccurred())
 				pvConfig = framework.PersistentVolumeConfig{
 					NamePrefix: "gce-",
