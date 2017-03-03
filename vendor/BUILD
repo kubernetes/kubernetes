@@ -10508,7 +10508,9 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apiserver/pkg/endpoints/filters",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
