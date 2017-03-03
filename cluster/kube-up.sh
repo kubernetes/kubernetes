@@ -31,7 +31,7 @@ if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
 fi
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
-
+source "${KUBE_ROOT}/cluster/common.sh"
 
 if [ -z "${ZONE-}" ]; then
   echo "... Starting cluster using provider: ${KUBERNETES_PROVIDER}" >&2

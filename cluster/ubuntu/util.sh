@@ -19,7 +19,6 @@
 set -e
 
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
-source "${KUBE_ROOT}/cluster/common.sh"
 
 MASTER=""
 MASTER_IP=""

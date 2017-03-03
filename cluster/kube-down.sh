@@ -27,6 +27,7 @@ if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
 fi
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
+source "${KUBE_ROOT}/cluster/common.sh"
 
 echo "Bringing down cluster using provider: $KUBERNETES_PROVIDER"
 
