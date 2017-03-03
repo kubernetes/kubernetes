@@ -76,10 +76,13 @@ func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string)
 func newStore(c *clientv3.Client, quorumRead bool, codec runtime.Codec, prefix string) *store {
 	versioner := etcd.APIObjectVersioner{}
 	result := &store{
-		client:     c,
-		versioner:  versioner,
-		codec:      codec,
-		pathPrefix: prefix,
+		client:    c,
+		versioner: versioner,
+		codec:     codec,
+		// for compatibility with etcd2 impl.
+		// no-op for default prefix of '/registry'.
+		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
+		pathPrefix: path.Join("/", prefix),
 		watcher:    newWatcher(c, codec, versioner),
 	}
 	if !quorumRead {
