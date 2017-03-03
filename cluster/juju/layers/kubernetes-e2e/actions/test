@@ -45,3 +45,7 @@ tar -czf $ACTION_LOG_TGZ ${JUJU_ACTION_UUID}.log
 
 action-set log="$ACTION_LOG_TGZ"
 action-set junit="$ACTION_JUNIT_TGZ"
+
+if tail ${JUJU_ACTION_UUID}.log | grep -q "Test Suite Failed"; then
+  action-fail "Failure detected in the logs"
+fi
