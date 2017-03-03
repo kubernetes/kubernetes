@@ -15,6 +15,7 @@ go_library(
         "blobDiskController.go",
         "common.go",
         "controllerCommon.go",
+        "diskMap.go",
         "managedDiskController.go",
         "mounter.go",
         "provisioner.go",

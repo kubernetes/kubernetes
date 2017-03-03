@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -114,16 +115,10 @@ func (a *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 }
 
 func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
-	ticker := time.NewTicker(time.Second * 2)
-	timer := time.NewTimer(timeout)
-	defer ticker.Stop()
-	defer timer.Stop()
-	exe := exec.New()
-
+	var err error
 	lun, err := strconv.Atoi(devicePath)
 	if err != nil {
-		glog.Infof("azureDisk - Wait for attach expect device path as a lun number, instead got: %s", devicePath)
-		return "", err
+		return "", fmt.Errorf("azureDisk - Wait for attach expect device path as a lun number, instead got: %s", devicePath)
 	}
 
 	volumeSource, err := getVolumeSource(spec)
@@ -135,27 +130,28 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 
 	diskName := volumeSource.DiskName
 	nodeName := a.plugin.host.GetHostName()
+	newDevicePath := ""
 
-	for {
-		select {
-		case <-ticker.C:
-			newDevicePath, err := findDiskByLun(lun, exe)
-			if err != nil {
-				glog.Infof("azureDisk - WaitForAttach ticker failed node (%s) disk (%s) lun(%v) err(%s)", nodeName, diskName, lun, err)
-			} else {
-				if newDevicePath != "" {
-					// the curent sequence k8s uses for unformated disk (check-disk, mount, fail, mkfs.extX) hangs on
-					// Azure Managed disk scsi interface. this is a hack and will be replaced once we identify and solve
-					// the root case on Azure.
-					formatIfNotFormatted(newDevicePath, *volumeSource.FSType)
-					return newDevicePath, nil
-				}
-			}
-		case <-timer.C:
-			glog.Infof("azureDisk - WaitForAttach ticker timeout finding attached disk node (%s) disk (%s) lun(%v)", nodeName, diskName, lun)
-			return "", fmt.Errorf("azureDisk - WaitForAttach failed within timeout node (%s) diskId:(%s) lun:(%v)", nodeName, diskName, lun)
+	err = wait.Poll(2*time.Second, timeout, func() (bool, error) {
+		exe := exec.New()
+
+		if newDevicePath, err = findDiskByLun(lun, exe); err != nil {
+			return false, fmt.Errorf("azureDisk - WaitForAttach ticker failed node (%s) disk (%s) lun(%v) err(%s)", nodeName, diskName, lun, err)
 		}
-	}
+
+		// did we find it?
+		if newDevicePath != "" {
+			// the curent sequence k8s uses for unformated disk (check-disk, mount, fail, mkfs.extX) hangs on
+			// Azure Managed disk scsi interface. this is a hack and will be replaced once we identify and solve
+			// the root case on Azure.
+			formatIfNotFormatted(newDevicePath, *volumeSource.FSType)
+			return true, nil
+		}
+
+		return false, fmt.Errorf("azureDisk - WaitForAttach failed within timeout node (%s) diskId:(%s) lun:(%v)", nodeName, diskName, lun)
+	})
+
+	return newDevicePath, err
 }
 
 // to avoid name conflicts (similar *.vhd name)
@@ -178,33 +174,37 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 }
 
 func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	m := attacher.plugin.host.GetMounter()
-	notMnt, err := m.IsLikelyNotMountPoint(deviceMountPath)
+	mounter := attacher.plugin.host.GetMounter()
+	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
-				glog.Warningf("azureDisk - mountDevice:CreateDirectory failed with %s", err)
-				return err
+				return fmt.Errorf("azureDisk - mountDevice:CreateDirectory failed with %s", err)
 			}
 			notMnt = true
 		} else {
-			glog.Warningf("azureDisk - mountDevice:IsLikelyNotMountPoint failed with %s", err)
-			return err
+			return fmt.Errorf("azureDisk - mountDevice:IsLikelyNotMountPoint failed with %s", err)
 		}
 	}
 
+	volumeSource, err := getVolumeSource(spec)
+	if err != nil {
+		return err
+	}
+
+	options := []string{}
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
 		mountOptions := volume.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, mountOptions)
 		if err != nil {
-			glog.Infof("azureDisk - mountDevice:FormatAndMount failed with %s", err)
-			_ = os.Remove(deviceMountPath)
-			return err
+			if cleanErr := os.Remove(deviceMountPath); cleanErr != nil {
+				return fmt.Errorf("azureDisk - mountDevice:FormatAndMount failed with %s and clean up failed with :%v", err, cleanErr)
+			}
+			return fmt.Errorf("azureDisk - mountDevice:FormatAndMount failed with %s", err)
 		}
 	}
-
 	return nil
 }
 

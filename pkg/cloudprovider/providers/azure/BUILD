@@ -12,7 +12,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "azure.go",
-        "azure_blob.go",
         "azure_instances.go",
         "azure_loadbalancer.go",
         "azure_routes.go",
