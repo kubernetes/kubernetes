@@ -33394,7 +33394,7 @@ func (x *PodSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq2[20] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("schedulername"))
+					r.EncodeString(codecSelferC_UTF81234, string("schedulerName"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					yym71 := z.EncBinary()
 					_ = yym71
@@ -33738,7 +33738,7 @@ func (x *PodSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 				x.Affinity.CodecDecodeSelf(d)
 			}
-		case "schedulername":
+		case "schedulerName":
 			if r.TryDecodeAsNil() {
 				x.SchedulerName = ""
 			} else {

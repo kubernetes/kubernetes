@@ -40899,7 +40899,7 @@
       "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy",
       "type": "string"
      },
-     "schedulername": {
+     "schedulerName": {
       "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
       "type": "string"
      },
