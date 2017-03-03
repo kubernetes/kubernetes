@@ -91,9 +91,9 @@ func (entry *logEntry) getLogEntryNumber() (int, bool) {
 	return lineNumber, err == nil
 }
 
-func createLoggingPod(f *framework.Framework, podName string, totalLines int, loggingDuration time.Duration) *loggingPod {
+func createLoggingPod(f *framework.Framework, podName string, nodeName string, totalLines int, loggingDuration time.Duration) *loggingPod {
 	framework.Logf("Starting pod %s", podName)
-	createLogsGeneratorPod(f, podName, totalLines, loggingDuration)
+	createLogsGeneratorPod(f, podName, nodeName, totalLines, loggingDuration)
 
 	return &loggingPod{
 		Name: podName,
@@ -104,7 +104,7 @@ func createLoggingPod(f *framework.Framework, podName string, totalLines int, lo
 	}
 }
 
-func createLogsGeneratorPod(f *framework.Framework, podName string, linesCount int, duration time.Duration) {
+func createLogsGeneratorPod(f *framework.Framework, podName string, nodeName string, linesCount int, duration time.Duration) {
 	f.PodClient().Create(&api_v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: podName,
@@ -137,6 +137,7 @@ func createLogsGeneratorPod(f *framework.Framework, podName string, linesCount i
 					},
 				},
 			},
+			NodeName: nodeName,
 		},
 	})
 }
