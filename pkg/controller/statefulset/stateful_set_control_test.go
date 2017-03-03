@@ -769,13 +769,14 @@ func (spc *fakeStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod 
 	return nil
 }
 
-func (spc *fakeStatefulPodControl) UpdateStatefulSetReplicas(set *apps.StatefulSet, replicas int32) error {
+func (spc *fakeStatefulPodControl) UpdateStatefulSetStatus(set *apps.StatefulSet, replicas int32, generation int64) error {
 	defer spc.updateStatusTracker.inc()
 	if spc.updateStatusTracker.errorReady() {
 		defer spc.updateStatusTracker.reset()
 		return spc.updateStatusTracker.err
 	}
 	set.Status.Replicas = replicas
+	set.Status.ObservedGeneration = &generation
 	spc.setsIndexer.Update(set)
 	return nil
 }
