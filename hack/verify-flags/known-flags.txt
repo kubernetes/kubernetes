@@ -20,6 +20,7 @@ apiserver-advertise-address
 apiserver-arg-overrides
 apiserver-arg-overrides
 apiserver-bind-port
+apiserver-cert-extra-sans
 apiserver-count
 apiserver-count
 apiserver-count
@@ -72,6 +73,7 @@ build-only
 build-tag
 ca-cert-path
 cadvisor-port
+cert-altnames
 cert-dir
 certificate-authority
 cgroup-driver
@@ -163,6 +165,7 @@ discovery-file
 discovery-port
 discovery-token
 dns-bind-address
+dns-domain
 dns-port
 dns-provider
 dns-provider-config

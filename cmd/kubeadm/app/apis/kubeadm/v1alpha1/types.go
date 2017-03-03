@@ -30,6 +30,7 @@ type MasterConfiguration struct {
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
 	AuthorizationMode string     `json:"authorizationMode"`
+
 	// SelfHosted enables an alpha deployment type where the apiserver, scheduler, and
 	// controller manager are managed by Kubernetes itself. This option is likely to
 	// become the default in the future.
@@ -38,13 +39,18 @@ type MasterConfiguration struct {
 	APIServerExtraArgs         map[string]string `json:"apiServerExtraArgs"`
 	ControllerManagerExtraArgs map[string]string `json:"controllerManagerExtraArgs"`
 	SchedulerExtraArgs         map[string]string `json:"schedulerExtraArgs"`
+
+	// APIServerCertSANs sets extra Subject Alternative Names for the API Server signing cert
+	APIServerCertSANs []string `json:"apiServerCertSANs"`
+	// CertificatesDir specifies where to store or look for all required certificates
+	CertificatesDir string `json:"certificatesDir"`
 }
 
 type API struct {
-	// The address for the API server to advertise.
-	AdvertiseAddress string   `json:"advertiseAddress"`
-	ExternalDNSNames []string `json:"externalDNSNames"`
-	BindPort         int32    `json:"bindPort"`
+	// AdvertiseAddress sets the address for the API server to advertise.
+	AdvertiseAddress string `json:"advertiseAddress"`
+	// BindPort sets the secure port for the API Server to bind to
+	BindPort int32 `json:"bindPort"`
 }
 
 type Discovery struct {

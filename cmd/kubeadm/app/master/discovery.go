@@ -60,7 +60,7 @@ func encodeKubeDiscoverySecretData(dcfg *kubeadmapi.TokenDiscovery, apicfg kubea
 }
 
 func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
-	caCertificatePath := path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)
+	caCertificatePath := path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName)
 	caCerts, err := certutil.CertsFromFile(caCertificatePath)
 	if err != nil {
 		return fmt.Errorf("couldn't load the CA certificate file %s: %v", caCertificatePath, err)

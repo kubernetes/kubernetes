@@ -292,10 +292,6 @@ func getComponentBaseCommand(component string) []string {
 	return []string{"kube-" + component}
 }
 
-func getCertFilePath(certName string) string {
-	return path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, certName)
-}
-
 func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
 	var command []string
 
@@ -308,13 +304,13 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"insecure-port":                   "0",
 		"admission-control":               kubeadmconstants.DefaultAdmissionControl,
 		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
-		"service-account-key-file":        getCertFilePath(kubeadmconstants.ServiceAccountPublicKeyName),
-		"client-ca-file":                  getCertFilePath(kubeadmconstants.CACertName),
-		"tls-cert-file":                   getCertFilePath(kubeadmconstants.APIServerCertName),
-		"tls-private-key-file":            getCertFilePath(kubeadmconstants.APIServerKeyName),
-		"kubelet-client-certificate":      getCertFilePath(kubeadmconstants.APIServerKubeletClientCertName),
-		"kubelet-client-key":              getCertFilePath(kubeadmconstants.APIServerKubeletClientKeyName),
-		"token-auth-file":                 path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CSVTokenFileName),
+		"service-account-key-file":        path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
+		"client-ca-file":                  path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"tls-cert-file":                   path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertName),
+		"tls-private-key-file":            path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName),
+		"kubelet-client-certificate":      path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName),
+		"kubelet-client-key":              path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName),
+		"token-auth-file":                 path.Join(cfg.CertificatesDir, kubeadmconstants.CSVTokenFileName),
 		"secure-port":                     fmt.Sprintf("%d", cfg.API.BindPort),
 		"allow-privileged":                "true",
 		"storage-backend":                 "etcd3",
@@ -324,7 +320,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"requestheader-username-headers":     "X-Remote-User",
 		"requestheader-group-headers":        "X-Remote-Group",
 		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
-		"requestheader-client-ca-file":       getCertFilePath(kubeadmconstants.FrontProxyCACertName),
+		"requestheader-client-ca-file":       path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName),
 		"requestheader-allowed-names":        "front-proxy-client",
 	}
 
@@ -379,10 +375,10 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		"address":                                                  "127.0.0.1",
 		"leader-elect":                                             "true",
 		"kubeconfig":                                               path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
-		"root-ca-file":                                             getCertFilePath(kubeadmconstants.CACertName),
-		"service-account-private-key-file":                         getCertFilePath(kubeadmconstants.ServiceAccountPrivateKeyName),
-		"cluster-signing-cert-file":                                getCertFilePath(kubeadmconstants.CACertName),
-		"cluster-signing-key-file":                                 getCertFilePath(kubeadmconstants.CAKeyName),
+		"root-ca-file":                                             path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"service-account-private-key-file":                         path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName),
+		"cluster-signing-cert-file":                                path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"cluster-signing-key-file":                                 path.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),
 		"insecure-experimental-approve-all-kubelet-csrs-for-group": kubeadmconstants.CSVTokenBootstrapGroup,
 		"use-service-account-credentials":                          "true",
 	}

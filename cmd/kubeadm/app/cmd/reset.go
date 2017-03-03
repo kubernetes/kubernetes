@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -36,11 +37,12 @@ import (
 // NewCmdReset returns the "kubeadm reset" command
 func NewCmdReset(out io.Writer) *cobra.Command {
 	var skipPreFlight, removeNode bool
+	var certsDir string
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
 		Run: func(cmd *cobra.Command, args []string) {
-			r, err := NewReset(skipPreFlight, removeNode)
+			r, err := NewReset(skipPreFlight, removeNode, certsDir)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(r.Run(out))
 		},
@@ -56,14 +58,20 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 		"Remove this node from the pool of nodes in this cluster",
 	)
 
+	cmd.PersistentFlags().StringVar(
+		&certsDir, "cert-dir", kubeadmapiext.DefaultCertificatesDir,
+		"The path to the directory where the certificates are stored. If specified, clean this directory.",
+	)
+
 	return cmd
 }
 
 type Reset struct {
 	removeNode bool
+	certsDir   string
 }
 
-func NewReset(skipPreFlight, removeNode bool) (*Reset, error) {
+func NewReset(skipPreFlight, removeNode bool, certsDir string) (*Reset, error) {
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks")
 
@@ -76,6 +84,7 @@ func NewReset(skipPreFlight, removeNode bool) (*Reset, error) {
 
 	return &Reset{
 		removeNode: removeNode,
+		certsDir:   certsDir,
 	}, nil
 }
 
@@ -137,7 +146,7 @@ func (r *Reset) Run(out io.Writer) error {
 	}
 
 	// Remove contents from the config and pki directories
-	resetConfigDir(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmapi.GlobalEnvParams.HostPKIPath)
+	resetConfigDir(kubeadmapi.GlobalEnvParams.KubernetesDir, r.certsDir)
 
 	return nil
 }

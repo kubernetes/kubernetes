@@ -23,16 +23,15 @@ import (
 	"path"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 // CreateTokenAuthFile creates the CSV file that can be used for allowing users with tokens access to the API Server
-func CreateTokenAuthFile(bt string) error {
-	tokenAuthFilePath := path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CSVTokenFileName)
-	if err := os.MkdirAll(kubeadmapi.GlobalEnvParams.HostPKIPath, 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q [%v]", kubeadmapi.GlobalEnvParams.HostPKIPath, err)
+func CreateTokenAuthFile(certsDir, bt string) error {
+	tokenAuthFilePath := path.Join(certsDir, kubeadmconstants.CSVTokenFileName)
+	if err := os.MkdirAll(certsDir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory %q [%v]", certsDir, err)
 	}
 	serialized := []byte(fmt.Sprintf("%s,%s,%s,%s\n", bt, kubeadmconstants.CSVTokenBootstrapUser, uuid.NewUUID(), kubeadmconstants.CSVTokenBootstrapGroup))
 	// DumpReaderToFile create a file with mode 0600
