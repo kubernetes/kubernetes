@@ -46,7 +46,7 @@ cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = ser
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:def send_cluster_dns_detail(cluster_dns):
 cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:def service_cidr():
 cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    context.update({'kube_api_endpoint': ','.join(api_servers),
-cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    context['ca_cert_path'] = layer_options.get('ca_certificate_path')
+cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    ca_cert_path = layer_options.get('ca_certificate_path')
 cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:def render_init_scripts(api_servers):
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:    local source_file=${BASH_SOURCE[$stack_skip]}
