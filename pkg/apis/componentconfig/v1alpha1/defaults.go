@@ -385,6 +385,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.KubeReserved == nil {
 		obj.KubeReserved = make(map[string]string)
 	}
+	if obj.ExperimentalQOSReserved == nil {
+		obj.ExperimentalQOSReserved = make(map[string]string)
+	}
 	if obj.MakeIPTablesUtilChains == nil {
 		obj.MakeIPTablesUtilChains = boolVar(true)
 	}
