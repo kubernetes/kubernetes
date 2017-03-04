@@ -200,14 +200,17 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 			count++
 
-			if err := info.Refresh(patchedObj, true); err != nil {
-				return err
-			}
-
+			//info.Object is updated by the info.Refresh call.
+			//we should compute old data prior to refresh
 			oldData, err := json.Marshal(info.Object)
 			if err != nil {
 				return err
 			}
+
+			if err := info.Refresh(patchedObj, true); err != nil {
+				return err
+			}
+
 			newData, err := json.Marshal(patchedObj)
 			if err != nil {
 				return err
