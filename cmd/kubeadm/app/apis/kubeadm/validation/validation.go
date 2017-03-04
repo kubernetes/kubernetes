@@ -56,6 +56,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateAPIServerCertSANs(c.APIServerCertSANs, field.NewPath("cert-altnames"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificates-dir"))...)
+	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
 	return allErrs
 }
 
@@ -87,6 +88,14 @@ func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.
 	allErrs = append(allErrs, ValidateArgSelection(c, fldPath)...)
 	allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, fldPath)...)
 	allErrs = append(allErrs, ValidateJoinDiscoveryTokenAPIServer(c, fldPath)...)
+
+	if len(c.DiscoveryToken) != 0 {
+		allErrs = append(allErrs, ValidateToken(c.DiscoveryToken, fldPath)...)
+	}
+	if len(c.DiscoveryFile) != 0 {
+		allErrs = append(allErrs, ValidateDiscoveryFile(c.DiscoveryFile, fldPath)...)
+	}
+
 	return allErrs
 }
 

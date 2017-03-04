@@ -99,3 +99,15 @@ func WriteToDisk(filename string, kubeconfig *clientcmdapi.Config) error {
 	fmt.Printf("[kubeconfig] Wrote KubeConfig file to disk: %q\n", filename)
 	return nil
 }
+
+// GetClusterFromKubeConfig returns the default Cluster of the specified KubeConfig
+func GetClusterFromKubeConfig(config *clientcmdapi.Config) *clientcmdapi.Cluster {
+	// If there is an unnamed cluster object, use it
+	if config.Clusters[""] != nil {
+		return config.Clusters[""]
+	}
+	if config.Contexts[config.CurrentContext] != nil {
+		return config.Clusters[config.Contexts[config.CurrentContext].Cluster]
+	}
+	return nil
+}

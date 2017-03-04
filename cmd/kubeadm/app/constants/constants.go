@@ -57,7 +57,7 @@ const (
 	SchedulerKubeConfigFileName         = "scheduler.conf"
 
 	// Important: a "v"-prefix shouldn't exist here; semver doesn't allow that
-	MinimumControlPlaneVersion = "1.6.0-alpha.2"
+	MinimumControlPlaneVersion = "1.6.0-beta.1"
 
 	// Some well-known users and groups in the core Kubernetes authorization system
 
@@ -72,6 +72,8 @@ const (
 
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
+	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery
+	DiscoveryRetryInterval = 5 * time.Second
 
 	// Minimum amount of nodes the Service subnet should allow.
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
@@ -84,15 +86,6 @@ const (
 	// LabelNodeRoleMaster specifies that a node is a master
 	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
-
-	// CSVTokenBootstrapUser is currently the user the bootstrap token in the .csv file
-	// TODO: This should change to something more official and supported
-	// TODO: Prefix with kubeadm prefix
-	CSVTokenBootstrapUser = "kubeadm-node-csr"
-	// CSVTokenBootstrapGroup specifies the group the tokens in the .csv file will belong to
-	CSVTokenBootstrapGroup = "kubeadm:kubelet-bootstrap"
-	// The file name of the tokens file that can be used for bootstrapping
-	CSVTokenFileName = "tokens.csv"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"

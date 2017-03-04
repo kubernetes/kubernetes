@@ -17,6 +17,8 @@ limitations under the License.
 package kubeadm
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,7 +27,6 @@ type EnvParams struct {
 	HostEtcdPath     string
 	HyperkubeImage   string
 	RepositoryPrefix string
-	DiscoveryImage   string
 	EtcdImage        string
 }
 
@@ -33,12 +34,14 @@ type MasterConfiguration struct {
 	metav1.TypeMeta
 
 	API               API
-	Discovery         Discovery
 	Etcd              Etcd
 	Networking        Networking
 	KubernetesVersion string
 	CloudProvider     string
 	AuthorizationMode string
+
+	Token    string
+	TokenTTL time.Duration
 
 	// SelfHosted enables an alpha deployment type where the apiserver, scheduler, and
 	// controller manager are managed by Kubernetes itself. This option is likely to
@@ -60,20 +63,6 @@ type API struct {
 	AdvertiseAddress string
 	// BindPort sets the secure port for the API Server to bind to
 	BindPort int32
-}
-
-type Discovery struct {
-	HTTPS *HTTPSDiscovery
-	File  *FileDiscovery
-	Token *TokenDiscovery
-}
-
-type HTTPSDiscovery struct {
-	URL string
-}
-
-type FileDiscovery struct {
-	Path string
 }
 
 type TokenDiscovery struct {
@@ -105,12 +94,4 @@ type NodeConfiguration struct {
 	DiscoveryTokenAPIServers []string
 	TLSBootstrapToken        string
 	Token                    string
-}
-
-// ClusterInfo TODO add description
-type ClusterInfo struct {
-	metav1.TypeMeta
-	// TODO(phase1+) this may become simply `api.Config`
-	CertificateAuthorities []string
-	Endpoints              []string
 }

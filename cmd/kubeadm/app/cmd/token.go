@@ -189,36 +189,37 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, client *clientset.Clientset, token string, tokenDuration time.Duration, usages []string, description string) error {
 
-	td := &kubeadmapi.TokenDiscovery{}
-	var err error
 	if len(token) == 0 {
-		err = tokenutil.GenerateToken(td)
+		var err error
+		token, err = tokenutil.GenerateToken()
+		if err != nil {
+			return err
+		}
 	} else {
-		td.ID, td.Secret, err = tokenutil.ParseToken(token)
-	}
-	if err != nil {
-		return err
+		_, _, err := tokenutil.ParseToken(token)
+		if err != nil {
+			return err
+		}
 	}
 
 	// TODO: Validate usages here so we don't allow something unsupported
-	err = tokenphase.CreateNewToken(client, td, tokenDuration, usages, description)
+	err := tokenphase.CreateNewToken(client, token, tokenDuration, usages, description)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintln(out, tokenutil.BearerToken(td))
+	fmt.Fprintln(out, token)
 	return nil
 }
 
 // RunGenerateToken just generates a random token for the user
 func RunGenerateToken(out io.Writer) error {
-	td := &kubeadmapi.TokenDiscovery{}
-	err := tokenutil.GenerateToken(td)
+	token, err := tokenutil.GenerateToken()
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintln(out, tokenutil.BearerToken(td))
+	fmt.Fprintln(out, token)
 	return nil
 }
 
