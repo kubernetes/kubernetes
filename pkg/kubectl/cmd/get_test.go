@@ -848,7 +848,7 @@ func TestWatchSelector(t *testing.T) {
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := []runtime.Object{podList, events[2].Object, events[3].Object}
+	expected := []runtime.Object{&pods[0], &pods[1], events[2].Object, events[3].Object}
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {

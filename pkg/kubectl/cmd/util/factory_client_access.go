@@ -416,7 +416,7 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 }
 
 func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-	p := printers.NewHumanReadablePrinter(options)
+	p := printers.NewHumanReadablePrinter(f.JSONEncoder(), f.Decoder(true), options)
 	printersinternal.AddHandlers(p)
 	return p, nil
 }
