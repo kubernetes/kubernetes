@@ -21,6 +21,7 @@ go_library(
         "//federation/pkg/kubefed/init:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",
         "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubectl:go_default_library",

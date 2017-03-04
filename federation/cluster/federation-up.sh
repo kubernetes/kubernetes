@@ -108,7 +108,6 @@ function join_clusters() {
         --federation-system-namespace=${FEDERATION_NAMESPACE} \
         --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
         --context="${FEDERATION_KUBE_CONTEXT}" \
-        --secret-name="${context//_/-}"    # Replace "_" by "-"
   done
 }
 
