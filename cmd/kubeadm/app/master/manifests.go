@@ -32,6 +32,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -301,20 +302,20 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 	}
 
 	defaultArguments := map[string]string{
-		"insecure-port":                   "0",
-		"admission-control":               kubeadmconstants.DefaultAdmissionControl,
-		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
-		"service-account-key-file":        path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
-		"client-ca-file":                  path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
-		"tls-cert-file":                   path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertName),
-		"tls-private-key-file":            path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName),
-		"kubelet-client-certificate":      path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName),
-		"kubelet-client-key":              path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName),
-		"token-auth-file":                 path.Join(cfg.CertificatesDir, kubeadmconstants.CSVTokenFileName),
-		"secure-port":                     fmt.Sprintf("%d", cfg.API.BindPort),
-		"allow-privileged":                "true",
-		"storage-backend":                 "etcd3",
-		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+		"insecure-port":                     "0",
+		"admission-control":                 kubeadmconstants.DefaultAdmissionControl,
+		"service-cluster-ip-range":          cfg.Networking.ServiceSubnet,
+		"service-account-key-file":          path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
+		"client-ca-file":                    path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"tls-cert-file":                     path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertName),
+		"tls-private-key-file":              path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName),
+		"kubelet-client-certificate":        path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName),
+		"kubelet-client-key":                path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName),
+		"secure-port":                       fmt.Sprintf("%d", cfg.API.BindPort),
+		"allow-privileged":                  "true",
+		"experimental-bootstrap-token-auth": "true",
+		"storage-backend":                   "etcd3",
+		"kubelet-preferred-address-types":   "InternalIP,ExternalIP,Hostname",
 		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
 		// so add it unconditionally with recommended values
 		"requestheader-username-headers":     "X-Remote-User",
@@ -379,8 +380,9 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		"service-account-private-key-file":                         path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName),
 		"cluster-signing-cert-file":                                path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
 		"cluster-signing-key-file":                                 path.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),
-		"insecure-experimental-approve-all-kubelet-csrs-for-group": kubeadmconstants.CSVTokenBootstrapGroup,
+		"insecure-experimental-approve-all-kubelet-csrs-for-group": bootstrapapi.BootstrapGroup,
 		"use-service-account-credentials":                          "true",
+		"controllers":                                              "*,bootstrapsigner,tokencleaner",
 	}
 
 	command = getComponentBaseCommand(controllerManager)

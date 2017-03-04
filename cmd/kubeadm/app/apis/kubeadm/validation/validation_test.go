@@ -172,41 +172,21 @@ func TestValidateMasterConfiguration(t *testing.T) {
 	}{
 		{&kubeadm.MasterConfiguration{}, false},
 		{&kubeadm.MasterConfiguration{
-			Discovery: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
-			},
 			AuthorizationMode: "RBAC",
 			Networking: kubeadm.Networking{
 				ServiceSubnet: "10.96.0.1/12",
 				DNSDomain:     "cluster.local",
 			},
 			CertificatesDir: "/some/cert/dir",
-		}, true},
+		}, false},
 		{&kubeadm.MasterConfiguration{
-			Discovery: kubeadm.Discovery{
-				File: &kubeadm.FileDiscovery{Path: "foo"},
-			},
 			AuthorizationMode: "RBAC",
 			Networking: kubeadm.Networking{
 				ServiceSubnet: "10.96.0.1/12",
 				DNSDomain:     "cluster.local",
 			},
 			CertificatesDir: "/some/other/cert/dir",
-		}, true},
-		{&kubeadm.MasterConfiguration{
-			Discovery: kubeadm.Discovery{
-				Token: &kubeadm.TokenDiscovery{
-					ID:        "abcdef",
-					Secret:    "1234567890123456",
-					Addresses: []string{"foobar"},
-				},
-			},
-			AuthorizationMode: "RBAC",
-			Networking: kubeadm.Networking{
-				ServiceSubnet: "10.96.0.1/12",
-				DNSDomain:     "cluster.local",
-			},
-			CertificatesDir: "/yet/another/cert/dir",
+			Token:           "abcdef.0123456789abcdef",
 		}, true},
 	}
 	for _, rt := range tests {

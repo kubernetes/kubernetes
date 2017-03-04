@@ -20,14 +20,15 @@ import (
 	"net/url"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
 	DefaultServiceDNSDomain  = "cluster.local"
 	DefaultServicesSubnet    = "10.96.0.0/12"
-	DefaultKubernetesVersion = "latest"
+	DefaultKubernetesVersion = "latest-1.6"
 	// This is only for clusters without internet, were the latest stable version can't be determined
-	DefaultKubernetesFallbackVersion = "v1.6.0-alpha.1"
+	DefaultKubernetesFallbackVersion = "v1.6.0-beta.1"
 	DefaultAPIBindPort               = 6443
 	DefaultDiscoveryBindPort         = 9898
 	DefaultAuthorizationMode         = "RBAC"
@@ -60,16 +61,16 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.Networking.DNSDomain = DefaultServiceDNSDomain
 	}
 
-	if obj.Discovery.Token == nil && obj.Discovery.File == nil && obj.Discovery.HTTPS == nil {
-		obj.Discovery.Token = &TokenDiscovery{}
-	}
-
 	if obj.AuthorizationMode == "" {
 		obj.AuthorizationMode = DefaultAuthorizationMode
 	}
 
 	if obj.CertificatesDir == "" {
 		obj.CertificatesDir = DefaultCertificatesDir
+	}
+
+	if obj.TokenTTL == 0 {
+		obj.TokenTTL = constants.DefaultTokenDuration
 	}
 }
 

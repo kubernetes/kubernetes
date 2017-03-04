@@ -18,32 +18,23 @@ package node
 
 import (
 	"fmt"
-	"os"
 
 	"k8s.io/apimachinery/pkg/types"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
 )
 
-// PerformTLSBootstrap executes a node certificate signing request.
-func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
-	hostName, err := os.Hostname()
-	if err != nil {
-		return err
-	}
-	name := types.NodeName(hostName)
+const CSRContextAndUser = "kubelet-csr"
 
-	rc, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
+// PerformTLSBootstrap executes a node certificate signing request.
+func PerformTLSBootstrap(cfg *clientcmdapi.Config, hostName string) error {
+	client, err := kubeconfigutil.KubeConfigToClientSet(cfg)
 	if err != nil {
 		return err
 	}
-	c, err := clientset.NewForConfig(rc)
-	if err != nil {
-		return err
-	}
+
 	fmt.Println("[csr] Created API client to obtain unique certificate for this node, generating keys and certificate signing request")
 
 	key, err := certutil.MakeEllipticPrivateKeyPEM()
@@ -51,21 +42,20 @@ func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
 		return fmt.Errorf("failed to generate private key [%v]", err)
 	}
 
-	cert, err := csr.RequestNodeCertificate(c.Certificates().CertificateSigningRequests(), key, name)
+	cert, err := csr.RequestNodeCertificate(client.CertificatesV1beta1().CertificateSigningRequests(), key, types.NodeName(hostName))
 	if err != nil {
 		return fmt.Errorf("failed to request signed certificate from the API server [%v]", err)
 	}
-	fmt.Printf("[csr] Received signed certificate from the API server")
-	fmt.Println("[csr] Generating kubelet configuration")
+	fmt.Println("[csr] Received signed certificate from the API server, generating KubeConfig...")
 
-	cfg.AuthInfos["kubelet"] = &clientcmdapi.AuthInfo{
+	cfg.AuthInfos[CSRContextAndUser] = &clientcmdapi.AuthInfo{
 		ClientKeyData:         key,
 		ClientCertificateData: cert,
 	}
-	cfg.Contexts["kubelet"] = &clientcmdapi.Context{
-		AuthInfo: "kubelet",
+	cfg.Contexts[CSRContextAndUser] = &clientcmdapi.Context{
+		AuthInfo: CSRContextAndUser,
 		Cluster:  cfg.Contexts[cfg.CurrentContext].Cluster,
 	}
-	cfg.CurrentContext = "kubelet"
+	cfg.CurrentContext = CSRContextAndUser
 	return nil
 }
