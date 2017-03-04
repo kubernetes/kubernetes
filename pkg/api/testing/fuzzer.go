@@ -434,6 +434,24 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 				*obj.ReadOnly = false
 			}
 		},
+		func(sio *api.ScaleIOVolumeSource, c fuzz.Continue) {
+			sio.ProtectionDomain = c.RandString()
+			if sio.ProtectionDomain == "" {
+				sio.ProtectionDomain = "default"
+			}
+			sio.StoragePool = c.RandString()
+			if sio.StoragePool == "" {
+				sio.StoragePool = "default"
+			}
+			sio.StorageMode = c.RandString()
+			if sio.StorageMode == "" {
+				sio.StorageMode = "ThinProvisioned"
+			}
+			sio.FSType = c.RandString()
+			if sio.FSType == "" {
+				sio.FSType = "xfs"
+			}
+		},
 		func(s *api.NamespaceSpec, c fuzz.Continue) {
 			s.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
 		},

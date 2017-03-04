@@ -87,6 +87,7 @@ go_library(
         "//pkg/volume/portworx:go_default_library",
         "//pkg/volume/quobyte:go_default_library",
         "//pkg/volume/rbd:go_default_library",
+        "//pkg/volume/scaleio:go_default_library",
         "//pkg/volume/vsphere_volume:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/prometheus/client_golang/prometheus",

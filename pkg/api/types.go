@@ -299,6 +299,9 @@ type VolumeSource struct {
 	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
 	PortworxVolume *PortworxVolumeSource
+	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// +optional
+	ScaleIO *ScaleIOVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -364,6 +367,9 @@ type PersistentVolumeSource struct {
 	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
 	PortworxVolume *PortworxVolumeSource
+	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// +optional
+	ScaleIO *ScaleIOVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -1054,6 +1060,41 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool
+}
+
+// ScaleIOVolumeSource represents a persistent ScaleIO volume
+type ScaleIOVolumeSource struct {
+	// The host address of the ScaleIO API Gateway.
+	Gateway string
+	// The name of the storage system as configured in ScaleIO.
+	System string
+	// SecretRef references to the secret for ScaleIO user and other
+	// sensitive information. If this is not provided, Login operation will fail.
+	SecretRef *LocalObjectReference
+	// Flag to enable/disable SSL communication with Gateway, default false
+	// +optional
+	SSLEnabled bool
+	// The name of the Protection Domain for the configured storage (defaults to "default").
+	// +optional
+	ProtectionDomain string
+	// The Storage Pool associated with the protection domain (defaults to "default").
+	// +optional
+	StoragePool string
+	// Indicates whether the storage for a volume should be thick or thin (defaults to "thin").
+	// +optional
+	StorageMode string
+	// The name of a volume already created in the ScaleIO system
+	// that is associated with this volume source.
+	VolumeName string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
 }
 
 // Adapts a ConfigMap into a volume.
