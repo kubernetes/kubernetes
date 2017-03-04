@@ -585,18 +585,3 @@ func RunChecks(checks []Checker, ww io.Writer) error {
 	}
 	return nil
 }
-
-func TryStartKubelet() {
-	// If we notice that the kubelet service is inactive, try to start it
-	initSystem, err := initsystem.GetInitSystem()
-	if err != nil {
-		fmt.Println("[preflight] No supported init system detected, won't ensure kubelet is running.")
-	} else if initSystem.ServiceExists("kubelet") && !initSystem.ServiceIsActive("kubelet") {
-
-		fmt.Println("[preflight] Starting the kubelet service")
-		if err := initSystem.ServiceStart("kubelet"); err != nil {
-			fmt.Printf("[preflight] WARNING: Unable to start the kubelet service: [%v]\n", err)
-			fmt.Println("[preflight] WARNING: Please ensure kubelet is running manually.")
-		}
-	}
-}
