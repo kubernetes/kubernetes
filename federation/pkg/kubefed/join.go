@@ -36,6 +36,7 @@ import (
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -78,6 +79,7 @@ type joinFederationOptions struct {
 func (o *joinFederationOptions) Bind(flags *pflag.FlagSet) {
 	flags.StringVar(&o.clusterContext, "cluster-context", "", "Name of the cluster's context in the local kubeconfig. Defaults to cluster name if unspecified.")
 	flags.StringVar(&o.secretName, "secret-name", "", "Name of the secret where the cluster's credentials will be stored in the host cluster. This name should be a valid RFC 1035 label. Defaults to cluster name if unspecified.")
+	flags.MarkDeprecated("secret-name", "kubefed now generates a secret name, and this flag will be removed in a future release.")
 }
 
 // NewCmdJoin defines the `join` command that joins a cluster to a
@@ -120,9 +122,6 @@ func (j *joinFederation) Complete(cmd *cobra.Command, args []string) error {
 	if j.options.clusterContext == "" {
 		j.options.clusterContext = j.commonOptions.Name
 	}
-	if j.options.secretName == "" {
-		j.options.secretName = j.commonOptions.Name
-	}
 
 	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, cluster-context: %s, secret-name: %s, dry-run: %s", j.commonOptions.Name, j.commonOptions.Host, j.commonOptions.FederationSystemNamespace, j.commonOptions.Kubeconfig, j.options.clusterContext, j.options.secretName, j.options.dryRun)
 
@@ -137,7 +136,12 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	if err != nil {
 		return err
 	}
-	generator, err := clusterGenerator(clientConfig, j.commonOptions.Name, j.options.clusterContext, j.options.secretName)
+	secretName := j.options.secretName
+	if secretName == "" {
+		secretName = v1.SimpleNameGenerator.GenerateName(j.commonOptions.Name + "-")
+	}
+
+	generator, err := clusterGenerator(clientConfig, j.commonOptions.Name, j.options.clusterContext, secretName)
 	if err != nil {
 		glog.V(2).Infof("Failed creating cluster generator: %v", err)
 		return err
@@ -172,7 +176,7 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	//    don't have to print the created secret in the default case.
 	// Having said that, secret generation machinery could be altered to
 	// suit our needs, but it is far less invasive and readable this way.
-	_, err = createSecret(hostClientset, clientConfig, j.commonOptions.FederationSystemNamespace, federationName, j.commonOptions.Name, j.options.clusterContext, j.options.secretName, j.options.dryRun)
+	_, err = createSecret(hostClientset, clientConfig, j.commonOptions.FederationSystemNamespace, federationName, j.commonOptions.Name, j.options.clusterContext, secretName, j.options.dryRun)
 	if err != nil {
 		glog.V(2).Infof("Failed creating the cluster credentials secret: %v", err)
 		return err
