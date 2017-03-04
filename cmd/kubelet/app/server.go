@@ -525,6 +525,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				return err
 			}
 		}
+		experimentalQOSReserved, err := cm.ParseQOSReserved(s.ExperimentalQOSReserved)
+		if err != nil {
+			return err
+		}
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
@@ -546,6 +550,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 					SystemReserved:           systemReserved,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
+				ExperimentalQOSReserved: *experimentalQOSReserved,
 			},
 			s.ExperimentalFailSwapOn,
 			kubeDeps.Recorder)

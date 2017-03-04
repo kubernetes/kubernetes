@@ -252,7 +252,7 @@ def idle_status():
 
 
 @when('etcd.available', 'kubernetes-master.components.installed',
-      'certificates.server.cert.available')
+      'certificates.server.cert.available', 'authentication.setup')
 @when_not('kubernetes-master.components.started')
 def start_master(etcd, tls):
     '''Run the Kubernetes master components.'''
@@ -685,6 +685,8 @@ def render_files():
     # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
+    client_cert_path = layer_options.get('client_certificate_path')
+    client_key_path = layer_options.get('client_key_path')
     server_cert_path = layer_options.get('server_certificate_path')
     server_key_path = layer_options.get('server_key_path')
 
@@ -694,6 +696,9 @@ def render_files():
     api_opts.add('--client-ca-file', ca_cert_path)
     api_opts.add('--tls-cert-file', server_cert_path)
     api_opts.add('--tls-private-key-file', server_key_path)
+    api_opts.add('--kubelet-certificate-authority', ca_cert_path)
+    api_opts.add('--kubelet-client-certificate', client_cert_path)
+    api_opts.add('--kubelet-client-key', client_key_path)
 
     scheduler_opts.add('--v', '2')
 

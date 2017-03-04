@@ -99,14 +99,14 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	sort.Sort(ascendingOrdinal(condemned))
 
 	// if the current number of replicas has changed update the statefulSets replicas
-	if set.Status.Replicas != int32(ready) {
+	if set.Status.Replicas != int32(ready) || set.Status.ObservedGeneration == nil || set.Generation > *set.Status.ObservedGeneration {
 		obj, err := api.Scheme.Copy(set)
 		if err != nil {
 			return fmt.Errorf("unable to copy set: %v", err)
 		}
 		set = obj.(*apps.StatefulSet)
 
-		if err := ssc.podControl.UpdateStatefulSetReplicas(set, int32(ready)); err != nil {
+		if err := ssc.podControl.UpdateStatefulSetStatus(set, int32(ready), set.Generation); err != nil {
 			return err
 		}
 	}

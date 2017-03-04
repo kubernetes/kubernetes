@@ -88,10 +88,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort,
 		"Port for the API Server to bind to",
 	)
-	cmd.PersistentFlags().StringSliceVar(
-		&cfg.API.ExternalDNSNames, "api-external-dns-names", cfg.API.ExternalDNSNames,
-		"The DNS names to advertise, in case you have configured them yourself",
-	)
 	cmd.PersistentFlags().StringVar(
 		&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet,
 		"Use alternative range of IP address for service VIPs",
@@ -107,6 +103,14 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().StringVar(
 		&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane`,
+	)
+	cmd.PersistentFlags().StringVar(
+		&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir,
+		`The path where to save and store the certificates`,
+	)
+	cmd.PersistentFlags().StringSliceVar(
+		&cfg.APIServerCertSANs, "apiserver-cert-extra-sans", cfg.APIServerCertSANs,
+		`Optional extra altnames to use for the API Server serving cert. Can be both IP addresses and dns names.`,
 	)
 
 	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
@@ -179,7 +183,7 @@ func (i *Init) Validate() error {
 func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 1: Generate certificates
-	err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
+	err := certphase.CreatePKIAssets(i.cfg)
 	if err != nil {
 		return err
 	}
@@ -190,7 +194,7 @@ func (i *Init) Run(out io.Writer) error {
 	// so we'll pick the first one, there is much of chance to have an empty
 	// slice by the time this gets called
 	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
-	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmapi.GlobalEnvParams.KubernetesDir)
+	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, i.cfg.CertificatesDir, kubeadmapi.GlobalEnvParams.KubernetesDir)
 	if err != nil {
 		return err
 	}
@@ -198,7 +202,7 @@ func (i *Init) Run(out io.Writer) error {
 	// TODO: It's not great to have an exception for token here, but necessary because the apiserver doesn't handle this properly in the API yet
 	// but relies on files on disk for now, which is daunting.
 	if i.cfg.Discovery.Token != nil {
-		if err := tokenphase.CreateTokenAuthFile(tokenutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
+		if err := tokenphase.CreateTokenAuthFile(i.cfg.CertificatesDir, tokenutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
 			return err
 		}
 	}

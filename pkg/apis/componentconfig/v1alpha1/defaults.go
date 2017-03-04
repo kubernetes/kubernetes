@@ -51,8 +51,7 @@ const (
 var (
 	zeroDuration = metav1.Duration{}
 	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
-	// TODO: Set the default to "pods" once cgroups per qos is turned on by default.
-	defaultNodeAllocatableEnforcement = []string{}
+	defaultNodeAllocatableEnforcement = []string{"pods"}
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
@@ -385,6 +384,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.KubeReserved == nil {
 		obj.KubeReserved = make(map[string]string)
 	}
+	if obj.ExperimentalQOSReserved == nil {
+		obj.ExperimentalQOSReserved = make(map[string]string)
+	}
 	if obj.MakeIPTablesUtilChains == nil {
 		obj.MakeIPTablesUtilChains = boolVar(true)
 	}
@@ -397,10 +399,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.IPTablesDropBit = &temp
 	}
 	if obj.CgroupsPerQOS == nil {
-		// disabled pending merge of https://github.com/kubernetes/kubernetes/pull/41753
-		// as enabling the new hierarchy without setting /Burstable/cpu.shares may cause
-		// regression.
-		temp := false
+		temp := true
 		obj.CgroupsPerQOS = &temp
 	}
 	if obj.CgroupDriver == "" {

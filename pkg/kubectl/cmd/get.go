@@ -251,8 +251,16 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		// print the current object
 		filteredResourceCount := 0
 		if !isWatchOnly {
-			if err := printer.PrintObj(obj, out); err != nil {
-				return fmt.Errorf("unable to output the provided object: %v", err)
+			var objsToPrint []runtime.Object
+			if isList {
+				objsToPrint, _ = meta.ExtractList(obj)
+			} else {
+				objsToPrint = append(objsToPrint, obj)
+			}
+			for _, objToPrint := range objsToPrint {
+				if err := printer.PrintObj(objToPrint, out); err != nil {
+					return fmt.Errorf("unable to output the provided object: %v", err)
+				}
 			}
 			filteredResourceCount++
 			cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, filterOpts)

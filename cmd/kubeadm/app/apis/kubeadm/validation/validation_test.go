@@ -69,31 +69,6 @@ func TestValidateAuthorizationMode(t *testing.T) {
 	}
 }
 
-func TestValidateServiceSubnet(t *testing.T) {
-	var tests = []struct {
-		s        string
-		f        *field.Path
-		expected bool
-	}{
-		{"", nil, false},
-		{"this is not a cidr", nil, false}, // not a CIDR
-		{"10.0.0.1", nil, false},           // not a CIDR
-		{"10.96.0.1/29", nil, false},       // CIDR too small, only 8 addresses and we require at least 10
-		{"10.96.0.1/28", nil, true},        // a /28 subnet is ok because it can contain 16 addresses
-		{"10.96.0.1/12", nil, true},        // the default subnet should obviously pass as well
-	}
-	for _, rt := range tests {
-		actual := ValidateServiceSubnet(rt.s, rt.f)
-		if (len(actual) == 0) != rt.expected {
-			t.Errorf(
-				"failed ValidateServiceSubnet:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(len(actual) == 0),
-			)
-		}
-	}
-}
-
 func TestValidateCloudProvider(t *testing.T) {
 	var tests = []struct {
 		s        string
@@ -118,6 +93,78 @@ func TestValidateCloudProvider(t *testing.T) {
 	}
 }
 
+func TestValidateAPIServerCertSANs(t *testing.T) {
+	var tests = []struct {
+		sans     []string
+		expected bool
+	}{
+		{[]string{}, true},                                                  // ok if not provided
+		{[]string{"1,2,,3"}, false},                                         // not a DNS label or IP
+		{[]string{"my-hostname", "???&?.garbage"}, false},                   // not valid
+		{[]string{"my-hostname", "my.subdomain", "1.2.3.4"}, true},          // supported
+		{[]string{"my-hostname2", "my.other.subdomain", "10.0.0.10"}, true}, // supported
+	}
+	for _, rt := range tests {
+		actual := ValidateAPIServerCertSANs(rt.sans, nil)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateAPIServerCertSANs:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
+func TestValidateIPFromString(t *testing.T) {
+	var tests = []struct {
+		ip       string
+		expected bool
+	}{
+		{"", false},           // not valid
+		{"1234", false},       // not valid
+		{"1.2", false},        // not valid
+		{"1.2.3.4/16", false}, // not valid
+		{"1.2.3.4", true},     // valid
+		{"16.0.1.1", true},    // valid
+	}
+	for _, rt := range tests {
+		actual := ValidateIPFromString(rt.ip, nil)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateIPFromString:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
+func TestValidateIPNetFromString(t *testing.T) {
+	var tests = []struct {
+		subnet   string
+		minaddrs int64
+		expected bool
+	}{
+		{"", 0, false},              // not valid
+		{"1234", 0, false},          // not valid
+		{"abc", 0, false},           // not valid
+		{"1.2.3.4", 0, false},       // ip not valid
+		{"10.0.0.16/29", 10, false}, // valid, but too small. At least 10 addrs needed
+		{"10.0.0.16/12", 10, true},  // valid
+	}
+	for _, rt := range tests {
+		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, nil)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateIPNetFromString:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
 func TestValidateMasterConfiguration(t *testing.T) {
 	var tests = []struct {
 		s        *kubeadm.MasterConfiguration
@@ -131,7 +178,9 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			AuthorizationMode: "RBAC",
 			Networking: kubeadm.Networking{
 				ServiceSubnet: "10.96.0.1/12",
+				DNSDomain:     "cluster.local",
 			},
+			CertificatesDir: "/some/cert/dir",
 		}, true},
 		{&kubeadm.MasterConfiguration{
 			Discovery: kubeadm.Discovery{
@@ -140,7 +189,9 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			AuthorizationMode: "RBAC",
 			Networking: kubeadm.Networking{
 				ServiceSubnet: "10.96.0.1/12",
+				DNSDomain:     "cluster.local",
 			},
+			CertificatesDir: "/some/other/cert/dir",
 		}, true},
 		{&kubeadm.MasterConfiguration{
 			Discovery: kubeadm.Discovery{
@@ -153,7 +204,9 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			AuthorizationMode: "RBAC",
 			Networking: kubeadm.Networking{
 				ServiceSubnet: "10.96.0.1/12",
+				DNSDomain:     "cluster.local",
 			},
+			CertificatesDir: "/yet/another/cert/dir",
 		}, true},
 	}
 	for _, rt := range tests {
