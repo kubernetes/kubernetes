@@ -60,7 +60,7 @@ const (
 	// We wait for ingress to be created in this cluster before creating it any
 	// other cluster.
 	firstClusterAnnotation = "ingress.federation.kubernetes.io/first-cluster"
-	ControllerName         = "ingress"
+	ControllerName         = "ingresses"
 )
 
 var (

@@ -123,8 +123,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DnsProvider, "dns-provider", s.DnsProvider, "DNS provider. Valid values are: "+fmt.Sprintf("%q", dnsprovider.RegisteredDnsProviders()))
 	fs.StringVar(&s.DnsConfigFile, "dns-provider-config", s.DnsConfigFile, "Path to config file for configuring DNS provider.")
 	fs.Var(&s.Controllers, "controllers", ""+
-		"A set of key=value pairs that describe controller configuration that may be passed "+
-		"to controller manager to enable/disable specific controllers. Valid options are: \n"+
-		"ingress=true|false (default=true)")
+		"A set of key=value pairs that describe controller configuration "+
+		"to enable/disable specific controllers. Key should be the resource name (like services) and value should be true or false. "+
+		"For example: services=false,ingresses=false")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }
