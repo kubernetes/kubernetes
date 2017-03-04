@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,150 +27,9 @@ import (
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestEstablishMasterConnection(t *testing.T) {
-	srv := stubServer(t)
-	defer srv.Close()
-
-	tests := []struct {
-		c      string
-		e      string
-		expect bool
-	}{
-		{
-			c:      "",
-			e:      "",
-			expect: false,
-		},
-		{
-			c:      "",
-			e:      srv.URL,
-			expect: true,
-		},
-		{
-			c:      "foo",
-			e:      srv.URL,
-			expect: true,
-		},
-	}
-	for _, rt := range tests {
-		s := &kubeadmapi.TokenDiscovery{}
-		c := &kubeadmapi.ClusterInfo{Endpoints: []string{rt.e}, CertificateAuthorities: []string{rt.c}}
-		_, actual := EstablishMasterConnection(s, c)
-		if (actual == nil) != rt.expect {
-			t.Errorf(
-				"failed EstablishMasterConnection:\n\texpected: %t\n\t  actual: %t",
-				rt.expect,
-				(actual == nil),
-			)
-		}
-	}
-}
-
-func TestEstablishMasterConnectionWithMultipleEndpoints(t *testing.T) {
-	// ref. https://github.com/kubernetes/kubernetes/issues/36988
-
-	srv := stubServer(t)
-	defer srv.Close()
-
-	s := &kubeadmapi.TokenDiscovery{}
-	c := &kubeadmapi.ClusterInfo{Endpoints: []string{srv.URL, srv.URL}, CertificateAuthorities: []string{"foo"}}
-
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("failed EstablishMasterConnectionWithMultipleEndpoints; got a panic.")
-		}
-	}()
-
-	EstablishMasterConnection(s, c)
-}
-
-func stubServer(t *testing.T) *httptest.Server {
-	expect := version.Info{
-		Major:     "foo",
-		Minor:     "bar",
-		GitCommit: "baz",
-	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var obj interface{}
-		switch req.URL.Path {
-		case "/api":
-			obj = &metav1.APIVersions{
-				Versions: []string{
-					"v1.4",
-				},
-			}
-			output, err := json.Marshal(obj)
-			if err != nil {
-				t.Fatalf("unexpected encoding error: %v", err)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		case "/apis":
-			obj = &metav1.APIGroupList{
-				Groups: []metav1.APIGroup{
-					{
-						Name: "certificates.k8s.io",
-						Versions: []metav1.GroupVersionForDiscovery{
-							{GroupVersion: "extensions/v1beta1"},
-						},
-					},
-				},
-			}
-			output, err := json.Marshal(obj)
-			if err != nil {
-				t.Fatalf("unexpected encoding error: %v", err)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		default:
-			output, err := json.Marshal(expect)
-			if err != nil {
-				t.Errorf("unexpected encoding error: %v", err)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write(output)
-		}
-	}))
-
-	return srv
-}
-
-func TestCreateClients(t *testing.T) {
-	tests := []struct {
-		e      string
-		expect bool
-	}{
-		{
-			e:      "",
-			expect: false,
-		},
-		{
-			e:      "foo",
-			expect: true,
-		},
-	}
-	for _, rt := range tests {
-		_, actual := createClients(nil, rt.e, "", "")
-		if (actual == nil) != rt.expect {
-			t.Errorf(
-				"failed createClients:\n\texpected: %t\n\t  actual: %t",
-				rt.expect,
-				(actual == nil),
-			)
-		}
-	}
-}
-
-func TestCheckAPIEndpoint(t *testing.T) {
+func TestValidateAPIServer(t *testing.T) {
 	expect := version.Info{
 		Major:     "foo",
 		Minor:     "bar",
@@ -191,7 +50,7 @@ func TestCheckAPIEndpoint(t *testing.T) {
 				case "/api":
 					obj = &metav1.APIVersions{
 						Versions: []string{
-							"v1.4",
+							"v1.6.0",
 						},
 					}
 					output, err := json.Marshal(obj)
@@ -222,7 +81,7 @@ func TestCheckAPIEndpoint(t *testing.T) {
 				case "/api":
 					obj = &metav1.APIVersions{
 						Versions: []string{
-							"v1.4",
+							"v1.6.0",
 						},
 					}
 					output, err := json.Marshal(obj)
@@ -239,7 +98,7 @@ func TestCheckAPIEndpoint(t *testing.T) {
 							{
 								Name: "certificates.k8s.io",
 								Versions: []metav1.GroupVersionForDiscovery{
-									{GroupVersion: "extensions/v1beta1"},
+									{GroupVersion: "certificates.k8s.io/v1beta1", Version: "v1beta1"},
 								},
 							},
 						},
@@ -271,13 +130,13 @@ func TestCheckAPIEndpoint(t *testing.T) {
 		rc := &restclient.Config{Host: rt.s.URL}
 		c, err := discovery.NewDiscoveryClientForConfig(rc)
 		if err != nil {
-			t.Fatalf("encountered an error while trying to get New Discovery Client: %v", err)
+			t.Fatalf("encountered an error while trying to get the new discovery client: %v", err)
 		}
 		cs := &clientset.Clientset{DiscoveryClient: c}
-		actual := checkAPIEndpoint(cs, "")
+		actual := ValidateAPIServer(cs)
 		if (actual == nil) != rt.expect {
 			t.Errorf(
-				"failed runChecks:\n\texpected: %t\n\t  actual: %t",
+				"failed TestValidateAPIServer:\n\texpected: %t\n\t  actual: %t",
 				rt.expect,
 				(actual == nil),
 			)
