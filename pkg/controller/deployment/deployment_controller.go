@@ -371,7 +371,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 		if err != nil {
 			return
 		}
-		podMap, err := dc.getPodMapForReplicaSets(d.Namespace, rsList)
+		podMap, err := dc.getPodMapForDeployment(d, rsList)
 		if err != nil {
 			return
 		}
@@ -506,11 +506,17 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(d *extensions.Deploy
 	return cm.ClaimReplicaSets(rsList)
 }
 
-// getPodMapForReplicaSets scans the list of all Pods and returns a map from
-// RS UID to Pods controlled by that RS, based on the Pod's ControllerRef.
-func (dc *DeploymentController) getPodMapForReplicaSets(namespace string, rsList []*extensions.ReplicaSet) (map[types.UID]*v1.PodList, error) {
-	// List all Pods.
-	pods, err := dc.podLister.Pods(namespace).List(labels.Everything())
+// getPodMapForDeployment returns the Pods managed by a Deployment.
+//
+// It returns a map from ReplicaSet UID to a list of Pods controlled by that RS,
+// according to the Pod's ControllerRef.
+func (dc *DeploymentController) getPodMapForDeployment(d *extensions.Deployment, rsList []*extensions.ReplicaSet) (map[types.UID]*v1.PodList, error) {
+	// Get all Pods that potentially belong to this Deployment.
+	selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	pods, err := dc.podLister.Pods(d.Namespace).List(selector)
 	if err != nil {
 		return nil, err
 	}
@@ -583,8 +589,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return err
 	}
 	// List all Pods owned by this Deployment, grouped by their ReplicaSet.
-	// This is expensive, so do it once and pass it along to subroutines.
-	podMap, err := dc.getPodMapForReplicaSets(d.Namespace, rsList)
+	podMap, err := dc.getPodMapForDeployment(d, rsList)
 	if err != nil {
 		return err
 	}
