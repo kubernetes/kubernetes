@@ -238,17 +238,6 @@ function create-master-pki {
   APISERVER_SERVER_KEY_PATH="${pki_dir}/apiserver.key"
   echo "${APISERVER_SERVER_KEY}" | base64 --decode > "${APISERVER_SERVER_KEY_PATH}"
 
-  if [[ -z "${APISERVER_CLIENT_CERT:-}" || -z "${APISERVER_CLIENT_KEY:-}" ]]; then
-    APISERVER_CLIENT_CERT="${KUBEAPISERVER_CERT}"
-    APISERVER_CLIENT_KEY="${KUBEAPISERVER_KEY}"
-  fi
-
-  APISERVER_CLIENT_CERT_PATH="${pki_dir}/apiserver-client.crt"
-  echo "${APISERVER_CLIENT_CERT}" | base64 --decode > "${APISERVER_CLIENT_CERT_PATH}"
-
-  APISERVER_CLIENT_KEY_PATH="${pki_dir}/apiserver-client.key"
-  echo "${APISERVER_CLIENT_KEY}" | base64 --decode > "${APISERVER_CLIENT_KEY_PATH}"
-
   if [[ -z "${SERVICEACCOUNT_CERT:-}" || -z "${SERVICEACCOUNT_KEY:-}" ]]; then
     SERVICEACCOUNT_CERT="${MASTER_CERT}"
     SERVICEACCOUNT_KEY="${MASTER_KEY}"
