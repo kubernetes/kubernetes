@@ -918,6 +918,7 @@ var (
 	PhotonPersistentDisk  FSType = "photonPersistentDisk"
 	Projected             FSType = "projected"
 	PortworxVolume        FSType = "portworxVolume"
+	ScaleIO               FSType = "scaleIO"
 	All                   FSType = "*"
 )
 
