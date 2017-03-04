@@ -29,7 +29,6 @@ kube::golang::server_targets() {
     cmd/kubelet
     cmd/kubeadm
     cmd/hyperkube
-    cmd/kube-discovery
     vendor/k8s.io/kube-aggregator
     plugin/cmd/kube-scheduler
   )
@@ -190,7 +189,6 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-controller-manager
   kube-scheduler
   kube-proxy
-  kube-discovery
   kube-aggregator
   kubeadm
   kubectl
