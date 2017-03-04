@@ -20,7 +20,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
@@ -38,6 +41,7 @@ import (
 	fed "k8s.io/kubernetes/federation/apis/federation"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
@@ -48,12 +52,15 @@ import (
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 const (
 	FedDeploymentPreferencesAnnotation = "federation.kubernetes.io/deployment-preferences"
-	allClustersKey                     = "THE_ALL_CLUSTER_KEY"
-	UserAgentName                      = "Federation-Deployment-Controller"
+	FedReplicaSetDeploymentAnnotation  = "federation.kubernetes.io/deployment"
+
+	allClustersKey = "THE_ALL_CLUSTER_KEY"
+	UserAgentName  = "Federation-Deployment-Controller"
 )
 
 var (
@@ -84,6 +91,8 @@ type DeploymentController struct {
 
 	deploymentController cache.Controller
 	deploymentStore      cache.Store
+	rsController         cache.Controller
+	rsStore              cache.Store
 
 	fedDeploymentInformer fedutil.FederatedInformer
 	fedPodInformer        fedutil.FederatedInformer
@@ -182,6 +191,37 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		controller.NoResyncPeriodFunc(),
 		fedutil.NewTriggerOnMetaAndSpecChanges(
 			func(obj runtime.Object) { fdc.deliverFedDeploymentObj(obj, deploymentReviewDelay) },
+		),
+	)
+
+	// For shadow federated replicasets
+	fdc.rsStore, fdc.rsController = cache.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return fdc.fedClient.Extensions().ReplicaSets(metav1.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return fdc.fedClient.Extensions().ReplicaSets(metav1.NamespaceAll).Watch(options)
+			},
+		},
+		&extensionsv1.ReplicaSet{},
+		controller.NoResyncPeriodFunc(),
+		fedutil.NewTriggerOnMetaAndSpecChanges(
+			func(obj runtime.Object) {
+				replicaSet := obj.(*extensionsv1.ReplicaSet)
+				if replicaSet.Labels == nil {
+					return
+				}
+				podTemplateHash, hasHash := replicaSet.Labels[extensionsv1.DefaultDeploymentUniqueLabelKey]
+				if hasHash && strings.HasSuffix(replicaSet.Name, "-"+podTemplateHash) {
+					deploymentName := replicaSet.Name[0 : len(replicaSet.Name)-len(podTemplateHash)-1]
+					key := types.NamespacedName{
+						Namespace: replicaSet.Namespace,
+						Name:      deploymentName,
+					}.String()
+					fdc.deliverDeploymentByKey(key, deploymentReviewDelay, false)
+				}
+			},
 		),
 	)
 
@@ -504,24 +544,25 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		return statusAllOk, nil
 	}
 
-	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for deployment: %s",
-		fd.Name)
+	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for deployment: %s", key)
+
 	// Add the required finalizers before creating a deployment in underlying clusters.
 	updatedDeploymentObj, err := fdc.deletionHelper.EnsureFinalizers(fd)
 	if err != nil {
 		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in deployment %s: %v",
-			fd.Name, err)
+			key, err)
 		return statusError, err
 	}
 	fd = updatedDeploymentObj.(*extensionsv1.Deployment)
 
-	glog.V(3).Infof("Syncing deployment %s in underlying clusters", fd.Name)
+	revision := fdc.syncReplicaSetsAndGetRevision(fd)
+
+	glog.V(3).Infof("Syncing deployment %s in underlying clusters", key)
 
 	clusters, err := fdc.fedDeploymentInformer.GetReadyClusters()
 	if err != nil {
 		return statusError, err
 	}
-
 	// collect current status and do schedule
 	allPods, err := fdc.fedPodInformer.GetTargetStore().List()
 	if err != nil {
@@ -595,6 +636,18 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 			fedStatus.UnavailableReplicas += currentLd.Status.UnavailableReplicas
 		}
 	}
+	if fd.Annotations == nil || fd.Annotations[deploymentutil.RevisionAnnotation] != fmt.Sprintf("%d", revision) {
+		if fd.Annotations == nil {
+			fd.Annotations = make(map[string]string)
+		}
+		fd.Annotations[deploymentutil.RevisionAnnotation] = fmt.Sprintf("%d", revision)
+		fd.Status = fedStatus
+		_, err = fdc.fedClient.Extensions().Deployments(fd.Namespace).Update(fd)
+		if err != nil {
+			return statusError, err
+		}
+	}
+
 	if fedStatus.Replicas != fd.Status.Replicas ||
 		fedStatus.AvailableReplicas != fd.Status.AvailableReplicas ||
 		fedStatus.UnavailableReplicas != fd.Status.UnavailableReplicas {
@@ -651,4 +704,129 @@ func (fdc *DeploymentController) delete(deployment *extensionsv1.Deployment) err
 		}
 	}
 	return nil
+}
+
+func (fdc *DeploymentController) syncReplicaSetsAndGetRevision(deployment *extensionsv1.Deployment) int64 {
+	glog.V(3).Infof("Syncing shadow federated replicasets for deployment %s/%s", deployment.Namespace, deployment.Name)
+
+	replicaSets := fdc.getReplicaSetsForDeployment(deployment)
+	current := findCurrentReplicasetForDeployment(deployment, replicaSets)
+	target := buildReplicaSetForDeploymet(deployment)
+	var revision int64
+
+	// By default
+	revision = deploymentutil.MaxRevision(replicaSets) + 1
+
+	if current == nil {
+		target.Annotations[deploymentutil.RevisionAnnotation] = fmt.Sprintf("%d", revision)
+		_, err := fdc.fedClient.Extensions().ReplicaSets(current.Namespace).Create(target)
+		if err != nil {
+			glog.Errorf("Failed to create shadow replicaset for %s/%s: %v", deployment.Namespace, deployment.Name, err)
+			fdc.eventRecorder.Eventf(deployment, api.EventTypeWarning, "CreateShadowReplicaSet",
+				"Failed to create shadow replicaset: %v", err)
+		} else {
+			glog.V(3).Infof("Created shadow federated replicasets %s for deployment %s/%s",
+				target.Name,
+				deployment.Namespace, deployment.Name)
+		}
+	} else {
+		if current.Annotations != nil && current.Annotations[deploymentutil.RevisionAnnotation] != "" {
+			count, err := fmt.Sscanf(current.Annotations[deploymentutil.RevisionAnnotation], "%d", &revision)
+			if count == 0 || err != nil {
+				glog.Errorf("Failed to parse the revision for %s/%s, overwritting", current.Namespace, current.Name)
+			}
+		}
+		target.Annotations[deploymentutil.RevisionAnnotation] = fmt.Sprintf("%d", revision)
+
+		if !fedutil.ObjectMetaEquivalent(current.ObjectMeta, target.ObjectMeta) ||
+			!reflect.DeepEqual(current.Spec.Selector, target.Spec.Selector) ||
+			!reflect.DeepEqual(current.Spec.Template, target.Spec.Template) {
+
+			target.Spec.Replicas = current.Spec.Replicas
+			_, err := fdc.fedClient.Extensions().ReplicaSets(current.Namespace).Update(target)
+
+			if err != nil {
+				glog.Errorf("Failed to update shadow replicaset %s for %s/%s: %v",
+					target.Name,
+					deployment.Namespace, deployment.Name, err)
+				fdc.eventRecorder.Eventf(deployment, api.EventTypeWarning, "CreateShadowReplicaSet",
+					"Failed to update shadow replicaset %s: %v", target.Name, err)
+			} else {
+				glog.V(3).Infof("Updated shadow federated replicasets %s for deployment %s/%s",
+					target.Name,
+					deployment.Namespace, deployment.Name)
+			}
+		}
+	}
+	return revision
+}
+
+func (fdc *DeploymentController) getReplicaSetsForDeployment(deployment *extensionsv1.Deployment) []*extensionsv1.ReplicaSet {
+	replicaSets := fdc.rsStore.List()
+	result := make([]*extensionsv1.ReplicaSet, 0)
+	for _, rsObj := range replicaSets {
+		rs := rsObj.(*extensionsv1.ReplicaSet)
+		if rs.Namespace == deployment.Namespace &&
+			rs.Annotations != nil && rs.Annotations[FedReplicaSetDeploymentAnnotation] == deployment.Name {
+			result = append(result, rs)
+		}
+	}
+	return result
+}
+
+func copyMap(m map[string]string) map[string]string {
+	result := make(map[string]string)
+	if m != nil {
+		for k, v := range m {
+			result[k] = v
+		}
+	}
+	return result
+}
+
+func findCurrentReplicasetForDeployment(deployment *extensionsv1.Deployment,
+	replicaSets []*extensionsv1.ReplicaSet) *extensionsv1.ReplicaSet {
+	hash := fmt.Sprintf("%d", deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template))
+	for _, rs := range replicaSets {
+		if rs.Labels != nil && rs.Labels[extensionsv1.DefaultDeploymentUniqueLabelKey] == hash {
+			return rs
+		}
+	}
+	return nil
+}
+
+func buildReplicaSetForDeploymet(deployment *extensionsv1.Deployment) *extensionsv1.ReplicaSet {
+	hash := fmt.Sprintf("%d", deploymentutil.GetPodTemplateSpecHash(deployment.Spec.Template))
+	labels := copyMap(deployment.Labels)
+	labels[extensionsv1.DefaultDeploymentUniqueLabelKey] = hash
+
+	template := fedutil.DeepCopyApiTypeOrPanic(deployment.Spec.Template).(apiv1.PodTemplateSpec)
+	template.Labels[extensionsv1.DefaultDeploymentUniqueLabelKey] = hash
+
+	selector := fedutil.DeepCopyApiTypeOrPanic(deployment.Spec.Selector).(*metav1.LabelSelector)
+	if selector.MatchLabels == nil {
+		selector.MatchLabels = make(map[string]string)
+	}
+	selector.MatchLabels[extensionsv1.DefaultDeploymentUniqueLabelKey] = hash
+
+	rs := &extensionsv1.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: deployment.Namespace,
+			Name:      fmt.Sprintf("%s-%s", deployment.Name, hash),
+			Labels:    labels,
+			Annotations: map[string]string{
+				// TODO: replace with proper name once shadow/puppet annotations are in.
+				"shadow-replicaset":               "true",
+				FedReplicaSetDeploymentAnnotation: deployment.Name,
+			},
+		},
+		Spec: extensionsv1.ReplicaSetSpec{
+			Template: deployment.Spec.Template,
+			Selector: selector,
+		},
+	}
+	if deployment.Annotations != nil && deployment.Annotations[FedDeploymentPreferencesAnnotation] != "" {
+		rs.Annotations[replicaset.FedReplicaSetPreferencesAnnotation] = deployment.Annotations[FedDeploymentPreferencesAnnotation]
+	}
+	return rs
 }
