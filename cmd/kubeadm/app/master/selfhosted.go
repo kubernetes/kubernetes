@@ -138,7 +138,7 @@ func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 
 func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
 	start := time.Now()
-	scheduler := getSchedulerDeployment(cfg)
+	scheduler := getSchedulerDeployment(cfg, volumes, volumeMounts)
 	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(&scheduler); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeScheduler, err)
 	}
@@ -204,7 +204,7 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 					},
 				},
 				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
+					NodeSelector: map[string]string{kubeadmconstants.LabelNodeRoleMaster: ""},
 					HostNetwork:  true,
 					Volumes:      volumes,
 					Containers: []v1.Container{
@@ -255,7 +255,7 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 					},
 				},
 				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
+					NodeSelector: map[string]string{kubeadmconstants.LabelNodeRoleMaster: ""},
 					HostNetwork:  true,
 					Volumes:      volumes,
 					Containers: []v1.Container{
@@ -278,7 +278,7 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 	return d
 }
 
-func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment {
+func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.Deployment {
 	d := ext.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
@@ -307,13 +307,15 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 					},
 				},
 				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
+					NodeSelector: map[string]string{kubeadmconstants.LabelNodeRoleMaster: ""},
 					HostNetwork:  true,
+					Volumes:      volumes,
 					Containers: []v1.Container{
 						{
 							Name:          "self-hosted-" + kubeScheduler,
 							Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 							Command:       getSchedulerCommand(cfg, true),
+							VolumeMounts:  volumeMounts,
 							LivenessProbe: componentProbe(10251, "/healthz", v1.URISchemeHTTP),
 							Resources:     componentResources("100m"),
 							Env:           getProxyEnvVars(),
@@ -324,6 +326,7 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 			},
 		},
 	}
+
 	return d
 }
 
