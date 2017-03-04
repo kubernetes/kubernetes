@@ -71,6 +71,10 @@ func runDeleteContext(out io.Writer, configAccess clientcmd.ConfigAccess, cmd *c
 		return fmt.Errorf("cannot delete context %s, not in %s", name, configFile)
 	}
 
+	if config.CurrentContext == name {
+		fmt.Fprint(out, "warning: this removed your active context, use \"kubectl config use-context\" to select a different one\n")
+	}
+
 	delete(config.Contexts, name)
 
 	if err := clientcmd.ModifyConfig(configAccess, *config, true); err != nil {
