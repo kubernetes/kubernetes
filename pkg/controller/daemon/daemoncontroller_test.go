@@ -448,6 +448,22 @@ func TestSufficientCapacityNodeDaemonLaunchesPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
+// DaemonSet should launch a pod on a node with taint NetworkUnavailable condition.
+func TestNetworkUnavailableNodeDaemonLaunchesPod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("network-unavailable", nil)
+	node.Status.Conditions = []v1.NodeCondition{
+		{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionTrue},
+	}
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("simple")
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
 // DaemonSets not take any actions when being deleted
 func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 	podSpec := resourcePodSpec("not-too-much-mem", "75M", "75m")
