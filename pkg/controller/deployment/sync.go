@@ -100,8 +100,7 @@ func (dc *DeploymentController) checkPausedConditions(d *extensions.Deployment) 
 // getAllReplicaSetsAndSyncRevision returns all the replica sets for the provided deployment (new and all old), with new RS's and deployment's revision updated.
 //
 // rsList should come from getReplicaSetsForDeployment(d).
-// podMap should come from getPodMapForReplicaSets(rsList).
-// These are passed around to avoid repeating expensive API calls.
+// podMap should come from getPodMapForDeployment(d, rsList).
 //
 // 1. Get all old RSes this deployment targets, and calculate the max revision number among them (maxOldV).
 // 2. Get new RS this deployment targets (whose pod template matches deployment's), and update new RS's revision number to (maxOldV + 1),
@@ -134,8 +133,7 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(d *extensions.D
 // targets, with pod-template-hash information synced.
 //
 // rsList should come from getReplicaSetsForDeployment(d).
-// podMap should come from getPodMapForReplicaSets(rsList).
-// These are passed around to avoid repeating expensive API calls.
+// podMap should come from getPodMapForDeployment(d, rsList).
 func (dc *DeploymentController) rsAndPodsWithHashKeySynced(d *extensions.Deployment, rsList []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList) ([]*extensions.ReplicaSet, *v1.PodList, error) {
 	syncedRSList := []*extensions.ReplicaSet{}
 	for _, rs := range rsList {
@@ -594,8 +592,7 @@ func calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaS
 // by looking at the desired-replicas annotation in the active replica sets of the deployment.
 //
 // rsList should come from getReplicaSetsForDeployment(d).
-// podMap should come from getPodMapForReplicaSets(rsList).
-// These are passed around to avoid repeating expensive API calls.
+// podMap should come from getPodMapForDeployment(d, rsList).
 func (dc *DeploymentController) isScalingEvent(d *extensions.Deployment, rsList []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList) (bool, error) {
 	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, false)
 	if err != nil {

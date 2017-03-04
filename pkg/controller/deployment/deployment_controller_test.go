@@ -515,9 +515,9 @@ func TestGetPodMapForReplicaSets(t *testing.T) {
 	defer close(stopCh)
 	informers.Start(stopCh)
 
-	podMap, err := c.getPodMapForReplicaSets(d.Namespace, f.rsLister)
+	podMap, err := c.getPodMapForDeployment(d, f.rsLister)
 	if err != nil {
-		t.Fatalf("getPodMapForReplicaSets() error: %v", err)
+		t.Fatalf("getPodMapForDeployment() error: %v", err)
 	}
 	podCount := 0
 	for _, podList := range podMap {
