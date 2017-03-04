@@ -36,6 +36,7 @@ type NodeInfo struct {
 
 	pods             []*v1.Pod
 	podsWithAffinity []*v1.Pod
+	usedPorts        map[int]bool
 
 	// Total requested resource of all pods on this node.
 	// It includes assumed pods which scheduler sends binding to apiserver but
@@ -100,6 +101,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		allocatableResource: &Resource{},
 		allowedPodNumber:    0,
 		generation:          0,
+		usedPorts:           make(map[int]bool),
 	}
 	for _, pod := range pods {
 		ni.addPod(pod)
@@ -121,6 +123,13 @@ func (n *NodeInfo) Pods() []*v1.Pod {
 		return nil
 	}
 	return n.pods
+}
+
+func (n *NodeInfo) UsedPorts() map[int]bool {
+	if n == nil {
+		return nil
+	}
+	return n.usedPorts
 }
 
 // PodsWithAffinity return all pods with (anti)affinity constraints on this node.
@@ -198,6 +207,12 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	if len(n.pods) > 0 {
 		clone.pods = append([]*v1.Pod(nil), n.pods...)
 	}
+	if len(n.usedPorts) > 0 {
+		clone.usedPorts = make(map[int]bool)
+		for k, v := range n.usedPorts {
+			clone.usedPorts[k] = v
+		}
+	}
 	if len(n.podsWithAffinity) > 0 {
 		clone.podsWithAffinity = append([]*v1.Pod(nil), n.podsWithAffinity...)
 	}
@@ -213,7 +228,7 @@ func (n *NodeInfo) String() string {
 	for i, pod := range n.pods {
 		podKeys[i] = pod.Name
 	}
-	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v}", podKeys, n.requestedResource, n.nonzeroRequest)
+	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v}", podKeys, n.requestedResource, n.nonzeroRequest, n.usedPorts)
 }
 
 func hasPodAffinityConstraints(pod *v1.Pod) bool {
@@ -239,6 +254,10 @@ func (n *NodeInfo) addPod(pod *v1.Pod) {
 	if hasPodAffinityConstraints(pod) {
 		n.podsWithAffinity = append(n.podsWithAffinity, pod)
 	}
+
+	// Consume ports when pods added.
+	n.updateUsedPorts(pod, true)
+
 	n.generation++
 }
 
@@ -286,7 +305,12 @@ func (n *NodeInfo) removePod(pod *v1.Pod) error {
 			}
 			n.nonzeroRequest.MilliCPU -= non0_cpu
 			n.nonzeroRequest.Memory -= non0_mem
+
+			// Release ports when remove Pods.
+			n.updateUsedPorts(pod, false)
+
 			n.generation++
+
 			return nil
 		}
 	}
@@ -316,6 +340,20 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 		// No non-zero resources for GPUs or opaque resources.
 	}
 	return
+}
+
+func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, used bool) {
+	for j := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[j]
+		for k := range container.Ports {
+			podPort := &container.Ports[k]
+			// "0" is explicitly ignored in PodFitsHostPorts,
+			// which is the only function that uses this value.
+			if podPort.HostPort != 0 {
+				n.usedPorts[int(podPort.HostPort)] = used
+			}
+		}
+	}
 }
 
 // Sets the overall node information.
