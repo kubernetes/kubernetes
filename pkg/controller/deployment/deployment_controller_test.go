@@ -635,8 +635,9 @@ func TestUpdateReplicaSet(t *testing.T) {
 	dc, _ := f.newController()
 
 	prev := *rs1
-	bumpResourceVersion(rs1)
-	dc.updateReplicaSet(&prev, rs1)
+	next := *rs1
+	bumpResourceVersion(&next)
+	dc.updateReplicaSet(&prev, &next)
 	if got, want := dc.queue.Len(), 1; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
@@ -650,8 +651,9 @@ func TestUpdateReplicaSet(t *testing.T) {
 	}
 
 	prev = *rs2
-	bumpResourceVersion(rs2)
-	dc.updateReplicaSet(&prev, rs2)
+	next = *rs2
+	bumpResourceVersion(&next)
+	dc.updateReplicaSet(&prev, &next)
 	if got, want := dc.queue.Len(), 1; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
@@ -686,8 +688,9 @@ func TestUpdateReplicaSetOrphanWithNewLabels(t *testing.T) {
 	// Change labels and expect all matching controllers to queue.
 	prev := *rs
 	prev.Labels = map[string]string{"foo": "notbar"}
-	bumpResourceVersion(rs)
-	dc.updateReplicaSet(&prev, rs)
+	next := *rs
+	bumpResourceVersion(&next)
+	dc.updateReplicaSet(&prev, &next)
 	if got, want := dc.queue.Len(), 2; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
@@ -712,8 +715,9 @@ func TestUpdateReplicaSetChangeControllerRef(t *testing.T) {
 	// Change ControllerRef and expect both old and new to queue.
 	prev := *rs
 	prev.OwnerReferences = []metav1.OwnerReference{*newControllerRef(d2)}
-	bumpResourceVersion(rs)
-	dc.updateReplicaSet(&prev, rs)
+	next := *rs
+	bumpResourceVersion(&next)
+	dc.updateReplicaSet(&prev, &next)
 	if got, want := dc.queue.Len(), 2; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
@@ -737,9 +741,10 @@ func TestUpdateReplicaSetRelease(t *testing.T) {
 
 	// Remove ControllerRef and expect all matching controller to sync orphan.
 	prev := *rs
-	rs.OwnerReferences = nil
-	bumpResourceVersion(rs)
-	dc.updateReplicaSet(&prev, rs)
+	next := *rs
+	next.OwnerReferences = nil
+	bumpResourceVersion(&next)
+	dc.updateReplicaSet(&prev, &next)
 	if got, want := dc.queue.Len(), 2; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
