@@ -440,6 +440,10 @@ type KubeletConfiguration struct {
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
 	EnableControllerAttachDetach bool
+	// A set of ResourceName=Percentage (e.g. memory=50%) pairs that describe
+	// how pod resource requests are reserved at the QoS level.
+	// Currently only memory is supported. [default=none]"
+	ExperimentalQOSReserved ConfigurationMap
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool
 	// If true, Kubelet ensures a set of iptables rules are present on host.
