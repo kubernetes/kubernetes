@@ -81,6 +81,9 @@ func SetObjectDefaults_CronJob(in *CronJob) {
 				}
 			}
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 	}
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.InitContainers[i]
@@ -219,6 +222,9 @@ func SetObjectDefaults_Job(in *Job) {
 				}
 			}
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
@@ -355,6 +361,9 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 					}
 				}
 			}
+		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Template.Spec.Template.Spec.InitContainers {

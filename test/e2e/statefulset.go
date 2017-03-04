@@ -217,6 +217,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 			By("Before scale up finished setting 2nd pod to be not ready by breaking readiness probe")
 			sst.BreakProbe(ss, testProbe)
+			sst.WaitForStatus(ss, 0)
 			sst.WaitForRunningAndNotReady(2, ss)
 
 			By("Continue scale operation after the 2nd pod, and scaling down to 1 replica")
@@ -280,6 +281,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			By("Confirming that stateful set scale up will halt with unhealthy stateful pod")
 			sst.BreakProbe(ss, testProbe)
 			sst.WaitForRunningAndNotReady(*ss.Spec.Replicas, ss)
+			sst.WaitForStatus(ss, 0)
 			sst.UpdateReplicas(ss, 3)
 			sst.ConfirmStatefulPodCount(1, ss, 10*time.Second)
 
@@ -309,6 +311,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			sst.BreakProbe(ss, testProbe)
+			sst.WaitForStatus(ss, 0)
 			sst.WaitForRunningAndNotReady(3, ss)
 			sst.UpdateReplicas(ss, 0)
 			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second)
