@@ -13,10 +13,12 @@ go_test(
     srcs = [
         "podspec_mutation_test.go",
         "selfhosting_test.go",
+        "selfhosting_volumes_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -28,9 +30,11 @@ go_library(
     srcs = [
         "podspec_mutation.go",
         "selfhosting.go",
+        "selfhosting_volumes.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//pkg/api:go_default_library",

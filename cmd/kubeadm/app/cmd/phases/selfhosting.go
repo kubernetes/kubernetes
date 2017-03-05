@@ -19,23 +19,30 @@ package phases
 import (
 	"github.com/spf13/cobra"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // NewCmdSelfhosting returns the self-hosting Cobra command
 func NewCmdSelfhosting() *cobra.Command {
 	var kubeConfigFile string
+	cfg := &kubeadmapiext.MasterConfiguration{}
 	cmd := &cobra.Command{
 		Use:     "selfhosting",
 		Aliases: []string{"selfhosted"},
 		Short:   "Make a kubeadm cluster self-hosted.",
 		Run: func(cmd *cobra.Command, args []string) {
+			api.Scheme.Default(cfg)
+			internalcfg := &kubeadmapi.MasterConfiguration{}
+			api.Scheme.Convert(cfg, internalcfg, nil)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			err = selfhosting.CreateSelfHostedControlPlane(client)
+			err = selfhosting.CreateSelfHostedControlPlane(internalcfg, client)
 			kubeadmutil.CheckErr(err)
 		},
 	}

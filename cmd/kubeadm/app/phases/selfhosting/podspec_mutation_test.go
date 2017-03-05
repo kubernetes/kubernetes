@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -71,8 +72,9 @@ func TestMutatePodSpec(t *testing.T) {
 		},
 	}
 
+	cfg := &kubeadmapi.MasterConfiguration{}
 	for _, rt := range tests {
-		mutatePodSpec(rt.component, rt.podSpec)
+		mutatePodSpec(cfg, rt.component, rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed mutatePodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
@@ -108,8 +110,9 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 		},
 	}
 
+	cfg := &kubeadmapi.MasterConfiguration{}
 	for _, rt := range tests {
-		addNodeSelectorToPodSpec(rt.podSpec)
+		addNodeSelectorToPodSpec(cfg, rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed addNodeSelectorToPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
@@ -145,8 +148,9 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 		},
 	}
 
+	cfg := &kubeadmapi.MasterConfiguration{}
 	for _, rt := range tests {
-		setMasterTolerationOnPodSpec(rt.podSpec)
+		setMasterTolerationOnPodSpec(cfg, rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed setMasterTolerationOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
@@ -175,8 +179,9 @@ func TestSetRightDNSPolicyOnPodSpec(t *testing.T) {
 		},
 	}
 
+	cfg := &kubeadmapi.MasterConfiguration{}
 	for _, rt := range tests {
-		setRightDNSPolicyOnPodSpec(rt.podSpec)
+		setRightDNSPolicyOnPodSpec(cfg, rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed setRightDNSPolicyOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
