@@ -112,7 +112,7 @@ func Int32Ptr(i int32) *int32 {
 	return &o
 }
 
-// IntPtrDerefOr dereference the int ptr and returns it i not nil,
+// IntPtrDerefOr dereference the int ptr and returns it if not nil,
 // else returns def.
 func IntPtrDerefOr(ptr *int, def int) int {
 	if ptr != nil {
@@ -121,7 +121,7 @@ func IntPtrDerefOr(ptr *int, def int) int {
 	return def
 }
 
-// Int32PtrDerefOr dereference the int32 ptr and returns it i not nil,
+// Int32PtrDerefOr dereference the int32 ptr and returns it if not nil,
 // else returns def.
 func Int32PtrDerefOr(ptr *int32, def int32) int32 {
 	if ptr != nil {
