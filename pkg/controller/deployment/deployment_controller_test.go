@@ -17,7 +17,6 @@ limitations under the License.
 package deployment
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -109,11 +108,13 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 }
 
 func newReplicaSet(d *extensions.Deployment, name string, replicas int) *extensions.ReplicaSet {
+	control := true
 	return &extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: metav1.NamespaceDefault,
-			Labels:    d.Spec.Selector.MatchLabels,
+			Name:            name,
+			Namespace:       metav1.NamespaceDefault,
+			Labels:          d.Spec.Selector.MatchLabels,
+			OwnerReferences: []metav1.OwnerReference{{APIVersion: getDeploymentKind().GroupVersion().Version, Kind: getDeploymentKind().Kind, Name: d.Name, UID: d.UID, Controller: &control}},
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Selector: d.Spec.Selector,
@@ -150,6 +151,11 @@ type fixture struct {
 func (f *fixture) expectUpdateDeploymentStatusAction(d *extensions.Deployment) {
 	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
 	action.Subresource = "status"
+	f.actions = append(f.actions, action)
+}
+
+func (f *fixture) expectUpdateDeploymentAction(d *extensions.Deployment) {
+	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
 	f.actions = append(f.actions, action)
 }
 
@@ -214,6 +220,24 @@ func (f *fixture) run(deploymentName string) {
 	}
 }
 
+func filterInformerActions(actions []core.Action) []core.Action {
+	ret := []core.Action{}
+	for _, action := range actions {
+		if len(action.GetNamespace()) == 0 &&
+			(action.Matches("list", "pods") ||
+				action.Matches("list", "deployments") ||
+				action.Matches("list", "replicasets") ||
+				action.Matches("watch", "pods") ||
+				action.Matches("watch", "deployments") ||
+				action.Matches("watch", "replicasets")) {
+			continue
+		}
+		ret = append(ret, action)
+	}
+
+	return ret
+}
+
 func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	f := newFixture(t)
 
@@ -244,53 +268,47 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 }
 
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
-func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
-	fake := &fake.Clientset{}
-	informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-	controller := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), fake)
-	controller.eventRecorder = &record.FakeRecorder{}
-	controller.dListerSynced = alwaysReady
-	controller.rsListerSynced = alwaysReady
-	controller.podListerSynced = alwaysReady
-
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
+func TestDontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
+	f := newFixture(t)
 
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	empty := metav1.LabelSelector{}
-	d.Spec.Selector = &empty
-	informers.Extensions().V1beta1().Deployments().Informer().GetIndexer().Add(d)
-	// We expect the deployment controller to not take action here since it's configuration
-	// is invalid, even though no replicasets exist that match it's selector.
-	controller.syncDeployment(fmt.Sprintf("%s/%s", d.ObjectMeta.Namespace, d.ObjectMeta.Name))
+	d.Spec.Selector = &metav1.LabelSelector{}
+	f.dLister = append(f.dLister, d)
+	f.objects = append(f.objects, d)
 
-	filteredActions := filterInformerActions(fake.Actions())
-	if len(filteredActions) == 0 {
-		return
-	}
-	for _, action := range filteredActions {
-		t.Logf("unexpected action: %#v", action)
-	}
-	t.Errorf("expected deployment controller to not take action")
+	// Normally there should be a status update to sync observedGeneration but the fake
+	// deployment has no generation set so there is no action happpening here.
+	f.run(getKey(d, t))
 }
 
-func filterInformerActions(actions []core.Action) []core.Action {
-	ret := []core.Action{}
-	for _, action := range actions {
-		if len(action.GetNamespace()) == 0 &&
-			(action.Matches("list", "pods") ||
-				action.Matches("list", "deployments") ||
-				action.Matches("list", "replicasets") ||
-				action.Matches("watch", "pods") ||
-				action.Matches("watch", "deployments") ||
-				action.Matches("watch", "replicasets")) {
-			continue
-		}
-		ret = append(ret, action)
-	}
+func TestReentrantRollback(t *testing.T) {
+	f := newFixture(t)
 
-	return ret
+	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+	d.Spec.RollbackTo = &extensions.RollbackConfig{Revision: 0}
+	// TODO: This is 1 for now until FindOldReplicaSets gets fixed.
+	// See https://github.com/kubernetes/kubernetes/issues/42570.
+	d.Annotations = map[string]string{util.RevisionAnnotation: "1"}
+	f.dLister = append(f.dLister, d)
+
+	rs1 := newReplicaSet(d, "deploymentrs-old", 0)
+	rs1.Annotations = map[string]string{util.RevisionAnnotation: "1"}
+	one := int64(1)
+	rs1.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
+	rs1.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey] = "hash"
+
+	rs2 := newReplicaSet(d, "deploymentrs-new", 1)
+	rs2.Annotations = map[string]string{util.RevisionAnnotation: "2"}
+	rs2.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey] = "hash"
+
+	f.rsLister = append(f.rsLister, rs1, rs2)
+	f.objects = append(f.objects, d, rs1, rs2)
+
+	// Rollback is done here
+	f.expectUpdateDeploymentAction(d)
+	// Expect no update on replica sets though
+	f.run(getKey(d, t))
 }
 
 // TestOverlappingDeployment ensures that an overlapping deployment will not be synced by
