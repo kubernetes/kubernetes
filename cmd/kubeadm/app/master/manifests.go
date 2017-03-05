@@ -61,7 +61,7 @@ var (
 // where kubelet will pick and schedule them.
 func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	volumes := []api.Volume{k8sVolume(cfg)}
-	volumeMounts := []api.VolumeMount{k8sVolumeMount()}
+	volumeMounts := []api.VolumeMount{k8sVolumeMount(true)}
 
 	if isCertsVolumeMountNeeded() {
 		volumes = append(volumes, certsVolume(cfg))
@@ -102,7 +102,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Name:          kubeScheduler,
 			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getSchedulerCommand(cfg, false),
-			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
+			VolumeMounts:  []api.VolumeMount{k8sVolumeMount(true)},
 			LivenessProbe: componentProbe(10251, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
@@ -119,7 +119,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 				"--advertise-client-urls=http://127.0.0.1:2379",
 				"--data-dir=/var/lib/etcd",
 			},
-			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
+			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount(true)},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
@@ -244,11 +244,19 @@ func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	}
 }
 
-func k8sVolumeMount() api.VolumeMount {
+func k8sVolumeMount(readOnly bool) api.VolumeMount {
 	return api.VolumeMount{
 		Name:      "k8s",
 		MountPath: "/etc/kubernetes/",
-		ReadOnly:  true,
+		ReadOnly:  readOnly,
+	}
+}
+
+func k8sPKIVolumeMount(name string, readOnly bool) api.VolumeMount {
+	return api.VolumeMount{
+		Name:      name,
+		MountPath: path.Join("/etc/kubernetes/pki/", name),
+		ReadOnly:  readOnly,
 	}
 }
 
@@ -311,28 +319,11 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	defaultArguments := map[string]string{
-		"insecure-port":                     "0",
-		"admission-control":                 kubeadmconstants.DefaultAdmissionControl,
-		"service-cluster-ip-range":          cfg.Networking.ServiceSubnet,
-		"service-account-key-file":          path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
-		"client-ca-file":                    path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
-		"tls-cert-file":                     path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertName),
-		"tls-private-key-file":              path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName),
-		"kubelet-client-certificate":        path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName),
-		"kubelet-client-key":                path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName),
-		"secure-port":                       fmt.Sprintf("%d", cfg.API.BindPort),
-		"allow-privileged":                  "true",
-		"experimental-bootstrap-token-auth": "true",
-		"storage-backend":                   "etcd3",
-		"kubelet-preferred-address-types":   "InternalIP,ExternalIP,Hostname",
-		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
-		// so add it unconditionally with recommended values
-		"requestheader-username-headers":     "X-Remote-User",
-		"requestheader-group-headers":        "X-Remote-Group",
-		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
-		"requestheader-client-ca-file":       path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName),
-		"requestheader-allowed-names":        "front-proxy-client",
+	var defaultArguments map[string]string
+	if selfHosted {
+		defaultArguments = getSelfHostedAPIServerDefaultArguments(cfg)
+	} else {
+		defaultArguments = getStaticAPIServerDefaultArguments(cfg)
 	}
 	if k8sVersion.AtLeast(v170) {
 		// add options which allow the kube-apiserver to act as a front-proxy to aggregated API servers
@@ -379,6 +370,58 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 	return command
 }
 
+func getStaticAPIServerDefaultArguments(cfg *kubeadmapi.MasterConfiguration) map[string]string {
+	return map[string]string{
+		"insecure-port":                     "0",
+		"admission-control":                 kubeadmconstants.DefaultAdmissionControl,
+		"service-cluster-ip-range":          cfg.Networking.ServiceSubnet,
+		"service-account-key-file":          path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
+		"client-ca-file":                    path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"tls-cert-file":                     path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertName),
+		"tls-private-key-file":              path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName),
+		"kubelet-client-certificate":        path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName),
+		"kubelet-client-key":                path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName),
+		"secure-port":                       fmt.Sprintf("%d", cfg.API.BindPort),
+		"allow-privileged":                  "true",
+		"experimental-bootstrap-token-auth": "true",
+		"storage-backend":                   "etcd3",
+		"kubelet-preferred-address-types":   "InternalIP,ExternalIP,Hostname",
+		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
+		// so add it unconditionally with recommended values
+		"requestheader-username-headers":     "X-Remote-User",
+		"requestheader-group-headers":        "X-Remote-Group",
+		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
+		"requestheader-client-ca-file":       path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName),
+		"requestheader-allowed-names":        "front-proxy-client",
+	}
+}
+
+func getSelfHostedAPIServerDefaultArguments(cfg *kubeadmapi.MasterConfiguration) map[string]string {
+	return map[string]string{
+		"insecure-port":                     "0",
+		"admission-control":                 kubeadmconstants.DefaultAdmissionControl,
+		"service-cluster-ip-range":          cfg.Networking.ServiceSubnet,
+		"service-account-key-file":          path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountKeyBaseName, "tls.crt"),
+		"client-ca-file":                    path.Join(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "tls.crt"),
+		"tls-cert-file":                     path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertAndKeyBaseName, "tls.crt"),
+		"tls-private-key-file":              path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertAndKeyBaseName, "tls.key"),
+		"kubelet-client-certificate":        path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName, "tls.crt"),
+		"kubelet-client-key":                path.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName, "tls.key"),
+		"secure-port":                       fmt.Sprintf("%d", cfg.API.BindPort),
+		"allow-privileged":                  "true",
+		"experimental-bootstrap-token-auth": "true",
+		"storage-backend":                   "etcd3",
+		"kubelet-preferred-address-types":   "InternalIP,ExternalIP,Hostname",
+		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
+		// so add it unconditionally with recommended values
+		"requestheader-username-headers":     "X-Remote-User",
+		"requestheader-group-headers":        "X-Remote-Group",
+		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
+		"requestheader-client-ca-file":       path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, "tls.crt"),
+		"requestheader-allowed-names":        "front-proxy-client",
+	}
+}
+
 func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
 	var command []string
 
@@ -387,17 +430,11 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/controller-manager.lock"}
 	}
 
-	defaultArguments := map[string]string{
-		"address":                                                  "127.0.0.1",
-		"leader-elect":                                             "true",
-		"kubeconfig":                                               path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
-		"root-ca-file":                                             path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
-		"service-account-private-key-file":                         path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName),
-		"cluster-signing-cert-file":                                path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
-		"cluster-signing-key-file":                                 path.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),
-		"insecure-experimental-approve-all-kubelet-csrs-for-group": bootstrapapi.BootstrapGroup,
-		"use-service-account-credentials":                          "true",
-		"controllers":                                              "*,bootstrapsigner,tokencleaner",
+	var defaultArguments map[string]string
+	if selfHosted {
+		defaultArguments = getSelfHostedControllerManagerDefaultArguments(cfg)
+	} else {
+		defaultArguments = getStaticControllerManagerDefaultArguments(cfg)
 	}
 
 	command = getComponentBaseCommand(controllerManager)
@@ -421,6 +458,36 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 	return command
 }
 
+func getStaticControllerManagerDefaultArguments(cfg *kubeadmapi.MasterConfiguration) map[string]string {
+	return map[string]string{
+		"address":                                                  "127.0.0.1",
+		"leader-elect":                                             "true",
+		"kubeconfig":                                               path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
+		"root-ca-file":                                             path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"service-account-private-key-file":                         path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName),
+		"cluster-signing-cert-file":                                path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"cluster-signing-key-file":                                 path.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),
+		"insecure-experimental-approve-all-kubelet-csrs-for-group": bootstrapapi.BootstrapGroup,
+		"use-service-account-credentials":                          "true",
+		"controllers":                                              "*,bootstrapsigner,tokencleaner",
+	}
+}
+
+func getSelfHostedControllerManagerDefaultArguments(cfg *kubeadmapi.MasterConfiguration) map[string]string {
+	return map[string]string{
+		"address":                                                  "127.0.0.1",
+		"leader-elect":                                             "true",
+		"kubeconfig":                                               path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "controller-manager", kubeadmconstants.ControllerManagerKubeConfigFileName),
+		"root-ca-file":                                             path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName, "tls.key"),
+		"service-account-private-key-file":                         path.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountKeyBaseName, "tls.key"),
+		"cluster-signing-cert-file":                                path.Join(cfg.CertificatesDir, kubeadmconstants.CACertName, "tls.crt"),
+		"cluster-signing-key-file":                                 path.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName, "tls.key"),
+		"insecure-experimental-approve-all-kubelet-csrs-for-group": bootstrapapi.BootstrapGroup,
+		"use-service-account-credentials":                          "true",
+		"controllers":                                              "*,bootstrapsigner,tokencleaner",
+	}
+}
+
 func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
 	var command []string
 
@@ -429,16 +496,33 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
 	}
 
-	defaultArguments := map[string]string{
-		"address":      "127.0.0.1",
-		"leader-elect": "true",
-		"kubeconfig":   path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+	var defaultArguments map[string]string
+	if selfHosted {
+		defaultArguments = getSelfHostedSchedulerDefaultArguments(cfg)
+	} else {
+		defaultArguments = getStaticSchedulerDefaultArguments(cfg)
 	}
 
 	command = getComponentBaseCommand(scheduler)
 	command = append(command, getExtraParameters(cfg.SchedulerExtraArgs, defaultArguments)...)
 
 	return command
+}
+
+func getStaticSchedulerDefaultArguments(cfg *kubeadmapi.MasterConfiguration) map[string]string {
+	return map[string]string{
+		"address":      "127.0.0.1",
+		"leader-elect": "true",
+		"kubeconfig":   path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+	}
+}
+
+func getSelfHostedSchedulerDefaultArguments(cfg *kubeadmapi.MasterConfiguration) map[string]string {
+	return map[string]string{
+		"address":      "127.0.0.1",
+		"leader-elect": "true",
+		"kubeconfig":   path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "scheduler", kubeadmconstants.SchedulerKubeConfigFileName),
+	}
 }
 
 func getProxyEnvVars() []api.EnvVar {
