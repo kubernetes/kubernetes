@@ -20,17 +20,24 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
 
+func intOrStringP(i int) *intstrutil.IntOrString {
+	intstr := intstrutil.FromInt(i)
+	return &intstr
+}
+
 func TestDeploymentStatusViewerStatus(t *testing.T) {
 	tests := []struct {
-		generation   int64
-		specReplicas int32
-		status       extensions.DeploymentStatus
-		msg          string
-		done         bool
+		generation     int64
+		specReplicas   int32
+		maxUnavailable *intstrutil.IntOrString
+		status         extensions.DeploymentStatus
+		msg            string
+		done           bool
 	}{
 		{
 			generation:   0,
@@ -61,8 +68,9 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 			done: false,
 		},
 		{
-			generation:   1,
-			specReplicas: 2,
+			generation:     1,
+			specReplicas:   2,
+			maxUnavailable: intOrStringP(0),
 			status: extensions.DeploymentStatus{
 				ObservedGeneration:  1,
 				Replicas:            2,
@@ -71,7 +79,7 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				UnavailableReplicas: 1,
 			},
 
-			msg:  "Waiting for rollout to finish: 1 of 2 updated replicas are available...\n",
+			msg:  "Waiting for rollout to finish: 1 of 2 updated replicas are available (minimum required: 2)...\n",
 			done: false,
 		},
 		{
@@ -102,9 +110,26 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 			msg:  "Waiting for deployment spec update to be observed...\n",
 			done: false,
 		},
+		{
+			generation:     1,
+			specReplicas:   2,
+			maxUnavailable: intOrStringP(1),
+			status: extensions.DeploymentStatus{
+				ObservedGeneration:  1,
+				Replicas:            2,
+				UpdatedReplicas:     2,
+				AvailableReplicas:   1,
+				UnavailableReplicas: 0,
+			},
+
+			msg:  "deployment \"foo\" successfully rolled out\n",
+			done: true,
+		},
 	}
 
-	for _, test := range tests {
+	for i := range tests {
+		test := tests[i]
+		t.Logf("testing scenario %d", i)
 		d := &extensions.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:  "bar",
@@ -113,18 +138,27 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				Generation: test.generation,
 			},
 			Spec: extensions.DeploymentSpec{
+				Strategy: extensions.DeploymentStrategy{
+					Type: extensions.RollingUpdateDeploymentStrategyType,
+					RollingUpdate: &extensions.RollingUpdateDeployment{
+						MaxSurge: *intOrStringP(1),
+					},
+				},
 				Replicas: test.specReplicas,
 			},
 			Status: test.status,
+		}
+		if test.maxUnavailable != nil {
+			d.Spec.Strategy.RollingUpdate.MaxUnavailable = *test.maxUnavailable
 		}
 		client := fake.NewSimpleClientset(d).Extensions()
 		dsv := &DeploymentStatusViewer{c: client}
 		msg, done, err := dsv.Status("bar", "foo", 0)
 		if err != nil {
-			t.Fatalf("DeploymentStatusViewer.Status(): %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
 		if done != test.done || msg != test.msg {
-			t.Errorf("DeploymentStatusViewer.Status() for deployment with generation %d, %d replicas specified, and status %+v returned %q, %t, want %q, %t",
+			t.Errorf("deployment with generation %d, %d replicas specified, and status:\n%+v\nreturned:\n%q, %t\nwant:\n%q, %t",
 				test.generation,
 				test.specReplicas,
 				test.status,
