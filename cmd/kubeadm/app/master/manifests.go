@@ -329,6 +329,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 		"requestheader-client-ca-file":       path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName),
 		"requestheader-allowed-names":        "front-proxy-client",
 	}
+
 	if k8sVersion.AtLeast(v170) {
 		// add options which allow the kube-apiserver to act as a front-proxy to aggregated API servers
 		defaultArguments["proxy-client-cert-file"] = path.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName)
