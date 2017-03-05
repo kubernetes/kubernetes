@@ -332,7 +332,15 @@ func BuildMasterConfig(s *options.ServerRunOptions) (*master.Config, informers.S
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
-	pluginInitializer := kubeadmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
+	var cloudConfig []byte
+
+	if s.CloudProvider.CloudConfigFile != "" {
+		cloudConfig, err = ioutil.ReadFile(s.CloudProvider.CloudConfigFile)
+		if err != nil {
+			glog.Fatalf("Error reading from cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
+		}
+	}
+	pluginInitializer := kubeadmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig)
 	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read plugin config: %v", err)
