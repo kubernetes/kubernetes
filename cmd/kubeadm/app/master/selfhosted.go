@@ -41,8 +41,56 @@ var (
 )
 
 func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
-	volumes := []v1.Volume{k8sVolume()}
-	volumeMounts := []v1.VolumeMount{k8sVolumeMount()}
+	if err := createTLSSecrets(cfg, client); err != nil {
+		return err
+	}
+
+	if err := createOpaqueSecrets(client); err != nil {
+		return err
+	}
+
+	if err := launchSelfHostedAPIServer(cfg, client); err != nil {
+		return err
+	}
+
+	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
+		resp := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do()
+		if resp.Error() != nil {
+			fmt.Println("[apiclient] Waiting for self-hosted API server to become available")
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	if err := launchSelfHostedScheduler(cfg, client); err != nil {
+		return err
+	}
+
+	if err := launchSelfHostedControllerManager(cfg, client); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)); err != nil {
+		return fmt.Errorf("unable to delete temporary controller manager kubeconfig [%v]", err)
+	}
+	if err := os.RemoveAll(path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)); err != nil {
+		return fmt.Errorf("unable to delete temporary scheduler kubeconfig [%v]", err)
+	}
+
+	return nil
+}
+
+func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+	start := time.Now()
+
+	kubeVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	if err != nil {
+		return err
+	}
+	volumes := []v1.Volume{flockVolume(), apiServerProjectedVolume(cfg)}
+	volumeMounts := []v1.VolumeMount{flockVolumeMount(), k8sVolumeMount()}
+
 	if isCertsVolumeMountNeeded() {
 		volumes = append(volumes, certsVolume(cfg))
 		volumeMounts = append(volumeMounts, certsVolumeMount())
@@ -52,34 +100,8 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *c
 		volumes = append(volumes, pkiVolume())
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
 	}
-
-	// Need lock for self-hosted
-	volumes = append(volumes, flockVolume())
-	volumeMounts = append(volumeMounts, flockVolumeMount())
-
-	if err := launchSelfHostedAPIServer(cfg, client, volumes, volumeMounts); err != nil {
-		return err
-	}
-
-	if err := launchSelfHostedScheduler(cfg, client, volumes, volumeMounts); err != nil {
-		return err
-	}
-
-	if err := launchSelfHostedControllerManager(cfg, client, volumes, volumeMounts); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
-	start := time.Now()
-
-	kubeVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
-	if err != nil {
-		return err
-	}
 	apiServer := getAPIServerDS(cfg, volumes, volumeMounts, kubeVersion)
+
 	if _, err := client.Extensions().DaemonSets(metav1.NamespaceSystem).Create(&apiServer); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q daemon set [%v]", kubeAPIServer, err)
 	}
@@ -121,8 +143,21 @@ func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 	return nil
 }
 
-func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
+func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
 	start := time.Now()
+
+	volumes := []v1.Volume{flockVolume(), controllerManagerProjectedVolume(cfg)}
+	volumeMounts := []v1.VolumeMount{flockVolumeMount(), k8sVolumeMount()}
+
+	if isCertsVolumeMountNeeded() {
+		volumes = append(volumes, certsVolume(cfg))
+		volumeMounts = append(volumeMounts, certsVolumeMount())
+	}
+
+	if isPkiVolumeMountNeeded() {
+		volumes = append(volumes, pkiVolume())
+		volumeMounts = append(volumeMounts, pkiVolumeMount())
+	}
 
 	ctrlMgr := getControllerManagerDeployment(cfg, volumes, volumeMounts)
 	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(&ctrlMgr); err != nil {
@@ -141,8 +176,12 @@ func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 
 }
 
-func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
+func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
 	start := time.Now()
+
+	volumes := []v1.Volume{flockVolume(), schedulerProjectedVolume()}
+	volumeMounts := []v1.VolumeMount{flockVolumeMount(), k8sVolumeMount()}
+
 	scheduler := getSchedulerDeployment(cfg, volumes, volumeMounts)
 	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(&scheduler); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeScheduler, err)

@@ -14,6 +14,7 @@ go_library(
         "apiclient.go",
         "manifests.go",
         "selfhosted.go",
+        "selfhosted_volumes.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -39,7 +40,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["manifests_test.go"],
+    srcs = [
+        "manifests_test.go",
+        "selfhosted_volumes_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
