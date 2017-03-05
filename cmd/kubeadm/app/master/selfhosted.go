@@ -18,6 +18,7 @@ package master
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"time"
@@ -41,8 +42,50 @@ var (
 )
 
 func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
-	volumes := []v1.Volume{k8sVolume(cfg)}
-	volumeMounts := []v1.VolumeMount{k8sVolumeMount()}
+	// Launch the API server
+	if err := createTLSSecrets(client); err != nil {
+		return err
+	}
+
+	if err := launchSelfHostedAPIServer(cfg, client); err != nil {
+		return err
+	}
+
+	// Launch the scheduler
+
+	if err := createSchedulerSecrets(client); err != nil {
+		return err
+	}
+
+	if err := launchSelfHostedScheduler(cfg, client); err != nil {
+		return err
+	}
+
+	// Launch the controller manager
+
+	if err := createControllerManagerSecrets(client); err != nil {
+		return err
+	}
+
+	if err := launchSelfHostedControllerManager(cfg, client); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+	start := time.Now()
+
+	kubeVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	if err != nil {
+		return err
+	}
+	volumes := []v1.Volume{flockVolume()}
+	for _, volume := range apiServerPKISecretVolumes() {
+		volumes = append(volumes, volume)
+	}
+	volumeMounts := []v1.VolumeMount{k8sPKIVolumeMount(true), flockVolumeMount()}
 	if isCertsVolumeMountNeeded() {
 		volumes = append(volumes, certsVolume(cfg))
 		volumeMounts = append(volumeMounts, certsVolumeMount())
@@ -52,34 +95,8 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *c
 		volumes = append(volumes, pkiVolume(cfg))
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
 	}
-
-	// Need lock for self-hosted
-	volumes = append(volumes, flockVolume())
-	volumeMounts = append(volumeMounts, flockVolumeMount())
-
-	if err := launchSelfHostedAPIServer(cfg, client, volumes, volumeMounts); err != nil {
-		return err
-	}
-
-	if err := launchSelfHostedScheduler(cfg, client, volumes, volumeMounts); err != nil {
-		return err
-	}
-
-	if err := launchSelfHostedControllerManager(cfg, client, volumes, volumeMounts); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
-	start := time.Now()
-
-	kubeVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
-	if err != nil {
-		return err
-	}
 	apiServer := getAPIServerDS(cfg, volumes, volumeMounts, kubeVersion)
+
 	if _, err := client.Extensions().DaemonSets(metav1.NamespaceSystem).Create(&apiServer); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q daemon set [%v]", kubeAPIServer, err)
 	}
@@ -121,8 +138,23 @@ func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 	return nil
 }
 
-func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
+func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
 	start := time.Now()
+
+	volumes := []v1.Volume{flockVolume()}
+	for _, volume := range controllerManagerSecretVolumes() {
+		volumes = append(volumes, volume)
+	}
+	volumeMounts := []v1.VolumeMount{k8sVolumeMount(false), k8sPKIVolumeMount(true), flockVolumeMount()}
+	if isCertsVolumeMountNeeded() {
+		volumes = append(volumes, certsVolume(cfg))
+		volumeMounts = append(volumeMounts, certsVolumeMount())
+	}
+
+	if isPkiVolumeMountNeeded() {
+		volumes = append(volumes, pkiVolume(cfg))
+		volumeMounts = append(volumeMounts, pkiVolumeMount())
+	}
 
 	ctrlMgr := getControllerManagerDeployment(cfg, volumes, volumeMounts)
 	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(&ctrlMgr); err != nil {
@@ -141,8 +173,15 @@ func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 
 }
 
-func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
+func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
 	start := time.Now()
+
+	volumes := []v1.Volume{flockVolume()}
+	for _, volume := range schedulerSecretVolumes() {
+		volumes = append(volumes, volume)
+	}
+	volumeMounts := []v1.VolumeMount{k8sVolumeMount(true), flockVolumeMount()}
+
 	scheduler := getSchedulerDeployment(cfg, volumes, volumeMounts)
 	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(&scheduler); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeScheduler, err)
@@ -339,4 +378,230 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Vo
 
 func buildStaticManifestFilepath(name string) string {
 	return path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests", name+".yaml")
+}
+
+func apiServerPKISecretVolumes() []v1.Volume {
+	return []v1.Volume{
+		v1.Volume{
+			Name: "k8s-pki",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
+				},
+			},
+		},
+		v1.Volume{
+			Name: "k8s-pki",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: kubeadmconstants.ServiceAccountKeyBaseName,
+				},
+			},
+		},
+		v1.Volume{
+			Name: "k8s-pki",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: kubeadmconstants.FrontProxyCACertAndKeyBaseName,
+				},
+			},
+		},
+		v1.Volume{
+			Name: "k8s-pki",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: kubeadmconstants.CACertAndKeyBaseName,
+				},
+			},
+		},
+		v1.Volume{
+			Name: "k8s-pki",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: kubeadmconstants.APIServerCertAndKeyBaseName,
+				},
+			},
+		},
+		v1.Volume{
+			Name: "k8s-pki",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
+				},
+			},
+		},
+	}
+}
+
+func schedulerSecretVolumes() []v1.Volume {
+	return []v1.Volume{
+		v1.Volume{
+			Name: "k8s",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: kubeadmconstants.SchedulerKubeConfigFileName,
+				},
+			},
+		},
+	}
+}
+
+func controllerManagerSecretVolumes() []v1.Volume {
+	return []v1.Volume{
+		v1.Volume{
+			Name: "k8s",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: kubeadmconstants.ControllerManagerKubeConfigFileName,
+				},
+			},
+		},
+		v1.Volume{
+			Name: "k8s-pki",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: kubeadmconstants.CACertAndKeyBaseName,
+				},
+			},
+		},
+		v1.Volume{
+			Name: "k8s-pki",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: kubeadmconstants.ServiceAccountKeyBaseName,
+				},
+			},
+		},
+	}
+}
+
+func createTLSSecrets(client *clientset.Clientset) error {
+	if err := createTLSSecretFromFiles(
+		kubeadmconstants.CACertAndKeyBaseName,
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.CACertName),
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.CAKeyName),
+		client); err != nil {
+		return err
+	}
+	if err := createTLSSecretFromFiles(
+		kubeadmconstants.APIServerCertAndKeyBaseName,
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.APIServerCertName),
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.APIServerKeyName),
+		client); err != nil {
+		return err
+	}
+	if err := createTLSSecretFromFiles(
+		kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.APIServerKubeletClientCertName),
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.APIServerKubeletClientKeyName),
+		client); err != nil {
+		return err
+	}
+	if err := createTLSSecretFromFiles(
+		kubeadmconstants.ServiceAccountKeyBaseName,
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.ServiceAccountPublicKeyName),
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.ServiceAccountPrivateKeyName),
+		client); err != nil {
+		return err
+	}
+	if err := createTLSSecretFromFiles(kubeadmconstants.FrontProxyCACertAndKeyBaseName,
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.FrontProxyCACertName),
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.FrontProxyCAKeyName),
+		client); err != nil {
+		return err
+	}
+	if err := createTLSSecretFromFiles(kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.FrontProxyClientCertName),
+		path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "pki", kubeadmconstants.FrontProxyClientKeyName),
+		client); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createControllerManagerSecrets(client *clientset.Clientset) error {
+	file := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
+	if err := createOpaqueSecretFromFile(kubeadmconstants.ControllerManagerKubeConfigFileName, file, client); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createSchedulerSecrets(client *clientset.Clientset) error {
+	file := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
+	if err := createOpaqueSecretFromFile(kubeadmconstants.SchedulerKubeConfigFileName, file, client); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createTLSSecretFromFiles(secretName, crt, key string, client *clientset.Clientset) error {
+	data := make(map[string][]byte, 0)
+
+	crtBytes, err := ioutil.ReadFile(crt)
+	if err != nil {
+		return err
+	}
+	data[path.Base(crt)] = crtBytes
+
+	keyBytes, err := ioutil.ReadFile(key)
+	if err != nil {
+		return err
+	}
+	data[path.Base(key)] = keyBytes
+
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Type: v1.SecretTypeTLS,
+		Data: data,
+	}
+
+	if _, err := client.Secrets(metav1.NamespaceSystem).Create(secret); err != nil {
+		return err
+	}
+
+	if err = os.Remove(crt); err != nil {
+		return err
+	}
+
+	if err = os.Remove(key); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createOpaqueSecretFromFile(secretName, file string, client *clientset.Clientset) error {
+	data := make(map[string][]byte, 0)
+
+	fileBytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	data[path.Base(file)] = fileBytes
+
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: data,
+	}
+
+	if _, err := client.Secrets(metav1.NamespaceSystem).Create(secret); err != nil {
+		return err
+	}
+
+	if err = os.Remove(file); err != nil {
+		return err
+	}
+
+	return nil
 }
