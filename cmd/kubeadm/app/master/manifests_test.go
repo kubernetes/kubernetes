@@ -246,7 +246,7 @@ func TestK8sVolumeMount(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := k8sVolumeMount()
+		actual := k8sVolumeMount(true)
 		if actual.Name != rt.expected.Name {
 			t.Errorf(
 				"failed k8sVolumeMount:\n\texpected: %s\n\t  actual: %s",

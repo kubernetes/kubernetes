@@ -56,7 +56,7 @@ const (
 // where kubelet will pick and schedule them.
 func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	volumes := []api.Volume{k8sVolume(cfg)}
-	volumeMounts := []api.VolumeMount{k8sVolumeMount()}
+	volumeMounts := []api.VolumeMount{k8sVolumeMount(true)}
 
 	if isCertsVolumeMountNeeded() {
 		volumes = append(volumes, certsVolume(cfg))
@@ -92,7 +92,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Name:          kubeScheduler,
 			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getSchedulerCommand(cfg, false),
-			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
+			VolumeMounts:  []api.VolumeMount{k8sVolumeMount(true)},
 			LivenessProbe: componentProbe(10251, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
@@ -109,7 +109,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 				"--advertise-client-urls=http://127.0.0.1:2379",
 				"--data-dir=/var/lib/etcd",
 			},
-			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
+			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount(true)},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
@@ -234,11 +234,19 @@ func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	}
 }
 
-func k8sVolumeMount() api.VolumeMount {
+func k8sVolumeMount(readOnly bool) api.VolumeMount {
 	return api.VolumeMount{
 		Name:      "k8s",
 		MountPath: "/etc/kubernetes/",
-		ReadOnly:  true,
+		ReadOnly:  readOnly,
+	}
+}
+
+func k8sPKIVolumeMount(readOnly bool) api.VolumeMount {
+	return api.VolumeMount{
+		Name:      "k8s-pki",
+		MountPath: "/etc/kubernetes/pki",
+		ReadOnly:  readOnly,
 	}
 }
 

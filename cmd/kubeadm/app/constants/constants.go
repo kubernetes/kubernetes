@@ -27,6 +27,10 @@ const (
 	// KubernetesDir is the directory kubernetes owns for storing various configuration files
 	KubernetesDir = "/etc/kubernetes"
 
+	PKISecretName               = "kubernetes-pki"
+	ControllerManagerSecretName = "kubernetes-controller-manager"
+	SchedulerSecretName         = "kubernetes-scheduler"
+
 	CACertAndKeyBaseName = "ca"
 	CACertName           = "ca.crt"
 	CAKeyName            = "ca.key"
