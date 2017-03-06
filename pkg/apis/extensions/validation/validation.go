@@ -376,12 +376,27 @@ func ValidateThirdPartyResourceData(obj *extensions.ThirdPartyResourceData) fiel
 // ValidateIngress tests if required fields in the Ingress are set.
 func ValidateIngress(ingress *extensions.Ingress) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&ingress.ObjectMeta, true, ValidateIngressName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateIngressTLSAnnotation(&ingress.Spec, ingress.Annotations, field.NewPath("metadata").Child("annotations"))...)
 	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateIngressName validates that the given name can be used as an Ingress name.
 var ValidateIngressName = apivalidation.NameIsDNSSubdomain
+
+// ValidateIngressTLSAnnotation validates only one TLS source is set.
+// The TLS field in the IngressSpec cannot be specified if a TLS annotation is already specified.
+func ValidateIngressTLSAnnotation(spec *extensions.IngressSpec, annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if cert := annotations[extensions.IngressPreSharedCertAnnotationKey]; cert != "" {
+		if len(spec.TLS) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "may only specify 1 source for TLS (annotation or API)"))
+		}
+	}
+
+	return allErrs
+}
 
 func validateIngressTLS(spec *extensions.IngressSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}

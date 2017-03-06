@@ -40,6 +40,14 @@ const (
 	// allowed safe and unsafe sysctls in a pod spec. It's a comma-separated list of plain sysctl
 	// names or sysctl patterns (which end in *). The string "*" matches all sysctls.
 	SysctlsPodSecurityPolicyAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
+
+	// IngressPreSharedCertAnnotationKey represents the specific pre-shared SSL
+	// certicate for the Ingress controller to use. The controller *does not*
+	// manage this certificate, it is the users responsibility to create/delete it.
+	// In GCE, the Ingress controller assigns the SSL certificate with this name
+	// to the target proxies of the Ingress.
+	// TODO: In Nginx.
+	IngressPreSharedCertAnnotationKey = "kubernetes.io/ingress.pre-shared-cert"
 )
 
 // describes the attributes of a scale subresource
