@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"regexp"
-	"strings"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -50,20 +49,18 @@ func randBytes(length int) (string, error) {
 // GenerateToken generates a new token with a token ID that is valid as a
 // Kubernetes DNS label.
 // For more info, see kubernetes/pkg/util/validation/validation.go.
-func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
+func GenerateToken() (string, error) {
 	tokenID, err := randBytes(TokenIDBytes)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	token, err := randBytes(TokenSecretBytes)
+	tokenSecret, err := randBytes(TokenSecretBytes)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	d.ID = strings.ToLower(tokenID)
-	d.Secret = strings.ToLower(token)
-	return nil
+	return fmt.Sprintf("%s.%s", tokenID, tokenSecret), nil
 }
 
 // ParseTokenID tries and parse a valid token ID from a string.

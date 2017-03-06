@@ -50,7 +50,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "metrics_nil_test.go",
-        "metrics_statfs_test.go",
         "plugins_test.go",
         "util_test.go",
     ],
@@ -66,13 +65,15 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 
 go_test(
     name = "go_default_xtest",
-    srcs = ["metrics_du_test.go"],
+    srcs = [
+        "metrics_du_test.go",
+        "metrics_statfs_test.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/volume:go_default_library",

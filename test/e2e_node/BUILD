@@ -57,6 +57,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "allocatable_eviction_test.go",
         "apparmor_test.go",
         "container_manager_test.go",
         "critical_pod_test.go",

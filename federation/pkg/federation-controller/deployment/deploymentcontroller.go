@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
@@ -54,9 +55,11 @@ const (
 	FedDeploymentPreferencesAnnotation = "federation.kubernetes.io/deployment-preferences"
 	allClustersKey                     = "THE_ALL_CLUSTER_KEY"
 	UserAgentName                      = "Federation-Deployment-Controller"
+	ControllerName                     = "deployments"
 )
 
 var (
+	RequiredResources        = []schema.GroupVersionResource{extensionsv1.SchemeGroupVersion.WithResource("deployments")}
 	deploymentReviewDelay    = 10 * time.Second
 	clusterAvailableDelay    = 20 * time.Second
 	clusterUnavailableDelay  = 60 * time.Second

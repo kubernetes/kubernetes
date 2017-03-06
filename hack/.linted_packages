@@ -14,10 +14,10 @@ cmd/kube-apiserver/app
 cmd/kube-apiserver/app/options
 cmd/kube-controller-manager
 cmd/kube-controller-manager/app/options
-cmd/kube-discovery
 cmd/kube-proxy
 cmd/kubeadm
 cmd/kubeadm/app/apis/kubeadm/install
+cmd/kubeadm/app/discovery/https
 cmd/kubeadm/app/phases/apiconfig
 cmd/kubeadm/app/phases/certs
 cmd/kubeadm/app/phases/kubeconfig

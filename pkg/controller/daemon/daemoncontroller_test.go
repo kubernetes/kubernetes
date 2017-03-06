@@ -448,6 +448,22 @@ func TestSufficientCapacityNodeDaemonLaunchesPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
+// DaemonSet should launch a pod on a node with taint NetworkUnavailable condition.
+func TestNetworkUnavailableNodeDaemonLaunchesPod(t *testing.T) {
+	manager, podControl, _ := newTestController()
+
+	node := newNode("network-unavailable", nil)
+	node.Status.Conditions = []v1.NodeCondition{
+		{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionTrue},
+	}
+	manager.nodeStore.Add(node)
+
+	ds := newDaemonSet("simple")
+	manager.dsStore.Add(ds)
+
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+}
+
 // DaemonSets not take any actions when being deleted
 func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 	podSpec := resourcePodSpec("not-too-much-mem", "75M", "75m")
@@ -1083,6 +1099,71 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 		}
 		if err != c.err {
 			t.Errorf("[%v] expected err: %v, got: %v", i, c.err, err)
+		}
+	}
+}
+
+// DaemonSets should be resynced when node labels or taints changed
+func TestUpdateNode(t *testing.T) {
+	var enqueued bool
+
+	cases := []struct {
+		test          string
+		newNode       *v1.Node
+		oldNode       *v1.Node
+		ds            *extensions.DaemonSet
+		shouldEnqueue bool
+	}{
+		{
+			test:    "Nothing changed, should not enqueue",
+			oldNode: newNode("node1", nil),
+			newNode: newNode("node1", nil),
+			ds: func() *extensions.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+				return ds
+			}(),
+			shouldEnqueue: false,
+		},
+		{
+			test:    "Node labels changed",
+			oldNode: newNode("node1", nil),
+			newNode: newNode("node1", simpleNodeLabel),
+			ds: func() *extensions.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+				return ds
+			}(),
+			shouldEnqueue: true,
+		},
+		{
+			test: "Node taints changed",
+			oldNode: func() *v1.Node {
+				node := newNode("node1", nil)
+				setNodeTaint(node, noScheduleTaints)
+				return node
+			}(),
+			newNode:       newNode("node1", nil),
+			ds:            newDaemonSet("ds"),
+			shouldEnqueue: true,
+		},
+	}
+	for _, c := range cases {
+		manager, podControl, _ := newTestController()
+		manager.nodeStore.Add(c.oldNode)
+		manager.dsStore.Add(c.ds)
+		syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0)
+
+		manager.enqueueDaemonSet = func(ds *extensions.DaemonSet) {
+			if ds.Name == "ds" {
+				enqueued = true
+			}
+		}
+
+		enqueued = false
+		manager.updateNode(c.oldNode, c.newNode)
+		if enqueued != c.shouldEnqueue {
+			t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
 		}
 	}
 }

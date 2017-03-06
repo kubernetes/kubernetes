@@ -71,7 +71,6 @@ SERVER_TARGETS = [
     "//cmd/hyperkube",
     "//cmd/kube-apiserver",
     "//cmd/kube-controller-manager",
-    "//cmd/kube-discovery",
     "//cmd/kubeadm",
     "//plugin/cmd/kube-scheduler",
 ]

@@ -85,6 +85,8 @@ type DaemonSetsController struct {
 
 	// To allow injection of syncDaemonSet for testing.
 	syncHandler func(dsKey string) error
+	// used for unit testing
+	enqueueDaemonSet func(ds *extensions.DaemonSet)
 	// A TTLCache of pod creates/deletes each ds expects to see
 	expectations controller.ControllerExpectationsInterface
 	// dsLister can list/get daemonsets from the shared informer's store
@@ -181,6 +183,7 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 	dsc.nodeLister = nodeInformer.Lister()
 
 	dsc.syncHandler = dsc.syncDaemonSet
+	dsc.enqueueDaemonSet = dsc.enqueue
 	dsc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
 	return dsc
 }
@@ -248,7 +251,7 @@ func (dsc *DaemonSetsController) processNextWorkItem() bool {
 	return true
 }
 
-func (dsc *DaemonSetsController) enqueueDaemonSet(ds *extensions.DaemonSet) {
+func (dsc *DaemonSetsController) enqueue(ds *extensions.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
@@ -432,8 +435,8 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	oldNode := old.(*v1.Node)
 	curNode := cur.(*v1.Node)
-	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) {
-		// If node labels didn't change, we can ignore this update.
+	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) && reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) {
+		// If node labels and taints didn't change, we can ignore this update.
 		return
 	}
 	dsList, err := dsc.dsLister.List(labels.Everything())
@@ -785,9 +788,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
 func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *extensions.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err error) {
-	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
-	newPod.Namespace = ds.Namespace
-	newPod.Spec.NodeName = node.Name
+	newPod := NewPod(ds, node.Name)
 	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(newPod)
 
 	// Because these bools require an && of all their required conditions, we start
@@ -864,14 +865,14 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
-	_, reasons, err := daemonSetPredicates(newPod, nodeInfo)
+	_, reasons, err := Predicates(newPod, nodeInfo)
 	if err != nil {
-		glog.Warningf("daemonSetPredicates failed on ds '%s/%s' due to unexpected error: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
+		glog.Warningf("DaemonSet Predicates failed on node %s for ds '%s/%s' due to unexpected error: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
 		return false, false, false, err
 	}
 
 	for _, r := range reasons {
-		glog.V(4).Infof("daemonSetPredicates failed on ds '%s/%s' for reason: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
+		glog.V(4).Infof("DaemonSet Predicates failed on node %s for ds '%s/%s' for reason: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 		switch reason := r.(type) {
 		case *predicates.InsufficientResourceError:
 			dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.Error())
@@ -908,7 +909,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				predicates.ErrPodAffinityNotMatch,
 				predicates.ErrServiceAffinityViolated:
 				glog.Warningf("unexpected predicate failure reason: %s", reason.GetReason())
-				return false, false, false, fmt.Errorf("unexpected reason: daemonSetPredicates should not return reason %s", reason.GetReason())
+				return false, false, false, fmt.Errorf("unexpected reason: DaemonSet Predicates should not return reason %s", reason.GetReason())
 			default:
 				glog.V(4).Infof("unknown predicate failure reason: %s", reason.GetReason())
 				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
@@ -922,9 +923,16 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	return
 }
 
-// daemonSetPredicates checks if a DaemonSet's pod can be scheduled on a node using GeneralPredicates
+func NewPod(ds *extensions.DaemonSet, nodeName string) *v1.Pod {
+	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
+	newPod.Namespace = ds.Namespace
+	newPod.Spec.NodeName = nodeName
+	return newPod
+}
+
+// Predicates checks if a DaemonSet's pod can be scheduled on a node using GeneralPredicates
 // and PodToleratesNodeTaints predicate
-func daemonSetPredicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var predicateFails []algorithm.PredicateFailureReason
 	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(pod)
 

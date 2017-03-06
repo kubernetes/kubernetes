@@ -349,7 +349,12 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		RootFreeDiskMB:   int(kubeCfg.LowDiskSpaceThresholdMB),
 	}
 
-	thresholds, err := eviction.ParseThresholdConfig(kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
+	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
+	if kubeCfg.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
+		// Do not provide kubeCfg.EnforceNodeAllocatable to eviction threshold parsing if we are not enforcing Evictions
+		enforceNodeAllocatable = []string{}
+	}
+	thresholds, err := eviction.ParseThresholdConfig(enforceNodeAllocatable, kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
 	if err != nil {
 		return nil, err
 	}
@@ -797,13 +802,16 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.appArmorValidator = apparmor.NewValidator(kubeCfg.ContainerRuntime)
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
-		if kubeCfg.ContainerRuntime != "docker" {
-			return nil, fmt.Errorf("Accelerators feature is supported with docker runtime only.")
+		if kubeCfg.ContainerRuntime == "docker" {
+			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, klet.dockerClient); err != nil {
+				return nil, err
+			}
+		} else {
+			glog.Errorf("Accelerators feature is supported with docker runtime only. Disabling this feature internally.")
 		}
-		if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, klet.dockerClient); err != nil {
-			return nil, err
-		}
-	} else {
+	}
+	// Set GPU manager to a stub implementation if it is not enabled or cannot be supported.
+	if klet.gpuManager == nil {
 		klet.gpuManager = gpu.NewGPUManagerStub()
 	}
 	// Finally, put the most recent version of the config on the Kubelet, so
@@ -1222,7 +1230,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		glog.Fatalf("Failed to start cAdvisor %v", err)
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl, kl.getActivePods, evictionMonitoringPeriod)
+	kl.evictionManager.Start(kl, kl.getActivePods, kl, evictionMonitoringPeriod)
 }
 
 // Run starts the kubelet reacting to config updates
