@@ -31,6 +31,7 @@ go_library(
         "disruption.go",
         "dns.go",
         "dns_autoscaling.go",
+        "dns_common.go",
         "dns_configmap.go",
         "e2e.go",
         "empty.go",
