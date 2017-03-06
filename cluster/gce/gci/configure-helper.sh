@@ -1081,6 +1081,7 @@ function start-kube-apiserver {
 
 
   local authorization_mode="RBAC"
+  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
 
   # Create the ABAC file only if it's explicitly requested.
   if [[ -n "${ENABLE_LEGACY_ABAC_16_ONLY:-}" ]]; then
@@ -1111,7 +1112,6 @@ function start-kube-apiserver {
     webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
   fi
-  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   params+=" --authorization-mode=${authorization_mode}"
 
   local container_env=""
