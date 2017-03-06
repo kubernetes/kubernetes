@@ -468,6 +468,30 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 	return true, nil, nil
 }
 
+// Returns a *schedulercache.Resource that covers the largest width in each
+// resource dimension. Because init-containers run sequentially, we collect the
+// max in each dimension iteratively. In contrast, we sum the resource vectors
+// for regular containers since they run simultaneously.
+//
+// Example:
+//
+// Pod:
+//   InitContainers
+//     IC1:
+//       CPU: 2
+//       Memory: 1G
+//     IC2:
+//       CPU: 2
+//       Memory: 3G
+//   Containers
+//     C1:
+//       CPU: 2
+//       Memory: 1G
+//     C2:
+//       CPU: 1
+//       Memory: 1G
+//
+// Result: CPU: 3, Memory: 3G
 func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 	result := schedulercache.Resource{}
 	for _, container := range pod.Spec.Containers {
@@ -505,10 +529,8 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 			default:
 				if v1.IsOpaqueIntResourceName(rName) {
 					value := rQuantity.Value()
-					// Ensure the opaque resource map is initialized in the result.
-					result.AddOpaque(rName, int64(0))
 					if value > result.OpaqueIntResources[rName] {
-						result.OpaqueIntResources[rName] = value
+						result.SetOpaque(rName, value)
 					}
 				}
 			}
