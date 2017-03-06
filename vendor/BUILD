@@ -16253,6 +16253,13 @@ go_library(
     tags = ["automanaged"],
 )
 
+go_test(
+    name = "k8s.io/apiserver/pkg/endpoints/metrics_test",
+    srcs = ["k8s.io/apiserver/pkg/endpoints/metrics/metrics_test.go"],
+    library = ":k8s.io/apiserver/pkg/endpoints/metrics",
+    tags = ["automanaged"],
+)
+
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
