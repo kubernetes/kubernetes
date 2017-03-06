@@ -593,6 +593,35 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 	return owned, nil
 }
 
+// ListReplicaSets returns a slice of RSes the given deployment targets.
+// Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),
+// because only the controller itself should do that.
+// However, it does filter out anything whose ControllerRef doesn't match.
+// TODO: Remove the duplicate.
+func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSList func(string, metav1.ListOptions) ([]*internalextensions.ReplicaSet, error)) ([]*internalextensions.ReplicaSet, error) {
+	// TODO: Right now we list replica sets by their labels. We should list them by selector, i.e. the replica set's selector
+	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830.
+	namespace := deployment.Namespace
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	all, err := getRSList(namespace, options)
+	if err != nil {
+		return all, err
+	}
+	// Only include those whose ControllerRef matches the Deployment.
+	owned := make([]*internalextensions.ReplicaSet, 0, len(all))
+	for _, rs := range all {
+		controllerRef := controller.GetControllerOf(rs)
+		if controllerRef != nil && controllerRef.UID == deployment.UID {
+			owned = append(owned, rs)
+		}
+	}
+	return owned, nil
+}
+
 // ListPods returns a list of pods the given deployment targets.
 // This needs a list of ReplicaSets for the Deployment,
 // which can be found with ListReplicaSets().
