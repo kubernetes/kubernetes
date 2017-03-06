@@ -162,6 +162,27 @@ func (jm *JobController) getPodJobs(pod *v1.Pod) []*batch.Job {
 	return ret
 }
 
+// resolveControllerRef returns the controller referenced by a ControllerRef,
+// or nil if the ControllerRef could not be resolved to a matching controller
+// of the corrrect Kind.
+func (jm *JobController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *batch.Job {
+	// We can't look up by UID, so look up by Name and then verify UID.
+	// Don't even try to look up by Name if it's the wrong Kind.
+	if controllerRef.Kind != controllerKind.Kind {
+		return nil
+	}
+	job, err := jm.jobLister.Jobs(namespace).Get(controllerRef.Name)
+	if err != nil {
+		return nil
+	}
+	if job.UID != controllerRef.UID {
+		// The controller we found with this Name is not the same one that the
+		// ControllerRef points to.
+		return nil
+	}
+	return job
+}
+
 // When a pod is created, enqueue the controller that manages it and update it's expectations.
 func (jm *JobController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
@@ -174,12 +195,8 @@ func (jm *JobController) addPod(obj interface{}) {
 
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
-		if controllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
-			return
-		}
-		job, err := jm.jobLister.Jobs(pod.Namespace).Get(controllerRef.Name)
-		if err != nil {
+		job := jm.resolveControllerRef(pod.Namespace, controllerRef)
+		if job == nil {
 			return
 		}
 		jobKey, err := controller.KeyFunc(job)
@@ -225,23 +242,17 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 	curControllerRef := controller.GetControllerOf(curPod)
 	oldControllerRef := controller.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
-	if controllerRefChanged &&
-		oldControllerRef != nil && oldControllerRef.Kind == controllerKind.Kind {
+	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
-		job, err := jm.jobLister.Jobs(oldPod.Namespace).Get(oldControllerRef.Name)
-		if err == nil {
+		if job := jm.resolveControllerRef(oldPod.Namespace, oldControllerRef); job != nil {
 			jm.enqueueController(job)
 		}
 	}
 
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
-		if curControllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
-			return
-		}
-		job, err := jm.jobLister.Jobs(curPod.Namespace).Get(curControllerRef.Name)
-		if err != nil {
+		job := jm.resolveControllerRef(curPod.Namespace, curControllerRef)
+		if job == nil {
 			return
 		}
 		jm.enqueueController(job)
@@ -284,13 +295,8 @@ func (jm *JobController) deletePod(obj interface{}) {
 		// No controller should care about orphans being deleted.
 		return
 	}
-	if controllerRef.Kind != controllerKind.Kind {
-		// It's controlled by a different type of controller.
-		return
-	}
-
-	job, err := jm.jobLister.Jobs(pod.Namespace).Get(controllerRef.Name)
-	if err != nil {
+	job := jm.resolveControllerRef(pod.Namespace, controllerRef)
+	if job == nil {
 		return
 	}
 	jobKey, err := controller.KeyFunc(job)
