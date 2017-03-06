@@ -25,6 +25,12 @@ import (
 )
 
 func TestRequestHeader(t *testing.T) {
+	anonymousUser := &user.DefaultInfo{
+		Name:   user.Anonymous,
+		Groups: []string{user.AllUnauthenticated},
+		Extra:  map[string][]string{},
+	}
+
 	testcases := map[string]struct {
 		nameHeaders        []string
 		groupHeaders       []string
@@ -34,9 +40,14 @@ func TestRequestHeader(t *testing.T) {
 		expectedUser user.Info
 		expectedOk   bool
 	}{
-		"empty": {},
+		"empty": {
+			expectedUser: anonymousUser,
+			expectedOk:   true,
+		},
 		"user no match": {
-			nameHeaders: []string{"X-Remote-User"},
+			nameHeaders:  []string{"X-Remote-User"},
+			expectedUser: anonymousUser,
+			expectedOk:   true,
 		},
 		"user match": {
 			nameHeaders:    []string{"X-Remote-User"},
@@ -54,6 +65,8 @@ func TestRequestHeader(t *testing.T) {
 				"Prefixed-X-Remote-User-With-Suffix": {"Bob"},
 				"X-Remote-User-With-Suffix":          {"Bob"},
 			},
+			expectedUser: anonymousUser,
+			expectedOk:   true,
 		},
 		"user first match": {
 			nameHeaders: []string{
