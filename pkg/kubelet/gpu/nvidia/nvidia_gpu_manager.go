@@ -23,6 +23,7 @@ import (
 	"path"
 	"regexp"
 	"sync"
+	"unicode"
 
 	"github.com/golang/glog"
 
@@ -116,6 +117,36 @@ func (ngm *nvidiaGPUManager) Capacity() v1.ResourceList {
 	return v1.ResourceList{
 		v1.ResourceNvidiaGPU: *gpus,
 	}
+}
+
+func containsInt(s string) bool {
+	for _, c := range s {
+		if unicode.IsDigit(c) {
+			return true
+		}
+	}
+	return false
+}
+
+// fixed #42412, release the GPU resources
+func (ngm *nvidiaGPUManager) UpdateDevices(podUID string, exitedContainerID string) {
+	inspectJSON, err := ngm.dockerClient.InspectContainer(exitedContainerID)
+	if err != nil {
+		glog.Errorf("SyncPod Inspect JSON container:%v, error:%v", exitedContainerID, err)
+	} else {
+		devicesMapping := inspectJSON.HostConfig.Devices
+		for _, deviceMap := range devicesMapping {
+			if containsInt(deviceMap.PathOnHost) {
+				if value, ok := ngm.allocated.podGPUMapping[podUID]; ok {
+					if value.Has(deviceMap.PathOnHost) {
+						value.Delete(deviceMap.PathOnHost)
+						ngm.allocated.podGPUMapping[podUID] = value
+					}
+				}
+			}
+		}
+	}
+
 }
 
 // AllocateGPUs returns `num` GPUs if available, error otherwise.

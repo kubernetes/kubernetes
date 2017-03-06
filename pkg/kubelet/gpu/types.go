@@ -29,4 +29,5 @@ type GPUManager interface {
 	// Returns paths to allocated GPUs and nil on success.
 	// Returns an error on failure.
 	AllocateGPU(*v1.Pod, *v1.Container) ([]string, error)
+	UpdateDevices(podUID string, exitedContainerID string)
 }
