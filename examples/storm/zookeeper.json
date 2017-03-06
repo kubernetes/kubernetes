@@ -11,7 +11,7 @@
     "containers": [
       {
         "name": "zookeeper",
-        "image": "mattf/zookeeper",
+        "image": "gcr.io/google-samples/zookeeper:1.0",
         "ports": [
           {
             "containerPort": 2181

@@ -23,7 +23,7 @@
         "containers": [
           {
             "name": "storm-worker",
-            "image": "mattf/storm-worker",
+            "image": "gcr.io/google-samples/storm-worker:1.0",
             "ports": [
               {
                 "hostPort": 6700,
