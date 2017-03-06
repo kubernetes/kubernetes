@@ -553,13 +553,13 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	// list all pods to include the pods that don't match the rs`s selector
 	// anymore but has the stale controller ref.
 	// TODO: Do the List and Filter in a single pass, or use an index.
-	pods, err := rsc.podLister.Pods(rs.Namespace).List(labels.Everything())
+	allPods, err := rsc.podLister.Pods(rs.Namespace).List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	// Ignore inactive pods.
 	var filteredPods []*v1.Pod
-	for _, pod := range pods {
+	for _, pod := range allPods {
 		if controller.IsPodActive(pod) {
 			filteredPods = append(filteredPods, pod)
 		}
