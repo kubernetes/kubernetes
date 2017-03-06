@@ -422,9 +422,16 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 		if s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
 			cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-			if err != nil {
-				return err
+
+			switch err {
+			case cloudprovider.ErrNoConfig:
+				cloud = nil
+				glog.Warningf("Disabling cloud provider: %v", err)
+			case nil: // success
+			default:
+				return fmt.Errorf("cloud provider could not be initialized: %v", err)
 			}
+
 			if cloud == nil {
 				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
 			} else {

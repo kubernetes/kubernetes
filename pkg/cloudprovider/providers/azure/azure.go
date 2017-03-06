@@ -22,12 +22,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
+	"time"
+
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
-	"time"
 )
 
 // CloudProviderName is the value used for the --cloud-provider flag
@@ -88,6 +89,10 @@ func init() {
 
 // NewCloud returns a Cloud with initialized clients
 func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
+	if configReader == nil {
+		return nil, cloudprovider.ErrNoConfig
+	}
+
 	var az Cloud
 
 	configContents, err := ioutil.ReadAll(configReader)

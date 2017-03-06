@@ -17,7 +17,6 @@ limitations under the License.
 package cloudstack
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -61,11 +60,11 @@ func init() {
 
 func readConfig(config io.Reader) (*CSConfig, error) {
 	if config == nil {
-		err := fmt.Errorf("no cloud provider config given")
-		return nil, err
+		return nil, cloudprovider.ErrNoConfig
 	}
 
 	cfg := &CSConfig{}
+
 	if err := gcfg.ReadInto(cfg, config); err != nil {
 		glog.Errorf("Couldn't parse config: %v", err)
 		return nil, err

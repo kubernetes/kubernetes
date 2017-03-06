@@ -164,10 +164,15 @@ func readInstanceID() (string, error) {
 
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
+		if config == nil {
+			return nil, cloudprovider.ErrNoConfig
+		}
+
 		cfg, err := readConfig(config)
 		if err != nil {
 			return nil, err
 		}
+
 		return newRackspace(cfg)
 	})
 }

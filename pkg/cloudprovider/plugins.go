@@ -17,6 +17,7 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -25,10 +26,14 @@ import (
 	"github.com/golang/glog"
 )
 
+var ErrNoConfig = errors.New("no cloud provider config file given")
+
 // Factory is a function that returns a cloudprovider.Interface.
 // The config parameter provides an io.Reader handler to the factory in
 // order to load specific configurations. If no configuration is provided
 // the parameter is nil.
+// If the cloudprovider does not support no configuration
+// it must return cloudprovider.ErrNoConfig.
 type Factory func(config io.Reader) (Interface, error)
 
 // All registered cloud providers.
@@ -112,8 +117,9 @@ func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("could not init cloud provider %q: %v", name, err)
+		return nil, err
 	}
+
 	if cloud == nil {
 		return nil, fmt.Errorf("unknown cloud provider %q", name)
 	}

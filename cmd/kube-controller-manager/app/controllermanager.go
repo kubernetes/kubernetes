@@ -404,7 +404,13 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	}
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-	if err != nil {
+
+	switch err {
+	case cloudprovider.ErrNoConfig:
+		cloud = nil
+		glog.Warningf("Disabling cloud provider: %v", err)
+	case nil: // success
+	default:
 		return fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
 

@@ -120,12 +120,12 @@ type VolumeOptions struct {
 }
 
 func readConfig(config io.Reader) (PCConfig, error) {
+	var cfg PCConfig
+
 	if config == nil {
-		err := fmt.Errorf("cloud provider config file is missing. Please restart kubelet with --cloud-provider=photon --cloud-config=[path_to_config_file]")
-		return PCConfig{}, err
+		return cfg, cloudprovider.ErrNoConfig
 	}
 
-	var cfg PCConfig
 	err := gcfg.ReadInto(&cfg, config)
 	return cfg, err
 }

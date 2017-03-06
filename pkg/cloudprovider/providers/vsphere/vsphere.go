@@ -185,12 +185,12 @@ func generateDiskFormatValidOptions() string {
 
 // Parses vSphere cloud config file and stores it into VSphereConfig.
 func readConfig(config io.Reader) (VSphereConfig, error) {
+	var cfg VSphereConfig
+
 	if config == nil {
-		err := fmt.Errorf("no vSphere cloud provider config file given")
-		return VSphereConfig{}, err
+		return cfg, cloudprovider.ErrNoConfig
 	}
 
-	var cfg VSphereConfig
 	err := gcfg.ReadInto(&cfg, config)
 	return cfg, err
 }
@@ -201,6 +201,7 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
+
 		return newVSphere(cfg)
 	})
 }
