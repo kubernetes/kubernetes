@@ -57,8 +57,8 @@ type podNodeSelector struct {
 	clusterNodeSelectors map[string]string
 }
 
-var _ = kubeapiserveradmission.WantsInternalClientSet(&podNodeSelector{})
-var _ = kubeapiserveradmission.WantsInformerFactory(&podNodeSelector{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&podNodeSelector{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&podNodeSelector{})
 
 type pluginConfig struct {
 	PodNodeSelectorPluginConfig map[string]string
@@ -162,11 +162,11 @@ func NewPodNodeSelector(clusterNodeSelectors map[string]string) *podNodeSelector
 	}
 }
 
-func (a *podNodeSelector) SetInternalClientSet(client internalclientset.Interface) {
+func (a *podNodeSelector) SetInternalKubeClientSet(client internalclientset.Interface) {
 	a.client = client
 }
 
-func (p *podNodeSelector) SetInformerFactory(f informers.SharedInformerFactory) {
+func (p *podNodeSelector) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().InternalVersion().Namespaces()
 	p.namespaceLister = namespaceInformer.Lister()
 	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
