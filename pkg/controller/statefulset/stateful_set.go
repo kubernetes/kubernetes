@@ -169,15 +169,11 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
-		if controllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
+		set := ssc.resolveControllerRef(pod.Namespace, controllerRef)
+		if set == nil {
 			return
 		}
 		glog.V(4).Infof("Pod %s created, labels: %+v", pod.Name, pod.Labels)
-		set, err := ssc.setLister.StatefulSets(pod.Namespace).Get(controllerRef.Name)
-		if err != nil {
-			return
-		}
 		ssc.enqueueStatefulSet(set)
 		return
 	}
@@ -209,26 +205,20 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 	curControllerRef := controller.GetControllerOf(curPod)
 	oldControllerRef := controller.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
-	if controllerRefChanged &&
-		oldControllerRef != nil && oldControllerRef.Kind == controllerKind.Kind {
+	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
-		set, err := ssc.setLister.StatefulSets(oldPod.Namespace).Get(oldControllerRef.Name)
-		if err == nil {
+		if set := ssc.resolveControllerRef(oldPod.Namespace, oldControllerRef); set != nil {
 			ssc.enqueueStatefulSet(set)
 		}
 	}
 
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
-		if curControllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
+		set := ssc.resolveControllerRef(curPod.Namespace, curControllerRef)
+		if set == nil {
 			return
 		}
 		glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
-		set, err := ssc.setLister.StatefulSets(curPod.Namespace).Get(curControllerRef.Name)
-		if err != nil {
-			return
-		}
 		ssc.enqueueStatefulSet(set)
 		return
 	}
@@ -273,16 +263,11 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 		// No controller should care about orphans being deleted.
 		return
 	}
-	if controllerRef.Kind != controllerKind.Kind {
-		// It's controlled by a different type of controller.
+	set := ssc.resolveControllerRef(pod.Namespace, controllerRef)
+	if set == nil {
 		return
 	}
 	glog.V(4).Infof("Pod %s/%s deleted through %v.", pod.Namespace, pod.Name, utilruntime.GetCaller())
-
-	set, err := ssc.setLister.StatefulSets(pod.Namespace).Get(controllerRef.Name)
-	if err != nil {
-		return
-	}
 	ssc.enqueueStatefulSet(set)
 }
 
@@ -325,6 +310,27 @@ func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*apps.Sta
 				pod.Labels))
 	}
 	return sets
+}
+
+// resolveControllerRef returns the controller referenced by a ControllerRef,
+// or nil if the ControllerRef could not be resolved to a matching controller
+// of the corrrect Kind.
+func (ssc *StatefulSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.StatefulSet {
+	// We can't look up by UID, so look up by Name and then verify UID.
+	// Don't even try to look up by Name if it's the wrong Kind.
+	if controllerRef.Kind != controllerKind.Kind {
+		return nil
+	}
+	set, err := ssc.setLister.StatefulSets(namespace).Get(controllerRef.Name)
+	if err != nil {
+		return nil
+	}
+	if set.UID != controllerRef.UID {
+		// The controller we found with this Name is not the same one that the
+		// ControllerRef points to.
+		return nil
+	}
+	return set
 }
 
 // enqueueStatefulSet enqueues the given statefulset in the work queue.
