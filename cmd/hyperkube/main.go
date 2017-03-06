@@ -33,6 +33,7 @@ func main() {
 	}
 
 	hk.AddServer(NewKubectlServer())
+	hk.AddServer(NewKubefedServer())
 	hk.AddServer(NewKubeAPIServer())
 	hk.AddServer(NewKubeControllerManager())
 	hk.AddServer(NewScheduler())
