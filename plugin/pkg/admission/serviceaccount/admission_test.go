@@ -133,7 +133,7 @@ func TestAssignsDefaultServiceAccountAndToleratesMissingAPIToken(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.MountServiceAccountToken = true
 	admit.RequireAPIToken = false
 
@@ -161,7 +161,7 @@ func TestAssignsDefaultServiceAccountAndRejectsMissingAPIToken(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.MountServiceAccountToken = true
 	admit.RequireAPIToken = true
 
@@ -194,7 +194,7 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.client = client
 	admit.RequireAPIToken = false
 
@@ -216,9 +216,9 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 	client := fake.NewSimpleClientset()
 
 	admit := NewServiceAccount()
-	admit.SetInternalClientSet(client)
+	admit.SetInternalKubeClientSet(client)
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 
 	pod := &api.Pod{}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
@@ -248,7 +248,7 @@ func TestAutomountsAPIToken(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.MountServiceAccountToken = true
 	admit.RequireAPIToken = true
 
@@ -349,7 +349,7 @@ func TestRespectsExistingMount(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.MountServiceAccountToken = true
 	admit.RequireAPIToken = true
 
@@ -447,7 +447,7 @@ func TestAllowsReferencedSecret(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -528,7 +528,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -606,7 +606,7 @@ func TestAllowUnreferencedSecretVolumesForPermissiveSAs(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.LimitSecretReferences = false
 	admit.RequireAPIToken = false
 
@@ -638,7 +638,7 @@ func TestAllowsReferencedImagePullSecrets(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -670,7 +670,7 @@ func TestRejectsUnreferencedImagePullSecrets(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -699,7 +699,7 @@ func TestDoNotAddImagePullSecrets(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -736,7 +736,7 @@ func TestAddImagePullSecrets(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -781,7 +781,7 @@ func TestMultipleReferencedSecrets(t *testing.T) {
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetInformerFactory(informerFactory)
+	admit.SetInternalKubeInformerFactory(informerFactory)
 	admit.MountServiceAccountToken = true
 	admit.RequireAPIToken = true
 

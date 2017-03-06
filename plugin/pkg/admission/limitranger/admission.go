@@ -68,7 +68,7 @@ type liveLookupEntry struct {
 	items  []*api.LimitRange
 }
 
-func (l *limitRanger) SetInformerFactory(f informers.SharedInformerFactory) {
+func (l *limitRanger) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	limitRangeInformer := f.Core().InternalVersion().LimitRanges()
 	l.SetReadyFunc(limitRangeInformer.Informer().HasSynced)
 	l.lister = limitRangeInformer.Lister()
@@ -167,10 +167,10 @@ func NewLimitRanger(actions LimitRangerActions) (admission.Interface, error) {
 	}, nil
 }
 
-var _ = kubeapiserveradmission.WantsInformerFactory(&limitRanger{})
-var _ = kubeapiserveradmission.WantsInternalClientSet(&limitRanger{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&limitRanger{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&limitRanger{})
 
-func (a *limitRanger) SetInternalClientSet(client internalclientset.Interface) {
+func (a *limitRanger) SetInternalKubeClientSet(client internalclientset.Interface) {
 	a.client = client
 }
 

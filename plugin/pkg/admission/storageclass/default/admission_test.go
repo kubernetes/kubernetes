@@ -199,7 +199,7 @@ func TestAdmission(t *testing.T) {
 
 		ctrl := newPlugin()
 		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-		ctrl.SetInformerFactory(informerFactory)
+		ctrl.SetInternalKubeInformerFactory(informerFactory)
 		for _, c := range test.classes {
 			informerFactory.Storage().InternalVersion().StorageClasses().Informer().GetStore().Add(c)
 		}
