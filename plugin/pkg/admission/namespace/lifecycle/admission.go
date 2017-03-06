@@ -72,8 +72,8 @@ type forceLiveLookupEntry struct {
 	expiry time.Time
 }
 
-var _ = kubeapiserveradmission.WantsInformerFactory(&lifecycle{})
-var _ = kubeapiserveradmission.WantsInternalClientSet(&lifecycle{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&lifecycle{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&lifecycle{})
 
 func makeNamespaceKey(namespace string) *api.Namespace {
 	return &api.Namespace{
@@ -193,13 +193,13 @@ func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock
 	}, nil
 }
 
-func (l *lifecycle) SetInformerFactory(f informers.SharedInformerFactory) {
+func (l *lifecycle) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().InternalVersion().Namespaces()
 	l.namespaceLister = namespaceInformer.Lister()
 	l.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
-func (l *lifecycle) SetInternalClientSet(client internalclientset.Interface) {
+func (l *lifecycle) SetInternalKubeClientSet(client internalclientset.Interface) {
 	l.client = client
 }
 
