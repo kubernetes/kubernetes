@@ -2439,10 +2439,6 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 			}
 			w.Write(LEVEL_0, "NewReplicaSet:\t%s\n", printReplicaSetsByLabels(newRSs))
 		}
-		overlapWith := d.Annotations[deploymentutil.OverlapAnnotation]
-		if len(overlapWith) > 0 {
-			w.Write(LEVEL_0, "!!!WARNING!!! This deployment has overlapping label selector with deployment %q and won't behave as expected. Please fix it before continue.\n", overlapWith)
-		}
 		if describerSettings.ShowEvents {
 			events, err := dd.Core().Events(namespace).Search(api.Scheme, d)
 			if err == nil && events != nil {
