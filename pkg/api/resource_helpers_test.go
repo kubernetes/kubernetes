@@ -215,20 +215,20 @@ func TestUpdatePodCondition(t *testing.T) {
 		addOrChange := UpdatePodCondition(test.podStatus, test.podCondition)
 		if addOrChange == false {
 			if addOrChange != test.expectedResult {
-				t.Errorf("%s: expected result: %t, got: %t", test.test, test.expected, test.podStatus)
+				t.Errorf("%s: expected result: %v, got: %v", test.test, test.expected, test.podStatus)
 			}
 		} else {
 			for i := range test.podStatus.Conditions {
 				if test.podStatus.Conditions[i].Type == test.podCondition.Type {
 					if test.podStatus.Conditions[i].LastTransitionTime.Equal(test.expected.Conditions[i].LastTransitionTime) {
-						t.Errorf("%s: expected result: %t, got: %t", test.test, test.expected, test.podStatus)
+						t.Errorf("%s: expected result: %v, got: %v", test.test, test.expected, test.podStatus)
 					}
 				}
 				test.podStatus.Conditions[i].LastTransitionTime = metav1.Time{}
 				test.expected.Conditions[i].LastTransitionTime = metav1.Time{}
 			}
 			if !reflect.DeepEqual(test.podStatus, test.expected) {
-				t.Errorf("%s: expected result: %t, got: %t", test.test, test.expected, test.podStatus)
+				t.Errorf("%s: expected result: %v, got: %v", test.test, test.expected, test.podStatus)
 			}
 		}
 	}
