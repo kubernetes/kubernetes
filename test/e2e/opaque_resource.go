@@ -38,7 +38,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Opaque resources", func() {
+var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 	f := framework.NewDefaultFramework("opaque-resource")
 	opaqueResName := v1.OpaqueIntResourceName("foo")
 	var node *v1.Node
@@ -59,19 +59,11 @@ var _ = framework.KubeDescribe("Opaque resources", func() {
 			}
 		}
 
+		removeOpaqueResource(f, node.Name, opaqueResName)
 		addOpaqueResource(f, node.Name, opaqueResName)
 	})
 
-	// TODO: The suite times out if removeOpaqueResource is called as part of
-	//       an AfterEach closure. For now, it is the last statement in each
-	//       It block.
-	// AfterEach(func() {
-	// 	removeOpaqueResource(f, node.Name, opaqueResName)
-	// })
-
 	It("should not break pods that do not consume opaque integer resources.", func() {
-		defer removeOpaqueResource(f, node.Name, opaqueResName)
-
 		By("Creating a vanilla pod")
 		requests := v1.ResourceList{v1.ResourceCPU: resource.MustParse("0.1")}
 		limits := v1.ResourceList{v1.ResourceCPU: resource.MustParse("0.2")}
@@ -82,17 +74,19 @@ var _ = framework.KubeDescribe("Opaque resources", func() {
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
-		// Here we don't check for the bound node name since it can land on
-		// any one (this pod doesn't require any of the opaque resource.)
-		predicate := scheduleSuccess(pod.Name, "")
+		predicate := func(e *v1.Event) bool {
+			return e.Type == v1.EventTypeNormal &&
+				e.Reason == "Scheduled" &&
+				// Here we don't check for the bound node name since it can land on
+				// any one (this pod doesn't require any of the opaque resource.)
+				strings.Contains(e.Message, fmt.Sprintf("Successfully assigned %v", pod.Name))
+		}
 		success, err := observeEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 	})
 
 	It("should schedule pods that do consume opaque integer resources.", func() {
-		defer removeOpaqueResource(f, node.Name, opaqueResName)
-
 		By("Creating a pod that requires less of the opaque resource than is allocatable on a node.")
 		requests := v1.ResourceList{
 			v1.ResourceCPU: resource.MustParse("0.1"),
@@ -109,15 +103,17 @@ var _ = framework.KubeDescribe("Opaque resources", func() {
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
-		predicate := scheduleSuccess(pod.Name, node.Name)
+		predicate := func(e *v1.Event) bool {
+			return e.Type == v1.EventTypeNormal &&
+				e.Reason == "Scheduled" &&
+				strings.Contains(e.Message, fmt.Sprintf("Successfully assigned %v to %v", pod.Name, node.Name))
+		}
 		success, err := observeEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 	})
 
 	It("should not schedule pods that exceed the available amount of opaque integer resource.", func() {
-		defer removeOpaqueResource(f, node.Name, opaqueResName)
-
 		By("Creating a pod that requires more of the opaque resource than is allocatable on any node")
 		requests := v1.ResourceList{opaqueResName: resource.MustParse("6")}
 		limits := v1.ResourceList{}
@@ -127,15 +123,17 @@ var _ = framework.KubeDescribe("Opaque resources", func() {
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(newTestPod(f, "over-max-oir", requests, limits))
 			return err
 		}
-		predicate := scheduleFailure("over-max-oir")
+		predicate := func(e *v1.Event) bool {
+			return e.Type == "Warning" &&
+				e.Reason == "FailedScheduling" &&
+				strings.Contains(e.Message, "failed to fit in any node")
+		}
 		success, err := observeEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 	})
 
 	It("should account opaque integer resources in pods with multiple containers.", func() {
-		defer removeOpaqueResource(f, node.Name, opaqueResName)
-
 		By("Creating a pod with two containers that together require less of the opaque resource than is allocatable on a node")
 		requests := v1.ResourceList{opaqueResName: resource.MustParse("1")}
 		limits := v1.ResourceList{}
@@ -172,7 +170,11 @@ var _ = framework.KubeDescribe("Opaque resources", func() {
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
-		predicate := scheduleSuccess(pod.Name, node.Name)
+		predicate := func(e *v1.Event) bool {
+			return e.Type == v1.EventTypeNormal &&
+				e.Reason == "Scheduled" &&
+				strings.Contains(e.Message, fmt.Sprintf("Successfully assigned %v to %v", pod.Name, node.Name))
+		}
 		success, err := observeEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
@@ -212,53 +214,11 @@ var _ = framework.KubeDescribe("Opaque resources", func() {
 			_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
-		predicate = scheduleFailure(pod.Name)
-		success, err = observeEventAfterAction(f, predicate, action)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(success).To(Equal(true))
-	})
-
-	It("should schedule pods that initially do not fit after enough opaque integer resources are freed.", func() {
-		defer removeOpaqueResource(f, node.Name, opaqueResName)
-
-		By("Creating a pod that requires less of the opaque resource than is allocatable on a node.")
-		requests := v1.ResourceList{
-			v1.ResourceCPU: resource.MustParse("0.1"),
-			opaqueResName:  resource.MustParse("3"),
+		predicate = func(e *v1.Event) bool {
+			return e.Type == "Warning" &&
+				e.Reason == "FailedScheduling" &&
+				strings.Contains(e.Message, "failed to fit in any node")
 		}
-		limits := v1.ResourceList{
-			v1.ResourceCPU: resource.MustParse("0.2"),
-			opaqueResName:  resource.MustParse("3"),
-		}
-		pod1 := newTestPod(f, "oir-1", requests, limits)
-		pod2 := newTestPod(f, "oir-2", requests, limits)
-
-		By("Observing an event that indicates one pod was scheduled")
-		action := func() error {
-			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod1)
-			return err
-		}
-		predicate := scheduleSuccess(pod1.Name, node.Name)
-		success, err := observeEventAfterAction(f, predicate, action)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(success).To(Equal(true))
-
-		By("Observing an event that indicates a subsequent pod was not scheduled")
-		action = func() error {
-			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod2)
-			return err
-		}
-		predicate = scheduleFailure(pod2.Name)
-		success, err = observeEventAfterAction(f, predicate, action)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(success).To(Equal(true))
-
-		By("Observing an event that indicates the second pod was scheduled after deleting the first pod")
-		action = func() error {
-			err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod1.Name, nil)
-			return err
-		}
-		predicate = scheduleSuccess(pod2.Name, node.Name)
 		success, err = observeEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
@@ -268,14 +228,12 @@ var _ = framework.KubeDescribe("Opaque resources", func() {
 // Adds the opaque resource to a node.
 func addOpaqueResource(f *framework.Framework, nodeName string, opaqueResName v1.ResourceName) {
 	action := func() error {
-		By(fmt.Sprintf("Adding OIR to node [%s]", nodeName))
 		patch := []byte(fmt.Sprintf(`[{"op": "add", "path": "/status/capacity/%s", "value": "5"}]`, escapeForJSONPatch(opaqueResName)))
 		return f.ClientSet.Core().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do().Error()
 	}
 	predicate := func(n *v1.Node) bool {
 		capacity, foundCap := n.Status.Capacity[opaqueResName]
 		allocatable, foundAlloc := n.Status.Allocatable[opaqueResName]
-		By(fmt.Sprintf("Node [%s] has OIR capacity: [%t] (%s), has OIR allocatable: [%t] (%s)", n.Name, foundCap, capacity.String(), foundAlloc, allocatable.String()))
 		return foundCap && capacity.MilliValue() == int64(5000) &&
 			foundAlloc && allocatable.MilliValue() == int64(5000)
 	}
@@ -287,16 +245,14 @@ func addOpaqueResource(f *framework.Framework, nodeName string, opaqueResName v1
 // Removes the opaque resource from a node.
 func removeOpaqueResource(f *framework.Framework, nodeName string, opaqueResName v1.ResourceName) {
 	action := func() error {
-		By(fmt.Sprintf("Removing OIR from node [%s]", nodeName))
 		patch := []byte(fmt.Sprintf(`[{"op": "remove", "path": "/status/capacity/%s"}]`, escapeForJSONPatch(opaqueResName)))
 		f.ClientSet.Core().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do()
 		return nil // Ignore error -- the opaque resource may not exist.
 	}
 	predicate := func(n *v1.Node) bool {
-		capacity, foundCap := n.Status.Capacity[opaqueResName]
-		allocatable, foundAlloc := n.Status.Allocatable[opaqueResName]
-		By(fmt.Sprintf("Node [%s] has OIR capacity: [%t] (%s), has OIR allocatable: [%t] (%s)", n.Name, foundCap, capacity.String(), foundAlloc, allocatable.String()))
-		return (!foundCap || capacity.IsZero()) && (!foundAlloc || allocatable.IsZero())
+		_, foundCap := n.Status.Capacity[opaqueResName]
+		_, foundAlloc := n.Status.Allocatable[opaqueResName]
+		return !foundCap && !foundAlloc
 	}
 	success, err := observeNodeUpdateAfterAction(f, nodeName, predicate, action)
 	Expect(err).NotTo(HaveOccurred())
@@ -389,7 +345,7 @@ func observeEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				e, ok := obj.(*v1.Event)
-				By(fmt.Sprintf("Considering event: \nType = [%s], Name = [%s], Reason = [%s], Message = [%s]", e.Type, e.Name, e.Reason, e.Message))
+				By(fmt.Sprintf("Considering event: \nType = [%s], Reason = [%s], Message = [%s]", e.Type, e.Reason, e.Message))
 				Expect(ok).To(Equal(true))
 				if ok && eventPredicate(e) {
 					observedMatchingEvent = true
@@ -416,21 +372,4 @@ func observeEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 		return observedMatchingEvent, nil
 	})
 	return err == nil, err
-}
-
-func scheduleSuccess(podName, nodeName string) func(*v1.Event) bool {
-	return func(e *v1.Event) bool {
-		return e.Type == v1.EventTypeNormal &&
-			e.Reason == "Scheduled" &&
-			strings.HasPrefix(e.Name, podName) &&
-			strings.Contains(e.Message, fmt.Sprintf("Successfully assigned %v to %v", podName, nodeName))
-	}
-}
-
-func scheduleFailure(podName string) func(*v1.Event) bool {
-	return func(e *v1.Event) bool {
-		return strings.HasPrefix(e.Name, podName) &&
-			e.Type == "Warning" &&
-			e.Reason == "FailedScheduling"
-	}
 }
