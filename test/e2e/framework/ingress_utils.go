@@ -374,7 +374,6 @@ func CleanupGCEIngressController(gceController *GCEIngressController) {
 		By(fmt.Sprintf("WARNING: possibly leaked static IP: %v\n", ipErr))
 	}
 
-	// TODO:
 	// TLS cert allocated on behalf of the test, never deleted by the
 	// controller. Delete this cert only after the controller has had a chance
 	// to cleanup or it might interfere with the controller, causing it to
@@ -390,7 +389,6 @@ func CleanupGCEIngressController(gceController *GCEIngressController) {
 		// of quota anyway.
 		By(fmt.Sprintf("WARNING: possibly leaked TLS cert: %v\n", certErr))
 	}
-	// TODO:
 
 	// Always try to cleanup even if pollErr == nil, because the cleanup
 	// routine also purges old leaked resources based on creation timestamp.
