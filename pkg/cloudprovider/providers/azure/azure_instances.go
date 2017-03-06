@@ -40,6 +40,14 @@ func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	}, nil
 }
 
+// NodeAddressesV2 returns the node addresses of an instances with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (az *Cloud) NodeAddressesV2(providerID string) ([]v1.NodeAddress, error) {
+	panic("unimplemented method")
+	return []v1.NodeAddress{}, nil
+}
+
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (az *Cloud) ExternalID(name types.NodeName) (string, error) {
 	return az.InstanceID(name)
@@ -55,6 +63,14 @@ func (az *Cloud) InstanceID(name types.NodeName) (string, error) {
 		return "", cloudprovider.InstanceNotFound
 	}
 	return *machine.ID, nil
+}
+
+// InstanceTypeV2 returns the cloudprovider instance type of the node with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (az *Cloud) InstanceTypeV2(providerID string) (string, error) {
+	panic("unimplemented method")
+	return "", nil
 }
 
 // InstanceType returns the type of the specified instance.

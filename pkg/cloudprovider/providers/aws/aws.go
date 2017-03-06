@@ -976,6 +976,14 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	return addresses, nil
 }
 
+// NodeAddressesV2 returns the node addresses of an instances with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (c *Cloud) NodeAddressesV2(providerID string) ([]v1.NodeAddress, error) {
+	panic("unimplemented method")
+	return []v1.NodeAddress{}, nil
+}
+
 // ExternalID returns the cloud provider ID of the node with the specified nodeName (deprecated).
 func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 	if c.selfAWSInstance.nodeName == nodeName {
@@ -1006,6 +1014,14 @@ func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %v", nodeName, err)
 	}
 	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
+}
+
+// InstanceTypeV2 returns the cloudprovider instance type of the node with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (c *Cloud) InstanceTypeV2(providerID string) (string, error) {
+	panic("unimplemented method")
+	return "", nil
 }
 
 // InstanceType returns the type of the node with the specified nodeName.

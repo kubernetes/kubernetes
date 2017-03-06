@@ -420,6 +420,14 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 	return nodeAddrs, fmt.Errorf("Failed to find the node %s from Photon Controller endpoint", name)
 }
 
+// NodeAddressesV2 returns the node addresses of an instances with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (pc *PCCloud) NodeAddressesV2(providerID string) ([]v1.NodeAddress, error) {
+	panic("unimplemented method")
+	return []v1.NodeAddress{}, nil
+}
+
 func (pc *PCCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
@@ -481,6 +489,14 @@ func (pc *PCCloud) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 			return ID, nil
 		}
 	}
+}
+
+// InstanceTypeV2 returns the cloudprovider instance type of the node with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (pc *PCCloud) InstanceTypeV2(providerID string) (string, error) {
+	panic("unimplemented method")
+	return "", nil
 }
 
 func (pc *PCCloud) InstanceType(nodeName k8stypes.NodeName) (string, error) {
