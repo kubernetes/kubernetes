@@ -67,14 +67,6 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
-	// OverlapAnnotation marks deployments with overlapping selector with other deployments
-	// TODO: Delete this annotation when we gracefully handle overlapping selectors.
-	// See https://github.com/kubernetes/kubernetes/issues/2210
-	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
-	// SelectorUpdateAnnotation marks the last time deployment selector update
-	// TODO: Delete this annotation when we gracefully handle overlapping selectors.
-	// See https://github.com/kubernetes/kubernetes/issues/2210
-	SelectorUpdateAnnotation = "deployment.kubernetes.io/selector-updated-at"
 
 	// Reasons for deployment conditions
 	//
@@ -295,8 +287,6 @@ var annotationsToSkip = map[string]bool{
 	RevisionHistoryAnnotation:               true,
 	DesiredReplicasAnnotation:               true,
 	MaxReplicasAnnotation:                   true,
-	OverlapAnnotation:                       true,
-	SelectorUpdateAnnotation:                true,
 }
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
@@ -1019,60 +1009,4 @@ func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployme
 		return nil, fmt.Errorf("expected Deployment, got %#v", objCopy)
 	}
 	return copied, nil
-}
-
-// SelectorUpdatedBefore returns true if the former deployment's selector
-// is updated before the latter, false otherwise.
-func SelectorUpdatedBefore(d1, d2 *extensions.Deployment) bool {
-	t1, t2 := LastSelectorUpdate(d1), LastSelectorUpdate(d2)
-	return t1.Before(t2)
-}
-
-// LastSelectorUpdate returns the last time given deployment's selector is updated
-func LastSelectorUpdate(d *extensions.Deployment) metav1.Time {
-	t := d.Annotations[SelectorUpdateAnnotation]
-	if len(t) > 0 {
-		parsedTime, err := time.Parse(time.RFC3339, t)
-		// If failed to parse the time, use creation timestamp instead
-		if err != nil {
-			return d.CreationTimestamp
-		}
-		return metav1.Time{Time: parsedTime}
-	}
-	// If it's never updated, use creation timestamp instead
-	return d.CreationTimestamp
-}
-
-// BySelectorLastUpdateTime sorts a list of deployments by the last update time of their selector,
-// first using their creation timestamp and then their names as a tie breaker.
-type BySelectorLastUpdateTime []*extensions.Deployment
-
-func (o BySelectorLastUpdateTime) Len() int      { return len(o) }
-func (o BySelectorLastUpdateTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-func (o BySelectorLastUpdateTime) Less(i, j int) bool {
-	ti, tj := LastSelectorUpdate(o[i]), LastSelectorUpdate(o[j])
-	if ti.Equal(tj) {
-		if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-			return o[i].Name < o[j].Name
-		}
-		return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
-	}
-	return ti.Before(tj)
-}
-
-// OverlapsWith returns true when two given deployments are different and overlap with each other
-func OverlapsWith(current, other *extensions.Deployment) (bool, error) {
-	if current.UID == other.UID {
-		return false, nil
-	}
-	currentSelector, err := metav1.LabelSelectorAsSelector(current.Spec.Selector)
-	if err != nil {
-		return false, fmt.Errorf("deployment %s/%s has invalid label selector: %v", current.Namespace, current.Name, err)
-	}
-	otherSelector, err := metav1.LabelSelectorAsSelector(other.Spec.Selector)
-	if err != nil {
-		return false, fmt.Errorf("deployment %s/%s has invalid label selector: %v", other.Namespace, other.Name, err)
-	}
-	return (!currentSelector.Empty() && currentSelector.Matches(labels.Set(other.Spec.Template.Labels))) ||
-		(!otherSelector.Empty() && otherSelector.Matches(labels.Set(current.Spec.Template.Labels))), nil
 }
