@@ -284,19 +284,15 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
-		if controllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
-			return
-		}
-		glog.V(4).Infof("Pod %s added.", pod.Name)
-		ds, err := dsc.dsLister.DaemonSets(pod.Namespace).Get(controllerRef.Name)
-		if err != nil {
+		ds := dsc.resolveControllerRef(pod.Namespace, controllerRef)
+		if ds == nil {
 			return
 		}
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
 			return
 		}
+		glog.V(4).Infof("Pod %s added.", pod.Name)
 		dsc.expectations.CreationObserved(dsKey)
 		dsc.enqueueDaemonSet(ds)
 		return
@@ -333,26 +329,20 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 	curControllerRef := controller.GetControllerOf(curPod)
 	oldControllerRef := controller.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
-	if controllerRefChanged &&
-		oldControllerRef != nil && oldControllerRef.Kind == controllerKind.Kind {
+	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
-		ds, err := dsc.dsLister.DaemonSets(oldPod.Namespace).Get(oldControllerRef.Name)
-		if err == nil {
+		if ds := dsc.resolveControllerRef(oldPod.Namespace, oldControllerRef); ds != nil {
 			dsc.enqueueDaemonSet(ds)
 		}
 	}
 
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
-		if curControllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
+		ds := dsc.resolveControllerRef(curPod.Namespace, curControllerRef)
+		if ds == nil {
 			return
 		}
 		glog.V(4).Infof("Pod %s updated.", curPod.Name)
-		ds, err := dsc.dsLister.DaemonSets(curPod.Namespace).Get(curControllerRef.Name)
-		if err != nil {
-			return
-		}
 		dsc.enqueueDaemonSet(ds)
 		// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
 		if changedToReady && ds.Spec.MinReadySeconds > 0 {
@@ -400,20 +390,15 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 		// No controller should care about orphans being deleted.
 		return
 	}
-	if controllerRef.Kind != controllerKind.Kind {
-		// It's controlled by a different type of controller.
-		return
-	}
-	glog.V(4).Infof("Pod %s deleted.", pod.Name)
-
-	ds, err := dsc.dsLister.DaemonSets(pod.Namespace).Get(controllerRef.Name)
-	if err != nil {
+	ds := dsc.resolveControllerRef(pod.Namespace, controllerRef)
+	if ds == nil {
 		return
 	}
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {
 		return
 	}
+	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	dsc.expectations.DeletionObserved(dsKey)
 	dsc.enqueueDaemonSet(ds)
 }
@@ -496,6 +481,27 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 		nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
 	}
 	return nodeToDaemonPods, nil
+}
+
+// resolveControllerRef returns the controller referenced by a ControllerRef,
+// or nil if the ControllerRef could not be resolved to a matching controller
+// of the corrrect Kind.
+func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.DaemonSet {
+	// We can't look up by UID, so look up by Name and then verify UID.
+	// Don't even try to look up by Name if it's the wrong Kind.
+	if controllerRef.Kind != controllerKind.Kind {
+		return nil
+	}
+	ds, err := dsc.dsLister.DaemonSets(namespace).Get(controllerRef.Name)
+	if err != nil {
+		return nil
+	}
+	if ds.UID != controllerRef.UID {
+		// The controller we found with this Name is not the same one that the
+		// ControllerRef points to.
+		return nil
+	}
+	return ds
 }
 
 func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) error {
