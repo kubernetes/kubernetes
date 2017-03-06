@@ -661,6 +661,7 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 			if newRS != nil && rs.UID == newRS.UID {
 				continue
 			}
+			// TODO: If there are no pods for a deployment, we will never return old replica sets....!
 			allOldRSs[rs.ObjectMeta.Name] = rs
 			if rsLabelsSelector.Matches(podLabelsSelector) {
 				oldRSs[rs.ObjectMeta.Name] = rs
