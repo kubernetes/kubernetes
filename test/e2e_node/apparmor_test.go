@@ -60,6 +60,7 @@ var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor]", func() {
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
+				Expect(state).ToNot(BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
 				Expect(state.ExitCode).To(Not(BeZero()), "ContainerStateTerminated: %+v", state)
 
 			})
@@ -70,6 +71,7 @@ var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor]", func() {
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
+				Expect(state).ToNot(BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
 				Expect(state.ExitCode).To(BeZero(), "ContainerStateTerminated: %+v", state)
 			})
 		})

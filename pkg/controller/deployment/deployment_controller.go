@@ -334,6 +334,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 			return
 		}
 	}
+	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	if d := dc.getDeploymentForPod(pod); d != nil && d.Spec.Strategy.Type == extensions.RecreateDeploymentStrategyType {
 		podList, err := dc.listPods(d)
 		if err == nil && len(podList.Items) == 0 {
@@ -480,7 +481,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 	deployment, err := dc.dLister.Deployments(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		glog.Infof("Deployment has been deleted %v", key)
+		glog.V(2).Infof("Deployment %v has been deleted", key)
 		return nil
 	}
 	if err != nil {

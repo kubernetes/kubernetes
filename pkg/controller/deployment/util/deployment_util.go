@@ -388,8 +388,7 @@ func getIntFromAnnotation(rs *extensions.ReplicaSet, annotationKey string) (int3
 	}
 	intValue, err := strconv.Atoi(annotationValue)
 	if err != nil {
-		glog.Warningf("Cannot convert the value %q with annotation key %q for the replica set %q",
-			annotationValue, annotationKey, rs.Name)
+		glog.V(2).Infof("Cannot convert the value %q with annotation key %q for the replica set %q", annotationValue, annotationKey, rs.Name)
 		return int32(0), false
 	}
 	return int32(intValue), true
@@ -416,11 +415,22 @@ func SetReplicasAnnotations(rs *extensions.ReplicaSet, desiredReplicas, maxRepli
 
 // MaxUnavailable returns the maximum unavailable pods a rolling deployment can take.
 func MaxUnavailable(deployment extensions.Deployment) int32 {
-	if !IsRollingUpdate(&deployment) {
+	if !IsRollingUpdate(&deployment) || *(deployment.Spec.Replicas) == 0 {
 		return int32(0)
 	}
 	// Error caught by validation
 	_, maxUnavailable, _ := ResolveFenceposts(deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, *(deployment.Spec.Replicas))
+	return maxUnavailable
+}
+
+// MaxUnavailableInternal returns the maximum unavailable pods a rolling deployment can take.
+// TODO: remove the duplicate
+func MaxUnavailableInternal(deployment internalextensions.Deployment) int32 {
+	if !(deployment.Spec.Strategy.Type == internalextensions.RollingUpdateDeploymentStrategyType) || deployment.Spec.Replicas == 0 {
+		return int32(0)
+	}
+	// Error caught by validation
+	_, maxUnavailable, _ := ResolveFenceposts(&deployment.Spec.Strategy.RollingUpdate.MaxSurge, &deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, deployment.Spec.Replicas)
 	return maxUnavailable
 }
 
@@ -854,8 +864,7 @@ func DeploymentTimedOut(deployment *extensions.Deployment, newStatus *extensions
 	delta := time.Duration(*deployment.Spec.ProgressDeadlineSeconds) * time.Second
 	timedOut := from.Add(delta).Before(now)
 
-	// TODO: Switch to a much higher verbosity level
-	glog.V(2).Infof("Deployment %q timed out (%t) [last progress check: %v - now: %v]", deployment.Name, timedOut, from, now)
+	glog.V(4).Infof("Deployment %q timed out (%t) [last progress check: %v - now: %v]", deployment.Name, timedOut, from, now)
 	return timedOut
 }
 

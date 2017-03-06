@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -52,6 +53,9 @@ type MetricsProvider interface {
 
 // Metrics represents the used and available bytes of the Volume.
 type Metrics struct {
+	// The time at which these stats were updated.
+	Time metav1.Time
+
 	// Used represents the total bytes used by the Volume.
 	// Note: For block devices this maybe more than the total size of the files.
 	Used *resource.Quantity

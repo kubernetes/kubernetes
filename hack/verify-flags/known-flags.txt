@@ -64,6 +64,7 @@ bench-pods
 bench-quiet
 bench-tasks
 bench-workers
+bind-addrsse
 bind-address
 bind-pods-burst
 bind-pods-qps
@@ -663,6 +664,7 @@ tls-cert-file
 tls-private-key-file
 tls-sni-cert-key
 token-auth-file
+token-ttl
 to-version
 to-version
 ttl-keys-prefix

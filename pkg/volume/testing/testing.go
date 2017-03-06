@@ -754,3 +754,13 @@ func CreateTestPVC(capacity string, accessModes []v1.PersistentVolumeAccessMode)
 	}
 	return &claim
 }
+
+func MetricsEqualIgnoreTimestamp(a *Metrics, b *Metrics) bool {
+	available := a.Available == b.Available
+	capacity := a.Capacity == b.Capacity
+	used := a.Used == b.Used
+	inodes := a.Inodes == b.Inodes
+	inodesFree := a.InodesFree == b.InodesFree
+	inodesUsed := a.InodesUsed == b.InodesUsed
+	return available && capacity && used && inodes && inodesFree && inodesUsed
+}

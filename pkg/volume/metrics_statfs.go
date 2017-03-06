@@ -18,6 +18,7 @@ package volume
 
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -39,7 +40,7 @@ func NewMetricsStatFS(path string) MetricsProvider {
 // GetMetrics calculates the volume usage and device free space by executing "du"
 // and gathering filesystem info for the Volume path.
 func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
-	metrics := &Metrics{}
+	metrics := &Metrics{Time: metav1.Now()}
 	if md.path == "" {
 		return metrics, NewNoPathDefinedError()
 	}

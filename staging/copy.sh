@@ -215,8 +215,9 @@ find "${CLIENT_REPO_TEMP}" -type f \( \
 
 if [ "${FAIL_ON_CHANGES}" = true ]; then
   echo "running FAIL_ON_CHANGES"
-  ret=0
-  if diff --ignore-matching-lines='^\s*\"Comment\"' -NauprB -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
+  # ignore base.go in diff
+  cp "${CLIENT_REPO}/pkg/version/base.go" "${CLIENT_REPO_TEMP}/pkg/version/"
+  if diff -NauprB  -I '^\s*\"Comment\"' -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
     echo "${CLIENT_REPO} up to date."
     exit 0
   else
