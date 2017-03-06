@@ -420,50 +420,21 @@ func TestGetReplicaSetsForDeployment(t *testing.T) {
 	}
 }
 
-func TestGetReplicaSetsForDeploymentAdopt(t *testing.T) {
+func TestGetReplicaSetsForDeploymentAdoptRelease(t *testing.T) {
 	f := newFixture(t)
 
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
 
 	// RS with matching labels, but orphaned. Should be adopted and returned.
-	rs := newReplicaSet(d, "rs", 1)
-	rs.OwnerReferences = nil
-
-	f.dLister = append(f.dLister, d)
-	f.rsLister = append(f.rsLister, rs)
-	f.objects = append(f.objects, d, rs)
-
-	// Start the fixture.
-	c, informers := f.newController()
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-
-	rsList, err := c.getReplicaSetsForDeployment(d)
-	if err != nil {
-		t.Fatalf("getReplicaSetsForDeployment() error: %v", err)
-	}
-	rsNames := []string{}
-	for _, rs := range rsList {
-		rsNames = append(rsNames, rs.Name)
-	}
-	if len(rsNames) != 1 || rsNames[0] != rs.Name {
-		t.Errorf("getReplicaSetsForDeployment() = %v, want [%v]", rsNames, rs.Name)
-	}
-}
-
-func TestGetReplicaSetsForDeploymentRelease(t *testing.T) {
-	f := newFixture(t)
-
-	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-
+	rsAdopt := newReplicaSet(d, "rsAdopt", 1)
+	rsAdopt.OwnerReferences = nil
 	// RS with matching ControllerRef, but wrong labels. Should be released.
-	rs := newReplicaSet(d, "rs", 1)
-	rs.Labels = map[string]string{"foo": "notbar"}
+	rsRelease := newReplicaSet(d, "rsRelease", 1)
+	rsRelease.Labels = map[string]string{"foo": "notbar"}
 
 	f.dLister = append(f.dLister, d)
-	f.rsLister = append(f.rsLister, rs)
-	f.objects = append(f.objects, d, rs)
+	f.rsLister = append(f.rsLister, rsAdopt, rsRelease)
+	f.objects = append(f.objects, d, rsAdopt, rsRelease)
 
 	// Start the fixture.
 	c, informers := f.newController()
@@ -479,8 +450,8 @@ func TestGetReplicaSetsForDeploymentRelease(t *testing.T) {
 	for _, rs := range rsList {
 		rsNames = append(rsNames, rs.Name)
 	}
-	if len(rsNames) != 0 {
-		t.Errorf("getReplicaSetsForDeployment() = %v, want []", rsNames)
+	if len(rsNames) != 1 || rsNames[0] != rsAdopt.Name {
+		t.Errorf("getReplicaSetsForDeployment() = %v, want [%v]", rsNames, rsAdopt.Name)
 	}
 }
 
