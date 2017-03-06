@@ -724,10 +724,10 @@ func (cont *GCEIngressController) Init() {
 	}
 }
 
-// createTLSCertificate generates a random TLS cert with the given name. Returns
+// CreateTLSCertificate generates a random TLS cert with the given name. Returns
 // a string representing the name of the certificate. Caller is expected to
 // manage cleanup of the cert by invoking deleteTLSCertificate.
-func (j *IngressTestJig) createTLSCertificate(cont *GCEIngressController, name string) string {
+func (j *IngressTestJig) CreateTLSCertificate(cont *GCEIngressController, name string) string {
 	_, cert, key, err := createCertificate(j.Ingress)
 	if err != nil {
 		Failf("Failed to generate TLS cert %v: %v", name, err)
@@ -748,7 +748,7 @@ func (j *IngressTestJig) createTLSCertificate(cont *GCEIngressController, name s
 }
 
 // deleteTLSCertificate deletes all TLS certs allocated through calls to
-// createTLSCertificate.
+// CreateTLSCertificate.
 func (cont *GCEIngressController) deleteTLSCertificate() error {
 	if cont.certName != "" {
 		if err := GcloudComputeResourceDelete("ssl-certificates", cont.certName, cont.Cloud.ProjectID); err == nil {

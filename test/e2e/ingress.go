@@ -140,35 +140,35 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		})
 
 		It("should create ingress with pre-shared TLS certificate", func() {
-			jig.createIngress(filepath.Join(ingressManifestPath, "pre-shared-cert"), ns, map[string]string{
+			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "pre-shared-cert"), ns, map[string]string{
 				"kubernetes.io/ingress.allow-http": "false",
 			})
 
 			// Cert deleted when the rest of lb resources are deleted in cleanupGCE.
-			certName := jig.createTLSCertificate(gceController, ns)
+			certName := jig.CreateTLSCertificate(gceController, ns)
 			By(fmt.Sprintf("created TLS cert %v: %v through the GCE cloud provider", ns, certName))
 
-			jig.addPreSharedCert(certName)
+			jig.AddPreSharedCert(certName)
 
 			By("waiting for Ingress to come up with cert: " + certName)
-			jig.waitForIngress(true)
+			jig.WaitForIngress(true)
 
-			httpClient := buildInsecureClient(reqTimeout)
-			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", jig.address), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, false))
+			httpClient := framework.BuildInsecureClient(framework.IngressReqTimeout)
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", jig.Address), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
 
 			By("should reject HTTP traffic")
-			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%v/", jig.address), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, true))
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%v/", jig.Address), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
 
 			By("should have correct firewall rule for ingress")
-			fw := gceController.getFirewallRule()
-			expFw := jig.constructFirewallForIngress(gceController)
+			fw := gceController.GetFirewallRule()
+			expFw := jig.ConstructFirewallForIngress(gceController)
 			// Passed the last argument as `true` to verify the backend ports is a subset
 			// of the allowed ports in firewall rule, given there may be other existing
 			// ingress resources and backends we are not aware of.
-			Expect(framework.VerifyFirewallRule(fw, expFw, gceController.cloud.Network, true)).NotTo(HaveOccurred())
+			Expect(framework.VerifyFirewallRule(fw, expFw, gceController.Cloud.Network, true)).NotTo(HaveOccurred())
 
 			By("should continue serving on provided TLS cert for 30 seconds")
-			framework.ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", jig.address), "", 30, 1*time.Second, httpClient))
+			framework.ExpectNoError(jig.VerifyURL(fmt.Sprintf("https://%v/", jig.Address), "", 30, 1*time.Second, httpClient))
 		})
 
 		// TODO: Implement a multizone e2e that verifies traffic reaches each
