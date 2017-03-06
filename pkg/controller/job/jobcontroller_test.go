@@ -291,6 +291,12 @@ func TestControllerSyncJob(t *testing.T) {
 			if got, want := controllerRef.Kind, "Job"; got != want {
 				t.Errorf("controllerRef.Kind = %q, want %q", got, want)
 			}
+			if got, want := controllerRef.Name, job.Name; got != want {
+				t.Errorf("controllerRef.Name = %q, want %q", got, want)
+			}
+			if got, want := controllerRef.UID, job.UID; got != want {
+				t.Errorf("controllerRef.UID = %q, want %q", got, want)
+			}
 			if controllerRef.Controller == nil || *controllerRef.Controller != true {
 				t.Errorf("controllerRef.Controller is not set to true")
 			}
