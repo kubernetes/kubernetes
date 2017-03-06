@@ -407,9 +407,9 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 	// Set up admission plugin to auto-assign serviceaccounts to pods
 	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount()
-	serviceAccountAdmission.SetInternalClientSet(internalRootClientset)
+	serviceAccountAdmission.SetInternalKubeClientSet(internalRootClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalRootClientset, controller.NoResyncPeriodFunc())
-	serviceAccountAdmission.SetInformerFactory(internalInformers)
+	serviceAccountAdmission.SetInternalKubeInformerFactory(internalInformers)
 
 	masterConfig := framework.NewMasterConfig()
 	masterConfig.GenericConfig.EnableIndex = true
