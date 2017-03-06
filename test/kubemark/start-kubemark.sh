@@ -156,7 +156,7 @@ clusters:
 - name: kubemark
   cluster:
     certificate-authority-data: "${CA_CERT_BASE64}"
-    server: https://${MASTER_IP}
+    server: https://${MASTER_IP_AND_PORT}
 contexts:
 - context:
     cluster: kubemark
@@ -216,7 +216,7 @@ clusters:
 - name: kubemark
   cluster:
     certificate-authority-data: "${CA_CERT_BASE64}"
-    server: https://${MASTER_IP}
+    server: https://${MASTER_IP_AND_PORT}
 contexts:
 - context:
     cluster: kubemark
@@ -235,7 +235,7 @@ clusters:
 - name: kubemark
   cluster:
     insecure-skip-tls-verify: true
-    server: https://${MASTER_IP}
+    server: https://${MASTER_IP_AND_PORT}
 contexts:
 - context:
     cluster: kubemark
@@ -254,7 +254,7 @@ clusters:
 - name: kubemark
   cluster:
     insecure-skip-tls-verify: true
-    server: https://${MASTER_IP}
+    server: https://${MASTER_IP_AND_PORT}
 contexts:
 - context:
     cluster: kubemark
@@ -273,7 +273,7 @@ clusters:
 - name: kubemark
   cluster:
     insecure-skip-tls-verify: true
-    server: https://${MASTER_IP}
+    server: https://${MASTER_IP_AND_PORT}
 contexts:
 - context:
     cluster: kubemark
@@ -370,6 +370,7 @@ echo -e "${color_yellow}STARTING SETUP FOR MASTER${color_norm}"
 find-release-tars
 create-master-environment-file
 create-master-instance-with-resources
+MASTER_IP_AND_PORT="${MASTER_IP_AND_PORT:-$MASTER_IP}"
 generate-pki-config
 wait-for-master-reachability
 write-pki-config-to-master
