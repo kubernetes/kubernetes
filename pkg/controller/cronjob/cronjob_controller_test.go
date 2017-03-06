@@ -302,6 +302,12 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 				if got, want := controllerRef.Kind, "CronJob"; got != want {
 					t.Errorf("%s: controllerRef.Kind = %q, want %q", name, got, want)
 				}
+				if got, want := controllerRef.Name, sj.Name; got != want {
+					t.Errorf("%s: controllerRef.Name = %q, want %q", name, got, want)
+				}
+				if got, want := controllerRef.UID, sj.UID; got != want {
+					t.Errorf("%s: controllerRef.UID = %q, want %q", name, got, want)
+				}
 				if controllerRef.Controller == nil || *controllerRef.Controller != true {
 					t.Errorf("%s: controllerRef.Controller is not set to true", name)
 				}
