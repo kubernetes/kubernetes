@@ -203,15 +203,11 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := controller.GetControllerOf(rs); controllerRef != nil {
-		if controllerRef.Kind != controllerKind.Kind {
-			// It's controller by a different type of controller.
+		d := dc.resolveControllerRef(rs.Namespace, controllerRef)
+		if d == nil {
 			return
 		}
 		glog.V(4).Infof("ReplicaSet %s added.", rs.Name)
-		d, err := dc.dLister.Deployments(rs.Namespace).Get(controllerRef.Name)
-		if err != nil {
-			return
-		}
 		dc.enqueueDeployment(d)
 		return
 	}
@@ -264,26 +260,20 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 	curControllerRef := controller.GetControllerOf(curRS)
 	oldControllerRef := controller.GetControllerOf(oldRS)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
-	if controllerRefChanged &&
-		oldControllerRef != nil && oldControllerRef.Kind == controllerKind.Kind {
+	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
-		d, err := dc.dLister.Deployments(oldRS.Namespace).Get(oldControllerRef.Name)
-		if err == nil {
+		if d := dc.resolveControllerRef(oldRS.Namespace, oldControllerRef); d != nil {
 			dc.enqueueDeployment(d)
 		}
 	}
 
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
-		if curControllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
+		d := dc.resolveControllerRef(curRS.Namespace, curControllerRef)
+		if d == nil {
 			return
 		}
 		glog.V(4).Infof("ReplicaSet %s updated.", curRS.Name)
-		d, err := dc.dLister.Deployments(curRS.Namespace).Get(curControllerRef.Name)
-		if err != nil {
-			return
-		}
 		dc.enqueueDeployment(d)
 		return
 	}
@@ -331,16 +321,11 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 		// No controller should care about orphans being deleted.
 		return
 	}
-	if controllerRef.Kind != controllerKind.Kind {
-		// It's controlled by a different type of controller.
+	d := dc.resolveControllerRef(rs.Namespace, controllerRef)
+	if d == nil {
 		return
 	}
 	glog.V(4).Infof("ReplicaSet %s deleted.", rs.Name)
-
-	d, err := dc.dLister.Deployments(rs.Namespace).Get(controllerRef.Name)
-	if err != nil {
-		return
-	}
 	dc.enqueueDeployment(d)
 }
 
@@ -431,7 +416,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *extensions.Dep
 		return nil
 	}
 	rs, err = dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
-	if err != nil {
+	if err != nil || rs.UID != controllerRef.UID {
 		glog.V(4).Infof("Cannot get replicaset %q for pod %q: %v", controllerRef.Name, pod.Name, err)
 		return nil
 	}
@@ -441,11 +426,25 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *extensions.Dep
 	if controllerRef == nil {
 		return nil
 	}
+	return dc.resolveControllerRef(rs.Namespace, controllerRef)
+}
+
+// resolveControllerRef returns the controller referenced by a ControllerRef,
+// or nil if the ControllerRef could not be resolved to a matching controller
+// of the corrrect Kind.
+func (dc *DeploymentController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.Deployment {
+	// We can't look up by UID, so look up by Name and then verify UID.
+	// Don't even try to look up by Name if it's the wrong Kind.
 	if controllerRef.Kind != controllerKind.Kind {
 		return nil
 	}
-	d, err := dc.dLister.Deployments(rs.Namespace).Get(controllerRef.Name)
+	d, err := dc.dLister.Deployments(namespace).Get(controllerRef.Name)
 	if err != nil {
+		return nil
+	}
+	if d.UID != controllerRef.UID {
+		// The controller we found with this Name is not the same one that the
+		// ControllerRef points to.
 		return nil
 	}
 	return d
