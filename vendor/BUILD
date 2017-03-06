@@ -9637,7 +9637,10 @@ go_test(
 
 go_library(
     name = "k8s.io/apiserver/pkg/authentication/group",
-    srcs = ["k8s.io/apiserver/pkg/authentication/group/group_adder.go"],
+    srcs = [
+        "k8s.io/apiserver/pkg/authentication/group/authenticated_group_adder.go",
+        "k8s.io/apiserver/pkg/authentication/group/group_adder.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
