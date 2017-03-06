@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -1837,7 +1836,7 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 		if strings.Contains(data.Image, jpgExpected) {
 			return nil
 		} else {
-			return errors.New(fmt.Sprintf("data served up in container is inaccurate, %s didn't contain %s", data, jpgExpected))
+			return fmt.Errorf("data served up in container is inaccurate, %s didn't contain %s", data, jpgExpected)
 		}
 	}
 }
