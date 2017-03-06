@@ -403,10 +403,12 @@ func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
 	go wait.Until(s.clusterEndpointWorker, time.Second, stopCh)
 	go wait.Until(s.clusterServiceWorker, time.Second, stopCh)
 	go wait.Until(s.clusterSyncLoop, time.Second, stopCh)
-	<-stopCh
-	glog.Infof("Shutting down Federation Service Controller")
-	s.queue.ShutDown()
-	s.federatedInformer.Stop()
+	go func() {
+		<-stopCh
+		glog.Infof("Shutting down Federation Service Controller")
+		s.queue.ShutDown()
+		s.federatedInformer.Stop()
+	}()
 	return nil
 }
 
