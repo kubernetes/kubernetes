@@ -12399,7 +12399,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"concurrencyPolicy": {
 							SchemaProps: spec.SchemaProps{
-								Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+								Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job. Defaults to Allow.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
