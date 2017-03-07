@@ -20,7 +20,9 @@ package garbagecollector
 
 import (
 	"fmt"
+	"math"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,6 +32,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	kubectlutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -147,7 +151,9 @@ func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, 
 	metaOnlyClientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), deletableGroupVersionResources)
+	cachedDiscoveryClient := kubectlutil.NewCachedDiscoveryClient(discovery.NewDiscoveryClientForConfigOrDie(config), os.TempDir(), time.Duration(math.MaxInt64))
+	dynamicMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoveryClient, meta.InterfacesForUnstructured)
+	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, dynamicMapper, deletableGroupVersionResources)
 	if err != nil {
 		t.Fatalf("Failed to create garbage collector")
 	}
