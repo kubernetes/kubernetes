@@ -52,7 +52,7 @@ func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	<-done
 	if upgrade == MasterUpgrade {
-		t.verifyPodStaysUp(f)
+		t.verifyPodStillUp(f)
 	}
 	t.verifyNodesAppArmorEnabled(f)
 	t.verifyNewPodSucceeds(f)
@@ -65,7 +65,7 @@ func (t *AppArmorUpgradeTest) Teardown(f *framework.Framework) {
 	framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 }
 
-func (t *AppArmorUpgradeTest) verifyPodStaysUp(f *framework.Framework) {
+func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 	By("Verifying an AppArmor profile is continuously enforced for a pod")
 	pod, err := f.PodClient().Get(t.pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Should be able to get pod")
