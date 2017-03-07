@@ -689,3 +689,12 @@ func (c byCapacity) Swap(i, j int) {
 func (c byCapacity) Len() int {
 	return len(c.volumes)
 }
+
+// matchStorageCapacity is a matchPredicate used to sort and find volumes
+func matchStorageCapacity(pvA, pvB *v1.PersistentVolume) bool {
+	aQty := pvA.Spec.Capacity[v1.ResourceStorage]
+	bQty := pvB.Spec.Capacity[v1.ResourceStorage]
+	aSize := aQty.Value()
+	bSize := bQty.Value()
+	return aSize <= bSize
+}
