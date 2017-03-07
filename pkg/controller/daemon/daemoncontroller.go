@@ -504,7 +504,13 @@ func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controll
 	return ds
 }
 
-func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) error {
+func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
+	// Find out which nodes are running the daemon pods controlled by ds.
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	if err != nil {
+		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+	}
+
 	// For each node, if the node is running the daemon pod but isn't supposed to, kill the daemon
 	// pod. If the node is supposed to run the daemon pod, but isn't, create the daemon pod on the node.
 	nodeList, err := dsc.nodeLister.List(labels.Everything())
@@ -682,8 +688,12 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 	return updateErr
 }
 
-func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) error {
+func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet) error {
 	glog.V(4).Infof("Updating daemon set status")
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	if err != nil {
+		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+	}
 
 	nodeList, err := dsc.nodeLister.List(labels.Everything())
 	if err != nil {
@@ -760,12 +770,6 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		return nil
 	}
 
-	// Find out which nodes are running the daemon pods controlled by ds.
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
-	if err != nil {
-		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
-	}
-
 	// Don't process a daemon set until all its creations and deletions have been processed.
 	// For example if daemon set foo asked for 3 new daemon pods in the previous call to manage,
 	// then we do not want to call manage on foo until the daemon pods have been created.
@@ -773,25 +777,27 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	if err != nil {
 		return fmt.Errorf("couldn't get key for object %#v: %v", ds, err)
 	}
-	dsNeedsSync := dsc.expectations.SatisfiedExpectations(dsKey)
-	if dsNeedsSync && ds.DeletionTimestamp == nil {
-		if err := dsc.manage(ds, nodeToDaemonPods); err != nil {
-			return err
-		}
+	if ds.DeletionTimestamp != nil || !dsc.expectations.SatisfiedExpectations(dsKey) {
+		// Only update status.
+		return dsc.updateDaemonSetStatus(ds)
 	}
 
-	dsNeedsSync = dsc.expectations.SatisfiedExpectations(dsKey)
-	if dsNeedsSync && ds.DeletionTimestamp == nil {
+	if err := dsc.manage(ds); err != nil {
+		return err
+	}
+
+	// Process rolling updates if we're ready.
+	if dsc.expectations.SatisfiedExpectations(dsKey) {
 		switch ds.Spec.UpdateStrategy.Type {
 		case extensions.RollingUpdateDaemonSetStrategyType:
-			err = dsc.rollingUpdate(ds, nodeToDaemonPods)
+			err = dsc.rollingUpdate(ds)
 		}
 		if err != nil {
 			return err
 		}
 	}
 
-	return dsc.updateDaemonSetStatus(ds, nodeToDaemonPods)
+	return dsc.updateDaemonSetStatus(ds)
 }
 
 // nodeShouldRunDaemonPod checks a set of preconditions against a (node,daemonset) and returns a
