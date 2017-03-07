@@ -2,10 +2,7 @@
   "kind": "PersistentVolumeClaim",
   "apiVersion": "v1",
   "metadata": {
-    "name": "claim1",
-    "annotations": {
-      "volume.beta.kubernetes.io/storage-class": "slow"
-    }
+    "name": "claim1"
   },
   "spec": {
     "accessModes": [
@@ -15,6 +12,7 @@
       "requests": {
         "storage": "3Gi"
       }
-    }
+    },
+    "storageClassName": "slow"
   }
 }
