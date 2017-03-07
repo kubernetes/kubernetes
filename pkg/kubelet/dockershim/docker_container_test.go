@@ -23,7 +23,9 @@ import (
 	"testing"
 	"time"
 
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -101,14 +103,15 @@ func TestContainerStatus(t *testing.T) {
 	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
 	labels := map[string]string{"abc.xyz": "foo"}
 	annotations := map[string]string{"foo.bar.baz": "abc"}
-	config := makeContainerConfig(sConfig, "pause", "iamimage", 0, labels, annotations)
+	imageName := "iamimage"
+	config := makeContainerConfig(sConfig, "pause", imageName, 0, labels, annotations)
 
 	var defaultTime time.Time
 	dt := defaultTime.UnixNano()
 	ct, st, ft := dt, dt, dt
 	state := runtimeapi.ContainerState_CONTAINER_CREATED
+	imageRef := DockerImageIDPrefix + imageName
 	// The following variables are not set in FakeDockerClient.
-	imageRef := DockerImageIDPrefix + ""
 	exitCode := int32(0)
 	var reason, message string
 
@@ -128,11 +131,14 @@ func TestContainerStatus(t *testing.T) {
 		Annotations: config.Annotations,
 	}
 
+	fDocker.InjectImages([]dockertypes.Image{{ID: imageName}})
+
 	// Create the container.
 	fClock.SetTime(time.Now().Add(-1 * time.Hour))
 	expected.CreatedAt = fClock.Now().UnixNano()
 	const sandboxId = "sandboxid"
 	id, err := ds.CreateContainer(sandboxId, config, sConfig)
+	assert.NoError(t, err)
 
 	// Check internal labels
 	c, err := fDocker.InspectContainer(id)
@@ -242,23 +248,20 @@ func TestContainerCreationConflict(t *testing.T) {
 			expectFields: 6,
 		},
 		"random create error": {
-			createError:  randomError,
-			expectError:  randomError,
-			expectCalls:  []string{"create"},
-			expectFields: 1,
+			createError: randomError,
+			expectError: randomError,
+			expectCalls: []string{"create"},
 		},
 		"conflict create error with successful remove": {
-			createError:  conflictError,
-			expectError:  conflictError,
-			expectCalls:  []string{"create", "remove"},
-			expectFields: 1,
+			createError: conflictError,
+			expectError: conflictError,
+			expectCalls: []string{"create", "remove"},
 		},
 		"conflict create error with random remove error": {
-			createError:  conflictError,
-			removeError:  randomError,
-			expectError:  conflictError,
-			expectCalls:  []string{"create", "remove"},
-			expectFields: 1,
+			createError: conflictError,
+			removeError: randomError,
+			expectError: conflictError,
+			expectCalls: []string{"create", "remove"},
 		},
 		"conflict create error with no such container remove error": {
 			createError:  conflictError,
@@ -276,9 +279,13 @@ func TestContainerCreationConflict(t *testing.T) {
 		if test.removeError != nil {
 			fDocker.InjectError("remove", test.removeError)
 		}
-		name, err := ds.CreateContainer(sandboxId, config, sConfig)
-		assert.Equal(t, test.expectError, err)
+		id, err := ds.CreateContainer(sandboxId, config, sConfig)
+		require.Equal(t, test.expectError, err)
 		assert.NoError(t, fDocker.AssertCalls(test.expectCalls))
-		assert.Len(t, strings.Split(name, nameDelimiter), test.expectFields)
+		if err == nil {
+			c, err := fDocker.InspectContainer(id)
+			assert.NoError(t, err)
+			assert.Len(t, strings.Split(c.Name, nameDelimiter), test.expectFields)
+		}
 	}
 }
