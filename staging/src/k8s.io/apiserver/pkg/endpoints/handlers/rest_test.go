@@ -284,6 +284,37 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 }
 
+func TestNumberConversion(t *testing.T) {
+	codec := api.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
+
+	currentVersionedObject := &v1.Service{
+		TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-service"},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Port:     80,
+					Protocol: "TCP",
+					NodePort: 31678,
+				},
+			},
+		},
+	}
+	versionedObjToUpdate := &v1.Service{}
+	versionedObj := &v1.Service{}
+
+	patchJS := []byte(`{"spec":{"ports":[{"port":80,"nodePort":31789}]}}`)
+
+	_, _, err := strategicPatchObject(codec, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ports := versionedObjToUpdate.Spec.Ports
+	if len(ports) != 1 || ports[0].Port != 80 || ports[0].NodePort != 31789 {
+		t.Fatal(errors.New("Ports failed to merge because of number conversion issue"))
+	}
+}
+
 func TestPatchResourceWithVersionConflict(t *testing.T) {
 	namespace := "bar"
 	name := "foo"
