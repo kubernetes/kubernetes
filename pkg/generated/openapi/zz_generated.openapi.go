@@ -5944,6 +5944,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"minMatchingPods": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The minimal number of pod that matching the selector; the term is considered to be matched if and only if the matching number is larger than minMatchingPods. The default value is 1. Only available for hard pod anti-affinity (RequiredDuringSchedulingIgnoredDuringExecution).",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
 					},
 					Required: []string{"namespaces"},
 				},

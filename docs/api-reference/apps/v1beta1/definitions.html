@@ -1996,6 +1996,13 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">minMatchingPods</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The minimal number of pod that matching the selector; the term is considered to be matched if and only if the matching number is larger than minMatchingPods. The default value is 1. Only available for hard pod anti-affinity (RequiredDuringSchedulingIgnoredDuringExecution).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -6256,7 +6263,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-03-03 18:17:45 UTC
+Last updated 2017-03-07 00:49:13 UTC
 </div>
 </div>
 </body>
