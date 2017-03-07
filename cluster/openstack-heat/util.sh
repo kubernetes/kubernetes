@@ -233,6 +233,7 @@ function run-heat-script() {
       --parameter https_proxy="${HTTPS_PROXY}" \
       --parameter socks_proxy="${SOCKS_PROXY}" \
       --parameter no_proxy="${NO_PROXY}" \
+      --parameter assign_floating_ip="${ASSIGN_FLOATING_IP}" \
       --template kubecluster.yaml \
       ${STACK_NAME}
     )
