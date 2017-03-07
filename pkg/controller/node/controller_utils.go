@@ -85,7 +85,7 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 			continue
 		}
 
-		glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
+		glog.V(2).Infof("Starting deletion of pod %v/%v", pod.Namespace, pod.Name)
 		recorder.Eventf(&pod, v1.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
 		if err := kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			return false, err
