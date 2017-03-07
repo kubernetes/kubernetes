@@ -34,9 +34,14 @@ import (
 // namespace> tuple to a unversioned.APIResource struct.
 func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool) (*metav1.APIResource, error) {
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
-	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
+	mapping, err := gc.dynamicMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get REST mapping for kind: %s, version: %s", kind, apiVersion)
+		// reset the mapper so that next call will communicate with the server to re-discover.
+		gc.dynamicMapper.Reset()
+		mapping, err = gc.dynamicMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get REST mapping for kind: %s, version: %s", kind, apiVersion)
+		}
 	}
 	glog.V(5).Infof("map kind %s, version %s to resource %s", kind, apiVersion, mapping.Resource)
 	resource := metav1.APIResource{

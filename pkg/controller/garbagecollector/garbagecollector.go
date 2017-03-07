@@ -31,6 +31,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -55,7 +56,7 @@ const ResourceResyncTime time.Duration = 0
 // ensures that the garbage collector operates with a graph that is at least as
 // up to date as the notification is sent.
 type GarbageCollector struct {
-	restMapper meta.RESTMapper
+	dynamicMapper *discovery.DeferredDiscoveryRESTMapper
 	// clientPool uses the regular dynamicCodec. We need it to update
 	// finalizers. It can be removed if we support patching finalizers.
 	clientPool dynamic.ClientPool
@@ -71,22 +72,22 @@ type GarbageCollector struct {
 	absentOwnerCache *UIDCache
 }
 
-func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, deletableResources map[schema.GroupVersionResource]struct{}) (*GarbageCollector, error) {
+func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, dynamicMapper *discovery.DeferredDiscoveryRESTMapper, deletableResources map[schema.GroupVersionResource]struct{}) (*GarbageCollector, error) {
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewUIDCache(500)
 	gc := &GarbageCollector{
 		clientPool:            clientPool,
-		restMapper:            mapper,
+		dynamicMapper:         dynamicMapper,
 		attemptToDelete:       attemptToDelete,
 		attemptToOrphan:       attemptToOrphan,
 		registeredRateLimiter: NewRegisteredRateLimiter(deletableResources),
 		absentOwnerCache:      absentOwnerCache,
 	}
 	gb := &GraphBuilder{
+		restMapper:                          dynamicMapper,
 		metaOnlyClientPool:                  metaOnlyClientPool,
 		registeredRateLimiterForControllers: NewRegisteredRateLimiter(deletableResources),
-		restMapper:                          mapper,
 		graphChanges:                        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
 		uidToNode: &concurrentUIDToNode{
 			uidToNode: make(map[types.UID]*node),
