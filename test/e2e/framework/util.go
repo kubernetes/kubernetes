@@ -3177,9 +3177,7 @@ func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deploymen
 		}
 
 		// When the deployment status and its underlying resources reach the desired state, we're done
-		if deployment.Status.Replicas == *(deployment.Spec.Replicas) &&
-			deployment.Status.UpdatedReplicas == *(deployment.Spec.Replicas) &&
-			deployment.Status.AvailableReplicas == *(deployment.Spec.Replicas) {
+		if deploymentutil.DeploymentComplete(deployment, &deployment.Status) {
 			return true, nil
 		}
 
@@ -3245,11 +3243,7 @@ func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment) er
 		}
 
 		// When the deployment status and its underlying resources reach the desired state, we're done
-		if deployment.Status.Replicas == *(deployment.Spec.Replicas) &&
-			deployment.Status.UpdatedReplicas == *(deployment.Spec.Replicas) {
-			return true, nil
-		}
-		return false, nil
+		return deploymentutil.DeploymentComplete(deployment, &deployment.Status), nil
 	})
 
 	if err == wait.ErrWaitTimeout {
