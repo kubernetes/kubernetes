@@ -203,11 +203,12 @@ func TestValidate(t *testing.T) {
 		},
 		"test-valid-case": {
 			roleOptions: &CreateRoleOptions{
-				Name:  "my-role",
-				Verbs: []string{"get", "list"},
+				Name:  "role-binder",
+				Verbs: []string{"get", "list", "bind"},
 				Resources: []schema.GroupVersionResource{
 					{
-						Resource: "pods",
+						Resource: "roles",
+						Group:    "rbac.authorization.k8s.io",
 					},
 				},
 				ResourceNames: []string{"foo"},
