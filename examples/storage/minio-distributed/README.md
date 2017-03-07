@@ -42,7 +42,7 @@ kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/
 
 ## Step 1: Create Minio Headless Service
 
-Headless Service controls the domain within which we create StatefulSets. The domain managed by this Service takes the form: `$(service name).$(namespace).svc.cluster.local` (where “cluster.local” is the cluster domain), and the pods in this domain take the form: `$(pod-name-{i}).$(service name).$(namespace).svc.cluster.local`. This is required to get a DNS resolvable URL for each of the pods created within the Statefulset.
+Headless Service controls the domain within which StatefulSets are created. The domain managed by this Service takes the form: `$(service name).$(namespace).svc.cluster.local` (where “cluster.local” is the cluster domain), and the pods in this domain take the form: `$(pod-name-{i}).$(service name).$(namespace).svc.cluster.local`. This is required to get a DNS resolvable URL for each of the pods created within the Statefulset.
 
 This is the Headless service description.
 
@@ -61,16 +61,11 @@ spec:
   selector:
     app: minio
 ```
-[Download example] (minio-distributed-headless-service.yaml?raw=true)
 
 Create the Headless Service
 
 ```sh
-kubectl create -f minio-distributed-headless-service.yaml
-```
-The response should be like this:
-
-```sh
+$ kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio-distributed/minio-distributed-headless-service.yaml?raw=true
 service "minio" created
 ```
 
@@ -86,7 +81,7 @@ kind: StatefulSet
 metadata:
   name: minio
 spec:
-  serviceName: "minio"
+  serviceName: minio
   replicas: 4
   template:
     metadata:
@@ -103,8 +98,14 @@ spec:
         - name: MINIO_SECRET_KEY
           value: "minio123"
         image: minio/minio
-        command: ["minio"]
-        args: ["server", "http://minio-0.minio.default.svc.cluster.local/data", "http://minio-1.minio.default.svc.cluster.local/data", "http://minio-2.minio.default.svc.cluster.local/data", "http://minio-3.minio.default.svc.cluster.local/data"]
+        command:
+        - minio
+        args:
+        - server
+        - http://minio-0.minio.default.svc.cluster.local/data
+        - http://minio-1.minio.default.svc.cluster.local/data
+        - http://minio-2.minio.default.svc.cluster.local/data
+        - http://minio-3.minio.default.svc.cluster.local/data
         ports:
         - containerPort: 9000
           hostPort: 9000
@@ -121,23 +122,17 @@ spec:
       annotations:
         volume.alpha.kubernetes.io/storage-class: anything
     spec:
-      accessModes: [ "ReadWriteOnce" ]
+      accessModes:
+        - ReadWriteOnce
       resources:
         requests:
           storage: 10Gi
 ```
 
-[Download example] (minio-distributed-statefulset.yaml?raw=true)
-
 Create the Statefulset
 
 ```sh
-kubectl create -f minio-distributed-statefulset.yaml
-```
-
-The response should be like this
-
-```sh
+$ kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio-distributed/minio-distributed-statefulset.yaml?raw=true
 statefulset "minio" created
 ```
 
@@ -159,35 +154,26 @@ spec:
       targetPort: 9000
       protocol: TCP
   selector:
-    app: minio-server
+    app: minio
 ```
-
-[Download example] (minio-distributed-service.yaml?raw=true)
+Create the Minio service
 
 ```sh
-kubectl create -f minio-distributed-service.yaml
-```
-
-The response should be like this
-
-```sh
+$ kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio-distributed/minio-distributed-service.yaml?raw=true
 service "minio-service" created
 ```
-To check if the service was created successfully, run the command
+
+The `LoadBalancer` service takes couple of minutes to launch. To check if the service was created successfully, run the command
 
 ```sh
-kubectl get svc minio-service
-```
-
-You should get a response like this
-```sh
+$ kubectl get svc minio-service
 NAME            CLUSTER-IP     EXTERNAL-IP       PORT(S)          AGE
 minio-service   10.55.248.23   104.199.249.165   9000:31852/TCP   1m
 ```
 
 # Step 4: Resource cleanup
 
-Once you are done, cleanup the cluster using
+You can cleanup the cluster using
 ```sh
 kubectl delete statefulset minio \
 &&  kubectl delete svc minio \

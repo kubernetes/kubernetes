@@ -67,16 +67,11 @@ spec:
     requests:
       storage: 10Gi
 ```
-[Download example] (minio-standalone-pvc.yaml?raw=true)
 
 Create the PersistentVolumeClaim
 
 ```sh
-kubectl create -f minio-standalone-pvc.yaml
-```
-The response should be like this:
-
-```sh
+kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio/minio-standalone-pvc.yaml?raw=true
 persistentvolumeclaim "minio-pv-claim" created
 ```
 
@@ -99,7 +94,7 @@ spec:
     metadata:
       labels:
         # Label is used as selector in the service.
-        app: minio-server
+        app: minio
     spec:
       # Refer to the PVC created earlier
       volumes:
@@ -111,8 +106,11 @@ spec:
       - name: minio
         # Pulls the default Minio image from Docker Hub
         image: minio/minio
-        command: ["minio"]
-        args: ["server", "/storage"]
+        command:
+        - minio
+        args:
+        - server
+        - /storage
         env:
         # Minio access key and secret key
         - name: MINIO_ACCESS_KEY
@@ -128,17 +126,10 @@ spec:
           mountPath: "/storage"
 ```
 
-[Download example] (minio-standalone-deployment.yaml?raw=true)
-
 Create the Deployment
 
 ```sh
-kubectl create -f minio-standalone-deployment.yaml
-```
-
-The response should be like this
-
-```sh
+kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio/minio-standalone-deployment.yaml?raw=true
 deployment "minio-deployment" created
 ```
 
@@ -160,28 +151,19 @@ spec:
       targetPort: 9000
       protocol: TCP
   selector:
-    app: minio-server
+    app: minio
 ```
-
-[Download example] (minio-standalone-service.yaml?raw=true)
+Create the Minio service
 
 ```sh
-kubectl create -f minio-standalone-service.yaml
-```
-
-The response should be like this
-
-```sh
+kubectl create -f https://github.com/kubernetes/kubernetes/blob/master/examples/storage/minio/minio-standalone-service.yaml?raw=true
 service "minio-service" created
 ```
-To check if the service was created successfully, run the command
+
+The `LoadBalancer` service takes couple of minutes to launch. To check if the service was created successfully, run the command
 
 ```sh
 kubectl get svc minio-service
-```
-
-You should get a response like this
-```sh
 NAME            CLUSTER-IP     EXTERNAL-IP       PORT(S)          AGE
 minio-service   10.55.248.23   104.199.249.165   9000:31852/TCP   1m
 ```

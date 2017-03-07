@@ -10,7 +10,7 @@ spec:
     metadata:
       labels:
         # Label is used as selector in the service.
-        app: minio-server
+        app: minio
     spec:
       # Refer to the PVC created earlier
       volumes:
@@ -22,8 +22,11 @@ spec:
       - name: minio
         # Pulls the default Minio image from Docker Hub
         image: minio/minio
-        command: ["minio"]
-        args: ["server", "/storage"]
+        command:
+        - minio
+        args:
+        - server
+        - /storage
         env:
         # Minio access key and secret key
         - name: MINIO_ACCESS_KEY

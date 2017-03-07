@@ -9,4 +9,4 @@ spec:
       targetPort: 9000
       protocol: TCP
   selector:
-    app: minio-server
+    app: minio
