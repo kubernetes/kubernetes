@@ -88,6 +88,7 @@ function upgrade-master() {
 
   detect-master
   parse-master-env
+  backfile-kubeletauth-certs
 
   # Delete the master instance. Note that the master-pd is created
   # with auto-delete=no, so it should not be deleted.
@@ -99,6 +100,51 @@ function upgrade-master() {
 
   create-master-instance "${MASTER_NAME}-ip"
   wait-for-master
+}
+
+# TODO(mikedanese): delete when we don't support < 1.6
+function backfile-kubeletauth-certs() {
+  if [[ ! -z "${KUBEAPISERVER_CERT_BASE64:-}" && ! -z "${KUBEAPISERVER_CERT_BASE64:-}" ]]; then
+    return 0
+  fi
+
+  mkdir -p "${KUBE_TEMP}/pki"
+  echo "${CA_KEY_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.key"
+  echo "${CA_CERT_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.crt"
+  (cd "${KUBE_TEMP}/pki"
+    download-cfssl
+    cat <<EOF > ca-config.json
+{
+  "signing": {
+    "client": {
+      "expiry": "43800h",
+      "usages": [
+        "signing",
+        "key encipherment",
+        "client auth"
+      ]
+    }
+  }
+}
+EOF
+    # the name kube-apiserver is bound to the node proxy
+    # subpaths required for the apiserver to hit proxy
+    # endpoints on the kubelet's handler.
+    cat <<EOF \
+      | "${KUBE_TEMP}/cfssl/cfssl" gencert \
+        -ca=ca.crt \
+        -ca-key=ca.key \
+        -config=ca-config.json \
+        -profile=client \
+        - \
+      | "${KUBE_TEMP}/cfssl/cfssljson" -bare kube-apiserver
+{
+  "CN": "kube-apiserver"
+}
+EOF
+  )
+  KUBEAPISERVER_CERT_BASE64=$(cat "${KUBE_TEMP}/pki/kube-apiserver.pem" | base64 | tr -d '\r\n')
+  KUBEAPISERVER_KEY_BASE64=$(cat "${KUBE_TEMP}/pki/kube-apiserver-key.pem" | base64 | tr -d '\r\n')
 }
 
 function wait-for-master() {
