@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -44,13 +44,12 @@ const (
 )
 
 var (
-	CronJobGroupVersionResource      = schema.GroupVersionResource{Group: batch.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
-	ScheduledJobGroupVersionResource = schema.GroupVersionResource{Group: batch.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}
-	BatchV2Alpha1GroupVersion        = schema.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
+	CronJobGroupVersionResource      = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
+	ScheduledJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}
 )
 
 var _ = framework.KubeDescribe("CronJob", func() {
-	f := framework.NewDefaultGroupVersionFramework("cronjob", BatchV2Alpha1GroupVersion)
+	f := framework.NewDefaultFramework("cronjob")
 
 	sleepCommand := []string{"sleep", "300"}
 
@@ -64,7 +63,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// multiple jobs running at once
 	It("should schedule multiple jobs concurrently", func() {
 		By("Creating a cronjob")
-		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent,
+		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv2alpha1.AllowConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
@@ -87,7 +86,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// suspended should not schedule jobs
 	It("should not schedule jobs when suspended [Slow]", func() {
 		By("Creating a suspended cronjob")
-		cronJob := newTestCronJob("suspended", "*/1 * * * ?", batch.AllowConcurrent,
+		cronJob := newTestCronJob("suspended", "*/1 * * * ?", batchv2alpha1.AllowConcurrent,
 			sleepCommand, nil)
 		t := true
 		cronJob.Spec.Suspend = &t
@@ -111,7 +110,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// only single active job is allowed for ForbidConcurrent
 	It("should not schedule new jobs when ForbidConcurrent [Slow]", func() {
 		By("Creating a ForbidConcurrent cronjob")
-		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batch.ForbidConcurrent,
+		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batchv2alpha1.ForbidConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
@@ -143,7 +142,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// only single active job is allowed for ReplaceConcurrent
 	It("should replace jobs when ReplaceConcurrent", func() {
 		By("Creating a ReplaceConcurrent cronjob")
-		cronJob := newTestCronJob("replace", "*/1 * * * ?", batch.ReplaceConcurrent,
+		cronJob := newTestCronJob("replace", "*/1 * * * ?", batchv2alpha1.ReplaceConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
@@ -175,7 +174,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// shouldn't give us unexpected warnings
 	It("should not emit unexpected warnings", func() {
 		By("Creating a cronjob")
-		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent,
+		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv2alpha1.AllowConcurrent,
 			nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
@@ -198,7 +197,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// deleted jobs should be removed from the active list
 	It("should remove from active list jobs that have been deleted", func() {
 		By("Creating a ForbidConcurrent cronjob")
-		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batch.ForbidConcurrent,
+		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batchv2alpha1.ForbidConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
@@ -242,7 +241,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	It("should delete successful finished jobs with limit of one successful job", func() {
 		By("Creating a AllowConcurrent cronjob with custom history limits")
 		successLimit := int32(1)
-		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batch.AllowConcurrent,
+		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batchv2alpha1.AllowConcurrent,
 			successCommand, &successLimit)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		Expect(err).NotTo(HaveOccurred())
@@ -278,19 +277,19 @@ var _ = framework.KubeDescribe("CronJob", func() {
 })
 
 // newTestCronJob returns a cronjob which does one of several testing behaviors.
-func newTestCronJob(name, schedule string, concurrencyPolicy batch.ConcurrencyPolicy, command []string,
-	successfulJobsHistoryLimit *int32) *batch.CronJob {
+func newTestCronJob(name, schedule string, concurrencyPolicy batchv2alpha1.ConcurrencyPolicy,
+	command []string, successfulJobsHistoryLimit *int32) *batchv2alpha1.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
-	sj := &batch.CronJob{
+	sj := &batchv2alpha1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: batch.CronJobSpec{
+		Spec: batchv2alpha1.CronJobSpec{
 			Schedule:          schedule,
 			ConcurrencyPolicy: concurrencyPolicy,
-			JobTemplate: batch.JobTemplateSpec{
-				Spec: batch.JobSpec{
+			JobTemplate: batchv2alpha1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
 					Parallelism: &parallelism,
 					Completions: &completions,
 					Template: v1.PodTemplateSpec{
@@ -329,11 +328,11 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batch.ConcurrencyPo
 	return sj
 }
 
-func createCronJob(c clientset.Interface, ns string, cronJob *batch.CronJob) (*batch.CronJob, error) {
+func createCronJob(c clientset.Interface, ns string, cronJob *batchv2alpha1.CronJob) (*batchv2alpha1.CronJob, error) {
 	return c.BatchV2alpha1().CronJobs(ns).Create(cronJob)
 }
 
-func getCronJob(c clientset.Interface, ns, name string) (*batch.CronJob, error) {
+func getCronJob(c clientset.Interface, ns, name string) (*batchv2alpha1.CronJob, error) {
 	return c.BatchV2alpha1().CronJobs(ns).Get(name, metav1.GetOptions{})
 }
 
