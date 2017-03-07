@@ -674,3 +674,22 @@ func TestDeleteWithRetry(t *testing.T) {
 		t.Errorf("Expect an NotFound error, got %v", err)
 	}
 }
+
+func TestPrefix(t *testing.T) {
+	scheme, codecs := testScheme(t)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	defer server.Terminate(t)
+
+	testcases := map[string]string{
+		"custom/prefix":     "/custom/prefix",
+		"/custom//prefix//": "/custom/prefix",
+		"/registry":         "/registry",
+	}
+	for configuredPrefix, effectivePrefix := range testcases {
+		helper := newEtcdHelper(server.Client, scheme, codec, configuredPrefix)
+		if helper.pathPrefix != effectivePrefix {
+			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, helper.pathPrefix)
+		}
+	}
+}
