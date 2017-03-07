@@ -77,6 +77,10 @@ run_federation_apiserver
 run_federation_controller_manager
 # TODO: Fix for secrets, replicasets and deployments.
 SUPPORTED_RESOURCES=("configmaps" "daemonsets" "events" "ingress" "namespaces" "services")
+# Set wait for deletion to true for federation apiserver since resources are
+# deleted asynchronously.
+# This is a temporary workaround until https://github.com/kubernetes/kubernetes/issues/42594 is fixed.
+WAIT_FOR_DELETION="true"
 # WARNING: Do not wrap this call in a subshell to capture output, e.g. output=$(runTests)
 # Doing so will suppress errexit behavior inside runTests
 runTests

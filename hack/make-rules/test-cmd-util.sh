@@ -1812,6 +1812,9 @@ run_secrets_test() {
   kubectl delete secret test-secret --namespace=test-secrets
 
   ### Create a docker-registry secret in a specific namespace
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
+  fi
   # Pre-condition: no SECRET exists
   kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -1824,6 +1827,9 @@ run_secrets_test() {
   kubectl delete secret test-secret --namespace=test-secrets
 
   ### Create a tls secret
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
+  fi
   # Pre-condition: no SECRET exists
   kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -1858,6 +1864,9 @@ __EOF__
   kubectl delete secret secret-string-data --namespace=test-secrets
 
   ### Create a secret using output flags
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
+  fi
   # Pre-condition: no secret exists
   kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
