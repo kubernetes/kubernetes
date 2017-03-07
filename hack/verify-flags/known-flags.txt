@@ -64,7 +64,6 @@ bench-pods
 bench-quiet
 bench-tasks
 bench-workers
-bind-addrsse
 bind-address
 bind-pods-burst
 bind-pods-qps
