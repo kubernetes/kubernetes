@@ -628,7 +628,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionFalse {
 				if nc.useTaintBasedEvictions {
 					if nc.markNodeForTainting(node) {
-						glog.V(2).Infof("Tainting Node %v with NotReady taint on %v",
+						glog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
 						)
@@ -636,7 +636,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				} else {
 					if decisionTimestamp.After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
 						if nc.evictPods(node) {
-							glog.V(2).Infof("Evicting pods on node %s: %v is later than %v + %v",
+							glog.V(2).Infof("Node is NotReady. Adding Pods on Node %s to eviction queue: %v is later than %v + %v",
 								node.Name,
 								decisionTimestamp,
 								nc.nodeStatusMap[node.Name].readyTransitionTimestamp,
@@ -649,7 +649,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionUnknown {
 				if nc.useTaintBasedEvictions {
 					if nc.markNodeForTainting(node) {
-						glog.V(2).Infof("Tainting Node %v with NotReady taint on %v",
+						glog.V(2).Infof("Node %v is unresponsive as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
 						)
@@ -657,7 +657,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				} else {
 					if decisionTimestamp.After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout)) {
 						if nc.evictPods(node) {
-							glog.V(2).Infof("Evicting pods on node %s: %v is later than %v + %v",
+							glog.V(2).Infof("Node is unresponsive. Adding Pods on Node %s to eviction queues: %v is later than %v + %v",
 								node.Name,
 								decisionTimestamp,
 								nc.nodeStatusMap[node.Name].readyTransitionTimestamp,

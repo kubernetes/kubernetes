@@ -17,12 +17,12 @@ limitations under the License.
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	"github.com/evanphx/json-patch"

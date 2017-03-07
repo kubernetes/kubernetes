@@ -29,7 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -189,21 +190,21 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	})
 })
 
-func newTestingCronJob(name string, value string) *v2alpha1.CronJob {
+func newTestingCronJob(name string, value string) *batchv2alpha1.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
-	return &v2alpha1.CronJob{
+	return &batchv2alpha1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"time": value,
 			},
 		},
-		Spec: v2alpha1.CronJobSpec{
+		Spec: batchv2alpha1.CronJobSpec{
 			Schedule:          "*/1 * * * ?",
-			ConcurrencyPolicy: v2alpha1.AllowConcurrent,
-			JobTemplate: v2alpha1.JobTemplateSpec{
-				Spec: v2alpha1.JobSpec{
+			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
+			JobTemplate: batchv2alpha1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
 					Parallelism: &parallelism,
 					Completions: &completions,
 					Template: v1.PodTemplateSpec{
@@ -244,9 +245,9 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		groupList, err := f.ClientSet.Discovery().ServerGroups()
 		framework.ExpectNoError(err)
 		for _, group := range groupList.Groups {
-			if group.Name == v2alpha1.GroupName {
+			if group.Name == batchv2alpha1.GroupName {
 				for _, version := range group.Versions {
-					if version.Version == v2alpha1.SchemeGroupVersion.Version {
+					if version.Version == batchv2alpha1.SchemeGroupVersion.Version {
 						enabled = true
 						break
 					}
@@ -254,7 +255,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 			}
 		}
 		if !enabled {
-			framework.Logf("%s is not enabled, test skipped", v2alpha1.SchemeGroupVersion)
+			framework.Logf("%s is not enabled, test skipped", batchv2alpha1.SchemeGroupVersion)
 			return
 		}
 		cronJobClient := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name)
