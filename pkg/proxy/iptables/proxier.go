@@ -188,12 +188,14 @@ func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, se
 
 type proxyServiceMap map[proxy.ServicePortName]*serviceInfo
 
+type proxyEndpointMap map[proxy.ServicePortName][]*endpointsInfo
+
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
 	mu                        sync.Mutex // protects the following fields
 	serviceMap                proxyServiceMap
-	endpointsMap              map[proxy.ServicePortName][]*endpointsInfo
+	endpointsMap              proxyEndpointMap
 	portsMap                  map[localPort]closeable
 	haveReceivedServiceUpdate bool            // true once we've seen an OnServiceUpdate event
 	allEndpoints              []api.Endpoints // nil until we have seen an OnEndpointsUpdate event
@@ -320,7 +322,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 	return &Proxier{
 		serviceMap:     make(proxyServiceMap),
-		endpointsMap:   make(map[proxy.ServicePortName][]*endpointsInfo),
+		endpointsMap:   make(proxyEndpointMap),
 		portsMap:       make(map[localPort]closeable),
 		syncPeriod:     syncPeriod,
 		minSyncPeriod:  minSyncPeriod,
@@ -578,11 +580,11 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 }
 
 // Convert a slice of api.Endpoints objects into a map of service-port -> endpoints.
-func updateEndpoints(allEndpoints []api.Endpoints, curMap map[proxy.ServicePortName][]*endpointsInfo, hostname string,
-	healthChecker healthChecker) (newMap map[proxy.ServicePortName][]*endpointsInfo, staleSet map[endpointServicePair]bool) {
+func updateEndpoints(allEndpoints []api.Endpoints, curMap proxyEndpointMap, hostname string,
+	healthChecker healthChecker) (newMap proxyEndpointMap, staleSet map[endpointServicePair]bool) {
 
 	// return values
-	newMap = make(map[proxy.ServicePortName][]*endpointsInfo)
+	newMap = make(proxyEndpointMap)
 	staleSet = make(map[endpointServicePair]bool)
 
 	// Update endpoints for services.
@@ -633,8 +635,8 @@ func updateEndpoints(allEndpoints []api.Endpoints, curMap map[proxy.ServicePortN
 // - the test for this is overlapped by the test for updateEndpoints
 // - naming is poor and responsibilities are muddled
 func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
-	curEndpoints map[proxy.ServicePortName][]*endpointsInfo,
-	newEndpoints *map[proxy.ServicePortName][]*endpointsInfo) {
+	curEndpoints proxyEndpointMap,
+	newEndpoints *proxyEndpointMap) {
 
 	// We need to build a map of portname -> all ip:ports for that
 	// portname.  Explode Endpoints.Subsets[*] into this structure.
