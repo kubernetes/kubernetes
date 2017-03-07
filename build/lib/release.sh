@@ -309,7 +309,7 @@ function kube::release::create_docker_images_for_server() {
         if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
           local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
           kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
-          docker rmi "${release_docker_image_tag}" || true
+          "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
           "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
         fi
 
