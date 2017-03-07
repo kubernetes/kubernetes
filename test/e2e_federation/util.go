@@ -54,6 +54,10 @@ var (
 	FederatedSvcNodePort = int32(32256)
 )
 
+const (
+	federatedNamespaceTimeout = 5 * time.Minute
+)
+
 var FederationSuite common.Suite
 
 // cluster keeps track of the assorted objects and state related to each cluster
@@ -188,6 +192,22 @@ func unregisterClusters(clusters map[string]*cluster, f *fedframework.Framework)
 	}
 }
 
+// waitForNamespaceInFederatedClusters waits for the federated namespace to be created in federated clusters
+func waitForNamespaceInFederatedClusters(clusters map[string]*cluster, nsName string, timeout time.Duration) {
+	for name, c := range clusters {
+		err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+			_, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{})
+			if err != nil {
+				By(fmt.Sprintf("Waiting for namespace %q to be created in cluster %q, err: %v", nsName, name, err))
+				return false, nil
+			}
+			By(fmt.Sprintf("Namespace %q exists in cluster %q", nsName, name))
+			return true, nil
+		})
+		framework.ExpectNoError(err, "Failed to verify federated namespace %q creation in cluster %q", nsName, name)
+	}
+}
+
 // can not be moved to util, as By and Expect must be put in Ginkgo test unit
 func getRegisteredClusters(userAgentName string, f *fedframework.Framework) (map[string]*cluster, string) {
 	clusters := make(map[string]*cluster)
@@ -209,6 +229,7 @@ func getRegisteredClusters(userAgentName string, f *fedframework.Framework) (map
 		Expect(framework.TestContext.KubeConfig).ToNot(Equal(""), "KubeConfig must be specified to load clusters' client config")
 		clusters[c.Name] = &cluster{c.Name, createClientsetForCluster(c, i, userAgentName), false, nil}
 	}
+	waitForNamespaceInFederatedClusters(clusters, f.FederationNamespace.Name, federatedNamespaceTimeout)
 	return clusters, primaryClusterName
 }
 
