@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -307,6 +308,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		secret          *v1.Secret             // an optional Secret to pull from
 		expectedEnvs    []kubecontainer.EnvVar // a set of expected environment vars
 		expectedError   bool                   // does the test fail
+		expectedEvent   string                 // does the test emit an event
 	}{
 		{
 			name: "api server = Y, kubelet = Y",
@@ -864,7 +866,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name: "configmap_invalid_keys",
-			ns:   "test1",
+			ns:   "test",
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}}},
@@ -878,9 +880,17 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				},
 				Data: map[string]string{
 					"1234": "abc",
+					"1z":   "abc",
+					"key":  "value",
 				},
 			},
-			expectedError: true,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "key",
+					Value: "value",
+				},
+			},
+			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom configMap test/test-config-map were skipped since they are considered invalid environment variable names.",
 		},
 		{
 			name: "configmap_invalid_keys_valid",
@@ -1031,7 +1041,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name: "secret_invalid_keys",
-			ns:   "test1",
+			ns:   "test",
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}}},
@@ -1045,9 +1055,17 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				},
 				Data: map[string][]byte{
 					"1234": []byte("abc"),
+					"1z":   []byte("abc"),
+					"key":  []byte("value"),
 				},
 			},
-			expectedError: true,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "key",
+					Value: "value",
+				},
+			},
+			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom secret test/test-secret were skipped since they are considered invalid environment variable names.",
 		},
 		{
 			name: "secret_invalid_keys_valid",
@@ -1080,7 +1098,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		fakeRecorder := record.NewFakeRecorder(1)
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet.kubelet.recorder = fakeRecorder
 		defer testKubelet.Cleanup()
 		kl := testKubelet.kubelet
 		kl.masterServiceNamespace = tc.masterServiceNs
@@ -1126,6 +1146,12 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		podIP := "1.2.3.4"
 
 		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP)
+		select {
+		case e := <-fakeRecorder.Events:
+			assert.Equal(t, tc.expectedEvent, e)
+		default:
+			assert.Equal(t, "", tc.expectedEvent)
+		}
 		if tc.expectedError {
 			assert.Error(t, err, tc.name)
 		} else {
