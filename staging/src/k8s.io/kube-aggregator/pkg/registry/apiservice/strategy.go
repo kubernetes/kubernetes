@@ -27,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	kapi "k8s.io/client-go/pkg/api"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/validation"
@@ -38,7 +37,9 @@ type apiServerStrategy struct {
 	names.NameGenerator
 }
 
-var Strategy = apiServerStrategy{kapi.Scheme, names.SimpleNameGenerator}
+func NewStrategy(typer runtime.ObjectTyper) apiServerStrategy {
+	return apiServerStrategy{typer, names.SimpleNameGenerator}
+}
 
 func (apiServerStrategy) NamespaceScoped() bool {
 	return false

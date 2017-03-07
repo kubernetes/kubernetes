@@ -19,6 +19,12 @@ package apiserver
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -26,18 +32,39 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	kubeclientset "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/version"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 	apiservicestorage "k8s.io/kube-aggregator/pkg/registry/apiservice/etcd"
-
-	_ "k8s.io/client-go/pkg/api/install"
 )
+
+var (
+	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
+	registry             = registered.NewOrDie("")
+	Scheme               = runtime.NewScheme()
+	Codecs               = serializer.NewCodecFactory(Scheme)
+)
+
+func init() {
+	install.Install(groupFactoryRegistry, registry, Scheme)
+
+	// we need to add the options (like ListOptions) to empty v1
+	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Group: "", Version: "v1"})
+
+	unversioned := schema.GroupVersion{Group: "", Version: "v1"}
+	Scheme.AddUnversionedTypes(unversioned,
+		&metav1.Status{},
+		&metav1.APIVersions{},
+		&metav1.APIGroupList{},
+		&metav1.APIGroup{},
+		&metav1.APIResourceList{},
+	)
+}
 
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
 const legacyAPIServiceName = "v1."
@@ -124,10 +151,10 @@ func (c completedConfig) New(stopCh <-chan struct{}) (*APIAggregator, error) {
 		endpointsLister:  kubeInformers.Core().V1().Endpoints().Lister(),
 	}
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 	v1alpha1storage := map[string]rest.Storage{}
-	v1alpha1storage["apiservices"] = apiservicestorage.NewREST(c.GenericConfig.RESTOptionsGetter)
+	v1alpha1storage["apiservices"] = apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
 	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
@@ -135,6 +162,7 @@ func (c completedConfig) New(stopCh <-chan struct{}) (*APIAggregator, error) {
 	}
 
 	apisHandler := &apisHandler{
+		codecs:          Codecs,
 		lister:          s.lister,
 		delegate:        s.GenericAPIServer.FallThroughHandler,
 		serviceLister:   s.serviceLister,
@@ -198,6 +226,7 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 	// it's time to register the group aggregation endpoint
 	groupPath := "/apis/" + apiService.Spec.Group
 	groupDiscoveryHandler := &apiGroupHandler{
+		codecs:          Codecs,
 		groupName:       apiService.Spec.Group,
 		lister:          s.lister,
 		serviceLister:   s.serviceLister,
