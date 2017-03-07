@@ -31,7 +31,12 @@ import (
 
 // rollingUpdate deletes old daemon set pods making sure that no more than
 // ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable pods are unavailable
-func (dsc *DaemonSetsController) rollingUpdate(ds *extensions.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) error {
+func (dsc *DaemonSetsController) rollingUpdate(ds *extensions.DaemonSet) error {
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	if err != nil {
+		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+	}
+
 	_, oldPods, err := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods)
 	maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, nodeToDaemonPods)
 	if err != nil {

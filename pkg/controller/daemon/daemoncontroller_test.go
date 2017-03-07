@@ -346,6 +346,32 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
 }
 
+func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
+	manager, podControl, clientset := newTestController()
+
+	var updated *extensions.DaemonSet
+	clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetSubresource() != "status" {
+			return false, nil, nil
+		}
+		if u, ok := action.(core.UpdateAction); ok {
+			updated = u.GetObject().(*extensions.DaemonSet)
+		}
+		return false, nil, nil
+	})
+
+	ds := newDaemonSet("foo")
+	manager.dsStore.Add(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
+
+	// Make sure the single sync() updated Status already for the change made
+	// during the manage() phase.
+	if got, want := updated.Status.CurrentNumberScheduled, int32(5); got != want {
+		t.Errorf("Status.CurrentNumberScheduled = %v, want %v", got, want)
+	}
+}
+
 // DaemonSets should do nothing if there aren't any nodes
 func TestNoNodesDoesNothing(t *testing.T) {
 	manager, podControl, _ := newTestController()
