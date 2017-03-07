@@ -36,6 +36,8 @@ type IngressUpgradeTest struct {
 	ipName        string
 }
 
+func (IngressUpgradeTest) Name() string { return "ingress-upgrade" }
+
 // Setup creates a GLBC, allocates an ip, and an ingress resource,
 // then waits for a successful connectivity check to the ip.
 func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
@@ -44,8 +46,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 	// jig handles all Kubernetes testing logic
 	jig := framework.NewIngressTestJig(f.ClientSet)
 
-	ns, err := f.CreateNamespace("ingress-upgrade", nil)
-	framework.ExpectNoError(err)
+	ns := f.Namespace
 
 	// gceController handles all cloud testing logic
 	gceController := &framework.GCEIngressController{
