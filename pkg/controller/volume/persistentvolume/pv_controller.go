@@ -790,9 +790,9 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *v1.PersistentVo
 	dirty := false
 
 	// Check if the claim was already bound (either by controller or by user)
-	shouldSetBoundByController := false
+	shouldBind := false
 	if volume.Name != claim.Spec.VolumeName {
-		shouldSetBoundByController = true
+		shouldBind = true
 	}
 
 	// The claim from method args can be pointing to watcher cache. We must not
@@ -806,16 +806,15 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *v1.PersistentVo
 		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
 	}
 
-	// Bind the claim to the volume if it is not bound yet
-	if claimClone.Spec.VolumeName != volume.Name {
+	if shouldBind {
+		dirty = true
+		// Bind the claim to the volume
 		claimClone.Spec.VolumeName = volume.Name
-		dirty = true
-	}
 
-	// Set annBoundByController if it is not set yet
-	if shouldSetBoundByController && !metav1.HasAnnotation(claimClone.ObjectMeta, annBoundByController) {
-		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annBoundByController, "yes")
-		dirty = true
+		// Set annBoundByController if it is not set yet
+		if !metav1.HasAnnotation(claimClone.ObjectMeta, annBoundByController) {
+			metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annBoundByController, "yes")
+		}
 	}
 
 	// Set annBindCompleted if it is not set yet
