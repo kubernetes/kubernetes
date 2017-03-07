@@ -68,11 +68,8 @@ func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []v1.Persis
 	return volumes, nil
 }
 
-// matchPredicate is a function that indicates that a persistent volume matches another
-type matchPredicate func(compareThis, toThis *v1.PersistentVolume) bool
-
 // find returns the nearest PV from the ordered list or nil if a match is not found
-func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVolumeClaim, matchPredicate matchPredicate) (*v1.PersistentVolume, error) {
+func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	// PVs are indexed by their access modes to allow easier searching.  Each
 	// index is the string representation of a set of access modes. There is a
 	// finite number of possible sets and PVs will only be indexed in one of
@@ -170,16 +167,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 
 // findBestMatchForClaim is a convenience method that finds a volume by the claim's AccessModes and requests for Storage
 func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
-	return pvIndex.findByClaim(claim, matchStorageCapacity)
-}
-
-// matchStorageCapacity is a matchPredicate used to sort and find volumes
-func matchStorageCapacity(pvA, pvB *v1.PersistentVolume) bool {
-	aQty := pvA.Spec.Capacity[v1.ResourceStorage]
-	bQty := pvB.Spec.Capacity[v1.ResourceStorage]
-	aSize := aQty.Value()
-	bSize := bQty.Value()
-	return aSize <= bSize
+	return pvIndex.findByClaim(claim)
 }
 
 // allPossibleMatchingAccessModes returns an array of AccessMode arrays that
