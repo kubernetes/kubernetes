@@ -284,6 +284,9 @@ plugin/pkg/auth/authenticator/token/bootstrap
 plugin/pkg/auth/authorizer
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
 plugin/pkg/scheduler
+plugin/pkg/scheduler/algorithmprovider
+plugin/pkg/scheduler/algorithmprovider/defaults
+plugin/pkg/scheduler/api/validation
 staging/src/k8s.io/apimachinery/pkg/api/equality
 staging/src/k8s.io/apimachinery/pkg/api/errors
 staging/src/k8s.io/apimachinery/pkg/api/resource

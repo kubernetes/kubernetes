@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This is the default algorithm provider for the scheduler.
+// Package defaults is the default algorithm provider for the scheduler.
 package defaults
 
 import (
@@ -35,13 +35,19 @@ import (
 )
 
 const (
+	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
 	// GCE instances can have up to 16 PD volumes attached.
 	DefaultMaxGCEPDVolumes = 16
-	// Larger Azure VMs can actually have much more disks attached. TODO We should determine the max based on VM size
+	// DefaultMaxAzureDiskVolumes defines the maximum number of PD Volumes for Azure
+	// Larger Azure VMs can actually have much more disks attached.
+	// TODO We should determine the max based on VM size
 	DefaultMaxAzureDiskVolumes = 16
-	ClusterAutoscalerProvider  = "ClusterAutoscalerProvider"
-	StatefulSetKind            = "StatefulSet"
-	KubeMaxPDVols              = "KUBE_MAX_PD_VOLS"
+	// ClusterAutoscalerProvider defines the default autoscaler provider
+	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
+	// StatefulSetKind defines the default StatefulSet kind
+	StatefulSetKind = "StatefulSet"
+	// KubeMaxPDVols defines the maximum number of PD Volumes per kubelet
+	KubeMaxPDVols = "KUBE_MAX_PD_VOLS"
 )
 
 func init() {
