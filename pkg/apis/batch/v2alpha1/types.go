@@ -94,6 +94,7 @@ type CronJobSpec struct {
 	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=startingDeadlineSeconds"`
 
 	// ConcurrencyPolicy specifies how to treat concurrent executions of a Job.
+	// Defaults to Allow.
 	// +optional
 	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty" protobuf:"bytes,3,opt,name=concurrencyPolicy,casttype=ConcurrencyPolicy"`
 
