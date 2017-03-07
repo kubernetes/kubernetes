@@ -31,7 +31,7 @@ func TestConfigz(t *testing.T) {
 
 	v.Set("blah")
 
-	s := httptest.NewServer(http.HandlerFunc(handle))
+	s := httptest.NewServer(http.HandlerFunc(Handle))
 	defer s.Close()
 
 	resp, err := http.Get(s.URL + "/configz")

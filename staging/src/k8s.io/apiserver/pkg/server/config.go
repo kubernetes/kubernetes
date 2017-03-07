@@ -20,6 +20,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"github.com/emicklei/go-restful/swagger"
+	"github.com/go-openapi/spec"
+	"github.com/pborman/uuid"
 	"io"
 	"net"
 	"net/http"
@@ -28,10 +31,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/emicklei/go-restful/swagger"
-	"github.com/go-openapi/spec"
-	"github.com/pborman/uuid"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapicommon "k8s.io/apimachinery/pkg/openapi"
@@ -465,6 +464,7 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 			routes.DefaultMetrics{}.Install(s.HandlerContainer)
 		}
 	}
+
 	routes.Version{Version: c.Version}.Install(s.HandlerContainer)
 	s.HandlerContainer.Add(s.DynamicApisDiscovery())
 }

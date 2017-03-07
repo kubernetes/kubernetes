@@ -38,6 +38,14 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
+		Convert_v1alpha1_APIServerAuditLogOptions_To_componentconfig_APIServerAuditLogOptions,
+		Convert_componentconfig_APIServerAuditLogOptions_To_v1alpha1_APIServerAuditLogOptions,
+		Convert_v1alpha1_APIServerConfiguration_To_componentconfig_APIServerConfiguration,
+		Convert_componentconfig_APIServerConfiguration_To_v1alpha1_APIServerConfiguration,
+		Convert_v1alpha1_APIServerEtcdConfiguration_To_componentconfig_APIServerEtcdConfiguration,
+		Convert_componentconfig_APIServerEtcdConfiguration_To_v1alpha1_APIServerEtcdConfiguration,
+		Convert_v1alpha1_APIServerStorageSerializationOptions_To_componentconfig_APIServerStorageSerializationOptions,
+		Convert_componentconfig_APIServerStorageSerializationOptions_To_v1alpha1_APIServerStorageSerializationOptions,
 		Convert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration,
 		Convert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration,
 		Convert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration,
@@ -59,6 +67,170 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration,
 		Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration,
 	)
+}
+
+func autoConvert_v1alpha1_APIServerAuditLogOptions_To_componentconfig_APIServerAuditLogOptions(in *APIServerAuditLogOptions, out *componentconfig.APIServerAuditLogOptions, s conversion.Scope) error {
+	out.Path = in.Path
+	out.MaxAge = in.MaxAge
+	out.MaxBackups = in.MaxBackups
+	out.MaxSize = in.MaxSize
+	return nil
+}
+
+func Convert_v1alpha1_APIServerAuditLogOptions_To_componentconfig_APIServerAuditLogOptions(in *APIServerAuditLogOptions, out *componentconfig.APIServerAuditLogOptions, s conversion.Scope) error {
+	return autoConvert_v1alpha1_APIServerAuditLogOptions_To_componentconfig_APIServerAuditLogOptions(in, out, s)
+}
+
+func autoConvert_componentconfig_APIServerAuditLogOptions_To_v1alpha1_APIServerAuditLogOptions(in *componentconfig.APIServerAuditLogOptions, out *APIServerAuditLogOptions, s conversion.Scope) error {
+	out.Path = in.Path
+	out.MaxAge = in.MaxAge
+	out.MaxBackups = in.MaxBackups
+	out.MaxSize = in.MaxSize
+	return nil
+}
+
+func Convert_componentconfig_APIServerAuditLogOptions_To_v1alpha1_APIServerAuditLogOptions(in *componentconfig.APIServerAuditLogOptions, out *APIServerAuditLogOptions, s conversion.Scope) error {
+	return autoConvert_componentconfig_APIServerAuditLogOptions_To_v1alpha1_APIServerAuditLogOptions(in, out, s)
+}
+
+func autoConvert_v1alpha1_APIServerConfiguration_To_componentconfig_APIServerConfiguration(in *APIServerConfiguration, out *componentconfig.APIServerConfiguration, s conversion.Scope) error {
+	out.AdmissionControl = in.AdmissionControl
+	out.AdmissionControlConfigFile = in.AdmissionControlConfigFile
+	out.AdvertiseAddress = in.AdvertiseAddress
+	out.CorsAllowedOriginList = *(*[]string)(unsafe.Pointer(&in.CorsAllowedOriginList))
+	out.ExternalHost = in.ExternalHost
+	out.MaxRequestsInFlight = in.MaxRequestsInFlight
+	out.MaxMutatingRequestsInFlight = in.MaxMutatingRequestsInFlight
+	out.MinRequestTimeout = in.MinRequestTimeout
+	out.TargetRAMMB = in.TargetRAMMB
+	out.WatchCacheSizes = *(*[]string)(unsafe.Pointer(&in.WatchCacheSizes))
+	if err := Convert_v1alpha1_APIServerAuditLogOptions_To_componentconfig_APIServerAuditLogOptions(&in.AuditLogOptions, &out.AuditLogOptions, s); err != nil {
+		return err
+	}
+	out.EnableProfiling = in.EnableProfiling
+	out.EnableContentionProfiling = in.EnableContentionProfiling
+	out.EnableSwaggerUI = in.EnableSwaggerUI
+	if err := Convert_v1alpha1_APIServerEtcdConfiguration_To_componentconfig_APIServerEtcdConfiguration(&in.StorageConfig, &out.StorageConfig, s); err != nil {
+		return err
+	}
+	out.EtcdServersOverrides = *(*[]string)(unsafe.Pointer(&in.EtcdServersOverrides))
+	out.DefaultStorageMediaType = in.DefaultStorageMediaType
+	out.DeleteCollectionWorkers = in.DeleteCollectionWorkers
+	out.EnableGarbageCollection = in.EnableGarbageCollection
+	out.EnableWatchCache = in.EnableWatchCache
+	out.CloudConfigFile = in.CloudConfigFile
+	out.CloudProvider = in.CloudProvider
+	if err := Convert_v1alpha1_APIServerStorageSerializationOptions_To_componentconfig_APIServerStorageSerializationOptions(&in.StorageSerialization, &out.StorageSerialization, s); err != nil {
+		return err
+	}
+	out.AllowPrivileged = (*bool)(unsafe.Pointer(in.AllowPrivileged))
+	out.EventTTL = (*v1.Duration)(unsafe.Pointer(in.EventTTL))
+	out.KubernetesServiceNodePort = (*int)(unsafe.Pointer(in.KubernetesServiceNodePort))
+	out.MasterCount = (*int)(unsafe.Pointer(in.MasterCount))
+	out.MaxConnectionBytesPerSec = (*int64)(unsafe.Pointer(in.MaxConnectionBytesPerSec))
+	out.ServiceClusterIPRange = (*string)(unsafe.Pointer(in.ServiceClusterIPRange))
+	out.ServiceNodePortRange = (*string)(unsafe.Pointer(in.ServiceNodePortRange))
+	return nil
+}
+
+func Convert_v1alpha1_APIServerConfiguration_To_componentconfig_APIServerConfiguration(in *APIServerConfiguration, out *componentconfig.APIServerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_APIServerConfiguration_To_componentconfig_APIServerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_APIServerConfiguration_To_v1alpha1_APIServerConfiguration(in *componentconfig.APIServerConfiguration, out *APIServerConfiguration, s conversion.Scope) error {
+	out.AdmissionControl = in.AdmissionControl
+	out.AdmissionControlConfigFile = in.AdmissionControlConfigFile
+	out.AdvertiseAddress = in.AdvertiseAddress
+	out.CorsAllowedOriginList = *(*[]string)(unsafe.Pointer(&in.CorsAllowedOriginList))
+	out.ExternalHost = in.ExternalHost
+	out.MaxRequestsInFlight = in.MaxRequestsInFlight
+	out.MaxMutatingRequestsInFlight = in.MaxMutatingRequestsInFlight
+	out.MinRequestTimeout = in.MinRequestTimeout
+	out.TargetRAMMB = in.TargetRAMMB
+	out.WatchCacheSizes = *(*[]string)(unsafe.Pointer(&in.WatchCacheSizes))
+	if err := Convert_componentconfig_APIServerAuditLogOptions_To_v1alpha1_APIServerAuditLogOptions(&in.AuditLogOptions, &out.AuditLogOptions, s); err != nil {
+		return err
+	}
+	out.EnableProfiling = in.EnableProfiling
+	out.EnableContentionProfiling = in.EnableContentionProfiling
+	out.EnableSwaggerUI = in.EnableSwaggerUI
+	if err := Convert_componentconfig_APIServerEtcdConfiguration_To_v1alpha1_APIServerEtcdConfiguration(&in.StorageConfig, &out.StorageConfig, s); err != nil {
+		return err
+	}
+	out.EtcdServersOverrides = *(*[]string)(unsafe.Pointer(&in.EtcdServersOverrides))
+	out.DefaultStorageMediaType = in.DefaultStorageMediaType
+	out.DeleteCollectionWorkers = in.DeleteCollectionWorkers
+	out.EnableGarbageCollection = in.EnableGarbageCollection
+	out.EnableWatchCache = in.EnableWatchCache
+	out.CloudConfigFile = in.CloudConfigFile
+	out.CloudProvider = in.CloudProvider
+	if err := Convert_componentconfig_APIServerStorageSerializationOptions_To_v1alpha1_APIServerStorageSerializationOptions(&in.StorageSerialization, &out.StorageSerialization, s); err != nil {
+		return err
+	}
+	out.AllowPrivileged = (*bool)(unsafe.Pointer(in.AllowPrivileged))
+	out.EventTTL = (*v1.Duration)(unsafe.Pointer(in.EventTTL))
+	out.KubernetesServiceNodePort = (*int)(unsafe.Pointer(in.KubernetesServiceNodePort))
+	out.MasterCount = (*int)(unsafe.Pointer(in.MasterCount))
+	out.MaxConnectionBytesPerSec = (*int64)(unsafe.Pointer(in.MaxConnectionBytesPerSec))
+	out.ServiceClusterIPRange = (*string)(unsafe.Pointer(in.ServiceClusterIPRange))
+	out.ServiceNodePortRange = (*string)(unsafe.Pointer(in.ServiceNodePortRange))
+	return nil
+}
+
+func Convert_componentconfig_APIServerConfiguration_To_v1alpha1_APIServerConfiguration(in *componentconfig.APIServerConfiguration, out *APIServerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_APIServerConfiguration_To_v1alpha1_APIServerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_APIServerEtcdConfiguration_To_componentconfig_APIServerEtcdConfiguration(in *APIServerEtcdConfiguration, out *componentconfig.APIServerEtcdConfiguration, s conversion.Scope) error {
+	out.Type = in.Type
+	out.Prefix = in.Prefix
+	out.ServerList = *(*[]string)(unsafe.Pointer(&in.ServerList))
+	out.KeyFile = in.KeyFile
+	out.CertFile = in.CertFile
+	out.CAFile = in.CAFile
+	out.Quorum = in.Quorum
+	out.DeserializationCacheSize = in.DeserializationCacheSize
+	return nil
+}
+
+func Convert_v1alpha1_APIServerEtcdConfiguration_To_componentconfig_APIServerEtcdConfiguration(in *APIServerEtcdConfiguration, out *componentconfig.APIServerEtcdConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_APIServerEtcdConfiguration_To_componentconfig_APIServerEtcdConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_APIServerEtcdConfiguration_To_v1alpha1_APIServerEtcdConfiguration(in *componentconfig.APIServerEtcdConfiguration, out *APIServerEtcdConfiguration, s conversion.Scope) error {
+	out.Type = in.Type
+	out.Prefix = in.Prefix
+	out.ServerList = *(*[]string)(unsafe.Pointer(&in.ServerList))
+	out.KeyFile = in.KeyFile
+	out.CertFile = in.CertFile
+	out.CAFile = in.CAFile
+	out.Quorum = in.Quorum
+	out.DeserializationCacheSize = in.DeserializationCacheSize
+	return nil
+}
+
+func Convert_componentconfig_APIServerEtcdConfiguration_To_v1alpha1_APIServerEtcdConfiguration(in *componentconfig.APIServerEtcdConfiguration, out *APIServerEtcdConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_APIServerEtcdConfiguration_To_v1alpha1_APIServerEtcdConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_APIServerStorageSerializationOptions_To_componentconfig_APIServerStorageSerializationOptions(in *APIServerStorageSerializationOptions, out *componentconfig.APIServerStorageSerializationOptions, s conversion.Scope) error {
+	out.StorageVersions = in.StorageVersions
+	out.DefaultStorageVersions = in.DefaultStorageVersions
+	return nil
+}
+
+func Convert_v1alpha1_APIServerStorageSerializationOptions_To_componentconfig_APIServerStorageSerializationOptions(in *APIServerStorageSerializationOptions, out *componentconfig.APIServerStorageSerializationOptions, s conversion.Scope) error {
+	return autoConvert_v1alpha1_APIServerStorageSerializationOptions_To_componentconfig_APIServerStorageSerializationOptions(in, out, s)
+}
+
+func autoConvert_componentconfig_APIServerStorageSerializationOptions_To_v1alpha1_APIServerStorageSerializationOptions(in *componentconfig.APIServerStorageSerializationOptions, out *APIServerStorageSerializationOptions, s conversion.Scope) error {
+	out.StorageVersions = in.StorageVersions
+	out.DefaultStorageVersions = in.DefaultStorageVersions
+	return nil
+}
+
+func Convert_componentconfig_APIServerStorageSerializationOptions_To_v1alpha1_APIServerStorageSerializationOptions(in *componentconfig.APIServerStorageSerializationOptions, out *APIServerStorageSerializationOptions, s conversion.Scope) error {
+	return autoConvert_componentconfig_APIServerStorageSerializationOptions_To_v1alpha1_APIServerStorageSerializationOptions(in, out, s)
 }
 
 func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *componentconfig.KubeProxyConfiguration, s conversion.Scope) error {

@@ -21,9 +21,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	reflect "reflect"
 )
 
@@ -35,6 +36,10 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServerAuditLogOptions, InType: reflect.TypeOf(&APIServerAuditLogOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServerConfiguration, InType: reflect.TypeOf(&APIServerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServerEtcdConfiguration, InType: reflect.TypeOf(&APIServerEtcdConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServerStorageSerializationOptions, InType: reflect.TypeOf(&APIServerStorageSerializationOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletAnonymousAuthentication, InType: reflect.TypeOf(&KubeletAnonymousAuthentication{})},
@@ -46,6 +51,100 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletX509Authentication, InType: reflect.TypeOf(&KubeletX509Authentication{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
 	)
+}
+
+func DeepCopy_v1alpha1_APIServerAuditLogOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*APIServerAuditLogOptions)
+		out := out.(*APIServerAuditLogOptions)
+		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_APIServerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*APIServerConfiguration)
+		out := out.(*APIServerConfiguration)
+		*out = *in
+		if in.CorsAllowedOriginList != nil {
+			in, out := &in.CorsAllowedOriginList, &out.CorsAllowedOriginList
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if in.WatchCacheSizes != nil {
+			in, out := &in.WatchCacheSizes, &out.WatchCacheSizes
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if err := DeepCopy_v1alpha1_APIServerEtcdConfiguration(&in.StorageConfig, &out.StorageConfig, c); err != nil {
+			return err
+		}
+		if in.EtcdServersOverrides != nil {
+			in, out := &in.EtcdServersOverrides, &out.EtcdServersOverrides
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if in.AllowPrivileged != nil {
+			in, out := &in.AllowPrivileged, &out.AllowPrivileged
+			*out = new(bool)
+			**out = **in
+		}
+		if in.EventTTL != nil {
+			in, out := &in.EventTTL, &out.EventTTL
+			*out = new(v1.Duration)
+			**out = **in
+		}
+		if in.KubernetesServiceNodePort != nil {
+			in, out := &in.KubernetesServiceNodePort, &out.KubernetesServiceNodePort
+			*out = new(int)
+			**out = **in
+		}
+		if in.MasterCount != nil {
+			in, out := &in.MasterCount, &out.MasterCount
+			*out = new(int)
+			**out = **in
+		}
+		if in.MaxConnectionBytesPerSec != nil {
+			in, out := &in.MaxConnectionBytesPerSec, &out.MaxConnectionBytesPerSec
+			*out = new(int64)
+			**out = **in
+		}
+		if in.ServiceClusterIPRange != nil {
+			in, out := &in.ServiceClusterIPRange, &out.ServiceClusterIPRange
+			*out = new(string)
+			**out = **in
+		}
+		if in.ServiceNodePortRange != nil {
+			in, out := &in.ServiceNodePortRange, &out.ServiceNodePortRange
+			*out = new(string)
+			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_APIServerEtcdConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*APIServerEtcdConfiguration)
+		out := out.(*APIServerEtcdConfiguration)
+		*out = *in
+		if in.ServerList != nil {
+			in, out := &in.ServerList, &out.ServerList
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_APIServerStorageSerializationOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*APIServerStorageSerializationOptions)
+		out := out.(*APIServerStorageSerializationOptions)
+		*out = *in
+		return nil
+	}
 }
 
 func DeepCopy_v1alpha1_KubeProxyConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
@@ -227,9 +326,9 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		}
 		if in.RegisterWithTaints != nil {
 			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
-			*out = make([]v1.Taint, len(*in))
+			*out = make([]api_v1.Taint, len(*in))
 			for i := range *in {
-				if err := v1.DeepCopy_v1_Taint(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := api_v1.DeepCopy_v1_Taint(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}

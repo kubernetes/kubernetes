@@ -21,6 +21,7 @@ import (
 	"net"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -34,6 +35,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/features"
 
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 // DefaultServiceNodePortRange is the default port range for NodePort services.
@@ -107,6 +109,64 @@ func NewServerRunOptions() *ServerRunOptions {
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 	return &s
+}
+
+// ComponentConfigz produces a componentconfig object from server options.
+func (s *ServerRunOptions) ComponentConfigz() componentconfig.APIServerConfiguration {
+	serviceClusterIPRange := s.ServiceClusterIPRange.String()
+	serviceNodePortRange := s.ServiceNodePortRange.String()
+
+	componentconfig := componentconfig.APIServerConfiguration{
+		AdmissionControl:            s.GenericServerRunOptions.AdmissionControl,
+		AdmissionControlConfigFile:  s.GenericServerRunOptions.AdmissionControlConfigFile,
+		AdvertiseAddress:            s.GenericServerRunOptions.AdvertiseAddress.String(),
+		CorsAllowedOriginList:       s.GenericServerRunOptions.CorsAllowedOriginList,
+		ExternalHost:                s.GenericServerRunOptions.ExternalHost,
+		MaxRequestsInFlight:         s.GenericServerRunOptions.MaxRequestsInFlight,
+		MaxMutatingRequestsInFlight: s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
+		MinRequestTimeout:           s.GenericServerRunOptions.MinRequestTimeout,
+		TargetRAMMB:                 s.GenericServerRunOptions.TargetRAMMB,
+		WatchCacheSizes:             s.GenericServerRunOptions.WatchCacheSizes,
+		AuditLogOptions: componentconfig.APIServerAuditLogOptions{
+			Path:       s.Audit.Path,
+			MaxAge:     s.Audit.MaxAge,
+			MaxBackups: s.Audit.MaxBackups,
+			MaxSize:    s.Audit.MaxSize,
+		},
+		EnableProfiling:           s.Features.EnableProfiling,
+		EnableContentionProfiling: s.Features.EnableContentionProfiling,
+		EnableSwaggerUI:           s.Features.EnableSwaggerUI,
+		StorageConfig: componentconfig.APIServerEtcdConfiguration{
+			Type:       s.Etcd.StorageConfig.Type,
+			Prefix:     s.Etcd.StorageConfig.Prefix,
+			ServerList: s.Etcd.StorageConfig.ServerList,
+			KeyFile:    s.Etcd.StorageConfig.KeyFile,
+			CertFile:   s.Etcd.StorageConfig.CertFile,
+			CAFile:     s.Etcd.StorageConfig.CAFile,
+			Quorum:     s.Etcd.StorageConfig.Quorum,
+			DeserializationCacheSize: s.Etcd.StorageConfig.DeserializationCacheSize,
+		},
+		EtcdServersOverrides:    s.Etcd.EtcdServersOverrides,
+		DefaultStorageMediaType: s.Etcd.DefaultStorageMediaType,
+		DeleteCollectionWorkers: s.Etcd.DeleteCollectionWorkers,
+		EnableGarbageCollection: s.Etcd.EnableGarbageCollection,
+		EnableWatchCache:        s.Etcd.EnableWatchCache,
+		CloudConfigFile:         s.CloudProvider.CloudConfigFile,
+		CloudProvider:           s.CloudProvider.CloudProvider,
+		StorageSerialization: componentconfig.APIServerStorageSerializationOptions{
+			StorageVersions:        s.StorageSerialization.StorageVersions,
+			DefaultStorageVersions: s.StorageSerialization.DefaultStorageVersions,
+		},
+		AllowPrivileged:           &s.AllowPrivileged,
+		EventTTL:                  &metav1.Duration{s.EventTTL},
+		KubernetesServiceNodePort: &s.KubernetesServiceNodePort,
+		MasterCount:               &s.MasterCount,
+		MaxConnectionBytesPerSec:  &s.MaxConnectionBytesPerSec,
+		ServiceClusterIPRange:     &serviceClusterIPRange,
+		ServiceNodePortRange:      &serviceNodePortRange,
+	}
+
+	return componentconfig
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
