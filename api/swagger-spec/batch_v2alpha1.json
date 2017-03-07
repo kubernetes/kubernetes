@@ -2186,7 +2186,7 @@
      },
      "concurrencyPolicy": {
       "type": "string",
-      "description": "ConcurrencyPolicy specifies how to treat concurrent executions of a Job."
+      "description": "ConcurrencyPolicy specifies how to treat concurrent executions of a Job. Defaults to Allow."
      },
      "suspend": {
       "type": "boolean",
