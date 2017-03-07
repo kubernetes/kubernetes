@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -94,12 +95,18 @@ func (s *DaemonSetStatusViewer) Status(namespace, name string, revision int64) (
 	if err != nil {
 		return "", false, err
 	}
+	if daemon.Spec.UpdateStrategy.Type != extensions.RollingUpdateDaemonSetStrategyType {
+		return "", true, fmt.Errorf("Status is available only for RollingUpdate strategy type")
+	}
 	if daemon.Generation <= daemon.Status.ObservedGeneration {
 		if daemon.Status.UpdatedNumberScheduled < daemon.Status.DesiredNumberScheduled {
-			return fmt.Sprintf("Waiting for rollout to finish: %d out of %d new pod have been updated...\n", daemon.Status.UpdatedNumberScheduled, daemon.Status.DesiredNumberScheduled), false, nil
+			return fmt.Sprintf("Waiting for rollout to finish: %d out of %d new pods have been updated...\n", daemon.Status.UpdatedNumberScheduled, daemon.Status.DesiredNumberScheduled), false, nil
 		}
-		if daemon.Status.NumberAvailable < daemon.Status.DesiredNumberScheduled {
-			return fmt.Sprintf("Waiting for rollout to finish: %d of %d updated pods are available...\n", daemon.Status.NumberAvailable, daemon.Status.DesiredNumberScheduled), false, nil
+
+		maxUnavailable, _ := intstrutil.GetValueFromIntOrPercent(&daemon.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, int(daemon.Status.DesiredNumberScheduled), true)
+		minRequired := daemon.Status.DesiredNumberScheduled - int32(maxUnavailable)
+		if daemon.Status.NumberAvailable < minRequired {
+			return fmt.Sprintf("Waiting for rollout to finish: %d of %d updated pods are available (minimum required: %d)...\n", daemon.Status.NumberAvailable, daemon.Status.DesiredNumberScheduled, minRequired), false, nil
 		}
 		return fmt.Sprintf("daemon set %q successfully rolled out\n", name), true, nil
 	}
