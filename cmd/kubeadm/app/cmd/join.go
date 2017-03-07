@@ -145,6 +145,10 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		}
 	}
 
+	if len(cfg.DiscoveryFile) > 0 && len(cfg.DiscoveryToken) > 0 {
+		return nil, fmt.Errorf("Only one of --discovery-file or --discovery-token can be set.")
+	}
+
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks")
 
