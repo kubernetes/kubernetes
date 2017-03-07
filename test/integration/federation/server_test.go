@@ -44,8 +44,8 @@ var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
 var groupVersions = []schema.GroupVersion{
 	fed_v1b1.SchemeGroupVersion,
 	ext_v1b1.SchemeGroupVersion,
-	batch_v1.SchemeGroupVersion,
-	autoscaling_v1.SchemeGroupVersion,
+	//	batch_v1.SchemeGroupVersion,
+	//	autoscaling_v1.SchemeGroupVersion,
 }
 
 func TestRun(t *testing.T) {
@@ -215,8 +215,8 @@ func testAPIResourceList(t *testing.T) {
 	testFederationResourceList(t)
 	testCoreResourceList(t)
 	testExtensionsResourceList(t)
-	testBatchResourceList(t)
-	testAutoscalingResourceList(t)
+	//	testBatchResourceList(t)
+	//	testAutoscalingResourceList(t)
 }
 
 func testFederationResourceList(t *testing.T) {
