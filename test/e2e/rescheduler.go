@@ -72,9 +72,9 @@ var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
 
 func reserveAllCpu(f *framework.Framework, id string, millicores int) error {
 	timeout := 5 * time.Minute
-	replicas := millicores / 100
+	replicas := millicores / 500
 
-	ReserveCpu(f, id, 1, 100)
+	ReserveCpu(f, id, 1, 500)
 	framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.InternalClientset, f.Namespace.Name, id, uint(replicas), false))
 
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
