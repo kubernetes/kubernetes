@@ -134,9 +134,9 @@ type Disks interface {
 	// DiskIsAttached checks if a disk is attached to the node with the specified NodeName.
 	DiskIsAttached(diskName string, nodeName types.NodeName) (bool, error)
 
-	// DisksAreAttached is a batch function to check if a list of disks are attached
-	// to the node with the specified NodeName.
-	DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error)
+	// DisksAreAttached is a batch function to check if disks specified in map are still
+	// attached to their respective nodes.
+	DisksAreAttached(nodeDisks map[types.NodeName][]string) (map[types.NodeName]map[string]bool, error)
 
 	// CreateDisk creates a new PD with given properties. Tags are serialized
 	// as JSON into Description field.
@@ -2215,7 +2215,7 @@ func mapNodeNameToInstanceName(nodeName types.NodeName) string {
 }
 
 // mapInstanceToNodeName maps a GCE Instance to a k8s NodeName
-func mapInstanceToNodeName(instance *compute.Instance) types.NodeName {
+func mapInstanceToNodeName(instance *gceInstance) types.NodeName {
 	return types.NodeName(instance.Name)
 }
 
@@ -2651,36 +2651,55 @@ func (gce *GCECloud) DiskIsAttached(diskName string, nodeName types.NodeName) (b
 	return false, nil
 }
 
-func (gce *GCECloud) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
-	attached := make(map[string]bool)
-	for _, diskName := range diskNames {
-		attached[diskName] = false
-	}
-	instanceName := mapNodeNameToInstanceName(nodeName)
-	instance, err := gce.getInstanceByName(instanceName)
-	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			// If instance no longer exists, safe to assume volume is not attached.
-			glog.Warningf(
-				"Instance %q does not exist. DisksAreAttached will assume PD %v are not attached to it.",
-				instanceName,
-				diskNames)
-			return attached, nil
-		}
+func (gce *GCECloud) DisksAreAttached(nodeDisks map[types.NodeName][]string) (map[types.NodeName]map[string]bool, error) {
+	attachedResult := make(map[types.NodeName]map[string]bool)
 
-		return attached, err
-	}
-
-	for _, instanceDisk := range instance.Disks {
+	nodeNameSlice := []string{}
+	for nodeName, diskNames := range nodeDisks {
 		for _, diskName := range diskNames {
-			if instanceDisk.DeviceName == diskName {
-				// Disk is still attached to node
-				attached[diskName] = true
+			checkMap, exists := attachedResult[nodeName]
+			if !exists {
+				checkMap = make(map[string]bool)
+				attachedResult[nodeName] = checkMap
+			}
+			checkMap[diskName] = false
+		}
+		nodeNameSlice = append(nodeNameSlice, mapNodeNameToInstanceName(nodeName))
+	}
+	gceInstances, err := gce.getInstancesByNames(nodeNameSlice)
+	if err != nil {
+		return nil, err
+	}
+	if len(gceInstances) == 0 {
+		glog.V(2).Info("No instances can be found, DisksAreAttached assume no disks are attached to any node in GCE cluster")
+	}
+
+	instanceMap := make(map[types.NodeName]*gceInstance)
+	for _, instance := range gceInstances {
+		instanceMap[mapInstanceToNodeName(instance)] = instance
+	}
+
+	for nodeName, diskNames := range nodeDisks {
+		instance, exist := instanceMap[nodeName]
+		if !exist {
+			glog.Warningf(
+				"Node %q does not exist. DisksAreAttached assume disks %v are not attached to it",
+				nodeName,
+				diskNames)
+			continue
+		}
+		checkMap := attachedResult[nodeName]
+		for _, disk := range instance.Disks {
+
+			_, found := checkMap[disk.DeviceName]
+			if found {
+				checkMap[disk.DeviceName] = true
 			}
 		}
 	}
 
-	return attached, nil
+	return attachedResult, nil
+
 }
 
 // Returns a gceDisk for the disk, if it is found in the specified zone.
