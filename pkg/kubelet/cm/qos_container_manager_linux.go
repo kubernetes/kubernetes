@@ -19,12 +19,14 @@ package cm
 import (
 	"fmt"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
@@ -81,12 +83,15 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 
 	// Top level for Qos containers are created only for Burstable
 	// and Best Effort classes
-	qosClasses := [2]v1.PodQOSClass{v1.PodQOSBurstable, v1.PodQOSBestEffort}
+	qosClasses := map[v1.PodQOSClass]string{
+		v1.PodQOSBurstable:  path.Join(rootContainer, strings.ToLower(string(v1.PodQOSBurstable))),
+		v1.PodQOSBestEffort: path.Join(rootContainer, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
 
 	// Create containers for both qos classes
-	for _, qosClass := range qosClasses {
+	for qosClass, containerName := range qosClasses {
 		// get the container's absolute name
-		absoluteContainerName := CgroupName(path.Join(rootContainer, string(qosClass)))
+		absoluteContainerName := CgroupName(containerName)
 
 		resourceParameters := &ResourceConfig{}
 		// the BestEffort QoS class has a statically configured minShares value
@@ -114,8 +119,8 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 	// Store the top level qos container names
 	m.qosContainersInfo = QOSContainersInfo{
 		Guaranteed: rootContainer,
-		Burstable:  path.Join(rootContainer, string(v1.PodQOSBurstable)),
-		BestEffort: path.Join(rootContainer, string(v1.PodQOSBestEffort)),
+		Burstable:  qosClasses[v1.PodQOSBurstable],
+		BestEffort: qosClasses[v1.PodQOSBestEffort],
 	}
 	m.getNodeAllocatable = getNodeAllocatable
 	m.activePods = activePods
