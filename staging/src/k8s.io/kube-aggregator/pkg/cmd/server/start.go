@@ -29,7 +29,6 @@ import (
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeclientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
@@ -92,7 +91,7 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, api.Scheme, api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
 
 		StdOut: out,
 		StdErr: err,
@@ -116,7 +115,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	}
 
 	serverConfig := genericapiserver.NewConfig().
-		WithSerializer(api.Codecs)
+		WithSerializer(apiserver.Codecs)
 
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return err
