@@ -25,15 +25,15 @@ import (
 
 // TODO add a `WantsToRun` which takes a stopCh.  Might make it generic.
 
-// WantsInformerFactory defines a function which sets InformerFactory for admission plugins that need it
-type WantsInternalClientSet interface {
-	SetInternalClientSet(internalclientset.Interface)
+// WantsInternalKubeClientSet defines a function which sets ClientSet for admission plugins that need it
+type WantsInternalKubeClientSet interface {
+	SetInternalKubeClientSet(internalclientset.Interface)
 	admission.Validator
 }
 
-// WantsInformerFactory defines a function which sets InformerFactory for admission plugins that need it
-type WantsInformerFactory interface {
-	SetInformerFactory(informers.SharedInformerFactory)
+// WantsInternalKubeInformerFactory defines a function which sets InformerFactory for admission plugins that need it
+type WantsInternalKubeInformerFactory interface {
+	SetInternalKubeInformerFactory(informers.SharedInformerFactory)
 	admission.Validator
 }
 
@@ -70,12 +70,12 @@ func NewPluginInitializer(internalClient internalclientset.Interface, sharedInfo
 // Initialize checks the initialization interfaces implemented by each plugin
 // and provide the appropriate initialization data
 func (i pluginInitializer) Initialize(plugin admission.Interface) {
-	if wants, ok := plugin.(WantsInternalClientSet); ok {
-		wants.SetInternalClientSet(i.internalClient)
+	if wants, ok := plugin.(WantsInternalKubeClientSet); ok {
+		wants.SetInternalKubeClientSet(i.internalClient)
 	}
 
-	if wants, ok := plugin.(WantsInformerFactory); ok {
-		wants.SetInformerFactory(i.informers)
+	if wants, ok := plugin.(WantsInternalKubeInformerFactory); ok {
+		wants.SetInternalKubeInformerFactory(i.informers)
 	}
 
 	if wants, ok := plugin.(WantsAuthorizer); ok {

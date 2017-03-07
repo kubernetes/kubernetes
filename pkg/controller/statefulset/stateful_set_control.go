@@ -74,6 +74,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 			// if the ordinal is greater than the number of replicas add it to the condemned list
 			condemned = append(condemned, pods[i])
 		}
+		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
 	}
 
 	// for any empty indices in the sequence [0,set.Spec.Replicas) create a new Pod
@@ -109,6 +110,12 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		if err := ssc.podControl.UpdateStatefulSetStatus(set, int32(ready), set.Generation); err != nil {
 			return err
 		}
+	}
+
+	// If the StatefulSet is being deleted, don't do anything other than updating
+	// status.
+	if set.DeletionTimestamp != nil {
+		return nil
 	}
 
 	// Examine each replica with respect to its ordinal

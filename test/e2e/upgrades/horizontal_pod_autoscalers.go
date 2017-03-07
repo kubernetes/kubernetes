@@ -32,7 +32,7 @@ type HPAUpgradeTest struct {
 // Creates a resource consumer and an HPA object that autoscales the consumer.
 func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 	t.rc = common.NewDynamicResourceConsumer(
-		"resource-consumer-upgrade-test",
+		"res-cons-upgrade",
 		common.KindRC,
 		1,   /* replicas */
 		250, /* initCPUTotal */

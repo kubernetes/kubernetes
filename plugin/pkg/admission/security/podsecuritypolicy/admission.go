@@ -82,7 +82,7 @@ func (plugin *podSecurityPolicyPlugin) Validate() error {
 
 var _ admission.Interface = &podSecurityPolicyPlugin{}
 var _ kubeapiserveradmission.WantsAuthorizer = &podSecurityPolicyPlugin{}
-var _ kubeapiserveradmission.WantsInformerFactory = &podSecurityPolicyPlugin{}
+var _ kubeapiserveradmission.WantsInternalKubeInformerFactory = &podSecurityPolicyPlugin{}
 
 // NewPlugin creates a new PSP admission plugin.
 func NewPlugin(strategyFactory psp.StrategyFactory, pspMatcher PSPMatchFn, failOnNoPolicies bool) *podSecurityPolicyPlugin {
@@ -94,7 +94,7 @@ func NewPlugin(strategyFactory psp.StrategyFactory, pspMatcher PSPMatchFn, failO
 	}
 }
 
-func (a *podSecurityPolicyPlugin) SetInformerFactory(f informers.SharedInformerFactory) {
+func (a *podSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	podSecurityPolicyInformer := f.Extensions().InternalVersion().PodSecurityPolicies()
 	a.lister = podSecurityPolicyInformer.Lister()
 	a.SetReadyFunc(podSecurityPolicyInformer.Informer().HasSynced)

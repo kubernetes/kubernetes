@@ -19,7 +19,6 @@ package testing
 import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -41,8 +40,8 @@ func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *
 	return &opts, false, nil
 }
 
-func (f *FakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
-	return "", ""
+func (f *FakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) string {
+	return ""
 }
 
 func (f *FakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) {
