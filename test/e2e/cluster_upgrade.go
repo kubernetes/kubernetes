@@ -45,6 +45,13 @@ var upgradeTests = []upgrades.Test{
 var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
 
+	// Create the frameworks here because we can only create them
+	// in a "Describe".
+	testFrameworks := map[string]*framework.Framework{}
+	for _, t := range upgradeTests {
+		testFrameworks[t.Name()] = framework.NewDefaultFramework(t.Name())
+	}
+
 	framework.KubeDescribe("master upgrade", func() {
 		It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
 			cm := chaosmonkey.New(func() {
@@ -56,7 +63,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			for _, t := range upgradeTests {
 				cm.RegisterInterface(&chaosMonkeyAdapter{
 					test:        t,
-					framework:   f,
+					framework:   testFrameworks[t.Name()],
 					upgradeType: upgrades.MasterUpgrade,
 				})
 			}
@@ -76,7 +83,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			for _, t := range upgradeTests {
 				cm.RegisterInterface(&chaosMonkeyAdapter{
 					test:        t,
-					framework:   f,
+					framework:   testFrameworks[t.Name()],
 					upgradeType: upgrades.NodeUpgrade,
 				})
 			}
@@ -97,7 +104,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			for _, t := range upgradeTests {
 				cm.RegisterInterface(&chaosMonkeyAdapter{
 					test:        t,
-					framework:   f,
+					framework:   testFrameworks[t.Name()],
 					upgradeType: upgrades.ClusterUpgrade,
 				})
 			}
@@ -107,7 +114,12 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 })
 
 var _ = framework.KubeDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
-	f := framework.NewDefaultFramework("etcd-upgrade")
+	// Create the frameworks here because we can only create them
+	// in a "Describe".
+	testFrameworks := map[string]*framework.Framework{}
+	for _, t := range upgradeTests {
+		testFrameworks[t.Name()] = framework.NewDefaultFramework(t.Name())
+	}
 
 	framework.KubeDescribe("etcd upgrade", func() {
 		It("should maintain a functioning cluster", func() {
@@ -118,7 +130,7 @@ var _ = framework.KubeDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 			for _, t := range upgradeTests {
 				cm.RegisterInterface(&chaosMonkeyAdapter{
 					test:        t,
-					framework:   f,
+					framework:   testFrameworks[t.Name()],
 					upgradeType: upgrades.EtcdUpgrade,
 				})
 			}
