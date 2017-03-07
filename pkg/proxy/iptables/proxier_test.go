@@ -1336,7 +1336,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 
 	for tci, tc := range testCases {
 		// outputs
-		newEndpoints := map[proxy.ServicePortName][]*endpointsInfo{}
+		newEndpoints := make(proxyEndpointMap)
 		accumulateEndpointsMap(&tc.newEndpoints, "host", tc.oldEndpoints, &newEndpoints)
 
 		if len(newEndpoints) != len(tc.expectedNew) {
