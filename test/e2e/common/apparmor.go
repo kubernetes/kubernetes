@@ -27,9 +27,9 @@ import (
 )
 
 const (
-	profilePrefix = "e2e-apparmor-test-"
-	allowedPath   = "/expect_allowed_write"
-	deniedPath    = "/expect_permission_denied"
+	appArmorProfilePrefix = "e2e-apparmor-test-"
+	appArmorAllowedPath   = "/expect_allowed_write"
+	appArmorDeniedPath    = "/expect_permission_denied"
 )
 
 func SkipIfAppArmorNotSupported() {
@@ -47,7 +47,7 @@ func LoadAppArmorProfiles(f *framework.Framework) {
 // an error code if the profile is incorrectly enforced. If runOnce is true the pod will exit after
 // a single test, otherwise it will repeat the test every 1 second until failure.
 func CreateAppArmorTestPod(f *framework.Framework, runOnce bool) *api.Pod {
-	profile := "localhost/" + profilePrefix + f.Namespace.Name
+	profile := "localhost/" + appArmorProfilePrefix + f.Namespace.Name
 	testCmd := fmt.Sprintf(`
 if touch %[1]s; then
   echo "FAILURE: write to %[1]s should be denied"
@@ -58,7 +58,7 @@ elif ! touch %[2]s; then
 elif ! grep "%[3]s" /proc/1/attr/current; then
   echo "FAILURE: not running with expected profile %[3]s"
   exit 3
-fi`, deniedPath, allowedPath, profilePrefix+f.Namespace.Name)
+fi`, appArmorDeniedPath, appArmorAllowedPath, appArmorProfilePrefix+f.Namespace.Name)
 
 	if !runOnce {
 		testCmd = fmt.Sprintf(`while true; do
@@ -100,7 +100,7 @@ done`, testCmd)
 }
 
 func createAppArmorProfileCM(f *framework.Framework) (*api.ConfigMap, error) {
-	profileName := profilePrefix + f.Namespace.Name
+	profileName := appArmorProfilePrefix + f.Namespace.Name
 	profile := fmt.Sprintf(`#include <tunables/global>
 profile %s flags=(attach_disconnected) {
   #include <abstractions/base>
@@ -110,7 +110,7 @@ profile %s flags=(attach_disconnected) {
   deny %s w,
   audit %s w,
 }
-`, profileName, deniedPath, allowedPath)
+`, profileName, appArmorDeniedPath, appArmorAllowedPath)
 
 	cm := &api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
