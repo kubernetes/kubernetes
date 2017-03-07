@@ -236,23 +236,23 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/go-oidc/http",
-			"Rev": "5644a2f50e2d2d5ba0b474bc5bc55fea1925936d"
+			"Rev": "be73733bb8cc830d0205609b95d125215f8e9c70"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-oidc/jose",
-			"Rev": "5644a2f50e2d2d5ba0b474bc5bc55fea1925936d"
+			"Rev": "be73733bb8cc830d0205609b95d125215f8e9c70"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-oidc/key",
-			"Rev": "5644a2f50e2d2d5ba0b474bc5bc55fea1925936d"
+			"Rev": "be73733bb8cc830d0205609b95d125215f8e9c70"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-oidc/oauth2",
-			"Rev": "5644a2f50e2d2d5ba0b474bc5bc55fea1925936d"
+			"Rev": "be73733bb8cc830d0205609b95d125215f8e9c70"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-oidc/oidc",
-			"Rev": "5644a2f50e2d2d5ba0b474bc5bc55fea1925936d"
+			"Rev": "be73733bb8cc830d0205609b95d125215f8e9c70"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-semver/semver",
