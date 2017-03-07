@@ -75,7 +75,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getAPIServerCommand(cfg, false),
 			VolumeMounts:  volumeMounts,
-			LivenessProbe: componentProbe(6443, "/healthz", api.URISchemeHTTPS),
+			LivenessProbe: componentProbe(int(cfg.API.BindPort), "/healthz", api.URISchemeHTTPS),
 			Resources:     componentResources("250m"),
 			Env:           getProxyEnvVars(),
 		}, volumes...),
