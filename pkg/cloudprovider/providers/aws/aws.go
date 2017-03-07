@@ -531,7 +531,7 @@ func stringPointerArray(orig []string) []*string {
 }
 
 // isNilOrEmpty returns true if the value is nil or ""
-// Deprecated: prefer aws.StringValue(x) == "" (and elimination of this check altogether whrere possible)
+// Deprecated: prefer aws.StringValue(x) == "" (and elimination of this check altogether where possible)
 func isNilOrEmpty(s *string) bool {
 	return s == nil || *s == ""
 }
