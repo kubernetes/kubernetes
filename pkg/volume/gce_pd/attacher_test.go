@@ -352,7 +352,7 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 	return expected.isAttached, expected.ret
 }
 
-func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
+func (testcase *testcase) DisksAreAttached(nodeDisks map[types.NodeName][]string) (map[types.NodeName]map[string]bool, error) {
 	return nil, errors.New("Not implemented")
 }
 
