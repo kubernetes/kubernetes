@@ -178,7 +178,7 @@ func runKubectlRetryOrDie(args ...string) string {
 // duplicated setup to avoid polluting "normal" clients with alpha features which confuses the generated clients
 var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 	defer GinkgoRecover()
-	f := framework.NewDefaultGroupVersionFramework("kubectl", BatchV2Alpha1GroupVersion)
+	f := framework.NewDefaultFramework("kubectl")
 
 	var c clientset.Interface
 	var ns string

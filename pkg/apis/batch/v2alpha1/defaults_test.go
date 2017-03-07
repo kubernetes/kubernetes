@@ -20,143 +20,40 @@ import (
 	"reflect"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	. "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
-func TestSetDefaultJob(t *testing.T) {
-	defaultLabels := map[string]string{"default": "default"}
+func TestSetDefaultCronJob(t *testing.T) {
 	tests := map[string]struct {
-		original     *Job
-		expected     *Job
-		expectLabels bool
+		original *CronJob
+		expected *CronJob
 	}{
-		"both unspecified -> sets both to 1": {
-			original: &Job{
-				Spec: JobSpec{
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(1),
-					Parallelism: newInt32(1),
-				},
-			},
-			expectLabels: true,
-		},
-		"both unspecified -> sets both to 1 and no default labels": {
-			original: &Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"mylabel": "myvalue"},
-				},
-				Spec: JobSpec{
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(1),
-					Parallelism: newInt32(1),
+		"empty CronJob should default ConcurrencyPolicy and Suspend": {
+			original: &CronJob{},
+			expected: &CronJob{
+				Spec: CronJobSpec{
+					ConcurrencyPolicy: AllowConcurrent,
+					Suspend:           newBool(false),
 				},
 			},
 		},
-		"WQ: Parallelism explicitly 0 and completions unset -> no change": {
-			original: &Job{
-				Spec: JobSpec{
-					Parallelism: newInt32(0),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
-					},
+		"nothing should be defaulted": {
+			original: &CronJob{
+				Spec: CronJobSpec{
+					ConcurrencyPolicy: ForbidConcurrent,
+					Suspend:           newBool(true),
 				},
 			},
-			expected: &Job{
-				Spec: JobSpec{
-					Parallelism: newInt32(0),
+			expected: &CronJob{
+				Spec: CronJobSpec{
+					ConcurrencyPolicy: ForbidConcurrent,
+					Suspend:           newBool(true),
 				},
 			},
-			expectLabels: true,
-		},
-		"WQ: Parallelism explicitly 2 and completions unset -> no change": {
-			original: &Job{
-				Spec: JobSpec{
-					Parallelism: newInt32(2),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Parallelism: newInt32(2),
-				},
-			},
-			expectLabels: true,
-		},
-		"Completions explicitly 2 and parallelism unset -> parallelism is defaulted": {
-			original: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(2),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(2),
-					Parallelism: newInt32(1),
-				},
-			},
-			expectLabels: true,
-		},
-		"Both set -> no change": {
-			original: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(10),
-					Parallelism: newInt32(11),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(10),
-					Parallelism: newInt32(11),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expectLabels: true,
-		},
-		"Both set, flipped -> no change": {
-			original: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(11),
-					Parallelism: newInt32(10),
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &Job{
-				Spec: JobSpec{
-					Completions: newInt32(11),
-					Parallelism: newInt32(10),
-				},
-			},
-			expectLabels: true,
 		},
 	}
 
@@ -164,35 +61,17 @@ func TestSetDefaultJob(t *testing.T) {
 		original := test.original
 		expected := test.expected
 		obj2 := roundTrip(t, runtime.Object(original))
-		actual, ok := obj2.(*Job)
+		actual, ok := obj2.(*CronJob)
 		if !ok {
 			t.Errorf("%s: unexpected object: %v", name, actual)
 			t.FailNow()
 		}
-		if (actual.Spec.Completions == nil) != (expected.Spec.Completions == nil) {
-			t.Errorf("%s: got different *completions than expected: %v %v", name, actual.Spec.Completions, expected.Spec.Completions)
+		if actual.Spec.ConcurrencyPolicy != expected.Spec.ConcurrencyPolicy {
+			t.Errorf("%s: got different concurrencyPolicy than expected: %v %v", name, actual.Spec.ConcurrencyPolicy, expected.Spec.ConcurrencyPolicy)
 		}
-		if actual.Spec.Completions != nil && expected.Spec.Completions != nil {
-			if *actual.Spec.Completions != *expected.Spec.Completions {
-				t.Errorf("%s: got different completions than expected: %d %d", name, *actual.Spec.Completions, *expected.Spec.Completions)
-			}
+		if *actual.Spec.Suspend != *expected.Spec.Suspend {
+			t.Errorf("%s: got different suspend than expected: %v %v", name, *actual.Spec.Suspend, *expected.Spec.Suspend)
 		}
-		if (actual.Spec.Parallelism == nil) != (expected.Spec.Parallelism == nil) {
-			t.Errorf("%s: got different *Parallelism than expected: %v %v", name, actual.Spec.Parallelism, expected.Spec.Parallelism)
-		}
-		if actual.Spec.Parallelism != nil && expected.Spec.Parallelism != nil {
-			if *actual.Spec.Parallelism != *expected.Spec.Parallelism {
-				t.Errorf("%s: got different parallelism than expected: %d %d", name, *actual.Spec.Parallelism, *expected.Spec.Parallelism)
-			}
-		}
-		if test.expectLabels != reflect.DeepEqual(actual.Labels, actual.Spec.Template.Labels) {
-			if test.expectLabels {
-				t.Errorf("%s: expected: %v, got: %v", name, actual.Spec.Template.Labels, actual.Labels)
-			} else {
-				t.Errorf("%s: unexpected equality: %v", name, actual.Labels)
-			}
-		}
-
 	}
 }
 
@@ -216,8 +95,8 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	return obj3
 }
 
-func newInt32(val int32) *int32 {
-	p := new(int32)
+func newBool(val bool) *bool {
+	p := new(bool)
 	*p = val
 	return p
 }

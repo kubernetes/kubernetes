@@ -11890,7 +11890,6 @@ go_library(
     srcs = [
         "k8s.io/client-go/informers/batch/v2alpha1/cronjob.go",
         "k8s.io/client-go/informers/batch/v2alpha1/interface.go",
-        "k8s.io/client-go/informers/batch/v2alpha1/job.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -12668,7 +12667,6 @@ go_library(
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/cronjob.go",
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/doc.go",
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/generated_expansion.go",
-        "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/job.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -12688,7 +12686,6 @@ go_library(
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake/doc.go",
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake/fake_batch_client.go",
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake/fake_cronjob.go",
-        "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake/fake_job.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -13235,7 +13232,6 @@ go_library(
     srcs = [
         "k8s.io/client-go/listers/batch/v2alpha1/cronjob.go",
         "k8s.io/client-go/listers/batch/v2alpha1/expansion_generated.go",
-        "k8s.io/client-go/listers/batch/v2alpha1/job.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -13966,6 +13962,7 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/apis/batch",
+        "//vendor:k8s.io/client-go/pkg/apis/batch/v1",
     ],
 )
 
