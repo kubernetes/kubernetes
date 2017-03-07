@@ -686,6 +686,10 @@ func rbacFuncs(t apitesting.TestingCommon) []interface{} {
 				r.Kind = rbac.UserKind
 				r.APIGroup = rbac.GroupName
 				c.FuzzNoCustom(&r.Name)
+				// user "*" won't round trip because we convert it to the system:authenticated group. try again.
+				for r.Name == "*" {
+					c.FuzzNoCustom(&r.Name)
+				}
 			case 2:
 				r.Kind = rbac.GroupKind
 				r.APIGroup = rbac.GroupName
