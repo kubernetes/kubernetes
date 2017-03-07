@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/federation/apis/federation"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -33,14 +34,19 @@ func TestClusterGenerate(t *testing.T) {
 	}{
 		{
 			params: map[string]interface{}{
-				"name":           "foo",
-				"client-cidr":    "0.0.0.0/0",
-				"server-address": "10.20.30.40",
-				"secret":         "foo-credentials",
+				"name":            "foo",
+				"federation-name": "foo-federation",
+				"client-cidr":     "0.0.0.0/0",
+				"server-address":  "10.20.30.40",
+				"secret":          "foo-credentials",
 			},
 			expected: &federationapi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
+					Annotations: map[string]string{
+						federation.FederationNameAnnotation: "foo-federation",
+						federation.ClusterNameAnnotation:    "foo",
+					},
 				},
 				Spec: federationapi.ClusterSpec{
 					ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
@@ -58,14 +64,19 @@ func TestClusterGenerate(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"name":           "foo",
-				"client-cidr":    "10.20.30.40/16",
-				"server-address": "https://foo.example.com",
-				"secret":         "foo-credentials",
+				"name":            "foo",
+				"federation-name": "foo-federation",
+				"client-cidr":     "10.20.30.40/16",
+				"server-address":  "https://foo.example.com",
+				"secret":          "foo-credentials",
 			},
 			expected: &federationapi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
+					Annotations: map[string]string{
+						federation.FederationNameAnnotation: "foo-federation",
+						federation.ClusterNameAnnotation:    "foo",
+					},
 				},
 				Spec: federationapi.ClusterSpec{
 					ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
@@ -83,14 +94,19 @@ func TestClusterGenerate(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"name":           "bar-cluster",
-				"client-cidr":    "10.20.30.40/16",
-				"server-address": "http://10.20.30.40",
-				"secret":         "credentials",
+				"name":            "bar-cluster",
+				"federation-name": "bar-cluster-federation",
+				"client-cidr":     "10.20.30.40/16",
+				"server-address":  "http://10.20.30.40",
+				"secret":          "credentials",
 			},
 			expected: &federationapi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar-cluster",
+					Annotations: map[string]string{
+						federation.FederationNameAnnotation: "bar-cluster-federation",
+						federation.ClusterNameAnnotation:    "bar-cluster",
+					},
 				},
 				Spec: federationapi.ClusterSpec{
 					ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{

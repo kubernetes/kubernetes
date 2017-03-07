@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/federation/apis/federation"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -30,6 +31,8 @@ import (
 type ClusterGeneratorV1Beta1 struct {
 	// Name of the cluster context (required)
 	Name string
+	// Name of the federation this cluster is joining (required)
+	FederationName string
 	// ClientCIDR is the CIDR range in which the Kubernetes APIServer
 	// is available for the client (optional)
 	ClientCIDR string
@@ -65,6 +68,7 @@ func (s ClusterGeneratorV1Beta1) Generate(genericParams map[string]interface{}) 
 		params[key] = strVal
 	}
 	clustergen.Name = params["name"]
+	clustergen.FederationName = params["federation-name"]
 	clustergen.ClientCIDR = params["client-cidr"]
 	clustergen.ServerAddress = params["server-address"]
 	clustergen.SecretName = params["secret"]
@@ -76,6 +80,7 @@ func (s ClusterGeneratorV1Beta1) Generate(genericParams map[string]interface{}) 
 func (s ClusterGeneratorV1Beta1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
+		{"federation-name", true},
 		{"client-cidr", false},
 		{"server-address", true},
 		{"secret", false},
@@ -97,6 +102,10 @@ func (s ClusterGeneratorV1Beta1) StructuredGenerate() (runtime.Object, error) {
 	cluster := &federationapi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
+			Annotations: map[string]string{
+				federation.FederationNameAnnotation: s.FederationName,
+				federation.ClusterNameAnnotation:    s.Name,
+			},
 		},
 		Spec: federationapi.ClusterSpec{
 			ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
