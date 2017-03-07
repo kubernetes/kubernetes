@@ -47,12 +47,17 @@ func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object) (run
 		return s.StandardStorage.Create(ctx, obj)
 	}
 
+	namespace, ok := genericapirequest.NamespaceFrom(ctx)
+	if !ok {
+		return nil, errors.NewBadRequest("namespace is required")
+	}
+
 	roleBinding := obj.(*rbac.RoleBinding)
-	if rbacregistry.BindingAuthorized(ctx, roleBinding.RoleRef, roleBinding.Namespace, s.authorizer) {
+	if rbacregistry.BindingAuthorized(ctx, roleBinding.RoleRef, namespace, s.authorizer) {
 		return s.StandardStorage.Create(ctx, obj)
 	}
 
-	rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, roleBinding.Namespace)
+	rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -68,15 +73,20 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 	}
 
 	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
+		namespace, ok := genericapirequest.NamespaceFrom(ctx)
+		if !ok {
+			return nil, errors.NewBadRequest("namespace is required")
+		}
+
 		roleBinding := obj.(*rbac.RoleBinding)
 
 		// if we're explicitly authorized to bind this role, return
-		if rbacregistry.BindingAuthorized(ctx, roleBinding.RoleRef, roleBinding.Namespace, s.authorizer) {
+		if rbacregistry.BindingAuthorized(ctx, roleBinding.RoleRef, namespace, s.authorizer) {
 			return obj, nil
 		}
 
 		// Otherwise, see if we already have all the permissions contained in the referenced role
-		rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, roleBinding.Namespace)
+		rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, namespace)
 		if err != nil {
 			return nil, err
 		}
