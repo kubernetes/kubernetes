@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/registry/apiservice"
 )
@@ -31,9 +30,10 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against API services.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST {
+	strategy := apiservice.NewStrategy(scheme)
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
+		Copier:      scheme,
 		NewFunc:     func() runtime.Object { return &apiregistration.APIService{} },
 		NewListFunc: func() runtime.Object { return &apiregistration.APIServiceList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
@@ -43,9 +43,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		QualifiedResource: apiregistration.Resource("apiservices"),
 		WatchCacheSize:    100,
 
-		CreateStrategy: apiservice.Strategy,
-		UpdateStrategy: apiservice.Strategy,
-		DeleteStrategy: apiservice.Strategy,
+		CreateStrategy: strategy,
+		UpdateStrategy: strategy,
+		DeleteStrategy: strategy,
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: apiservice.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
