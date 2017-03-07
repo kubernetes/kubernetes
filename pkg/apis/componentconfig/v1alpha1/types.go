@@ -21,6 +21,103 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
+type APIServerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+	//
+	// Generic Server Run Options
+	//
+	AdmissionControl           string `json:"admissionControl"`
+	AdmissionControlConfigFile string `json:"admissionControlConfigFile"`
+	AdvertiseAddress           string `json:"advertiseAddress"`
+
+	CorsAllowedOriginList []string `json:"corsAllowedOriginList"`
+
+	ExternalHost                string   `json:"externalHost"`
+	MaxRequestsInFlight         int      `json:"maxRequestsInFlight"`
+	MaxMutatingRequestsInFlight int      `json:"maxMutatingRequestsInFlight"`
+	MinRequestTimeout           int      `json:"minRequestTimeout"`
+	TargetRAMMB                 int      `json:"targetRAMMB"`
+	WatchCacheSizes             []string `json:"watchCacheSizes"`
+
+	//
+	// Server Run Options: Audit Options
+	//
+	AuditLogOptions APIServerAuditLogOptions `json:"auditLogOptions"`
+
+	//
+	// Server Run Options: Feature Options
+	//
+	EnableProfiling           bool `json:"enableProfiling"`
+	EnableContentionProfiling bool `json:"enableContentionProfiling"`
+	EnableSwaggerUI           bool `json:"enableSwaggerUI"`
+
+	//
+	// Server Run Options: Etcd
+	//
+	StorageConfig           APIServerEtcdConfiguration `json:"storageConfig"`
+	EtcdServersOverrides    []string                   `json:"etcdServersOverrides"`
+	DefaultStorageMediaType string                     `json:"defaultStorageMediaType"`
+	DeleteCollectionWorkers int                        `json:"deleteCollectionWorkers"`
+	EnableGarbageCollection bool                       `json:"enableGarbageCollection"`
+	EnableWatchCache        bool                       `json:"enableWatchCache"`
+
+	//
+	// Server Run Options: Cloud Provider
+	//
+	CloudConfigFile string `json:"cloudConfigFile"`
+	CloudProvider   string `json:"cloudProvider"`
+
+	//
+	// Server Run Options: Storage Serialization
+	//
+	StorageSerialization APIServerStorageSerializationOptions `json:"storageSerialization"`
+
+	//
+	// Server Run Options
+	//
+	AllowPrivileged           *bool           `json:"allowPrivileged,omitempty"`
+	EventTTL                  metav1.Duration `json:"eventTTL"`
+	KubernetesServiceNodePort *int            `json:"kubernetesServiceNodePort,omitempty"`
+	MasterCount               *int            `json:"masterCount,omitempty"`
+	MaxConnectionBytesPerSec  *int64          `json:"maxConnectionBytesPerSec,omitempty"`
+	ServiceClusterIPRange     *string         `json:"serviceClusterIPRange,omitempty"`
+	ServiceNodePortRange      *string         `json:"serviceNodePortRange,omitempty"`
+}
+
+type APIServerEtcdConfiguration struct {
+	// Type defines the type of storage backend, e.g. "etcd2", etcd3". Default ("") is "etcd3".
+	Type string `json:"type"`
+	// Prefix is the prefix to all keys passed to storage.Interface methods.
+	Prefix string `json:"prefix"`
+	// ServerList is the list of storage servers to connect with.
+	ServerList []string `json:"serverList"`
+	// TLS credentials
+	KeyFile  string `json:"keyFile"`
+	CertFile string `json:"certFile"`
+	CAFile   string `json:"caFile"`
+	// Quorum indicates that whether read operations should be quorum-level consistent.
+	Quorum bool `json:"quorum"`
+	// DeserializationCacheSize is the size of cache of deserialized objects.
+	// Currently this is only supported in etcd2.
+	// We will drop the cache once using protobuf.
+	DeserializationCacheSize int `json:"deserializationCacheSize"`
+}
+
+type APIServerStorageSerializationOptions struct {
+	StorageVersions string `json:"storageVersions"`
+	// The default values for StorageVersions. StorageVersions overrides
+	// these; you can change this if you want to change the defaults (e.g.,
+	// for testing). This is not actually exposed as a flag.
+	DefaultStorageVersions string `json:"defaultStorageVersions"`
+}
+
+type APIServerAuditLogOptions struct {
+	Path       string `json:"path"`
+	MaxAge     int    `json:"maxAge"`
+	MaxBackups int    `json:"maxBackups"`
+	MaxSize    int    `json:"maxSize"`
+}
+
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 

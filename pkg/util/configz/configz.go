@@ -34,7 +34,7 @@ type Config struct {
 }
 
 func InstallHandler(m mux) {
-	m.Handle("/configz", http.HandlerFunc(handle))
+	m.Handle("/configz", http.HandlerFunc(Handle))
 }
 
 type mux interface {
@@ -68,7 +68,7 @@ func (v *Config) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.val)
 }
 
-func handle(w http.ResponseWriter, r *http.Request) {
+func Handle(w http.ResponseWriter, r *http.Request) {
 	if err := write(w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

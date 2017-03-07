@@ -29,6 +29,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/features"
 
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 // Runtime options for the federation-apiserver.
@@ -46,6 +47,59 @@ type ServerRunOptions struct {
 	APIEnablement           *kubeoptions.APIEnablementOptions
 
 	EventTTL time.Duration
+}
+
+func (s *ServerRunOptions) ComponentConfigz() componentconfig.APIServerConfiguration {
+	componentconfig := componentconfig.APIServerConfiguration{
+		AdmissionControl:            s.GenericServerRunOptions.AdmissionControl,
+		AdmissionControlConfigFile:  s.GenericServerRunOptions.AdmissionControlConfigFile,
+		AdvertiseAddress:            s.GenericServerRunOptions.AdvertiseAddress.String(),
+		CorsAllowedOriginList:       s.GenericServerRunOptions.CorsAllowedOriginList,
+		ExternalHost:                s.GenericServerRunOptions.ExternalHost,
+		MaxRequestsInFlight:         s.GenericServerRunOptions.MaxRequestsInFlight,
+		MaxMutatingRequestsInFlight: s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
+		MinRequestTimeout:           s.GenericServerRunOptions.MinRequestTimeout,
+		TargetRAMMB:                 s.GenericServerRunOptions.TargetRAMMB,
+		WatchCacheSizes:             s.GenericServerRunOptions.WatchCacheSizes,
+		AuditLogOptions: componentconfig.APIServerAuditLogOptions{
+			Path:       s.Audit.Path,
+			MaxAge:     s.Audit.MaxAge,
+			MaxBackups: s.Audit.MaxBackups,
+			MaxSize:    s.Audit.MaxSize,
+		},
+		EnableProfiling:           s.Features.EnableProfiling,
+		EnableContentionProfiling: s.Features.EnableContentionProfiling,
+		EnableSwaggerUI:           s.Features.EnableSwaggerUI,
+		StorageConfig: componentconfig.APIServerEtcdConfiguration{
+			Type:       s.Etcd.StorageConfig.Type,
+			Prefix:     s.Etcd.StorageConfig.Prefix,
+			ServerList: s.Etcd.StorageConfig.ServerList,
+			KeyFile:    s.Etcd.StorageConfig.KeyFile,
+			CertFile:   s.Etcd.StorageConfig.CertFile,
+			CAFile:     s.Etcd.StorageConfig.CAFile,
+			Quorum:     s.Etcd.StorageConfig.Quorum,
+			DeserializationCacheSize: s.Etcd.StorageConfig.DeserializationCacheSize,
+		},
+		EtcdServersOverrides:    s.Etcd.EtcdServersOverrides,
+		DefaultStorageMediaType: s.Etcd.DefaultStorageMediaType,
+		DeleteCollectionWorkers: s.Etcd.DeleteCollectionWorkers,
+		EnableGarbageCollection: s.Etcd.EnableGarbageCollection,
+		EnableWatchCache:        s.Etcd.EnableWatchCache,
+		CloudConfigFile:         s.CloudProvider.CloudConfigFile,
+		CloudProvider:           s.CloudProvider.CloudProvider,
+		StorageSerialization: componentconfig.APIServerStorageSerializationOptions{
+			StorageVersions:        s.StorageSerialization.StorageVersions,
+			DefaultStorageVersions: s.StorageSerialization.DefaultStorageVersions,
+		},
+		AllowPrivileged:           nil,
+		KubernetesServiceNodePort: nil,
+		MasterCount:               nil,
+		MaxConnectionBytesPerSec:  nil,
+		ServiceClusterIPRange:     nil,
+		ServiceNodePortRange:      nil,
+	}
+
+	return componentconfig
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default values.
