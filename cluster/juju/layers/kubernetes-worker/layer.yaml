@@ -5,9 +5,11 @@ includes:
   - 'layer:docker'
   - 'layer:nagios'
   - 'layer:tls-client'
+  - 'layer:nvidia-cuda'
   - 'interface:http'
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
+  - 'interface:kube-control'
 options:
   basic:
     packages:
