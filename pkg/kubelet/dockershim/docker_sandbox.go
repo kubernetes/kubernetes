@@ -341,6 +341,18 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 			}
 		}
 	}
+
+	// Make sure we get the list of checkpoints first so that we don't include
+	// new PodSandboxes that are being created right now.
+	var err error
+	checkpoints := []string{}
+	if filter == nil {
+		checkpoints, err = ds.checkpointHandler.ListCheckpoints()
+		if err != nil {
+			glog.Errorf("Failed to list checkpoints: %v", err)
+		}
+	}
+
 	containers, err := ds.client.ListContainers(opts)
 	if err != nil {
 		return nil, err
@@ -368,10 +380,6 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 	// These PodSandbox will only include PodSandboxID, Name, Namespace.
 	// These PodSandbox will be in PodSandboxState_SANDBOX_NOTREADY state.
 	if filter == nil {
-		checkpoints, err := ds.checkpointHandler.ListCheckpoints()
-		if err != nil {
-			glog.Errorf("Failed to list checkpoints: %v", err)
-		}
 		for _, id := range checkpoints {
 			if _, ok := sandboxIDs[id]; ok {
 				continue
