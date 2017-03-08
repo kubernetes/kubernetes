@@ -50,6 +50,10 @@ type APIServiceSpec struct {
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty" protobuf:"varint,4,opt,name=insecureSkipTLSVerify"`
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
 	CABundle []byte `json:"caBundle" protobuf:"bytes,5,opt,name=caBundle"`
+	// Local means that the handling for the API groupversion is handled locally on this server.
+	// The call will simply delegate to the normal handler chain to be fulfilled.  This is mutually exclusive
+	// to Service and CABundle.
+	Local bool `json:"local" protobuf:"bytes,7,opt,name=local"`
 
 	// Priority controls the ordering of this API group in the overall discovery document that gets served.
 	// Client tools like `kubectl` use this ordering to derive preference, so this ordering mechanism is important.

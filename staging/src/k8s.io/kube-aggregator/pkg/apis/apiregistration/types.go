@@ -50,6 +50,10 @@ type APIServiceSpec struct {
 	InsecureSkipTLSVerify bool
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
 	CABundle []byte
+	// Local means that the handling for the API groupversion is handled locally on this server.
+	// The call will simply delegate to the normal handler chain to be fulfilled.  This is mutually exclusive
+	// to Service and CABundle.
+	Local bool
 
 	// Priority controls the ordering of this API group in the overall discovery document that gets served.
 	// Client tools like `kubectl` use this ordering to derive preference, so this ordering mechanism is important.

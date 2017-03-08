@@ -37,6 +37,9 @@ import (
 type proxyHandler struct {
 	contextMapper genericapirequest.RequestContextMapper
 
+	// localDelegate is used to satisfy local APIServices
+	localDelegate http.Handler
+
 	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
 	proxyClientCert []byte
@@ -44,6 +47,8 @@ type proxyHandler struct {
 
 	// lock protects us for updates.
 	lock sync.RWMutex
+	// local indicates that this APIService is locally satisfied
+	local bool
 	// restConfig holds the information for building a roundtripper
 	restConfig *restclient.Config
 	// transportBuildingError is an error produced while building the transport.  If this
@@ -56,6 +61,11 @@ type proxyHandler struct {
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if r.isLocal() {
+		r.localDelegate.ServeHTTP(w, req)
+		return
+	}
+
 	proxyRoundTripper, err := r.getRoundTripper()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -170,6 +180,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 	r.transportBuildingError = nil
 	r.proxyRoundTripper = nil
 
+	r.local = apiService.Spec.Local
 	r.destinationHost = apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc"
 	r.restConfig = &restclient.Config{
 		TLSClientConfig: restclient.TLSClientConfig{
@@ -190,6 +201,12 @@ func (r *proxyHandler) removeAPIService() {
 	r.proxyRoundTripper = nil
 }
 
+func (r *proxyHandler) isLocal() bool {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	return r.local
+}
 func (r *proxyHandler) getRoundTripper() (http.RoundTripper, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
