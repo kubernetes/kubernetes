@@ -503,7 +503,7 @@ func (h *etcdHelper) GuaranteedUpdate(
 			meta.ResourceVersion = node.ModifiedIndex
 		}
 		// Get the object to be written by calling tryUpdate.
-		ret, newTTL, err := tryUpdate(obj, meta)
+		ret, newTTL, err := tryUpdate(obj, false, meta)
 		if err != nil {
 			return toStorageErr(err, key, 0)
 		}

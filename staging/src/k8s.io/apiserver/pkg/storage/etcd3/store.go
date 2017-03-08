@@ -267,7 +267,9 @@ func (s *store) GuaranteedUpdate(
 	key = path.Join(s.pathPrefix, key)
 
 	var origState *objState
+	var maybeStale bool
 	if len(suggestion) == 1 && suggestion[0] != nil {
+		maybeStale = true
 		origState, err = s.getStateFromObject(suggestion[0])
 		if err != nil {
 			return err
@@ -289,7 +291,7 @@ func (s *store) GuaranteedUpdate(
 			return err
 		}
 
-		ret, ttl, err := s.updateState(origState, tryUpdate)
+		ret, ttl, err := s.updateState(origState, maybeStale, tryUpdate)
 		if err != nil {
 			return err
 		}
@@ -327,6 +329,7 @@ func (s *store) GuaranteedUpdate(
 		if !txnResp.Succeeded {
 			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
+			maybeStale = false
 			origState, err = s.getState(getResp, key, v, ignoreNotFound)
 			if err != nil {
 				return err
@@ -481,8 +484,8 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 	return state, nil
 }
 
-func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtime.Object, uint64, error) {
-	ret, ttlPtr, err := userUpdate(st.obj, *st.meta)
+func (s *store) updateState(st *objState, maybeStale bool, userUpdate storage.UpdateFunc) (runtime.Object, uint64, error) {
+	ret, ttlPtr, err := userUpdate(st.obj, maybeStale, *st.meta)
 	if err != nil {
 		return nil, 0, err
 	}

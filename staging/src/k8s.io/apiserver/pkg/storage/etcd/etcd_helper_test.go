@@ -204,9 +204,11 @@ func TestTransformationFailure(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	// GuaranteedUpdate should return an error
-	if err := helper.GuaranteedUpdate(context.TODO(), "/baz", &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
-		return input, nil, nil
-	}, &pods[1]); !storage.IsInternalError(err) {
+	if err := helper.GuaranteedUpdate(
+		context.TODO(), "/baz", &example.Pod{}, false, nil,
+		func(input runtime.Object, maybeStale bool, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+			return input, nil, nil
+		}, &pods[1]); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 

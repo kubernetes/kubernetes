@@ -584,7 +584,7 @@ func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn Creat
 	// Make sure a custom transform is called, and sees the expected updatedObject and oldObject
 	// This tests the mechanism used to pass the old and new object to admission
 	calledUpdatedObject := 0
-	noopTransform := func(_ genericapirequest.Context, updatedObject runtime.Object, oldObject runtime.Object) (runtime.Object, error) {
+	noopTransform := func(_ genericapirequest.Context, updatedObject runtime.Object, oldObject runtime.Object, maybeStale bool) (runtime.Object, error) {
 		if !reflect.DeepEqual(storedFoo, oldObject) {
 			t.Errorf("Expected\n\t%#v\ngot\n\t%#v", storedFoo, oldObject)
 		}
@@ -626,7 +626,7 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 
 	// Make sure our transform is called, and sees the expected updatedObject and oldObject
 	propagateErr := fmt.Errorf("custom updated object error for %v", foo)
-	noopTransform := func(_ genericapirequest.Context, updatedObject runtime.Object, oldObject runtime.Object) (runtime.Object, error) {
+	noopTransform := func(_ genericapirequest.Context, updatedObject runtime.Object, oldObject runtime.Object, maybeStale bool) (runtime.Object, error) {
 		return nil, propagateErr
 	}
 

@@ -77,7 +77,7 @@ var Everything = SelectionPredicate{
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update
 // that is guaranteed to succeed.
 // See the comment for GuaranteedUpdate for more details.
-type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
+type UpdateFunc func(input runtime.Object, maybeStale bool, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 type Preconditions struct {

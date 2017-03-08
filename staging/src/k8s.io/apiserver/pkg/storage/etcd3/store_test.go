@@ -437,7 +437,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 
 	out := &example.Pod{}
 	err := store.GuaranteedUpdate(ctx, key, out, true, nil,
-		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		func(_ runtime.Object, _ bool, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
 			ttl := uint64(1)
 			return input, &ttl, nil
 		})
@@ -557,15 +557,17 @@ func TestTransformationFailure(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	// GuaranteedUpdate without suggestion should return an error
-	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
-		return input, nil, nil
-	}); !storage.IsInternalError(err) {
+	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil,
+		func(input runtime.Object, maybeStale bool, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+			return input, nil, nil
+		}); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	// GuaranteedUpdate with suggestion should not return an error if we don't change the object
-	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
-		return input, nil, nil
-	}, preset[1].obj); err != nil {
+	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil,
+		func(input runtime.Object, maybeStale bool, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+			return input, nil, nil
+		}, preset[1].obj); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 

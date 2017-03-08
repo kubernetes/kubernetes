@@ -515,7 +515,7 @@ func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object
 
 func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
-	obj, err := objInfo.UpdatedObject(ctx, &storage.item)
+	obj, err := objInfo.UpdatedObject(ctx, &storage.item, false)
 	if err != nil {
 		return nil, false, err
 	}

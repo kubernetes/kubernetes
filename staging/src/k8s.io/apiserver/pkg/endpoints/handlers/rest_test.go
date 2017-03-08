@@ -105,7 +105,7 @@ func (p *testPatcher) Update(ctx request.Context, name string, objInfo rest.Upda
 	}
 	p.numUpdates++
 
-	obj, err := objInfo.UpdatedObject(ctx, currentPod)
+	obj, err := objInfo.UpdatedObject(ctx, currentPod, false)
 	if err != nil {
 		return nil, false, err
 	}

@@ -140,7 +140,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 	}
 
 	oldScale := scaleFromRC(rc)
-	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	obj, err := objInfo.UpdatedObject(ctx, oldScale, false)
 	if err != nil {
 		return nil, false, err
 	}

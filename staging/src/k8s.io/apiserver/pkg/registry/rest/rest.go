@@ -195,7 +195,7 @@ type UpdatedObjectInfo interface {
 
 	// UpdatedObject returns the updated object, given a context and old object.
 	// The only time an empty oldObj should be passed in is if a "create on update" is occurring (there is no oldObj).
-	UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object) (newObj runtime.Object, err error)
+	UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object, maybeStale bool) (newObj runtime.Object, err error)
 }
 
 // Updater is an object that can update an instance of a RESTful object.

@@ -377,7 +377,7 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldService)
+	obj, err := objInfo.UpdatedObject(ctx, oldService, false)
 	if err != nil {
 		return nil, false, err
 	}
