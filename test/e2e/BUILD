@@ -89,6 +89,7 @@ go_library(
         "volumes.go",
         "vsphere_utils.go",
         "vsphere_volume_diskformat.go",
+        "vsphere_volume_ops_storm.go",
         "vsphere_volume_placement.go",
     ],
     tags = ["automanaged"],
