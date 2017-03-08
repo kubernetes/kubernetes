@@ -456,31 +456,33 @@ func (f *ring0Factory) DefaultNamespace() (string, bool, error) {
 }
 
 const (
-	RunV1GeneratorName                     = "run/v1"
-	RunPodV1GeneratorName                  = "run-pod/v1"
-	ServiceV1GeneratorName                 = "service/v1"
-	ServiceV2GeneratorName                 = "service/v2"
-	ServiceNodePortGeneratorV1Name         = "service-nodeport/v1"
-	ServiceClusterIPGeneratorV1Name        = "service-clusterip/v1"
-	ServiceLoadBalancerGeneratorV1Name     = "service-loadbalancer/v1"
-	ServiceExternalNameGeneratorV1Name     = "service-externalname/v1"
-	ServiceAccountV1GeneratorName          = "serviceaccount/v1"
-	HorizontalPodAutoscalerV1GeneratorName = "horizontalpodautoscaler/v1"
-	DeploymentV1Beta1GeneratorName         = "deployment/v1beta1"
-	DeploymentBasicV1Beta1GeneratorName    = "deployment-basic/v1beta1"
-	JobV1GeneratorName                     = "job/v1"
-	CronJobV2Alpha1GeneratorName           = "cronjob/v2alpha1"
-	ScheduledJobV2Alpha1GeneratorName      = "scheduledjob/v2alpha1"
-	NamespaceV1GeneratorName               = "namespace/v1"
-	ResourceQuotaV1GeneratorName           = "resourcequotas/v1"
-	SecretV1GeneratorName                  = "secret/v1"
-	SecretForDockerRegistryV1GeneratorName = "secret-for-docker-registry/v1"
-	SecretForTLSV1GeneratorName            = "secret-for-tls/v1"
-	ConfigMapV1GeneratorName               = "configmap/v1"
-	ClusterRoleBindingV1GeneratorName      = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
-	RoleBindingV1GeneratorName             = "rolebinding.rbac.authorization.k8s.io/v1alpha1"
-	ClusterV1Beta1GeneratorName            = "cluster/v1beta1"
-	PodDisruptionBudgetV1GeneratorName     = "poddisruptionbudget/v1beta1"
+	RunV1GeneratorName                      = "run/v1"
+	RunPodV1GeneratorName                   = "run-pod/v1"
+	ServiceV1GeneratorName                  = "service/v1"
+	ServiceV2GeneratorName                  = "service/v2"
+	ServiceNodePortGeneratorV1Name          = "service-nodeport/v1"
+	ServiceClusterIPGeneratorV1Name         = "service-clusterip/v1"
+	ServiceLoadBalancerGeneratorV1Name      = "service-loadbalancer/v1"
+	ServiceExternalNameGeneratorV1Name      = "service-externalname/v1"
+	ServiceAccountV1GeneratorName           = "serviceaccount/v1"
+	HorizontalPodAutoscalerV1GeneratorName  = "horizontalpodautoscaler/v1"
+	DeploymentV1Beta1GeneratorName          = "deployment/v1beta1"
+	DeploymentAppsV1Beta1GeneratorName      = "deployment/apps.v1beta1"
+	DeploymentBasicV1Beta1GeneratorName     = "deployment-basic/v1beta1"
+	DeploymentBasicAppsV1Beta1GeneratorName = "deployment-basic/apps.v1beta1"
+	JobV1GeneratorName                      = "job/v1"
+	CronJobV2Alpha1GeneratorName            = "cronjob/v2alpha1"
+	ScheduledJobV2Alpha1GeneratorName       = "scheduledjob/v2alpha1"
+	NamespaceV1GeneratorName                = "namespace/v1"
+	ResourceQuotaV1GeneratorName            = "resourcequotas/v1"
+	SecretV1GeneratorName                   = "secret/v1"
+	SecretForDockerRegistryV1GeneratorName  = "secret-for-docker-registry/v1"
+	SecretForTLSV1GeneratorName             = "secret-for-tls/v1"
+	ConfigMapV1GeneratorName                = "configmap/v1"
+	ClusterRoleBindingV1GeneratorName       = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
+	RoleBindingV1GeneratorName              = "rolebinding.rbac.authorization.k8s.io/v1alpha1"
+	ClusterV1Beta1GeneratorName             = "cluster/v1beta1"
+	PodDisruptionBudgetV1GeneratorName      = "poddisruptionbudget/v1beta1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
@@ -506,16 +508,18 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 		}
 	case "deployment":
 		generator = map[string]kubectl.Generator{
-			DeploymentBasicV1Beta1GeneratorName: kubectl.DeploymentBasicGeneratorV1{},
+			DeploymentBasicV1Beta1GeneratorName:     kubectl.DeploymentBasicGeneratorV1{},
+			DeploymentBasicAppsV1Beta1GeneratorName: kubectl.DeploymentBasicAppsGeneratorV1{},
 		}
 	case "run":
 		generator = map[string]kubectl.Generator{
-			RunV1GeneratorName:                kubectl.BasicReplicationController{},
-			RunPodV1GeneratorName:             kubectl.BasicPod{},
-			DeploymentV1Beta1GeneratorName:    kubectl.DeploymentV1Beta1{},
-			JobV1GeneratorName:                kubectl.JobV1{},
-			ScheduledJobV2Alpha1GeneratorName: kubectl.CronJobV2Alpha1{},
-			CronJobV2Alpha1GeneratorName:      kubectl.CronJobV2Alpha1{},
+			RunV1GeneratorName:                 kubectl.BasicReplicationController{},
+			RunPodV1GeneratorName:              kubectl.BasicPod{},
+			DeploymentV1Beta1GeneratorName:     kubectl.DeploymentV1Beta1{},
+			DeploymentAppsV1Beta1GeneratorName: kubectl.DeploymentAppsV1Beta1{},
+			JobV1GeneratorName:                 kubectl.JobV1{},
+			ScheduledJobV2Alpha1GeneratorName:  kubectl.CronJobV2Alpha1{},
+			CronJobV2Alpha1GeneratorName:       kubectl.CronJobV2Alpha1{},
 		}
 	case "autoscale":
 		generator = map[string]kubectl.Generator{

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -121,6 +122,94 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 	return &deployment, nil
 }
 
+type DeploymentAppsV1Beta1 struct{}
+
+func (DeploymentAppsV1Beta1) ParamNames() []GeneratorParam {
+	return []GeneratorParam{
+		{"labels", false},
+		{"default-name", false},
+		{"name", true},
+		{"replicas", true},
+		{"image", true},
+		{"image-pull-policy", false},
+		{"port", false},
+		{"hostport", false},
+		{"stdin", false},
+		{"tty", false},
+		{"command", false},
+		{"args", false},
+		{"env", false},
+		{"requests", false},
+		{"limits", false},
+	}
+}
+
+func (DeploymentAppsV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args, err := getArgs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	envs, err := getEnvs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := getParams(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	name, err := getName(params)
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := getLabels(params, true, name)
+	if err != nil {
+		return nil, err
+	}
+
+	count, err := strconv.Atoi(params["replicas"])
+	if err != nil {
+		return nil, err
+	}
+
+	podSpec, err := makePodSpec(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])
+	if err = updatePodContainers(params, args, envs, imagePullPolicy, podSpec); err != nil {
+		return nil, err
+	}
+
+	if err := updatePodPorts(params, podSpec); err != nil {
+		return nil, err
+	}
+
+	count32 := int32(count)
+	deployment := appsv1beta1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: appsv1beta1.DeploymentSpec{
+			Replicas: &count32,
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: *podSpec,
+			},
+		},
+	}
+	return &deployment, nil
+}
+
+// getLabels returns map of labels.
 func getLabels(params map[string]string, defaultRunLabel bool, name string) (map[string]string, error) {
 	labelString, found := params["labels"]
 	var labels map[string]string
@@ -138,6 +227,7 @@ func getLabels(params map[string]string, defaultRunLabel bool, name string) (map
 	return labels, nil
 }
 
+// getName returns the name of newly created resource.
 func getName(params map[string]string) (string, error) {
 	name, found := params["name"]
 	if !found || len(name) == 0 {
@@ -149,6 +239,7 @@ func getName(params map[string]string) (string, error) {
 	return name, nil
 }
 
+// getParams returns map of generic parameters.
 func getParams(genericParams map[string]interface{}) (map[string]string, error) {
 	params := map[string]string{}
 	for key, value := range genericParams {
@@ -161,6 +252,7 @@ func getParams(genericParams map[string]interface{}) (map[string]string, error) 
 	return params, nil
 }
 
+// getArgs returns arguments for the container command.
 func getArgs(genericParams map[string]interface{}) ([]string, error) {
 	args := []string{}
 	val, found := genericParams["args"]
@@ -175,6 +267,7 @@ func getArgs(genericParams map[string]interface{}) ([]string, error) {
 	return args, nil
 }
 
+// getEnvs returns environment variables.
 func getEnvs(genericParams map[string]interface{}) ([]v1.EnvVar, error) {
 	var envs []v1.EnvVar
 	envStrings, found := genericParams["env"]
@@ -409,6 +502,7 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 }
 
 // populateResourceList takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
+// and returns ResourceList.
 func populateResourceList(spec string) (api.ResourceList, error) {
 	// empty input gets a nil response to preserve generator test expected behaviors
 	if spec == "" {
@@ -433,6 +527,7 @@ func populateResourceList(spec string) (api.ResourceList, error) {
 }
 
 // populateResourceListV1 takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
+// and returns ResourceList.
 func populateResourceListV1(spec string) (v1.ResourceList, error) {
 	// empty input gets a nil response to preserve generator test expected behaviors
 	if spec == "" {
@@ -457,6 +552,7 @@ func populateResourceListV1(spec string) (v1.ResourceList, error) {
 }
 
 // HandleResourceRequirements parses the limits and requests parameters if specified
+// and returns ResourceRequirements.
 func HandleResourceRequirements(params map[string]string) (api.ResourceRequirements, error) {
 	result := api.ResourceRequirements{}
 	limits, err := populateResourceList(params["limits"])
@@ -473,6 +569,7 @@ func HandleResourceRequirements(params map[string]string) (api.ResourceRequireme
 }
 
 // HandleResourceRequirementsV1 parses the limits and requests parameters if specified
+// and returns ResourceRequirements.
 func HandleResourceRequirementsV1(params map[string]string) (v1.ResourceRequirements, error) {
 	result := v1.ResourceRequirements{}
 	limits, err := populateResourceListV1(params["limits"])
@@ -488,6 +585,7 @@ func HandleResourceRequirementsV1(params map[string]string) (v1.ResourceRequirem
 	return result, nil
 }
 
+// makePodSpec returns PodSpec filled with passed parameters.
 func makePodSpec(params map[string]string, name string) (*v1.PodSpec, error) {
 	stdin, err := GetBool(params, "stdin", false)
 	if err != nil {
@@ -583,6 +681,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 	return &controller, nil
 }
 
+// updatePodContainers updates PodSpec.Containers with passed parameters.
 func updatePodContainers(params map[string]string, args []string, envs []v1.EnvVar, imagePullPolicy v1.PullPolicy, podSpec *v1.PodSpec) error {
 	if len(args) > 0 {
 		command, err := GetBool(params, "command", false)
@@ -607,6 +706,7 @@ func updatePodContainers(params map[string]string, args []string, envs []v1.EnvV
 	return nil
 }
 
+// updatePodContainers updates PodSpec.Containers.Ports with passed parameters.
 func updatePodPorts(params map[string]string, podSpec *v1.PodSpec) (err error) {
 	port := -1
 	hostPort := -1
@@ -747,6 +847,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	return &pod, nil
 }
 
+// parseEnvs converts string into EnvVar objects.
 func parseEnvs(envArray []string) ([]v1.EnvVar, error) {
 	envs := make([]v1.EnvVar, 0, len(envArray))
 	for _, env := range envArray {
