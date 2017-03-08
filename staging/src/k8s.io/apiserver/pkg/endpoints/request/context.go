@@ -63,8 +63,17 @@ const (
 	// userAgentKey is the context key for the request user agent.
 	userAgentKey
 
+	// resourceKey is the context key for the request resource and subresource.
+	resourceKey
+
 	namespaceDefault = "default" // TODO(sttts): solve import cycle when using metav1.NamespaceDefault
 )
+
+// resourceInformation holds the resource and subresource for a request in the context.
+type resourceInformation struct {
+	resource    string
+	subresource string
+}
 
 // NewContext instantiates a base context object for request flows.
 func NewContext() Context {
@@ -142,4 +151,19 @@ func WithUserAgent(parent Context, userAgent string) Context {
 func UserAgentFrom(ctx Context) (string, bool) {
 	userAgent, ok := ctx.Value(userAgentKey).(string)
 	return userAgent, ok
+}
+
+// WithResourceInformation returns a copy of parent in which the resource and subresource values are set
+func WithResourceInformation(parent Context, resource, subresource string) Context {
+	return WithValue(parent, resourceKey, resourceInformation{resource, subresource})
+}
+
+// ResourceInformationFrom returns resource and subresource on the ctx
+func ResourceInformationFrom(ctx Context) (resource string, subresource string, ok bool) {
+	resourceInfo, ok := ctx.Value(resourceKey).(resourceInformation)
+	if !ok {
+		return "", "", ok
+	}
+
+	return resourceInfo.resource, resourceInfo.subresource, ok
 }

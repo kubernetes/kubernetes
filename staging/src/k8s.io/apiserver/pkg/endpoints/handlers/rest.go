@@ -74,9 +74,16 @@ type ScopeNamer interface {
 	GenerateListLink(req *restful.Request) (uri string, err error)
 }
 
+// ScopeResourcer handles accessing resource and subresource namespaces from requests
+type ScopeResourcer interface {
+	// Resource returns the resource and optionally the subresource (empty if not present) from the request.
+	Resource(req *restful.Request) (resource string, subresource string, err error)
+}
+
 // RequestScope encapsulates common fields across all RESTful handler methods.
 type RequestScope struct {
-	Namer ScopeNamer
+	Namer     ScopeNamer
+	Resourcer ScopeResourcer
 	ContextFunc
 
 	Serializer runtime.NegotiatedSerializer
@@ -116,8 +123,14 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
+		resource, subresource, err := scope.Resourcer.Resource(req)
+		if err != nil {
+			scope.err(err, res.ResponseWriter, req.Request)
+			return
+		}
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
+		ctx = request.WithResourceInformation(ctx, resource, subresource)
 
 		result, err := getter(ctx, name, req)
 		if err != nil {

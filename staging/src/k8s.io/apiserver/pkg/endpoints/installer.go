@@ -56,6 +56,7 @@ type action struct {
 	Path          string               // The path of the action
 	Params        []*restful.Parameter // List of parameters associated with the action.
 	Namer         handlers.ScopeNamer
+	Resourcer     handlers.ScopeResourcer
 	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
 }
 
@@ -201,6 +202,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return nil, err
 	}
+
+	wildcardResource := (resource == "*")
+	wildcardSubresource := (subresource == "*")
 
 	mapping, err := a.restMapping(resource)
 	if err != nil {
@@ -356,6 +360,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
 	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
+	resourceParam := ws.PathParameter("resource", "the name of the resource").DataType("string")
+	subresourceParam := ws.PathParameter("subresource", "the name of the subresource").DataType("string")
 
 	params := []*restful.Parameter{}
 	actions := []action{}
@@ -379,14 +385,27 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	switch scope.Name() {
 	case meta.RESTScopeNameRoot:
 		// Handle non-namespace scoped resources like nodes.
+		resourcer := possiblyStaticResourcing{resource, &subresource}
 		resourcePath := resource
 		resourceParams := params
+		if wildcardResource {
+			resourcePath = "{resource}"
+			resourceParams = append(resourceParams, resourceParam)
+			resourcer.staticResource = ""
+		}
+
 		itemPath := resourcePath + "/{name}"
 		nameParams := append(params, nameParam)
 		proxyParams := append(nameParams, pathParam)
 		suffix := ""
 		if hasSubresource {
-			suffix = "/" + subresource
+			if wildcardSubresource {
+				suffix = "/{subresource}"
+				resourceParams = append(resourceParams, subresourceParam)
+				resourcer.staticSubresource = nil
+			} else {
+				suffix = "/" + subresource
+			}
 			itemPath = itemPath + suffix
 			resourcePath = itemPath
 			resourceParams = nameParams
@@ -398,29 +417,29 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		// Add actions at the resource path: /api/apiVersion/resource
-		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
-		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, resourcer, false}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, resourcer, false}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, resourcer, false}, isCollectionDeleter)
 		// DEPRECATED
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, resourcer, false}, allowWatchList)
 
 		// Add actions at the item path: /api/apiVersion/resource/{name}
-		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false}, isGetter)
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, resourcer, false}, isGetter)
 		if getSubpath {
-			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false}, isGetter)
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, resourcer, false}, isGetter)
 		}
-		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
-		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isDeleter)
-		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, resourcer, false}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, resourcer, false}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, resourcer, false}, isDeleter)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, resourcer, false}, isWatcher)
 		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
 		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
 		// TODO: DEPRECATED in v1.2.
-		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer, false}, isRedirector)
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer, resourcer, false}, isRedirector)
 		// TODO: DEPRECATED in v1.2.
-		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer, false}, isRedirector)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer, resourcer, false}, isRedirector)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, resourcer, false}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, resourcer, false}, isConnecter && connectSubpath)
 		break
 	case meta.RESTScopeNameNamespace:
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -428,8 +447,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		namespacedPath := scope.ParamName() + "/{" + scope.ArgumentName() + "}/" + resource
 		namespaceParams := []*restful.Parameter{namespaceParam}
 
-		resourcePath := namespacedPath
+		resourcer := possiblyStaticResourcing{resource, &subresource}
 		resourceParams := namespaceParams
+		if wildcardResource {
+			namespacedPath = scope.ParamName() + "/{" + scope.ArgumentName() + "}/{resource}"
+			resourceParams = append(resourceParams, resourceParam)
+			resourcer.staticResource = ""
+		}
+		resourcePath := namespacedPath
+
 		itemPathPrefix := gpath.Join(a.prefix, scope.ParamName()) + "/"
 		itemPath := namespacedPath + "/{name}"
 		itemPathMiddle := "/" + resource + "/"
@@ -437,7 +463,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		proxyParams := append(nameParams, pathParam)
 		itemPathSuffix := ""
 		if hasSubresource {
-			itemPathSuffix = "/" + subresource
+			if wildcardSubresource {
+				itemPathSuffix = "/{subresource}"
+				resourceParams = append(resourceParams, subresourceParam)
+				resourcer.staticSubresource = nil
+			} else {
+				itemPathSuffix = "/" + subresource
+			}
 			itemPath = itemPath + itemPathSuffix
 			resourcePath = itemPath
 			resourceParams = nameParams
@@ -457,36 +489,36 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		namer := scopeNaming{scope, a.group.Linker, itemPathFn, false}
 
-		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
-		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, resourcer, false}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, resourcer, false}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, resourcer, false}, isCollectionDeleter)
 		// DEPRECATED
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, resourcer, false}, allowWatchList)
 
-		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false}, isGetter)
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, resourcer, false}, isGetter)
 		if getSubpath {
-			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false}, isGetter)
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, resourcer, false}, isGetter)
 		}
-		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
-		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isDeleter)
-		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, resourcer, false}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, resourcer, false}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, resourcer, false}, isDeleter)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, resourcer, false}, isWatcher)
 		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
 		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
 		// TODO: DEPRECATED in v1.2.
-		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer, false}, isRedirector)
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer, resourcer, false}, isRedirector)
 		// TODO: DEPRECATED in v1.2.
-		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer, false}, isRedirector)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer, resourcer, false}, isRedirector)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, resourcer, false}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, resourcer, false}, isConnecter && connectSubpath)
 
 		// list or post across namespace.
 		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 		if !hasSubresource {
 			namer = scopeNaming{scope, a.group.Linker, itemPathFn, true}
-			actions = appendIf(actions, action{"LIST", resource, params, namer, true}, isLister)
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true}, allowWatchList)
+			actions = appendIf(actions, action{"LIST", resource, params, namer, resourcer, true}, isLister)
+			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, resourcer, true}, allowWatchList)
 		}
 		break
 	default:
@@ -541,6 +573,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			versionedObject = defaultVersionedObject
 		}
 		reqScope.Namer = action.Namer
+		reqScope.Resourcer = action.Resourcer
 		namespaced := ""
 		if apiResource.Namespaced {
 			namespaced = "Namespaced"
@@ -951,6 +984,42 @@ func (n scopeNaming) ObjectName(obj runtime.Object) (namespace, name string, err
 		return "", "", err
 	}
 	return namespace, name, err
+}
+
+// possiblyStaticResourcing is a ScopeResourcer which returns the static values
+// given, if provided, and otherwise extracts the resource and subresource from
+// the request.
+type possiblyStaticResourcing struct {
+	// staticResource is the static resource to return for requests, or empty if the request
+	// needs to be checked for a dynamic resource
+	staticResource string
+	// staticSubresource is the static subresource to return for requests, or nil if the request
+	// needs to be checked for a dynamic subresource (notice that a pointer to an empty string
+	// just means static "no subresource").
+	staticSubresource *string
+}
+
+func (r possiblyStaticResourcing) Resource(req *restful.Request) (resource string, subresource string, err error) {
+	resource = r.staticResource
+	subresource = ""
+
+	if resource == "" {
+		resource = req.PathParameter("resource")
+		if len(resource) == 0 {
+			return "", "", fmt.Errorf("no resource parameter found on request, and static resource not provided")
+		}
+	}
+
+	if r.staticSubresource == nil {
+		subresource = req.PathParameter("subresource")
+		if len(resource) == 0 {
+			return "", "", fmt.Errorf("no subresource parameter found on request, and static subresource not provided")
+		}
+	} else {
+		subresource = *r.staticSubresource
+	}
+
+	return resource, subresource, nil
 }
 
 // This magic incantation returns *ptrToObject for an arbitrary pointer
