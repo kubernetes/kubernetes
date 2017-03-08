@@ -115,9 +115,11 @@ func (cc *ClusterController) Run() {
 	}, cc.clusterMonitorPeriod, wait.NeverStop)
 }
 
-func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster) (*federationv1beta1.ClusterStatus, error) {
+// GetClusterClient gets cluster client.
+func (cc *ClusterController) GetClusterClient(cluster *federationv1beta1.Cluster) (*ClusterClient, error) {
 	// just get the status of cluster, by requesting the restapi "/healthz"
 	clusterClient, found := cc.clusterKubeClientMap[cluster.Name]
+	client := &clusterClient
 	if !found {
 		glog.Infof("It's a new cluster, a cluster client will be created")
 		client, err := NewClusterClientSet(cluster)
@@ -125,8 +127,16 @@ func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster
 			glog.Errorf("Failed to create cluster client, err: %v", err)
 			return nil, err
 		}
-		clusterClient = *client
-		cc.clusterKubeClientMap[cluster.Name] = clusterClient
+	}
+	return client, nil
+}
+
+// GetClusterStatus gets cluster status.
+func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster) (*federationv1beta1.ClusterStatus, error) {
+	// just get the status of cluster, by requesting the restapi "/healthz"
+	clusterClient, err := cc.GetClusterClient(cluster)
+	if err != nil {
+		return nil, err
 	}
 	clusterStatus := clusterClient.GetClusterHealthStatus()
 	return clusterStatus, nil
@@ -141,7 +151,13 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 	for _, cluster := range clusters.Items {
 		if !cc.knownClusterSet.Has(cluster.Name) {
 			glog.V(1).Infof("ClusterController observed a new cluster: %#v", cluster)
+			// add cluster name into knownClusterSet and add cluster client into clusterKubeClientMap
 			cc.knownClusterSet.Insert(cluster.Name)
+			clusterClient, err := cc.GetClusterClient(&cluster)
+			if err != nil {
+				return err
+			}
+			cc.clusterKubeClientMap[cluster.Name] = *clusterClient
 		}
 	}
 
@@ -154,7 +170,9 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 		deleted := cc.knownClusterSet.Difference(observedSet)
 		for clusterName := range deleted {
 			glog.V(1).Infof("ClusterController observed a Cluster deletion: %v", clusterName)
+			// delete the cluster name from knownClusterSet and delete the cluster client from clusterKubeClientMap
 			cc.knownClusterSet.Delete(clusterName)
+			delete(cc.clusterKubeClientMap, clusterName)
 		}
 	}
 	for _, cluster := range clusters.Items {
