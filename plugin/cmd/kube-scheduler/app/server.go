@@ -146,6 +146,7 @@ func startHTTP(s *options.SchedulerServer) {
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 		if s.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
