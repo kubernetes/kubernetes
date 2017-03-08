@@ -49,16 +49,13 @@ var _ = framework.KubeDescribe("Volume fstype [Volume]", func() {
 	var (
 		client    clientset.Interface
 		namespace string
-		nodeName  string
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) != 0 {
-			nodeName = nodeList.Items[0].Name
-		} else {
+		if len(nodeList.Items) == 0 {
 			framework.Failf("Unable to find ready and schedulable Node")
 		}
 	})
