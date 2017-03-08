@@ -175,11 +175,10 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 
 	// register the proxy handler
 	proxyHandler := &proxyHandler{
-		contextMapper:          s.contextMapper,
-		proxyClientCert:        s.proxyClientCert,
-		proxyClientKey:         s.proxyClientKey,
-		transportBuildingError: nil,
-		proxyRoundTripper:      nil,
+		contextMapper:   s.contextMapper,
+		localDelegate:   s.GenericAPIServer.FallThroughHandler,
+		proxyClientCert: s.proxyClientCert,
+		proxyClientKey:  s.proxyClientKey,
 	}
 	proxyHandler.updateAPIService(apiService)
 	s.proxyHandlers[apiService.Name] = proxyHandler

@@ -125,25 +125,27 @@ func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService, se
 	var discoveryGroup *metav1.APIGroup
 
 	for _, apiService := range apiServicesByGroup {
-		// skip any API services without actual services
-		if _, err := serviceLister.Services(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name); err != nil {
-			continue
-		}
-
-		hasActiveEndpoints := false
-		endpoints, err := endpointsLister.Endpoints(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
-		// skip any API services without endpoints
-		if err != nil {
-			continue
-		}
-		for _, subset := range endpoints.Subsets {
-			if len(subset.Addresses) > 0 {
-				hasActiveEndpoints = true
-				break
+		if apiService.Spec.Service != nil {
+			// skip any API services without actual services
+			if _, err := serviceLister.Services(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name); err != nil {
+				continue
 			}
-		}
-		if !hasActiveEndpoints {
-			continue
+
+			hasActiveEndpoints := false
+			endpoints, err := endpointsLister.Endpoints(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
+			// skip any API services without endpoints
+			if err != nil {
+				continue
+			}
+			for _, subset := range endpoints.Subsets {
+				if len(subset.Addresses) > 0 {
+					hasActiveEndpoints = true
+					break
+				}
+			}
+			if !hasActiveEndpoints {
+				continue
+			}
 		}
 
 		// the first APIService which is valid becomes the default

@@ -713,20 +713,26 @@ func (x *APIServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yy4 := &x.Service
-				yy4.CodecEncodeSelf(e)
+				if x.Service == nil {
+					r.EncodeNil()
+				} else {
+					x.Service.CodecEncodeSelf(e)
+				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("service"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yy6 := &x.Service
-				yy6.CodecEncodeSelf(e)
+				if x.Service == nil {
+					r.EncodeNil()
+				} else {
+					x.Service.CodecEncodeSelf(e)
+				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[1] {
-					yym9 := z.EncBinary()
-					_ = yym9
+					yym7 := z.EncBinary()
+					_ = yym7
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Group))
@@ -739,8 +745,8 @@ func (x *APIServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("group"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym10 := z.EncBinary()
-					_ = yym10
+					yym8 := z.EncBinary()
+					_ = yym8
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Group))
@@ -750,8 +756,8 @@ func (x *APIServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[2] {
-					yym12 := z.EncBinary()
-					_ = yym12
+					yym10 := z.EncBinary()
+					_ = yym10
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Version))
@@ -764,8 +770,8 @@ func (x *APIServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("version"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym13 := z.EncBinary()
-					_ = yym13
+					yym11 := z.EncBinary()
+					_ = yym11
 					if false {
 					} else {
 						r.EncodeString(codecSelferC_UTF81234, string(x.Version))
@@ -775,8 +781,8 @@ func (x *APIServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[3] {
-					yym15 := z.EncBinary()
-					_ = yym15
+					yym13 := z.EncBinary()
+					_ = yym13
 					if false {
 					} else {
 						r.EncodeBool(bool(x.InsecureSkipTLSVerify))
@@ -789,8 +795,8 @@ func (x *APIServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("insecureSkipTLSVerify"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym16 := z.EncBinary()
-					_ = yym16
+					yym14 := z.EncBinary()
+					_ = yym14
 					if false {
 					} else {
 						r.EncodeBool(bool(x.InsecureSkipTLSVerify))
@@ -802,8 +808,8 @@ func (x *APIServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.CABundle == nil {
 					r.EncodeNil()
 				} else {
-					yym18 := z.EncBinary()
-					_ = yym18
+					yym16 := z.EncBinary()
+					_ = yym16
 					if false {
 					} else {
 						r.EncodeStringBytes(codecSelferC_RAW1234, []byte(x.CABundle))
@@ -816,8 +822,8 @@ func (x *APIServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 				if x.CABundle == nil {
 					r.EncodeNil()
 				} else {
-					yym19 := z.EncBinary()
-					_ = yym19
+					yym17 := z.EncBinary()
+					_ = yym17
 					if false {
 					} else {
 						r.EncodeStringBytes(codecSelferC_RAW1234, []byte(x.CABundle))
@@ -826,8 +832,8 @@ func (x *APIServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym21 := z.EncBinary()
-				_ = yym21
+				yym19 := z.EncBinary()
+				_ = yym19
 				if false {
 				} else {
 					r.EncodeInt(int64(x.Priority))
@@ -836,8 +842,8 @@ func (x *APIServiceSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
 				r.EncodeString(codecSelferC_UTF81234, string("priority"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym22 := z.EncBinary()
-				_ = yym22
+				yym20 := z.EncBinary()
+				_ = yym20
 				if false {
 				} else {
 					r.EncodeInt(int64(x.Priority))
@@ -906,10 +912,14 @@ func (x *APIServiceSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		switch yys3 {
 		case "service":
 			if r.TryDecodeAsNil() {
-				x.Service = ServiceReference{}
+				if x.Service != nil {
+					x.Service = nil
+				}
 			} else {
-				yyv4 := &x.Service
-				yyv4.CodecDecodeSelf(d)
+				if x.Service == nil {
+					x.Service = new(ServiceReference)
+				}
+				x.Service.CodecDecodeSelf(d)
 			}
 		case "group":
 			if r.TryDecodeAsNil() {
@@ -997,10 +1007,14 @@ func (x *APIServiceSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Service = ServiceReference{}
+		if x.Service != nil {
+			x.Service = nil
+		}
 	} else {
-		yyv16 := &x.Service
-		yyv16.CodecDecodeSelf(d)
+		if x.Service == nil {
+			x.Service = new(ServiceReference)
+		}
+		x.Service.CodecDecodeSelf(d)
 	}
 	yyj15++
 	if yyhl15 {
@@ -1679,7 +1693,7 @@ func (x codecSelfer1234) decSliceAPIService(v *[]APIService, d *codec1978.Decode
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 368)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 344)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]
