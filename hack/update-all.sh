@@ -59,10 +59,10 @@ BASH_TARGETS="
 	update-swagger-spec
 	update-openapi-spec
 	update-api-reference-docs
-	update-bazel
 	update-federation-openapi-spec
-	verify-staging-client-go
-	verify-staging-godeps"
+	update-staging-client-go
+	update-staging-godeps
+	update-bazel"
 
 for t in $BASH_TARGETS
 do
@@ -70,9 +70,6 @@ do
 	if $SILENT ; then
 		if ! bash "$KUBE_ROOT/hack/$t.sh" 1> /dev/null; then
 			echo -e "${color_red}Running $t FAILED${color_norm}"
-			if [[ $t == "verify"* ]]; then
-				echo -e "${color_red}Run ./hack/update-all-staging.sh to fix it"
-			fi
 			if ! $ALL; then
 				exit 1
 			fi
@@ -80,9 +77,6 @@ do
 	else
 		if ! bash "$KUBE_ROOT/hack/$t.sh"; then
 			echo -e "${color_red}Running $t FAILED${color_norm}"
-			if [[ $t == "verify"* ]]; then
-				echo -e "${color_red}Run ./hack/update-all-staging.sh to fix it"
-			fi
 			if ! $ALL; then
 				exit 1
 			fi
@@ -91,3 +85,4 @@ do
 done
 
 echo -e "${color_green}Update scripts completed successfully${color_norm}"
+

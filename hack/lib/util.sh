@@ -453,12 +453,18 @@ kube::util::godep_restored() {
   return 0
 }
 
-# Exits script if working directory is dirty.
+# Exits script if working directory is dirty. If it's run interactively in the terminal
+# the user can commit changes in a second terminal. This script will wait.
 kube::util::ensure_clean_working_dir() {
-  if ! git diff --exit-code; then
-    echo -e "\nUnexpected dirty working directory."
-    exit 1
-  fi
+  while ! git diff HEAD --exit-code &>/dev/null; do
+    echo -e "\nUnexpected dirty working directory:\n"
+    git status -s | sed 's/^/  /'
+    if ! tty -s; then
+        exit 1
+    fi
+    echo -e "\nCommit your changes in another terminal and then continue here by pressing enter."
+    read
+  done 1>&2
 }
 
 # Ensure that the given godep version is installed and in the path
