@@ -400,10 +400,10 @@ func createReplicaSetOrFail(clientset *fedclientset.Clientset, replicaset *v1bet
 	}
 	By(fmt.Sprintf("Creating federation replicaset %q in namespace %q", replicaset.Name, namespace))
 
-	_, err := clientset.Extensions().ReplicaSets(namespace).Create(replicaset)
+	newRS, err := clientset.Extensions().ReplicaSets(namespace).Create(replicaset)
 	framework.ExpectNoError(err, "Creating replicaset %q in namespace %q", replicaset.Name, namespace)
-	By(fmt.Sprintf("Successfully created federation replicaset %q in namespace %q", replicaset.Name, namespace))
-	return replicaset
+	By(fmt.Sprintf("Successfully created federation replicaset %q in namespace %q", newRS.Name, namespace))
+	return newRS
 }
 
 func deleteReplicaSetOrFail(clientset *fedclientset.Clientset, nsName string, replicaSetName string, orphanDependents *bool) {
