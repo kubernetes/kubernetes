@@ -690,6 +690,7 @@ type KubeControllerManagerConfiguration struct {
 	LookupCacheSizeForRS int32
 	// lookupCacheSizeForDaemonSet is the size of lookup cache for daemonsets.
 	// Larger number = more responsive daemonset, but more MEM load.
+	// DEPRECATED: This is no longer used.
 	LookupCacheSizeForDaemonSet int32
 	// serviceSyncPeriod is the period for syncing services with their external
 	// load balancers.
