@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,9 +34,6 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -227,62 +227,43 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			// not being deleted.
 			// NOTE:  Polls until no PVs are detected, times out at 5 minutes.
 
-			const raceAttempts int = 100
-			var suffix string = ns[len(ns)-5:] // match trailing random string of generated namespace
-			var regressedPVs []v1.PersistentVolume
-			var regressCount int
+			framework.SkipUnlessProviderIs("gce", "gke")
 
+			const raceAttempts int = 100
+			var suffix string = ns
+			var residualPVs []*v1.PersistentVolume
 			By("Creating a StorageClass")
 			class := newStorageClass("kubernetes.io/gce-pd", suffix)
-			class, err := c.Storage().StorageClasses().Create(class)
+			class, err := c.StorageV1beta1().StorageClasses().Create(class)
 			Expect(err).NotTo(HaveOccurred())
-			defer c.Storage().StorageClasses().Delete(class.Name, nil)
-			framework.Logf("Created sc %s", class.Name)
+			defer deleteStorageClass(c, class.Name)
+			framework.Logf("Created StorageClass %q", class.Name)
 
-			// To increase chance of detection, attempt multiple iterations
 			By(fmt.Sprintf("Creating and deleting PersistentVolumeClaims %d times", raceAttempts))
-			claim := newClaim(ns, suffix, false)
+			claim := newClaim(ns)
+			// To increase chance of detection, attempt multiple iterations
 			for i := 0; i < raceAttempts; i++ {
-				tmpClaim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
-				Expect(err).NotTo(HaveOccurred())
-				err = c.Core().PersistentVolumeClaims(ns).Delete(tmpClaim.Name, nil)
-				Expect(err).NotTo(HaveOccurred())
+				tmpClaim := framework.CreatePVC(c, ns, claim)
+				framework.DeletePersistentVolumeClaim(c, tmpClaim.Name, ns)
 			}
 
 			By(fmt.Sprintf("Checking for residual PersistentVolumes associated with StorageClass %s", class.Name))
-			// Every 10 seconds, check for PVs that have not been deleted.
-			err = wait.Poll(10*time.Second, 300*time.Second, func() (bool, error) {
-				regressedPVs = []v1.PersistentVolume{}
-				regressCount = 0
-
-				allPVs, err := c.Core().PersistentVolumes().List(metav1.ListOptions{})
+			residualPVs, err = waitForProvisionedVolumesDeleted(c, class.Name)
+			if err != nil {
+				// Cleanup the test resources before breaking
+				deleteProvisionedVolumesAndDisks(c, residualPVs)
 				Expect(err).NotTo(HaveOccurred())
-				for _, pv := range allPVs.Items {
-					if pv.Annotations[storageutil.StorageClassAnnotation] == class.Name {
-						regressedPVs = append(regressedPVs, pv)
-						regressCount++
-					}
-				}
-				if regressCount > 0 {
-					return false, nil // Poll until no PVs remain
-				} else {
-					return true, nil // No PVs remain
-				}
-			})
-			defer func() {
-				for _, pv := range regressedPVs {
-					framework.DeletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName)
-					framework.DeletePersistentVolume(c, pv.Name)
-				}
-			}()
-			if regressCount > 0 {
+			}
+
+			// Report indicators of regression
+			if len(residualPVs) > 0 {
 				framework.Logf("Remaining PersistentVolumes:")
-				for i, pv := range regressedPVs {
+				for i, pv := range residualPVs {
 					framework.Logf("%s%d) %s", "\t", i+1, pv.Name)
 				}
-				framework.Failf("Expected 0 PersistentVolumes remaining. Found %d", regressCount)
+				framework.Failf("Expected 0 PersistentVolumes remaining. Found %d", len(residualPVs))
 			}
-			Expect(err).NotTo(HaveOccurred()) // wait.Poll returned error but no PVs remain
+			framework.Logf("0 PersistentVolumes remain.")
 		})
 	})
 
@@ -513,4 +494,46 @@ func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
 
 	return pod
+}
+
+// waitForProvisionedVolumesDelete is a polling wrapper to scan all PersistentVolumes for any associated to the test's
+// StorageClass.  Returns either an error and nil values or the remaining PVs and their count.
+func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*v1.PersistentVolume, error) {
+	var remainingPVs []*v1.PersistentVolume
+
+	err := wait.Poll(10*time.Second, 300*time.Second, func() (bool, error) {
+		remainingPVs = []*v1.PersistentVolume{}
+
+		allPVs, err := c.Core().PersistentVolumes().List(metav1.ListOptions{})
+		if err != nil {
+			return true, err
+		}
+		for _, pv := range allPVs.Items {
+			if pv.Annotations[v1.BetaStorageClassAnnotation] == scName {
+				remainingPVs = append(remainingPVs, &pv)
+			}
+		}
+		if len(remainingPVs) > 0 {
+			return false, nil // Poll until no PVs remain
+		} else {
+			return true, nil // No PVs remain
+		}
+	})
+	return remainingPVs, err
+}
+
+// deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
+func deleteStorageClass(c clientset.Interface, className string) {
+	err := c.Storage().StorageClasses().Delete(className, nil)
+	if err != nil && !apierrs.IsNotFound(err) {
+		Expect(err).NotTo(HaveOccurred())
+	}
+}
+
+// deleteProvisionedVolumes [gce||gke only]  iteratively deletes persistent volumes and attached GCE PDs.
+func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.PersistentVolume) {
+	for _, pv := range pvs {
+		framework.DeletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName)
+		framework.DeletePersistentVolume(c, pv.Name)
+	}
 }
