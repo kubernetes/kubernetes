@@ -29,7 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
-	volume_validation "k8s.io/kubernetes/pkg/volume/validation"
+	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 )
 
 // persistentvolumeStrategy implements behavior for PersistentVolume objects
@@ -55,7 +55,7 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx genericapirequest.Context, 
 func (persistentvolumeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
 	errorList := validation.ValidatePersistentVolume(persistentvolume)
-	return append(errorList, volume_validation.ValidateForMountOptions(persistentvolume)...)
+	return append(errorList, volumevalidation.ValidateForMountOptions(persistentvolume)...)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -76,7 +76,7 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 func (persistentvolumeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	newPv := obj.(*api.PersistentVolume)
 	errorList := validation.ValidatePersistentVolume(newPv)
-	errorList = append(errorList, volume_validation.ValidateForMountOptions(newPv)...)
+	errorList = append(errorList, volumevalidation.ValidateForMountOptions(newPv)...)
 	return append(errorList, validation.ValidatePersistentVolumeUpdate(newPv, old.(*api.PersistentVolume))...)
 }
 

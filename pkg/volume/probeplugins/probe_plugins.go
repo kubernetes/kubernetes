@@ -14,12 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation
+package probeplugins
 
 import (
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
@@ -39,17 +36,27 @@ import (
 	"k8s.io/kubernetes/pkg/volume/iscsi"
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	"k8s.io/kubernetes/pkg/volume/photon_pd"
+	"k8s.io/kubernetes/pkg/volume/portworx"
 	"k8s.io/kubernetes/pkg/volume/projected"
 	"k8s.io/kubernetes/pkg/volume/quobyte"
 	"k8s.io/kubernetes/pkg/volume/rbd"
+	"k8s.io/kubernetes/pkg/volume/scaleio"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 )
 
-func probeVolumePlugins() []volume.VolumePlugin {
+// ProbeVolumePlugins collects all volume plugins into an easy to use list.
+// PluginDir specifies the directory to search for additional third party
+// volume plugins.
+func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
-	// list of volume plugins to probe for
+	// The list of plugins to probe is decided by the kubelet binary, not
+	// by dynamic linking or other "magic".  Plugins will be analyzed and
+	// initialized later.
+	//
+	// Kubelet does not currently need to configure volume plugins.
+	// If/when it does, see kube-controller-manager/app/plugins.go for example of using volume.VolumeConfig
 	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, empty_dir.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
@@ -66,40 +73,14 @@ func probeVolumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, downwardapi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins("")...)
+	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(pluginDir)...)
 	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, configmap.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, projected.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	return allPlugins
-}
-
-func findPluginBySpec(volumePlugins []volume.VolumePlugin, pv *api.PersistentVolume) volume.VolumePlugin {
-	matches := []volume.VolumePlugin{}
-	v1Pv := &v1.PersistentVolume{}
-	err := v1.Convert_api_PersistentVolume_To_v1_PersistentVolume(pv, v1Pv, nil)
-	if err != nil {
-		glog.Errorf("Error converting to v1.PersistentVolume: %v", err)
-		return nil
-	}
-	volumeSpec := &volume.Spec{PersistentVolume: v1Pv}
-	for _, plugin := range volumePlugins {
-		if plugin.CanSupport(volumeSpec) {
-			matches = append(matches, plugin)
-		}
-	}
-
-	if len(matches) == 0 {
-		glog.V(5).Infof("No matching plugin found for : %s", pv.Name)
-		return nil
-	}
-
-	if len(matches) > 1 {
-		glog.V(3).Infof("multiple volume plugins matched for : %s ", pv.Name)
-		return nil
-	}
-
-	return matches[0]
 }
