@@ -115,7 +115,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -127,7 +127,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -176,7 +176,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -188,7 +188,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v2.bar"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -200,7 +200,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v2.foo"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -212,7 +212,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -356,7 +356,7 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -368,7 +368,7 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v2.bar"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -380,7 +380,7 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v2.foo"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -392,7 +392,7 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
