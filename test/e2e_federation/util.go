@@ -266,16 +266,16 @@ func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters 
 	}
 }
 
-func createService(clientset *fedclientset.Clientset, namespace, name string) (*v1.Service, error) {
+func createService(clientset *fedclientset.Clientset, namespace, prefix string) (*v1.Service, error) {
 	if clientset == nil || len(namespace) == 0 {
 		return nil, fmt.Errorf("Internal error: invalid parameters passed to createService: clientset: %v, namespace: %v", clientset, namespace)
 	}
-	By(fmt.Sprintf("Creating federated service %q in namespace %q", name, namespace))
+	By(fmt.Sprintf("Creating federated service %q in namespace %q", prefix, namespace))
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			GenerateName: prefix,
+			Namespace:    namespace,
 		},
 		Spec: v1.ServiceSpec{
 			Selector: FederatedServiceLabels,
@@ -292,14 +292,14 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 			SessionAffinity: v1.ServiceAffinityNone,
 		},
 	}
-	By(fmt.Sprintf("Trying to create service %q in namespace %q", service.Name, namespace))
+	By(fmt.Sprintf("Trying to create service with prefix %q in namespace %q", prefix, namespace))
 	return clientset.Services(namespace).Create(service)
 }
 
-func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
-	service, err := createService(clientset, namespace, name)
+func createServiceOrFail(clientset *fedclientset.Clientset, namespace, prefix string) *v1.Service {
+	service, err := createService(clientset, namespace, prefix)
 	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
-	By(fmt.Sprintf("Successfully created federated service %q in namespace %q", name, namespace))
+	By(fmt.Sprintf("Successfully created federated service %q in namespace %q", service.Name, namespace))
 	return service
 }
 

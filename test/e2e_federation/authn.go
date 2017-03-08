@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			svc := createServiceOrFail(fcs, nsName, FederatedServiceName)
+			svc := createServiceOrFail(fcs, nsName, FederatedServicePrefix)
 			deleteServiceOrFail(f.FederationClientset, nsName, svc.Name, nil)
 		})
 
@@ -53,7 +53,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			svc, err := createService(fcs, nsName, FederatedServiceName)
+			svc, err := createService(fcs, nsName, FederatedServicePrefix)
 			Expect(err).NotTo(HaveOccurred())
 			deleteServiceOrFail(fcs, nsName, svc.Name, nil)
 		})
@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			svc, err := createService(fcs, nsName, FederatedServiceName)
+			svc, err := createService(fcs, nsName, FederatedServicePrefix)
 			Expect(err).NotTo(HaveOccurred())
 			deleteServiceOrFail(fcs, nsName, svc.Name, nil)
 		})
@@ -73,7 +73,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			_, err = createService(fcs, nsName, FederatedServiceName)
+			_, err = createService(fcs, nsName, FederatedServicePrefix)
 			Expect(errors.IsUnauthorized(err)).To(BeTrue())
 		})
 
@@ -85,7 +85,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			_, err = createService(fcs, nsName, FederatedServiceName)
+			_, err = createService(fcs, nsName, FederatedServicePrefix)
 			Expect(errors.IsUnauthorized(err)).To(BeTrue())
 		})
 
@@ -94,7 +94,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			_, err = createService(fcs, nsName, FederatedServiceName)
+			_, err = createService(fcs, nsName, FederatedServicePrefix)
 			Expect(errors.IsUnauthorized(err)).To(BeTrue())
 		})
 
