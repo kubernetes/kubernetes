@@ -323,6 +323,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 	reporter := &system.StreamReporter{WriteStream: bufw}
 
 	var errs []error
+	var warns []error
 	// All the validators we'd like to run:
 	var validators = []system.Validator{
 		&system.OSValidator{Reporter: reporter},
@@ -333,7 +334,9 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 
 	// Run all validators
 	for _, v := range validators {
-		errs = append(errs, v.Validate(system.DefaultSysSpec))
+		warn, err := v.Validate(system.DefaultSysSpec)
+		errs = append(errs, err)
+		warns = append(warns, warn)
 	}
 
 	err := utilerrors.NewAggregate(errs)
@@ -341,9 +344,9 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 		// Only print the output from the system verification check if the check failed
 		fmt.Println("[preflight] The system verification failed. Printing the output from the verification:")
 		bufw.Flush()
-		return nil, []error{err}
+		return warns, []error{err}
 	}
-	return nil, nil
+	return warns, nil
 }
 
 type etcdVersionResponse struct {
