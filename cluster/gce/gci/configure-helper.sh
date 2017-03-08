@@ -1370,20 +1370,6 @@ function start-kube-addons {
     if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
       setup-addon-manifests "addons" "dns-horizontal-autoscaler"
     fi
-
-    if [[ "${FEDERATION:-}" == "true" ]]; then
-      local federations_domain_map="${FEDERATIONS_DOMAIN_MAP:-}"
-      if [[ -z "${federations_domain_map}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
-        federations_domain_map="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
-      fi
-      if [[ -n "${federations_domain_map}" ]]; then
-        sed -i -e "s@{{ *pillar\['federations_domain_map'\] *}}@- --federations=${federations_domain_map}@g" "${dns_controller_file}"
-      else
-        sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_controller_file}"
-      fi
-    else
-      sed -i -e "/{{ *pillar\['federations_domain_map'\] *}}/d" "${dns_controller_file}"
-    fi
   fi
   if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
     setup-addon-manifests "addons" "registry"
