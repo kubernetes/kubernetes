@@ -457,7 +457,7 @@ kube::util::godep_restored() {
 kube::util::ensure_clean_working_dir() {
   if ! git diff --exit-code; then
     echo -e "\nUnexpected dirty working directory."
-    exit 1
+    return 1
   fi
 }
 

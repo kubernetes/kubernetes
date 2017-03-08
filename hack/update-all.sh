@@ -20,6 +20,8 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 SILENT=true
@@ -60,9 +62,7 @@ BASH_TARGETS="
 	update-openapi-spec
 	update-api-reference-docs
 	update-bazel
-	update-federation-openapi-spec
-	verify-staging-client-go
-	verify-staging-godeps"
+	update-federation-openapi-spec"
 
 for t in $BASH_TARGETS
 do
@@ -90,4 +90,9 @@ do
 	fi
 done
 
-echo -e "${color_green}Update scripts completed successfully${color_norm}"
+if kube::util::ensure_clean_working_dir &>/dev/null; then
+    exec "${KUBE_ROOT}/hack/update-all-staging.sh" "$@"
+else
+    echo -e "\n${color_green}Update scripts completed successfully${color_norm}, but with changes."
+    echo "Please commit them and continue with hack/update-all-staging.sh."
+fi
