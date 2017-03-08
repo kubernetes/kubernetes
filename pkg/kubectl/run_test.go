@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -729,6 +730,99 @@ func TestGenerateDeployment(t *testing.T) {
 		}
 		if !reflect.DeepEqual(obj.(*extensionsv1beta1.Deployment), test.expected) {
 			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*extensionsv1beta1.Deployment))
+		}
+	}
+}
+
+func TestGenerateAppsDeployment(t *testing.T) {
+	three := int32(3)
+	tests := []struct {
+		params    map[string]interface{}
+		expected  *appsv1beta1.Deployment
+		expectErr bool
+	}{
+		{
+			params: map[string]interface{}{
+				"labels":            "foo=bar,baz=blah",
+				"name":              "foo",
+				"replicas":          "3",
+				"image":             "someimage",
+				"image-pull-policy": "Always",
+				"port":              "80",
+				"hostport":          "80",
+				"stdin":             "true",
+				"command":           "true",
+				"args":              []string{"bar", "baz", "blah"},
+				"env":               []string{"a=b", "c=d"},
+				"requests":          "cpu=100m,memory=100Mi",
+				"limits":            "cpu=400m,memory=200Mi",
+			},
+			expected: &appsv1beta1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+				},
+				Spec: appsv1beta1.DeploymentSpec{
+					Replicas: &three,
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar", "baz": "blah"}},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"foo": "bar", "baz": "blah"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: v1.PullAlways,
+									Stdin:           true,
+									Ports: []v1.ContainerPort{
+										{
+											ContainerPort: 80,
+											HostPort:      80,
+										},
+									},
+									Command: []string{"bar", "baz", "blah"},
+									Env: []v1.EnvVar{
+										{
+											Name:  "a",
+											Value: "b",
+										},
+										{
+											Name:  "c",
+											Value: "d",
+										},
+									},
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("400m"),
+											v1.ResourceMemory: resource.MustParse("200Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	generator := DeploymentAppsV1Beta1{}
+	for _, test := range tests {
+		obj, err := generator.Generate(test.params)
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*appsv1beta1.Deployment), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*appsv1beta1.Deployment))
 		}
 	}
 }

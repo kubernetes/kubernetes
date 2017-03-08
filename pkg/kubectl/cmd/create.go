@@ -94,7 +94,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateConfigMap(f, out))
 	cmd.AddCommand(NewCmdCreateServiceAccount(f, out))
 	cmd.AddCommand(NewCmdCreateService(f, out, errOut))
-	cmd.AddCommand(NewCmdCreateDeployment(f, out))
+	cmd.AddCommand(NewCmdCreateDeployment(f, out, errOut))
 	cmd.AddCommand(NewCmdCreateClusterRole(f, out))
 	cmd.AddCommand(NewCmdCreateClusterRoleBinding(f, out))
 	cmd.AddCommand(NewCmdCreateRole(f, out))
