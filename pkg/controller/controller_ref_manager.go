@@ -314,7 +314,7 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(replicaSet *extensions.
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
 	addControllerPatch := fmt.Sprintf(
-		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true}],"uid":"%s"}}`,
+		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
 		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
 		m.controller.GetName(), m.controller.GetUID(), replicaSet.UID)
 	return m.rsControl.PatchReplicaSet(replicaSet.Namespace, replicaSet.Name, []byte(addControllerPatch))
