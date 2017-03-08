@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -48,10 +48,6 @@ var (
 	UserAgentName                 = "federation-e2e"
 	// We use this to decide how long to wait for our DNS probes to succeed.
 	DNSTTL = 180 * time.Second // TODO: make k8s.io/kubernetes/federation/pkg/federation-controller/service.minDnsTtl exported, and import it here.
-
-	// FederatedSvcNodePort is the node port on which the federated
-	// service shards are exposed in the underlying cluster.
-	FederatedSvcNodePort = int32(32256)
 )
 
 const (
@@ -272,6 +268,11 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 	}
 	By(fmt.Sprintf("Creating federated service %q in namespace %q", name, namespace))
 
+	// Tests can be run in parallel, so we need a different nodePort for
+	// each test. [30000, 32768) is the default nodeport range and our
+	// tests just use the defaults.
+	nodePort := int32(rand.IntnRange(30000, 32768))
+
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -286,7 +287,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 					Protocol:   v1.ProtocolTCP,
 					Port:       80,
 					TargetPort: intstr.FromInt(8080),
-					NodePort:   FederatedSvcNodePort,
+					NodePort:   nodePort,
 				},
 			},
 			SessionAffinity: v1.ServiceAffinityNone,
