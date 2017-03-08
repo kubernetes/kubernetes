@@ -94,10 +94,10 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive]", func() {
 		})
 		AfterEach(func() {
 			// Delete Pods
-			f.PodClient().DeleteSync(guaranteedPodName, &metav1.DeleteOptions{}, podDisappearTimeout)
-			f.PodClient().DeleteSync(burstablePodName, &metav1.DeleteOptions{}, podDisappearTimeout)
-			f.PodClient().DeleteSync(bestEffortPodName, &metav1.DeleteOptions{}, podDisappearTimeout)
-			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSyncInNamespace(criticalPodName, kubeapi.NamespaceSystem, &metav1.DeleteOptions{}, podDisappearTimeout)
+			f.PodClient().DeleteSync(guaranteedPodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(burstablePodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(bestEffortPodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSyncInNamespace(criticalPodName, kubeapi.NamespaceSystem, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			// Log Events
 			logPodEvents(f)
 			logNodeEvents(f)
