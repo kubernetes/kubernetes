@@ -130,6 +130,7 @@ type CloudConfig struct {
 	NumNodes          int
 	ClusterTag        string
 	Network           string
+	MultiZones        string
 
 	Provider cloudprovider.Interface
 }
@@ -203,6 +204,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.PrometheusPushGateway, "prom-push-gateway", "", "The URL to prometheus gateway, so that metrics can be pushed during e2es and scraped by prometheus. Typically something like 127.0.0.1:9091.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
 	flag.BoolVar(&TestContext.GarbageCollectorEnabled, "garbage-collector-enabled", true, "Set to true if the garbage collector is enabled in the kube-apiserver and kube-controller-manager, then some tests will rely on the garbage collector to delete dependent resources.")
+	flag.StringVar(&cloudConfig.MultiZones, "multi-zones", "", "For multizone clusters, comma-separated list of all the zones")
 }
 
 // Register flags specific to the node e2e test suite.

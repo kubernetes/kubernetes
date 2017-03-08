@@ -137,4 +137,5 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   ${E2E_MIN_STARTUP_PODS:+"--minStartupPods=${E2E_MIN_STARTUP_PODS}"} \
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
+  ${E2E_ZONES:+"--multi-zones=${E2E_ZONES}"} \
   "${@:-}"
