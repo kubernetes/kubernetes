@@ -85,7 +85,7 @@ func BindingAuthorized(ctx genericapirequest.Context, roleRef rbac.RoleRef, bind
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf(
 			"error authorizing user %#v to bind %#v in namespace %s: %v",
-			roleRef, bindingNamespace, user, err,
+			user, roleRef, bindingNamespace, err,
 		))
 	}
 	return ok
