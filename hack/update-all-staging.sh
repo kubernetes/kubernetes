@@ -25,6 +25,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 
 SILENT=true
 ALL=false
+V=""
 
 while getopts ":va" opt; do
 	case $opt in
@@ -33,6 +34,7 @@ while getopts ":va" opt; do
 			;;
 		v)
 			SILENT=false
+			V="-v"
 			;;
 		\?)
 			echo "Invalid flag: -$OPTARG" >&2
@@ -56,7 +58,7 @@ kube::util::ensure_godep_version v74
 
 if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
 	echo "Running godep restore"
-	godep restore
+	"${KUBE_ROOT}/hack/godep-restore.sh" ${V}
 fi
 
 BASH_TARGETS="
@@ -64,8 +66,7 @@ BASH_TARGETS="
 	staging-godeps
 	bazel"
 
-for t in $BASH_TARGETS
-do
+for t in $BASH_TARGETS; do
 	echo -e "${color_yellow}Updating $t${color_norm}"
 	if $SILENT ; then
 		if ! bash "$KUBE_ROOT/hack/update-$t.sh" 1> /dev/null; then
