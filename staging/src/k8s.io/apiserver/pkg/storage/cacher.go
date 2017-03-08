@@ -526,11 +526,17 @@ func (c *Cacher) GuaranteedUpdate(
 	} else if exists {
 		currObj, copyErr := c.copier.Copy(elem.(*storeElement).Object)
 		if copyErr == nil {
-			return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
+			err := c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
+			if !errors.IsConflict(err) {
+				// Return any error that isn't a conflict. Conflict errors should fall through to the
+				// no-suggestion update below.
+				return err
+			}
+		} else {
+			glog.Errorf("couldn't copy object: %v", copyErr)
 		}
-		glog.Errorf("couldn't copy object: %v", copyErr)
 	}
-	// If we couldn't get the object, fallback to no-suggestion.
+	// If we couldn't get the object or we got a conflict trying to update, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
 }
 
