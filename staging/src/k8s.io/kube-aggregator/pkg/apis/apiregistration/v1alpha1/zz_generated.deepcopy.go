@@ -83,6 +83,11 @@ func DeepCopy_v1alpha1_APIServiceSpec(in interface{}, out interface{}, c *conver
 		in := in.(*APIServiceSpec)
 		out := out.(*APIServiceSpec)
 		*out = *in
+		if in.Service != nil {
+			in, out := &in.Service, &out.Service
+			*out = new(ServiceReference)
+			**out = **in
+		}
 		if in.CABundle != nil {
 			in, out := &in.CABundle, &out.CABundle
 			*out = make([]byte, len(*in))

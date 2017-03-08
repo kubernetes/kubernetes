@@ -62,6 +62,8 @@ type APIAggregator struct {
 
 	contextMapper genericapirequest.RequestContextMapper
 
+	handlerChainConfig *handlerChainConfig
+
 	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
 	proxyClientCert []byte
@@ -114,13 +116,14 @@ func (c completedConfig) New(stopCh <-chan struct{}) (*APIAggregator, error) {
 
 	proxyMux := http.NewServeMux()
 
-	// most API servers don't need to do this, but we need a custom handler chain to handle the special /apis handling here
-	c.Config.GenericConfig.BuildHandlerChainsFunc = (&handlerChainConfig{
+	handlerChainConfig := &handlerChainConfig{
 		informers:       informerFactory,
 		proxyMux:        proxyMux,
 		serviceLister:   kubeInformers.Core().V1().Services().Lister(),
 		endpointsLister: kubeInformers.Core().V1().Endpoints().Lister(),
-	}).handlerChain
+	}
+	// most API servers don't need to do this, but we need a custom handler chain to handle the special /apis handling here
+	c.Config.GenericConfig.BuildHandlerChainsFunc = handlerChainConfig.handlerChain
 
 	genericServer, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
 	if err != nil {
@@ -128,16 +131,17 @@ func (c completedConfig) New(stopCh <-chan struct{}) (*APIAggregator, error) {
 	}
 
 	s := &APIAggregator{
-		GenericAPIServer: genericServer,
-		contextMapper:    c.GenericConfig.RequestContextMapper,
-		proxyClientCert:  c.ProxyClientCert,
-		proxyClientKey:   c.ProxyClientKey,
-		proxyHandlers:    map[string]*proxyHandler{},
-		handledGroups:    sets.String{},
-		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
-		serviceLister:    kubeInformers.Core().V1().Services().Lister(),
-		endpointsLister:  kubeInformers.Core().V1().Endpoints().Lister(),
-		proxyMux:         proxyMux,
+		GenericAPIServer:   genericServer,
+		contextMapper:      c.GenericConfig.RequestContextMapper,
+		handlerChainConfig: handlerChainConfig,
+		proxyClientCert:    c.ProxyClientCert,
+		proxyClientKey:     c.ProxyClientKey,
+		proxyHandlers:      map[string]*proxyHandler{},
+		handledGroups:      sets.String{},
+		lister:             informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
+		serviceLister:      kubeInformers.Core().V1().Services().Lister(),
+		endpointsLister:    kubeInformers.Core().V1().Endpoints().Lister(),
+		proxyMux:           proxyMux,
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
@@ -171,6 +175,11 @@ type handlerChainConfig struct {
 	proxyMux        *http.ServeMux
 	serviceLister   v1listers.ServiceLister
 	endpointsLister v1listers.EndpointsLister
+
+	// fallThroughHandler keeps track of the handler that comes after the proxy so that it can be used
+	// to satisfy delegation cases.  It is set as a side-effect while building the handler chain.
+	// TODO refactor to run the proxy *after* authorization so we can simply run at the end of the handling chain
+	fallThroughHandler http.Handler
 }
 
 // handlerChain is a method to build the handler chain for this API server.  We need a custom handler chain so that we
@@ -181,6 +190,7 @@ func (h *handlerChainConfig) handlerChain(apiHandler http.Handler, c *genericapi
 	handler := WithAPIs(apiHandler, h.informers.Apiregistration().InternalVersion().APIServices(), h.serviceLister, h.endpointsLister)
 
 	handler = genericapifilters.WithAuthorization(handler, c.RequestContextMapper, c.Authorizer)
+	h.fallThroughHandler = handler
 
 	// this mux is NOT protected by authorization, but DOES have authentication information
 	// this is so that everyone can hit the proxy and we can properly identify the user.  The backing
@@ -220,11 +230,10 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 
 	// register the proxy handler
 	proxyHandler := &proxyHandler{
-		contextMapper:          s.contextMapper,
-		proxyClientCert:        s.proxyClientCert,
-		proxyClientKey:         s.proxyClientKey,
-		transportBuildingError: nil,
-		proxyRoundTripper:      nil,
+		contextMapper:   s.contextMapper,
+		localDelegate:   s.handlerChainConfig.fallThroughHandler,
+		proxyClientCert: s.proxyClientCert,
+		proxyClientKey:  s.proxyClientKey,
 	}
 	proxyHandler.updateAPIService(apiService)
 	s.proxyHandlers[apiService.Name] = proxyHandler
