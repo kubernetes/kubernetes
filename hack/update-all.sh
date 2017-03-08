@@ -52,6 +52,7 @@ fi
 
 BASH_TARGETS="
 	update-generated-protobuf
+	update-bill-of-materials
 	update-codegen
 	update-codecgen
 	update-generated-docs
