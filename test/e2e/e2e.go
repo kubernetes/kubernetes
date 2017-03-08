@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -73,7 +74,10 @@ func setupProviderConfig() error {
 		if err != nil {
 			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 		}
-		managedZones := []string{zone} // Only single-zone for now
+		managedZones := []string{zone}
+		if framework.TestContext.CloudConfig.MultiZones != "" {
+			managedZones = strings.Split(framework.TestContext.CloudConfig.MultiZones, ",")
+		}
 		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)

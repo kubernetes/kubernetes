@@ -465,6 +465,7 @@ minion-path-override
 min-pr-number
 min-request-timeout
 min-resync-period
+multi-zones
 namespace-sync-period
 network-plugin
 network-plugin-dir
