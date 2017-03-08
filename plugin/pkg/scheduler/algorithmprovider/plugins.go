@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This package is used to register algorithm provider plugins.
 package algorithmprovider
 
 import (
+	// Import defaults of algorithmprovider for initialization.
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider/defaults"
 )
