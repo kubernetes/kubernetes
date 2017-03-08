@@ -73,11 +73,19 @@ var _ = framework.KubeDescribe("Downward API", func() {
 						FieldPath:  "status.podIP",
 					},
 				},
+				Name: "HOST_IP",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
 			},
 		}
 
 		expectations := []string{
 			"POD_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
+			"HOST_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
 		}
 
 		testDownwardAPI(f, podName, env, expectations)
