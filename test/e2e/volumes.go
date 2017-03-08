@@ -54,7 +54,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-
 func DeleteCinderVolume(name string) error {
 	// Try to delete the volume for several seconds - it takes
 	// a while for the plugin to detach it.
@@ -75,7 +74,6 @@ func DeleteCinderVolume(name string) error {
 	framework.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
 	return err
 }
-
 
 // These tests need privileged containers, which are disabled by default.  Run
 // the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"

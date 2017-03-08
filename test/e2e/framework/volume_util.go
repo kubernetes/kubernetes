@@ -82,7 +82,6 @@ type VolumeTestConfig struct {
 	ServerVolumes map[string]string
 }
 
-
 // VolumeTest contains a volume to mount into a client pod and its
 // expected content.
 type VolumeTest struct {
@@ -95,7 +94,7 @@ type VolumeTest struct {
 // config.serverPorts from it. The returned pod should be used to get the server
 // IP address and create appropriate VolumeSource.
 func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.Pod {
-	podClient := client.Core().Pods(config.Namespace)
+	podClient := client.CoreV1().Pods(config.Namespace)
 
 	portCount := len(config.ServerPorts)
 	serverPodPorts := make([]v1.ContainerPort, portCount)
@@ -187,7 +186,6 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	return pod
 }
 
-
 // Clean both server and client pods.
 func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 	By(fmt.Sprint("cleaning the environment after ", config.Prefix))
@@ -195,7 +193,7 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 	defer GinkgoRecover()
 
 	client := f.ClientSet
-	podClient := client.Core().Pods(config.Namespace)
+	podClient := client.CoreV1().Pods(config.Namespace)
 
 	err := podClient.Delete(config.Prefix+"-client", nil)
 	if err != nil {
@@ -243,7 +241,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 			Containers: []v1.Container{
 				{
 					Name:       config.Prefix + "-client",
-					Image:      "gcr.io/google_containers/busybox:1.24",
+					Image:      BusyBoxImage,
 					WorkingDir: "/opt",
 					// An imperative and easily debuggable container which reads vol contents for
 					// us to scan in the tests or by eye.
@@ -264,7 +262,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 			Volumes: []v1.Volume{},
 		},
 	}
-	podsNamespacer := client.Core().Pods(config.Namespace)
+	podsNamespacer := client.CoreV1().Pods(config.Namespace)
 
 	if fsGroup != nil {
 		clientPod.Spec.SecurityContext.FSGroup = fsGroup
@@ -306,7 +304,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 // The volume must be writable.
 func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.VolumeSource, content string) {
 	By(fmt.Sprint("starting ", config.Prefix, " injector"))
-	podClient := client.Core().Pods(config.Namespace)
+	podClient := client.CoreV1().Pods(config.Namespace)
 
 	injectPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
