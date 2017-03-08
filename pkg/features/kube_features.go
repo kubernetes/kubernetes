@@ -81,6 +81,13 @@ const (
 	// Only Nvidia GPUs are supported as of v1.6.
 	// Works only with Docker Container Runtime.
 	Accelerators utilfeature.Feature = "Accelerators"
+
+	// owner: @gmarek
+	// alpha: v1.6
+	//
+	// Changes the logic behind evicting Pods from not ready Nodes
+	// to take advantage of NoExecute Taints and Tolerations.
+	TaintBasedEvictions utilfeature.Feature = "TaintBasedEvictions"
 )
 
 func init() {
@@ -99,6 +106,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	AffinityInAnnotations:                       {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
+	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
