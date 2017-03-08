@@ -291,6 +291,7 @@ type subsystem interface {
 var supportedSubsystems = []subsystem{
 	&cgroupfs.MemoryGroup{},
 	&cgroupfs.CpuGroup{},
+	&cgroupfs.CpusetGroup{},
 }
 
 // setSupportedSubsytems sets cgroup resource limits only on the supported
@@ -331,6 +332,9 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	if resourceConfig.CpuPeriod != nil {
 		resources.CpuPeriod = *resourceConfig.CpuPeriod
 	}
+	if resourceConfig.CpusetCpus != nil {
+		resources.CpusetCpus = *resourceConfig.CpusetCpus
+	}
 	return resources
 }
 
@@ -345,6 +349,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	resourceConfig := cgroupConfig.ResourceParameters
 	resources := m.toResources(resourceConfig)
 
+	glog.Infof("resources to update: %v", resources.CpusetCpus)
 	cgroupPaths := m.buildCgroupPaths(cgroupConfig.Name)
 
 	// we take the location in traditional cgroupfs format.

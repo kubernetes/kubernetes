@@ -1,0 +1,18 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  annotations:
+    pod.alpha.kubernetes.io/isolation-api: '{
+        "core-affinity": "0-1"
+    }'
+  name: stress-with-pinning
+  labels:
+    app: example
+spec:
+  containers:
+  - name: stress
+    image: progrium/stress
+    args:
+    - --cpu
+    - "2"
+
