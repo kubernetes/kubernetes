@@ -105,11 +105,23 @@ func newPod(now time.Time, ready bool, beforeSec int) v1.Pod {
 	}
 }
 
+func newRSControllerRef(rs *extensions.ReplicaSet) *metav1.OwnerReference {
+	isController := true
+	return &metav1.OwnerReference{
+		APIVersion: "extensions/v1beta1",
+		Kind:       "ReplicaSet",
+		Name:       rs.GetName(),
+		UID:        rs.GetUID(),
+		Controller: &isController,
+	}
+}
+
 // generatePodFromRS creates a pod, with the input ReplicaSet's selector and its template
 func generatePodFromRS(rs extensions.ReplicaSet) v1.Pod {
 	return v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: rs.Labels,
+			Labels:          rs.Labels,
+			OwnerReferences: []metav1.OwnerReference{*newRSControllerRef(&rs)},
 		},
 		Spec: rs.Spec.Template.Spec,
 	}
@@ -161,14 +173,26 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 	}
 }
 
+func newDControllerRef(d *extensions.Deployment) *metav1.OwnerReference {
+	isController := true
+	return &metav1.OwnerReference{
+		APIVersion: "extensions/v1beta1",
+		Kind:       "Deployment",
+		Name:       d.GetName(),
+		UID:        d.GetUID(),
+		Controller: &isController,
+	}
+}
+
 // generateRS creates a replica set, with the input deployment's template as its template
 func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 	template := GetNewReplicaSetTemplate(&deployment)
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
-			UID:    randomUID(),
-			Name:   v1.SimpleNameGenerator.GenerateName("replicaset"),
-			Labels: template.Labels,
+			UID:             randomUID(),
+			Name:            v1.SimpleNameGenerator.GenerateName("replicaset"),
+			Labels:          template.Labels,
+			OwnerReferences: []metav1.OwnerReference{*newDControllerRef(&deployment)},
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: func() *int32 { i := int32(0); return &i }(),
@@ -291,7 +315,8 @@ func TestGetOldRCs(t *testing.T) {
 	oldRS2.Status.FullyLabeledReplicas = *(oldRS2.Spec.Replicas)
 	oldPod2 := generatePodFromRS(oldRS2)
 
-	// create 1 ReplicaSet that existed before the deployment, with the same labels as the deployment
+	// create 1 ReplicaSet that existed before the deployment,
+	// with the same labels as the deployment, but no ControllerRef.
 	existedPod := generatePod(newDeployment.Spec.Template.Labels, "foo")
 	existedRS := generateRSWithLabel(newDeployment.Spec.Template.Labels, "foo")
 	existedRS.Status.FullyLabeledReplicas = *(existedRS.Spec.Replicas)
@@ -345,7 +370,7 @@ func TestGetOldRCs(t *testing.T) {
 					},
 				},
 			},
-			[]*extensions.ReplicaSet{&oldRS, &oldRS2, &existedRS},
+			[]*extensions.ReplicaSet{&oldRS, &oldRS2},
 		},
 	}
 
@@ -1161,114 +1186,6 @@ func TestDeploymentTimedOut(t *testing.T) {
 		nowFn = test.nowFn
 		if got, exp := DeploymentTimedOut(&test.d, &test.d.Status), test.expected; got != exp {
 			t.Errorf("expected timeout: %t, got: %t", exp, got)
-		}
-	}
-}
-
-func TestSelectorUpdatedBefore(t *testing.T) {
-	now := metav1.Now()
-	later := metav1.Time{Time: now.Add(time.Minute)}
-	selectorUpdated := metav1.Time{Time: later.Add(time.Minute)}
-	selectorUpdatedLater := metav1.Time{Time: selectorUpdated.Add(time.Minute)}
-
-	tests := []struct {
-		name string
-
-		d1                 extensions.Deployment
-		creationTimestamp1 *metav1.Time
-		selectorUpdated1   *metav1.Time
-
-		d2                 extensions.Deployment
-		creationTimestamp2 *metav1.Time
-		selectorUpdated2   *metav1.Time
-
-		expected bool
-	}{
-		{
-			name: "d1 created before d2",
-
-			d1:                 generateDeployment("foo"),
-			creationTimestamp1: &now,
-
-			d2:                 generateDeployment("bar"),
-			creationTimestamp2: &later,
-
-			expected: true,
-		},
-		{
-			name: "d1 created after d2",
-
-			d1:                 generateDeployment("foo"),
-			creationTimestamp1: &later,
-
-			d2:                 generateDeployment("bar"),
-			creationTimestamp2: &now,
-
-			expected: false,
-		},
-		{
-			// Think of the following scenario:
-			// d1 is created first, d2 is created after and its selector overlaps
-			// with d1. d2 is marked as overlapping correctly. If d1's selector is
-			// updated and continues to overlap with the selector of d2 then d1 is
-			// now marked overlapping and d2 is cleaned up. Proved by the following
-			// test case. Callers of SelectorUpdatedBefore should first check for
-			// the existence of the overlapping annotation in any of the two deployments
-			// prior to comparing their timestamps and as a matter of fact this is
-			// now handled in `(dc *DeploymentController) handleOverlap`.
-			name: "d1 created before d2 but updated its selector afterwards",
-
-			d1:                 generateDeployment("foo"),
-			creationTimestamp1: &now,
-			selectorUpdated1:   &selectorUpdated,
-
-			d2:                 generateDeployment("bar"),
-			creationTimestamp2: &later,
-
-			expected: false,
-		},
-		{
-			name: "d1 selector is older than d2",
-
-			d1:               generateDeployment("foo"),
-			selectorUpdated1: &selectorUpdated,
-
-			d2:               generateDeployment("bar"),
-			selectorUpdated2: &selectorUpdatedLater,
-
-			expected: true,
-		},
-		{
-			name: "d1 selector is younger than d2",
-
-			d1:               generateDeployment("foo"),
-			selectorUpdated1: &selectorUpdatedLater,
-
-			d2:               generateDeployment("bar"),
-			selectorUpdated2: &selectorUpdated,
-
-			expected: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Logf("running scenario %q", test.name)
-
-		if test.creationTimestamp1 != nil {
-			test.d1.CreationTimestamp = *test.creationTimestamp1
-		}
-		if test.creationTimestamp2 != nil {
-			test.d2.CreationTimestamp = *test.creationTimestamp2
-		}
-		if test.selectorUpdated1 != nil {
-			test.d1.Annotations[SelectorUpdateAnnotation] = test.selectorUpdated1.Format(time.RFC3339)
-		}
-		if test.selectorUpdated2 != nil {
-			test.d2.Annotations[SelectorUpdateAnnotation] = test.selectorUpdated2.Format(time.RFC3339)
-		}
-
-		if got := SelectorUpdatedBefore(&test.d1, &test.d2); got != test.expected {
-			t.Errorf("expected d1 selector to be updated before d2: %t, got: %t", test.expected, got)
 		}
 	}
 }

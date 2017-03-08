@@ -218,8 +218,10 @@ func Run(s *options.ServerRunOptions) error {
 	installFederationAPIs(m, genericConfig.RESTOptionsGetter)
 	installCoreAPIs(s, m, genericConfig.RESTOptionsGetter)
 	installExtensionsAPIs(m, genericConfig.RESTOptionsGetter)
-	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
-	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
+	// Disable half-baked APIs for 1.6.
+	// TODO: Uncomment this once 1.6 is released.
+	//	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
+	//	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
 
 	sharedInformers.Start(wait.NeverStop)
 	return m.PrepareRun().Run(wait.NeverStop)

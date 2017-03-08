@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -66,14 +67,6 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
-	// OverlapAnnotation marks deployments with overlapping selector with other deployments
-	// TODO: Delete this annotation when we gracefully handle overlapping selectors.
-	// See https://github.com/kubernetes/kubernetes/issues/2210
-	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
-	// SelectorUpdateAnnotation marks the last time deployment selector update
-	// TODO: Delete this annotation when we gracefully handle overlapping selectors.
-	// See https://github.com/kubernetes/kubernetes/issues/2210
-	SelectorUpdateAnnotation = "deployment.kubernetes.io/selector-updated-at"
 
 	// Reasons for deployment conditions
 	//
@@ -294,8 +287,6 @@ var annotationsToSkip = map[string]bool{
 	RevisionHistoryAnnotation:               true,
 	DesiredReplicasAnnotation:               true,
 	MaxReplicasAnnotation:                   true,
-	OverlapAnnotation:                       true,
-	SelectorUpdateAnnotation:                true,
 }
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
@@ -507,7 +498,7 @@ func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	podList, err := listPods(deployment, c)
+	podList, err := listPods(deployment, rsList, c)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -529,7 +520,7 @@ func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 	if err != nil {
 		return nil, nil, err
 	}
-	podList, err := listPods(deployment, c)
+	podList, err := listPods(deployment, rsList, c)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -563,8 +554,8 @@ func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) (
 }
 
 // listReplicaSets lists all Pods the given deployment targets with the given client interface.
-func listPods(deployment *extensions.Deployment, c clientset.Interface) (*v1.PodList, error) {
-	return ListPods(deployment,
+func listPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, c clientset.Interface) (*v1.PodList, error) {
+	return ListPods(deployment, rsList,
 		func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
 			return c.Core().Pods(namespace).List(options)
 		})
@@ -575,28 +566,94 @@ type rsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, erro
 type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
 
 // ListReplicaSets returns a slice of RSes the given deployment targets.
+// Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),
+// because only the controller itself should do that.
+// However, it does filter out anything whose ControllerRef doesn't match.
 func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
 	// TODO: Right now we list replica sets by their labels. We should list them by selector, i.e. the replica set's selector
-	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830;
-	//       or use controllerRef, see https://github.com/kubernetes/kubernetes/issues/2210
+	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830.
 	namespace := deployment.Namespace
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	return getRSList(namespace, options)
+	all, err := getRSList(namespace, options)
+	if err != nil {
+		return all, err
+	}
+	// Only include those whose ControllerRef matches the Deployment.
+	owned := make([]*extensions.ReplicaSet, 0, len(all))
+	for _, rs := range all {
+		controllerRef := controller.GetControllerOf(rs)
+		if controllerRef != nil && controllerRef.UID == deployment.UID {
+			owned = append(owned, rs)
+		}
+	}
+	return owned, nil
+}
+
+// ListReplicaSets returns a slice of RSes the given deployment targets.
+// Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),
+// because only the controller itself should do that.
+// However, it does filter out anything whose ControllerRef doesn't match.
+// TODO: Remove the duplicate.
+func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSList func(string, metav1.ListOptions) ([]*internalextensions.ReplicaSet, error)) ([]*internalextensions.ReplicaSet, error) {
+	// TODO: Right now we list replica sets by their labels. We should list them by selector, i.e. the replica set's selector
+	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830.
+	namespace := deployment.Namespace
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	all, err := getRSList(namespace, options)
+	if err != nil {
+		return all, err
+	}
+	// Only include those whose ControllerRef matches the Deployment.
+	owned := make([]*internalextensions.ReplicaSet, 0, len(all))
+	for _, rs := range all {
+		controllerRef := controller.GetControllerOf(rs)
+		if controllerRef != nil && controllerRef.UID == deployment.UID {
+			owned = append(owned, rs)
+		}
+	}
+	return owned, nil
 }
 
 // ListPods returns a list of pods the given deployment targets.
-func ListPods(deployment *extensions.Deployment, getPodList podListFunc) (*v1.PodList, error) {
+// This needs a list of ReplicaSets for the Deployment,
+// which can be found with ListReplicaSets().
+// Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),
+// because only the controller itself should do that.
+// However, it does filter out anything whose ControllerRef doesn't match.
+func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, getPodList podListFunc) (*v1.PodList, error) {
 	namespace := deployment.Namespace
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	return getPodList(namespace, options)
+	all, err := getPodList(namespace, options)
+	if err != nil {
+		return all, err
+	}
+	// Only include those whose ControllerRef points to a ReplicaSet that is in
+	// turn owned by this Deployment.
+	rsMap := make(map[types.UID]bool, len(rsList))
+	for _, rs := range rsList {
+		rsMap[rs.UID] = true
+	}
+	owned := &v1.PodList{Items: make([]v1.Pod, 0, len(all.Items))}
+	for i := range all.Items {
+		pod := &all.Items[i]
+		controllerRef := controller.GetControllerOf(pod)
+		if controllerRef != nil && rsMap[controllerRef.UID] {
+			owned.Items = append(owned.Items, *pod)
+		}
+	}
+	return owned, nil
 }
 
 // EqualIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
@@ -981,60 +1038,4 @@ func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployme
 		return nil, fmt.Errorf("expected Deployment, got %#v", objCopy)
 	}
 	return copied, nil
-}
-
-// SelectorUpdatedBefore returns true if the former deployment's selector
-// is updated before the latter, false otherwise.
-func SelectorUpdatedBefore(d1, d2 *extensions.Deployment) bool {
-	t1, t2 := LastSelectorUpdate(d1), LastSelectorUpdate(d2)
-	return t1.Before(t2)
-}
-
-// LastSelectorUpdate returns the last time given deployment's selector is updated
-func LastSelectorUpdate(d *extensions.Deployment) metav1.Time {
-	t := d.Annotations[SelectorUpdateAnnotation]
-	if len(t) > 0 {
-		parsedTime, err := time.Parse(time.RFC3339, t)
-		// If failed to parse the time, use creation timestamp instead
-		if err != nil {
-			return d.CreationTimestamp
-		}
-		return metav1.Time{Time: parsedTime}
-	}
-	// If it's never updated, use creation timestamp instead
-	return d.CreationTimestamp
-}
-
-// BySelectorLastUpdateTime sorts a list of deployments by the last update time of their selector,
-// first using their creation timestamp and then their names as a tie breaker.
-type BySelectorLastUpdateTime []*extensions.Deployment
-
-func (o BySelectorLastUpdateTime) Len() int      { return len(o) }
-func (o BySelectorLastUpdateTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-func (o BySelectorLastUpdateTime) Less(i, j int) bool {
-	ti, tj := LastSelectorUpdate(o[i]), LastSelectorUpdate(o[j])
-	if ti.Equal(tj) {
-		if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-			return o[i].Name < o[j].Name
-		}
-		return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
-	}
-	return ti.Before(tj)
-}
-
-// OverlapsWith returns true when two given deployments are different and overlap with each other
-func OverlapsWith(current, other *extensions.Deployment) (bool, error) {
-	if current.UID == other.UID {
-		return false, nil
-	}
-	currentSelector, err := metav1.LabelSelectorAsSelector(current.Spec.Selector)
-	if err != nil {
-		return false, fmt.Errorf("deployment %s/%s has invalid label selector: %v", current.Namespace, current.Name, err)
-	}
-	otherSelector, err := metav1.LabelSelectorAsSelector(other.Spec.Selector)
-	if err != nil {
-		return false, fmt.Errorf("deployment %s/%s has invalid label selector: %v", other.Namespace, other.Name, err)
-	}
-	return (!currentSelector.Empty() && currentSelector.Matches(labels.Set(other.Spec.Template.Labels))) ||
-		(!otherSelector.Empty() && otherSelector.Matches(labels.Set(current.Spec.Template.Labels))), nil
 }

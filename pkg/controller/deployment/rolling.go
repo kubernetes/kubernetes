@@ -21,42 +21,44 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/integer"
+	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 // rolloutRolling implements the logic for rolling a new replica set.
-func (dc *DeploymentController) rolloutRolling(deployment *extensions.Deployment) error {
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, true)
+func (dc *DeploymentController) rolloutRolling(d *extensions.Deployment, rsList []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList) error {
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, true)
 	if err != nil {
 		return err
 	}
 	allRSs := append(oldRSs, newRS)
 
 	// Scale up, if we can.
-	scaledUp, err := dc.reconcileNewReplicaSet(allRSs, newRS, deployment)
+	scaledUp, err := dc.reconcileNewReplicaSet(allRSs, newRS, d)
 	if err != nil {
 		return err
 	}
 	if scaledUp {
 		// Update DeploymentStatus
-		return dc.syncRolloutStatus(allRSs, newRS, deployment)
+		return dc.syncRolloutStatus(allRSs, newRS, d)
 	}
 
 	// Scale down, if we can.
-	scaledDown, err := dc.reconcileOldReplicaSets(allRSs, controller.FilterActiveReplicaSets(oldRSs), newRS, deployment)
+	scaledDown, err := dc.reconcileOldReplicaSets(allRSs, controller.FilterActiveReplicaSets(oldRSs), newRS, d)
 	if err != nil {
 		return err
 	}
 	if scaledDown {
 		// Update DeploymentStatus
-		return dc.syncRolloutStatus(allRSs, newRS, deployment)
+		return dc.syncRolloutStatus(allRSs, newRS, d)
 	}
 
 	// Sync deployment status
-	return dc.syncRolloutStatus(allRSs, newRS, deployment)
+	return dc.syncRolloutStatus(allRSs, newRS, d)
 }
 
 func (dc *DeploymentController) reconcileNewReplicaSet(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) (bool, error) {
