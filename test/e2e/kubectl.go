@@ -590,19 +590,29 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			By("overriding icc with values provided by flags")
 			kubectlPath := framework.TestContext.KubectlPath
+			// we need the actual kubectl binary, not the script wrapper
+			kubectlPathNormalizer := exec.Command("which", kubectlPath)
+			if strings.HasSuffix(kubectlPath, "kubectl.sh") {
+				kubectlPathNormalizer = exec.Command("sh", "-c", kubectlPath, "path")
+			}
+			kubectlPathNormalized, err := kubectlPathNormalizer.Output()
+			framework.ExpectNoError(err)
+			kubectlPath = strings.TrimSpace(string(kubectlPathNormalized))
 
 			inClusterHost := strings.TrimSpace(framework.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_HOST"))
 			inClusterPort := strings.TrimSpace(framework.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_PORT"))
-			framework.RunKubectlOrDie("cp", kubectlPath, ns+"/"+simplePodName+":/")
+
+			framework.Logf("copying %s to the %s pod", kubectlPath, simplePodName)
+			framework.RunKubectlOrDie("cp", kubectlPath, ns+"/"+simplePodName+":/tmp/")
 
 			By("getting pods with in-cluster configs")
-			execOutput := framework.RunHostCmdOrDie(ns, simplePodName, "/kubectl get pods")
+			execOutput := framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods")
 			if matched, err := regexp.MatchString("nginx +1/1 +Running", execOutput); err != nil || !matched {
 				framework.Failf("Unexpected kubectl exec output: ", execOutput)
 			}
 
 			By("trying to use kubectl with invalid token")
-			_, err = framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --token=invalid --v=7 2>&1")
+			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
 			framework.Logf("got err %v", err)
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
@@ -611,14 +621,14 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			Expect(err).To(ContainSubstring("Response Status: 401 Unauthorized"))
 
 			By("trying to use kubectl with invalid server")
-			_, err = framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --server=invalid --v=6 2>&1")
+			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --server=invalid --v=6 2>&1")
 			framework.Logf("got err %v", err)
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(ContainSubstring("Unable to connect to the server"))
 			Expect(err).To(ContainSubstring("GET http://invalid/api"))
 
 			By("trying to use kubectl with invalid namespace")
-			output, _ := framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --namespace=invalid --v=6 2>&1")
+			output, _ := framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --namespace=invalid --v=6 2>&1")
 			Expect(output).To(ContainSubstring("No resources found"))
 			Expect(output).ToNot(ContainSubstring("Using in-cluster namespace"))
 			Expect(output).To(ContainSubstring("Using in-cluster configuration"))
