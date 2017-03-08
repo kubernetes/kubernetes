@@ -83,6 +83,19 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 			By("Checking if the pod outputted Success to its logs")
 			framework.ExpectNoError(f.PodClient().MatchContainerOutput(podSuccess.Name, podSuccess.Name, "Success"))
 
+			By("Checking if the pod outputted Success to its logs after the container restart.")
+			statuses := podSuccess.Status.ContainerStatuses
+			for start := time.Now(); time.Since(start) < 3*time.Minute; time.Sleep(10 * time.Second) {
+				if len(statuses) > 1 {
+					break
+				}
+			}
+			if len(statuses) > 1 {
+				framework.ExpectNoError(f.PodClient().MatchContainerOutput(podSuccess.Name, statuses[1].Name, "Success"))
+			} else {
+				framework.Failf("Failed to test the restarted container: %v, record: %v", podSuccess.Name, statuses)
+			}
+
 			By("Creating a new pod requesting a GPU and noticing that it is rejected by the Kubelet")
 			podFailure := makePod(1, "gpu-failure")
 			framework.WaitForPodCondition(f.ClientSet, f.Namespace.Name, podFailure.Name, "pod rejected", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
@@ -116,7 +129,8 @@ func makePod(gpus int64, name string) *v1.Pod {
 			v1.ResourceNvidiaGPU: *resource.NewQuantity(gpus, resource.DecimalSI),
 		},
 	}
-	gpuverificationCmd := fmt.Sprintf("if [[ %d -ne $(ls /dev/ | egrep '^nvidia[0-9]+$') ]]; then exit 1; fi; echo Success; sleep 10240 ", gpus)
+
+	gpuverificationCmd := fmt.Sprintf("if [[ %d -ne $(ls /dev/ | egrep '^nvidia[0-9]+$') ]]; then echo Failure; sleep 30; exit 1; fi; echo Success; sleep 30 ", gpus)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
