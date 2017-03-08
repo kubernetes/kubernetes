@@ -87,7 +87,7 @@ ifeq ($(CACHEBUST),1)
 endif
 	cd ${TEMP_DIR} && sed -i.back "s|-amd64|-${ARCH}|g" addons/singlenode/*.yaml addons/multinode/*.yaml
 	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__SERVER__|10.0.0.10|g" addons/singlenode/kubedns*.yaml addons/multinode/kubedns*.yaml
-	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__DOMAIN__|cluster.local|g;s|__PILLAR__FEDERATIONS__DOMAIN__MAP__||g;" addons/singlenode/kubedns*.yaml addons/multinode/kubedns*.yaml
+	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__DOMAIN__|cluster.local|g" addons/singlenode/kubedns*.yaml addons/multinode/kubedns*.yaml
 	cd ${TEMP_DIR} && rm -f addons/singlenode/*.back addons/multinode/*.back static-pods/*.back
 
 	# Make scripts executable before they are copied into the Docker image. If we make them executable later, in another layer
