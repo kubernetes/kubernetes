@@ -55,7 +55,9 @@ var (
 )
 
 const (
-	federatedNamespaceTimeout = 5 * time.Minute
+	federatedNamespaceTimeout    = 5 * time.Minute
+	federatedServiceTimeout      = 5 * time.Minute
+	federatedClustersWaitTimeout = 1 * time.Minute
 )
 
 var FederationSuite common.Suite
@@ -110,7 +112,7 @@ func clusterIsReadyOrFail(f *fedframework.Framework, context *fedframework.E2ECo
 // return ClusterList until the listed cluster items equals clusterCount
 func waitForAllRegisteredClusters(f *fedframework.Framework, clusterCount int) *federationapi.ClusterList {
 	var clusterList *federationapi.ClusterList
-	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
+	if err := wait.PollImmediate(framework.Poll, federatedClustersWaitTimeout, func() (bool, error) {
 		var err error
 		clusterList, err = f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
 		if err != nil {
@@ -260,7 +262,7 @@ func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, 
 func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters map[string]*cluster) {
 	framework.Logf("Waiting for service %q in %d clusters", service.Name, len(clusters))
 	for _, c := range clusters {
-		waitForServiceOrFail(c.Clientset, namespace, service, true, FederatedServiceTimeout)
+		waitForServiceOrFail(c.Clientset, namespace, service, true, federatedServiceTimeout)
 	}
 }
 
@@ -326,7 +328,7 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 	for name, c := range clusters {
 		var cSvc *v1.Service
 
-		err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
+		err := wait.PollImmediate(framework.Poll, federatedServiceTimeout, func() (bool, error) {
 			var err error
 			cSvc, err = c.Clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
@@ -343,15 +345,15 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 		})
 
 		if err != nil || cSvc == nil {
-			By(fmt.Sprintf("Failed to find service %q in namespace %q, in cluster %q in %s", service.Name, namespace, name, FederatedServiceTimeout))
+			By(fmt.Sprintf("Failed to find service %q in namespace %q, in cluster %q in %s", service.Name, namespace, name, federatedServiceTimeout))
 			continue
 		}
 
-		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, FederatedServiceTimeout)
+		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, federatedServiceTimeout)
 		if err != nil {
 			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", service.Name, namespace, name, err)
 		}
-		err = cleanupServiceShardLoadBalancer(name, cSvc, FederatedServiceTimeout)
+		err = cleanupServiceShardLoadBalancer(name, cSvc, federatedServiceTimeout)
 		if err != nil {
 			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
 		}

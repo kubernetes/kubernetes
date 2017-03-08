@@ -37,13 +37,8 @@ import (
 )
 
 const (
-	FederatedServiceTimeout = 60 * time.Second
-
 	FederatedServiceName    = "federated-service"
 	FederatedServicePodName = "federated-service-test-pod"
-
-	KubeDNSConfigMapName      = "kube-dns"
-	KubeDNSConfigMapNamespace = "kube-system"
 )
 
 var FederatedServiceLabels = map[string]string{
