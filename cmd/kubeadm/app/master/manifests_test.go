@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -45,12 +46,22 @@ func TestWriteStaticPodManifests(t *testing.T) {
 	defer func() { kubeadmapi.GlobalEnvParams = oldEnv }()
 
 	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
-		expected bool
+		cfg                  *kubeadmapi.MasterConfiguration
+		expected             bool
+		expectedAPIProbePort int32
 	}{
 		{
 			cfg:      &kubeadmapi.MasterConfiguration{},
 			expected: true,
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					BindPort: 443,
+				},
+			},
+			expected:             true,
+			expectedAPIProbePort: 443,
 		},
 	}
 	for _, rt := range tests {
@@ -61,6 +72,46 @@ func TestWriteStaticPodManifests(t *testing.T) {
 				rt.expected,
 				(actual == nil),
 			)
+			continue
+		}
+
+		if rt.expectedAPIProbePort != 0 {
+			manifest, err := os.Open(fmt.Sprintf("%s/manifests/kube-apiserver.yaml", kubeadmapi.GlobalEnvParams.KubernetesDir))
+			if err != nil {
+				t.Error("WriteStaticPodManifests: error opening manifests/kube-apiserver.yaml")
+				continue
+			}
+
+			var pod api.Pod
+			d := yaml.NewYAMLOrJSONDecoder(manifest, 4096)
+			if err := d.Decode(&pod); err != nil {
+				t.Error("WriteStaticPodManifests: error decoding manifests/kube-apiserver.yaml into Pod")
+				continue
+			}
+
+			// Lots of individual checks as we traverse pointers so we don't panic dereferencing a nil on failure
+			containers := pod.Spec.Containers
+			if containers == nil || len(containers) == 0 {
+				t.Error("WriteStaticPodManifests: wrote an apiserver manifest without any containers")
+				continue
+			}
+
+			probe := containers[0].LivenessProbe
+			if probe == nil {
+				t.Error("WriteStaticPodManifests: wrote an apiserver manifest without a liveness probe")
+				continue
+			}
+
+			httpGET := probe.Handler.HTTPGet
+			if httpGET == nil {
+				t.Error("WriteStaticPodManifests: wrote an apiserver manifest without an HTTP liveness probe")
+				continue
+			}
+
+			port := httpGET.Port.IntVal
+			if rt.expectedAPIProbePort != port {
+				t.Errorf("WriteStaticPodManifests: apiserver pod liveness probe port was: %v, wanted %v", port, rt.expectedAPIProbePort)
+			}
 		}
 	}
 }
