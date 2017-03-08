@@ -274,6 +274,7 @@ func createClients(numberOfClients int) ([]*clientset.Clientset, []*internalclie
 		Expect(err).NotTo(HaveOccurred())
 		config.QPS = 100
 		config.Burst = 200
+		config.DebugConcurrent = true
 		if framework.TestContext.KubeAPIContentType != "" {
 			config.ContentType = framework.TestContext.KubeAPIContentType
 		}

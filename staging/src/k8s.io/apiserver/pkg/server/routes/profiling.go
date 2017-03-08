@@ -17,6 +17,7 @@ limitations under the License.
 package routes
 
 import (
+	"net/http"
 	"net/http/pprof"
 
 	"k8s.io/apiserver/pkg/server/mux"
@@ -26,8 +27,9 @@ import (
 type Profiling struct{}
 
 // Install adds the Profiling webservice to the given mux.
-func (d Profiling) Install(c *mux.APIContainer) {
+func (d Profiling) Install(c *mux.APIContainer, secureConnHandler func(http.ResponseWriter, *http.Request)) {
 	c.UnlistedRoutes.HandleFunc("/debug/pprof/", pprof.Index)
 	c.UnlistedRoutes.HandleFunc("/debug/pprof/profile", pprof.Profile)
 	c.UnlistedRoutes.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	c.UnlistedRoutes.HandleFunc("/debug/connections/secure", secureConnHandler)
 }

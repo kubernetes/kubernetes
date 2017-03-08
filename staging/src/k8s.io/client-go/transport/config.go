@@ -48,6 +48,10 @@ type Config struct {
 	// config may layer other RoundTrippers on top of the returned
 	// RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
+
+	// Indicates if we should maintain & print debug state
+	// having to with concurrent state
+	DebugConcurrent bool
 }
 
 // ImpersonationConfig has all the available impersonation options

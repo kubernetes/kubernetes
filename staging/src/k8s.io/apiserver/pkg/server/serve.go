@@ -17,8 +17,10 @@ limitations under the License.
 package server
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -78,7 +80,7 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 
 	glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
 	var err error
-	s.effectiveSecurePort, err = runServer(secureServer, s.SecureServingInfo.BindNetwork, stopCh)
+	s.effectiveSecurePort, err = runServer(secureServer, &s.SecureServingInfo.ServingInfo, stopCh)
 	return err
 }
 
@@ -93,23 +95,24 @@ func (s *GenericAPIServer) serveInsecurely(stopCh <-chan struct{}) error {
 	}
 	glog.Infof("Serving insecurely on %s", s.InsecureServingInfo.BindAddress)
 	var err error
-	s.effectiveInsecurePort, err = runServer(insecureServer, s.InsecureServingInfo.BindNetwork, stopCh)
+	s.effectiveInsecurePort, err = runServer(insecureServer, s.InsecureServingInfo, stopCh)
 	return err
 }
 
 // runServer listens on the given port, then spawns a go-routine continuously serving
 // until the stopCh is closed. The port is returned. This function does not block.
-func runServer(server *http.Server, network string, stopCh <-chan struct{}) (int, error) {
+func runServer(server *http.Server, info *ServingInfo, stopCh <-chan struct{}) (int, error) {
 	if len(server.Addr) == 0 {
 		return 0, errors.New("address cannot be empty")
 	}
 
-	if len(network) == 0 {
-		network = "tcp"
+	if len(info.BindNetwork) == 0 {
+		info.BindNetwork = "tcp"
 	}
+	server.ConnState = info.IPLimit.HandleHttpServerStateChange
 
 	// first listen is synchronous (fail early!)
-	ln, err := net.Listen(network, server.Addr)
+	ln, err := net.Listen(info.BindNetwork, server.Addr)
 	if err != nil {
 		return 0, fmt.Errorf("failed to listen on %v: %v", server.Addr, err)
 	}
@@ -134,7 +137,11 @@ func runServer(server *http.Server, network string, stopCh <-chan struct{}) (int
 
 		for {
 			var listener net.Listener
-			listener = tcpKeepAliveListener{ln.(*net.TCPListener)}
+			chain := []tcpConnectionChainHandler{
+				tcpKeepAliveHandler{},
+				ipBasedLimitHandler{&info.IPLimit},
+			}
+			listener = tcpConnectionChainListener{ln.(*net.TCPListener), chain}
 			if server.TLSConfig != nil {
 				listener = tls.NewListener(listener, server.TLSConfig)
 			}
@@ -149,7 +156,7 @@ func runServer(server *http.Server, network string, stopCh <-chan struct{}) (int
 				for {
 					time.Sleep(15 * time.Second)
 
-					ln, err = net.Listen(network, server.Addr)
+					ln, err = net.Listen(info.BindNetwork, server.Addr)
 					if err == nil {
 						return
 					}
@@ -224,22 +231,224 @@ func GetNamedCertificateMap(certs []NamedTLSCert) (map[string]*tls.Certificate, 
 	return byName, nil
 }
 
+func (s *ServingInfo) Profile(w http.ResponseWriter, r *http.Request) {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "\t")
+	err := encoder.Encode(&s.IPLimit)
+	if err != nil {
+		glog.V(2).Infof("Error marshaling secure server info: %v", err)
+	}
+}
+
+func NoSecureHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, `{ "Error": "No secure server configured" }`)
+}
+
+// tcpConnectionChainListener is responsible to invoking any connection handling
+// code which is invoked after AcceptTCP() has been called but before the
+// connection is usable by the server for communicating with the client. We
+// assume if an error is returned from a chain handler that it will return a nil
+// conn and have already closed that conn. Init() is used to allow low levels tweaks
+// on the TCPConn.
+type tcpConnectionChainHandler interface {
+	Init(*net.TCPConn) error
+}
+
+type tcpConnectionChainListener struct {
+	*net.TCPListener
+	chain []tcpConnectionChainHandler
+}
+
+func (l tcpConnectionChainListener) Accept() (net.Conn, error) {
+	tc, err := l.AcceptTCP()
+	if err != nil {
+		return nil, err
+	}
+	for _, handler := range l.chain {
+		err = handler.Init(tc)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return tc, nil
+}
+
 // tcpKeepAliveListener sets TCP keep-alive timeouts on accepted
 // connections. It's used by ListenAndServe and ListenAndServeTLS so
 // dead TCP connections (e.g. closing laptop mid-download) eventually
 // go away.
 //
 // Copied from Go 1.7.2 net/http/server.go
-type tcpKeepAliveListener struct {
-	*net.TCPListener
+type tcpKeepAliveHandler struct{}
+
+func (ln tcpKeepAliveHandler) Init(conn *net.TCPConn) error {
+	conn.SetKeepAlive(true)
+	conn.SetKeepAlivePeriod(defaultKeepAlivePeriod)
+	return nil
 }
 
-func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
-	tc, err := ln.AcceptTCP()
-	if err != nil {
-		return nil, err
-	}
-	tc.SetKeepAlive(true)
-	tc.SetKeepAlivePeriod(defaultKeepAlivePeriod)
-	return tc, nil
+// IPBasedLimitListener accepts at most n simultaneous connections from a
+// given IP address. We also limit the total simultaneous connections.
+// None of this is applied to localhost/loopback connections.
+//
+// Based on Go 1.7.4 net/netutil/listen.go
+// TODO: (cheftako) : IPv6, CIDR Range rather than individual IP Addresses?
+// Considered using atomic for per IP limit value,
+// but problem initing map value safely
+type IPBasedLimit struct {
+	// The maximum concurent connections an IP is allowed to have open
+	MaxPerIP int
+
+	// The total maximum concurrent connections allowed open (Except localhost)
+	Max int
+
+	// Lock used to ensure the Limits and total are updated atomicaly
+	mutex sync.Mutex
+
+	// Map in which we map the serialized ip to the current count
+	Limits map[string]int
+
+	// Map in which we retain the lookup from connection to decrementIPLocked call
+	Decrementers map[string]func()
+
+	// Current total count of the connections in existance except those from localhost
+	total int
 }
+
+func (i *IPBasedLimit) incrementIP(conn, sourceIP string) error {
+	if i.Max <= 0 {
+		return nil
+	}
+	ip := net.ParseIP(sourceIP)
+	if ip == nil {
+		glog.Infof("Received request from client with invalid ip %s", sourceIP)
+		return IPLimitExceededError{ip: sourceIP, reason: "unparseable ip address"}
+	}
+	if ip.IsLoopback() {
+		return nil
+	}
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+	current := i.Limits[sourceIP]
+	if current >= i.MaxPerIP {
+		return IPLimitExceededError{ip: sourceIP, reason: fmt.Sprintf("exceeded per IP limit of %d", i.MaxPerIP)}
+	}
+	if i.total >= i.Max {
+		return IPLimitExceededError{ip: sourceIP, reason: fmt.Sprintf("exceeded overall limit of %d", i.Max)}
+	}
+	i.total++
+	i.Limits[sourceIP] = current + 1
+	var releaseOnce sync.Once
+	i.Decrementers[conn] = func() {
+		releaseOnce.Do(func() { i.decrementIPLocked(conn, sourceIP) })
+	}
+	return nil
+}
+
+// Please note that to call decrementIPLocked you should hold the i.mutex lock.
+// Currently the only caller of this method is HandleHttpServerStateChange
+func (i *IPBasedLimit) decrementIPLocked(conn, sourceIP string) {
+	if i.Max <= 0 {
+		return
+	}
+	ip := net.ParseIP(sourceIP)
+	if ip == nil || ip.IsLoopback() {
+		return
+	}
+	i.total--
+	current, ok := i.Limits[sourceIP]
+	if !ok {
+		glog.Errorf("Attempt to decrement limit for not connected IP %s", sourceIP)
+	}
+	if current > 1 {
+		i.Limits[sourceIP] = current - 1
+	} else {
+		delete(i.Limits, sourceIP)
+	}
+	delete(i.Decrementers, conn)
+}
+
+func (i *IPBasedLimit) HandleHttpServerStateChange(conn net.Conn, state http.ConnState) {
+	if state == http.StateClosed || state == http.StateHijacked {
+		i.mutex.Lock()
+		defer i.mutex.Unlock()
+		if dec, ok := i.Decrementers[conn.RemoteAddr().String()]; ok {
+			dec()
+		}
+	}
+}
+
+// Using a custom marshal JSON method for several reasons
+// A) It allows us to minimize the scope of the mutex which needs to be held
+// B) It allows the fields to remain private
+// C) It allows us to marshal 'Decrementers' as a list of its keys
+// This is only meant for use in the debug API.
+func (i *IPBasedLimit) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString("{")
+	fmt.Fprintf(buffer, `"MaxPerIP": %d, `, i.MaxPerIP)
+	fmt.Fprintf(buffer, `"MaxTotal": %d, `, i.Max)
+	fmt.Fprintf(buffer, `"NumberIPs": %d, `, len(i.Limits))
+	fmt.Fprintf(buffer, `"NumberConns": %d, `, len(i.Decrementers))
+	fmt.Fprintf(buffer, `"IPCounts": {`)
+	first := true
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+	for ip, count := range i.Limits {
+		if first {
+			fmt.Fprintf(buffer, `"%s": %d`, ip, count)
+			first = false
+		} else {
+			fmt.Fprintf(buffer, `, "%s": %d`, ip, count)
+		}
+	}
+	buffer.WriteString("}, ")
+	buffer.WriteString(` "Connections": [`)
+	first = true
+	for conn := range i.Decrementers {
+		if first {
+			fmt.Fprintf(buffer, `"%s"`, conn)
+			first = false
+		} else {
+			fmt.Fprintf(buffer, `, "%s"`, conn)
+		}
+	}
+	buffer.WriteString("] ")
+	buffer.WriteString("}")
+	return buffer.Bytes(), nil
+}
+
+// The actual structure/handler which attaches the limiting code to a connection
+type ipBasedLimitHandler struct {
+	// The limit structure for this connection type.
+	ipLimit *IPBasedLimit
+}
+
+func (h ipBasedLimitHandler) Init(conn *net.TCPConn) error {
+	remote := conn.RemoteAddr().String()
+	ip, _, err := net.SplitHostPort(remote)
+	if err != nil {
+		conn.Close() // Not decrementing as we have not yet incremented
+		glog.Errorf("Error getting remote address for connection: %v", err)
+		return err
+	}
+	err = h.ipLimit.incrementIP(remote, ip)
+	if err != nil {
+		conn.Close() // Not decrementing as we did not successfully increment
+		glog.V(1).Infof("%s. Read the help for --max-requests-inflight if you need to change the limit", err.Error())
+		return err
+	}
+	return nil
+}
+
+// A custom error which tells http/server.go Serve() to retry Accept() quickly
+type IPLimitExceededError struct {
+	// IP which saw the problem, present to allow for reporting and debugging.
+	ip     string
+	reason string
+}
+
+func (l IPLimitExceededError) Error() string {
+	return "Accept() blocked connection request from " + l.ip + " because " + l.reason
+}
+func (l IPLimitExceededError) Timeout() bool   { return true }
+func (l IPLimitExceededError) Temporary() bool { return true }

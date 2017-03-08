@@ -170,6 +170,9 @@ type ServingInfo struct {
 	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
 	// "tcp4", and "tcp6".
 	BindNetwork string
+
+	// IPBasedLimit determines the maximum number of concurrent requests based on ip
+	IPLimit IPBasedLimit
 }
 
 type SecureServingInfo struct {
@@ -203,6 +206,19 @@ func NewConfig() *Config {
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
 		MinRequestTimeout:           1800,
+		SecureServingInfo: &SecureServingInfo{
+			ServingInfo: ServingInfo{
+				BindAddress: "",
+				BindNetwork: "",
+				IPLimit: IPBasedLimit{
+					Limits:       make(map[string]int),
+					Decrementers: make(map[string]func()),
+					MaxPerIP:     100,
+					Max:          800,
+				},
+			},
+			SNICerts: make(map[string]*tls.Certificate),
+		},
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
@@ -309,7 +325,7 @@ func (c *Config) Complete() completedConfig {
 		}
 	}
 	if c.SwaggerConfig != nil && len(c.SwaggerConfig.WebServicesUrl) == 0 {
-		if c.SecureServingInfo != nil {
+		if c.SecureServingInfo != nil && c.SecureServingInfo.Cert != nil {
 			c.SwaggerConfig.WebServicesUrl = "https://" + c.ExternalAddress
 		} else {
 			c.SwaggerConfig.WebServicesUrl = "http://" + c.ExternalAddress
@@ -453,7 +469,11 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 		routes.SwaggerUI{}.Install(s.HandlerContainer)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.HandlerContainer)
+		if s.SecureServingInfo != nil {
+			routes.Profiling{}.Install(s.HandlerContainer, s.SecureServingInfo.ServingInfo.Profile)
+		} else {
+			routes.Profiling{}.Install(s.HandlerContainer, NoSecureHandler)
+		}
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
