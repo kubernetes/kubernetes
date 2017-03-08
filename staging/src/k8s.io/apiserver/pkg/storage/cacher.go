@@ -526,11 +526,21 @@ func (c *Cacher) GuaranteedUpdate(
 	} else if exists {
 		currObj, copyErr := c.copier.Copy(elem.(*storeElement).Object)
 		if copyErr == nil {
-			return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
+			err := c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
+			if !errors.IsConflict(err) {
+				// Return any error that isn't a conflict. Conflict errors should fall through to the
+				// no-suggestion update below.
+				return err
+			}
+		} else {
+			utilruntime.HandleError(fmt.Errorf("couldn't copy object: %v", copyErr))
 		}
-		glog.Errorf("couldn't copy object: %v", copyErr)
 	}
-	// If we couldn't get the object, fallback to no-suggestion.
+	// If we couldn't get the object or we got a conflict trying to update, fallback to no-suggestion.
+	//
+	// TODO: If there was a conflict, this doubles the cost with the fall through. We may want to be
+	// smarter in the storage implementation and only retry on conflict from the suggested object if
+	// the next live lookup has a different resource version.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
 }
 

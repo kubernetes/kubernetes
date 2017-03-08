@@ -10818,6 +10818,7 @@ go_library(
 go_test(
     name = "k8s.io/apiserver/pkg/storage_test",
     srcs = [
+        "k8s.io/apiserver/pkg/storage/cacher_test.go",
         "k8s.io/apiserver/pkg/storage/cacher_whitebox_test.go",
         "k8s.io/apiserver/pkg/storage/selection_predicate_test.go",
         "k8s.io/apiserver/pkg/storage/time_budget_test.go",
@@ -10827,6 +10828,7 @@ go_test(
     library = ":k8s.io/apiserver/pkg/storage",
     tags = ["automanaged"],
     deps = [
+        "//vendor:golang.org/x/net/context",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
