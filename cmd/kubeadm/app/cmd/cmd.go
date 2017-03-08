@@ -34,30 +34,30 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		Long: dedent.Dedent(`
 			kubeadm: easily bootstrap a secure Kubernetes cluster.
 
-			    ┌──────────────────────────────────────────────────────────┐
-			    │ KUBEADM IS ALPHA, DO NOT USE IT FOR PRODUCTION CLUSTERS! │
-			    │                                                          │
-			    │ But, please try it out! Give us feedback at:             │
-			    │ https://github.com/kubernetes/kubeadm/issues             │
-			    │ and at-mention @kubernetes/sig-cluster-lifecycle         │
-			    └──────────────────────────────────────────────────────────┘
+			    ┌───────────────────────────────────────────────────────────────┐
+			    │ KUBEADM IS ALPHA, DO NOT USE IT FOR PRODUCTION CLUSTERS!      │
+			    │                                                               │
+			    │ But, please try it out! Give us feedback at:                  │
+			    │ https://github.com/kubernetes/kubeadm/issues                  │
+			    │ and at-mention @kubernetes/sig-cluster-lifecycle              │
+			    └───────────────────────────────────────────────────────────────┘
 
 			Example usage:
 
 			    Create a two-machine cluster with one master (which controls the cluster),
 			    and one node (where your workloads, like Pods and ReplicaSets run).
 
-			    ┌──────────────────────────────────────────────────────────┐
-			    │ On the first machine                                     │
-			    ├──────────────────────────────────────────────────────────┤
-			    │ master# kubeadm init                                     │
-			    └──────────────────────────────────────────────────────────┘
+			    ┌───────────────────────────────────────────────────────────────┐
+			    │ On the first machine                                          │
+			    ├───────────────────────────────────────────────────────────────┤
+			    │ master# kubeadm init                                          │
+			    └───────────────────────────────────────────────────────────────┘
 
-			    ┌──────────────────────────────────────────────────────────┐
-			    │ On the second machine                                    │
-			    ├──────────────────────────────────────────────────────────┤
-			    │ node# kubeadm join --token=<token> <ip-of-master>        │
-			    └──────────────────────────────────────────────────────────┘
+			    ┌───────────────────────────────────────────────────────────────┐
+			    │ On the second machine                                         │
+			    ├───────────────────────────────────────────────────────────────┤
+			    │ node# kubeadm join --discovery token://<token>@<ip-of-master> │
+			    └───────────────────────────────────────────────────────────────┘
 
 			    You can then repeat the second step on as many other machines as you like.
 
