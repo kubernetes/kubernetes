@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -38,7 +39,7 @@ var (
 )
 
 // NewCmdCreateDeployment is a macro command to create a new deployment
-func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment NAME --image=image [--dry-run]",
 		Aliases: []string{"deploy"},
@@ -46,7 +47,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 		Long:    deploymentLong,
 		Example: deploymentExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := CreateDeployment(f, cmdOut, cmd, args)
+			err := CreateDeployment(f, cmdOut, cmdErr, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -60,13 +61,33 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 }
 
 // CreateDeployment implements the behavior to run the create deployment command
-func CreateDeployment(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
+
+	clientset, err := f.ClientSet()
+	if err != nil {
+		return err
+	}
+	resourcesList, err := clientset.Discovery().ServerResources()
+	// ServerResources ignores errors for old servers do not expose discovery
+	if err != nil {
+		return fmt.Errorf("failed to discover supported resources: %v", err)
+	}
+	generatorName := cmdutil.GetFlagString(cmd, "generator")
+	// fallback to the old generator if server does not support apps/v1beta1 deployments
+	if generatorName == cmdutil.DeploymentBasicAppsV1Beta1GeneratorName &&
+		!contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+		fmt.Fprintf(cmdErr, "WARNING: New deployments generator specified (%s), but apps/v1beta1.Deployments are not available, falling back to the old one (%s).\n",
+			cmdutil.DeploymentBasicAppsV1Beta1GeneratorName, cmdutil.DeploymentBasicV1Beta1GeneratorName)
+		generatorName = cmdutil.DeploymentBasicV1Beta1GeneratorName
+	}
 	var generator kubectl.StructuredGenerator
-	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
+	switch generatorName {
+	case cmdutil.DeploymentBasicAppsV1Beta1GeneratorName:
+		generator = &kubectl.DeploymentBasicAppsGeneratorV1{Name: name, Images: cmdutil.GetFlagStringSlice(cmd, "image")}
 	case cmdutil.DeploymentBasicV1Beta1GeneratorName:
 		generator = &kubectl.DeploymentBasicGeneratorV1{Name: name, Images: cmdutil.GetFlagStringSlice(cmd, "image")}
 	default:
