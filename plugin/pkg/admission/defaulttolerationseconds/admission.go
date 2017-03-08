@@ -25,7 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 var (
@@ -62,11 +62,11 @@ func NewDefaultTolerationSeconds() admission.Interface {
 }
 
 func (p *plugin) Admit(attributes admission.Attributes) (err error) {
-	if attributes.GetResource().GroupResource() != v1.Resource("pods") {
+	if attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 
-	pod, ok := attributes.GetObject().(*v1.Pod)
+	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
 		glog.Errorf("expected pod but got %s", attributes.GetKind().Kind)
 		return nil
@@ -78,12 +78,12 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 	toleratesNodeUnreachable := false
 	for _, toleration := range tolerations {
 		if (toleration.Key == metav1.TaintNodeNotReady || len(toleration.Key) == 0) &&
-			(toleration.Effect == v1.TaintEffectNoExecute || len(toleration.Effect) == 0) {
+			(toleration.Effect == api.TaintEffectNoExecute || len(toleration.Effect) == 0) {
 			toleratesNodeNotReady = true
 		}
 
 		if (toleration.Key == metav1.TaintNodeUnreachable || len(toleration.Key) == 0) &&
-			(toleration.Effect == v1.TaintEffectNoExecute || len(toleration.Effect) == 0) {
+			(toleration.Effect == api.TaintEffectNoExecute || len(toleration.Effect) == 0) {
 			toleratesNodeUnreachable = true
 		}
 	}
@@ -94,10 +94,10 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 	}
 
 	if !toleratesNodeNotReady {
-		_, err := v1.AddOrUpdateTolerationInPod(pod, &v1.Toleration{
+		_, err := api.AddOrUpdateTolerationInPod(pod, &api.Toleration{
 			Key:               metav1.TaintNodeNotReady,
-			Operator:          v1.TolerationOpExists,
-			Effect:            v1.TaintEffectNoExecute,
+			Operator:          api.TolerationOpExists,
+			Effect:            api.TaintEffectNoExecute,
 			TolerationSeconds: defaultNotReadyTolerationSeconds,
 		})
 		if err != nil {
@@ -107,10 +107,10 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 	}
 
 	if !toleratesNodeUnreachable {
-		_, err := v1.AddOrUpdateTolerationInPod(pod, &v1.Toleration{
+		_, err := api.AddOrUpdateTolerationInPod(pod, &api.Toleration{
 			Key:               metav1.TaintNodeUnreachable,
-			Operator:          v1.TolerationOpExists,
-			Effect:            v1.TaintEffectNoExecute,
+			Operator:          api.TolerationOpExists,
+			Effect:            api.TaintEffectNoExecute,
 			TolerationSeconds: defaultUnreachableTolerationSeconds,
 		})
 		if err != nil {
