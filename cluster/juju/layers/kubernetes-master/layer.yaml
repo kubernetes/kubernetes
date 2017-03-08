@@ -10,6 +10,7 @@ includes:
   - 'interface:http'
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
+  - 'interface:kube-control'
   - 'interface:public-address'
 options:
   basic:

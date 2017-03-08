@@ -35,6 +35,7 @@ from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import when, when_any, when_not
 from charms.reactive.helpers import data_changed
+from charms.kubernetes.common import get_version, reset_versions
 from charms.kubernetes.flagmanager import FlagManager
 
 from charmhelpers.core import hookenv
@@ -131,6 +132,7 @@ def install():
         hookenv.log(install)
         check_call(install)
 
+    reset_versions()
     set_state('kubernetes-master.components.installed')
 
 
@@ -274,13 +276,28 @@ def start_master(etcd, tls):
     set_state('kubernetes-master.components.started')
 
 
-@when('cluster-dns.connected')
-def send_cluster_dns_detail(cluster_dns):
+@when('kube-control.connected')
+def send_cluster_dns_detail(kube_control):
     ''' Send cluster DNS info '''
     # Note that the DNS server doesn't necessarily exist at this point. We know
     # where we're going to put it, though, so let's send the info anyway.
     dns_ip = get_dns_ip()
-    cluster_dns.set_dns_info(53, hookenv.config('dns_domain'), dns_ip)
+    kube_control.set_dns(53, hookenv.config('dns_domain'), dns_ip)
+
+
+@when_not('kube-control.connected')
+def missing_kube_control():
+    """Inform the operator they need to add the kube-control relation.
+
+    If deploying via bundle this won't happen, but if operator is upgrading a
+    a charm in a deployment that pre-dates the kube-control relation, it'll be
+    missing.
+
+    """
+    hookenv.status_set(
+        'blocked',
+        'Relate {}:kube-control kubernetes-worker:kube-control'.format(
+            hookenv.service_name()))
 
 
 @when('kube-api-endpoint.available')
@@ -529,12 +546,110 @@ def remove_nrpe_config(nagios=None):
         nrpe_setup.remove_check(shortname=service)
 
 
+def set_privileged(privileged, render_config=True):
+    """Update the KUBE_ALLOW_PRIV flag for kube-apiserver and re-render config.
+
+    If the flag already matches the requested value, this is a no-op.
+
+    :param str privileged: "true" or "false"
+    :param bool render_config: whether to render new config file
+    :return: True if the flag was changed, else false
+
+    """
+    if privileged == "true":
+        set_state('kubernetes-master.privileged')
+    else:
+        remove_state('kubernetes-master.privileged')
+
+    flag = '--allow-privileged'
+    kube_allow_priv_opts = FlagManager('KUBE_ALLOW_PRIV')
+    if kube_allow_priv_opts.get(flag) == privileged:
+        # Flag isn't changing, nothing to do
+        return False
+
+    hookenv.log('Setting {}={}'.format(flag, privileged))
+
+    # Update --allow-privileged flag value
+    kube_allow_priv_opts.add(flag, privileged, strict=True)
+
+    # re-render config with new options
+    if render_config:
+        context = {
+            'kube_allow_priv': kube_allow_priv_opts.to_s(),
+        }
+
+        # render the kube-defaults file
+        render('kube-defaults.defaults', '/etc/default/kube-defaults', context)
+
+        # signal that we need a kube-apiserver restart
+        set_state('kubernetes-master.kube-apiserver.restart')
+
+    return True
+
+
+@when('config.changed.allow-privileged')
+@when('kubernetes-master.components.started')
+def on_config_allow_privileged_change():
+    """React to changed 'allow-privileged' config value.
+
+    """
+    config = hookenv.config()
+    privileged = config['allow-privileged']
+    if privileged == "auto":
+        return
+
+    set_privileged(privileged)
+    remove_state('config.changed.allow-privileged')
+
+
+@when('kubernetes-master.kube-apiserver.restart')
+def restart_kube_apiserver():
+    """Restart kube-apiserver.
+
+    """
+    host.service_restart('kube-apiserver')
+    remove_state('kubernetes-master.kube-apiserver.restart')
+
+
+@when('kube-control.gpu.available')
+@when('kubernetes-master.components.started')
+@when_not('kubernetes-master.gpu.enabled')
+def on_gpu_available(kube_control):
+    """The remote side (kubernetes-worker) is gpu-enabled.
+
+    We need to run in privileged mode.
+
+    """
+    config = hookenv.config()
+    if config['allow-privileged'] == "false":
+        hookenv.status_set(
+            'active',
+            'GPUs available. Set allow-privileged="auto" to enable.'
+        )
+        return
+
+    set_privileged("true")
+    set_state('kubernetes-master.gpu.enabled')
+
+
+@when('kubernetes-master.gpu.enabled')
+@when_not('kubernetes-master.privileged')
+def disable_gpu_mode():
+    """We were in gpu mode, but the operator has set allow-privileged="false",
+    so we can't run in gpu mode anymore.
+
+    """
+    remove_state('kubernetes-master.gpu.enabled')
+
+
 def create_addon(template, context):
     '''Create an addon from a template'''
     source = 'addons/' + template
     target = '/etc/kubernetes/addons/' + template
     render(source, target, context)
-    cmd = ['kubectl', 'apply', '-f', target]
+    # Need --force when upgrading between k8s versions where the templates have
+    # changed.
+    cmd = ['kubectl', 'apply', '--force', '-f', target]
     check_call(cmd)
 
 
@@ -683,6 +798,7 @@ def render_files():
     api_opts = FlagManager('kube-apiserver')
     controller_opts = FlagManager('kube-controller-manager')
     scheduler_opts = FlagManager('kube-scheduler')
+    scheduler_opts.add('--v', '2')
 
     # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
@@ -691,6 +807,11 @@ def render_files():
     client_key_path = layer_options.get('client_key_path')
     server_cert_path = layer_options.get('server_certificate_path')
     server_key_path = layer_options.get('server_key_path')
+
+    # set --allow-privileged flag for kube-apiserver
+    set_privileged(
+        "true" if config['allow-privileged'] == "true" else "false",
+        render_config=False)
 
     # Handle static options for now
     api_opts.add('--min-request-timeout', '300')
@@ -701,17 +822,33 @@ def render_files():
     api_opts.add('--kubelet-certificate-authority', ca_cert_path)
     api_opts.add('--kubelet-client-certificate', client_cert_path)
     api_opts.add('--kubelet-client-key', client_key_path)
-
-    scheduler_opts.add('--v', '2')
+    # Needed for upgrade from 1.5.x to 1.6.0
+    # XXX: support etcd3
+    api_opts.add('--storage-backend', 'etcd2')
+    admission_control = [
+        'NamespaceLifecycle',
+        'LimitRanger',
+        'ServiceAccount',
+        'ResourceQuota',
+        'DefaultTolerationSeconds'
+    ]
+    if get_version('kube-apiserver') < (1, 6):
+        hookenv.log('Removing DefaultTolerationSeconds from admission-control')
+        admission_control.remove('DefaultTolerationSeconds')
+    api_opts.add(
+        '--admission-control', ','.join(admission_control), strict=True)
 
     # Default to 3 minute resync. TODO: Make this configureable?
     controller_opts.add('--min-resync-period', '3m')
     controller_opts.add('--v', '2')
     controller_opts.add('--root-ca-file', ca_cert_path)
 
-    context.update({'kube_apiserver_flags': api_opts.to_s(),
-                    'kube_scheduler_flags': scheduler_opts.to_s(),
-                    'kube_controller_manager_flags': controller_opts.to_s()})
+    context.update({
+        'kube_allow_priv': FlagManager('KUBE_ALLOW_PRIV').to_s(),
+        'kube_apiserver_flags': api_opts.to_s(),
+        'kube_scheduler_flags': scheduler_opts.to_s(),
+        'kube_controller_manager_flags': controller_opts.to_s(),
+    })
 
     # Render the configuration files that contains parameters for
     # the apiserver, scheduler, and controller-manager
