@@ -278,7 +278,7 @@ func (cgc *containerGC) evictSandboxes(minAge time.Duration) error {
 		if createdAt.After(newestGCTime) {
 			continue
 		}
-
+		glog.V(4).Infof("PodSandbox %q is eligible for garbage collection since it was created before %v: %+v", sandboxID, newestGCTime, sandbox)
 		evictSandboxes = append(evictSandboxes, sandboxID)
 	}
 
