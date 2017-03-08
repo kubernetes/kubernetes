@@ -113,6 +113,39 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 	})
 })
 
+var _ = framework.KubeDescribe("Downgrade [Feature:Downgrade]", func() {
+	f := framework.NewDefaultFramework("cluster-downgrade")
+
+	// Create the frameworks here because we can only create them
+	// in a "Describe".
+	testFrameworks := map[string]*framework.Framework{}
+	for _, t := range upgradeTests {
+		testFrameworks[t.Name()] = framework.NewDefaultFramework(t.Name())
+	}
+
+	framework.KubeDescribe("cluster downgrade", func() {
+		It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
+			cm := chaosmonkey.New(func() {
+				// Yes this really is a downgrade. And nodes must downgrade first.
+				v, err := realVersion(framework.TestContext.UpgradeTarget)
+				framework.ExpectNoError(err)
+				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
+				framework.ExpectNoError(framework.MasterUpgrade(v))
+				framework.ExpectNoError(checkMasterVersion(f.ClientSet, v))
+			})
+			for _, t := range upgradeTests {
+				cm.RegisterInterface(&chaosMonkeyAdapter{
+					test:        t,
+					framework:   testFrameworks[t.Name()],
+					upgradeType: upgrades.ClusterUpgrade,
+				})
+			}
+			cm.Do()
+		})
+	})
+})
+
 var _ = framework.KubeDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 	// Create the frameworks here because we can only create them
 	// in a "Describe".
