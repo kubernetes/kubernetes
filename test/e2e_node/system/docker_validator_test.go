@@ -34,35 +34,46 @@ func TestValidateDockerInfo(t *testing.T) {
 	for _, test := range []struct {
 		info types.Info
 		err  bool
+		warn bool
 	}{
 		{
 			info: types.Info{Driver: "driver_1", ServerVersion: "1.10.1"},
 			err:  false,
+			warn: false,
 		},
 		{
 			info: types.Info{Driver: "bad_driver", ServerVersion: "1.9.1"},
 			err:  true,
+			warn: false,
 		},
 		{
 			info: types.Info{Driver: "driver_2", ServerVersion: "1.8.1"},
 			err:  true,
+			warn: false,
 		},
-		// TODO remove once sig-node supports 1.13
+		// TODO remove/change warn value  once sig-node supports 1.13
 		{
 			info: types.Info{Driver: "driver_2", ServerVersion: "1.13.1"},
-			err:  true,
+			err:  false,
+			warn: true,
 		},
-		// TODO remove once sig-node supports 17.03-0-ce
+		// TODO remove/change warn value once sig-node supports 17.03-0-ce
 		{
 			info: types.Info{Driver: "driver_2", ServerVersion: "17.03.0-ce"},
-			err:  true,
+			err:  false,
+			warn: true,
 		},
 	} {
-		err := v.validateDockerInfo(spec, test.info)
+		warn, err := v.validateDockerInfo(spec, test.info)
 		if !test.err {
 			assert.Nil(t, err, "Expect error not to occur with docker info %+v", test.info)
 		} else {
 			assert.NotNil(t, err, "Expect error to occur with docker info %+v", test.info)
+		}
+		if !test.warn {
+			assert.Nil(t, warn, "Expect error not to occur with docker info %+v", test.info)
+		} else {
+			assert.NotNil(t, warn, "Expect error to occur with docker info %+v", test.info)
 		}
 
 	}
