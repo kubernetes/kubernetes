@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "apparmor.go",
         "autoscaling_utils.go",
         "configmap.go",
         "container_probe.go",
@@ -36,11 +37,13 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
+        "//pkg/security/apparmor:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/golang/glog",
