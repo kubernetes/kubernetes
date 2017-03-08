@@ -25,6 +25,7 @@ import (
 	"net/http/pprof"
 	"net/url"
 	"reflect"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -119,11 +120,12 @@ func ListenAndServeKubeletServer(
 	port uint,
 	tlsOptions *TLSOptions,
 	auth AuthInterface,
-	enableDebuggingHandlers bool,
+	enableDebuggingHandlers,
+	enableContentionProfiling bool,
 	runtime kubecontainer.Runtime,
 	criHandler http.Handler) {
 	glog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableDebuggingHandlers, runtime, criHandler)
+	handler := NewServer(host, resourceAnalyzer, auth, enableDebuggingHandlers, enableContentionProfiling, runtime, criHandler)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -140,7 +142,7 @@ func ListenAndServeKubeletServer(
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, runtime kubecontainer.Runtime) {
 	glog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, resourceAnalyzer, nil, false, runtime, nil)
+	s := NewServer(host, resourceAnalyzer, nil, false, false, runtime, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -192,7 +194,8 @@ func NewServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	auth AuthInterface,
-	enableDebuggingHandlers bool,
+	enableDebuggingHandlers,
+	enableContentionProfiling bool,
 	runtime kubecontainer.Runtime,
 	criHandler http.Handler) Server {
 	server := Server{
@@ -208,6 +211,9 @@ func NewServer(
 	server.InstallDefaultHandlers()
 	if enableDebuggingHandlers {
 		server.InstallDebuggingHandlers(criHandler)
+		if enableContentionProfiling {
+			goruntime.SetBlockProfileRate(1)
+		}
 	}
 	return server
 }
@@ -381,6 +387,8 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 			pprof.Symbol(resp, req.Request)
 		case "cmdline":
 			pprof.Cmdline(resp, req.Request)
+		case "trace":
+			pprof.Trace(resp, req.Request)
 		default:
 			pprof.Index(resp, req.Request)
 		}

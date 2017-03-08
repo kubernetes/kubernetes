@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	goruntime "runtime"
 	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -131,6 +132,10 @@ func Run(s *options.CMServer) error {
 			mux.HandleFunc("/debug/pprof/", pprof.Index)
 			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+			if s.EnableContentionProfiling {
+				goruntime.SetBlockProfileRate(1)
+			}
 		}
 		mux.Handle("/metrics", prometheus.Handler())
 
