@@ -140,7 +140,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 
 func auditStringSlice(inList []string) string {
 	if len(inList) == 0 {
-		return ""
+		return "<none>"
 	}
 
 	quotedElements := make([]string, len(inList))
