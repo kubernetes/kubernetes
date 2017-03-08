@@ -20,10 +20,13 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 SILENT=true
 ALL=false
+V=""
 
 while getopts ":va" opt; do
 	case $opt in
@@ -32,6 +35,7 @@ while getopts ":va" opt; do
 			;;
 		v)
 			SILENT=false
+			V="-v"
 			;;
 		\?)
 			echo "Invalid flag: -$OPTARG" >&2
@@ -50,6 +54,13 @@ if ! $ALL ; then
 	echo "Running in short-circuit mode; run with -a to force all scripts to run."
 fi
 
+kube::util::ensure_godep_version v74
+
+if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
+	echo "Running godep restore"
+	"${KUBE_ROOT}/hack/godep-restore.sh" ${V}
+fi
+
 BASH_TARGETS="
 	update-generated-protobuf
 	update-codegen
@@ -64,9 +75,8 @@ BASH_TARGETS="
 	update-staging-godeps
 	update-bazel"
 
-for t in $BASH_TARGETS
-do
-	echo -e "${color_yellow}Running $t${color_norm}"
+for t in $BASH_TARGETS; do
+	echo -e "${color_yellow}Updating $t${color_norm}"
 	if $SILENT ; then
 		if ! bash "$KUBE_ROOT/hack/$t.sh" 1> /dev/null; then
 			echo -e "${color_red}Running $t FAILED${color_norm}"
