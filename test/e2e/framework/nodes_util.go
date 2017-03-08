@@ -57,13 +57,13 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 		"STORAGE_BACKEND="+target_storage,
 		"TEST_ETCD_IMAGE=3.0.17")
 
-	_, _, err := RunCmdEnv(env, path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-l", "-M")
+	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
 }
 
 func masterUpgradeGCE(rawV string) error {
 	v := "v" + rawV
-	_, _, err := RunCmd(path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-M", v)
+	_, _, err := RunCmd(gceUpgradeScript(), "-M", v)
 	return err
 }
 
@@ -111,10 +111,10 @@ func nodeUpgradeGCE(rawV, img string) error {
 	v := "v" + rawV
 	if img != "" {
 		env := append(os.Environ(), "KUBE_NODE_OS_DISTRIBUTION="+img)
-		_, _, err := RunCmdEnv(env, path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", "-o", v)
+		_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-N", "-o", v)
 		return err
 	}
-	_, _, err := RunCmd(path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", v)
+	_, _, err := RunCmd(gceUpgradeScript(), "-N", v)
 	return err
 }
 
@@ -253,4 +253,11 @@ func MigTemplate() (string, error) {
 		return "", fmt.Errorf("MigTemplate() failed with last error: %v", errLast)
 	}
 	return templ, nil
+}
+
+func gceUpgradeScript() string {
+	if len(TestContext.GCEUpgradeScript) == 0 {
+		return path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh")
+	}
+	return TestContext.GCEUpgradeScript
 }
