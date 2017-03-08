@@ -890,38 +890,6 @@ function sha1sum-file() {
   fi
 }
 
-# Downloads cfssl into $1 directory
-#
-# Assumed vars:
-#   $1 (cfssl directory)
-#
-function download-cfssl {
-  mkdir -p "$1"
-  pushd "$1"
-
-  kernel=$(uname -s)
-  case "${kernel}" in
-    Linux)
-      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
-      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
-      ;;
-    Darwin)
-      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
-      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
-      ;;
-    *)
-      echo "Unknown, unsupported platform: ${kernel}." >&2
-      echo "Supported platforms: Linux, Darwin." >&2
-      exit 2
-  esac
-
-  chmod +x cfssl
-  chmod +x cfssljson
-
-  popd
-}
-
-
 # Create certificate pairs for the cluster.
 # $1: The public IP for the master.
 #
@@ -1012,12 +980,12 @@ function generate-certs {
     ./easyrsa --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
     ./easyrsa build-client-full kube-apiserver nopass
 
-    download-cfssl "${KUBE_TEMP}/cfssl"
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
 
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the kubelet client cert with the correct groups
-    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${KUBE_TEMP}/cfssl/cfssl" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${KUBE_TEMP}/cfssl/cfssljson" -bare kubelet
+    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare kubelet
     mv "kubelet-key.pem" "pki/private/kubelet.key"
     mv "kubelet.pem" "pki/issued/kubelet.crt"
     rm -f "kubelet.csr"
@@ -1061,10 +1029,7 @@ function generate-etcd-cert() {
   mkdir -p "${cert_dir}"
   pushd "${cert_dir}"
 
-  if [ ! -x cfssl ] || [ ! -x cfssljson ]; then
-    echo "Download cfssl & cfssljson ..."
-    download-cfssl .
-  fi
+  kube::util::ensure-cfssl .
 
   if [ ! -r "ca-config.json" ]; then
     cat >ca-config.json <<EOF
@@ -1130,27 +1095,27 @@ EOF
   fi
 
   if [[ ! -r "ca.pem" || ! -r "ca-key.pem" ]]; then
-    ./cfssl gencert -initca ca-csr.json | ./cfssljson -bare ca -
+    ${CFSSL_BIN} gencert -initca ca-csr.json | ${CFSSLJSON_BIN} -bare ca -
   fi
 
   case "${type_cert}" in
     client)
       echo "Generate client certificates..."
       echo '{"CN":"client","hosts":["*"],"key":{"algo":"ecdsa","size":256}}' \
-       | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client - \
-       | ./cfssljson -bare "${prefix}"
+       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client - \
+       | ${CFSSLJSON_BIN} -bare "${prefix}"
       ;;
     server)
       echo "Generate server certificates..."
       echo '{"CN":"'${member_ip}'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
-       | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server -hostname="${member_ip},127.0.0.1" - \
-       | ./cfssljson -bare "${prefix}"
+       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server -hostname="${member_ip},127.0.0.1" - \
+       | ${CFSSLJSON_BIN} -bare "${prefix}"
       ;;
     peer)
       echo "Generate peer certificates..."
       echo '{"CN":"'${member_ip}'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
-       | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=peer -hostname="${member_ip},127.0.0.1" - \
-       | ./cfssljson -bare "${prefix}"
+       | ${CFSSL_BIN} gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=peer -hostname="${member_ip},127.0.0.1" - \
+       | ${CFSSLJSON_BIN} -bare "${prefix}"
       ;;
     *)
       echo "Unknow, unsupported etcd certs type: ${type_cert}" >&2
