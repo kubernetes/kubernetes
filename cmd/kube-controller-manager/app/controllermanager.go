@@ -36,7 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+
 	"k8s.io/apiserver/pkg/server/healthz"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
 	"k8s.io/client-go/discovery"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
@@ -44,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
+
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -58,6 +62,7 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/configz"
 
@@ -466,14 +471,13 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			int(s.NodeCIDRMaskSize),
 			s.AllocateNodeCIDRs,
 			s.EnableTaintManager,
-			s.UseTaintBasedEvictions,
+			utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to initialize nodecontroller: %v", err)
 		}
 		nodeController.Run()
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
-
 	} else {
 		glog.Warningf("%q is disabled", nodeControllerName)
 	}

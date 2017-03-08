@@ -817,8 +817,6 @@ type KubeControllerManagerConfiguration struct {
 	// If set to true enables NoExecute Taints and will evict all not-tolerating
 	// Pod running on Nodes tainted with this kind of Taints.
 	EnableTaintManager bool
-	// If set to true NodeController will use taints to evict Pods from notReady and unreachable Nodes.
-	UseTaintBasedEvictions bool
 	// HorizontalPodAutoscalerUseRESTClients causes the HPA controller to use REST clients
 	// through the kube-aggregator when enabled, instead of using the legacy metrics client
 	// through the API server proxy.
