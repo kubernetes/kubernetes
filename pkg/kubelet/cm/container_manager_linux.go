@@ -272,7 +272,6 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	if cm.NodeConfig.CgroupsPerQOS {
 		eventDispatcher := newEventDispatcher()
-		eventDispatcher.Start(":5433") // "life" on a North American keypad
 
 		return &podContainerManagerImpl{
 			qosContainersInfo: cm.GetQOSContainersInfo(),
