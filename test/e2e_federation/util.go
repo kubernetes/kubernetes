@@ -44,7 +44,7 @@ import (
 var (
 	KubeAPIQPS            float32 = 20.0
 	KubeAPIBurst                  = 30
-	DefaultFederationName         = "federation"
+	DefaultFederationName         = "e2e-federation"
 	UserAgentName                 = "federation-e2e"
 	// We use this to decide how long to wait for our DNS probes to succeed.
 	DNSTTL = 180 * time.Second // TODO: make k8s.io/kubernetes/federation/pkg/federation-controller/service.minDnsTtl exported, and import it here.
