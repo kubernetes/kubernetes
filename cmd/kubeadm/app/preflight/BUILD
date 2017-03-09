@@ -13,15 +13,19 @@ go_library(
     srcs = ["checks.go"],
     tags = ["automanaged"],
     deps = [
+        "//cmd/kube-apiserver/app/options:go_default_library",
+        "//cmd/kube-controller-manager/app/options:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/node:go_default_library",
+        "//plugin/cmd/kube-scheduler/app/options:go_default_library",
         "//test/e2e_node/system:go_default_library",
         "//vendor/github.com/PuerkitoBio/purell:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 
