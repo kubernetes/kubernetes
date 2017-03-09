@@ -80,7 +80,20 @@ $ kubectl create -f ./examples/volumes/scaleio/secret.yaml
 
 ## Deploying Pods with Persistent Volumes
 
-The following example shows how the ScaleIO volume plugin for Kubernetes automatically attach, format, and mount a volume for a deployed pod. This approach requires an existing ScaleIO volume.
+The example presented in this section shows how the ScaleIO volume plugin can automatically attach, format, and mount an existing ScaleIO volume for pod. 
+The Kubernetes ScaleIO volume spec supports the following attributes:
+
+| Attribute | Description |
+|-----------|-------------|
+| gateway | address to a ScaleIO API gateway (required)|
+| system  | the name of the ScaleIO system (required)|
+| protectionDomain| the name of the ScaleIO protection domain (default `default`)|
+| storagePool| the name of the volume storage pool (default `default`)|
+| storageMode| the storage provision mode: `ThinProvisionned` (default) or `ThickProvisionned`|
+| volumeName| the name of an existing volume in ScaleIO (required)|
+| secretRef:name| reference to a configuered Secret object (required, see Secret earlier)|
+| readOnly| specifies the access mode to the mounted volume (default `false`)|
+| fsType| the file system to use for the volume (default `xfs`)|
 
 ### Create Volume
 
@@ -114,12 +127,11 @@ spec:
         name: sio-secret
       fsType: xfs
 ```
-
 Notice the followings in the previous YAML:
 
-- Update the `gatewway` to point to your ScaleIO gateway endpoint.  
-- The `volumeName` attribute refers to the name of an existing volume in ScaleIO.  
-- The  `secretRef` attribute references the name of the secret object deployed earlier.
+- Update the `gatewway` to point to your ScaleIO gateway endpoint.
+- The `volumeName` attribute refers to the name of an existing volume in ScaleIO.
+- The `secretRef:name` attribute references the name of the secret object deployed earlier.
 
 Next, deploy the pod.
 
@@ -146,9 +158,22 @@ scinia      252:0    0    8G  0 disk /var/lib/kubelet/pods/135986c7-dcb7-11e6-9f
 
 ## StorageClass and Dynamic Provisioning
 
-In this example, we will see how the ScaleIO volume plugin can automatically provision a new volume as described in a `StorageClass`.
+In the example in this section, we will see how the ScaleIO volume plugin can automatically provision described in a `StorageClass`.
+The ScaleIO volume plugin is a dynamic provisioner identified as `kubernetes.io/scaleio` and supports the following parameters:
 
-### StorageClass
+| Parameter | Description |
+|-----------|-------------|
+| gateway | address to a ScaleIO API gateway (required)|
+| system  | the name of the ScaleIO system (required)|
+| protectionDomain| the name of the ScaleIO protection domain (default `default`)|
+| storagePool| the name of the volume storage pool (default `default`)|
+| storageMode| the storage provision mode: `ThinProvisionned` (default) or `ThickProvisionned`|
+| secretRef| reference to the name of a configuered Secret object (required)|
+| readOnly| specifies the access mode to the mounted volume (default `false`)|
+| fsType| the file system to use for the volume (default `xfs`)|
+
+
+### ScaleIO StorageClass
 
 Define a new `StorageClass` as shown in the following YAML.
 
@@ -156,7 +181,7 @@ File [sc.yaml](sc.yaml)
 
 ```
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: sio-small
 provisioner: kubernetes.io/scaleio
@@ -167,12 +192,9 @@ parameters:
   secretRef: sio-secret
   fsType: xfs
 ```
-
 Note the followings:
 
-- The `name` attribute is set to `sio-small` . It will be referenced later.
-- The `provisioner` attribute is set to `kubernetes.io/scaleio` to trigger the ScaleIO plugin.
-- The use of the `parameters:` section in the yaml for configurations.  
+- The `name` attribute is set to sio-small . It will be referenced later.
 - The `secretRef` attribute matches the name of the Secret object created earlier.
 
 Next, deploy the storage class file.
