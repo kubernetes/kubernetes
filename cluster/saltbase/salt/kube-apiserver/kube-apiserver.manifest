@@ -251,7 +251,7 @@
         "mountPath": "/etc/openssl",
         "readOnly": true},
         { "name": "etcpki",
-        "mountPath": "/etc/pki",
+        "mountPath": "/etc/srv/pki",
         "readOnly": true},
         { "name": "srvsshproxy",
         "mountPath": "{{srv_sshproxy_path}}",
@@ -292,7 +292,7 @@
   },
   { "name": "etcpki",
     "hostPath": {
-        "path": "/etc/pki"}
+        "path": "/etc/srv/pki"}
   },
   { "name": "srvsshproxy",
     "hostPath": {
