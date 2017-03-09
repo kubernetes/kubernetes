@@ -829,7 +829,8 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 				// TODO: the name/domain name pair should ideally be checked for naming convention
 				// as done in kube-dns federation flags check.
 				// https://github.com/kubernetes/dns/blob/master/pkg/dns/federation/federation.go
-				util.FedDomainMapKey: fmt.Sprintf("%s=%s", name, dnsZoneName),
+				// For now, ensure that we remove all trailing periods.
+				util.FedDomainMapKey: fmt.Sprintf("%s=%s", name, strings.TrimRight(dnsZoneName, ".")),
 			},
 		},
 		Spec: extensions.DeploymentSpec{
