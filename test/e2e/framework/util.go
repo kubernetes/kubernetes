@@ -104,7 +104,8 @@ const (
 	PodStartTimeout = 5 * time.Minute
 
 	// How long to wait for the pod to no longer be running
-	podNoLongerRunningTimeout = 30 * time.Second
+	// Pod deletions requires containers to be terminated and all pod resources to be reclaimed.
+	podNoLongerRunningTimeout = time.Minute
 
 	// If there are any orphaned namespaces to clean up, this test is running
 	// on a long lived cluster. A long wait here is preferably to spurious test
