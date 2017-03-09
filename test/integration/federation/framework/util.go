@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package discovery
+package framework
 
-type ClusterInfo struct {
-	// TODO Kind, apiVersion
-	// TODO clusterId, fetchedTime, expiredTime
-	CertificateAuthorities []string `json:"certificateAuthorities,omitempty"`
-	Endpoints              []string `json:"endpoints,omitempty"`
+import (
+	"testing"
+)
+
+// Setup is likely to be fixture-specific, but Teardown needs to be
+// consistent to enable TeardownOnPanic.
+type TestFixture interface {
+	Teardown(t *testing.T)
+}
+
+// TeardownOnPanic can be used to ensure cleanup on setup failure.
+func TeardownOnPanic(t *testing.T, f TestFixture) {
+	if r := recover(); r != nil {
+		f.Teardown(t)
+		panic(r)
+	}
 }

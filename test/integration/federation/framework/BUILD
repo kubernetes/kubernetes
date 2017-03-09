@@ -4,21 +4,23 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
     "go_library",
-)
-
-go_binary(
-    name = "kube-discovery",
-    library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
-    srcs = ["kubediscovery.go"],
+    srcs = [
+        "api.go",
+        "util.go",
+    ],
     tags = ["automanaged"],
-    deps = ["//cmd/kube-discovery/app:go_default_library"],
+    deps = [
+        "//federation/cmd/federation-apiserver/app:go_default_library",
+        "//federation/cmd/federation-apiserver/app/options:go_default_library",
+        "//test/integration/framework:go_default_library",
+        "//vendor:github.com/pborman/uuid",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+    ],
 )
 
 filegroup(
@@ -30,9 +32,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//cmd/kube-discovery/app:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

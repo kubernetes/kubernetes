@@ -267,9 +267,10 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 }
 
 // GetPodCgroupParent gets pod cgroup parent from container manager.
-func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
+func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 	pcm := kl.containerManager.NewPodContainerManager()
-	return pcm.GetPodContainerName(pod)
+	_, cgroupParent := pcm.GetPodContainerName(pod)
+	return cgroupParent
 }
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
@@ -277,7 +278,7 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
 func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
 	var err error
 	useClusterFirstPolicy := false
-	_, cgroupParent := kl.GetPodCgroupParent(pod)
+	cgroupParent := kl.GetPodCgroupParent(pod)
 	opts := &kubecontainer.RunContainerOptions{CgroupParent: cgroupParent}
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
@@ -686,11 +687,7 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 		// restarted.
 		status = pod.Status
 	}
-	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
-		return true
-	}
-
-	return false
+	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
 }
 
 // OkToDeletePod returns true if all required node-level resources that a pod was consuming have
@@ -847,7 +844,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 
 	// Remove any cgroups in the hierarchy for pods that are no longer running.
 	if kl.cgroupsPerQOS {
-		kl.cleanupOrphanedPodCgroups(cgroupPods, runningPods)
+		kl.cleanupOrphanedPodCgroups(cgroupPods, activePods)
 	}
 
 	kl.backOff.GC()
@@ -1510,13 +1507,12 @@ func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID
 
 // cleanupOrphanedPodCgroups removes cgroups that should no longer exist.
 // it reconciles the cached state of cgroupPods with the specified list of runningPods
-func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupName, runningPods []*kubecontainer.Pod) {
+func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupName, activePods []*v1.Pod) {
 	// Add all running pods to the set that we want to preserve
 	podSet := sets.NewString()
-	for _, pod := range runningPods {
-		podSet.Insert(string(pod.ID))
+	for _, pod := range activePods {
+		podSet.Insert(string(pod.UID))
 	}
-
 	pcm := kl.containerManager.NewPodContainerManager()
 
 	// Iterate over all the found pods to verify if they should be running

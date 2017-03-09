@@ -105,7 +105,12 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 	// recognized by the CNI standard yet.
 	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
 	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations)
-	// TODO: Do we need to teardown on failure or can we rely on a StopPodSandbox call with the given ID?
+	if err != nil {
+		// TODO(random-liu): Do we need to teardown network here?
+		if err := ds.client.StopContainer(createResp.ID, defaultSandboxGracePeriod); err != nil {
+			glog.Warningf("Failed to stop sandbox container %q for pod %q: %v", createResp.ID, config.Metadata.Name, err)
+		}
+	}
 	return createResp.ID, err
 }
 
@@ -341,6 +346,18 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 			}
 		}
 	}
+
+	// Make sure we get the list of checkpoints first so that we don't include
+	// new PodSandboxes that are being created right now.
+	var err error
+	checkpoints := []string{}
+	if filter == nil {
+		checkpoints, err = ds.checkpointHandler.ListCheckpoints()
+		if err != nil {
+			glog.Errorf("Failed to list checkpoints: %v", err)
+		}
+	}
+
 	containers, err := ds.client.ListContainers(opts)
 	if err != nil {
 		return nil, err
@@ -367,27 +384,21 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 	// Include sandbox that could only be found with its checkpoint if no filter is applied
 	// These PodSandbox will only include PodSandboxID, Name, Namespace.
 	// These PodSandbox will be in PodSandboxState_SANDBOX_NOTREADY state.
-	if filter == nil {
-		checkpoints, err := ds.checkpointHandler.ListCheckpoints()
+	for _, id := range checkpoints {
+		if _, ok := sandboxIDs[id]; ok {
+			continue
+		}
+		checkpoint, err := ds.checkpointHandler.GetCheckpoint(id)
 		if err != nil {
-			glog.Errorf("Failed to list checkpoints: %v", err)
-		}
-		for _, id := range checkpoints {
-			if _, ok := sandboxIDs[id]; ok {
-				continue
-			}
-			checkpoint, err := ds.checkpointHandler.GetCheckpoint(id)
-			if err != nil {
-				glog.Errorf("Failed to retrieve checkpoint for sandbox %q: %v", id, err)
+			glog.Errorf("Failed to retrieve checkpoint for sandbox %q: %v", id, err)
 
-				if err == errors.CorruptCheckpointError {
-					glog.V(2).Info("Removing corrupted checkpoint %q: %+v", id, *checkpoint)
-					ds.checkpointHandler.RemoveCheckpoint(id)
-				}
-				continue
+			if err == errors.CorruptCheckpointError {
+				glog.V(2).Info("Removing corrupted checkpoint %q: %+v", id, *checkpoint)
+				ds.checkpointHandler.RemoveCheckpoint(id)
 			}
-			result = append(result, checkpointToRuntimeAPISandbox(id, checkpoint))
+			continue
 		}
+		result = append(result, checkpointToRuntimeAPISandbox(id, checkpoint))
 	}
 
 	// Include legacy sandboxes if there are still legacy sandboxes not cleaned up yet.

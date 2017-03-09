@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,11 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -50,6 +51,8 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
+
+	"github.com/golang/glog"
 )
 
 func init() {
@@ -260,6 +263,9 @@ func NewNodeController(
 		zoneStates:                      make(map[string]zoneState),
 		runTaintManager:                 runTaintManager,
 		useTaintBasedEvictions:          useTaintBasedEvictions && runTaintManager,
+	}
+	if useTaintBasedEvictions {
+		glog.Infof("NodeController is using taint based evictions.")
 	}
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
@@ -628,7 +634,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionFalse {
 				if nc.useTaintBasedEvictions {
 					if nc.markNodeForTainting(node) {
-						glog.V(2).Infof("Tainting Node %v with NotReady taint on %v",
+						glog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
 						)
@@ -636,7 +642,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				} else {
 					if decisionTimestamp.After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
 						if nc.evictPods(node) {
-							glog.V(2).Infof("Evicting pods on node %s: %v is later than %v + %v",
+							glog.V(2).Infof("Node is NotReady. Adding Pods on Node %s to eviction queue: %v is later than %v + %v",
 								node.Name,
 								decisionTimestamp,
 								nc.nodeStatusMap[node.Name].readyTransitionTimestamp,
@@ -649,7 +655,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionUnknown {
 				if nc.useTaintBasedEvictions {
 					if nc.markNodeForTainting(node) {
-						glog.V(2).Infof("Tainting Node %v with NotReady taint on %v",
+						glog.V(2).Infof("Node %v is unresponsive as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
 						)
@@ -657,7 +663,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				} else {
 					if decisionTimestamp.After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout)) {
 						if nc.evictPods(node) {
-							glog.V(2).Infof("Evicting pods on node %s: %v is later than %v + %v",
+							glog.V(2).Infof("Node is unresponsive. Adding Pods on Node %s to eviction queues: %v is later than %v + %v",
 								node.Name,
 								decisionTimestamp,
 								nc.nodeStatusMap[node.Name].readyTransitionTimestamp,

@@ -14,7 +14,6 @@ go_library(
         "cronjob.go",
         "doc.go",
         "generated_expansion.go",
-        "job.go",
     ],
     tags = ["automanaged"],
     deps = [

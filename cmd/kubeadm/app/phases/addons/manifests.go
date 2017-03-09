@@ -89,7 +89,7 @@ spec:
           name: kube-proxy
 `
 
-	KubeDNSVersion = "1.13.0"
+	KubeDNSVersion = "1.14.1"
 
 	KubeDNSDeployment = `
 
@@ -179,7 +179,7 @@ spec:
         - name: kube-dns-config
           mountPath: /kube-dns-config
       - name: dnsmasq
-        image: {{ .ImageRepository }}/k8s-dns-dnsmasq-{{ .Arch }}:{{ .Version }}
+        image: {{ .ImageRepository }}/k8s-dns-dnsmasq-nanny-{{ .Arch }}:{{ .Version }}
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -191,11 +191,17 @@ spec:
           successThreshold: 1
           failureThreshold: 5
         args:
+        - -v=2
+        - -logtostderr
+        - -configDir=/etc/k8s/dns/dnsmasq-nanny
+        - -restartDnsmasq=true
+        - --
+        - -k
         - --cache-size=1000
+        - --log-facility=-
         - --server=/{{ .DNSDomain }}/127.0.0.1#10053
         - --server=/in-addr.arpa/127.0.0.1#10053
         - --server=/ip6.arpa/127.0.0.1#10053
-        - --log-facility=-
         ports:
         - containerPort: 53
           name: dns
@@ -207,7 +213,10 @@ spec:
         resources:
           requests:
             cpu: 150m
-            memory: 10Mi
+            memory: 20Mi
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /etc/k8s/dns/dnsmasq-nanny
       - name: sidecar
         image: {{ .ImageRepository }}/k8s-dns-sidecar-{{ .Arch }}:{{ .Version }}
         imagePullPolicy: IfNotPresent

@@ -39,16 +39,15 @@ type DeploymentUpgradeTest struct {
 	newRS    *extensions.ReplicaSet
 }
 
+func (DeploymentUpgradeTest) Name() string { return "deployment-upgrade" }
+
 // Setup creates a deployment and makes sure it has a new and an old replica set running.
 func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	deploymentName := "deployment-hash-test"
 	c := f.ClientSet
 	nginxImage := "gcr.io/google_containers/nginx-slim:0.8"
 
-	// Grab a unique namespace so we don't collide.
-	namespace, err := f.CreateNamespace("deployment-upgrade", nil)
-	framework.ExpectNoError(err)
-	ns := namespace.Name
+	ns := f.Namespace.Name
 
 	By(fmt.Sprintf("Creating a deployment %q in namespace %q", deploymentName, ns))
 	d := framework.NewDeployment(deploymentName, int32(1), map[string]string{"test": "upgrade"}, "nginx", nginxImage, extensions.RollingUpdateDeploymentStrategyType)

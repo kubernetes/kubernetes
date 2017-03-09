@@ -47,7 +47,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
@@ -108,7 +109,7 @@ func (jm *CronJobController) syncAll() {
 	sjs := sjl.Items
 	glog.V(4).Infof("Found %d cronjobs", len(sjs))
 
-	jl, err := jm.kubeClient.BatchV2alpha1().Jobs(metav1.NamespaceAll).List(metav1.ListOptions{})
+	jl, err := jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("Error listing jobs")
 		return
@@ -126,20 +127,21 @@ func (jm *CronJobController) syncAll() {
 }
 
 // cleanupFinishedJobs cleanups finished jobs created by a CronJob
-func cleanupFinishedJobs(sj *batch.CronJob, js []batch.Job, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
+func cleanupFinishedJobs(sj *batchv2alpha1.CronJob, js []batchv1.Job, jc jobControlInterface,
+	sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
 	// If neither limits are active, there is no need to do anything.
 	if sj.Spec.FailedJobsHistoryLimit == nil && sj.Spec.SuccessfulJobsHistoryLimit == nil {
 		return
 	}
 
-	failedJobs := []batch.Job{}
-	succesfulJobs := []batch.Job{}
+	failedJobs := []batchv1.Job{}
+	succesfulJobs := []batchv1.Job{}
 
 	for _, job := range js {
 		isFinished, finishedStatus := getFinishedStatus(&job)
-		if isFinished && finishedStatus == batch.JobComplete {
+		if isFinished && finishedStatus == batchv1.JobComplete {
 			succesfulJobs = append(succesfulJobs, job)
-		} else if isFinished && finishedStatus == batch.JobFailed {
+		} else if isFinished && finishedStatus == batchv1.JobFailed {
 			failedJobs = append(failedJobs, job)
 		}
 	}
@@ -170,7 +172,8 @@ func cleanupFinishedJobs(sj *batch.CronJob, js []batch.Job, jc jobControlInterfa
 }
 
 // removeOldestJobs removes the oldest jobs from a list of jobs
-func removeOldestJobs(sj *batch.CronJob, js []batch.Job, jc jobControlInterface, pc podControlInterface, maxJobs int32, recorder record.EventRecorder) {
+func removeOldestJobs(sj *batchv2alpha1.CronJob, js []batchv1.Job, jc jobControlInterface,
+	pc podControlInterface, maxJobs int32, recorder record.EventRecorder) {
 	numToDelete := len(js) - int(maxJobs)
 	if numToDelete <= 0 {
 		return
@@ -190,7 +193,7 @@ func removeOldestJobs(sj *batch.CronJob, js []batch.Job, jc jobControlInterface,
 // All known jobs created by "sj" should be included in "js".
 // The current time is passed in to facilitate testing.
 // It has no receiver, to facilitate testing.
-func syncOne(sj *batch.CronJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
+func syncOne(sj *batchv2alpha1.CronJob, js []batchv1.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
 	childrenJobs := make(map[types.UID]bool)
@@ -269,7 +272,7 @@ func syncOne(sj *batch.CronJob, js []batch.Job, now time.Time, jc jobControlInte
 		// can see easily that there was a missed execution.
 		return
 	}
-	if sj.Spec.ConcurrencyPolicy == batch.ForbidConcurrent && len(sj.Status.Active) > 0 {
+	if sj.Spec.ConcurrencyPolicy == batchv2alpha1.ForbidConcurrent && len(sj.Status.Active) > 0 {
 		// Regardless which source of information we use for the set of active jobs,
 		// there is some risk that we won't see an active job when there is one.
 		// (because we haven't seen the status update to the SJ or the created pod).
@@ -282,7 +285,7 @@ func syncOne(sj *batch.CronJob, js []batch.Job, now time.Time, jc jobControlInte
 		glog.V(4).Infof("Not starting job for %s because of prior execution still running and concurrency policy is Forbid", nameForLog)
 		return
 	}
-	if sj.Spec.ConcurrencyPolicy == batch.ReplaceConcurrent {
+	if sj.Spec.ConcurrencyPolicy == batchv2alpha1.ReplaceConcurrent {
 		for _, j := range sj.Status.Active {
 			// TODO: this should be replaced with server side job deletion
 			// currently this mimics JobReaper from pkg/kubectl/stop.go
@@ -338,7 +341,8 @@ func syncOne(sj *batch.CronJob, js []batch.Job, now time.Time, jc jobControlInte
 }
 
 // deleteJob reaps a job, deleting the job, the pobs and the reference in the active list
-func deleteJob(sj *batch.CronJob, job *batch.Job, jc jobControlInterface, pc podControlInterface, recorder record.EventRecorder, reason string) bool {
+func deleteJob(sj *batchv2alpha1.CronJob, job *batchv1.Job, jc jobControlInterface,
+	pc podControlInterface, recorder record.EventRecorder, reason string) bool {
 	// TODO: this should be replaced with server side job deletion
 	// currencontinuetly this mimics JobReaper from pkg/kubectl/stop.go
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)

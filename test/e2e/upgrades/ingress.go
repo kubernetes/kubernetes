@@ -33,7 +33,10 @@ type IngressUpgradeTest struct {
 	jig           *framework.IngressTestJig
 	httpClient    *http.Client
 	ip            string
+	ipName        string
 }
+
+func (IngressUpgradeTest) Name() string { return "ingress-upgrade" }
 
 // Setup creates a GLBC, allocates an ip, and an ingress resource,
 // then waits for a successful connectivity check to the ip.
@@ -43,8 +46,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 	// jig handles all Kubernetes testing logic
 	jig := framework.NewIngressTestJig(f.ClientSet)
 
-	ns, err := f.CreateNamespace("ingress-upgrade", nil)
-	framework.ExpectNoError(err)
+	ns := f.Namespace
 
 	// gceController handles all cloud testing logic
 	gceController := &framework.GCEIngressController{
@@ -59,12 +61,13 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 	t.httpClient = framework.BuildInsecureClient(framework.IngressReqTimeout)
 
 	// Allocate a static-ip for the Ingress, this IP is cleaned up via CleanupGCEIngressController
-	t.ip = t.gceController.CreateStaticIP(ns.Name)
+	t.ipName = fmt.Sprintf("%s-static-ip", ns.Name)
+	t.ip = t.gceController.CreateStaticIP(t.ipName)
 
 	// Create a working basic Ingress
-	By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns.Name, t.ip))
+	By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", t.ipName, t.ip))
 	jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip"), ns.Name, map[string]string{
-		"kubernetes.io/ingress.global-static-ip-name": ns.Name,
+		"kubernetes.io/ingress.global-static-ip-name": t.ipName,
 		"kubernetes.io/ingress.allow-http":            "false",
 	})
 
@@ -96,12 +99,12 @@ func (t *IngressUpgradeTest) Teardown(f *framework.Framework) {
 	if CurrentGinkgoTestDescription().Failed {
 		framework.DescribeIng(t.gceController.Ns)
 	}
-	if t.jig.Ingress == nil {
+	if t.jig.Ingress != nil {
+		By("Deleting ingress")
+		t.jig.DeleteIngress()
+	} else {
 		By("No ingress created, no cleanup necessary")
-		return
 	}
-	By("Deleting ingress")
-	t.jig.DeleteIngress()
 
 	By("Cleaning up cloud resources")
 	framework.CleanupGCEIngressController(t.gceController)

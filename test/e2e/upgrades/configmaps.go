@@ -33,13 +33,13 @@ type ConfigMapUpgradeTest struct {
 	configMap *v1.ConfigMap
 }
 
+func (ConfigMapUpgradeTest) Name() string { return "configmap-upgrade" }
+
 // Setup creates a ConfigMap and then verifies that a pod can consume it.
 func (t *ConfigMapUpgradeTest) Setup(f *framework.Framework) {
 	configMapName := "upgrade-configmap"
 
-	// Grab a unique namespace so we don't collide.
-	ns, err := f.CreateNamespace("configmap-upgrade", nil)
-	framework.ExpectNoError(err)
+	ns := f.Namespace
 
 	t.configMap = &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -52,6 +52,7 @@ func (t *ConfigMapUpgradeTest) Setup(f *framework.Framework) {
 	}
 
 	By("Creating a ConfigMap")
+	var err error
 	if t.configMap, err = f.ClientSet.Core().ConfigMaps(ns.Name).Create(t.configMap); err != nil {
 		framework.Failf("unable to create test ConfigMap %s: %v", t.configMap.Name, err)
 	}

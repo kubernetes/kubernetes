@@ -31,11 +31,11 @@ type JobUpgradeTest struct {
 	namespace string
 }
 
+func (JobUpgradeTest) Name() string { return "job-upgrade" }
+
 // Setup starts a Job with a parallelism of 2 and 2 completions running.
 func (t *JobUpgradeTest) Setup(f *framework.Framework) {
-	ns, err := f.CreateNamespace("service-upgrade", nil)
-	Expect(err).NotTo(HaveOccurred())
-	t.namespace = ns.Name
+	t.namespace = f.Namespace.Name
 
 	By("Creating a job")
 	t.job = framework.NewTestJob("notTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2)

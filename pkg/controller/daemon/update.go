@@ -32,10 +32,13 @@ import (
 // rollingUpdate deletes old daemon set pods making sure that no more than
 // ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable pods are unavailable
 func (dsc *DaemonSetsController) rollingUpdate(ds *extensions.DaemonSet) error {
-	newPods, oldPods, err := dsc.getAllDaemonSetPods(ds)
-	allPods := append(oldPods, newPods...)
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	if err != nil {
+		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+	}
 
-	maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, allPods)
+	_, oldPods, err := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods)
+	maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, nodeToDaemonPods)
 	if err != nil {
 		return fmt.Errorf("Couldn't get unavailable numbers: %v", err)
 	}
@@ -67,39 +70,28 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *extensions.DaemonSet) error {
 	return utilerrors.NewAggregate(errors)
 }
 
-func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *extensions.DaemonSet) ([]*v1.Pod, []*v1.Pod, error) {
+func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *extensions.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) ([]*v1.Pod, []*v1.Pod, error) {
 	var newPods []*v1.Pod
 	var oldPods []*v1.Pod
 
-	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
-	if err != nil {
-		return newPods, oldPods, err
-	}
-	daemonPods, err := dsc.podLister.Pods(ds.Namespace).List(selector)
-	if err != nil {
-		return newPods, oldPods, fmt.Errorf("Couldn't get list of pods for daemon set %#v: %v", ds, err)
-	}
-	for _, pod := range daemonPods {
-		if util.IsPodUpdated(ds.Spec.TemplateGeneration, pod) {
-			newPods = append(newPods, pod)
-		} else {
-			oldPods = append(oldPods, pod)
+	for _, pods := range nodeToDaemonPods {
+		for _, pod := range pods {
+			if util.IsPodUpdated(ds.Spec.TemplateGeneration, pod) {
+				newPods = append(newPods, pod)
+			} else {
+				oldPods = append(oldPods, pod)
+			}
 		}
 	}
 	return newPods, oldPods, nil
 }
 
-func (dsc *DaemonSetsController) getUnavailableNumbers(ds *extensions.DaemonSet, allPods []*v1.Pod) (int, int, error) {
+func (dsc *DaemonSetsController) getUnavailableNumbers(ds *extensions.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) (int, int, error) {
 	glog.V(4).Infof("Getting unavailable numbers")
 	// TODO: get nodeList once in syncDaemonSet and pass it to other functions
 	nodeList, err := dsc.nodeLister.List(labels.Everything())
 	if err != nil {
 		return -1, -1, fmt.Errorf("couldn't get list of nodes during rolling update of daemon set %#v: %v", ds, err)
-	}
-
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
-	if err != nil {
-		return -1, -1, fmt.Errorf("couldn't get node to daemon pods mapping for daemon set %#v: %v", ds, err)
 	}
 
 	var numUnavailable, desiredNumberScheduled int

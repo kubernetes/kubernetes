@@ -30,6 +30,8 @@ type PersistentVolumeUpgradeTest struct {
 	pvc      *v1.PersistentVolumeClaim
 }
 
+func (PersistentVolumeUpgradeTest) Name() string { return "persistent-volume-upgrade" }
+
 const (
 	pvTestFile string = "/mnt/pv_upgrade_test"
 	pvTestData string = "keep it pv"

@@ -11,13 +11,15 @@ scripts that launch kube-controller-manager.
 
 The admin must define `StorageClass` objects that describe named "classes" of storage offered in a cluster. Different classes might map to arbitrary levels or policies determined by the admin. When configuring a `StorageClass` object for persistent volume provisioning, the admin will need to describe the type of provisioner to use and the parameters that will be used by the provisioner when it provisions a `PersistentVolume` belonging to the class.
 
-The name of a StorageClass object is significant, and is how users can request a particular class, by specifying the name in their `PersistentVolumeClaim`. The `provisioner` field must be specified as it determines what volume plugin is used for provisioning PVs. 2 cloud providers will be provided in the beta version of this feature: EBS and GCE. The `parameters` field contains the parameters that describe volumes belonging to the storage class. Different parameters may be accepted depending on the `provisioner`. For example, the value `io1`, for the parameter `type`, and the parameter `iopsPerGB` are specific to EBS . When a parameter is omitted, some default is used.
+The name of a StorageClass object is significant, and is how users can request a particular class, by specifying the name in their `PersistentVolumeClaim`. The `provisioner` field must be specified as it determines what volume plugin is used for provisioning PVs. The `parameters` field contains the parameters that describe volumes belonging to the storage class. Different parameters may be accepted depending on the `provisioner`. For example, the value `io1`, for the parameter `type`, and the parameter `iopsPerGB` are specific to EBS . When a parameter is omitted, some default is used.
+
+See [Kubernetes StorageClass documentation](https://kubernetes.io/docs/user-guide/persistent-volumes/#storageclasses) for complete reference of all supported parameters.
 
 #### AWS
 
 ```yaml
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: slow
 provisioner: kubernetes.io/aws-ebs
@@ -37,7 +39,7 @@ parameters:
 
 ```yaml
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: slow
 provisioner: kubernetes.io/gce-pd
@@ -53,7 +55,7 @@ parameters:
 
 ```yaml
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: slow
 provisioner: kubernetes.io/vsphere-volume
@@ -67,7 +69,7 @@ parameters:
 
 ```yaml
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: portworx-io-priority-high
 provisioner: kubernetes.io/portworx-volume
@@ -91,7 +93,7 @@ For a complete example refer ([Portworx Volume docs](../../volumes/portworx/READ
 #### GLUSTERFS
 
 ```yaml
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: slow
@@ -141,7 +143,7 @@ When the persistent volumes are dynamically provisioned, the Gluster plugin auto
 
 ```yaml
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: gold
 provisioner: kubernetes.io/cinder
@@ -156,7 +158,7 @@ parameters:
 #### Ceph RBD
 
 ```yaml
-  apiVersion: storage.k8s.io/v1beta1
+  apiVersion: storage.k8s.io/v1
   kind: StorageClass
   metadata:
     name: fast
@@ -184,7 +186,7 @@ parameters:
 <!-- BEGIN MUNGE: EXAMPLE quobyte/quobyte-storage-class.yaml -->
 
 ```yaml
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
    name: slow
@@ -270,7 +272,7 @@ $ kubectl create -f examples/persistent-volume-provisioning/quobyte/example-pod.
 
 ```yaml
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: slow
 provisioner: kubernetes.io/azure-disk
@@ -286,18 +288,15 @@ parameters:
 
 ### User provisioning requests
 
-Users request dynamically provisioned storage by including a storage class in their `PersistentVolumeClaim`.
-The annotation `volume.beta.kubernetes.io/storage-class` is used to access this feature. It is required that this value matches the name of a `StorageClass` configured by the administrator.
-In the future, the storage class may remain in an annotation or become a field on the claim itself.
+Users request dynamically provisioned storage by including a storage class in their `PersistentVolumeClaim` using `spec.storageClassName` attribute.
+It is required that this value matches the name of a `StorageClass` configured by the administrator.
 
 ```
 {
   "kind": "PersistentVolumeClaim",
   "apiVersion": "v1",
   "metadata": {
-    "name": "claim1",
-    "annotations": {
-        "volume.beta.kubernetes.io/storage-class": "slow"
+    "name": "claim1"
     }
   },
   "spec": {
@@ -308,7 +307,8 @@ In the future, the storage class may remain in an annotation or become a field o
       "requests": {
         "storage": "3Gi"
       }
-    }
+    },
+    "storageClassName": "slow"
   }
 }
 ```

@@ -18,6 +18,7 @@ package upgrades
 
 import (
 	"fmt"
+
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -29,10 +30,12 @@ type HPAUpgradeTest struct {
 	rc *common.ResourceConsumer
 }
 
+func (HPAUpgradeTest) Name() string { return "hpa-upgrade" }
+
 // Creates a resource consumer and an HPA object that autoscales the consumer.
 func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 	t.rc = common.NewDynamicResourceConsumer(
-		"resource-consumer-upgrade-test",
+		"res-cons-upgrade",
 		common.KindRC,
 		1,   /* replicas */
 		250, /* initCPUTotal */

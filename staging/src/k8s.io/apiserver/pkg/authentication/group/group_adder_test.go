@@ -40,3 +40,72 @@ func TestGroupAdder(t *testing.T) {
 		t.Errorf("Expected original,added groups, got %#v", user.GetGroups())
 	}
 }
+
+func TestAuthenticatedGroupAdder(t *testing.T) {
+	tests := []struct {
+		name         string
+		inputUser    user.Info
+		expectedUser user.Info
+	}{
+		{
+			name: "add",
+			inputUser: &user.DefaultInfo{
+				Name:   "user",
+				Groups: []string{"some-group"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "user",
+				Groups: []string{"some-group", user.AllAuthenticated},
+			},
+		},
+		{
+			name: "don't double add",
+			inputUser: &user.DefaultInfo{
+				Name:   "user",
+				Groups: []string{user.AllAuthenticated, "some-group"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "user",
+				Groups: []string{user.AllAuthenticated, "some-group"},
+			},
+		},
+		{
+			name: "don't add for anon",
+			inputUser: &user.DefaultInfo{
+				Name:   user.Anonymous,
+				Groups: []string{"some-group"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   user.Anonymous,
+				Groups: []string{"some-group"},
+			},
+		},
+		{
+			name: "don't add for unauthenticated group",
+			inputUser: &user.DefaultInfo{
+				Name:   "user",
+				Groups: []string{user.AllUnauthenticated, "some-group"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "user",
+				Groups: []string{user.AllUnauthenticated, "some-group"},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		adder := authenticator.Request(
+			NewAuthenticatedGroupAdder(
+				authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+					return test.inputUser, true, nil
+				}),
+			),
+		)
+
+		user, _, _ := adder.AuthenticateRequest(nil)
+		if !reflect.DeepEqual(user, test.expectedUser) {
+			t.Errorf("got %#v", user)
+		}
+	}
+
+}
