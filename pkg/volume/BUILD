@@ -119,6 +119,7 @@ filegroup(
         "//pkg/volume/secret:all-srcs",
         "//pkg/volume/testing:all-srcs",
         "//pkg/volume/util:all-srcs",
+        "//pkg/volume/validation:all-srcs",
         "//pkg/volume/vsphere_volume:all-srcs",
     ],
     tags = ["automanaged"],
