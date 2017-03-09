@@ -60,7 +60,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					podClient.WaitForSuccess(podCheckHook.Name, postStartWaitTimeout)
 				}
 				By("delete the pod with lifecycle hook")
-				podClient.DeleteSync(podWithHook.Name, metav1.NewDeleteOptions(15), podWaitTimeout)
+				podClient.DeleteSync(podWithHook.Name, metav1.NewDeleteOptions(15), framework.DefaultPodDeletionTimeout)
 				if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 					By("create the hook check pod")
 					podClient.Create(podCheckHook)
@@ -144,7 +144,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					}, postStartWaitTimeout, podCheckInterval).Should(BeNil())
 				}
 				By("delete the pod with lifecycle hook")
-				podClient.DeleteSync(podWithHook.Name, metav1.NewDeleteOptions(15), podWaitTimeout)
+				podClient.DeleteSync(podWithHook.Name, metav1.NewDeleteOptions(15), framework.DefaultPodDeletionTimeout)
 				if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 					By("check prestop hook")
 					Eventually(func() error {

@@ -289,7 +289,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 			By("deleting pods")
 			for _, spec := range podTestSpecs {
 				By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
-				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, podDisappearTimeout)
+				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			}
 
 			if CurrentGinkgoTestDescription().Failed {

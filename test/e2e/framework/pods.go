@@ -37,6 +37,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const DefaultPodDeletionTimeout = 3 * time.Minute
+
 // ImageWhiteList is the images used in the current test suite. It should be initialized in test suite and
 // the images in the white list should be pre-pulled in the test suite.  Currently, this is only used by
 // node e2e test.
