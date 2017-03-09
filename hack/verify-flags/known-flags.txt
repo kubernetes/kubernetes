@@ -282,6 +282,7 @@ gather-metrics-at-teardown
 gather-resource-usage
 gce-project
 gce-service-account
+gce-upgrade-script
 gce-zone
 ginkgo-flags
 gke-cluster
