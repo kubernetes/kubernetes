@@ -274,6 +274,10 @@ func createConfigMap(hostClientSet internalclientset.Interface, config util.Admi
 				util.FedDomainMapKey: domainMap,
 			},
 		}
+		newConfigMap = appendStubDomains(newConfigMap,
+			cmDep.Annotations[util.FedDNSProvider],
+			cmDep.Annotations[util.FedDNSZoneName],
+			cmDep.Annotations[util.FedNameServer])
 
 		if dryRun {
 			return newConfigMap, nil
@@ -392,4 +396,12 @@ func getFederationName(hostClientSet internalclientset.Interface, fedNamespace s
 	}
 
 	return name, nil
+}
+
+func appendStubDomains(configMap *api.ConfigMap, dnsProvider, dnsZoneName, nameServer string) *api.ConfigMap {
+	if dnsProvider != util.FedDNSProviderCoreDNS || dnsZoneName == "" || nameServer == "" {
+		return configMap
+	}
+	configMap.Data[util.KubeDnsStubDomains] = fmt.Sprintf(`{"%s":["%s"]}`, dnsZoneName, nameServer)
+	return configMap
 }

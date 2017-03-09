@@ -44,8 +44,13 @@ const (
 	KubeconfigSecretDataKey = "kubeconfig"
 
 	// Used in and to create the kube-dns configmap storing the zone info
-	FedDomainMapKey      = "federations"
-	KubeDnsConfigmapName = "kube-dns"
+	FedDomainMapKey       = "federations"
+	KubeDnsConfigmapName  = "kube-dns"
+	FedDNSZoneName        = "dns-zone-name"
+	FedNameServer         = "nameserver"
+	FedDNSProvider        = "dns-provider"
+	FedDNSProviderCoreDNS = "coredns"
+	KubeDnsStubDomains    = "stubDomains"
 
 	// DefaultFederationSystemNamespace is the namespace in which
 	// federation system components are hosted.

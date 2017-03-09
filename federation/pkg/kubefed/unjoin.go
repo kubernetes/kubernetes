@@ -111,10 +111,10 @@ func (u *unjoinFederation) Run(f cmdutil.Factory, cmdOut, cmdErr io.Writer, conf
 			// We anyways continue to try and delete the config map but with above warning
 		}
 
-		// We need to ensure deleting the config map created in the deregistered cluster
-		// This configmap was created when the cluster joined this federation to aid
+		// We need to ensure updating the config map created in the deregistered cluster
+		// This configmap was created/updated when the cluster joined this federation to aid
 		// the kube-dns of that cluster to aid service discovery.
-		err = deleteConfigMapFromCluster(hostClientset, secret, cluster, u.commonOptions.FederationSystemNamespace)
+		err = updateConfigMapFromCluster(hostClientset, secret, cluster, u.commonOptions.FederationSystemNamespace)
 		if err != nil {
 			fmt.Fprintf(cmdErr, "WARNING: Encountered error in deleting kube-dns configmap, %v", err)
 			// We anyways continue to print success message but with above warning
@@ -162,7 +162,7 @@ func popCluster(f cmdutil.Factory, name string) (*federationapi.Cluster, error) 
 	return cluster, rh.Delete("", name)
 }
 
-func deleteConfigMapFromCluster(hostClientset internalclientset.Interface, secret *api.Secret, cluster *federationapi.Cluster, fedSystemNamespace string) error {
+func updateConfigMapFromCluster(hostClientset internalclientset.Interface, secret *api.Secret, cluster *federationapi.Cluster, fedSystemNamespace string) error {
 	clientset, err := getClientsetFromCluster(secret, cluster)
 	if err != nil {
 		return err
@@ -182,12 +182,20 @@ func deleteConfigMapFromCluster(hostClientset internalclientset.Interface, secre
 		return err
 	}
 
-	if _, ok := configMap.Data[util.FedDomainMapKey]; !ok {
-		return nil
+	needUpdate := false
+	if _, ok := configMap.Data[util.FedDomainMapKey]; ok {
+		configMap.Data[util.FedDomainMapKey] = removeConfigMapString(configMap.Data[util.FedDomainMapKey], domainMap)
+		needUpdate = true
 	}
-	configMap.Data[util.FedDomainMapKey] = removeConfigMapString(configMap.Data[util.FedDomainMapKey], domainMap)
 
-	_, err = clientset.Core().ConfigMaps(metav1.NamespaceSystem).Update(configMap)
+	if _, ok := configMap.Data[util.KubeDnsStubDomains]; ok {
+		delete(configMap.Data, util.KubeDnsStubDomains)
+		needUpdate = true
+	}
+
+	if needUpdate {
+		_, err = clientset.Core().ConfigMaps(metav1.NamespaceSystem).Update(configMap)
+	}
 	return err
 }
 
