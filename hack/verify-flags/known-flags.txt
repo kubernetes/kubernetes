@@ -680,11 +680,9 @@ upgrade-target
 use-kubernetes-cluster-service
 use-kubernetes-version
 use-service-account-credentials
-use-taint-based-evictions
 user-whitelist
 use-service-account-credentials
 use-service-account-credentials
-use-taint-based-evictions
 verb
 verify-only
 versioned-clientset-package
