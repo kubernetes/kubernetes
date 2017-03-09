@@ -27,6 +27,7 @@ go_library(
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
+        "//pkg/kubeapiserver/server:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/spf13/pflag",

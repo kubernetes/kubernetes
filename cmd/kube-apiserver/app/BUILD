@@ -33,6 +33,7 @@ go_library(
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
+        "//pkg/kubeapiserver/server:go_default_library",
         "//pkg/master:go_default_library",
         "//pkg/master/thirdparty:go_default_library",
         "//pkg/master/tunneler:go_default_library",
