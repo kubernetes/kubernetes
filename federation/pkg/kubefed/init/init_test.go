@@ -936,7 +936,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			Namespace: namespaceName,
 			Labels:    componentLabel,
 			Annotations: map[string]string{
-				util.FedDomainMapKey: fmt.Sprintf("%s=%s", federationName, dnsZoneName),
+				util.FedDomainMapKey: fmt.Sprintf("%s=%s", federationName, strings.TrimRight(dnsZoneName, ".")),
 			},
 		},
 		Spec: v1beta1.DeploymentSpec{
