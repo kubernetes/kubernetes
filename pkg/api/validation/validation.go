@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
-	"k8s.io/kubernetes/pkg/volume"
 )
 
 // TODO: delete this global variable when we enable the validation of common
@@ -64,11 +63,6 @@ var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), bo
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = genericvalidation.BannedOwners
-var volumePlugins []volume.VolumePlugin
-
-func init() {
-	volumePlugins = probeVolumePlugins()
-}
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -1061,20 +1055,6 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	if len(string(pv.Spec.PersistentVolumeReclaimPolicy)) > 0 {
 		if !supportedReclaimPolicy.Has(string(pv.Spec.PersistentVolumeReclaimPolicy)) {
 			allErrs = append(allErrs, field.NotSupported(specPath.Child("persistentVolumeReclaimPolicy"), pv.Spec.PersistentVolumeReclaimPolicy, supportedReclaimPolicy.List()))
-		}
-	}
-
-	volumePlugin := findPluginBySpec(volumePlugins, pv)
-	mountOptions := volume.MountOptionFromApiPV(pv)
-
-	metaField := field.NewPath("metadata")
-	if volumePlugin == nil && len(mountOptions) > 0 {
-		allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", volume.MountOptionAnnotation), "may not specify mount options for this volume type"))
-	}
-
-	if volumePlugin != nil {
-		if !volumePlugin.SupportsMountOption() && len(mountOptions) > 0 {
-			allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", volume.MountOptionAnnotation), "may not specify mount options for this volume type"))
 		}
 	}
 
