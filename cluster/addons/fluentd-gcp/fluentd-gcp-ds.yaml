@@ -22,6 +22,8 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       dnsPolicy: Default
+      updateStrategy:
+        type: RollingUpdate
       containers:
       - name: fluentd-gcp
         image: gcr.io/google-containers/fluentd-gcp:2.0.2
