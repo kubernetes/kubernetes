@@ -239,6 +239,17 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
 		{[]Checker{InPathCheck{executable: "foobarbaz"}}, true, "[preflight] WARNING: foobarbaz not found in system path\n"},
 		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true}}, false, ""},
+		{[]Checker{ExtraArgsCheck{
+			APIServerExtraArgs:         map[string]string{"secure-port": "1234"},
+			ControllerManagerExtraArgs: map[string]string{"use-service-account-credentials": "true"},
+			SchedulerExtraArgs:         map[string]string{"leader-elect": "true"},
+		}}, true, ""},
+		{[]Checker{ExtraArgsCheck{
+			APIServerExtraArgs: map[string]string{"secure-port": "foo"},
+		}}, true, "[preflight] WARNING: kube-apiserver: failed to parse extra argument --secure-port=foo\n"},
+		{[]Checker{ExtraArgsCheck{
+			APIServerExtraArgs: map[string]string{"invalid-argument": "foo"},
+		}}, true, "[preflight] WARNING: kube-apiserver: failed to parse extra argument --invalid-argument=foo\n"},
 	}
 	for _, rt := range tokenTest {
 		buf := new(bytes.Buffer)
