@@ -1,0 +1,116 @@
+**************** Sig assignments for tests ********************
+monitoring.go ('sig-ui', 2)
+deployment.go ('sig-scheduling', 4)
+scheduler_predicates.go ('sig-testing', 141)
+kubelet.go ('sig-storage', 14)
+cadvisor.go ('sig-cluster-lifecycle', 2)
+e2e_test.go ('no-sig', 0)  UNASSIGNED
+util_iperf.go ('no-sig', 0)  UNASSIGNED
+cluster_logging_gcl_load.go ('sig-scale', 4)
+third-party.go ('sig-testing', 47)
+job.go ('sig-apps', 28)
+cluster_size_autoscaling.go ('sig-scheduling', 24)
+persistent_volumes-disruptive.go ('sig-storage', 8)
+networking_perf.go ('sig-command-line-tools', 2)
+events.go ('sig-testing', 47)
+persistent_volumes.go ('sig-storage', 22)
+proxy.go ('sig-testing', 235)
+volume_provisioning.go ('sig-storage', 110)
+vsphere_volume_placement.go ('sig-storage', 10)
+statefulset.go ('sig-scheduling', 16)
+ingress.go ('sig-network', 24)
+daemon_restart.go ('sig-cluster-lifecycle', 47)
+example_k8petstore.go ('sig-scheduling', 2)
+ssh.go ('no-sig', 0)  UNASSIGNED
+networking.go ('sig-testing', 47)
+vsphere_utils.go ('no-sig', 0)  UNASSIGNED
+horizontal_pod_autoscaling.go ('sig-scheduling', 6)
+kube_proxy.go ('sig-command-line-tools', 2)
+daemon_set.go ('sig-scheduling', 2)
+initial_resources.go ('sig-command-line-tools', 2)
+dashboard.go ('sig-ui', 2)
+logging_soak.go ('sig-scheduling', 49)
+apparmor.go ('sig-command-line-tools', 6)
+cronjob.go ('sig-apps', 84)
+gke_local_ssd.go ('no-sig', 0)  UNASSIGNED
+pv_reclaimpolicy.go ('sig-storage', 22)
+empty.go ('no-sig', 0)  UNASSIGNED
+volumes.go ('sig-storage', 394)
+node_problem_detector.go ('no-sig', 0)  UNASSIGNED
+kubectl.go ('sig-testing', 1034)
+metrics_grabber_test.go ('sig-network', 6)
+service.go ('sig-testing', 141)
+cluster_logging_es_utils.go ('sig-big-data', 8)
+pre_stop.go ('sig-testing', 47)
+addon_update.go ('sig-apps', 4)
+density.go ('sig-scheduling', 6)
+service_accounts.go ('sig-testing', 94)
+ingress_utils.go ('sig-command-line-tools', 4)
+pod_gc.go ('sig-command-line-tools', 2)
+namespace.go ('sig-command-line-tools', 4)
+dns_configmap.go ('sig-network', 4)
+dns.go ('sig-testing', 94)
+pods.go ('sig-testing', 94)
+cluster_logging_gcl.go ('sig-ui', 2)
+taints_test.go ('sig-node', 24)
+service_latency.go ('sig-testing', 47)
+pvc_label_selector.go ('sig-storage', 18)
+empty_dir_wrapper.go ('sig-storage', 147)
+cluster_logging_utils.go ('sig-command-line-tools', 2)
+generated_clientset.go ('sig-apps', 14)
+network_partition.go ('sig-cluster-lifecycle', 141)
+reboot.go ('sig-cluster-lifecycle', 47)
+security_context.go ('sig-auth', 14)
+garbage_collector.go ('sig-command-line-tools', 10)
+example_cluster_dns.go ('sig-network', 4)
+disruption.go ('sig-api-machinery', 2)
+cluster_upgrade.go ('sig-storage', 4)
+pd.go ('sig-storage', 376)
+persistent_volumes-vsphere.go ('sig-storage', 4)
+cluster_logging_gcl_utils.go ('no-sig', 0)  UNASSIGNED
+restart.go ('sig-cluster-lifecycle', 47)
+gke_node_pools.go ('no-sig', 0)  UNASSIGNED
+vsphere_volume_diskformat.go ('sig-command-line-tools', 6)
+etcd_failure.go ('sig-cluster-lifecycle', 47)
+serviceloadbalancers.go ('sig-command-line-tools', 6)
+rescheduler.go ('sig-scheduling', 2)
+portforward.go ('sig-testing', 141)
+kibana_logging.go ('sig-ui', 6)
+ha_master.go ('sig-cluster-lifecycle', 6)
+limit_range.go ('sig-command-line-tools', 10)
+load.go ('sig-command-line-tools', 2)
+resize_nodes.go ('sig-cluster-lifecycle', 47)
+ubernetes_lite.go ('sig-api-machinery', 6)
+rc.go ('sig-testing', 47)
+dns_autoscaling.go ('sig-network', 46)
+replica_set.go ('sig-testing', 47)
+examples.go ('sig-big-data', 22)
+e2e.go ('no-sig', 0)  UNASSIGNED
+kubelet_perf.go ('sig-node', 2)
+nodeoutofdisk.go ('sig-cluster-lifecycle', 47)
+mesos.go ('no-sig', 0)  UNASSIGNED
+firewall.go ('sig-scale', 4)
+resource_quota.go ('sig-storage', 110)
+cluster_logging_es.go ('sig-big-data', 4)
+opaque_resource.go ('sig-command-line-tools', 10)
+*************** Number of tests assigned per sig ***********************
+sig-aws 0
+sig-network 5
+sig-node 2
+sig-command-line-tools 14
+sig-big-data 3
+sig-ui 4
+sig-federation 0
+sig-auth 1
+sig-on-prem 0
+sig-rkt 0
+sig-api-machinery 2
+sig-testing 15
+sig-cluster-lifecycle 9
+sig-storage 13
+sig-scale 2
+sig-scheduling 9
+sig-openstack 0
+sig-autoscaling 0
+sig-apps 4
+sig-windows 0
