@@ -82,6 +82,19 @@ func (r *Resource) ResourceList() v1.ResourceList {
 	return result
 }
 
+func (r *Resource) Clone() *Resource {
+	res := &Resource{
+		MilliCPU:  r.MilliCPU,
+		Memory:    r.Memory,
+		NvidiaGPU: r.NvidiaGPU,
+	}
+	res.OpaqueIntResources = make(map[v1.ResourceName]int64)
+	for k, v := range r.OpaqueIntResources {
+		res.OpaqueIntResources[k] = v
+	}
+	return res
+}
+
 func (r *Resource) AddOpaque(name v1.ResourceName, quantity int64) {
 	r.SetOpaque(name, r.OpaqueIntResources[name]+quantity)
 }
@@ -190,9 +203,9 @@ func (n *NodeInfo) AllocatableResource() Resource {
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
 		node:                    n.node,
-		requestedResource:       &(*n.requestedResource),
-		nonzeroRequest:          &(*n.nonzeroRequest),
-		allocatableResource:     &(*n.allocatableResource),
+		requestedResource:       n.requestedResource.Clone(),
+		nonzeroRequest:          n.nonzeroRequest.Clone(),
+		allocatableResource:     n.allocatableResource.Clone(),
 		allowedPodNumber:        n.allowedPodNumber,
 		taintsErr:               n.taintsErr,
 		memoryPressureCondition: n.memoryPressureCondition,
