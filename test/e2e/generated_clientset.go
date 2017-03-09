@@ -100,12 +100,19 @@ func observeCreation(w watch.Interface) {
 }
 
 func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
+	// output to give us a duration to failure.  Maybe we aren't getting the
+	// full timeout for some reason.  My guess would be watch failure
+	framework.Logf("Starting to observe pod deletion")
 	deleted := false
 	timeout := false
 	timer := time.After(60 * time.Second)
 	for !deleted && !timeout {
 		select {
-		case event, _ := <-w.ResultChan():
+		case event, normal := <-w.ResultChan():
+			if !normal {
+				framework.Failf("The channel was closed unexpectedly")
+				return
+			}
 			if event.Type == watch.Deleted {
 				obj = event.Object
 				deleted = true
