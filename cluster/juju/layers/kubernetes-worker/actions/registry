@@ -44,7 +44,7 @@ for param in ('tlscert', 'tlskey', 'domain', 'htpasswd', 'htpasswd-plain'):
     context[param] = value
 
 # Create the dockercfg template variable
-dockercfg = '{"https://%s/v2/": {"auth": "%s", "email": "root@localhost"}}' % \
+dockercfg = '{"%s:443": {"auth": "%s", "email": "root@localhost"}}' % \
             (context['domain'], context['htpasswd-plain'])
 context['dockercfg'] = b64encode(dockercfg.encode()).decode('ASCII')
 
