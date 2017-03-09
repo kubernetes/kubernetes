@@ -41,7 +41,7 @@ import (
 
 const (
 	FederationReplicaSetPrefix = "federation-replicaset-"
-	FederatedReplicaSetTimeout = 120 * time.Second
+	FederatedReplicaSetTimeout = 2 * time.Minute
 )
 
 // Create/delete replicaset api objects
@@ -93,6 +93,9 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 				// cleanup. deletion of replicasets is not supported for underling clusters
 				By(fmt.Sprintf("zero replicas then delete replicaset %q/%q", nsName, rs.Name))
 				zeroReplicas := int32(0)
+				rs.GenerateName = ""
+				rs.ResourceVersion = ""
+				rs.Generation = 0
 				rs.Spec.Replicas = &zeroReplicas
 				updateReplicaSetOrFail(f.FederationClientset, rs)
 				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters, nil)
@@ -108,7 +111,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters, nil)
 				By(fmt.Sprintf("Successfuly created and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
 
-				rs = newReplicaSet(nsName, FederationReplicaSetPrefix, 15, nil)
+				rs = newReplicaSetWithName(nsName, rs.Name, 15, nil)
 				updateReplicaSetOrFail(f.FederationClientset, rs)
 				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters, nil)
 				By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
@@ -117,18 +120,18 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			// test for replicaset prefs with weight, min and max replicas
 			createAndUpdateFn := func(pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
 				rs := newReplicaSet(nsName, FederationReplicaSetPrefix, replicas, pref)
-				createReplicaSetOrFail(f.FederationClientset, rs)
+				rs = createReplicaSetOrFail(f.FederationClientset, rs)
 				defer cleanupFn(rs)
 
 				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters, expect)
 				By(fmt.Sprintf("Successfuly created and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
 
-				rs = newReplicaSet(nsName, FederationReplicaSetPrefix, 0, pref)
+				rs = newReplicaSetWithName(nsName, rs.Name, 0, pref)
 				updateReplicaSetOrFail(f.FederationClientset, rs)
 				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters, nil)
 				By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
 
-				rs = newReplicaSet(nsName, FederationReplicaSetPrefix, replicas, pref)
+				rs = newReplicaSetWithName(nsName, rs.Name, replicas, pref)
 				updateReplicaSetOrFail(f.FederationClientset, rs)
 				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters, expect)
 				By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
@@ -146,13 +149,13 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters, expect1)
 				By(fmt.Sprintf("Successfuly created and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
 
-				rs = newReplicaSet(nsName, FederationReplicaSetPrefix, replicas, pref2)
+				rs = newReplicaSetWithName(nsName, rs.Name, replicas, pref2)
 				updateReplicaSetOrFail(f.FederationClientset, rs)
 				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters, expect1)
 				By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
 
 				pref2 = updateFedRePrefsRebalance(pref2, true)
-				rs = newReplicaSet(nsName, FederationReplicaSetPrefix, replicas, pref2)
+				rs = newReplicaSetWithName(nsName, rs.Name, replicas, pref2)
 				updateReplicaSetOrFail(f.FederationClientset, rs)
 				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters, expect2)
 				By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q (%v/%v) to clusters", nsName, rs.Name, *rs.Spec.Replicas, rs.Status.Replicas))
@@ -423,19 +426,30 @@ func updateReplicaSetOrFail(clientset *fedclientset.Clientset, replicaset *v1bet
 	}
 	By(fmt.Sprintf("Updating federation replicaset %q in namespace %q", replicaset.Name, namespace))
 
-	newRs, err := clientset.ReplicaSets(namespace).Update(replicaset)
+	var newRS *v1beta1.ReplicaSet
+	err := wait.Poll(5*time.Second, FederatedReplicaSetTimeout, func() (bool, error) {
+		var err error
+		newRS, err = clientset.ReplicaSets(namespace).Update(replicaset)
+		if !errors.IsConflict(err) {
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		}
+		framework.Logf("Retrying due to an update failure: %v", err)
+		return false, nil
+	})
 	framework.ExpectNoError(err, "Updating replicaset %q in namespace %q", replicaset.Name, namespace)
 	By(fmt.Sprintf("Successfully updated federation replicaset %q in namespace %q", replicaset.Name, namespace))
 
-	return newRs
+	return newRS
 }
 
-func newReplicaSet(namespace string, prefix string, replicas int32, pref *federation.FederatedReplicaSetPreferences) *v1beta1.ReplicaSet {
-	rs := v1beta1.ReplicaSet{
+func newReplicaSetObj(namespace string, replicas int32, pref *federation.FederatedReplicaSetPreferences) *v1beta1.ReplicaSet {
+	rs := &v1beta1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: prefix,
-			Namespace:    namespace,
-			Annotations:  map[string]string{},
+			Namespace:   namespace,
+			Annotations: map[string]string{},
 		},
 		Spec: v1beta1.ReplicaSetSpec{
 			Replicas: &replicas,
@@ -462,7 +476,20 @@ func newReplicaSet(namespace string, prefix string, replicas int32, pref *federa
 		prefString := string(prefBytes)
 		rs.Annotations[fedreplicsetcontroller.FedReplicaSetPreferencesAnnotation] = prefString
 	}
-	return &rs
+	return rs
+
+}
+
+func newReplicaSet(namespace string, prefix string, replicas int32, pref *federation.FederatedReplicaSetPreferences) *v1beta1.ReplicaSet {
+	rs := newReplicaSetObj(namespace, replicas, pref)
+	rs.GenerateName = prefix
+	return rs
+}
+
+func newReplicaSetWithName(namespace string, name string, replicas int32, pref *federation.FederatedReplicaSetPreferences) *v1beta1.ReplicaSet {
+	rs := newReplicaSetObj(namespace, replicas, pref)
+	rs.Name = name
+	return rs
 }
 
 func extraceClusterNames(clusters map[string]*cluster) []string {
