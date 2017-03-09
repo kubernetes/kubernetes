@@ -8154,6 +8154,7 @@ go_test(
     srcs = [
         "k8s.io/apimachinery/pkg/api/resource/amount_test.go",
         "k8s.io/apimachinery/pkg/api/resource/math_test.go",
+        "k8s.io/apimachinery/pkg/api/resource/quantity_proto_test.go",
         "k8s.io/apimachinery/pkg/api/resource/quantity_test.go",
         "k8s.io/apimachinery/pkg/api/resource/scale_int_test.go",
     ],
