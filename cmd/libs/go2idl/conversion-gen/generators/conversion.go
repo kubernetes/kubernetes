@@ -578,6 +578,7 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 		}
 	} else {
 		// Emit a public conversion function.
+		sw.Do("//"+nameTmpl+" ... \n", args)
 		sw.Do("func "+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", args)
 		sw.Do("return auto"+nameTmpl+"(in, out, s)\n", args)
 		sw.Do("}\n\n", nil)
