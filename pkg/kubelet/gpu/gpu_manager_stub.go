@@ -18,7 +18,9 @@ package gpu
 
 import (
 	"fmt"
-
+	dockertypes "github.com/docker/engine-api/types"
+	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -36,8 +38,8 @@ func (gms *gpuManagerStub) AllocateGPU(_ *v1.Pod, _ *v1.Container) ([]string, er
 	return nil, fmt.Errorf("GPUs are not supported")
 }
 
-func (gms *gpuManagerStub) UpdateDevices(podUID string, exitedContainerID string) {
-	fmt.Printf("update GPUs devices mapping.")
+func (gms *gpuManagerStub) UpdateDevices(podUID types.UID, inspectJSON *dockertypes.ContainerJSON) {
+	glog.V(4).Infof("Update GPUs devices mapping cache.")
 }
 
 func NewGPUManagerStub() GPUManager {

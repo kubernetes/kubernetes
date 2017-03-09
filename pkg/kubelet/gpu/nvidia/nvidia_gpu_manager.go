@@ -23,11 +23,11 @@ import (
 	"path"
 	"regexp"
 	"sync"
-	"unicode"
 
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
-
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -119,34 +119,20 @@ func (ngm *nvidiaGPUManager) Capacity() v1.ResourceList {
 	}
 }
 
-func containsInt(s string) bool {
-	for _, c := range s {
-		if unicode.IsDigit(c) {
-			return true
-		}
-	}
-	return false
-}
-
 // fixed #42412, release the GPU resources
-func (ngm *nvidiaGPUManager) UpdateDevices(podUID string, exitedContainerID string) {
-	inspectJSON, err := ngm.dockerClient.InspectContainer(exitedContainerID)
-	if err != nil {
-		glog.Errorf("SyncPod Inspect JSON container:%v, error:%v", exitedContainerID, err)
-	} else {
+func (ngm *nvidiaGPUManager) UpdateDevices(podUID types.UID, inspectJSON *dockertypes.ContainerJSON) {
+	if value, ok := ngm.allocated.podGPUMapping[string(podUID)]; ok {
+		ngm.Lock()
+		defer ngm.Unlock()
+
 		devicesMapping := inspectJSON.HostConfig.Devices
 		for _, deviceMap := range devicesMapping {
-			if containsInt(deviceMap.PathOnHost) {
-				if value, ok := ngm.allocated.podGPUMapping[podUID]; ok {
-					if value.Has(deviceMap.PathOnHost) {
-						value.Delete(deviceMap.PathOnHost)
-						ngm.allocated.podGPUMapping[podUID] = value
-					}
-				}
+			if isValidPath(deviceMap.PathOnHost) && value.Has(deviceMap.PathOnHost) {
+				value.Delete(deviceMap.PathOnHost)
+				ngm.allocated.podGPUMapping[string(podUID)] = value
 			}
 		}
 	}
-
 }
 
 // AllocateGPUs returns `num` GPUs if available, error otherwise.
