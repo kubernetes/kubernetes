@@ -88,6 +88,14 @@ addon-dir-create:
     - group: root
     - dir_mode: 755
     - makedirs: True
+
+/etc/kubernetes/addons/dns/kubedns-cm.yaml:
+  file.managed:
+    - source: salt://kube-addons/dns/kubedns-cm.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
+    - makedirs: True
 {% endif %}
 
 {% if pillar.get('enable_dns_horizontal_autoscaler', '').lower() == 'true'
