@@ -105,7 +105,7 @@ func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
 	framework.Logf("Starting to observe pod deletion")
 	deleted := false
 	timeout := false
-	timer := time.After(60 * time.Second)
+	timer := time.After(framework.DefaultPodDeletionTimeout)
 	for !deleted && !timeout {
 		select {
 		case event, normal := <-w.ResultChan():

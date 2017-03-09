@@ -18,7 +18,6 @@ package e2e_node
 
 import (
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,10 +97,10 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 			deleteOptions := metav1.DeleteOptions{
 				GracePeriodSeconds: &gp,
 			}
-			f.PodClient().DeleteSync(podSuccess.Name, &deleteOptions, 30*time.Second)
+			f.PodClient().DeleteSync(podSuccess.Name, &deleteOptions, framework.DefaultPodDeletionTimeout)
 
 			By("attempting to start the failed pod again")
-			f.PodClient().DeleteSync(podFailure.Name, &deleteOptions, 10*time.Second)
+			f.PodClient().DeleteSync(podFailure.Name, &deleteOptions, framework.DefaultPodDeletionTimeout)
 			podFailure = f.PodClient().CreateSync(podFailure)
 
 			By("Checking if the pod outputted Success to its logs")
