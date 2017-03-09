@@ -55,7 +55,6 @@ if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
   exit 1
 fi
 
-kube::util::ensure_clean_working_dir
 kube::util::ensure-temp-dir
 kube::util::ensure_godep_version v74
 
@@ -84,6 +83,8 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   if [ "${repo}" == "client-go" ]; then
     continue
   fi
+
+  kube::util::ensure_clean_working_dir
 
   cp -a "${KUBE_ROOT}/staging/src/k8s.io/${repo}" "${TMP_GOPATH}/src/k8s.io/"
 
