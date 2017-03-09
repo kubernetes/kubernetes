@@ -262,6 +262,7 @@ pkg/volume/util/nestedpendingoperations
 pkg/volume/util/operationexecutor
 pkg/volume/util/types
 pkg/volume/util/volumehelper
+pkg/volume/validation
 pkg/watch
 pkg/watch/json
 pkg/watch/versioned

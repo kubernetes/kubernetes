@@ -24,7 +24,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -119,6 +118,7 @@ filegroup(
         "//pkg/volume/secret:all-srcs",
         "//pkg/volume/testing:all-srcs",
         "//pkg/volume/util:all-srcs",
+        "//pkg/volume/validation:all-srcs",
         "//pkg/volume/vsphere_volume:all-srcs",
     ],
     tags = ["automanaged"],
