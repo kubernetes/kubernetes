@@ -96,7 +96,6 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 		StdOut: out,
 		StdErr: err,
 	}
-	o.RecommendedOptions.SecureServing.ServingOptions.BindPort = 443
 	return o
 }
 

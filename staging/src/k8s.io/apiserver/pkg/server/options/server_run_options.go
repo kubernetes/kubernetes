@@ -71,29 +71,19 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	return nil
 }
 
-// DefaultAdvertiseAddress sets the field AdvertiseAddress if
-// unset. The field will be set based on the SecureServingOptions. If
-// the SecureServingOptions is not present, DefaultExternalAddress
-// will fall back to the insecure ServingOptions.
-func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions, insecure *ServingOptions) error {
-	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
-		switch {
-		case secure != nil:
-			hostIP, err := secure.ServingOptions.DefaultExternalAddress()
-			if err != nil {
-				return fmt.Errorf("Unable to find suitable network address.error='%v'. "+
-					"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
-			}
-			s.AdvertiseAddress = hostIP
+// DefaultAdvertiseAddress sets the field AdvertiseAddress if unset. The field will be set based on the SecureServingOptions.
+func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions) error {
+	if secure == nil {
+		return nil
+	}
 
-		case insecure != nil:
-			hostIP, err := insecure.DefaultExternalAddress()
-			if err != nil {
-				return fmt.Errorf("Unable to find suitable network address.error='%v'. "+
-					"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
-			}
-			s.AdvertiseAddress = hostIP
+	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
+		hostIP, err := secure.DefaultExternalAddress()
+		if err != nil {
+			return fmt.Errorf("Unable to find suitable network address.error='%v'. "+
+				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
 		}
+		s.AdvertiseAddress = hostIP
 	}
 
 	return nil

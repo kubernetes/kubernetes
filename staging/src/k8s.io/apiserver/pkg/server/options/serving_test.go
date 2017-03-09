@@ -459,10 +459,8 @@ NextTest:
 
 			config.EnableIndex = true
 			secureOptions := &SecureServingOptions{
-				ServingOptions: ServingOptions{
-					BindAddress: net.ParseIP("127.0.0.1"),
-					BindPort:    6443,
-				},
+				BindAddress: net.ParseIP("127.0.0.1"),
+				BindPort:    6443,
 				ServerCert: GeneratableKeyCert{
 					CertKey: CertKey{
 						CertFile: serverCertBundleFile,
