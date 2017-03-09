@@ -129,71 +129,73 @@ func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
 
 var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
-	It("should create pods, delete pods, watch pods", func() {
-		podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
-		By("constructing the pod")
-		name := "pod" + string(uuid.NewUUID())
+	It("should create configmaps, delete configmaps, watch configmaps", func() {
+		configmapClient := f.ClientSet.Core().ConfigMaps(f.Namespace.Name)
+		By("constructing the configmap")
+		name := "configmap" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
-		podCopy := testingPod(name, value)
-		pod := &podCopy
+		configmapCopy := v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: name,
+				Labels: map[string]string{
+					"name": "foo",
+					"time": value,
+				},
+			},
+		}
+		configmap := &configmapCopy
 		By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
 		options := metav1.ListOptions{LabelSelector: selector}
-		pods, err := podClient.List(options)
+		configmaps, err := configmapClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
+			framework.Failf("Failed to query for configmaps: %v", err)
 		}
-		Expect(len(pods.Items)).To(Equal(0))
+		Expect(len(configmaps.Items)).To(Equal(0))
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
-			ResourceVersion: pods.ListMeta.ResourceVersion,
+			ResourceVersion: configmaps.ListMeta.ResourceVersion,
 		}
-		w, err := podClient.Watch(options)
+		w, err := configmapClient.Watch(options)
 		if err != nil {
 			framework.Failf("Failed to set up watch: %v", err)
 		}
 
-		By("creating the pod")
-		pod, err = podClient.Create(pod)
+		By("creating the configmap")
+		configmap, err = configmapClient.Create(configmap)
 		if err != nil {
-			framework.Failf("Failed to create pod: %v", err)
+			framework.Failf("Failed to create configmap: %v", err)
 		}
 
-		By("verifying the pod is in kubernetes")
+		By("verifying the configmap is in kubernetes")
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
-			ResourceVersion: pod.ResourceVersion,
+			ResourceVersion: configmap.ResourceVersion,
 		}
-		pods, err = podClient.List(options)
+		configmaps, err = configmapClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
+			framework.Failf("Failed to query for configmaps: %v", err)
 		}
-		Expect(len(pods.Items)).To(Equal(1))
+		Expect(len(configmaps.Items)).To(Equal(1))
 
-		By("verifying pod creation was observed")
+		By("verifying configmap creation was observed")
 		observeCreation(w)
 
-		// We need to wait for the pod to be scheduled, otherwise the deletion
-		// will be carried out immediately rather than gracefully.
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
-
-		By("deleting the pod gracefully")
-		if err := podClient.Delete(pod.Name, metav1.NewDeleteOptions(30)); err != nil {
-			framework.Failf("Failed to delete pod: %v", err)
+		By("deleting the configmap")
+		if err := configmapClient.Delete(configmap.Name, nil); err != nil {
+			framework.Failf("Failed to delete configmap: %v", err)
 		}
 
-		By("verifying pod deletion was observed")
+		By("verifying configmap deletion was observed")
 		obj := observeObjectDeletion(w)
-		lastPod := obj.(*v1.Pod)
-		Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
-		Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(BeZero())
+		// make sure we got back the right kind of object
+		_ = obj.(*v1.ConfigMap)
 
 		options = metav1.ListOptions{LabelSelector: selector}
-		pods, err = podClient.List(options)
+		configmaps, err = configmapClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to list pods to verify deletion: %v", err)
+			framework.Failf("Failed to list configmaps to verify deletion: %v", err)
 		}
-		Expect(len(pods.Items)).To(Equal(0))
+		Expect(len(configmaps.Items)).To(Equal(0))
 	})
 })
 
