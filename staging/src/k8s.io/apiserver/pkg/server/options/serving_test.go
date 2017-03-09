@@ -474,7 +474,6 @@ NextTest:
 				t.Errorf("%q - failed applying the SecureServingOptions: %v", title, err)
 				return
 			}
-			config.InsecureServingInfo = nil
 
 			s, err := config.Complete().New()
 			if err != nil {

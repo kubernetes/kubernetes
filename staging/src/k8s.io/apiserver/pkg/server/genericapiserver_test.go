@@ -202,7 +202,7 @@ func TestInstallAPIGroups(t *testing.T) {
 		groupPaths = append(groupPaths, APIGroupPrefix+"/"+api.GroupMeta.GroupVersion.Group) // /apis/<group>
 	}
 
-	server := httptest.NewServer(s.InsecureHandler)
+	server := httptest.NewServer(s.Handler)
 	defer server.Close()
 
 	for i := range apis {
@@ -336,14 +336,11 @@ func TestCustomHandlerChain(t *testing.T) {
 
 	var protected, called bool
 
-	config.BuildHandlerChainsFunc = func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				protected = true
-				apiHandler.ServeHTTP(w, req)
-			}), http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				protected = false
-				apiHandler.ServeHTTP(w, req)
-			})
+			protected = true
+			apiHandler.ServeHTTP(w, req)
+		})
 	}
 	handler := http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
 		called = true
@@ -365,8 +362,6 @@ func TestCustomHandlerChain(t *testing.T) {
 	for i, test := range []Test{
 		{s.Handler, "/nonswagger", true},
 		{s.Handler, "/secret", true},
-		{s.InsecureHandler, "/nonswagger", false},
-		{s.InsecureHandler, "/secret", false},
 	} {
 		protected, called = false, false
 
@@ -485,7 +480,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.InsecureHandler)
+	server := httptest.NewServer(master.Handler)
 	groupList, err := getGroupList(server)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -535,7 +530,7 @@ func TestDiscoveryOrdering(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.InsecureHandler)
+	server := httptest.NewServer(master.Handler)
 	groupList, err := getGroupList(server)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

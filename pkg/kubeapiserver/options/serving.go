@@ -28,6 +28,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
 )
 
 // NewSecureServingOptions gives default values for the kube-apiserver and federation-apiserver which are not the options wanted by
@@ -115,20 +116,20 @@ func (s *InsecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("port", "see --insecure-port instead.")
 }
 
-func (s *InsecureServingOptions) ApplyTo(c *server.Config) error {
+func (s *InsecureServingOptions) ApplyTo(c *server.Config) (*kubeserver.InsecureServingInfo, error) {
 	if s.BindPort <= 0 {
-		return nil
+		return nil, nil
 	}
 
-	c.InsecureServingInfo = &server.ServingInfo{
+	ret := &kubeserver.InsecureServingInfo{
 		BindAddress: net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort)),
 	}
 
 	var err error
 	privilegedLoopbackToken := uuid.NewRandom().String()
-	if c.LoopbackClientConfig, err = c.InsecureServingInfo.NewLoopbackClientConfig(privilegedLoopbackToken); err != nil {
-		return err
+	if c.LoopbackClientConfig, err = ret.NewLoopbackClientConfig(privilegedLoopbackToken); err != nil {
+		return nil, err
 	}
 
-	return nil
+	return ret, nil
 }

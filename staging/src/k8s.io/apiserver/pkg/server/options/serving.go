@@ -176,9 +176,7 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 	}
 
 	secureServingInfo := &server.SecureServingInfo{
-		ServingInfo: server.ServingInfo{
-			BindAddress: net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort)),
-		},
+		BindAddress: net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort)),
 	}
 
 	serverCertFile, serverKeyFile := s.ServerCert.CertKey.CertFile, s.ServerCert.CertKey.KeyFile
