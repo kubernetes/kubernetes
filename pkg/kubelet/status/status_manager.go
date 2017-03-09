@@ -414,7 +414,7 @@ func (m *manager) syncBatch() {
 
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
-	if !m.needsUpdate(uid, status) {
+	if !m.needsUpdate(uid, status) && !m.couldBeDeleted(uid, status.status) {
 		glog.V(1).Infof("Status for pod %q is up-to-date; skipping", uid)
 		return
 	}
