@@ -50,13 +50,13 @@ With the "registry" action that is part for the kubernetes-worker charm, you can
 Create the relevant authentication files. Let's say you want user `userA` to authenticate with the password `passwordA`. Then you'll do :
 
     echo "userA:passwordA" > htpasswd-plain
-    htpasswd -b -B htpasswd userA passwordA
+    htpasswd -c -b -B htpasswd userA passwordA
 
 (the `htpasswd` program comes with the `apache2-utils` package)
 
 Supposing your registry will be reachable at `myregistry.company.com`, and that you already have your TLS key in the `registry.key` file, and your TLS certificate (with `myregistry.company.com` as Common Name) in the `registry.crt` file, you would then run :
 
-    juju run-action kubernetes-worker/0 registry domain=myregistry.company.com htpasswd="$(base64 -w0 htpasswd)" htpasswd-plain="$(base64 -w0 htpasswd-plain) tlscert="$(base64 -w0 registry.crt)" tlskey="$(base64 -w0 registry.key) ingress=true
+    juju run-action kubernetes-worker/0 registry domain=myregistry.company.com htpasswd="$(base64 -w0 htpasswd)" htpasswd-plain="$(base64 -w0 htpasswd-plain)" tlscert="$(base64 -w0 registry.crt)" tlskey="$(base64 -w0 registry.key)" ingress=true
 
 If you then decide that you want do delete the registry, just run :
 
