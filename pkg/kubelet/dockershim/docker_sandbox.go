@@ -105,7 +105,12 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 	// recognized by the CNI standard yet.
 	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
 	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations)
-	// TODO: Do we need to teardown on failure or can we rely on a StopPodSandbox call with the given ID?
+	if err != nil {
+		// TODO(random-liu): Do we need to teardown network here?
+		if err := ds.client.StopContainer(createResp.ID, defaultSandboxGracePeriod); err != nil {
+			glog.Warningf("Failed to clear sandbox container %q for pod %q: %v", createResp.ID, config.Metadata.Name, err)
+		}
+	}
 	return createResp.ID, err
 }
 

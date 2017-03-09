@@ -17,7 +17,9 @@ limitations under the License.
 package dockershim
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -202,4 +204,48 @@ func TestHostNetworkPluginInvocation(t *testing.T) {
 	_, err := ds.RunPodSandbox(c)
 	assert.NoError(t, err)
 	assert.NoError(t, ds.StopPodSandbox(cID.ID))
+}
+
+// TestSetUpPodFailure checks that the sandbox should be not ready when it
+// hits a SetUpPod failure.
+func TestSetUpPodFailure(t *testing.T) {
+	ds, _, _ := newTestDockerService()
+	mockPlugin := newTestNetworkPlugin(t)
+	ds.network = network.NewPluginManager(mockPlugin)
+	defer mockPlugin.Finish()
+
+	name := "foo0"
+	ns := "bar0"
+	c := makeSandboxConfigWithLabelsAndAnnotations(
+		name, ns, "0", 0,
+		map[string]string{"label": name},
+		map[string]string{"annotation": ns},
+	)
+	cID := kubecontainer.ContainerID{Type: runtimeName, ID: dockertools.GetFakeContainerID(fmt.Sprintf("/%v", makeSandboxName(c)))}
+	mockPlugin.EXPECT().Name().Return("mockNetworkPlugin").AnyTimes()
+	mockPlugin.EXPECT().SetUpPod(ns, name, cID).Return(errors.New("setup pod error")).AnyTimes()
+	// Assume network plugin doesn't return error, dockershim should still be able to return not ready correctly.
+	mockPlugin.EXPECT().GetPodNetworkStatus(ns, name, cID).Return(&network.PodNetworkStatus{IP: net.IP("127.0.0.01")}, nil).AnyTimes()
+
+	t.Logf("RunPodSandbox should return error")
+	_, err := ds.RunPodSandbox(c)
+	assert.Error(t, err)
+
+	t.Logf("PodSandboxStatus should be not ready")
+	status, err := ds.PodSandboxStatus(cID.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, status.State)
+
+	t.Logf("ListPodSandbox should also show not ready")
+	sandboxes, err := ds.ListPodSandbox(nil)
+	assert.NoError(t, err)
+	var sandbox *runtimeapi.PodSandbox
+	for _, s := range sandboxes {
+		if s.Id == cID.ID {
+			sandbox = s
+			break
+		}
+	}
+	assert.NotNil(t, sandbox)
+	assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, sandbox.State)
 }
