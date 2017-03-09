@@ -114,7 +114,7 @@ var DefaultSysSpec = SysSpec{
 	Cgroups: []string{"cpu", "cpuacct", "cpuset", "devices", "freezer", "memory"},
 	RuntimeSpec: RuntimeSpec{
 		DockerSpec: &DockerSpec{
-			Version: []string{`1\.(9|\d{2,})\..*`}, // Requires 1.9+
+			Version: []string{`1\.(9|1[0-2])\..*`}, // Requires 1.9+
 			// TODO(random-liu): Validate overlay2.
 			GraphDriver: []string{"aufs", "overlay", "devicemapper"},
 		},
