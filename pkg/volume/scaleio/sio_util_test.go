@@ -136,7 +136,7 @@ func TestUtilApplyConfigDefaults(t *testing.T) {
 	if data[confKey.sslEnabled] != "false" {
 		t.Error("Unexpected sslEnabled value")
 	}
-	if data[confKey.readOnly] != "true" {
+	if data[confKey.readOnly] != "false" {
 		t.Error("Unexpected readOnly value: ", data[confKey.readOnly])
 	}
 }
