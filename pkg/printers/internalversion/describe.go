@@ -62,6 +62,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -538,7 +539,12 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
-		w.Write(LEVEL_0, "Controllers:\t%s\n", printControllers(pod.Annotations))
+		if createdBy := printCreator(pod.Annotations); len(createdBy) > 0 {
+			w.Write(LEVEL_0, "Created By:\t%s\n", createdBy)
+		}
+		if controlledBy := printController(pod); len(controlledBy) > 0 {
+			w.Write(LEVEL_0, "Controller:\t%s\n", controlledBy)
+		}
 
 		if len(pod.Spec.InitContainers) > 0 {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
@@ -563,7 +569,14 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 	})
 }
 
-func printControllers(annotation map[string]string) string {
+func printController(controllee metav1.Object) string {
+	if controllerRef := controller.GetControllerOf(controllee); controllerRef != nil {
+		return fmt.Sprintf("%s/%s", controllerRef.Kind, controllerRef.Name)
+	}
+	return ""
+}
+
+func printCreator(annotation map[string]string) string {
 	value, ok := annotation[api.CreatedByAnnotation]
 	if ok {
 		var r api.SerializedReference
@@ -572,7 +585,7 @@ func printControllers(annotation map[string]string) string {
 			return fmt.Sprintf("%s/%s", r.Reference.Kind, r.Reference.Name)
 		}
 	}
-	return "<none>"
+	return ""
 }
 
 func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
@@ -1338,6 +1351,9 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(rs.Spec.Selector))
 		printLabelsMultiline(w, "Labels", rs.Labels)
 		printAnnotationsMultiline(w, "Annotations", rs.Annotations)
+		if controlledBy := printController(rs); len(controlledBy) > 0 {
+			w.Write(LEVEL_0, "Controller:\t%s\n", controlledBy)
+		}
 		w.Write(LEVEL_0, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
 		w.Write(LEVEL_0, "Pods Status:\t")
 		if getPodErr != nil {
@@ -1381,6 +1397,9 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", job.Labels)
 		printAnnotationsMultiline(w, "Annotations", job.Annotations)
+		if createdBy := printCreator(job.Annotations); len(createdBy) > 0 {
+			w.Write(LEVEL_0, "Created By:\t%s\n", createdBy)
+		}
 		w.Write(LEVEL_0, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		if job.Spec.Completions != nil {
 			w.Write(LEVEL_0, "Completions:\t%d\n", *job.Spec.Completions)
