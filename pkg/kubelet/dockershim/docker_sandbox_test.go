@@ -54,7 +54,7 @@ func makeSandboxConfigWithLabelsAndAnnotations(name, namespace, uid string, atte
 // TestListSandboxes creates several sandboxes and then list them to check
 // whether the correct metadatas, states, and labels are returned.
 func TestListSandboxes(t *testing.T) {
-	ds, _, _ := newTestDockerService()
+	ds, _, fakeClock := newTestDockerService()
 	name, namespace := "foo", "bar"
 	configs := []*runtimeapi.PodSandboxConfig{}
 	for i := 0; i < 3; i++ {
@@ -68,7 +68,7 @@ func TestListSandboxes(t *testing.T) {
 
 	expected := []*runtimeapi.PodSandbox{}
 	state := runtimeapi.PodSandboxState_SANDBOX_READY
-	var createdAt int64 = 0
+	var createdAt int64 = fakeClock.Now().UnixNano()
 	for i := range configs {
 		id, err := ds.RunPodSandbox(configs[i])
 		assert.NoError(t, err)

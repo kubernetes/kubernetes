@@ -47,7 +47,7 @@ func makeContainerConfig(sConfig *runtimeapi.PodSandboxConfig, name, image strin
 // TestListContainers creates several containers and then list them to check
 // whether the correct metadatas, states, and labels are returned.
 func TestListContainers(t *testing.T) {
-	ds, _, _ := newTestDockerService()
+	ds, _, fakeClock := newTestDockerService()
 	podName, namespace := "foo", "bar"
 	containerName, image := "sidecar", "logger"
 
@@ -66,7 +66,7 @@ func TestListContainers(t *testing.T) {
 
 	expected := []*runtimeapi.Container{}
 	state := runtimeapi.ContainerState_CONTAINER_RUNNING
-	var createdAt int64 = 0
+	var createdAt int64 = fakeClock.Now().UnixNano()
 	for i := range configs {
 		// We don't care about the sandbox id; pass a bogus one.
 		sandboxID := fmt.Sprintf("sandboxid%d", i)

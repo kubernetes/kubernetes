@@ -516,12 +516,13 @@ func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) 
 	name := "/" + c.Name
 	id := GetFakeContainerID(name)
 	f.appendContainerTrace("Created", id)
+	timestamp := f.Clock.Now()
 	// The newest container should be in front, because we assume so in GetPodStatus()
 	f.RunningContainerList = append([]dockertypes.Container{
-		{ID: id, Names: []string{name}, Image: c.Config.Image, Labels: c.Config.Labels},
+		{ID: id, Names: []string{name}, Image: c.Config.Image, Created: timestamp.Unix(), State: statusCreatedPrefix, Labels: c.Config.Labels},
 	}, f.RunningContainerList...)
 	f.ContainerMap[id] = convertFakeContainer(&FakeContainer{
-		ID: id, Name: name, Config: c.Config, HostConfig: c.HostConfig, CreatedAt: f.Clock.Now()})
+		ID: id, Name: name, Config: c.Config, HostConfig: c.HostConfig, CreatedAt: timestamp})
 
 	f.normalSleep(100, 25, 25)
 
@@ -539,12 +540,13 @@ func (f *FakeDockerClient) StartContainer(id string) error {
 	}
 	f.appendContainerTrace("Started", id)
 	container, ok := f.ContainerMap[id]
+	timestamp := f.Clock.Now()
 	if !ok {
-		container = convertFakeContainer(&FakeContainer{ID: id, Name: id})
+		container = convertFakeContainer(&FakeContainer{ID: id, Name: id, CreatedAt: timestamp})
 	}
 	container.State.Running = true
 	container.State.Pid = os.Getpid()
-	container.State.StartedAt = dockerTimestampToString(f.Clock.Now())
+	container.State.StartedAt = dockerTimestampToString(timestamp)
 	container.NetworkSettings.IPAddress = "2.3.4.5"
 	f.ContainerMap[id] = container
 	f.updateContainerStatus(id, statusRunningPrefix)
