@@ -40,8 +40,8 @@ type HollowProxy struct {
 
 type FakeProxyHandler struct{}
 
-func (*FakeProxyHandler) OnServiceUpdate(services []api.Service)      {}
-func (*FakeProxyHandler) OnEndpointsUpdate(endpoints []api.Endpoints) {}
+func (*FakeProxyHandler) OnServiceUpdate(services []api.Service)       {}
+func (*FakeProxyHandler) OnEndpointsUpdate(endpoints []*api.Endpoints) {}
 
 type FakeProxier struct{}
 

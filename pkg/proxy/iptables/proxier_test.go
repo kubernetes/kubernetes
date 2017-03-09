@@ -369,7 +369,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		serviceMap:                make(map[proxy.ServicePortName]*serviceInfo),
 		iptables:                  ipt,
 		clusterCIDR:               "10.0.0.0/24",
-		allEndpoints:              []api.Endpoints{},
+		allEndpoints:              []*api.Endpoints{},
 		haveReceivedServiceUpdate: true,
 		hostname:                  testHostname,
 		portsMap:                  make(map[localPort]closeable),
@@ -570,7 +570,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 	ip := "10.180.0.1"
 	port := 80
 	ep := fmt.Sprintf("%s:%d", ip, port)
-	allEndpoints := []api.Endpoints{
+	allEndpoints := []*api.Endpoints{
 		makeTestEndpoints("ns1", svcName, func(ept *api.Endpoints) {
 			ept.Subsets = []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{
@@ -624,7 +624,7 @@ func TestLoadBalancer(t *testing.T) {
 
 	ip := "10.180.0.1"
 	port := 80
-	fp.allEndpoints = []api.Endpoints{
+	fp.allEndpoints = []*api.Endpoints{
 		makeTestEndpoints("ns1", svcName, func(ept *api.Endpoints) {
 			ept.Subsets = []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{
@@ -669,7 +669,7 @@ func TestNodePort(t *testing.T) {
 
 	ip := "10.180.0.1"
 	port := 80
-	fp.allEndpoints = []api.Endpoints{
+	fp.allEndpoints = []*api.Endpoints{
 		makeTestEndpoints("ns1", svcName, func(ept *api.Endpoints) {
 			ept.Subsets = []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{
@@ -713,7 +713,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	port := 80
 	nonLocalEp := fmt.Sprintf("%s:%d", ip1, port)
 	localEp := fmt.Sprintf("%s:%d", ip2, port)
-	allEndpoints := []api.Endpoints{
+	allEndpoints := []*api.Endpoints{
 		makeTestEndpoints("ns1", svcName, func(ept *api.Endpoints) {
 			ept.Subsets = []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{
@@ -791,7 +791,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	port := 80
 	nonLocalEp := fmt.Sprintf("%s:%d", ip1, port)
 	localEp := fmt.Sprintf("%s:%d", ip2, port)
-	allEndpoints := []api.Endpoints{
+	allEndpoints := []*api.Endpoints{
 		makeTestEndpoints("ns1", svcName, func(ept *api.Endpoints) {
 			ept.Subsets = []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{
@@ -1128,7 +1128,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 // This is a coarse test, but it offers some modicum of confidence as the code is evolved.
 func Test_accumulateEndpointsMap(t *testing.T) {
 	testCases := []struct {
-		newEndpoints api.Endpoints
+		newEndpoints *api.Endpoints
 		oldEndpoints map[proxy.ServicePortName][]*endpointsInfo
 		expectedNew  map[proxy.ServicePortName][]*endpointsInfo
 	}{{
@@ -1338,7 +1338,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 		// outputs
 		newEndpoints := map[proxy.ServicePortName][]*endpointsInfo{}
 		svcPortToInfoMap := map[proxy.ServicePortName][]hostPortInfo{}
-		accumulateEndpointsMap(&tc.newEndpoints, "host", tc.oldEndpoints, &newEndpoints, &svcPortToInfoMap)
+		accumulateEndpointsMap(tc.newEndpoints, "host", tc.oldEndpoints, &newEndpoints, &svcPortToInfoMap)
 
 		if len(newEndpoints) != len(tc.expectedNew) {
 			t.Errorf("[%d] expected %d new, got %d: %v", tci, len(tc.expectedNew), len(newEndpoints), spew.Sdump(newEndpoints))
@@ -1357,14 +1357,14 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 	}
 }
 
-func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) api.Endpoints {
-	ept := api.Endpoints{
+func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) *api.Endpoints {
+	ept := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
 	}
-	eptFunc(&ept)
+	eptFunc(ept)
 	return ept
 }
 
@@ -1380,19 +1380,19 @@ func makeServicePortName(ns, name, port string) proxy.ServicePortName {
 
 func Test_updateEndpoints(t *testing.T) {
 	testCases := []struct {
-		newEndpoints   []api.Endpoints
+		newEndpoints   []*api.Endpoints
 		oldEndpoints   map[proxy.ServicePortName][]*endpointsInfo
 		expectedResult map[proxy.ServicePortName][]*endpointsInfo
 		expectedStale  []endpointServicePair
 	}{{
 		// Case[0]: nothing
-		newEndpoints:   []api.Endpoints{},
+		newEndpoints:   []*api.Endpoints{},
 		oldEndpoints:   map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedStale:  []endpointServicePair{},
 	}, {
 		// Case[1]: no change, unnamed port
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1417,7 +1417,7 @@ func Test_updateEndpoints(t *testing.T) {
 		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[2]: no change, named port
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1443,7 +1443,7 @@ func Test_updateEndpoints(t *testing.T) {
 		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[3]: no change, multiple subsets
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1483,7 +1483,7 @@ func Test_updateEndpoints(t *testing.T) {
 		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[4]: no change, multiple subsets, multiple ports
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1532,7 +1532,7 @@ func Test_updateEndpoints(t *testing.T) {
 		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[5]: no change, multiple endpoints, subsets, IPs, and ports
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1634,7 +1634,7 @@ func Test_updateEndpoints(t *testing.T) {
 		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[6]: add an Endpoints
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1655,7 +1655,7 @@ func Test_updateEndpoints(t *testing.T) {
 		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[7]: remove an Endpoints
-		newEndpoints: []api.Endpoints{ /* empty */ },
+		newEndpoints: []*api.Endpoints{ /* empty */ },
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", ""): {
 				{"1.1.1.1:11", false},
@@ -1668,7 +1668,7 @@ func Test_updateEndpoints(t *testing.T) {
 		}},
 	}, {
 		// Case[8]: add an IP and port
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1704,7 +1704,7 @@ func Test_updateEndpoints(t *testing.T) {
 		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[9]: remove an IP and port
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1744,7 +1744,7 @@ func Test_updateEndpoints(t *testing.T) {
 		}},
 	}, {
 		// Case[10]: add a subset
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1781,7 +1781,7 @@ func Test_updateEndpoints(t *testing.T) {
 		expectedStale: []endpointServicePair{},
 	}, {
 		// Case[11]: remove a subset
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1813,7 +1813,7 @@ func Test_updateEndpoints(t *testing.T) {
 		}},
 	}, {
 		// Case[12]: rename a port
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1842,7 +1842,7 @@ func Test_updateEndpoints(t *testing.T) {
 		}},
 	}, {
 		// Case[13]: renumber a port
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
@@ -1871,7 +1871,7 @@ func Test_updateEndpoints(t *testing.T) {
 		}},
 	}, {
 		// Case[14]: complex add and remove
-		newEndpoints: []api.Endpoints{
+		newEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
 				ept.Subsets = []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{
