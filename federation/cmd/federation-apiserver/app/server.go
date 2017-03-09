@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/version"
@@ -81,7 +82,10 @@ func Run(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 // stop with the given channel.
 func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// set defaults
-	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
+	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
+		return err
+	}
+	if err := kubeoptions.DefaultAdvertiseAddress(s.GenericServerRunOptions, s.InsecureServing); err != nil {
 		return err
 	}
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), nil, nil); err != nil {

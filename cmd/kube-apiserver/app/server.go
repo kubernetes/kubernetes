@@ -66,6 +66,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -441,7 +442,11 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 }
 
 func defaultOptions(s *options.ServerRunOptions) error {
-	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
+	// set defaults
+	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
+		return err
+	}
+	if err := kubeoptions.DefaultAdvertiseAddress(s.GenericServerRunOptions, s.InsecureServing); err != nil {
 		return err
 	}
 	_, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
