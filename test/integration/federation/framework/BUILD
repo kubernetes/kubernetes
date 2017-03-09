@@ -4,28 +4,22 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
     "go_library",
-)
-
-go_binary(
-    name = "federation-apiserver",
-    library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
-    srcs = ["apiserver.go"],
+    srcs = [
+        "api.go",
+        "util.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//federation/cmd/federation-apiserver/app:go_default_library",
         "//federation/cmd/federation-apiserver/app/options:go_default_library",
-        "//pkg/version/verflag:go_default_library",
-        "//vendor:github.com/spf13/pflag",
+        "//test/integration/framework:go_default_library",
+        "//vendor:github.com/pborman/uuid",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/apiserver/pkg/util/flag",
-        "//vendor:k8s.io/apiserver/pkg/util/logs",
     ],
 )
 
@@ -38,9 +32,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//federation/cmd/federation-apiserver/app:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
