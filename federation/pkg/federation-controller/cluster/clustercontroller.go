@@ -85,14 +85,24 @@ func NewclusterController(federationClient federationclientset.Interface, cluste
 // delete the corresponding restclient from the map clusterKubeClientMap
 func (cc *ClusterController) delFromClusterSet(obj interface{}) {
 	cluster := obj.(*federationv1beta1.Cluster)
+	glog.V(1).Infof("ClusterController observed a cluster deletion: %v", cluster.Name)
 	cc.knownClusterSet.Delete(cluster.Name)
 	delete(cc.clusterKubeClientMap, cluster.Name)
+}
+
+// delFromClusterSetByName delete a cluster from clusterSet by name and
+// delete the corresponding restclient from the map clusterKubeClientMap
+func (cc *ClusterController) delFromClusterSetByName(clusterName string) {
+	glog.V(1).Infof("ClusterController observed a cluster deletion: %v", clusterName)
+	cc.knownClusterSet.Delete(clusterName)
+	delete(cc.clusterKubeClientMap, clusterName)
 }
 
 // addToClusterSet insert the new cluster to clusterSet and create a corresponding
 // restclient to map clusterKubeClientMap
 func (cc *ClusterController) addToClusterSet(obj interface{}) {
 	cluster := obj.(*federationv1beta1.Cluster)
+	glog.V(1).Infof("ClusterController observed a new cluster: %v", cluster.Name)
 	cc.knownClusterSet.Insert(cluster.Name)
 	// create the restclient of cluster
 	restClient, err := NewClusterClientSet(cluster)
@@ -115,9 +125,10 @@ func (cc *ClusterController) Run() {
 	}, cc.clusterMonitorPeriod, wait.NeverStop)
 }
 
-func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster) (*federationv1beta1.ClusterStatus, error) {
+func (cc *ClusterController) GetClusterClient(cluster *federationv1beta1.Cluster) (*ClusterClient, error) {
 	// just get the status of cluster, by requesting the restapi "/healthz"
 	clusterClient, found := cc.clusterKubeClientMap[cluster.Name]
+	client := &clusterClient
 	if !found {
 		glog.Infof("It's a new cluster, a cluster client will be created")
 		client, err := NewClusterClientSet(cluster)
@@ -125,8 +136,15 @@ func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster
 			glog.Errorf("Failed to create cluster client, err: %v", err)
 			return nil, err
 		}
-		clusterClient = *client
-		cc.clusterKubeClientMap[cluster.Name] = clusterClient
+	}
+	return client, nil
+}
+
+func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster) (*federationv1beta1.ClusterStatus, error) {
+	// just get the status of cluster, by requesting the restapi "/healthz"
+	clusterClient, err := cc.GetClusterClient(cluster)
+	if err != nil {
+		return nil, err
 	}
 	clusterStatus := clusterClient.GetClusterHealthStatus()
 	return clusterStatus, nil
@@ -140,11 +158,9 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 	}
 	for _, cluster := range clusters.Items {
 		if !cc.knownClusterSet.Has(cluster.Name) {
-			glog.V(1).Infof("ClusterController observed a new cluster: %#v", cluster)
-			cc.knownClusterSet.Insert(cluster.Name)
+			cc.addToClusterSet(cluster)
 		}
 	}
-
 	// If there's a difference between lengths of known clusters and observed clusters
 	if len(cc.knownClusterSet) != len(clusters.Items) {
 		observedSet := make(sets.String)
@@ -153,8 +169,7 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 		}
 		deleted := cc.knownClusterSet.Difference(observedSet)
 		for clusterName := range deleted {
-			glog.V(1).Infof("ClusterController observed a Cluster deletion: %v", clusterName)
-			cc.knownClusterSet.Delete(clusterName)
+			cc.delFromClusterSetByName(clusterName)
 		}
 	}
 	for _, cluster := range clusters.Items {
