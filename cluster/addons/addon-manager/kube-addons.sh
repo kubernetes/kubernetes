@@ -207,8 +207,8 @@ annotate_addons Deployment
 # The new Deployments will not fight for pods created by old RCs with the same label because the additional `pod-template-hash` label.
 # Apply will fail if some fields are modified but not are allowed, in that case should bump up addon version and name (e.g. handle externally).
 log INFO "== Executing apply to spin up new addon resources at $(date -Is) =="
-reconcile_addons false
 ensure_addons
+reconcile_addons false
 
 # Wait for new addons to be spinned up before delete old resources
 log INFO "== Wait for addons to be spinned up at $(date -Is) =="
@@ -221,8 +221,8 @@ log INFO "== Entering periodical apply loop at $(date -Is) =="
 while true; do
   start_sec=$(date +"%s")
   # Only print stderr for the readability of logging
-  reconcile_addons true
   ensure_addons
+  reconcile_addons true
   end_sec=$(date +"%s")
   len_sec=$((${end_sec}-${start_sec}))
   # subtract the time passed from the sleep time
