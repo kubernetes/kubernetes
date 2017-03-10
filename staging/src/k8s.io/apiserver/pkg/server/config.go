@@ -347,10 +347,6 @@ func (c *Config) Complete() completedConfig {
 		c.FallThroughHandler = mux.NewPathRecorderMux()
 	}
 
-	if c.FallThroughHandler == nil {
-		c.FallThroughHandler = mux.NewPathRecorderMux()
-	}
-
 	return completedConfig{c}
 }
 

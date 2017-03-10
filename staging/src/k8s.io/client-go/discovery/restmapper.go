@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -127,10 +126,9 @@ func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
 		for _, version := range group.Versions {
 			resources, err := cl.ServerResourcesForGroupVersion(version.GroupVersion)
 			if err != nil {
-				if errors.IsNotFound(err) {
-					continue // ignore as this can race with deletion of 3rd party APIs
-				}
-				return nil, err
+				// continue as best we can
+				// TODO track the errors and update callers to handle partial errors.
+				continue
 			}
 			groupResources.VersionedResources[version.Version] = resources.APIResources
 		}

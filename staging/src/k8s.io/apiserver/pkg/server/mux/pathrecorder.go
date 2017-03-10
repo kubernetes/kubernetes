@@ -51,13 +51,17 @@ func (m *PathRecorderMux) ListedPaths() []string {
 	return handledPaths
 }
 
-// Handle registers the handler for the given pattern.
-// If a handler already exists for pattern, Handle panics.
-func (m *PathRecorderMux) Handle(path string, handler http.Handler) {
+func (m *PathRecorderMux) trackCallers(path string) {
 	if existingStack, ok := m.pathStacks[path]; ok {
 		utilruntime.HandleError(fmt.Errorf("registered %q from %v", path, existingStack))
 	}
 	m.pathStacks[path] = string(debug.Stack())
+}
+
+// Handle registers the handler for the given pattern.
+// If a handler already exists for pattern, Handle panics.
+func (m *PathRecorderMux) Handle(path string, handler http.Handler) {
+	m.trackCallers(path)
 
 	m.exposedPaths = append(m.exposedPaths, path)
 	m.mux.Handle(path, handler)
@@ -66,10 +70,7 @@ func (m *PathRecorderMux) Handle(path string, handler http.Handler) {
 // HandleFunc registers the handler function for the given pattern.
 // If a handler already exists for pattern, Handle panics.
 func (m *PathRecorderMux) HandleFunc(path string, handler func(http.ResponseWriter, *http.Request)) {
-	if existingStack, ok := m.pathStacks[path]; ok {
-		utilruntime.HandleError(fmt.Errorf("registered %q from %v", path, existingStack))
-	}
-	m.pathStacks[path] = string(debug.Stack())
+	m.trackCallers(path)
 
 	m.exposedPaths = append(m.exposedPaths, path)
 	m.mux.HandleFunc(path, handler)
@@ -78,21 +79,15 @@ func (m *PathRecorderMux) HandleFunc(path string, handler func(http.ResponseWrit
 // UnlistedHandle registers the handler for the given pattern, but doesn't list it.
 // If a handler already exists for pattern, Handle panics.
 func (m *PathRecorderMux) UnlistedHandle(path string, handler http.Handler) {
-	if existingStack, ok := m.pathStacks[path]; ok {
-		utilruntime.HandleError(fmt.Errorf("registered %q from %v", path, existingStack))
-	}
-	m.pathStacks[path] = string(debug.Stack())
-	m.mux.Handle(path, handler)
+	m.trackCallers(path)
 
+	m.mux.Handle(path, handler)
 }
 
 // UnlistedHandleFunc registers the handler function for the given pattern, but doesn't list it.
 // If a handler already exists for pattern, Handle panics.
 func (m *PathRecorderMux) UnlistedHandleFunc(path string, handler func(http.ResponseWriter, *http.Request)) {
-	if existingStack, ok := m.pathStacks[path]; ok {
-		utilruntime.HandleError(fmt.Errorf("registered %q from %v", path, existingStack))
-	}
-	m.pathStacks[path] = string(debug.Stack())
+	m.trackCallers(path)
 
 	m.mux.HandleFunc(path, handler)
 }
