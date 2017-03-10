@@ -33,6 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	"golang.org/x/net/context"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -72,6 +74,8 @@ func NewEtcd(alloc allocator.Snapshottable, baseKey string, resource unversioned
 
 // Allocate attempts to allocate the item locally and then in etcd.
 func (e *Etcd) Allocate(offset int) (bool, error) {
+	glog.V(2).Infof("[Allocate(%d),", offset)
+	defer glog.V(2).Infof("Allocate(%d)]", offset)
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
@@ -101,10 +105,13 @@ func (e *Etcd) Allocate(offset int) (bool, error) {
 
 // AllocateNext attempts to allocate the next item locally and then in etcd.
 func (e *Etcd) AllocateNext() (int, bool, error) {
+	glog.V(2).Infof("[AllocateNext(),")
+	defer glog.V(2).Infof("AllocateNext()]")
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
 	offset, ok, err := e.alloc.AllocateNext()
+	glog.V(2).Infof("AllocateNext(%d),", offset)
 	if !ok || err != nil {
 		return offset, ok, err
 	}
@@ -152,6 +159,8 @@ func (e *Etcd) ForEach(fn func(int)) {
 
 // tryUpdate performs a read-update to persist the latest snapshot state of allocation.
 func (e *Etcd) tryUpdate(fn func() error) error {
+	glog.V(2).Infof("[tryUpdate,")
+	defer glog.V(2).Infof("tryUpdate]")
 	err := e.storage.GuaranteedUpdate(context.TODO(), e.baseKey, &api.RangeAllocation{}, true, nil,
 		storage.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
 			existing := input.(*api.RangeAllocation)
@@ -189,6 +198,8 @@ func (e *Etcd) Get() (*api.RangeAllocation, error) {
 // CreateOrUpdate attempts to update the current etcd state with the provided
 // allocation.
 func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
+	glog.V(2).Infof("[CreateOrUpdate,")
+	defer glog.V(2).Infof("CreateOrUpdate]")
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
