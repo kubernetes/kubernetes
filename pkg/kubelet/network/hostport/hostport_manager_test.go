@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
@@ -136,35 +137,37 @@ func TestHostportManager(t *testing.T) {
 	raw, err := iptables.Save(utiliptables.TableNAT)
 	assert.NoError(t, err)
 
-	lines := strings.Split(string(raw), "\n")
-	expectedLines := map[string]bool{
-		`*nat`: true,
-		`:KUBE-HOSTPORTS - [0:0]`:                                                                                                         true,
-		`:OUTPUT - [0:0]`:                                                                                                                 true,
-		`:PREROUTING - [0:0]`:                                                                                                             true,
-		`:POSTROUTING - [0:0]`:                                                                                                            true,
-		`:KUBE-HP-4YVONL46AKYWSKS3 - [0:0]`:                                                                                               true,
-		`:KUBE-HP-7THKRFSEH4GIIXK7 - [0:0]`:                                                                                               true,
-		`:KUBE-HP-5N7UH5JAXCVP5UJR - [0:0]`:                                                                                               true,
-		"-A KUBE-HOSTPORTS -m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp --dport 8443 -j KUBE-HP-5N7UH5JAXCVP5UJR":        true,
-		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp --dport 8081 -j KUBE-HP-7THKRFSEH4GIIXK7":        true,
-		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp --dport 8080 -j KUBE-HP-4YVONL46AKYWSKS3":        true,
-		"-A OUTPUT -m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS":                         true,
-		"-A PREROUTING -m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS":                     true,
-		"-A POSTROUTING -m comment --comment \"SNAT for localhost access to hostports\" -o cbr0 -s 127.0.0.0/8 -j MASQUERADE":             true,
-		"-A KUBE-HP-4YVONL46AKYWSKS3 -m comment --comment \"pod1_ns1 hostport 8080\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ":                    true,
-		"-A KUBE-HP-4YVONL46AKYWSKS3 -m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.2:80":  true,
-		"-A KUBE-HP-7THKRFSEH4GIIXK7 -m comment --comment \"pod1_ns1 hostport 8081\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ":                    true,
-		"-A KUBE-HP-7THKRFSEH4GIIXK7 -m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp -j DNAT --to-destination 10.1.1.2:81":  true,
-		"-A KUBE-HP-5N7UH5JAXCVP5UJR -m comment --comment \"pod3_ns1 hostport 8443\" -s 10.1.1.4/32 -j KUBE-MARK-MASQ":                    true,
-		"-A KUBE-HP-5N7UH5JAXCVP5UJR -m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.4:443": true,
-		`COMMIT`: true,
+	linesList := strings.Split(string(raw), "\n")
+	for i, line := range linesList {
+		linesList[i] = strings.TrimSpace(line)
 	}
-	for _, line := range lines {
-		if len(strings.TrimSpace(line)) > 0 {
-			_, ok := expectedLines[strings.TrimSpace(line)]
-			assert.EqualValues(t, true, ok)
-		}
+	lines := sets.NewString(linesList...)
+
+	expectedLines := sets.NewString(
+		`*nat`,
+		`:KUBE-HOSTPORTS - [0:0]`,
+		`:KUBE-LOCALDEST - [0:0]`,
+		`:OUTPUT - [0:0]`,
+		`:PREROUTING - [0:0]`,
+		`:KUBE-HP-4YVONL46AKYWSKS3 - [0:0]`,
+		`:KUBE-HP-7THKRFSEH4GIIXK7 - [0:0]`,
+		`:KUBE-HP-5N7UH5JAXCVP5UJR - [0:0]`,
+		"-A KUBE-HOSTPORTS -m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp --dport 8443 -j KUBE-HP-5N7UH5JAXCVP5UJR",
+		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp --dport 8081 -j KUBE-HP-7THKRFSEH4GIIXK7",
+		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp --dport 8080 -j KUBE-HP-4YVONL46AKYWSKS3",
+		"-A KUBE-LOCALDEST -m comment --comment \"maybe kube hostport\" -d 127.0.0.1/32 -j KUBE-HOSTPORTS",
+		"-A OUTPUT -m comment --comment \"maybe kube hostport\" -m addrtype --dst-type LOCAL -j KUBE-LOCALDEST",
+		"-A PREROUTING -m comment --comment \"maybe kube hostport\" -m addrtype --dst-type LOCAL -j KUBE-LOCALDEST",
+		"-A KUBE-HP-4YVONL46AKYWSKS3 -m comment --comment \"pod1_ns1 hostport 8080\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ",
+		"-A KUBE-HP-4YVONL46AKYWSKS3 -m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.2:80",
+		"-A KUBE-HP-7THKRFSEH4GIIXK7 -m comment --comment \"pod1_ns1 hostport 8081\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ",
+		"-A KUBE-HP-7THKRFSEH4GIIXK7 -m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp -j DNAT --to-destination 10.1.1.2:81",
+		"-A KUBE-HP-5N7UH5JAXCVP5UJR -m comment --comment \"pod3_ns1 hostport 8443\" -s 10.1.1.4/32 -j KUBE-MARK-MASQ",
+		"-A KUBE-HP-5N7UH5JAXCVP5UJR -m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.4:443",
+		`COMMIT`)
+	for line := range expectedLines {
+		_, ok := lines[line]
+		assert.EqualValues(t, true, ok, "line %q not found in output", line)
 	}
 
 	// Remove all added hostports
@@ -178,11 +181,15 @@ func TestHostportManager(t *testing.T) {
 	// Check Iptables-save result after deleting hostports
 	raw, err = iptables.Save(utiliptables.TableNAT)
 	assert.NoError(t, err)
-	lines = strings.Split(string(raw), "\n")
-	remainingChains := make(map[string]bool)
-	for _, line := range lines {
+	linesList = strings.Split(string(raw), "\n")
+	for i, line := range linesList {
+		linesList[i] = strings.TrimSpace(line)
+	}
+	lines = sets.NewString(linesList...)
+	remainingChains := sets.NewString()
+	for line := range lines {
 		if strings.HasPrefix(line, ":") {
-			remainingChains[strings.TrimSpace(line)] = true
+			remainingChains.Insert(line)
 		}
 	}
 	expectDeletedChains := []string{"KUBE-HP-4YVONL46AKYWSKS3", "KUBE-HP-7THKRFSEH4GIIXK7", "KUBE-HP-5N7UH5JAXCVP5UJR"}

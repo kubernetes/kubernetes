@@ -17,9 +17,11 @@ limitations under the License.
 package hostport
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -30,6 +32,8 @@ import (
 const (
 	// the hostport chain
 	kubeHostportsChain utiliptables.Chain = "KUBE-HOSTPORTS"
+	// the "is a local destination" chain, which pre-filters hostports
+	kubeLocalDestChain utiliptables.Chain = "KUBE-LOCALDEST"
 	// prefix for hostport chains
 	kubeHostportChainPrefix string = "KUBE-HP-"
 )
@@ -144,9 +148,14 @@ func portMappingToHostport(portMapping *PortMapping) hostport {
 // ensureKubeHostportChainLinked ensures the KUBE-HOSTPORTS chain is linked into the root of iptables
 func ensureKubeHostportChainLinked(iptables utiliptables.Interface) error {
 	glog.V(4).Info("Ensuring kubelet hostport chains")
-	// Ensure kubeHostportChain exists
+	// Ensure kubeHostportsChain exists
 	if _, err := iptables.EnsureChain(utiliptables.TableNAT, kubeHostportsChain); err != nil {
 		return fmt.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubeHostportsChain, err)
+	}
+
+	// Enusure and fill kubeLocalDestChain with current info
+	if err := syncLocaldest(iptables); err != nil {
+		return fmt.Errorf("Failed to populate %s chain %s: %v", utiliptables.TableNAT, kubeLocalDestChain, err)
 	}
 
 	// Ensure it is linked from the root.
@@ -158,18 +167,89 @@ func ensureKubeHostportChainLinked(iptables utiliptables.Interface) error {
 		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
 	}
 	args := []string{
-		"-m", "comment", "--comment", "kube hostport portals",
+		"-m", "comment", "--comment", "maybe kube hostport",
 		"-m", "addrtype", "--dst-type", "LOCAL",
-		"-j", string(kubeHostportsChain),
+		"-j", string(kubeLocalDestChain),
 	}
 	for _, tc := range tableChainsNeedJumpServices {
 		if _, err := iptables.EnsureRule(utiliptables.Prepend, tc.table, tc.chain, args...); err != nil {
 			return fmt.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", tc.table, tc.chain, kubeHostportsChain, err)
 		}
+		removeOldLink(iptables, tc.table, tc.chain) // ignore errors
 	}
-
 	removeOldSNAT(iptables) // ignore errors
 
+	return nil
+}
+
+func syncLocaldest(iptables utiliptables.Interface) error {
+	start := time.Now()
+	defer func() {
+		glog.V(4).Infof("syncLocaldest took %v", time.Since(start))
+	}()
+
+	// Get iptables-save output so we can check for existing chains and rules.
+	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
+	existingNATChains := make(map[utiliptables.Chain]string)
+	iptablesSaveRaw, err := iptables.Save(utiliptables.TableNAT)
+	if err != nil { // if we failed to get any rules
+		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
+	} else { // otherwise parse the output
+		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+	}
+
+	natChains := bytes.NewBuffer(nil)
+	natRules := bytes.NewBuffer(nil)
+	writeLine(natChains, "*nat")
+	// Make sure we keep stats for the top-level chains, if they existed
+	// (which most should have because we created them above).
+	if chain, ok := existingNATChains[kubeLocalDestChain]; ok {
+		writeLine(natChains, chain)
+	} else {
+		writeLine(natChains, utiliptables.MakeChainLine(kubeLocalDestChain))
+	}
+
+	// Populate the LOCALDEST chain.
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return err
+	}
+	// Only consider packets with dest of a real interface addr for hostports.
+	for _, a := range addrs {
+		astr := a.String() // CIDR notation
+		ip, _, err := net.ParseCIDR(astr)
+		if err != nil {
+			return err
+		}
+		if ip.To4() != nil {
+			args := []string{
+				"-A", string(kubeLocalDestChain),
+				"-m", "comment", "--comment", `"maybe kube hostport"`,
+				"-d", ip.String(),
+				"-j", string(kubeHostportsChain),
+			}
+			writeLine(natRules, args...)
+		}
+	}
+	writeLine(natRules, "COMMIT")
+
+	natLines := append(natChains.Bytes(), natRules.Bytes()...)
+	glog.V(3).Infof("Restoring iptables rules: %s", natLines)
+	err = iptables.RestoreAll(natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	if err != nil {
+		return fmt.Errorf("Failed to execute iptables-restore: %v", err)
+	}
+	return nil
+}
+
+// This can be removed after v1.8.
+func removeOldLink(iptables utiliptables.Interface, table utiliptables.Table, chain utiliptables.Chain) error {
+	if err := iptables.DeleteRule(table, chain,
+		"-m", "comment", "--comment", "kube hostport portals",
+		"-m", "addrtype", "--dst-type", "LOCAL",
+		"-j", string(kubeHostportsChain)); err != nil {
+		return fmt.Errorf("Failed to remove old link from %s chain %s to %s: %v", table, chain, kubeHostportsChain, err)
+	}
 	return nil
 }
 
