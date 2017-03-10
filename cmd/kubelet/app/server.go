@@ -83,6 +83,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/volume/probeplugins"
 )
 
 const (
@@ -160,7 +161,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		OOMAdjuster:        oom.NewOOMAdjuster(),
 		OSInterface:        kubecontainer.RealOS{},
 		Writer:             writer,
-		VolumePlugins:      ProbeVolumePlugins(s.VolumePluginDir),
+		VolumePlugins:      probeplugins.ProbeVolumePlugins(s.VolumePluginDir),
 		TLSOptions:         tlsOptions,
 	}, nil
 }

@@ -256,12 +256,14 @@ pkg/util/yaml
 pkg/version/prometheus
 pkg/volume
 pkg/volume/downwardapi
+pkg/volume/probeplugins
 pkg/volume/projected
 pkg/volume/quobyte
 pkg/volume/util/nestedpendingoperations
 pkg/volume/util/operationexecutor
 pkg/volume/util/types
 pkg/volume/util/volumehelper
+pkg/volume/validation
 pkg/watch
 pkg/watch/json
 pkg/watch/versioned
