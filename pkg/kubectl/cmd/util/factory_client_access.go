@@ -477,8 +477,8 @@ const (
 	SecretForDockerRegistryV1GeneratorName = "secret-for-docker-registry/v1"
 	SecretForTLSV1GeneratorName            = "secret-for-tls/v1"
 	ConfigMapV1GeneratorName               = "configmap/v1"
-	ClusterRoleBindingV1GeneratorName      = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
-	RoleBindingV1GeneratorName             = "rolebinding.rbac.authorization.k8s.io/v1alpha1"
+	ClusterRoleBindingV1GeneratorName      = "clusterrolebinding.rbac.authorization.k8s.io/v1beta1"
+	RoleBindingV1GeneratorName             = "rolebinding.rbac.authorization.k8s.io/v1beta1"
 	ClusterV1Beta1GeneratorName            = "cluster/v1beta1"
 	PodDisruptionBudgetV1GeneratorName     = "poddisruptionbudget/v1beta1"
 )
