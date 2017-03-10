@@ -2612,8 +2612,12 @@ func autoConvert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(i
 	}
 	out.VolumeName = in.VolumeName
 	out.StorageClassName = (*string)(unsafe.Pointer(in.StorageClassName))
-	// WARNING: in.VolumeType requires manual conversion: does not exist in peer-type
+	out.VolumeType = (*string)(unsafe.Pointer(in.VolumeType))
 	return nil
+}
+
+func Convert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(in *PersistentVolumeClaimSpec, out *api.PersistentVolumeClaimSpec, s conversion.Scope) error {
+	return autoConvert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(in, out, s)
 }
 
 func autoConvert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(in *api.PersistentVolumeClaimSpec, out *PersistentVolumeClaimSpec, s conversion.Scope) error {
@@ -2624,8 +2628,12 @@ func autoConvert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(i
 	}
 	out.VolumeName = in.VolumeName
 	out.StorageClassName = (*string)(unsafe.Pointer(in.StorageClassName))
-	// WARNING: in.Type requires manual conversion: does not exist in peer-type
+	out.VolumeType = (*string)(unsafe.Pointer(in.VolumeType))
 	return nil
+}
+
+func Convert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(in *api.PersistentVolumeClaimSpec, out *PersistentVolumeClaimSpec, s conversion.Scope) error {
+	return autoConvert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(in, out, s)
 }
 
 func autoConvert_v1_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimStatus(in *PersistentVolumeClaimStatus, out *api.PersistentVolumeClaimStatus, s conversion.Scope) error {
@@ -2730,8 +2738,12 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
 	out.PortworxVolume = (*api.PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*api.ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
-	// WARNING: in.LocalStorage requires manual conversion: does not exist in peer-type
+	out.LocalStorage = (*api.LocalStorageVolumeSource)(unsafe.Pointer(in.LocalStorage))
 	return nil
+}
+
+func Convert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *PersistentVolumeSource, out *api.PersistentVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in, out, s)
 }
 
 func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api.PersistentVolumeSource, out *PersistentVolumeSource, s conversion.Scope) error {
@@ -2754,6 +2766,7 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
 	out.PortworxVolume = (*PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
+	out.LocalStorage = (*LocalStorageVolumeSource)(unsafe.Pointer(in.LocalStorage))
 	return nil
 }
 
@@ -4575,8 +4588,11 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.Projected = (*ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
 	out.PortworxVolume = (*PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
-	// WARNING: in.LocalStorage requires manual conversion: does not exist in peer-type
 	return nil
+}
+
+func Convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *VolumeSource, s conversion.Scope) error {
+	return autoConvert_api_VolumeSource_To_v1_VolumeSource(in, out, s)
 }
 
 func autoConvert_v1_VsphereVirtualDiskVolumeSource_To_api_VsphereVirtualDiskVolumeSource(in *VsphereVirtualDiskVolumeSource, out *api.VsphereVirtualDiskVolumeSource, s conversion.Scope) error {

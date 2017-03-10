@@ -1922,8 +1922,8 @@ func DeepCopy_api_PersistentVolumeClaimSpec(in interface{}, out interface{}, c *
 			*out = new(string)
 			**out = **in
 		}
-		if in.Type != nil {
-			in, out := &in.Type, &out.Type
+		if in.VolumeType != nil {
+			in, out := &in.VolumeType, &out.VolumeType
 			*out = new(string)
 			**out = **in
 		}
@@ -2092,6 +2092,11 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 			if err := DeepCopy_api_ScaleIOVolumeSource(*in, *out, c); err != nil {
 				return err
 			}
+		}
+		if in.LocalStorage != nil {
+			in, out := &in.LocalStorage, &out.LocalStorage
+			*out = new(LocalStorageVolumeSource)
+			**out = **in
 		}
 		return nil
 	}
@@ -3515,11 +3520,6 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 			if err := DeepCopy_api_ScaleIOVolumeSource(*in, *out, c); err != nil {
 				return err
 			}
-		}
-		if in.LocalStorage != nil {
-			in, out := &in.LocalStorage, &out.LocalStorage
-			*out = new(LocalStorageVolumeSource)
-			**out = **in
 		}
 		return nil
 	}
