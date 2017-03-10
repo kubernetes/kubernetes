@@ -66,7 +66,7 @@ var (
 	endpointColumns                  = []string{"NAME", "ENDPOINTS", "AGE"}
 	nodeColumns                      = []string{"NAME", "STATUS", "AGE", "VERSION"}
 	nodeWideColumns                  = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION"}
-	daemonSetColumns                 = []string{"NAME", "DESIRED", "CURRENT", "READY", "NODE-SELECTOR", "AGE"}
+	daemonSetColumns                 = []string{"NAME", "DESIRED", "CURRENT", "READY", "UP-TO-DATE", "AVAILABLE", "NODE-SELECTOR", "AGE"}
 	daemonSetWideColumns             = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 	eventColumns                     = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
 	limitRangeColumns                = []string{"NAME", "AGE"}
@@ -904,16 +904,20 @@ func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, options printers.Prin
 	desiredScheduled := ds.Status.DesiredNumberScheduled
 	currentScheduled := ds.Status.CurrentNumberScheduled
 	numberReady := ds.Status.NumberReady
+	numberUpdated := ds.Status.UpdatedNumberScheduled
+	numberAvailable := ds.Status.NumberAvailable
 	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		// this shouldn't happen if LabelSelector passed validation
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%s\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s",
 		name,
 		desiredScheduled,
 		currentScheduled,
 		numberReady,
+		numberUpdated,
+		numberAvailable,
 		labels.FormatLabels(ds.Spec.Template.Spec.NodeSelector),
 		translateTimestamp(ds.CreationTimestamp),
 	); err != nil {
