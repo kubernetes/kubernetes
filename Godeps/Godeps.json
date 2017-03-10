@@ -2215,8 +2215,8 @@
 		},
 		{
 			"ImportPath": "github.com/robfig/cron",
-			"Comment": "v1-40-g783cfcb",
-			"Rev": "783cfcb01fb00c48f740c9de79122bd410294149"
+			"Comment": "v1-53-gdf38d32",
+			"Rev": "df38d32658d8788cd446ba74db4bb5375c4b0cb3"
 		},
 		{
 			"ImportPath": "github.com/rubiojr/go-vhd/vhd",
