@@ -817,7 +817,6 @@ func DeepCopy_v1_EmptyDirVolumeSource(in interface{}, out interface{}, c *conver
 		in := in.(*EmptyDirVolumeSource)
 		out := out.(*EmptyDirVolumeSource)
 		*out = *in
-		out.Size = in.Size.DeepCopy()
 		return nil
 	}
 }
@@ -3351,9 +3350,7 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 		if in.EmptyDir != nil {
 			in, out := &in.EmptyDir, &out.EmptyDir
 			*out = new(EmptyDirVolumeSource)
-			if err := DeepCopy_v1_EmptyDirVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
+			**out = **in
 		}
 		if in.GCEPersistentDisk != nil {
 			in, out := &in.GCEPersistentDisk, &out.GCEPersistentDisk
