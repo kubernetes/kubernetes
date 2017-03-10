@@ -35,22 +35,12 @@ import (
 // handlers that do not show up in swagger or in /
 type APIContainer struct {
 	*restful.Container
-
-	// NonSwaggerRoutes are recorded and are visible at /, but do not show up in Swagger.
-	NonSwaggerRoutes PathRecorderMux
-
-	// UnlistedRoutes are not recorded, therefore not visible at / and do not show up in Swagger.
-	UnlistedRoutes *http.ServeMux
 }
 
 // NewAPIContainer constructs a new container for APIs
-func NewAPIContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *APIContainer {
+func NewAPIContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer, defaultMux http.Handler) *APIContainer {
 	c := APIContainer{
 		Container: restful.NewContainer(),
-		NonSwaggerRoutes: PathRecorderMux{
-			mux: mux,
-		},
-		UnlistedRoutes: mux,
 	}
 	c.Container.ServeMux = mux
 	c.Container.Router(restful.CurlyRouter{}) // e.g. for proxy/{kind}/{name}/{*}
@@ -60,6 +50,10 @@ func NewAPIContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *APICon
 	c.Container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 		serviceErrorHandler(s, serviceErr, request, response)
 	})
+
+	// register the defaultHandler for everything.  This will allow an unhandled request to fall through to another handler instead of
+	// ending up with a forced 404
+	c.Container.Handle("/", defaultMux)
 
 	return &c
 }

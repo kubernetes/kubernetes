@@ -44,7 +44,7 @@ type openAPI struct {
 }
 
 // RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
-func RegisterOpenAPIService(servePath string, webServices []*restful.WebService, config *openapi.Config, container *genericmux.APIContainer) (err error) {
+func RegisterOpenAPIService(servePath string, webServices []*restful.WebService, config *openapi.Config, mux *genericmux.PathRecorderMux) (err error) {
 	o := openAPI{
 		config:    config,
 		servePath: servePath,
@@ -63,7 +63,7 @@ func RegisterOpenAPIService(servePath string, webServices []*restful.WebService,
 		return err
 	}
 
-	container.UnlistedRoutes.HandleFunc(servePath, func(w http.ResponseWriter, r *http.Request) {
+	mux.UnlistedHandleFunc(servePath, func(w http.ResponseWriter, r *http.Request) {
 		resp := restful.NewResponse(w)
 		if r.URL.Path != servePath {
 			resp.WriteErrorString(http.StatusNotFound, "Path not found!")
