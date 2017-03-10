@@ -52,6 +52,14 @@ type hostportManager struct {
 
 func NewHostportManager() HostPortManager {
 	iptInterface := utiliptables.New(utilexec.New(), utildbus.New(), utiliptables.ProtocolIpv4)
+
+	// Ensure the chain is linked from the root.
+	// FIXME: This is a hack. It will update as new pods come in, but we really
+	// should periodically resync this.
+	if err := ensureKubeHostportChainLinked(iptInterface); err != nil {
+		glog.Errorf("Failed to ensure hostport chains are linked, will retry on next pod creation: %v", err)
+	}
+
 	return &hostportManager{
 		hostPortMap: make(map[hostport]closeable),
 		iptables:    iptInterface,
@@ -59,6 +67,7 @@ func NewHostportManager() HostPortManager {
 	}
 }
 
+// FIXME: this is only called when pods are first created, but if kubelet crashes, the port will not be re-opened.
 func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping) (err error) {
 	if podPortMapping == nil || podPortMapping.HostNetwork {
 		return nil

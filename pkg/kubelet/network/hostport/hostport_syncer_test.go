@@ -175,8 +175,9 @@ func TestOpenPodHostports(t *testing.T) {
 
 	// Generic rules
 	genericRules := []*ruleMatch{
-		{-1, "PREROUTING", "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"},
-		{-1, "OUTPUT", "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"},
+		{-1, "PREROUTING", "-m comment --comment \"maybe kube hostport\" -m addrtype --dst-type LOCAL -j KUBE-LOCALDEST"},
+		{-1, "OUTPUT", "-m comment --comment \"maybe kube hostport\" -m addrtype --dst-type LOCAL -j KUBE-LOCALDEST"},
+		{-1, "KUBE-LOCALDEST", "-m comment --comment \"maybe kube hostport\" -d 127.0.0.0/8 -j KUBE-HOSTPORTS"},
 	}
 
 	for _, rule := range genericRules {
@@ -185,7 +186,7 @@ func TestOpenPodHostports(t *testing.T) {
 			t.Fatalf("Expected NAT chain %s did not exist", rule.chain)
 		}
 		if !matchRule(chain, rule.match) {
-			t.Fatalf("Expected %s chain rule match '%s' not found", rule.chain, rule.match)
+			t.Fatalf("Expected %s chain rule match '%s' not found, got '%s'", rule.chain, rule.match, chain)
 		}
 	}
 

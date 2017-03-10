@@ -127,12 +127,15 @@ func TestOpenHostports(t *testing.T) {
 
 func TestEnsureKubeHostportChainLinked(t *testing.T) {
 	builtinChains := []string{"PREROUTING", "OUTPUT"}
-	jumpRule := "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"
+	jumpRule := "-m comment --comment \"maybe kube hostport\" -m addrtype --dst-type LOCAL -j KUBE-LOCALDEST"
 
 	fakeIPTables := NewFakeIPTables()
 	assert.NoError(t, ensureKubeHostportChainLinked(fakeIPTables))
 
-	_, _, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain("KUBE-HOSTPORTS"))
+	_, _, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain("KUBE-LOCALDEST"))
+	assert.NoError(t, err)
+
+	_, _, err = fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain("KUBE-HOSTPORTS"))
 	assert.NoError(t, err)
 
 	for _, chainName := range builtinChains {

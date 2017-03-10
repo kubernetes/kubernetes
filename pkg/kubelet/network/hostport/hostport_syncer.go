@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -201,6 +202,11 @@ func (h *hostportSyncer) SyncHostports(activePodPortMappings []*PodPortMapping) 
 	writeLine(natChains, "*nat")
 	// Make sure we keep stats for the top-level chains, if they existed
 	// (which most should have because we created them above).
+	if chain, ok := existingNATChains[kubeLocalDestChain]; ok {
+		writeLine(natChains, chain)
+	} else {
+		writeLine(natChains, utiliptables.MakeChainLine(kubeLocalDestChain))
+	}
 	if chain, ok := existingNATChains[kubeHostportsChain]; ok {
 		writeLine(natChains, chain)
 	} else {
@@ -210,6 +216,33 @@ func (h *hostportSyncer) SyncHostports(activePodPortMappings []*PodPortMapping) 
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
 
+	// Populate the LOCALDEST chain.
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return err
+	}
+	// Only consider packets with dest of a real interface addr for hostports.
+	for _, a := range addrs {
+		astr := a.String() // CIDR notation
+		ip, ipnet, err := net.ParseCIDR(astr)
+		if err != nil {
+			return err
+		}
+		if ip.To4() != nil {
+			ipstr := ip.String()
+			if ip.IsLoopback() {
+				// Special case loopback devices.
+				ipstr = ipnet.String()
+			}
+			args := []string{
+				"-A", string(kubeLocalDestChain),
+				"-m", "comment", "--comment", `"maybe kube hostport"`,
+				"-d", ipstr,
+				"-j", string(kubeHostportsChain),
+			}
+			writeLine(natRules, args...)
+		}
+	}
 	for port, target := range hostportPodMap {
 		protocol := strings.ToLower(string(port.Protocol))
 		hostportChain := hostportChainName(port, target.podFullName)
