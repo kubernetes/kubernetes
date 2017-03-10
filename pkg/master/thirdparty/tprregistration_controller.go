@@ -99,8 +99,7 @@ func NewAutoRegistrationController(tprInformer informers.ThirdPartyResourceInfor
 	return c
 }
 
-func (c *tprRegistrationController) Run(threadiness int, stopCh chan struct{}) {
-	// don't let panics crash the process
+func (c *tprRegistrationController) Run(threadiness int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()

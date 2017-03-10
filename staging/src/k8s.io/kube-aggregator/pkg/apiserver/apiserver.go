@@ -106,6 +106,9 @@ type APIAggregator struct {
 	serviceLister v1listers.ServiceLister
 	// endpointsLister is used by the aggregator handler to determine whether or not to try to expose the group
 	endpointsLister v1listers.EndpointsLister
+
+	// provided for easier embedding
+	APIRegistrationInformers informers.SharedInformerFactory
 }
 
 type completedConfig struct {
@@ -114,7 +117,8 @@ type completedConfig struct {
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() completedConfig {
-	// generic discovery must be disabled so that we can register our own discovery handler
+	// the kube aggregator wires its own discovery mechanism
+	// TODO eventually collapse this by extracting all of the discovery out
 	c.GenericConfig.EnableDiscovery = false
 	c.GenericConfig.Complete()
 
@@ -131,28 +135,29 @@ func (c *Config) SkipComplete() completedConfig {
 
 // New returns a new instance of APIAggregator from the given config.
 func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget, stopCh <-chan struct{}) (*APIAggregator, error) {
+	genericServer, err := c.Config.GenericConfig.SkipComplete().NewWithDelegate(delegationTarget) // completion is done in Complete, no need for a second time
+	if err != nil {
+		return nil, err
+	}
+
 	informerFactory := informers.NewSharedInformerFactory(
 		internalclientset.NewForConfigOrDie(c.Config.GenericConfig.LoopbackClientConfig),
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
 	kubeInformers := kubeinformers.NewSharedInformerFactory(c.CoreAPIServerClient, 5*time.Minute)
 
-	genericServer, err := c.Config.GenericConfig.SkipComplete().NewWithDelegate(delegationTarget) // completion is done in Complete, no need for a second time
-	if err != nil {
-		return nil, err
-	}
-
 	s := &APIAggregator{
-		GenericAPIServer: genericServer,
-		delegateHandler:  delegationTarget.UnprotectedHandler(),
-		contextMapper:    c.GenericConfig.RequestContextMapper,
-		proxyClientCert:  c.ProxyClientCert,
-		proxyClientKey:   c.ProxyClientKey,
-		proxyHandlers:    map[string]*proxyHandler{},
-		handledGroups:    sets.String{},
-		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
-		serviceLister:    kubeInformers.Core().V1().Services().Lister(),
-		endpointsLister:  kubeInformers.Core().V1().Endpoints().Lister(),
+		GenericAPIServer:         genericServer,
+		delegateHandler:          delegationTarget.UnprotectedHandler(),
+		contextMapper:            c.GenericConfig.RequestContextMapper,
+		proxyClientCert:          c.ProxyClientCert,
+		proxyClientKey:           c.ProxyClientKey,
+		proxyHandlers:            map[string]*proxyHandler{},
+		handledGroups:            sets.String{},
+		lister:                   informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
+		serviceLister:            kubeInformers.Core().V1().Services().Lister(),
+		endpointsLister:          kubeInformers.Core().V1().Endpoints().Lister(),
+		APIRegistrationInformers: informerFactory,
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
@@ -182,7 +187,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
-		apiserviceRegistrationController.Run(stopCh)
+		go apiserviceRegistrationController.Run(stopCh)
 		return nil
 	})
 
@@ -214,8 +219,8 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 	}
 	proxyHandler.updateAPIService(apiService)
 	s.proxyHandlers[apiService.Name] = proxyHandler
-	s.GenericAPIServer.FallThroughHandler.Handle(proxyPath, proxyHandler)
-	s.GenericAPIServer.FallThroughHandler.Handle(proxyPath+"/", proxyHandler)
+	s.GenericAPIServer.HandlerContainer.ServeMux.Handle(proxyPath, proxyHandler)
+	s.GenericAPIServer.HandlerContainer.ServeMux.Handle(proxyPath+"/", proxyHandler)
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
@@ -235,10 +240,11 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 		lister:          s.lister,
 		serviceLister:   s.serviceLister,
 		endpointsLister: s.endpointsLister,
+		delegate:        s.GenericAPIServer.FallThroughHandler,
 	}
 	// aggregation is protected
-	s.GenericAPIServer.FallThroughHandler.UnlistedHandle(groupPath, groupDiscoveryHandler)
-	s.GenericAPIServer.FallThroughHandler.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
+	s.GenericAPIServer.HandlerContainer.ServeMux.Handle(groupPath, groupDiscoveryHandler)
+	s.GenericAPIServer.HandlerContainer.ServeMux.Handle(groupPath+"/", groupDiscoveryHandler)
 	s.handledGroups.Insert(apiService.Spec.Group)
 }
 

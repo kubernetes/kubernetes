@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "aggregator.go",
         "plugins.go",
         "server.go",
     ],
@@ -32,6 +33,7 @@ go_library(
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/master:go_default_library",
+        "//pkg/master/thirdparty:go_default_library",
         "//pkg/master/tunneler:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/version:go_default_library",
@@ -62,6 +64,7 @@ go_library(
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/openapi",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
@@ -73,7 +76,15 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/apiserver/pkg/server/filters",
+        "//vendor:k8s.io/apiserver/pkg/server/healthz",
+        "//vendor:k8s.io/apiserver/pkg/server/mux",
+        "//vendor:k8s.io/apiserver/pkg/server/options",
         "//vendor:k8s.io/apiserver/pkg/server/storage",
+        "//vendor:k8s.io/client-go/kubernetes",
+        "//vendor:k8s.io/kube-aggregator/pkg/apis/apiregistration",
+        "//vendor:k8s.io/kube-aggregator/pkg/apiserver",
+        "//vendor:k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion",
+        "//vendor:k8s.io/kube-aggregator/pkg/controllers/autoregister",
     ],
 )
 
