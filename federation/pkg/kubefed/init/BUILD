@@ -14,6 +14,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
+        "//federation/pkg/dnsprovider/providers/coredns:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
@@ -25,6 +26,7 @@ go_library(
         "//pkg/version:go_default_library",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:gopkg.in/gcfg.v1",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
@@ -42,6 +44,7 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//federation/pkg/dnsprovider/providers/coredns:go_default_library",
         "//federation/pkg/kubefed/testing:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",
         "//pkg/api:go_default_library",
@@ -52,6 +55,7 @@ go_test(
         "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//vendor:gopkg.in/gcfg.v1",
         "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
