@@ -32,6 +32,7 @@ go_library(
         "service_util.go",
         "statefulset_utils.go",
         "test_context.go",
+        "upgrade_util.go",
         "util.go",
     ],
     tags = ["automanaged"],
