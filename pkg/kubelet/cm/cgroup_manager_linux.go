@@ -449,12 +449,16 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 
 		// WalkFunc which is called for each file and directory in the pod cgroup dir
 		visitor := func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				glog.V(4).Infof("cgroup manager encountered error scanning cgroup path %q: %v", path, err)
+				return filepath.SkipDir
+			}
 			if !info.IsDir() {
 				return nil
 			}
 			pids, err = getCgroupProcs(path)
 			if err != nil {
-				glog.V(5).Infof("cgroup manager encountered error getting procs for cgroup path %v", path)
+				glog.V(4).Infof("cgroup manager encountered error getting procs for cgroup path %q: %v", path, err)
 				return filepath.SkipDir
 			}
 			pidsToKill.Insert(pids...)
@@ -464,7 +468,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 		// container cgroups haven't been GCed yet. Get attached processes to
 		// all such unwanted containers under the pod cgroup
 		if err = filepath.Walk(dir, visitor); err != nil {
-			glog.V(5).Infof("cgroup manager encountered error scanning pids for directory: %v", dir)
+			glog.V(4).Infof("cgroup manager encountered error scanning pids for directory: %q: %v", dir, err)
 		}
 	}
 	return pidsToKill.List()
