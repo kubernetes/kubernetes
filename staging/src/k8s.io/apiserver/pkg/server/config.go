@@ -91,6 +91,7 @@ type Config struct {
 	EnableSwaggerUI bool
 	EnableIndex     bool
 	EnableProfiling bool
+	EnableDiscovery bool
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
 	EnableMetrics             bool
@@ -203,6 +204,7 @@ func NewConfig() *Config {
 		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
 		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz},
 		EnableIndex:                 true,
+		EnableDiscovery:             true,
 		EnableProfiling:             true,
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
@@ -342,6 +344,10 @@ func (c *Config) Complete() completedConfig {
 		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
 	}
 
+	if c.FallThroughHandler == nil {
+		c.FallThroughHandler = mux.NewPathRecorderMux()
+	}
+
 	return completedConfig{c}
 }
 
@@ -403,9 +409,6 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 
 		postStartHooks: map[string]postStartHookEntry{},
 		healthzChecks:  c.HealthzChecks,
-	}
-	if s.FallThroughHandler == nil {
-		s.FallThroughHandler = mux.NewPathRecorderMux()
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer, s.FallThroughHandler)
@@ -475,7 +478,10 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 		}
 	}
 	routes.Version{Version: c.Version}.Install(s.HandlerContainer)
-	s.HandlerContainer.Add(s.DynamicApisDiscovery())
+
+	if c.EnableDiscovery {
+		s.HandlerContainer.Add(s.DynamicApisDiscovery())
+	}
 }
 
 func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {
