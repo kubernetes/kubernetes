@@ -261,6 +261,17 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		return err
 	}
 
+	rbacAvailable := true
+	rbacVersionedClientset, err := util.GetVersionedClientForRBACOrFail(hostFactory)
+	if err != nil {
+		if _, ok := err.(*util.NoRBACAPIError); !ok {
+			return err
+		}
+		// If the error is type NoRBACAPIError, We continue to create the rest of
+		// the resources, without the SA and roles (in the abscense of RBAC support).
+		rbacAvailable = false
+	}
+
 	serverName := fmt.Sprintf("%s-%s", i.commonOptions.Name, APIServerNameSuffix)
 	serverCredName := fmt.Sprintf("%s-%s", serverName, CredentialSuffix)
 	cmName := fmt.Sprintf("%s-%s", i.commonOptions.Name, CMNameSuffix)
@@ -329,19 +340,26 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		return err
 	}
 
-	// 7. Create federation controller manager
-	// 7a. Create a service account in the host cluster for federation
-	// controller manager.
-	sa, err := createControllerManagerSA(hostClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
-	if err != nil {
-		return err
-	}
+	sa := &api.ServiceAccount{}
+	sa.Name = ""
+	// 7. Create deployment for federation controller manager
+	// The below code either creates the SA and the related roles or skips
+	// creating the same if the RBAC support is not found in the base cluster
+	// TODO: We must evaluate creating a separate service account even when RBAC support is missing
+	if rbacAvailable {
+		// 7a. Create a service account in the host cluster for federation
+		// controller manager.
+		sa, err = createControllerManagerSA(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+		if err != nil {
+			return err
+		}
 
-	// 7b. Create RBAC role and role binding for federation controller
-	// manager service account.
-	_, _, err = createRoleBindings(hostClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.options.dryRun)
-	if err != nil {
-		return err
+		// 7b. Create RBAC role and role binding for federation controller
+		// manager service account.
+		_, _, err = createRoleBindings(rbacVersionedClientset, i.commonOptions.FederationSystemNamespace, sa.Name, i.options.dryRun)
+		if err != nil {
+			return err
+		}
 	}
 
 	// 7c. Create a dns-provider config secret
@@ -876,10 +894,13 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 							},
 						},
 					},
-					ServiceAccountName: saName,
 				},
 			},
 		},
+	}
+
+	if saName != "" {
+		dep.Spec.Template.Spec.ServiceAccountName = saName
 	}
 
 	if dryRun {
