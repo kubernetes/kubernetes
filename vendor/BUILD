@@ -10479,6 +10479,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
+        "//vendor:k8s.io/apiserver/pkg/server/mux",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",
         "//vendor:k8s.io/client-go/rest",
     ],
@@ -10618,7 +10619,7 @@ go_library(
 
 go_test(
     name = "k8s.io/apiserver/pkg/server/mux_test",
-    srcs = ["k8s.io/apiserver/pkg/server/mux/container_test.go"],
+    srcs = ["k8s.io/apiserver/pkg/server/mux/pathrecorder_test.go"],
     library = ":k8s.io/apiserver/pkg/server/mux",
     tags = ["automanaged"],
     deps = ["//vendor:github.com/stretchr/testify/assert"],
@@ -10638,6 +10639,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apiserver/pkg/endpoints/handlers/responsewriters",
     ],
 )
