@@ -1108,6 +1108,35 @@ go_library(
 )
 
 go_library(
+    name = "github.com/codedellemc/goscaleio",
+    srcs = [
+        "github.com/codedellemc/goscaleio/api.go",
+        "github.com/codedellemc/goscaleio/certs.go",
+        "github.com/codedellemc/goscaleio/device.go",
+        "github.com/codedellemc/goscaleio/instance.go",
+        "github.com/codedellemc/goscaleio/protectiondomain.go",
+        "github.com/codedellemc/goscaleio/scsiinitiator.go",
+        "github.com/codedellemc/goscaleio/sdc.go",
+        "github.com/codedellemc/goscaleio/sds.go",
+        "github.com/codedellemc/goscaleio/storagepool.go",
+        "github.com/codedellemc/goscaleio/system.go",
+        "github.com/codedellemc/goscaleio/user.go",
+        "github.com/codedellemc/goscaleio/volume.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/Sirupsen/logrus",
+        "//vendor:github.com/codedellemc/goscaleio/types/v1",
+    ],
+)
+
+go_library(
+    name = "github.com/codedellemc/goscaleio/types/v1",
+    srcs = ["github.com/codedellemc/goscaleio/types/v1/types.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/codegangsta/negroni",
     srcs = [
         "github.com/codegangsta/negroni/doc.go",
@@ -4125,6 +4154,21 @@ go_library(
 )
 
 go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/results.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
     name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes",
     srcs = [
         "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/doc.go",
@@ -4132,6 +4176,22 @@ go_library(
         "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/results.go",
         "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/urls.go",
         "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/pagination",
+    ],
+)
+
+go_library(
+    name = "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes",
+    srcs = [
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/doc.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/requests.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/results.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/urls.go",
+        "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes/util.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -10105,6 +10165,13 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/util/flushwriter",
         "//vendor:k8s.io/apiserver/pkg/util/wsstream",
     ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/endpoints/metrics_test",
+    srcs = ["k8s.io/apiserver/pkg/endpoints/metrics/metrics_test.go"],
+    library = ":k8s.io/apiserver/pkg/endpoints/metrics",
+    tags = ["automanaged"],
 )
 
 go_library(
@@ -16251,13 +16318,6 @@ go_library(
     tags = ["automanaged"],
 )
 
-go_test(
-    name = "k8s.io/apiserver/pkg/endpoints/metrics_test",
-    srcs = ["k8s.io/apiserver/pkg/endpoints/metrics/metrics_test.go"],
-    library = ":k8s.io/apiserver/pkg/endpoints/metrics",
-    tags = ["automanaged"],
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -16268,34 +16328,5 @@ filegroup(
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "github.com/codedellemc/goscaleio",
-    srcs = [
-        "github.com/codedellemc/goscaleio/api.go",
-        "github.com/codedellemc/goscaleio/certs.go",
-        "github.com/codedellemc/goscaleio/device.go",
-        "github.com/codedellemc/goscaleio/instance.go",
-        "github.com/codedellemc/goscaleio/protectiondomain.go",
-        "github.com/codedellemc/goscaleio/scsiinitiator.go",
-        "github.com/codedellemc/goscaleio/sdc.go",
-        "github.com/codedellemc/goscaleio/sds.go",
-        "github.com/codedellemc/goscaleio/storagepool.go",
-        "github.com/codedellemc/goscaleio/system.go",
-        "github.com/codedellemc/goscaleio/user.go",
-        "github.com/codedellemc/goscaleio/volume.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/Sirupsen/logrus",
-        "//vendor:github.com/codedellemc/goscaleio/types/v1",
-    ],
-)
-
-go_library(
-    name = "github.com/codedellemc/goscaleio/types/v1",
-    srcs = ["github.com/codedellemc/goscaleio/types/v1/types.go"],
     tags = ["automanaged"],
 )
