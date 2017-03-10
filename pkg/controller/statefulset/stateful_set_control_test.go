@@ -857,7 +857,7 @@ func assertInvariants(set *apps.StatefulSet, spc *fakeStatefulPodControl) error 
 	}
 	sort.Sort(ascendingOrdinal(pods))
 	for ord := 0; ord < len(pods); ord++ {
-		if ord > 0 && isRunningAndReady(pods[ord]) && !isRunningAndReady(pods[ord-1]) {
+		if ord > 0 && isAlive(pods[ord]) && !isAlive(pods[ord-1]) {
 			return fmt.Errorf("Predecessor %s is Running and Ready while %s is not",
 				pods[ord-1].Name,
 				pods[ord].Name)

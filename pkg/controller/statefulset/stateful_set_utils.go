@@ -189,13 +189,33 @@ func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 	pod.Annotations[podapi.PodSubdomainAnnotation] = set.Spec.ServiceName
 }
 
-// isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady, and if the init
-// annotation has not explicitly disabled the Pod from being ready.
-func isRunningAndReady(pod *v1.Pod) bool {
-	if pod.Status.Phase != v1.PodRunning {
+// isAlive returns true if pod is in an acceptable phase.
+// Whether a Pod phase is acceptable is determined by the Pod's RestartPolicy, current condition and annotations.
+func isAlive(pod *v1.Pod) bool {
+	phase := pod.Status.Phase
+	if phase == "" || phase == v1.PodUnknown || phase == v1.PodPending {
 		return false
 	}
-	podReady := v1.IsPodReady(pod)
+
+	// Determine alive or not based on its restart policy
+	switch pod.Spec.RestartPolicy {
+	case v1.RestartPolicyNever:
+		// RestartPolicyNever treats all the other phases as alive
+	case v1.RestartPolicyOnFailure:
+		if phase != v1.PodRunning && phase != v1.PodSucceeded {
+			return false
+		}
+	default:
+		if phase != v1.PodRunning {
+			return false
+		}
+	}
+
+	// It requires a condition of PodReady when it is running.
+	if phase == v1.PodRunning && !v1.IsPodReady(pod) {
+		return false
+	}
+
 	// User may have specified a pod readiness override through a debug annotation.
 	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
 	if ok {
@@ -205,10 +225,10 @@ func isRunningAndReady(pod *v1.Pod) bool {
 		} else if !initAnnotation {
 			glog.V(4).Infof("StatefulSet pod %v waiting on annotation %v", pod.Name,
 				apps.StatefulSetInitAnnotation)
-			podReady = initAnnotation
+			return false
 		}
 	}
-	return podReady
+	return true
 }
 
 // isCreated returns true if pod has been created and is maintained by the API server
@@ -221,14 +241,14 @@ func isFailed(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodFailed
 }
 
-// isTerminated returns true if pod's deletion Timestamp has been set
-func isTerminated(pod *v1.Pod) bool {
+// isDeleted returns true if pod's deletion Timestamp has been set
+func isDeleted(pod *v1.Pod) bool {
 	return pod.DeletionTimestamp != nil
 }
 
 // isHealthy returns true if pod is running and ready and has not been terminated
 func isHealthy(pod *v1.Pod) bool {
-	return isRunningAndReady(pod) && !isTerminated(pod)
+	return isAlive(pod) && !isDeleted(pod)
 }
 
 // newControllerRef returns an ControllerRef pointing to a given StatefulSet.

@@ -206,32 +206,42 @@ func TestUpdateStorage(t *testing.T) {
 	}
 }
 
-func TestIsRunningAndReady(t *testing.T) {
+func TestIsAlive(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
-	if isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not respect Pod phase")
+	if isAlive(pod) {
+		t.Error("isAlive does not respect Pod phase")
 	}
 	pod.Status.Phase = v1.PodRunning
-	if isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not respect Pod condition")
+	if isAlive(pod) {
+		t.Error("isAlive does not respect Pod condition")
 	}
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 	v1.UpdatePodCondition(&pod.Status, &condition)
-	if !isRunningAndReady(pod) {
-		t.Error("Pod should be running and ready")
+	if !isAlive(pod) {
+		t.Error("Pod should be alive")
+	}
+	pod.Spec.RestartPolicy = v1.RestartPolicyNever
+	pod.Status.Phase = v1.PodFailed
+	if !isAlive(pod) {
+		t.Error("Pod does not respect Pod restart policy: RestartPolicyNever")
+	}
+	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+	pod.Status.Phase = v1.PodSucceeded
+	if !isAlive(pod) {
+		t.Error("Pod does not respect Pod restart policy: RestartPolicyOnFailure")
 	}
 	pod.Annotations[apps.StatefulSetInitAnnotation] = "true"
-	if !isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not respected init annotation set to true")
+	if !isAlive(pod) {
+		t.Error("isAlive does not respected init annotation set to true")
 	}
 	pod.Annotations[apps.StatefulSetInitAnnotation] = "false"
-	if isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not respected init annotation set to false")
+	if isAlive(pod) {
+		t.Error("isAlive does not respected init annotation set to false")
 	}
 	pod.Annotations[apps.StatefulSetInitAnnotation] = "blah"
-	if !isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not erroneous init annotation")
+	if !isAlive(pod) {
+		t.Error("isAlive does not erroneous init annotation")
 	}
 }
 

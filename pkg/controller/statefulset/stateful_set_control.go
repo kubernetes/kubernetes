@@ -62,7 +62,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	// First we partition pods into two lists valid replicas and condemned Pods
 	for i := range pods {
 		//count the number of running and ready replicas
-		if isRunningAndReady(pods[i]) {
+		if isAlive(pods[i]) {
 			ready++
 		}
 		if ord := getOrdinal(pods[i]); 0 <= ord && ord < replicaCount {
@@ -135,7 +135,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		// If we have a Pod that has been created but is not running and ready we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Ready.
-		if !isRunningAndReady(replicas[i]) {
+		if !isAlive(replicas[i]) {
 			glog.V(2).Infof("StatefulSet %s is waiting for Pod %s to be Running and Ready",
 				set.Name, replicas[i].Name)
 			return nil

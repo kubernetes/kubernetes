@@ -152,44 +152,6 @@ func TestValidateStatefulSet(t *testing.T) {
 				Template: validPodTemplate.Template,
 			},
 		},
-		"invalid restart policy 1": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: api.PodTemplateSpec{
-					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicyOnFailure,
-						DNSPolicy:     api.DNSClusterFirst,
-						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: validLabels,
-					},
-				},
-			},
-		},
-		"invalid restart policy 2": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: apps.StatefulSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: api.PodTemplateSpec{
-					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicyNever,
-						DNSPolicy:     api.DNSClusterFirst,
-						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: validLabels,
-					},
-				},
-			},
-		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateStatefulSet(&v)
