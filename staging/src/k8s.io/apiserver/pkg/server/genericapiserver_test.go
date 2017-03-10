@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/server/mux"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	restclient "k8s.io/client-go/rest"
 )
@@ -90,6 +91,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
+	config.FallThroughHandler = mux.NewPathRecorderMux()
 
 	// TODO restore this test, but right now, eliminate our cycle
 	// config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
@@ -352,8 +354,8 @@ func TestCustomHandlerChain(t *testing.T) {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.HandlerContainer.NonSwaggerRoutes.Handle("/nonswagger", handler)
-	s.HandlerContainer.UnlistedRoutes.Handle("/secret", handler)
+	s.FallThroughHandler.Handle("/nonswagger", handler)
+	s.FallThroughHandler.Handle("/secret", handler)
 
 	type Test struct {
 		handler   http.Handler
