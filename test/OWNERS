@@ -30,3 +30,4 @@ approvers:
   - gmarek
   - soltysh
   - pwittrock # for test/e2e/kubectl.go
+  - fabianofranz # for test/e2e/kubectl.go
