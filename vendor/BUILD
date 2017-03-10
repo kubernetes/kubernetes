@@ -16299,3 +16299,40 @@ go_library(
     srcs = ["github.com/codedellemc/goscaleio/types/v1/types.go"],
     tags = ["automanaged"],
 )
+
+go_test(
+    name = "k8s.io/client-go/util/certificate_test",
+    srcs = [
+        "k8s.io/client-go/util/certificate/certificate_manager_test.go",
+        "k8s.io/client-go/util/certificate/certificate_store_test.go",
+    ],
+    library = ":k8s.io/client-go/util/certificate",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/apis/certificates/v1beta1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/util/cert",
+    ],
+)
+
+go_library(
+    name = "k8s.io/client-go/util/certificate",
+    srcs = [
+        "k8s.io/client-go/util/certificate/certificate_manager.go",
+        "k8s.io/client-go/util/certificate/certificate_store.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/apis/certificates/v1beta1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
+        "//pkg/util:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/util/cert",
+    ],
+)
