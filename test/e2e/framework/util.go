@@ -2215,14 +2215,26 @@ func (f *Framework) MatchContainerOutput(
 	}()
 
 	// Wait for client pod to complete.
-	if err := WaitForPodSuccessInNamespace(f.ClientSet, createdPod.Name, ns); err != nil {
-		return fmt.Errorf("expected pod %q success: %v", pod.Name, err)
-	}
+	podErr := WaitForPodSuccessInNamespace(f.ClientSet, createdPod.Name, ns)
 
 	// Grab its logs.  Get host first.
 	podStatus, err := podClient.Get(createdPod.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get pod status: %v", err)
+	}
+
+	if podErr != nil {
+		// Pod failed. Dump all logs from all containers to see what's wrong
+		for _, container := range podStatus.Spec.Containers {
+			logs, err := GetPodLogs(f.ClientSet, ns, podStatus.Name, container.Name)
+			if err != nil {
+				Logf("Failed to get logs from node %q pod %q container %q: %v",
+					podStatus.Spec.NodeName, podStatus.Name, container.Name, err)
+				continue
+			}
+			Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, container.Name, logs)
+		}
+		return fmt.Errorf("expected pod %q success: %v", pod.Name, err)
 	}
 
 	Logf("Trying to get logs from node %s pod %s container %s: %v",
