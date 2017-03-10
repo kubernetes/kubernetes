@@ -47,6 +47,7 @@ type pausePodConfig struct {
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
 	Tolerations                       []v1.Toleration
+	NodeName                          string
 }
 
 var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
@@ -765,6 +766,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 				},
 			},
 			Tolerations: conf.Tolerations,
+			NodeName:    conf.NodeName,
 		},
 	}
 	if conf.Resources != nil {
