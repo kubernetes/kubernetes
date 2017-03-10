@@ -105,7 +105,7 @@ func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
 	framework.Logf("Starting to observe pod deletion")
 	deleted := false
 	timeout := false
-	timer := time.After(60 * time.Second)
+	timer := time.After(framework.DefaultPodDeletionTimeout)
 	for !deleted && !timeout {
 		select {
 		case event, normal := <-w.ResultChan():
@@ -127,9 +127,31 @@ func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
 	return
 }
 
+func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool) {
+	timer := time.After(30 * time.Second)
+	updated := false
+	timeout := false
+	for !updated && !timeout {
+		select {
+		case event, _ := <-w.ResultChan():
+			if event.Type == watch.Modified {
+				if expectedUpdate(event.Object) {
+					updated = true
+				}
+			}
+		case <-timer:
+			timeout = true
+		}
+	}
+	if !updated {
+		framework.Failf("Failed to observe pod update")
+	}
+	return
+}
+
 var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
-	It("should create pods, delete pods, watch pods", func() {
+	It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
 		podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
 		By("constructing the pod")
 		name := "pod" + string(uuid.NewUUID())
@@ -178,22 +200,16 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		By("deleting the pod gracefully")
-		if err := podClient.Delete(pod.Name, metav1.NewDeleteOptions(30)); err != nil {
+		gracePeriod := int64(31)
+		if err := podClient.Delete(pod.Name, metav1.NewDeleteOptions(gracePeriod)); err != nil {
 			framework.Failf("Failed to delete pod: %v", err)
 		}
 
-		By("verifying pod deletion was observed")
-		obj := observeObjectDeletion(w)
-		lastPod := obj.(*v1.Pod)
-		Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
-		Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(BeZero())
-
-		options = metav1.ListOptions{LabelSelector: selector}
-		pods, err = podClient.List(options)
-		if err != nil {
-			framework.Failf("Failed to list pods to verify deletion: %v", err)
-		}
-		Expect(len(pods.Items)).To(Equal(0))
+		By("verifying the deletionTimestamp and deletionGracePeriodSeconds of the pod is set")
+		observerUpdate(w, func(obj runtime.Object) bool {
+			pod := obj.(*v1.Pod)
+			return pod.ObjectMeta.DeletionTimestamp != nil && *pod.ObjectMeta.DeletionGracePeriodSeconds == gracePeriod
+		})
 	})
 })
 

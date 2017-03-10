@@ -1258,6 +1258,8 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		}
 		zones := testutil.GetZones(fakeNodeHandler)
 		for _, zone := range zones {
+			// Time for rate-limiter reloading per node.
+			time.Sleep(50 * time.Millisecond)
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
 				uid, _ := value.UID.(string)
 				deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)

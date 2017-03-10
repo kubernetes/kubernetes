@@ -88,6 +88,8 @@ function upgrade-master() {
 
   detect-master
   parse-master-env
+  upgrade-master-env
+
   backfile-kubeletauth-certs
 
   # Delete the master instance. Note that the master-pd is created
@@ -100,6 +102,15 @@ function upgrade-master() {
 
   create-master-instance "${MASTER_NAME}-ip"
   wait-for-master
+}
+
+function upgrade-master-env() {
+  echo "== Upgrading master environment variables. =="
+  # Generate the node problem detector token if it isn't present on the original
+  # master.
+ if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
+    NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  fi
 }
 
 # TODO(mikedanese): delete when we don't support < 1.6
@@ -282,6 +293,8 @@ function prepare-node-upgrade() {
   KUBELET_CERT_BASE64=$(get-env-val "${node_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${node_env}" "KUBELET_KEY")
 
+  upgrade-node-env
+
   # TODO(zmerlynn): How do we ensure kube-env is written in a ${version}-
   #                 compatible way?
   write-node-env
@@ -293,6 +306,17 @@ function prepare-node-upgrade() {
   # The following is echo'd so that callers can get the template name.
   echo "Instance template name: ${template_name}"
   echo "== Finished preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
+}
+
+function upgrade-node-env() {
+  echo "== Upgrading node environment variables. =="
+  # Get the node problem detector token from master if it isn't present on
+  # the original node.
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
+    detect-master
+    local master_env=$(get-master-env)
+    NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${master_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
+  fi
 }
 
 # Prereqs:
