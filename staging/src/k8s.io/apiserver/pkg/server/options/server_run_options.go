@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -48,7 +49,7 @@ type ServerRunOptions struct {
 }
 
 func NewServerRunOptions() *ServerRunOptions {
-	defaults := server.NewConfig()
+	defaults := server.NewConfig(serializer.CodecFactory{})
 
 	return &ServerRunOptions{
 		AdmissionControl:            "AlwaysAdmit",
