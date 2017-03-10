@@ -18,9 +18,10 @@ package hostport
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"net"
 	"strings"
+
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -140,13 +141,15 @@ func portMappingToHostport(portMapping *PortMapping) hostport {
 	}
 }
 
-// ensureKubeHostportChains ensures the KUBE-HOSTPORTS chain is setup correctly
-func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName string) error {
+// ensureKubeHostportChainLinked ensures the KUBE-HOSTPORTS chain is linked into the root of iptables
+func ensureKubeHostportChainLinked(iptables utiliptables.Interface, natInterfaceName string) error {
 	glog.V(4).Info("Ensuring kubelet hostport chains")
-	// Ensure kubeHostportChain
+	// Ensure kubeHostportChain exists
 	if _, err := iptables.EnsureChain(utiliptables.TableNAT, kubeHostportsChain); err != nil {
 		return fmt.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubeHostportsChain, err)
 	}
+
+	// Ensure it is linked from the root.
 	tableChainsNeedJumpServices := []struct {
 		table utiliptables.Table
 		chain utiliptables.Chain
@@ -154,18 +157,27 @@ func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName 
 		{utiliptables.TableNAT, utiliptables.ChainOutput},
 		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
 	}
-	args := []string{"-m", "comment", "--comment", "kube hostport portals",
+	args := []string{
+		"-m", "comment", "--comment", "kube hostport portals",
 		"-m", "addrtype", "--dst-type", "LOCAL",
-		"-j", string(kubeHostportsChain)}
+		"-j", string(kubeHostportsChain),
+	}
 	for _, tc := range tableChainsNeedJumpServices {
 		if _, err := iptables.EnsureRule(utiliptables.Prepend, tc.table, tc.chain, args...); err != nil {
 			return fmt.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", tc.table, tc.chain, kubeHostportsChain, err)
 		}
 	}
+
 	// Need to SNAT traffic from localhost
-	args = []string{"-m", "comment", "--comment", "SNAT for localhost access to hostports", "-o", natInterfaceName, "-s", "127.0.0.0/8", "-j", "MASQUERADE"}
+	args = []string{
+		"-m", "comment", "--comment", "SNAT for localhost access to hostports",
+		"-o", natInterfaceName,
+		"-s", "127.0.0.0/8",
+		"-j", "MASQUERADE",
+	}
 	if _, err := iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
 		return fmt.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
 	}
+
 	return nil
 }

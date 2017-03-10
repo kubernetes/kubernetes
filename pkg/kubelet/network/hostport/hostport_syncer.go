@@ -186,9 +186,6 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 		return err
 	}
 
-	// Ensure KUBE-HOSTPORTS chains
-	ensureKubeHostportChains(h.iptables, natInterfaceName)
-
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
 	existingNATChains := make(map[utiliptables.Chain]string)
@@ -277,6 +274,9 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	if err != nil {
 		return fmt.Errorf("Failed to execute iptables-restore: %v", err)
 	}
+
+	// Ensure hostport chains are linked into the root
+	ensureKubeHostportChainLinked(h.iptables, natInterfaceName)
 
 	h.cleanupHostportMap(hostportPodMap)
 	return nil

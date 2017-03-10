@@ -77,10 +77,6 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 	}
 	podIP := podPortMapping.IP.String()
 
-	if err = ensureKubeHostportChains(hm.iptables, natInterfaceName); err != nil {
-		return err
-	}
-
 	// Ensure atomicity for port opening and iptables operations
 	hm.mu.Lock()
 	defer hm.mu.Unlock()
@@ -152,6 +148,12 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		// clean up opened host port if encounter any error
 		return utilerrors.NewAggregate([]error{err, hm.closeHostports(hostportMappings)})
 	}
+
+	// Ensure the chain is linked from the root.
+	if err = ensureKubeHostportChainLinked(hm.iptables, natInterfaceName); err != nil {
+		return err
+	}
+
 	return nil
 }
 
