@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -63,6 +64,9 @@ const (
 	lbIP     = "10.20.30.40"
 	nodeIP   = "10.20.30.50"
 	nodePort = 32111
+
+	testAPIGroup   = "testGroup"
+	testAPIVersion = "testVersion"
 )
 
 func TestInitFederation(t *testing.T) {
@@ -96,6 +100,7 @@ func TestInitFederation(t *testing.T) {
 		cmArgOverrides               string
 		apiserverEnableHTTPBasicAuth bool
 		apiserverEnableTokenAuth     bool
+		isRBACAPIAvailable           bool
 	}{
 		{
 			federation:            "union",
@@ -191,6 +196,7 @@ func TestInitFederation(t *testing.T) {
 			dryRun:               "",
 			apiserverEnableHTTPBasicAuth: true,
 			apiserverEnableTokenAuth:     true,
+			isRBACAPIAvailable:           true,
 		},
 	}
 
@@ -198,6 +204,7 @@ func TestInitFederation(t *testing.T) {
 
 	for i, tc := range testCases {
 		cmdErrMsg = ""
+		tmpDirPath := ""
 		buf := bytes.NewBuffer([]byte{})
 
 		if tc.dnsProviderConfig != "" {
@@ -208,7 +215,16 @@ func TestInitFederation(t *testing.T) {
 			tc.dnsProviderConfig = tmpfile.Name()
 			defer os.Remove(tmpfile.Name())
 		}
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth)
+
+		// Check pkg/kubectl/cmd/testing/fake (fakeAPIFactory.DiscoveryClient()) for details of tmpDir
+		// We want an unique discovery cache path for each test run, else the case from previous case would be used
+		tmpDirPath, err = ioutil.TempDir("", "")
+		if err != nil {
+			t.Fatalf("[%d] unexpected error: %v", i, err)
+		}
+		defer os.Remove(tmpDirPath)
+
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -577,7 +593,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, apiserverOverrideArg, cmOverrideArg string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth bool) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -982,11 +998,13 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 							},
 						},
 					},
-					ServiceAccountName:       "federation-controller-manager",
-					DeprecatedServiceAccount: "federation-controller-manager",
 				},
 			},
 		},
+	}
+	if isRBACAPIAvailable {
+		cm.Spec.Template.Spec.ServiceAccountName = "federation-controller-manager"
+		cm.Spec.Template.Spec.DeprecatedServiceAccount = "federation-controller-manager"
 	}
 	if dnsProviderConfig != "" {
 		cm = addDNSProviderConfigTest(cm, cmDNSProviderSecret.Name)
@@ -1024,11 +1042,37 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	podList.Items = append(podList.Items, apiServerPod)
 	podList.Items = append(podList.Items, cmPod)
 
+	apiGroupList := &metav1.APIGroupList{}
+	testGroup := metav1.APIGroup{
+		Name: testAPIGroup,
+		Versions: []metav1.GroupVersionForDiscovery{
+			{
+				GroupVersion: testAPIGroup + "/" + testAPIVersion,
+				Version:      testAPIVersion,
+			},
+		},
+	}
+	rbacGroup := metav1.APIGroup{
+		Name: rbac.GroupName,
+		Versions: []metav1.GroupVersionForDiscovery{
+			{
+				GroupVersion: rbac.GroupName + "/v1beta1",
+				Version:      "v1beta1",
+			},
+		},
+	}
+
+	apiGroupList.Groups = append(apiGroupList.Groups, testGroup)
+	if isRBACAPIAvailable {
+		apiGroupList.Groups = append(apiGroupList.Groups, rbacGroup)
+	}
+
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	extCodec := testapi.Extensions.Codec()
 	rbacCodec := testapi.Rbac.Codec()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
+	tf.TmpDir = tmpDirPath
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
@@ -1036,6 +1080,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/healthz":
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte("ok")))}, nil
+			case p == "/api" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &metav1.APIVersions{})}, nil
+			case p == "/apis" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, apiGroupList)}, nil
 			case p == "/api/v1/namespaces" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
