@@ -1596,9 +1596,11 @@ func TestPrintDaemonSet(t *testing.T) {
 					CurrentNumberScheduled: 2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					UpdatedNumberScheduled: 2,
+					NumberAvailable:        0,
 				},
 			},
-			"test1\t3\t2\t1\t<none>\t0s\n",
+			"test1\t3\t2\t1\t2\t0\t<none>\t0s\n",
 		},
 	}
 
