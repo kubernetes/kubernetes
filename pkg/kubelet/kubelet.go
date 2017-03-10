@@ -1160,10 +1160,17 @@ func (kl *Kubelet) StartGarbageCollection() {
 	}, ContainerGCPeriod, wait.NeverStop)
 
 	loggedImageGCFailure := false
+	imageGCFailCount := 0
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
-			glog.Errorf("Image garbage collection failed: %v", err)
-			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
+			imageGCFailCount += 1
+			if imageGCFailCount > 1 {
+				glog.Errorf("Image garbage collection failed %v times in a row: %v", imageGCFailCount, err)
+				// Only create an event for repeated failures
+				kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
+			} else {
+				glog.Errorf("Image garbage collection failed. Stats initialization may not have completed yet: %v", err)
+			}
 			loggedImageGCFailure = true
 		} else {
 			var vLevel glog.Level = 4
@@ -1171,6 +1178,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 				vLevel = 1
 				loggedImageGCFailure = false
 			}
+			imageGCFailCount = 0
 
 			glog.V(vLevel).Infof("Image garbage collection succeeded")
 		}
