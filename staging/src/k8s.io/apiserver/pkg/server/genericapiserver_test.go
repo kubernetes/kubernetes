@@ -352,8 +352,8 @@ func TestCustomHandlerChain(t *testing.T) {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.HandlerContainer.NonSwaggerRoutes.Handle("/nonswagger", handler)
-	s.HandlerContainer.UnlistedRoutes.Handle("/secret", handler)
+	s.FallThroughHandler.Handle("/nonswagger", handler)
+	s.FallThroughHandler.Handle("/secret", handler)
 
 	type Test struct {
 		handler   http.Handler
