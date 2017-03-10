@@ -485,6 +485,7 @@ func (nc *NodeController) Run() {
 							oppositeTaint = *NotReadyTaintTemplate
 						} else {
 							// It seems that the Node is ready again, so there's no need to taint it.
+							glog.V(4).Infof("Node %v was in a taint queue, but it's ready now. Ignoring taint request.", value.Value)
 							return true, 0
 						}
 
@@ -498,6 +499,8 @@ func (nc *NodeController) Run() {
 									value.Value,
 									err))
 							return false, 0
+						} else {
+							glog.V(4).Info("Added %v Taint to Node %v", taintToAdd, value.Value)
 						}
 						err = controller.RemoveTaintOffNode(nc.kubeClient, value.Value, &oppositeTaint, node)
 						if err != nil {
@@ -508,6 +511,8 @@ func (nc *NodeController) Run() {
 									value.Value,
 									err))
 							return false, 0
+						} else {
+							glog.V(4).Info("Made sure that Node %v has no %v Taint", value.Value, oppositeTaint)
 						}
 						return true, 0
 					})
