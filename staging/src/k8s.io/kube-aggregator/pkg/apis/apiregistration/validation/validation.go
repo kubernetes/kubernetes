@@ -64,12 +64,6 @@ func ValidateAPIService(apiService *discoveryapi.APIService) field.ErrorList {
 	}
 
 	if apiService.Spec.Service == nil {
-		if len(apiService.Spec.Service.Namespace) != 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "service", "namespace"), apiService.Spec.Service.Namespace, "local APIServices may not have a service"))
-		}
-		if len(apiService.Spec.Service.Name) != 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "service", "name"), apiService.Spec.Service.Name, "local APIServices may not have a service"))
-		}
 		if len(apiService.Spec.CABundle) != 0 {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "caBundle"), fmt.Sprintf("%d bytes", len(apiService.Spec.CABundle)), "local APIServices may not have a caBundle"))
 		}

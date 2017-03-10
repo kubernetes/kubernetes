@@ -148,6 +148,7 @@ func RunServer(s *options.ServerRunOptions, config *master.Config, sharedInforme
 		return err
 	}
 	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(), apiRegistrationClient)
+	registerAPIGroups(autoRegistrationController)
 	go autoRegistrationController.Run(5, stopCh)
 
 	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("autoregister-completion", func(r *http.Request) error {
