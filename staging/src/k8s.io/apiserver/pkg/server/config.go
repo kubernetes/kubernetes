@@ -195,8 +195,9 @@ type SecureServingInfo struct {
 }
 
 // NewConfig returns a Config struct with the default values
-func NewConfig() *Config {
+func NewConfig(codecs serializer.CodecFactory) *Config {
 	return &Config{
+		Serializer:                  codecs,
 		ReadWritePort:               443,
 		RequestContextMapper:        apirequest.NewRequestContextMapper(),
 		BuildHandlerChainsFunc:      DefaultBuildHandlerChain,
@@ -212,11 +213,6 @@ func NewConfig() *Config {
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 	}
-}
-
-func (c *Config) WithSerializer(codecs serializer.CodecFactory) *Config {
-	c.Serializer = codecs
-	return c
 }
 
 func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, scheme *runtime.Scheme) *openapicommon.Config {

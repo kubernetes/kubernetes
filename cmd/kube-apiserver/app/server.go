@@ -249,7 +249,7 @@ func BuildMasterConfig(s *options.ServerRunOptions) (*master.Config, informers.S
 
 // BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
 func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, informers.SharedInformerFactory, error) {
-	genericConfig := genericapiserver.NewConfig().WithSerializer(api.Codecs)
+	genericConfig := genericapiserver.NewConfig(api.Codecs)
 	if err := s.GenericServerRunOptions.ApplyTo(genericConfig); err != nil {
 		return nil, nil, err
 	}
