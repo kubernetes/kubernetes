@@ -578,7 +578,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	return utilerrors.NewAggregate(errors)
 }
 
-// syncNodes deletes given pods and creates new daemon set pods on the given node
+// syncNodes deletes given pods and creates new daemon set pods on the given nodes
 // returns slice with erros if any
 func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string) []error {
 	// We need to set expectations before creating/deleting pods to avoid race conditions.
