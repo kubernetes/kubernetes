@@ -593,7 +593,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			// we need the actual kubectl binary, not the script wrapper
 			kubectlPathNormalizer := exec.Command("which", kubectlPath)
 			if strings.HasSuffix(kubectlPath, "kubectl.sh") {
-				kubectlPathNormalizer = exec.Command("sh", "-c", kubectlPath, "path")
+				kubectlPathNormalizer = exec.Command(kubectlPath, "path")
 			}
 			kubectlPathNormalized, err := kubectlPathNormalizer.Output()
 			framework.ExpectNoError(err)
