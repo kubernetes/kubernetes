@@ -216,7 +216,7 @@ func (c completedConfig) New() (*Master, error) {
 	}
 
 	if c.EnableUISupport {
-		routes.UIRedirect{}.Install(s.HandlerContainer)
+		routes.UIRedirect{}.Install(s.FallThroughHandler)
 	}
 	if c.EnableLogsSupport {
 		routes.Logs{}.Install(s.HandlerContainer)
