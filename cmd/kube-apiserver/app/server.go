@@ -95,23 +95,23 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
-	config, apiserverConfigs, sharedInformers, err := BuildMasterConfig(s)
+	config, componentconfig, sharedInformers, err := BuildMasterConfig(s)
 	if err != nil {
 		return err
 	}
 
-	return RunServer(config, apiserverConfigs, sharedInformers, wait.NeverStop)
+	return RunServer(config, componentconfig, sharedInformers, wait.NeverStop)
 }
 
 // RunServer uses the provided config and shared informers to run the apiserver.  It does not return.
-func RunServer(config *master.Config, apiserverConfigs *componentconfig.APIServerConfiguration, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) error {
+func RunServer(config *master.Config, componentconfig *componentconfig.APIServerConfiguration, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) error {
 	m, err := config.Complete().New()
 	if err != nil {
 		return err
 	}
 
-	if apiserverConfigs != nil {
-		if _, err := initConfigz(*apiserverConfigs); err != nil {
+	if componentconfig != nil {
+		if _, err := initConfigz(*componentconfig); err != nil {
 			glog.Errorf("error initiating configz: %s", err)
 		} else {
 			m.GenericAPIServer.HandlerContainer.NonSwaggerRoutes.HandleFunc("/configz", configz.Handle)
