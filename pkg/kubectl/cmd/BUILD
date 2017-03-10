@@ -9,6 +9,7 @@ go_library(
     srcs = [
         "alpha.go",
         "annotate.go",
+        "apiresources.go",
         "apiversions.go",
         "apply.go",
         "apply_edit_last_applied.go",
