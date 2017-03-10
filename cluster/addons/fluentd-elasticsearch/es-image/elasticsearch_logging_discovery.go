@@ -53,7 +53,6 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
-
 	namespace := meta_v1.NamespaceSystem
 	envNamespace := os.Getenv("NAMESPACE")
 	if envNamespace != "" {
