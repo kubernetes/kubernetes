@@ -136,6 +136,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        "//vendor/k8s.io/client-go/util/certificate:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//vendor/k8s.io/client-go/util/integer:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",

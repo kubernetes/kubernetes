@@ -28,8 +28,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
-	utilfile "k8s.io/kubernetes/pkg/util/file"
 )
 
 const (
@@ -86,7 +84,7 @@ func NewFileStore(
 func (s *fileStore) recover() error {
 	// If the 'current' file doesn't exist, continue on with the recovery process.
 	currentPath := filepath.Join(s.certDirectory, s.filename(currentPair))
-	if exists, err := utilfile.FileExists(currentPath); err != nil {
+	if exists, err := fileExists(currentPath); err != nil {
 		return err
 	} else if exists {
 		return nil
@@ -113,18 +111,18 @@ func (s *fileStore) recover() error {
 
 func (s *fileStore) Current() (*tls.Certificate, error) {
 	pairFile := filepath.Join(s.certDirectory, s.filename(currentPair))
-	if pairFileExists, err := utilfile.FileExists(pairFile); err != nil {
+	if pairFileExists, err := fileExists(pairFile); err != nil {
 		return nil, err
 	} else if pairFileExists {
 		glog.Infof("Loading cert/key pair from %q.", pairFile)
 		return loadFile(pairFile)
 	}
 
-	certFileExists, err := utilfile.FileExists(s.certFile)
+	certFileExists, err := fileExists(s.certFile)
 	if err != nil {
 		return nil, err
 	}
-	keyFileExists, err := utilfile.FileExists(s.keyFile)
+	keyFileExists, err := fileExists(s.keyFile)
 	if err != nil {
 		return nil, err
 	}
@@ -135,11 +133,11 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 
 	c := filepath.Join(s.certDirectory, s.pairNamePrefix+certExtension)
 	k := filepath.Join(s.keyDirectory, s.pairNamePrefix+keyExtension)
-	certFileExists, err = utilfile.FileExists(c)
+	certFileExists, err = fileExists(c)
 	if err != nil {
 		return nil, err
 	}
-	keyFileExists, err = utilfile.FileExists(k)
+	keyFileExists, err = fileExists(k)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +238,7 @@ func (s *fileStore) updateSymlink(filename string) error {
 			return err
 		}
 	} else if fi.Mode()&os.ModeSymlink != os.ModeSymlink {
-		return fmt.Errorf("expected %q to be a symlink but it is a file.", currentPath)
+		return fmt.Errorf("expected %q to be a symlink but it is a file", currentPath)
 	} else {
 		currentPathExists = true
 	}
@@ -253,7 +251,7 @@ func (s *fileStore) updateSymlink(filename string) error {
 			return err
 		}
 	} else if fi.Mode()&os.ModeSymlink != os.ModeSymlink {
-		return fmt.Errorf("expected %q to be a symlink but it is a file.", updatedPath)
+		return fmt.Errorf("expected %q to be a symlink but it is a file", updatedPath)
 	} else {
 		if err := os.Remove(updatedPath); err != nil {
 			return fmt.Errorf("unable to remove %q: %v", updatedPath, err)
@@ -262,7 +260,7 @@ func (s *fileStore) updateSymlink(filename string) error {
 
 	// Check that the new cert/key pair file exists to avoid rotating to an
 	// invalid cert/key.
-	if filenameExists, err := utilfile.FileExists(filename); err != nil {
+	if filenameExists, err := fileExists(filename); err != nil {
 		return err
 	} else if !filenameExists {
 		return fmt.Errorf("file %q does not exist so it can not be used as the currently selected cert/key", filename)
@@ -306,4 +304,14 @@ func loadX509KeyPair(certFile, keyFile string) (*tls.Certificate, error) {
 	}
 	cert.Leaf = certs[0]
 	return &cert, nil
+}
+
+// FileExists checks if specified file exists.
+func fileExists(filename string) (bool, error) {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
 }

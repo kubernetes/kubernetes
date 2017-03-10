@@ -216,7 +216,6 @@ pkg/kubelet/apis/kubeletconfig
 pkg/kubelet/apis/kubeletconfig/v1alpha1
 pkg/kubelet/cadvisor
 pkg/kubelet/cadvisor/testing
-pkg/kubelet/certificate
 pkg/kubelet/client
 pkg/kubelet/cm
 pkg/kubelet/cm/util

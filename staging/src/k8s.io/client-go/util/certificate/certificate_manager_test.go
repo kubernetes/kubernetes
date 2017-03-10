@@ -26,19 +26,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	certificates "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 )
-
-type certificateData struct {
-	keyPEM         []byte
-	certificatePEM []byte
-	certificate    *tls.Certificate
-}
 
 var storeCertData = newCertificateData(`-----BEGIN CERTIFICATE-----
 MIICRzCCAfGgAwIBAgIJALMb7ecMIk3MMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNV
@@ -115,6 +107,12 @@ bDQT1r8Q3Gx+h9LRqQeHgPBQ3F5ylqqBAiBaJ0hkYvrIdWxNlcLqD3065bJpHQ4S
 WQkuZUQN1M/Xvg==
 -----END RSA PRIVATE KEY-----`)
 
+type certificateData struct {
+	keyPEM         []byte
+	certificatePEM []byte
+	certificate    *tls.Certificate
+}
+
 func newCertificateData(certificatePEM string, keyPEM string) *certificateData {
 	certificate, err := tls.X509KeyPair([]byte(certificatePEM), []byte(keyPEM))
 	if err != nil {
@@ -137,7 +135,6 @@ func TestNewManagerNoRotation(t *testing.T) {
 		cert: storeCertData.certificate,
 	}
 	if _, err := NewManager(&Config{
-		Name:             "test_no_rotation",
 		Template:         &x509.CertificateRequest{},
 		Usages:           []certificates.KeyUsage{},
 		CertificateStore: store,
@@ -173,11 +170,6 @@ func TestShouldRotate(t *testing.T) {
 				},
 				template: &x509.CertificateRequest{},
 				usages:   []certificates.KeyUsage{},
-				certificateExpiration: prometheus.NewGauge(
-					prometheus.GaugeOpts{
-						Name: "test_gauge_name",
-					},
-				),
 			}
 			m.setRotationDeadline()
 			if m.shouldRotate() != test.shouldRotate {
@@ -191,7 +183,19 @@ func TestShouldRotate(t *testing.T) {
 	}
 }
 
+type gaugeMock struct {
+	calls     int
+	lastValue float64
+}
+
+func (g *gaugeMock) Set(v float64) {
+	g.calls++
+	g.lastValue = v
+}
+
 func TestSetRotationDeadline(t *testing.T) {
+	defer func(original func(float64) time.Duration) { jitteryDuration = original }(jitteryDuration)
+
 	now := time.Now()
 	testCases := []struct {
 		name         string
@@ -211,6 +215,7 @@ func TestSetRotationDeadline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			g := gaugeMock{}
 			m := manager{
 				cert: &tls.Certificate{
 					Leaf: &x509.Certificate{
@@ -218,27 +223,27 @@ func TestSetRotationDeadline(t *testing.T) {
 						NotAfter:  tc.notAfter,
 					},
 				},
-				template: &x509.CertificateRequest{},
-				usages:   []certificates.KeyUsage{},
-				certificateExpiration: prometheus.NewGauge(
-					prometheus.GaugeOpts{
-						Name: "test_gauge_name",
-					},
-				),
+				template:              &x509.CertificateRequest{},
+				usages:                []certificates.KeyUsage{},
+				certificateExpiration: &g,
 			}
+			jitteryDuration = func(float64) time.Duration { return time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7) }
 			lowerBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7))
-			upperBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.9))
-			for i := 0; i < 1000; i++ {
-				// setRotationDeadline includes jitter, so this needs to run many times for validation.
-				m.setRotationDeadline()
-				if m.rotationDeadline.Before(lowerBound) || m.rotationDeadline.After(upperBound) {
-					t.Errorf("For notBefore %v, notAfter %v, the rotationDeadline %v should be between %v and %v.",
-						tc.notBefore,
-						tc.notAfter,
-						m.rotationDeadline,
-						lowerBound,
-						upperBound)
-				}
+
+			m.setRotationDeadline()
+
+			if !m.rotationDeadline.Equal(lowerBound) {
+				t.Errorf("For notBefore %v, notAfter %v, the rotationDeadline %v should be %v.",
+					tc.notBefore,
+					tc.notAfter,
+					m.rotationDeadline,
+					lowerBound)
+			}
+			if g.calls != 1 {
+				t.Errorf("%d metrics were recorded, wanted %d", g.calls, 1)
+			}
+			if g.lastValue != float64(tc.notAfter.Unix()) {
+				t.Errorf("%d value for metric was recorded, wanted %d", g.lastValue, tc.notAfter.Unix())
 			}
 		})
 	}
@@ -295,7 +300,6 @@ func TestNewManagerBootstrap(t *testing.T) {
 
 	var cm Manager
 	cm, err := NewManager(&Config{
-		Name:                    "test_bootstrap",
 		Template:                &x509.CertificateRequest{},
 		Usages:                  []certificates.KeyUsage{},
 		CertificateStore:        store,
@@ -333,7 +337,6 @@ func TestNewManagerNoBootstrap(t *testing.T) {
 	}
 
 	cm, err := NewManager(&Config{
-		Name:                    "test_no_bootstrap",
 		Template:                &x509.CertificateRequest{},
 		Usages:                  []certificates.KeyUsage{},
 		CertificateStore:        store,
@@ -469,14 +472,13 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 		},
 	}
 
-	for i, tc := range testCases {
+	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			certificateStore := &fakeStore{
 				cert: tc.storeCert.certificate,
 			}
 
 			certificateManager, err := NewManager(&Config{
-				Name: fmt.Sprintf("test_initialize_client_%d", i),
 				Template: &x509.CertificateRequest{
 					Subject: pkix.Name{
 						Organization: []string{"system:nodes"},
@@ -571,14 +573,13 @@ func TestInitializeOtherRESTClients(t *testing.T) {
 		},
 	}
 
-	for i, tc := range testCases {
+	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			certificateStore := &fakeStore{
 				cert: tc.storeCert.certificate,
 			}
 
 			certificateManager, err := NewManager(&Config{
-				Name: fmt.Sprintf("test_initialize_other_rest_clients_%d", i),
 				Template: &x509.CertificateRequest{
 					Subject: pkix.Name{
 						Organization: []string{"system:nodes"},
