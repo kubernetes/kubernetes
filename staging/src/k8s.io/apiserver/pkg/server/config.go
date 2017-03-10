@@ -107,6 +107,10 @@ type Config struct {
 	// Will default to a value based on secure serving info and available ipv4 IPs.
 	ExternalAddress string
 
+	// FallThroughHandler is the final HTTP handler in the chain.  If it is nil, one will be created for you.
+	// It comes after all filters and the API handling
+	FallThroughHandler *mux.PathRecorderMux
+
 	//===========================================================================
 	// Fields you probably don't care about changing
 	//===========================================================================
@@ -337,6 +341,9 @@ func (c *Config) Complete() completedConfig {
 		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
 	}
+	if c.FallThroughHandler == nil {
+		c.FallThroughHandler = mux.NewPathRecorderMux()
+	}
 
 	return completedConfig{c}
 }
@@ -392,6 +399,8 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 
 		apiGroupsForDiscovery: map[string]metav1.APIGroup{},
 
+		FallThroughHandler: c.FallThroughHandler,
+
 		swaggerConfig: c.SwaggerConfig,
 		openAPIConfig: c.OpenAPIConfig,
 
@@ -399,7 +408,7 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		healthzChecks:  c.HealthzChecks,
 	}
 
-	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
+	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer, s.FallThroughHandler)
 
 	if s.openAPIConfig != nil {
 		if s.openAPIConfig.Info == nil {
@@ -447,22 +456,22 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insec
 
 func (s *GenericAPIServer) installAPI(c *Config) {
 	if c.EnableIndex {
-		routes.Index{}.Install(s.HandlerContainer)
+		routes.Index{}.Install(s.HandlerContainer, s.FallThroughHandler)
 	}
 	if c.SwaggerConfig != nil && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.HandlerContainer)
+		routes.SwaggerUI{}.Install(s.FallThroughHandler)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.HandlerContainer)
+		routes.Profiling{}.Install(s.FallThroughHandler)
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
 	if c.EnableMetrics {
 		if c.EnableProfiling {
-			routes.MetricsWithReset{}.Install(s.HandlerContainer)
+			routes.MetricsWithReset{}.Install(s.FallThroughHandler)
 		} else {
-			routes.DefaultMetrics{}.Install(s.HandlerContainer)
+			routes.DefaultMetrics{}.Install(s.FallThroughHandler)
 		}
 	}
 	routes.Version{Version: c.Version}.Install(s.HandlerContainer)

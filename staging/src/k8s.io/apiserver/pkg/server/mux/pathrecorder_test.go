@@ -23,18 +23,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewAPIContainer(t *testing.T) {
-	mux := http.NewServeMux()
-	c := NewAPIContainer(mux, nil)
-	assert.Equal(t, mux, c.UnlistedRoutes, "UnlistedRoutes ServeMux's do not match")
-	assert.Equal(t, mux, c.Container.ServeMux, "Container ServeMux's do not match")
-}
-
 func TestSecretHandlers(t *testing.T) {
-	mux := http.NewServeMux()
-	c := NewAPIContainer(mux, nil)
-	c.UnlistedRoutes.HandleFunc("/secret", func(http.ResponseWriter, *http.Request) {})
-	c.NonSwaggerRoutes.HandleFunc("/nonswagger", func(http.ResponseWriter, *http.Request) {})
-	assert.NotContains(t, c.NonSwaggerRoutes.HandledPaths(), "/secret")
-	assert.Contains(t, c.NonSwaggerRoutes.HandledPaths(), "/nonswagger")
+	c := NewPathRecorderMux()
+	c.UnlistedHandleFunc("/secret", func(http.ResponseWriter, *http.Request) {})
+	c.HandleFunc("/nonswagger", func(http.ResponseWriter, *http.Request) {})
+	assert.NotContains(t, c.HandledPaths(), "/secret")
+	assert.Contains(t, c.HandledPaths(), "/nonswagger")
 }
