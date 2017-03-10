@@ -549,6 +549,15 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		}
 	}
 
+	if source.LocalStorage != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("localStorage"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateLocalStorageVolumeSource(source.LocalStorage, fldPath.Child("localStorage"))...)
+		}
+	}
+
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
 	}
@@ -1026,6 +1035,17 @@ func validateScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, fldPath *field.Pa
 	return allErrs
 }
 
+func validateLocalStorageVolumeSource(ls *api.LocalStorageVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(ls.Path) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+	}
+	if len(ls.NodeName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("nodeName"), ""))
+	}
+	return allErrs
+}
+
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
 var ValidatePersistentVolumeName = NameIsDNSSubdomain
@@ -1217,6 +1237,14 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateScaleIOVolumeSource(pv.Spec.ScaleIO, specPath.Child("scaleIO"))...)
+		}
+	}
+	if pv.Spec.LocalStorage != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("localStorage"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateLocalStorageVolumeSource(pv.Spec.LocalStorage, specPath.Child("localStorage"))...)
 		}
 	}
 

@@ -302,6 +302,9 @@ type VolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource
+	// LocalStorage represents a logical storage partition that is local to a node
+	// +optional
+	LocalStorage *LocalStorageVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.

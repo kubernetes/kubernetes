@@ -334,6 +334,9 @@ type VolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,25,opt,name=scaleIO"`
+	// LocalStorage represents a logical storage partition that is local to a node
+	// +optional
+	LocalStorage *LocalStorageVolumeSource `json:"localStorage,omitempty" protobuf:"bytes,27,opt,name=localStorage"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -604,7 +607,7 @@ type PersistentVolumeClaimSpec struct {
 	// Defaults to "remote" storage.
 	// Accepted options include SemiPersistentLocalStorage.
 	// +optional
-	VolumeType *string `json:"volumeType,omitempty" protobuf:"bytes,6,opt,name=volumeType"`
+	VolumeType *string `json:"volumeType" protobuf:"bytes,6,opt,name=volumeType"`
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
