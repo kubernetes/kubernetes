@@ -125,14 +125,14 @@ func TestOpenHostports(t *testing.T) {
 	}
 }
 
-func TestEnsureKubeHostportChains(t *testing.T) {
+func TestEnsureKubeHostportChainLinked(t *testing.T) {
 	interfaceName := "cbr0"
 	builtinChains := []string{"PREROUTING", "OUTPUT"}
 	jumpRule := "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"
 	masqRule := "-m comment --comment \"SNAT for localhost access to hostports\" -o cbr0 -s 127.0.0.0/8 -j MASQUERADE"
 
 	fakeIPTables := NewFakeIPTables()
-	assert.NoError(t, ensureKubeHostportChains(fakeIPTables, interfaceName))
+	assert.NoError(t, ensureKubeHostportChainLinked(fakeIPTables, interfaceName))
 
 	_, _, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain("KUBE-HOSTPORTS"))
 	assert.NoError(t, err)
