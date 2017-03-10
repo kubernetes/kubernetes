@@ -74,6 +74,8 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipall
 }
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+	glog.V(2).Infof("[Create(rest.go),")
+	defer glog.V(2).Infof("Create]")
 	service := obj.(*api.Service)
 
 	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
@@ -135,6 +137,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 				svcPortToNodePort[int(servicePort.Port)] = np
 			} else if assignNodePorts {
 				nodePort, err := nodePortOp.AllocateNext()
+				glog.V(2).Infof("nodePortOp.AllocateNext() %v (err %v)", nodePort, err)
 				if err != nil {
 					// TODO: what error should be returned here?  It's not a
 					// field-level validation failure (the field is valid), and it's
@@ -369,6 +372,8 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 }
 
 func (rs *REST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	glog.V(2).Infof("[Update(rest.go),")
+	defer glog.V(2).Infof("Update(rest.go)]")
 	oldService, err := rs.registry.GetService(ctx, name)
 	if err != nil {
 		return nil, false, err

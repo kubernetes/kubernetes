@@ -133,7 +133,7 @@ func (r *PortAllocator) AllocateNext() (int, error) {
 	if !ok {
 		return 0, ErrFull
 	}
-	glog.V(2).Infof("Allocate %v (%v %v)", r.portRange.Base+offset, r.portRange.Base, offset)
+	glog.V(2).Infof("Allocate %v (%v %v)(Free: %v)", r.portRange.Base+offset, r.portRange.Base, offset, r.alloc.Free())
 	return r.portRange.Base + offset, nil
 }
 
@@ -170,11 +170,13 @@ func (r *PortAllocator) Has(port int) bool {
 
 // Snapshot saves the current state of the pool.
 func (r *PortAllocator) Snapshot(dst *api.RangeAllocation) error {
+	glog.V(2).Infof("[Snapshot,")
 	snapshottable, ok := r.alloc.(allocator.Snapshottable)
 	if !ok {
 		return fmt.Errorf("not a snapshottable allocator")
 	}
 	rangeString, data := snapshottable.Snapshot()
+	glog.V(2).Infof("Snapshot]")
 	dst.Range = rangeString
 	dst.Data = data
 	return nil
@@ -183,6 +185,8 @@ func (r *PortAllocator) Snapshot(dst *api.RangeAllocation) error {
 // Restore restores the pool to the previously captured state. ErrMismatchedNetwork
 // is returned if the provided port range doesn't exactly match the previous range.
 func (r *PortAllocator) Restore(pr net.PortRange, data []byte) error {
+	glog.V(2).Infof("[Restore,")
+	defer glog.V(2).Infof("Restore]")
 	if pr.String() != r.portRange.String() {
 		return ErrMismatchedNetwork
 	}

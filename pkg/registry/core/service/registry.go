@@ -23,6 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
+
+	"github.com/golang/glog"
 )
 
 // Registry is an interface for things that know how to store services.
@@ -48,6 +50,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 }
 
 func (s *storage) ListServices(ctx api.Context, options *api.ListOptions) (*api.ServiceList, error) {
+	glog.V(2).Infof("[ListServices,")
+	defer glog.V(2).Infof("ListServices]")
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -56,6 +60,8 @@ func (s *storage) ListServices(ctx api.Context, options *api.ListOptions) (*api.
 }
 
 func (s *storage) CreateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
+	glog.V(2).Infof("[CreateService,")
+	defer glog.V(2).Infof("CreateService]")
 	obj, err := s.Create(ctx, svc)
 	if err != nil {
 		return nil, err
@@ -64,6 +70,8 @@ func (s *storage) CreateService(ctx api.Context, svc *api.Service) (*api.Service
 }
 
 func (s *storage) GetService(ctx api.Context, name string) (*api.Service, error) {
+	glog.V(2).Infof("[GetService,")
+	defer glog.V(2).Infof("GetService]")
 	obj, err := s.Get(ctx, name)
 	if err != nil {
 		return nil, err
@@ -72,11 +80,15 @@ func (s *storage) GetService(ctx api.Context, name string) (*api.Service, error)
 }
 
 func (s *storage) DeleteService(ctx api.Context, name string) error {
+	glog.V(2).Infof("[DeleteService,")
+	defer glog.V(2).Infof("DeleteService]")
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }
 
 func (s *storage) UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
+	glog.V(2).Infof("[UpdateService,")
+	defer glog.V(2).Infof("UpdateService]")
 	obj, _, err := s.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc, api.Scheme))
 	if err != nil {
 		return nil, err
@@ -85,12 +97,16 @@ func (s *storage) UpdateService(ctx api.Context, svc *api.Service) (*api.Service
 }
 
 func (s *storage) WatchServices(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	glog.V(2).Infof("[DeleteService,")
+	defer glog.V(2).Infof("DeleteService]")
 	return s.Watch(ctx, options)
 }
 
 // If StandardStorage implements rest.Exporter, returns exported service.
 // Otherwise export is not supported.
 func (s *storage) ExportService(ctx api.Context, name string, options unversioned.ExportOptions) (*api.Service, error) {
+	glog.V(2).Infof("[ExportService,")
+	defer glog.V(2).Infof("ExportService]")
 	exporter, isExporter := s.StandardStorage.(rest.Exporter)
 	if !isExporter {
 		return nil, fmt.Errorf("export is not supported")
