@@ -459,6 +459,7 @@ func (e *EndpointController) syncService(key string) error {
 					Name:   service.Name,
 					Labels: service.Labels,
 				},
+				Subsets:	[]v1.EndpointSubset{},
 			}
 		} else {
 			return err
