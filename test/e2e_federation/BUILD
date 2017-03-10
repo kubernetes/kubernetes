@@ -20,6 +20,7 @@ go_library(
         "replicaset.go",
         "secret.go",
         "service.go",
+        "upgrade.go",
         "util.go",
     ],
     tags = ["automanaged"],
@@ -34,9 +35,11 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//test/e2e/chaosmonkey:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e_federation/framework:go_default_library",
+        "//test/e2e_federation/upgrades:go_default_library",
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/gomega",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -63,6 +66,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/e2e_federation/framework:all-srcs",
+        "//test/e2e_federation/upgrades:all-srcs",
     ],
     tags = ["automanaged"],
 )
