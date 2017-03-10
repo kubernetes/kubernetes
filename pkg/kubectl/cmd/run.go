@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	conditions "k8s.io/kubernetes/pkg/client/unversioned"
@@ -239,6 +240,11 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		fmt.Fprintf(cmdErr, "WARNING: New deployments generator specified (%s), but apps/v1beta1.Deployments are not available, falling back to the old one (%s).\n",
 			cmdutil.DeploymentAppsV1Beta1GeneratorName, cmdutil.DeploymentV1Beta1GeneratorName)
 		generatorName = cmdutil.DeploymentV1Beta1GeneratorName
+	}
+
+	if generatorName == cmdutil.CronJobV2Alpha1GeneratorName &&
+		!contains(resourcesList, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs")) {
+		return fmt.Errorf("CronJob generator specified, but batch/v2alpha1.CronJobs are not available")
 	}
 
 	generators := f.Generators("run")
