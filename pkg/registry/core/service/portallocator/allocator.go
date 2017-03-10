@@ -133,6 +133,7 @@ func (r *PortAllocator) AllocateNext() (int, error) {
 	if !ok {
 		return 0, ErrFull
 	}
+	glog.V(2).Infof("Allocate %v (%v %v)", r.portRange.Base+offset, r.portRange.Base, offset)
 	return r.portRange.Base + offset, nil
 }
 
