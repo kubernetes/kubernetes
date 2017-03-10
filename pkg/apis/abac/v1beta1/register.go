@@ -40,7 +40,7 @@ func init() {
 }
 
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addConversionFuncs)
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addConversionFuncs, RegisterDefaults)
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 

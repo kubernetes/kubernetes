@@ -24,37 +24,7 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	RegisterDefaults(scheme)
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_PodExecOptions,
-		SetDefaults_PodAttachOptions,
-		SetDefaults_ReplicationController,
-		SetDefaults_Volume,
-		SetDefaults_ContainerPort,
-		SetDefaults_Container,
-		SetDefaults_ServiceSpec,
-		SetDefaults_Pod,
-		SetDefaults_PodSpec,
-		SetDefaults_Probe,
-		SetDefaults_SecretVolumeSource,
-		SetDefaults_ConfigMapVolumeSource,
-		SetDefaults_DownwardAPIVolumeSource,
-		SetDefaults_ProjectedVolumeSource,
-		SetDefaults_Secret,
-		SetDefaults_PersistentVolume,
-		SetDefaults_PersistentVolumeClaim,
-		SetDefaults_ISCSIVolumeSource,
-		SetDefaults_Endpoints,
-		SetDefaults_HTTPGetAction,
-		SetDefaults_NamespaceStatus,
-		SetDefaults_Node,
-		SetDefaults_NodeStatus,
-		SetDefaults_ObjectFieldSelector,
-		SetDefaults_LimitRangeItem,
-		SetDefaults_ConfigMap,
-		SetDefaults_RBDVolumeSource,
-		SetDefaults_ResourceList,
-	)
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_ResourceList(obj *ResourceList) {
