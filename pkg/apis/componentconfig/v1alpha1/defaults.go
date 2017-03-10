@@ -55,13 +55,7 @@ var (
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
-	RegisterDefaults(scheme)
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_KubeProxyConfiguration,
-		SetDefaults_KubeSchedulerConfiguration,
-		SetDefaults_LeaderElectionConfiguration,
-		SetDefaults_KubeletConfiguration,
-	)
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
