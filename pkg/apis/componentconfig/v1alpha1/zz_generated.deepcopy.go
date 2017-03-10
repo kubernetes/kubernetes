@@ -21,10 +21,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	reflect "reflect"
 )
 
@@ -88,11 +87,6 @@ func DeepCopy_v1alpha1_APIServerConfiguration(in interface{}, out interface{}, c
 		if in.AllowPrivileged != nil {
 			in, out := &in.AllowPrivileged, &out.AllowPrivileged
 			*out = new(bool)
-			**out = **in
-		}
-		if in.EventTTL != nil {
-			in, out := &in.EventTTL, &out.EventTTL
-			*out = new(v1.Duration)
 			**out = **in
 		}
 		if in.KubernetesServiceNodePort != nil {
@@ -326,9 +320,9 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		}
 		if in.RegisterWithTaints != nil {
 			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
-			*out = make([]api_v1.Taint, len(*in))
+			*out = make([]v1.Taint, len(*in))
 			for i := range *in {
-				if err := api_v1.DeepCopy_v1_Taint(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := v1.DeepCopy_v1_Taint(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}

@@ -21,7 +21,6 @@ import (
 	"net"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -158,13 +157,14 @@ func (s *ServerRunOptions) ComponentConfigz() componentconfig.APIServerConfigura
 			DefaultStorageVersions: s.StorageSerialization.DefaultStorageVersions,
 		},
 		AllowPrivileged:           &s.AllowPrivileged,
-		EventTTL:                  &metav1.Duration{s.EventTTL},
 		KubernetesServiceNodePort: &s.KubernetesServiceNodePort,
 		MasterCount:               &s.MasterCount,
 		MaxConnectionBytesPerSec:  &s.MaxConnectionBytesPerSec,
 		ServiceClusterIPRange:     &serviceClusterIPRange,
 		ServiceNodePortRange:      &serviceNodePortRange,
 	}
+
+	componentconfig.EventTTL.Duration = s.EventTTL
 
 	return componentconfig
 }

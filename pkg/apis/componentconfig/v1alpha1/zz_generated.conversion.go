@@ -124,7 +124,7 @@ func autoConvert_v1alpha1_APIServerConfiguration_To_componentconfig_APIServerCon
 		return err
 	}
 	out.AllowPrivileged = (*bool)(unsafe.Pointer(in.AllowPrivileged))
-	out.EventTTL = (*v1.Duration)(unsafe.Pointer(in.EventTTL))
+	out.EventTTL = in.EventTTL
 	out.KubernetesServiceNodePort = (*int)(unsafe.Pointer(in.KubernetesServiceNodePort))
 	out.MasterCount = (*int)(unsafe.Pointer(in.MasterCount))
 	out.MaxConnectionBytesPerSec = (*int64)(unsafe.Pointer(in.MaxConnectionBytesPerSec))
@@ -168,7 +168,7 @@ func autoConvert_componentconfig_APIServerConfiguration_To_v1alpha1_APIServerCon
 		return err
 	}
 	out.AllowPrivileged = (*bool)(unsafe.Pointer(in.AllowPrivileged))
-	out.EventTTL = (*v1.Duration)(unsafe.Pointer(in.EventTTL))
+	out.EventTTL = in.EventTTL
 	out.KubernetesServiceNodePort = (*int)(unsafe.Pointer(in.KubernetesServiceNodePort))
 	out.MasterCount = (*int)(unsafe.Pointer(in.MasterCount))
 	out.MaxConnectionBytesPerSec = (*int64)(unsafe.Pointer(in.MaxConnectionBytesPerSec))

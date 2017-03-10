@@ -21,7 +21,6 @@ limitations under the License.
 package componentconfig
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
@@ -93,11 +92,6 @@ func DeepCopy_componentconfig_APIServerConfiguration(in interface{}, out interfa
 		if in.AllowPrivileged != nil {
 			in, out := &in.AllowPrivileged, &out.AllowPrivileged
 			*out = new(bool)
-			**out = **in
-		}
-		if in.EventTTL != nil {
-			in, out := &in.EventTTL, &out.EventTTL
-			*out = new(v1.Duration)
 			**out = **in
 		}
 		if in.KubernetesServiceNodePort != nil {

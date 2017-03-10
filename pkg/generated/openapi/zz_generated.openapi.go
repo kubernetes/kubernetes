@@ -12847,7 +12847,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"admissionControl", "admissionControlConfigFile", "advertiseAddress", "corsAllowedOriginList", "externalHost", "maxRequestsInFlight", "maxMutatingRequestsInFlight", "minRequestTimeout", "targetRAMMB", "watchCacheSizes", "auditLogOptions", "enableProfiling", "enableContentionProfiling", "enableSwaggerUI", "storageConfig", "etcdServersOverrides", "defaultStorageMediaType", "deleteCollectionWorkers", "enableGarbageCollection", "enableWatchCache", "cloudConfigFile", "cloudProvider", "storageSerialization"},
+					Required: []string{"admissionControl", "admissionControlConfigFile", "advertiseAddress", "corsAllowedOriginList", "externalHost", "maxRequestsInFlight", "maxMutatingRequestsInFlight", "minRequestTimeout", "targetRAMMB", "watchCacheSizes", "auditLogOptions", "enableProfiling", "enableContentionProfiling", "enableSwaggerUI", "storageConfig", "etcdServersOverrides", "defaultStorageMediaType", "deleteCollectionWorkers", "enableGarbageCollection", "enableWatchCache", "cloudConfigFile", "cloudProvider", "storageSerialization", "eventTTL"},
 				},
 			},
 			Dependencies: []string{
@@ -12857,20 +12857,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					Properties: map[string]spec.Schema{
-						"kind": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"apiVersion": {
-							SchemaProps: spec.SchemaProps{
-								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
 						"type": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Type defines the type of storage backend, e.g. \"etcd2\", etcd3\". Default (\"\") is \"etcd3\".",

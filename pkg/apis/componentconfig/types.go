@@ -26,10 +26,10 @@ import (
 )
 
 type APIServerConfiguration struct {
+	metav1.TypeMeta
 	//
 	// Generic Server Run Options
 	//
-	metav1.TypeMeta
 	AdmissionControl           string
 	AdmissionControlConfigFile string
 	AdvertiseAddress           string
@@ -80,7 +80,7 @@ type APIServerConfiguration struct {
 	//Server Run Options
 	//
 	AllowPrivileged           *bool
-	EventTTL                  *metav1.Duration
+	EventTTL                  metav1.Duration
 	KubernetesServiceNodePort *int
 	MasterCount               *int
 	MaxConnectionBytesPerSec  *int64
@@ -89,7 +89,6 @@ type APIServerConfiguration struct {
 }
 
 type APIServerEtcdConfiguration struct {
-	metav1.TypeMeta
 	// Type defines the type of storage backend, e.g. "etcd2", etcd3". Default ("") is "etcd3".
 	Type string
 	// Prefix is the prefix to all keys passed to storage.Interface methods.

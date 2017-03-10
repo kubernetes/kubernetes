@@ -75,17 +75,16 @@ type APIServerConfiguration struct {
 	//
 	// Server Run Options
 	//
-	AllowPrivileged           *bool            `json:"allowPrivileged,omitempty"`
-	EventTTL                  *metav1.Duration `json:"eventTTL,omitempty"`
-	KubernetesServiceNodePort *int             `json:"kubernetesServiceNodePort,omitempty"`
-	MasterCount               *int             `json:"masterCount,omitempty"`
-	MaxConnectionBytesPerSec  *int64           `json:"maxConnectionBytesPerSec,omitempty"`
-	ServiceClusterIPRange     *string          `json:"serviceClusterIPRange,omitempty"`
-	ServiceNodePortRange      *string          `json:"serviceNodePortRange,omitempty"`
+	AllowPrivileged           *bool           `json:"allowPrivileged,omitempty"`
+	EventTTL                  metav1.Duration `json:"eventTTL"`
+	KubernetesServiceNodePort *int            `json:"kubernetesServiceNodePort,omitempty"`
+	MasterCount               *int            `json:"masterCount,omitempty"`
+	MaxConnectionBytesPerSec  *int64          `json:"maxConnectionBytesPerSec,omitempty"`
+	ServiceClusterIPRange     *string         `json:"serviceClusterIPRange,omitempty"`
+	ServiceNodePortRange      *string         `json:"serviceNodePortRange,omitempty"`
 }
 
 type APIServerEtcdConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
 	// Type defines the type of storage backend, e.g. "etcd2", etcd3". Default ("") is "etcd3".
 	Type string `json:"type"`
 	// Prefix is the prefix to all keys passed to storage.Interface methods.

@@ -92,7 +92,6 @@ func (s *ServerRunOptions) ComponentConfigz() componentconfig.APIServerConfigura
 			DefaultStorageVersions: s.StorageSerialization.DefaultStorageVersions,
 		},
 		AllowPrivileged:           nil,
-		EventTTL:                  nil,
 		KubernetesServiceNodePort: nil,
 		MasterCount:               nil,
 		MaxConnectionBytesPerSec:  nil,
