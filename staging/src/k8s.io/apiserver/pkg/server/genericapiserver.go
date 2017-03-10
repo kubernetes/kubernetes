@@ -285,6 +285,11 @@ func (s *GenericAPIServer) EffectiveSecurePort() int {
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
+			glog.Warningf("Skipping API %v because it has no resources.", groupVersion)
+			continue
+		}
+
 		apiGroupVersion := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
 		if apiGroupInfo.OptionsExternalVersion != nil {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion

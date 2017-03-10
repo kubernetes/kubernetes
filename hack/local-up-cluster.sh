@@ -149,7 +149,7 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube vendor/k8s.io/kube-aggregator"
+    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
 else
     echo "skipped the build."
 fi
@@ -459,6 +459,8 @@ function start_apiserver {
       --requestheader-extra-headers-prefix=X-Remote-Extra- \
       --requestheader-client-ca-file="${CERT_DIR}/request-header-ca.crt" \
       --requestheader-allowed-names=system:auth-proxy \
+      --proxy-client-cert-file="${CERT_DIR}/client-auth-proxy.crt" \
+      --proxy-client-key-file="${CERT_DIR}/client-auth-proxy.key" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 

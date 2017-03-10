@@ -320,27 +320,40 @@ func TestAPIGroupMissing(t *testing.T) {
 	handler := &apiGroupHandler{
 		codecs:    Codecs,
 		lister:    listers.NewAPIServiceLister(indexer),
-		groupName: "foo",
+		groupName: "groupName",
+		delegate: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		}),
 	}
 
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
+	// this call should delegate
 	resp, err := http.Get(server.URL + "/apis/groupName/foo")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("expected %v, got %v", resp.StatusCode, http.StatusNotFound)
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected %v, got %v", http.StatusForbidden, resp.StatusCode)
 	}
 
-	// foo still has no api services for it (like it was deleted), it should 404
+	// groupName still has no api services for it (like it was deleted), it should 404
 	resp, err = http.Get(server.URL + "/apis/groupName/")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("expected %v, got %v", resp.StatusCode, http.StatusNotFound)
+		t.Fatalf("expected %v, got %v", http.StatusNotFound, resp.StatusCode)
+	}
+
+	// missing group should delegate still has no api services for it (like it was deleted)
+	resp, err = http.Get(server.URL + "/apis/missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected %v, got %v", http.StatusForbidden, resp.StatusCode)
 	}
 }
 

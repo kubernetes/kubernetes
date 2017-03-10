@@ -130,7 +130,8 @@ func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
 				if errors.IsNotFound(err) {
 					continue // ignore as this can race with deletion of 3rd party APIs
 				}
-				return nil, err
+				// continue as best we can
+				continue
 			}
 			groupResources.VersionedResources[version.Version] = resources.APIResources
 		}

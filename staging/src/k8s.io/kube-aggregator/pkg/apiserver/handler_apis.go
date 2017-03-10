@@ -181,12 +181,14 @@ type apiGroupHandler struct {
 
 	serviceLister   v1listers.ServiceLister
 	endpointsLister v1listers.EndpointsLister
+
+	delegate http.Handler
 }
 
 func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// don't handle URLs that aren't /apis/<groupName>
 	if req.URL.Path != "/apis/"+r.groupName && req.URL.Path != "/apis/"+r.groupName+"/" {
-		http.Error(w, "", http.StatusNotFound)
+		r.delegate.ServeHTTP(w, req)
 		return
 	}
 
