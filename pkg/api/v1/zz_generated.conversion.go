@@ -171,6 +171,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
 		Convert_v1_LocalObjectReference_To_api_LocalObjectReference,
 		Convert_api_LocalObjectReference_To_v1_LocalObjectReference,
+		Convert_v1_LocalStorageVolumeSource_To_api_LocalStorageVolumeSource,
+		Convert_api_LocalStorageVolumeSource_To_v1_LocalStorageVolumeSource,
 		Convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
 		Convert_api_NFSVolumeSource_To_v1_NFSVolumeSource,
 		Convert_v1_Namespace_To_api_Namespace,
@@ -1150,6 +1152,7 @@ func Convert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in *api.D
 
 func autoConvert_v1_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource(in *EmptyDirVolumeSource, out *api.EmptyDirVolumeSource, s conversion.Scope) error {
 	out.Medium = api.StorageMedium(in.Medium)
+	out.Size = in.Size
 	return nil
 }
 
@@ -1159,6 +1162,7 @@ func Convert_v1_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource(in *EmptyDirVol
 
 func autoConvert_api_EmptyDirVolumeSource_To_v1_EmptyDirVolumeSource(in *api.EmptyDirVolumeSource, out *EmptyDirVolumeSource, s conversion.Scope) error {
 	out.Medium = StorageMedium(in.Medium)
+	out.Size = in.Size
 	return nil
 }
 
@@ -1958,6 +1962,26 @@ func Convert_api_LocalObjectReference_To_v1_LocalObjectReference(in *api.LocalOb
 	return autoConvert_api_LocalObjectReference_To_v1_LocalObjectReference(in, out, s)
 }
 
+func autoConvert_v1_LocalStorageVolumeSource_To_api_LocalStorageVolumeSource(in *LocalStorageVolumeSource, out *api.LocalStorageVolumeSource, s conversion.Scope) error {
+	out.Path = in.Path
+	out.NodeName = in.NodeName
+	return nil
+}
+
+func Convert_v1_LocalStorageVolumeSource_To_api_LocalStorageVolumeSource(in *LocalStorageVolumeSource, out *api.LocalStorageVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_LocalStorageVolumeSource_To_api_LocalStorageVolumeSource(in, out, s)
+}
+
+func autoConvert_api_LocalStorageVolumeSource_To_v1_LocalStorageVolumeSource(in *api.LocalStorageVolumeSource, out *LocalStorageVolumeSource, s conversion.Scope) error {
+	out.Path = in.Path
+	out.NodeName = in.NodeName
+	return nil
+}
+
+func Convert_api_LocalStorageVolumeSource_To_v1_LocalStorageVolumeSource(in *api.LocalStorageVolumeSource, out *LocalStorageVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_LocalStorageVolumeSource_To_v1_LocalStorageVolumeSource(in, out, s)
+}
+
 func autoConvert_v1_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource, out *api.NFSVolumeSource, s conversion.Scope) error {
 	out.Server = in.Server
 	out.Path = in.Path
@@ -2590,11 +2614,8 @@ func autoConvert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(i
 	}
 	out.VolumeName = in.VolumeName
 	out.StorageClassName = (*string)(unsafe.Pointer(in.StorageClassName))
+	// WARNING: in.VolumeType requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-func Convert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(in *PersistentVolumeClaimSpec, out *api.PersistentVolumeClaimSpec, s conversion.Scope) error {
-	return autoConvert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(in, out, s)
 }
 
 func autoConvert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(in *api.PersistentVolumeClaimSpec, out *PersistentVolumeClaimSpec, s conversion.Scope) error {
@@ -2605,11 +2626,8 @@ func autoConvert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(i
 	}
 	out.VolumeName = in.VolumeName
 	out.StorageClassName = (*string)(unsafe.Pointer(in.StorageClassName))
+	// WARNING: in.Type requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-func Convert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(in *api.PersistentVolumeClaimSpec, out *PersistentVolumeClaimSpec, s conversion.Scope) error {
-	return autoConvert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(in, out, s)
 }
 
 func autoConvert_v1_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimStatus(in *PersistentVolumeClaimStatus, out *api.PersistentVolumeClaimStatus, s conversion.Scope) error {
@@ -2714,11 +2732,8 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
 	out.PortworxVolume = (*api.PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*api.ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
+	// WARNING: in.LocalStorage requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-func Convert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *PersistentVolumeSource, out *api.PersistentVolumeSource, s conversion.Scope) error {
-	return autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in, out, s)
 }
 
 func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api.PersistentVolumeSource, out *PersistentVolumeSource, s conversion.Scope) error {
@@ -4562,11 +4577,8 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.Projected = (*ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
 	out.PortworxVolume = (*PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
+	// WARNING: in.LocalStorage requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-func Convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *VolumeSource, s conversion.Scope) error {
-	return autoConvert_api_VolumeSource_To_v1_VolumeSource(in, out, s)
 }
 
 func autoConvert_v1_VsphereVirtualDiskVolumeSource_To_api_VsphereVirtualDiskVolumeSource(in *VsphereVirtualDiskVolumeSource, out *api.VsphereVirtualDiskVolumeSource, s conversion.Scope) error {

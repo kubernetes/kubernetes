@@ -106,6 +106,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LoadBalancerIngress, InType: reflect.TypeOf(&LoadBalancerIngress{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LoadBalancerStatus, InType: reflect.TypeOf(&LoadBalancerStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LocalObjectReference, InType: reflect.TypeOf(&LocalObjectReference{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LocalStorageVolumeSource, InType: reflect.TypeOf(&LocalStorageVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NFSVolumeSource, InType: reflect.TypeOf(&NFSVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Namespace, InType: reflect.TypeOf(&Namespace{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceList, InType: reflect.TypeOf(&NamespaceList{})},
@@ -844,6 +845,7 @@ func DeepCopy_api_EmptyDirVolumeSource(in interface{}, out interface{}, c *conve
 		in := in.(*EmptyDirVolumeSource)
 		out := out.(*EmptyDirVolumeSource)
 		*out = *in
+		out.Size = in.Size.DeepCopy()
 		return nil
 	}
 }
@@ -1446,6 +1448,15 @@ func DeepCopy_api_LocalObjectReference(in interface{}, out interface{}, c *conve
 	}
 }
 
+func DeepCopy_api_LocalStorageVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LocalStorageVolumeSource)
+		out := out.(*LocalStorageVolumeSource)
+		*out = *in
+		return nil
+	}
+}
+
 func DeepCopy_api_NFSVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NFSVolumeSource)
@@ -1909,6 +1920,11 @@ func DeepCopy_api_PersistentVolumeClaimSpec(in interface{}, out interface{}, c *
 		}
 		if in.StorageClassName != nil {
 			in, out := &in.StorageClassName, &out.StorageClassName
+			*out = new(string)
+			**out = **in
+		}
+		if in.Type != nil {
+			in, out := &in.Type, &out.Type
 			*out = new(string)
 			**out = **in
 		}
@@ -3357,7 +3373,9 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 		if in.EmptyDir != nil {
 			in, out := &in.EmptyDir, &out.EmptyDir
 			*out = new(EmptyDirVolumeSource)
-			**out = **in
+			if err := DeepCopy_api_EmptyDirVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		if in.GCEPersistentDisk != nil {
 			in, out := &in.GCEPersistentDisk, &out.GCEPersistentDisk
@@ -3500,6 +3518,11 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 			if err := DeepCopy_api_ScaleIOVolumeSource(*in, *out, c); err != nil {
 				return err
 			}
+		}
+		if in.LocalStorage != nil {
+			in, out := &in.LocalStorage, &out.LocalStorage
+			*out = new(LocalStorageVolumeSource)
+			**out = **in
 		}
 		return nil
 	}
