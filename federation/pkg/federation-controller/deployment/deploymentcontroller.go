@@ -596,11 +596,13 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 			fedStatus.Replicas += currentLd.Status.Replicas
 			fedStatus.AvailableReplicas += currentLd.Status.AvailableReplicas
 			fedStatus.UnavailableReplicas += currentLd.Status.UnavailableReplicas
+			fedStatus.ReadyReplicas += currentLd.Status.ReadyReplicas
 		}
 	}
 	if fedStatus.Replicas != fd.Status.Replicas ||
 		fedStatus.AvailableReplicas != fd.Status.AvailableReplicas ||
-		fedStatus.UnavailableReplicas != fd.Status.UnavailableReplicas {
+		fedStatus.UnavailableReplicas != fd.Status.UnavailableReplicas ||
+		fedStatus.ReadyReplicas != fd.Status.ReadyReplicas {
 		fd.Status = fedStatus
 		_, err = fdc.fedClient.Extensions().Deployments(fd.Namespace).UpdateStatus(fd)
 		if err != nil {
