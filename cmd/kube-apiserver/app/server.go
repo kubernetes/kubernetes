@@ -132,12 +132,15 @@ func RunServer(s *options.ServerRunOptions, config *master.Config, sharedInforme
 	if err != nil {
 		return err
 	}
+	// if the files are there, load them. This makes things nice and easy for my demo
+	certBytes, _ := ioutil.ReadFile("/var/run/kubernetes/client-auth-proxy.crt")
+	keyBytes, _ := ioutil.ReadFile("/var/run/kubernetes/client-auth-proxy.key")
+	fmt.Printf("#### 0a got %d %d\n", len(certBytes), len(keyBytes))
 	aggregatorConfig := &aggregatorapiserver.Config{
 		GenericConfig:       config.GenericConfig,
 		CoreAPIServerClient: client,
-		// TODO support this
-		ProxyClientCert: nil,
-		ProxyClientKey:  nil,
+		ProxyClientCert:     certBytes,
+		ProxyClientKey:      keyBytes,
 	}
 	aggregatorServer, err := aggregatorConfig.Complete().NewFromExistingServer(m.GenericAPIServer, stopCh)
 	if err != nil {
