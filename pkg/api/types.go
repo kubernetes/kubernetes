@@ -1391,6 +1391,9 @@ type TCPSocketAction struct {
 	// Required: Port to connect to.
 	// +optional
 	Port intstr.IntOrString
+	// Optional: Host name to connect to, defaults to the pod IP.
+	// +optional
+	Host string
 }
 
 // ExecAction describes a "run in container" action.
