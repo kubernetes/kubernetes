@@ -117,6 +117,7 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddValidateFlags(cmd)
 	return cmd
 }
 
@@ -231,7 +232,11 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 		if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
 			codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
-			object, err = cmdutil.Merge(codec, object, inline, mapping.GroupVersionKind.Kind)
+			schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+			if err != nil {
+				return err
+			}
+			object, err = cmdutil.Merge(codec, object, inline, schema)
 			if err != nil {
 				return err
 			}
