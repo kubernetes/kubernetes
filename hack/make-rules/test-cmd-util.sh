@@ -2979,6 +2979,8 @@ runTests() {
 
   kubectl get "${kube_flags[@]}" --raw /version
 
+  kubectl "${kube_flags[@]}" api-resources
+
   if kube::test::if_supports_resource "${clusterroles}" ; then
     # make sure the server was properly bootstrapped with clusterroles and bindings
     kube::test::get_object_assert clusterroles/cluster-admin "{{.metadata.name}}" 'cluster-admin'

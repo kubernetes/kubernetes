@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "annotate.go",
+        "apiresources.go",
         "apiversions.go",
         "apply.go",
         "apply_set_last_applied.go",
