@@ -37,6 +37,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -47,7 +49,16 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/apiserver/pkg/server/healthz"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	kubeclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
+	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
+	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
+	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
+
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/preflight"
 	"k8s.io/kubernetes/pkg/api"
@@ -92,23 +103,96 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
 	config, sharedInformers, err := BuildMasterConfig(s)
 	if err != nil {
 		return err
 	}
 
-	return RunServer(config, sharedInformers, wait.NeverStop)
+	return RunServer(s, config, sharedInformers, wait.NeverStop)
 }
 
 // RunServer uses the provided config and shared informers to run the apiserver.  It does not return.
-func RunServer(config *master.Config, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) error {
+func RunServer(s *options.ServerRunOptions, config *master.Config, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) error {
+	// if you're running the aggregator, you have to shut off root discovery
+	config.GenericConfig.EnableDiscovery = false
+
 	m, err := config.Complete().New()
 	if err != nil {
 		return err
 	}
 
+	// create the aggregator config based on the kubeapiserver config
+	// insane doesn't not even begin to describe this.  Turns out that you need protobufs to run with the
+	// storagefactory for kube.  this wires us to a different one
+	s.Etcd.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(schema.GroupVersion{Group: "apiregistration.k8s.io", Version: "v1alpha1"})
+	s.Etcd.StorageConfig.Copier = aggregatorapiserver.Scheme
+	config.GenericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{*s.Etcd}
+	client, err := kubeclientset.NewForConfig(config.GenericConfig.LoopbackClientConfig)
+	if err != nil {
+		return err
+	}
+	aggregatorConfig := &aggregatorapiserver.Config{
+		GenericConfig:       config.GenericConfig,
+		CoreAPIServerClient: client,
+		// TODO support this
+		ProxyClientCert: nil,
+		ProxyClientKey:  nil,
+	}
+	aggregatorServer, err := aggregatorConfig.Complete().NewFromExistingServer(m.GenericAPIServer, stopCh)
+	if err != nil {
+		return err
+	}
+	apiRegistrationClient, err := apiregistrationclient.NewForConfig(config.GenericConfig.LoopbackClientConfig)
+	if err != nil {
+		return err
+	}
+	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(), apiRegistrationClient)
+	go autoRegistrationController.Run(5, stopCh)
+
+	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("autoregister-completion", func(r *http.Request) error {
+		items, _ := aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices().Lister().List(labels.Everything())
+		if len(items) < 16 {
+			return fmt.Errorf("missing registration")
+		}
+		return nil
+	}))
+
 	sharedInformers.Start(stopCh)
 	return m.GenericAPIServer.PrepareRun().Run(stopCh)
+}
+
+func registerAPIGroups(registration autoregister.AutoAPIServiceRegistration) {
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "", Version: "v1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "apps", Version: "v1beta1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "authentication.k8s.io", Version: "v1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "authentication.k8s.io", Version: "v1beta1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "authorization.k8s.io", Version: "v1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "authorization.k8s.io", Version: "v1beta1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "autoscaling", Version: "v1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "autoscaling", Version: "v2alpha1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "batch", Version: "v1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "batch", Version: "v2alpha1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1beta1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "extensions", Version: "v1beta1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "policy", Version: "v1beta1"}))
+	// registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "policy", Version: "v1alpha1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1beta1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "settings.k8s.io", Version: "v1alpha1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "storage.k8s.io", Version: "v1"}))
+	registration.AddAPIServiceToSync(makeAPIService(schema.GroupVersion{Group: "storage.k8s.io", Version: "v1beta1"}))
+}
+
+func makeAPIService(gv schema.GroupVersion) *apiregistration.APIService {
+	return &apiregistration.APIService{
+		ObjectMeta: metav1.ObjectMeta{Name: gv.Version + "." + gv.Group},
+		Spec: apiregistration.APIServiceSpec{
+			Group:    gv.Group,
+			Version:  gv.Version,
+			Priority: 100,
+		},
+	}
 }
 
 // BuildMasterConfig creates all the resources for running the API server, but runs none of them
@@ -165,7 +249,8 @@ func BuildMasterConfig(s *options.ServerRunOptions) (*master.Config, informers.S
 	// Since not every generic apiserver has to support protobufs, we
 	// cannot default to it in generic apiserver and need to explicitly
 	// set it in kube-apiserver.
-	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+	// No protobuf for aggregated apiserver
+	// genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
 
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
@@ -360,10 +445,13 @@ func BuildMasterConfig(s *options.ServerRunOptions) (*master.Config, informers.S
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, api.Scheme)
-	genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
-	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
-	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
+	// open API config has problems
+	if false {
+		genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, api.Scheme)
+		genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
+		genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
+		genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
+	}
 	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	genericConfig.EnableMetrics = true
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(

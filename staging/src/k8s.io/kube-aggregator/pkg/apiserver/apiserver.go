@@ -103,6 +103,9 @@ type APIAggregator struct {
 	serviceLister v1listers.ServiceLister
 	// endpointsLister is used by the aggregator handler to determine whether or not to try to expose the group
 	endpointsLister v1listers.EndpointsLister
+
+	// provided for easier embedding
+	APIRegistrationInformers informers.SharedInformerFactory
 }
 
 type completedConfig struct {
@@ -128,27 +131,34 @@ func (c *Config) SkipComplete() completedConfig {
 
 // New returns a new instance of APIAggregator from the given config.
 func (c completedConfig) New(stopCh <-chan struct{}) (*APIAggregator, error) {
+	genericServer, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
+	if err != nil {
+		return nil, err
+	}
+
+	return c.NewFromExistingServer(genericServer, stopCh)
+}
+
+// NewFromExistingServer allows injection of already completed server.  This a very advanced use-case.  You
+// end up needing tight coupling and coordination on the config.  We may improve this moving foward
+func (c completedConfig) NewFromExistingServer(genericServer *genericapiserver.GenericAPIServer, stopCh <-chan struct{}) (*APIAggregator, error) {
 	informerFactory := informers.NewSharedInformerFactory(
 		internalclientset.NewForConfigOrDie(c.Config.GenericConfig.LoopbackClientConfig),
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
 	kubeInformers := kubeinformers.NewSharedInformerFactory(c.CoreAPIServerClient, 5*time.Minute)
 
-	genericServer, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
-	if err != nil {
-		return nil, err
-	}
-
 	s := &APIAggregator{
-		GenericAPIServer: genericServer,
-		contextMapper:    c.GenericConfig.RequestContextMapper,
-		proxyClientCert:  c.ProxyClientCert,
-		proxyClientKey:   c.ProxyClientKey,
-		proxyHandlers:    map[string]*proxyHandler{},
-		handledGroups:    sets.String{},
-		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
-		serviceLister:    kubeInformers.Core().V1().Services().Lister(),
-		endpointsLister:  kubeInformers.Core().V1().Endpoints().Lister(),
+		GenericAPIServer:         genericServer,
+		contextMapper:            c.GenericConfig.RequestContextMapper,
+		proxyClientCert:          c.ProxyClientCert,
+		proxyClientKey:           c.ProxyClientKey,
+		proxyHandlers:            map[string]*proxyHandler{},
+		handledGroups:            sets.String{},
+		lister:                   informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
+		serviceLister:            kubeInformers.Core().V1().Services().Lister(),
+		endpointsLister:          kubeInformers.Core().V1().Endpoints().Lister(),
+		APIRegistrationInformers: informerFactory,
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)

@@ -183,7 +183,8 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, deletableGroupVersionResources)
 	if err != nil {
-		return true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)
+		// return true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)
+		return true, nil
 	}
 	workers := int(ctx.Options.ConcurrentGCSyncs)
 	go garbageCollector.Run(workers, ctx.Stop)
