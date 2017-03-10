@@ -24,7 +24,6 @@ go_library(
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apiserver/pkg/server/options",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
