@@ -3917,6 +3917,10 @@ message VolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 25;
+
+  // LocalStorage represents a logical storage partition that is local to a node
+  // +optional
+  optional LocalStorageVolumeSource localStorage = 27;
 }
 
 // Represents a vSphere volume resource.

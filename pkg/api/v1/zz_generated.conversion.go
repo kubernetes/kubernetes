@@ -4554,6 +4554,7 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	out.Projected = (*api.ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
 	out.PortworxVolume = (*api.PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*api.ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
+	out.LocalStorage = (*api.LocalStorageVolumeSource)(unsafe.Pointer(in.LocalStorage))
 	return nil
 }
 
@@ -4588,6 +4589,7 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.Projected = (*ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
 	out.PortworxVolume = (*PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
 	out.ScaleIO = (*ScaleIOVolumeSource)(unsafe.Pointer(in.ScaleIO))
+	out.LocalStorage = (*LocalStorageVolumeSource)(unsafe.Pointer(in.LocalStorage))
 	return nil
 }
 
