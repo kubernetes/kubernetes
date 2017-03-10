@@ -1492,6 +1492,9 @@ type TCPSocketAction struct {
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
 	Port intstr.IntOrString `json:"port" protobuf:"bytes,1,opt,name=port"`
+	// Optional: Host name to connect to, defaults to the pod IP.
+	// +optional
+	Host string `json:"host,omitempty" protobuf:"bytes,2,opt,name=host"`
 }
 
 // ExecAction describes a "run in container" action.
