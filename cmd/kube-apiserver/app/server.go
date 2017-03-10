@@ -43,7 +43,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -51,6 +50,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/preflight"
 	"k8s.io/kubernetes/pkg/api"
@@ -94,31 +94,52 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(s *options.ServerRunOptions) error {
-	config, sharedInformers, err := BuildMasterConfig(s)
+func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
+	kubeAPIServerConfig, sharedInformers, err := CreateKubeAPIServerConfig(runOptions)
+	if err != nil {
+		return err
+	}
+	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers, stopCh)
 	if err != nil {
 		return err
 	}
 
-	return RunServer(config, sharedInformers, wait.NeverStop)
+	// if we're starting up a hacked up version of this API server for a weird test case,
+	// just start the API server as is because clients don't get built correctly when you do this
+	if len(os.Getenv("KUBE_API_VERSIONS")) > 0 {
+		return kubeAPIServer.GenericAPIServer.PrepareRun().Run(stopCh)
+	}
+
+	// otherwise go down the normal path of standing the aggregator up in front of the API server
+	// this wires up openapi
+	kubeAPIServer.GenericAPIServer.PrepareRun()
+	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, runOptions)
+	if err != nil {
+		return err
+	}
+	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, stopCh)
+	if err != nil {
+		return err
+	}
+	return aggregatorServer.GenericAPIServer.PrepareRun().Run(stopCh)
 }
 
-// RunServer uses the provided config and shared informers to run the apiserver.  It does not return.
-func RunServer(config *master.Config, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) error {
-	m, err := config.Complete().New()
+// CreateKubeAPIServer creates and wires a workable kube-apiserver
+func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) (*master.Master, error) {
+	kubeAPIServer, err := kubeAPIServerConfig.Complete().New()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	m.GenericAPIServer.AddPostStartHook("start-kube-apiserver-informers", func(context genericapiserver.PostStartHookContext) error {
+	kubeAPIServer.GenericAPIServer.AddPostStartHook("start-kube-apiserver-informers", func(context genericapiserver.PostStartHookContext) error {
 		sharedInformers.Start(stopCh)
 		return nil
 	})
 
-	return m.GenericAPIServer.PrepareRun().Run(stopCh)
+	return kubeAPIServer, nil
 }
 
-// BuildMasterConfig creates all the resources for running the API server, but runs none of them
-func BuildMasterConfig(s *options.ServerRunOptions) (*master.Config, informers.SharedInformerFactory, error) {
+// CreateKubeAPIServerConfig creates all the resources for running the API server, but runs none of them
+func CreateKubeAPIServerConfig(s *options.ServerRunOptions) (*master.Config, informers.SharedInformerFactory, error) {
 	// set defaults in the options before trying to create the generic config
 	if err := defaultOptions(s); err != nil {
 		return nil, nil, err
