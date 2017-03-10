@@ -181,18 +181,14 @@ func deleteConfigMapFromCluster(hostClientset internalclientset.Interface, secre
 	if err != nil {
 		return err
 	}
+
 	if _, ok := configMap.Data[util.FedDomainMapKey]; !ok {
-		return clientset.Core().ConfigMaps(metav1.NamespaceSystem).Delete(util.KubeDnsConfigmapName, &metav1.DeleteOptions{})
+		return nil
 	}
+	configMap.Data[util.FedDomainMapKey] = removeConfigMapString(configMap.Data[util.FedDomainMapKey], domainMap)
 
-	newFedMapValue := removeConfigMapString(configMap.Data[util.FedDomainMapKey], domainMap)
-	if newFedMapValue != "" {
-		configMap.Data[util.FedDomainMapKey] = newFedMapValue
-		_, err := clientset.Core().ConfigMaps(metav1.NamespaceSystem).Update(configMap)
-		return err
-	}
-
-	return clientset.Core().ConfigMaps(metav1.NamespaceSystem).Delete(util.KubeDnsConfigmapName, &metav1.DeleteOptions{})
+	_, err = clientset.Core().ConfigMaps(metav1.NamespaceSystem).Update(configMap)
+	return err
 }
 
 // deleteSecret deletes the secret with the given name from the host
