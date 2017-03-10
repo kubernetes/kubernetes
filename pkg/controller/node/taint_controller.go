@@ -44,41 +44,6 @@ const (
 	retries               = 5
 )
 
-func computeTaintDifference(left []v1.Taint, right []v1.Taint) []v1.Taint {
-	result := []v1.Taint{}
-	for i := range left {
-		found := false
-		for j := range right {
-			if left[i] == right[j] {
-				found = true
-				break
-			}
-		}
-		if !found {
-			result = append(result, left[i])
-		}
-	}
-	return result
-}
-
-// copy of 'computeTaintDifference' - long live lack of generics...
-func computeTolerationDifference(left []v1.Toleration, right []v1.Toleration) []v1.Toleration {
-	result := []v1.Toleration{}
-	for i := range left {
-		found := false
-		for j := range right {
-			if left[i] == right[j] {
-				found = true
-				break
-			}
-		}
-		if !found {
-			result = append(result, left[i])
-		}
-	}
-	return result
-}
-
 // Needed to make workqueue work
 type updateItemInterface interface{}
 
