@@ -259,7 +259,8 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 			return dc.client.Extensions().ReplicaSets(rsCopy.ObjectMeta.Namespace).Update(rsCopy)
 		}
 
-		updateConditions := deploymentutil.SetDeploymentRevision(deployment, newRevision)
+		// Should use the revision in existingNewRS's annotation, since it set by before
+		updateConditions := deploymentutil.SetDeploymentRevision(deployment, rsCopy.Annotations[deploymentutil.RevisionAnnotation])
 		// If no other Progressing condition has been recorded and we need to estimate the progress
 		// of this deployment then it is likely that old users started caring about progress. In that
 		// case we need to take into account the first time we noticed their new replica set.
