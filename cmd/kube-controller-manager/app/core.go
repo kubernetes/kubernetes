@@ -22,7 +22,11 @@ package app
 
 import (
 	"fmt"
+	"math"
+	"os"
+	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -41,6 +45,7 @@ import (
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
+	kubectlutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 )
 
@@ -162,10 +167,9 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 
-	// TODO: should use a dynamic RESTMapper built from the discovery results.
+	gcClientset := ctx.ClientBuilder.ClientOrDie("generic-garbage-collector")
 	restMapper := api.Registry.RESTMapper()
 
-	gcClientset := ctx.ClientBuilder.ClientOrDie("generic-garbage-collector")
 	preferredResources, err := gcClientset.Discovery().ServerPreferredResources()
 	if err != nil {
 		return true, fmt.Errorf("failed to get supported resources from server: %v", err)
@@ -176,12 +180,16 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 		return true, fmt.Errorf("Failed to parse resources from server: %v", err)
 	}
 
+	// create clientPool for GC
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 	metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig = dynamic.ContentConfig()
 	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-	garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, deletableGroupVersionResources)
+	// create dynamic RESTMapper for GC
+	cachedDiscoveryClient := kubectlutil.NewCachedDiscoveryClient(gcClientset.Discovery(), os.TempDir(), time.Duration(math.MaxInt64))
+	dynamicMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoveryClient, meta.InterfacesForUnstructured)
+	garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, dynamicMapper, deletableGroupVersionResources)
 	if err != nil {
 		return true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)
 	}

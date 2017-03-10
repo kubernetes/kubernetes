@@ -17,12 +17,15 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -36,12 +39,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	kubectlutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func TestNewGarbageCollector(t *testing.T) {
@@ -51,7 +56,9 @@ func TestNewGarbageCollector(t *testing.T) {
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	podResource := map[schema.GroupVersionResource]struct{}{schema.GroupVersionResource{Version: "v1", Resource: "pods"}: {}}
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource)
+	cachedDiscoveryClient := kubectlutil.NewCachedDiscoveryClient(discovery.NewDiscoveryClientForConfigOrDie(config), os.TempDir(), time.Duration(math.MaxInt64))
+	dynamicMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoveryClient, meta.InterfacesForUnstructured)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, dynamicMapper, podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +122,9 @@ func setupGC(t *testing.T, config *restclient.Config) *GarbageCollector {
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	podResource := map[schema.GroupVersionResource]struct{}{schema.GroupVersionResource{Version: "v1", Resource: "pods"}: {}}
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource)
+	cachedDiscoveryClient := kubectlutil.NewCachedDiscoveryClient(discovery.NewDiscoveryClientForConfigOrDie(config), os.TempDir(), time.Duration(math.MaxInt64))
+	dynamicMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoveryClient, meta.InterfacesForUnstructured)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, dynamicMapper, podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
