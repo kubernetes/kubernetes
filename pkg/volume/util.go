@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
@@ -386,16 +385,6 @@ func MountOptionFromSpec(spec *Spec, options ...string) []string {
 
 	}
 	return options
-}
-
-// MountOptionFromApiPV extracts mount options from api.PersistentVolume
-func MountOptionFromApiPV(pv *api.PersistentVolume) []string {
-	mountOptions := []string{}
-	if mo, ok := pv.Annotations[MountOptionAnnotation]; ok {
-		moList := strings.Split(mo, ",")
-		return JoinMountOptions(moList, mountOptions)
-	}
-	return mountOptions
 }
 
 // JoinMountOptions joins mount options eliminating duplicates
