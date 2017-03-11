@@ -262,6 +262,7 @@ federated-api-qps
 federated-kube-context
 federation-name
 federation-system-namespace
+federation-upgrade-target
 file-check-frequency
 file_content_in_loop
 file-suffix
