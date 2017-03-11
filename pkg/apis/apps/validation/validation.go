@@ -86,7 +86,13 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) fi
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"), spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
 	}
-
+	if len(spec.ServiceName) == 0 {
+		return append(allErrs, field.Required(fldPath.Child("serviceName"), ""))
+	} else {
+		for _, msg := range apivalidation.ValidateServiceName(spec.ServiceName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceName"), spec.ServiceName, msg))
+		}
+	}
 	return allErrs
 }
 
