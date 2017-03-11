@@ -32,8 +32,8 @@ type testActivePodsLister struct {
 	activePods []*v1.Pod
 }
 
-func (tapl *testActivePodsLister) GetRunningPods() ([]*v1.Pod, error) {
-	return tapl.activePods, nil
+func (tapl *testActivePodsLister) GetActivePods() []*v1.Pod {
+	return tapl.activePods
 }
 
 func makeTestPod(numContainers, gpusPerContainer int) *v1.Pod {
