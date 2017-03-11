@@ -339,15 +339,16 @@ func markPodsReady(store cache.Store) {
 
 // DaemonSets without node selectors should launch pods on every node.
 func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
-	manager, podControl, _ := newTestController()
-	addNodes(manager.nodeStore, 0, 5, nil)
 	ds := newDaemonSet("foo")
+	manager, podControl, _ := newTestController(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
 }
 
 func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
-	manager, podControl, clientset := newTestController()
+	ds := newDaemonSet("foo")
+	manager, podControl, clientset := newTestController(ds)
 
 	var updated *extensions.DaemonSet
 	clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -360,7 +361,6 @@ func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
 		return false, nil, nil
 	})
 
-	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
 	addNodes(manager.nodeStore, 0, 5, nil)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
@@ -383,33 +383,33 @@ func TestNoNodesDoesNothing(t *testing.T) {
 // DaemonSets without node selectors should launch on a single node in a
 // single node cluster.
 func TestOneNodeDaemonLaunchesPod(t *testing.T) {
-	manager, podControl, _ := newTestController()
-	manager.nodeStore.Add(newNode("only-node", nil))
 	ds := newDaemonSet("foo")
+	manager, podControl, _ := newTestController(ds)
+	manager.nodeStore.Add(newNode("only-node", nil))
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
 // DaemonSets should place onto NotReady nodes
 func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	manager, podControl, _ := newTestController(ds)
 	node := newNode("not-ready", nil)
 	node.Status.Conditions = []v1.NodeCondition{
 		{Type: v1.NodeReady, Status: v1.ConditionFalse},
 	}
 	manager.nodeStore.Add(node)
-	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
 // DaemonSets should not place onto OutOfDisk nodes
 func TestOutOfDiskNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	manager, podControl, _ := newTestController(ds)
 	node := newNode("not-enough-disk", nil)
 	node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
 	manager.nodeStore.Add(node)
-	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
@@ -436,15 +436,15 @@ func allocatableResources(memory, cpu string) v1.ResourceList {
 // DaemonSets should not place onto nodes with insufficient free resource
 func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	manager, podControl, _ := newTestController(ds)
 	node := newNode("too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("100M", "200m")
 	manager.nodeStore.Add(node)
 	manager.podStore.Add(&v1.Pod{
 		Spec: podSpec,
 	})
-	ds := newDaemonSet("foo")
-	ds.Spec.Template.Spec = podSpec
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
@@ -453,22 +453,24 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 func TestInsufficentCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T) {
 	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 	podSpec.NodeName = "too-much-mem"
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	manager, podControl, _ := newTestController(ds)
 	node := newNode("too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("100M", "200m")
 	manager.nodeStore.Add(node)
 	manager.podStore.Add(&v1.Pod{
 		Spec: podSpec,
 	})
-	ds := newDaemonSet("foo")
-	ds.Spec.Template.Spec = podSpec
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
 func TestSufficientCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	manager, podControl, _ := newTestController(ds)
 	node := newNode("too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("100M", "200m")
 	manager.nodeStore.Add(node)
@@ -476,8 +478,6 @@ func TestSufficientCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 		Spec:   podSpec,
 		Status: v1.PodStatus{Phase: v1.PodSucceeded},
 	})
-	ds := newDaemonSet("foo")
-	ds.Spec.Template.Spec = podSpec
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
@@ -485,30 +485,29 @@ func TestSufficientCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 // DaemonSets should place onto nodes with sufficient free resource
 func TestSufficientCapacityNodeDaemonLaunchesPod(t *testing.T) {
 	podSpec := resourcePodSpec("not-too-much-mem", "75M", "75m")
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	manager, podControl, _ := newTestController(ds)
 	node := newNode("not-too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("200M", "200m")
 	manager.nodeStore.Add(node)
 	manager.podStore.Add(&v1.Pod{
 		Spec: podSpec,
 	})
-	ds := newDaemonSet("foo")
-	ds.Spec.Template.Spec = podSpec
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
 // DaemonSet should launch a pod on a node with taint NetworkUnavailable condition.
 func TestNetworkUnavailableNodeDaemonLaunchesPod(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("simple")
+	manager, podControl, _ := newTestController(ds)
 
 	node := newNode("network-unavailable", nil)
 	node.Status.Conditions = []v1.NodeCondition{
 		{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionTrue},
 	}
 	manager.nodeStore.Add(node)
-
-	ds := newDaemonSet("simple")
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
@@ -517,18 +516,38 @@ func TestNetworkUnavailableNodeDaemonLaunchesPod(t *testing.T) {
 // DaemonSets not take any actions when being deleted
 func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 	podSpec := resourcePodSpec("not-too-much-mem", "75M", "75m")
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	now := metav1.Now()
+	ds.DeletionTimestamp = &now
+	manager, podControl, _ := newTestController(ds)
 	node := newNode("not-too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("200M", "200m")
 	manager.nodeStore.Add(node)
 	manager.podStore.Add(&v1.Pod{
 		Spec: podSpec,
 	})
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+}
+
+func TestDontDoAnythingIfBeingDeletedRace(t *testing.T) {
+	// Bare client says it IS deleted.
 	ds := newDaemonSet("foo")
-	ds.Spec.Template.Spec = podSpec
 	now := metav1.Now()
 	ds.DeletionTimestamp = &now
-	manager.dsStore.Add(ds)
+	manager, podControl, _ := newTestController(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
+
+	// Lister (cache) says it's NOT deleted.
+	ds2 := *ds
+	ds2.DeletionTimestamp = nil
+	manager.dsStore.Add(&ds2)
+
+	// The existence of a matching orphan should block all actions in this state.
+	pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, nil)
+	manager.podStore.Add(pod)
+
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
@@ -603,14 +622,14 @@ func TestNoPortConflictNodeDaemonLaunchesPod(t *testing.T) {
 			}},
 		}},
 	}
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec2
+	manager, podControl, _ := newTestController(ds)
 	node := newNode("no-port-conflict", nil)
 	manager.nodeStore.Add(node)
 	manager.podStore.Add(&v1.Pod{
 		Spec: podSpec1,
 	})
-	ds := newDaemonSet("foo")
-	ds.Spec.Template.Spec = podSpec2
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
@@ -619,19 +638,6 @@ func TestNoPortConflictNodeDaemonLaunchesPod(t *testing.T) {
 //
 // issue https://github.com/kubernetes/kubernetes/pull/23223
 func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
-	manager, podControl, _ := newTestController()
-	manager.nodeStore.Add(newNode("node1", nil))
-	// Create pod not controlled by a daemonset.
-	manager.podStore.Add(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:    map[string]string{"bang": "boom"},
-			Namespace: metav1.NamespaceDefault,
-		},
-		Spec: v1.PodSpec{
-			NodeName: "node1",
-		},
-	})
-
 	// Create a misconfigured DaemonSet. An empty pod selector is invalid but could happen
 	// if we upgrade and make a backwards incompatible change.
 	//
@@ -645,6 +651,19 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 	ls := metav1.LabelSelector{}
 	ds.Spec.Selector = &ls
 	ds.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
+
+	manager, podControl, _ := newTestController(ds)
+	manager.nodeStore.Add(newNode("node1", nil))
+	// Create pod not controlled by a daemonset.
+	manager.podStore.Add(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    map[string]string{"bang": "boom"},
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: v1.PodSpec{
+			NodeName: "node1",
+		},
+	})
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
@@ -652,8 +671,8 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 
 // Controller should not create pods on nodes which have daemon pods, and should remove excess pods from nodes that have extra pods.
 func TestDealsWithExistingPods(t *testing.T) {
-	manager, podControl, _ := newTestController()
 	ds := newDaemonSet("foo")
+	manager, podControl, _ := newTestController(ds)
 	manager.dsStore.Add(ds)
 	addNodes(manager.nodeStore, 0, 5, nil)
 	addPods(manager.podStore, "node-1", simpleDaemonSetLabel, ds, 1)
@@ -665,20 +684,20 @@ func TestDealsWithExistingPods(t *testing.T) {
 
 // Daemon with node selector should launch pods on nodes matching selector.
 func TestSelectorDaemonLaunchesPods(t *testing.T) {
-	manager, podControl, _ := newTestController()
-	addNodes(manager.nodeStore, 0, 4, nil)
-	addNodes(manager.nodeStore, 4, 3, simpleNodeLabel)
 	daemon := newDaemonSet("foo")
 	daemon.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	manager, podControl, _ := newTestController(daemon)
+	addNodes(manager.nodeStore, 0, 4, nil)
+	addNodes(manager.nodeStore, 4, 3, simpleNodeLabel)
 	manager.dsStore.Add(daemon)
 	syncAndValidateDaemonSets(t, manager, daemon, podControl, 3, 0)
 }
 
 // Daemon with node selector should delete pods from nodes that do not satisfy selector.
 func TestSelectorDaemonDeletesUnselectedPods(t *testing.T) {
-	manager, podControl, _ := newTestController()
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	manager, podControl, _ := newTestController(ds)
 	manager.dsStore.Add(ds)
 	addNodes(manager.nodeStore, 0, 5, nil)
 	addNodes(manager.nodeStore, 5, 5, simpleNodeLabel)
@@ -691,9 +710,9 @@ func TestSelectorDaemonDeletesUnselectedPods(t *testing.T) {
 
 // DaemonSet with node selector should launch pods on nodes matching selector, but also deal with existing pods on nodes.
 func TestSelectorDaemonDealsWithExistingPods(t *testing.T) {
-	manager, podControl, _ := newTestController()
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	manager, podControl, _ := newTestController(ds)
 	manager.dsStore.Add(ds)
 	addNodes(manager.nodeStore, 0, 5, nil)
 	addNodes(manager.nodeStore, 5, 5, simpleNodeLabel)
@@ -721,53 +740,50 @@ func TestBadSelectorDaemonDoesNothing(t *testing.T) {
 
 // DaemonSet with node name should launch pod on node with corresponding name.
 func TestNameDaemonSetLaunchesPods(t *testing.T) {
-	manager, podControl, _ := newTestController()
-	addNodes(manager.nodeStore, 0, 5, nil)
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec.NodeName = "node-0"
+	manager, podControl, _ := newTestController(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
 // DaemonSet with node name that does not exist should not launch pods.
 func TestBadNameDaemonSetDoesNothing(t *testing.T) {
-	manager, podControl, _ := newTestController()
-	addNodes(manager.nodeStore, 0, 5, nil)
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec.NodeName = "node-10"
+	manager, podControl, _ := newTestController(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
 // DaemonSet with node selector, and node name, matching a node, should launch a pod on the node.
 func TestNameAndSelectorDaemonSetLaunchesPods(t *testing.T) {
-	manager, podControl, _ := newTestController()
-	addNodes(manager.nodeStore, 0, 4, nil)
-	addNodes(manager.nodeStore, 4, 3, simpleNodeLabel)
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
 	ds.Spec.Template.Spec.NodeName = "node-6"
+	manager, podControl, _ := newTestController(ds)
+	addNodes(manager.nodeStore, 0, 4, nil)
+	addNodes(manager.nodeStore, 4, 3, simpleNodeLabel)
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
 // DaemonSet with node selector that matches some nodes, and node name that matches a different node, should do nothing.
 func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
-	manager, podControl, _ := newTestController()
-	addNodes(manager.nodeStore, 0, 4, nil)
-	addNodes(manager.nodeStore, 4, 3, simpleNodeLabel)
 	ds := newDaemonSet("foo")
 	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
 	ds.Spec.Template.Spec.NodeName = "node-0"
+	manager, podControl, _ := newTestController(ds)
+	addNodes(manager.nodeStore, 0, 4, nil)
+	addNodes(manager.nodeStore, 4, 3, simpleNodeLabel)
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
 // Daemon with node affinity should launch pods on nodes matching affinity.
 func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
-	manager, podControl, _ := newTestController()
-	addNodes(manager.nodeStore, 0, 4, nil)
-	addNodes(manager.nodeStore, 4, 3, simpleNodeLabel)
 	daemon := newDaemonSet("foo")
 	daemon.Spec.Template.Spec.Affinity = &v1.Affinity{
 		NodeAffinity: &v1.NodeAffinity{
@@ -786,13 +802,17 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 			},
 		},
 	}
+
+	manager, podControl, _ := newTestController(daemon)
+	addNodes(manager.nodeStore, 0, 4, nil)
+	addNodes(manager.nodeStore, 4, 3, simpleNodeLabel)
 	manager.dsStore.Add(daemon)
 	syncAndValidateDaemonSets(t, manager, daemon, podControl, 3, 0)
 }
 
 func TestNumberReadyStatus(t *testing.T) {
 	ds := newDaemonSet("foo")
-	manager, podControl, clientset := newTestController()
+	manager, podControl, clientset := newTestController(ds)
 	var updated *extensions.DaemonSet
 	clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		if action.GetSubresource() != "status" {
@@ -829,7 +849,7 @@ func TestNumberReadyStatus(t *testing.T) {
 func TestObservedGeneration(t *testing.T) {
 	ds := newDaemonSet("foo")
 	ds.Generation = 1
-	manager, podControl, clientset := newTestController()
+	manager, podControl, clientset := newTestController(ds)
 	var updated *extensions.DaemonSet
 	clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		if action.GetSubresource() != "status" {
@@ -866,8 +886,8 @@ func TestDaemonKillFailedPods(t *testing.T) {
 
 	for _, test := range tests {
 		t.Logf("test case: %s\n", test.test)
-		manager, podControl, _ := newTestController()
 		ds := newDaemonSet("foo")
+		manager, podControl, _ := newTestController(ds)
 		manager.dsStore.Add(ds)
 		addNodes(manager.nodeStore, 0, 1, nil)
 		addFailedPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, test.numFailedPods)
@@ -878,13 +898,12 @@ func TestDaemonKillFailedPods(t *testing.T) {
 
 // DaemonSet should not launch a pod on a tainted node when the pod doesn't tolerate that taint.
 func TestTaintedNodeDaemonDoesNotLaunchUntoleratePod(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("untolerate")
+	manager, podControl, _ := newTestController(ds)
 
 	node := newNode("tainted", nil)
 	setNodeTaint(node, noScheduleTaints)
 	manager.nodeStore.Add(node)
-
-	ds := newDaemonSet("untolerate")
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
@@ -892,14 +911,13 @@ func TestTaintedNodeDaemonDoesNotLaunchUntoleratePod(t *testing.T) {
 
 // DaemonSet should launch a pod on a tainted node when the pod can tolerate that taint.
 func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("tolerate")
+	setDaemonSetToleration(ds, noScheduleTolerations)
+	manager, podControl, _ := newTestController(ds)
 
 	node := newNode("tainted", nil)
 	setNodeTaint(node, noScheduleTaints)
 	manager.nodeStore.Add(node)
-
-	ds := newDaemonSet("tolerate")
-	setDaemonSetToleration(ds, noScheduleTolerations)
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
@@ -907,7 +925,8 @@ func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
 
 // DaemonSet should launch a pod on a not ready node with taint notReady:NoExecute.
 func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("simple")
+	manager, podControl, _ := newTestController(ds)
 
 	node := newNode("tainted", nil)
 	setNodeTaint(node, nodeNotReady)
@@ -915,8 +934,6 @@ func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
 		{Type: v1.NodeReady, Status: v1.ConditionFalse},
 	}
 	manager.nodeStore.Add(node)
-
-	ds := newDaemonSet("simple")
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
@@ -924,7 +941,8 @@ func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
 
 // DaemonSet should launch a pod on an unreachable node with taint unreachable:NoExecute.
 func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("simple")
+	manager, podControl, _ := newTestController(ds)
 
 	node := newNode("tainted", nil)
 	setNodeTaint(node, nodeUnreachable)
@@ -932,8 +950,6 @@ func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
 		{Type: v1.NodeReady, Status: v1.ConditionUnknown},
 	}
 	manager.nodeStore.Add(node)
-
-	ds := newDaemonSet("simple")
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
@@ -941,13 +957,12 @@ func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
 
 // DaemonSet should launch a pod on an untainted node when the pod has tolerations.
 func TestNodeDaemonLaunchesToleratePod(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("tolerate")
+	setDaemonSetToleration(ds, noScheduleTolerations)
+	manager, podControl, _ := newTestController(ds)
 
 	node := newNode("untainted", nil)
 	manager.nodeStore.Add(node)
-
-	ds := newDaemonSet("tolerate")
-	setDaemonSetToleration(ds, noScheduleTolerations)
 	manager.dsStore.Add(ds)
 
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
@@ -963,7 +978,9 @@ func setDaemonSetToleration(ds *extensions.DaemonSet, tolerations []v1.Toleratio
 
 // DaemonSet should launch a critical pod even when the node is OutOfDisk.
 func TestOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("critical")
+	setDaemonSetCritical(ds)
+	manager, podControl, _ := newTestController(ds)
 
 	node := newNode("not-enough-disk", nil)
 	node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
@@ -971,8 +988,6 @@ func TestOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
 
 	// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
 	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
-	ds := newDaemonSet("critical")
-	setDaemonSetCritical(ds)
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 
@@ -984,7 +999,11 @@ func TestOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
 // DaemonSet should launch a critical pod even when the node has insufficient free resource.
 func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("critical")
+	ds.Spec.Template.Spec = podSpec
+	setDaemonSetCritical(ds)
+
+	manager, podControl, _ := newTestController(ds)
 	node := newNode("too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("100M", "200m")
 	manager.nodeStore.Add(node)
@@ -994,9 +1013,6 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 
 	// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
 	utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
-	ds := newDaemonSet("critical")
-	ds.Spec.Template.Spec = podSpec
-	setDaemonSetCritical(ds)
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 
@@ -1220,9 +1236,9 @@ func TestUpdateNode(t *testing.T) {
 }
 
 func TestGetNodesToDaemonPods(t *testing.T) {
-	manager, _, _ := newTestController()
 	ds := newDaemonSet("foo")
 	ds2 := newDaemonSet("foo2")
+	manager, _, _ := newTestController(ds, ds2)
 	manager.dsStore.Add(ds)
 	manager.dsStore.Add(ds2)
 	addNodes(manager.nodeStore, 0, 2, nil)
