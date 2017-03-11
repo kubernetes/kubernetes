@@ -84,7 +84,7 @@ func init() {
 			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup).Resources("daemonsets").RuleOrDie(),
 			rbac.NewRule("update").Groups(extensionsGroup).Resources("daemonsets/status").RuleOrDie(),
 			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-			rbac.NewRule("list", "watch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			rbac.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("create").Groups(legacyGroup).Resources("pods/binding").RuleOrDie(),
 			eventsRule(),
 		},
