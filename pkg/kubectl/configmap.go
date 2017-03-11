@@ -66,7 +66,7 @@ func (s ConfigMapGeneratorV1) Generate(genericParams map[string]interface{}) (ru
 	if found {
 		fromLiteralArray, isArray := fromLiteralStrings.([]string)
 		if !isArray {
-			return nil, fmt.Errorf("expected []string, found :%v", fromFileStrings)
+			return nil, fmt.Errorf("expected []string, found :%v", fromLiteralStrings)
 		}
 		delegate.LiteralSources = fromLiteralArray
 		delete(genericParams, "from-literal")
