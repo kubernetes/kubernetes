@@ -192,7 +192,7 @@ function wait-for-master() {
 # Assumed vars
 #   KUBE_VERSION
 function prepare-upgrade() {
-  ensure-temp-dir
+  kube::util::ensure-temp-dir
   detect-project
   detect-node-names # sets INSTANCE_GROUPS
   write-cluster-name
