@@ -52,29 +52,29 @@ func (s ClusterRoleBindingGeneratorV1) Generate(genericParams map[string]interfa
 		return nil, err
 	}
 	delegate := &ClusterRoleBindingGeneratorV1{}
-	fromFileStrings, found := genericParams["user"]
+	userStrings, found := genericParams["user"]
 	if found {
-		fromFileArray, isArray := fromFileStrings.([]string)
+		fromFileArray, isArray := userStrings.([]string)
 		if !isArray {
-			return nil, fmt.Errorf("expected []string, found :%v", fromFileStrings)
+			return nil, fmt.Errorf("expected []string, found :%v", userStrings)
 		}
 		delegate.Users = fromFileArray
 		delete(genericParams, "user")
 	}
-	fromLiteralStrings, found := genericParams["group"]
+	groupStrings, found := genericParams["group"]
 	if found {
-		fromLiteralArray, isArray := fromLiteralStrings.([]string)
+		fromLiteralArray, isArray := groupStrings.([]string)
 		if !isArray {
-			return nil, fmt.Errorf("expected []string, found :%v", fromFileStrings)
+			return nil, fmt.Errorf("expected []string, found :%v", groupStrings)
 		}
 		delegate.Groups = fromLiteralArray
 		delete(genericParams, "group")
 	}
-	fromSAStrings, found := genericParams["serviceaccount"]
+	saStrings, found := genericParams["serviceaccount"]
 	if found {
-		fromLiteralArray, isArray := fromSAStrings.([]string)
+		fromLiteralArray, isArray := saStrings.([]string)
 		if !isArray {
-			return nil, fmt.Errorf("expected []string, found :%v", fromFileStrings)
+			return nil, fmt.Errorf("expected []string, found :%v", saStrings)
 		}
 		delegate.ServiceAccounts = fromLiteralArray
 		delete(genericParams, "serviceaccount")
