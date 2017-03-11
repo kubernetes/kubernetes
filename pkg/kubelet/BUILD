@@ -238,7 +238,6 @@ filegroup(
         ":package-srcs",
         "//pkg/kubelet/api:all-srcs",
         "//pkg/kubelet/cadvisor:all-srcs",
-        "//pkg/kubelet/certificate:all-srcs",
         "//pkg/kubelet/client:all-srcs",
         "//pkg/kubelet/cm:all-srcs",
         "//pkg/kubelet/config:all-srcs",
