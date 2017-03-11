@@ -99,7 +99,7 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	for {
 		event, ok := <-podCh
 		if !ok {
-			glog.V(5).Infof("recycler pod %q watch channel had been closed", pod.Name)
+			return fmt.Errorf("recycler pod %q watch channel had been closed", pod.Name)
 		}
 		switch event.Object.(type) {
 		case *v1.Pod:
@@ -221,19 +221,20 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 						return
 					}
 					podWatchChannelClosed = true
+				} else {
+					podWatchChannelClosed = false
+					eventCh <- podEvent
 				}
-				podWatchChannelClosed = false
-				eventCh <- podEvent
-
 			case eventEvent, ok := <-eventWatch.ResultChan():
 				if !ok {
 					if podWatchChannelClosed == true {
 						return
 					}
 					eventWatchChannelClosed = true
+				} else {
+					eventWatchChannelClosed = false
+					eventCh <- eventEvent
 				}
-				eventWatchChannelClosed = false
-				eventCh <- eventEvent
 			}
 		}
 	}()
