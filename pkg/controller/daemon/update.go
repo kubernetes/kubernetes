@@ -36,6 +36,10 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *extensions.DaemonSet) error {
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
+	// Check DeletionTimestamp again because it may have been refreshed by getNodesToDaemonPods().
+	if ds.DeletionTimestamp != nil {
+		return nil
+	}
 
 	_, oldPods, err := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods)
 	maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, nodeToDaemonPods)

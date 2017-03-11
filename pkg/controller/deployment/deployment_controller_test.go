@@ -148,6 +148,11 @@ type fixture struct {
 	objects []runtime.Object
 }
 
+func (f *fixture) expectGetDeploymentAction(d *extensions.Deployment) {
+	action := core.NewGetAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d.Name)
+	f.actions = append(f.actions, action)
+}
+
 func (f *fixture) expectUpdateDeploymentStatusAction(d *extensions.Deployment) {
 	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
 	action.Subresource = "status"
@@ -247,6 +252,7 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 
 	rs := newReplicaSet(d, "deploymentrs-4186632231", 1)
 
+	f.expectGetDeploymentAction(d) // Expect to recheck DeletionTimestamp.
 	f.expectCreateRSAction(rs)
 	f.expectUpdateDeploymentStatusAction(d)
 	f.expectUpdateDeploymentStatusAction(d)
@@ -263,6 +269,24 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	f.dLister = append(f.dLister, d)
 	f.objects = append(f.objects, d)
 
+	f.expectGetDeploymentAction(d) // Expect to recheck DeletionTimestamp.
+	f.expectUpdateDeploymentStatusAction(d)
+	f.run(getKey(d, t))
+}
+
+func TestSyncDeploymentDeletionRace(t *testing.T) {
+	f := newFixture(t)
+
+	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := *d
+	// Lister (cache) says NOT deleted.
+	f.dLister = append(f.dLister, d)
+	// Bare client says it IS deleted. This should be presumed more up-to-date.
+	now := metav1.Now()
+	d2.DeletionTimestamp = &now
+	f.objects = append(f.objects, &d2)
+
+	f.expectGetDeploymentAction(d) // Expect to recheck DeletionTimestamp.
 	f.expectUpdateDeploymentStatusAction(d)
 	f.run(getKey(d, t))
 }
@@ -306,6 +330,7 @@ func TestReentrantRollback(t *testing.T) {
 	f.objects = append(f.objects, d, rs1, rs2)
 
 	// Rollback is done here
+	f.expectGetDeploymentAction(d) // Expect to recheck DeletionTimestamp.
 	f.expectUpdateDeploymentAction(d)
 	// Expect no update on replica sets though
 	f.run(getKey(d, t))

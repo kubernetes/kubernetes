@@ -454,6 +454,8 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 
 // getNodesToDaemonSetPods returns a map from nodes to daemon pods (corresponding to ds) running on the nodes.
 // This also reconciles ControllerRef by adopting/orphaning.
+// This may mutate the DaemonSet to refresh its DeletionTimestamp,
+// so make sure it's not a pointer into the cache.
 // Note that returned Pods are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
 func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) (map[string][]*v1.Pod, error) {
@@ -467,6 +469,16 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 	pods, err := dsc.podLister.Pods(ds.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
+	}
+	// After listing children, but before performing adoption, we need to recheck
+	// whether the GC has marked us as deleted (see #42639).
+	// TODO: Remove this when GC prevents races via ObservedGeneration (#26120).
+	delCheck, err := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if delCheck.UID == ds.UID {
+		ds.DeletionTimestamp = delCheck.DeletionTimestamp
 	}
 	// Use ControllerRefManager to adopt/orphan as needed.
 	cm := controller.NewPodControllerRefManager(dsc.podControl, ds, selector, controllerKind)
@@ -486,6 +498,7 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the corrrect Kind.
+// It returns a deep copy, not a pointer into the cache.
 func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.DaemonSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
@@ -501,7 +514,11 @@ func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controll
 		// ControllerRef points to.
 		return nil
 	}
-	return ds
+	cp, err := api.Scheme.DeepCopy(ds)
+	if err != nil {
+		return nil
+	}
+	return cp.(*extensions.DaemonSet)
 }
 
 func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
@@ -509,6 +526,10 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+	}
+	// Check DeletionTimestamp again because it may have been refreshed by getNodesToDaemonPods().
+	if ds.DeletionTimestamp != nil {
+		return nil
 	}
 
 	// For each node, if the node is running the daemon pod but isn't supposed to, kill the daemon
@@ -763,6 +784,12 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	if err != nil {
 		return fmt.Errorf("unable to retrieve ds %v from store: %v", key, err)
 	}
+	// DeepCopy so we don't mutate objects in the cache.
+	cp, err := api.Scheme.DeepCopy(ds)
+	if err != nil {
+		return err
+	}
+	ds = cp.(*extensions.DaemonSet)
 
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(ds.Spec.Selector, &everything) {

@@ -432,6 +432,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *extensions.Dep
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the corrrect Kind.
+// It returns a deep copy, not a pointer into the cache.
 func (dc *DeploymentController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.Deployment {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
@@ -447,7 +448,11 @@ func (dc *DeploymentController) resolveControllerRef(namespace string, controlle
 		// ControllerRef points to.
 		return nil
 	}
-	return d
+	cp, err := util.DeploymentDeepCopy(d)
+	if err != nil {
+		return nil
+	}
+	return cp
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -490,12 +495,24 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 // getReplicaSetsForDeployment uses ControllerRefManager to reconcile
 // ControllerRef by adopting and orphaning.
 // It returns the list of ReplicaSets that this Deployment should manage.
+// This may mutate the Deployment to refresh its DeletionTimestamp,
+// so make sure it's not a pointer into the cache.
 func (dc *DeploymentController) getReplicaSetsForDeployment(d *extensions.Deployment) ([]*extensions.ReplicaSet, error) {
 	// List all ReplicaSets to find those we own but that no longer match our
 	// selector. They will be orphaned by ClaimReplicaSets().
 	rsList, err := dc.rsLister.ReplicaSets(d.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
+	}
+	// After listing children, but before performing adoption, we need to recheck
+	// whether the GC has marked us as deleted (see #42639).
+	// TODO: Remove this when GC prevents races via ObservedGeneration (#26120).
+	delCheck, err := dc.client.ExtensionsV1beta1().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if delCheck.UID == d.UID {
+		d.DeletionTimestamp = delCheck.DeletionTimestamp
 	}
 	deploymentSelector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
 	if err != nil {
@@ -565,7 +582,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	// Deep-copy otherwise we are mutating our cache.
-	// TODO: Deep-copy only when needed.
 	d, err := util.DeploymentDeepCopy(deployment)
 	if err != nil {
 		return err

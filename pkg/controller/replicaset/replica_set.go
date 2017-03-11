@@ -542,6 +542,12 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	if err != nil {
 		return err
 	}
+	// DeepCopy so we don't mutate objects in the cache.
+	cp, err := api.Scheme.DeepCopy(rs)
+	if err != nil {
+		return err
+	}
+	rs = cp.(*extensions.ReplicaSet)
 
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
@@ -564,6 +570,16 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 			filteredPods = append(filteredPods, pod)
 		}
 	}
+	// After listing children, but before performing adoption, we need to recheck
+	// whether the GC has marked us as deleted (see #42639).
+	// TODO: Remove this when GC prevents races via ObservedGeneration (#26120).
+	delCheck, err := rsc.kubeClient.ExtensionsV1beta1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if delCheck.UID == rs.UID {
+		rs.DeletionTimestamp = delCheck.DeletionTimestamp
+	}
 	cm := controller.NewPodControllerRefManager(rsc.podControl, rs, selector, controllerKind)
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
@@ -576,12 +592,6 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(filteredPods, rs)
 	}
-
-	copy, err := api.Scheme.DeepCopy(rs)
-	if err != nil {
-		return err
-	}
-	rs = copy.(*extensions.ReplicaSet)
 
 	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
 

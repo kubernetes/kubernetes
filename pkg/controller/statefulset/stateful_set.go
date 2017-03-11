@@ -274,6 +274,9 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 // getPodsForStatefulSet returns the Pods that a given StatefulSet should manage.
 // It also reconciles ControllerRef by adopting/orphaning.
 //
+// NOTE: This may mutate the StatefulSet to refresh its DeletionTimestamp,
+//       so make sure it's not a pointer into the cache.
+//
 // NOTE: Returned Pods are pointers to objects from the cache.
 //       If you need to modify one, you need to copy it first.
 func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
@@ -282,6 +285,17 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 	pods, err := ssc.podLister.Pods(set.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
+	}
+
+	// After listing children, but before performing adoption, we need to recheck
+	// whether the GC has marked us as deleted (see #42639).
+	// TODO: Remove this when GC prevents races via ObservedGeneration (#26120).
+	delCheck, err := ssc.kubeClient.AppsV1beta1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if delCheck.UID == set.UID {
+		set.DeletionTimestamp = delCheck.DeletionTimestamp
 	}
 
 	filter := func(pod *v1.Pod) bool {
@@ -315,6 +329,7 @@ func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*apps.Sta
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the corrrect Kind.
+// It returns a deep copy, not a pointer into the cache.
 func (ssc *StatefulSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.StatefulSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
@@ -330,7 +345,11 @@ func (ssc *StatefulSetController) resolveControllerRef(namespace string, control
 		// ControllerRef points to.
 		return nil
 	}
-	return set
+	cp, err := api.Scheme.DeepCopy(set)
+	if err != nil {
+		return nil
+	}
+	return cp.(*apps.StatefulSet)
 }
 
 // enqueueStatefulSet enqueues the given statefulset in the work queue.
@@ -386,6 +405,13 @@ func (ssc *StatefulSetController) sync(key string) error {
 		utilruntime.HandleError(fmt.Errorf("unable to retrieve StatefulSet %v from store: %v", key, err))
 		return err
 	}
+	// DeepCopy so we don't mutate an object in the cache.
+	cp, err := api.Scheme.DeepCopy(set)
+	if err != nil {
+		return nil
+	}
+	set = cp.(*apps.StatefulSet)
+
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error converting StatefulSet %v selector: %v", key, err))

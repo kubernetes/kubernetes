@@ -214,69 +214,6 @@ func TestStatefulSetControlReplacesPods(t *testing.T) {
 	}
 }
 
-func TestStatefulSetDeletionTimestamp(t *testing.T) {
-	set := newStatefulSet(5)
-	client := fake.NewSimpleClientset(set)
-
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
-	ssc := NewDefaultStatefulSetControl(spc)
-
-	stop := make(chan struct{})
-	defer close(stop)
-	informerFactory.Start(stop)
-	cache.WaitForCacheSync(
-		stop,
-		informerFactory.Apps().V1beta1().StatefulSets().Informer().HasSynced,
-		informerFactory.Core().V1().Pods().Informer().HasSynced,
-	)
-
-	// Bring up a StatefulSet.
-	if err := scaleUpStatefulSetControl(set, ssc, spc); err != nil {
-		t.Errorf("failed to turn up StatefulSet : %s", err)
-	}
-	var err error
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
-	if err != nil {
-		t.Fatalf("error getting updated StatefulSet: %v", err)
-	}
-	if set.Status.Replicas != 5 {
-		t.Error("failed to scale statefulset to 5 replicas")
-	}
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	sort.Sort(ascendingOrdinal(pods))
-
-	// Mark the StatefulSet as being deleted.
-	set.DeletionTimestamp = new(metav1.Time)
-
-	// Delete the first pod.
-	spc.podsIndexer.Delete(pods[0])
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-
-	// The StatefulSet should update its replica count,
-	// but not try to fix it.
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("failed to update StatefulSet : %s", err)
-	}
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
-	if err != nil {
-		t.Fatalf("error getting updated StatefulSet: %v", err)
-	}
-	if e, a := int32(4), set.Status.Replicas; e != a {
-		t.Errorf("expected to scale to %d, got %d", e, a)
-	}
-}
-
 func TestDefaultStatefulSetControlRecreatesFailedPod(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())

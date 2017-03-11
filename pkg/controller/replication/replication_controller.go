@@ -563,6 +563,12 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	if err != nil {
 		return err
 	}
+	// DeepCopy so we don't mutate objects in the cache.
+	cp, err := api.Scheme.DeepCopy(rc)
+	if err != nil {
+		return err
+	}
+	rc = cp.(*v1.ReplicationController)
 
 	trace.Step("ReplicationController restored")
 	rcNeedsSync := rm.expectations.SatisfiedExpectations(key)
@@ -582,6 +588,16 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 			filteredPods = append(filteredPods, pod)
 		}
 	}
+	// After listing children, but before performing adoption, we need to recheck
+	// whether the GC has marked us as deleted (see #42639).
+	// TODO: Remove this when GC prevents races via ObservedGeneration (#26120).
+	delCheck, err := rm.kubeClient.CoreV1().ReplicationControllers(rc.Namespace).Get(rc.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if delCheck.UID == rc.UID {
+		rc.DeletionTimestamp = delCheck.DeletionTimestamp
+	}
 	cm := controller.NewPodControllerRefManager(rm.podControl, rc, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), controllerKind)
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
@@ -595,12 +611,6 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		manageReplicasErr = rm.manageReplicas(filteredPods, rc)
 	}
 	trace.Step("manageReplicas done")
-
-	copy, err := api.Scheme.DeepCopy(rc)
-	if err != nil {
-		return err
-	}
-	rc = copy.(*v1.ReplicationController)
 
 	newStatus := calculateStatus(rc, filteredPods, manageReplicasErr)
 
