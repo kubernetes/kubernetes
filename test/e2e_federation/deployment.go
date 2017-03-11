@@ -245,11 +245,11 @@ func updateDeploymentOrFail(clientset *fedclientset.Clientset, namespace string)
 
 	deployment := newDeploymentForFed(namespace, FederationDeploymentName, 15)
 
-	newRs, err := clientset.Deployments(namespace).Update(deployment)
+	newDeployment, err := clientset.Deployments(namespace).Update(deployment)
 	framework.ExpectNoError(err, "Updating deployment %q in namespace %q", deployment.Name, namespace)
 	By(fmt.Sprintf("Successfully updated federation deployment %q in namespace %q", FederationDeploymentName, namespace))
 
-	return newRs
+	return newDeployment
 }
 
 func deleteDeploymentOrFail(clientset *fedclientset.Clientset, nsName string, deploymentName string, orphanDependents *bool) {
