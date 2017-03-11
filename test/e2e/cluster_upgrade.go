@@ -35,6 +35,7 @@ var upgradeTests = []upgrades.Test{
 	&upgrades.PersistentVolumeUpgradeTest{},
 	&upgrades.DaemonSetUpgradeTest{},
 	&upgrades.IngressUpgradeTest{},
+	&upgrades.AppArmorUpgradeTest{},
 }
 
 var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
