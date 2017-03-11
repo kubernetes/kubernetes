@@ -181,7 +181,7 @@ __custom_func() {
 	// TODO: This should be populated using the discovery information from apiserver.
 	valid_resources = `Valid resource types include:
 
-    * all
+    * all (for reasons historic, the 'all' alias does not include everything below)
     * certificatesigningrequests (aka 'csr')
     * clusters (valid only for federation apiservers)
     * clusterrolebindings
