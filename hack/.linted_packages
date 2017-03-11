@@ -184,6 +184,7 @@ pkg/kubelet/container
 pkg/kubelet/envvars
 pkg/kubelet/eviction
 pkg/kubelet/eviction/api
+pkg/kubelet/gpu/nvidia
 pkg/kubelet/util/csr
 pkg/kubelet/util/format
 pkg/kubelet/util/ioutils
