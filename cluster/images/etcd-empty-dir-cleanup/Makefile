@@ -16,7 +16,7 @@
 
 ETCD_VERSION = 2.2.1
 IMAGE = gcr.io/google_containers/etcd-empty-dir-cleanup
-TAG = 0.0.1
+TAG = 0.0.2
 
 clean:
 	rm -rf etcdctl etcd-v$(ETCD_VERSION)-linux-amd64 etcd-v$(ETCD_VERSION)-linux-amd64.tar.gz
