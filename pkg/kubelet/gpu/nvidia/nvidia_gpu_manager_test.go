@@ -36,8 +36,8 @@ func (tapl *testActivePodsLister) GetRunningPods() ([]*v1.Pod, error) {
 	return tapl.activePods, nil
 }
 
-func makeTestPod(numContainers int) *v1.Pod {
-	quantity := resource.NewQuantity(1, resource.DecimalSI)
+func makeTestPod(numContainers, gpusPerContainer int) *v1.Pod {
+	quantity := resource.NewQuantity(int64(gpusPerContainer), resource.DecimalSI)
 	resources := v1.ResourceRequirements{
 		Limits: v1.ResourceList{
 			v1.ResourceNvidiaGPU: *quantity,
@@ -53,6 +53,7 @@ func makeTestPod(numContainers int) *v1.Pod {
 	}
 	for ; numContainers > 0; numContainers-- {
 		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+			Name:      string(uuid.NewUUID()),
 			Resources: resources,
 		})
 	}
@@ -75,7 +76,7 @@ func TestMultiContainerPodGPUAllocation(t *testing.T) {
 	as.Equal(len(gpusInUse.devices()), 0)
 
 	// Allocated GPUs for a pod with two containers.
-	pod := makeTestPod(2)
+	pod := makeTestPod(2, 1)
 	// Allocate for the first container.
 	devices1, err := testGpuManager.AllocateGPU(pod, &pod.Spec.Containers[0])
 	as.Nil(err)
@@ -90,7 +91,7 @@ func TestMultiContainerPodGPUAllocation(t *testing.T) {
 	as.NotEqual(devices1, devices2, "expected containers to get different devices")
 
 	// further allocations should fail.
-	newPod := makeTestPod(2)
+	newPod := makeTestPod(2, 1)
 	devices1, err = testGpuManager.AllocateGPU(newPod, &newPod.Spec.Containers[0])
 	as.NotNil(err, "expected gpu allocation to fail. got: %v", devices1)
 
@@ -126,7 +127,7 @@ func TestMultiPodGPUAllocation(t *testing.T) {
 	as.Equal(len(gpusInUse.devices()), 0)
 
 	// Allocated GPUs for a pod with two containers.
-	podA := makeTestPod(1)
+	podA := makeTestPod(1, 1)
 	// Allocate for the first container.
 	devicesA, err := testGpuManager.AllocateGPU(podA, &podA.Spec.Containers[0])
 	as.Nil(err)
@@ -135,10 +136,48 @@ func TestMultiPodGPUAllocation(t *testing.T) {
 	podLister.activePods = append(podLister.activePods, podA)
 
 	// further allocations should fail.
-	podB := makeTestPod(1)
+	podB := makeTestPod(1, 1)
 	// Allocate for the first container.
 	devicesB, err := testGpuManager.AllocateGPU(podB, &podB.Spec.Containers[0])
 	as.Nil(err)
 	as.Equal(len(devicesB), 1)
 	as.NotEqual(devicesA, devicesB, "expected pods to get different devices")
+}
+
+func TestPodContainerRestart(t *testing.T) {
+	podLister := &testActivePodsLister{}
+
+	testGpuManager := &nvidiaGPUManager{
+		activePodsLister: podLister,
+		allGPUs:          sets.NewString("/dev/nvidia0", "/dev/nvidia1"),
+		allocated:        newPodGPUs(),
+		defaultDevices:   []string{"/dev/nvidia-smi"},
+	}
+
+	// Expect that no devices are in use.
+	gpusInUse, err := testGpuManager.gpusInUse()
+	as := assert.New(t)
+	as.Nil(err)
+	as.Equal(len(gpusInUse.devices()), 0)
+
+	// Make a pod with one containers that requests two GPUs.
+	podA := makeTestPod(1, 2)
+	// Allocate GPUs
+	devicesA, err := testGpuManager.AllocateGPU(podA, &podA.Spec.Containers[0])
+	as.Nil(err)
+	as.Equal(len(devicesA), 3)
+
+	podLister.activePods = append(podLister.activePods, podA)
+
+	// further allocations should fail.
+	podB := makeTestPod(1, 1)
+	_, err = testGpuManager.AllocateGPU(podB, &podB.Spec.Containers[0])
+	as.NotNil(err)
+
+	// Allcate GPU for existing Pod A.
+	// The same gpus must be returned.
+	devicesAretry, err := testGpuManager.AllocateGPU(podA, &podA.Spec.Containers[0])
+	as.Nil(err)
+	as.Equal(len(devicesA), 3)
+	as.True(sets.NewString(devicesA...).Equal(sets.NewString(devicesAretry...)))
 }
