@@ -48,7 +48,7 @@ const (
 
 type activePodsLister interface {
 	// Returns a list of active pods on the node.
-	GetRunningPods() ([]*v1.Pod, error)
+	GetActivePods() []*v1.Pod
 }
 
 // nvidiaGPUManager manages nvidia gpu devices.
@@ -148,9 +148,7 @@ func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) (
 		ngm.allocated = allocated
 	} else {
 		// update internal list of GPUs in use prior to allocating new GPUs.
-		if err := ngm.updateAllocatedGPUs(); err != nil {
-			return nil, fmt.Errorf("Failed to allocate GPUs because of issues with updating GPUs in use: %v", err)
-		}
+		ngm.updateAllocatedGPUs()
 	}
 	// Check if GPUs have already been allocated. If so return them right away.
 	// This can happen if a container restarts for example.
@@ -179,13 +177,10 @@ func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) (
 }
 
 // updateAllocatedGPUs updates the list of GPUs in use.
-// It gets a list of running pods and then frees any GPUs that are bound to terminated pods.
+// It gets a list of active pods and then frees any GPUs that are bound to terminated pods.
 // Returns error on failure.
-func (ngm *nvidiaGPUManager) updateAllocatedGPUs() error {
-	activePods, err := ngm.activePodsLister.GetRunningPods()
-	if err != nil {
-		return fmt.Errorf("Failed to list active pods: %v", err)
-	}
+func (ngm *nvidiaGPUManager) updateAllocatedGPUs() {
+	activePods := ngm.activePodsLister.GetActivePods()
 	activePodUids := sets.NewString()
 	for _, pod := range activePods {
 		activePodUids.Insert(string(pod.UID))
@@ -194,7 +189,6 @@ func (ngm *nvidiaGPUManager) updateAllocatedGPUs() error {
 	podsToBeRemoved := allocatedPodUids.Difference(activePodUids)
 	glog.V(5).Infof("pods to be removed: %v", podsToBeRemoved.List())
 	ngm.allocated.delete(podsToBeRemoved.List())
-	return nil
 }
 
 // discoverGPUs identifies allGPUs NVIDIA GPU devices available on the local node by walking `/dev` directory.
@@ -224,10 +218,7 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 
 // gpusInUse returns a list of GPUs in use along with the respective pods that are using it.
 func (ngm *nvidiaGPUManager) gpusInUse() (*podGPUs, error) {
-	pods, err := ngm.activePodsLister.GetRunningPods()
-	if err != nil {
-		return nil, err
-	}
+	pods := ngm.activePodsLister.GetActivePods()
 	type containerIdentifier struct {
 		id   string
 		name string
