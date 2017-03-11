@@ -99,7 +99,7 @@ spec:
           name: metrics
           protocol: TCP
       - name: dnsmasq
-        image: gcr.io/google_containers/kube-dnsmasq-amd64:1.4
+        image: gcr.io/google_containers/kube-dnsmasq-amd64:1.4.1
         livenessProbe:
           httpGet:
             path: /healthz-dnsmasq
@@ -127,7 +127,7 @@ spec:
             cpu: 150m
             memory: 10Mi
       - name: dnsmasq-metrics
-        image: gcr.io/google_containers/dnsmasq-metrics-amd64:1.0
+        image: gcr.io/google_containers/dnsmasq-metrics-amd64:1.0.1
         livenessProbe:
           httpGet:
             path: /metrics
