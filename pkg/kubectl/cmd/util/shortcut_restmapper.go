@@ -112,6 +112,8 @@ var UserResources = []schema.GroupResource{
 	{Group: "batch", Resource: "jobs"},
 	{Group: "extensions", Resource: "deployments"},
 	{Group: "extensions", Resource: "replicasets"},
+	{Group: "extensions", Resource: "ingresses"},
+	{Group: "extensions", Resource: "daemonsets"},
 }
 
 // AliasesForResource returns whether a resource has an alias or not
