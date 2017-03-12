@@ -342,7 +342,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				// this is for leaderlease access
 				// TODO: scope this to the kube-system namespace
 				rbac.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
-				rbac.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
+				rbac.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names("kube-default-scheduler").RuleOrDie(),
 
 				// fundamental resources
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("nodes", "pods").RuleOrDie(),

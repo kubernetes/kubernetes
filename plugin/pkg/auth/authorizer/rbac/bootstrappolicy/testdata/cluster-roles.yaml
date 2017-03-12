@@ -598,7 +598,7 @@ items:
   - apiGroups:
     - ""
     resourceNames:
-    - kube-scheduler
+    - kube-default-scheduler
     resources:
     - endpoints
     verbs:
