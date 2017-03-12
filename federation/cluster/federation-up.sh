@@ -79,6 +79,9 @@ function init() {
   local -r kube_registry="${KUBE_REGISTRY:-gcr.io/${project}}"
   local -r kube_version="$(get_version)"
 
+  kube::log::status "DNS_ZONE_NAME: \"${DNS_ZONE_NAME}\", DNS_PROVIDER: \"${DNS_PROVIDER}\""
+  kube::log::status "Image: \"${kube_registry}/hyperkube-amd64:${kube_version}\""
+
   "${KUBE_ROOT}/federation/develop/kubefed.sh" init \
       "${FEDERATION_NAME}" \
       --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
