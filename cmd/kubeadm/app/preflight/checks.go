@@ -38,7 +38,6 @@ import (
 
 	"net/url"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -343,12 +342,11 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 		}
 	}
 
-	err := utilerrors.NewAggregate(errs)
-	if err != nil {
+	if len(errs) != 0 {
 		// Only print the output from the system verification check if the check failed
 		fmt.Println("[preflight] The system verification failed. Printing the output from the verification:")
 		bufw.Flush()
-		return warns, []error{err}
+		return warns, errs
 	}
 	return warns, nil
 }
