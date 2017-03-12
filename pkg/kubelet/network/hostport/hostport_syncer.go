@@ -36,11 +36,11 @@ import (
 type HostportSyncer interface {
 	// SyncHostports gathers all hostports on node and setup iptables rules to enable them.
 	// On each invocation existing ports are synced and stale rules are deleted.
-	SyncHostports(natInterfaceName string, activePodPortMappings []*PodPortMapping) error
+	SyncHostports(activePodPortMappings []*PodPortMapping) error
 	// OpenPodHostportsAndSync opens hostports for a new PodPortMapping, gathers all hostports on
 	// node, sets up iptables rules enable them. On each invocation existing ports are synced and stale rules are deleted.
 	// 'newPortMapping' must also be present in 'activePodPortMappings'.
-	OpenPodHostportsAndSync(newPortMapping *PodPortMapping, natInterfaceName string, activePodPortMappings []*PodPortMapping) error
+	OpenPodHostportsAndSync(newPortMapping *PodPortMapping, activePodPortMappings []*PodPortMapping) error
 }
 
 type hostportSyncer struct {
@@ -153,7 +153,7 @@ func hostportChainName(pm *PortMapping, podFullName string) utiliptables.Chain {
 // OpenPodHostportsAndSync opens hostports for a new PodPortMapping, gathers all hostports on
 // node, sets up iptables rules enable them. And finally clean up stale hostports.
 // 'newPortMapping' must also be present in 'activePodPortMappings'.
-func (h *hostportSyncer) OpenPodHostportsAndSync(newPortMapping *PodPortMapping, natInterfaceName string, activePodPortMappings []*PodPortMapping) error {
+func (h *hostportSyncer) OpenPodHostportsAndSync(newPortMapping *PodPortMapping, activePodPortMappings []*PodPortMapping) error {
 	// try to open pod host port if specified
 	if err := h.openHostports(newPortMapping); err != nil {
 		return err
@@ -171,11 +171,11 @@ func (h *hostportSyncer) OpenPodHostportsAndSync(newPortMapping *PodPortMapping,
 		activePodPortMappings = append(activePodPortMappings, newPortMapping)
 	}
 
-	return h.SyncHostports(natInterfaceName, activePodPortMappings)
+	return h.SyncHostports(activePodPortMappings)
 }
 
 // SyncHostports gathers all hostports on node and setup iptables rules enable them. And finally clean up stale hostports
-func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMappings []*PodPortMapping) error {
+func (h *hostportSyncer) SyncHostports(activePodPortMappings []*PodPortMapping) error {
 	start := time.Now()
 	defer func() {
 		glog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
@@ -276,7 +276,7 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	}
 
 	// Ensure hostport chains are linked into the root
-	ensureKubeHostportChainLinked(h.iptables, natInterfaceName)
+	ensureKubeHostportChainLinked(h.iptables)
 
 	h.cleanupHostportMap(hostportPodMap)
 	return nil

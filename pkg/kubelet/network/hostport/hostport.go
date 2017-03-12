@@ -142,7 +142,7 @@ func portMappingToHostport(portMapping *PortMapping) hostport {
 }
 
 // ensureKubeHostportChainLinked ensures the KUBE-HOSTPORTS chain is linked into the root of iptables
-func ensureKubeHostportChainLinked(iptables utiliptables.Interface, natInterfaceName string) error {
+func ensureKubeHostportChainLinked(iptables utiliptables.Interface) error {
 	glog.V(4).Info("Ensuring kubelet hostport chains")
 	// Ensure kubeHostportChain exists
 	if _, err := iptables.EnsureChain(utiliptables.TableNAT, kubeHostportsChain); err != nil {
@@ -168,16 +168,19 @@ func ensureKubeHostportChainLinked(iptables utiliptables.Interface, natInterface
 		}
 	}
 
-	// Need to SNAT traffic from localhost
-	args = []string{
-		"-m", "comment", "--comment", "SNAT for localhost access to hostports",
-		"-o", natInterfaceName,
-		"-s", "127.0.0.0/8",
-		"-j", "MASQUERADE",
-	}
-	if _, err := iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
-		return fmt.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
-	}
+	removeOldSNAT(iptables) // ignore errors
 
+	return nil
+}
+
+// This can be removed after v1.8.
+func removeOldSNAT(iptables utiliptables.Interface) error {
+	if err := iptables.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPostrouting,
+		"-s", "127.0.0.0/8",
+		"-o", "cbr0",
+		"-m", "comment", "--comment", "SNAT for localhost access to hostports",
+		"-j", "MASQUERADE"); err != nil {
+		return fmt.Errorf("Failed to remove old SNAT from nat chain POSTROUTING: %v", err)
+	}
 	return nil
 }

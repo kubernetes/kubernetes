@@ -37,8 +37,7 @@ type HostPortManager interface {
 	// Add implements port mappings.
 	// id should be a unique identifier for a pod, e.g. podSandboxID.
 	// podPortMapping is the associated port mapping information for the pod.
-	// natInterfaceName is the interface that localhost used to talk to the given pod.
-	Add(id string, podPortMapping *PodPortMapping, natInterfaceName string) error
+	Add(id string, podPortMapping *PodPortMapping) error
 	// Remove cleans up matching port mappings
 	// Remove must be able to clean up port mappings without pod IP
 	Remove(id string, podPortMapping *PodPortMapping) error
@@ -60,7 +59,7 @@ func NewHostportManager() HostPortManager {
 	}
 }
 
-func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInterfaceName string) (err error) {
+func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping) (err error) {
 	if podPortMapping == nil || podPortMapping.HostNetwork {
 		return nil
 	}
@@ -150,7 +149,7 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 	}
 
 	// Ensure the chain is linked from the root.
-	if err = ensureKubeHostportChainLinked(hm.iptables, natInterfaceName); err != nil {
+	if err = ensureKubeHostportChainLinked(hm.iptables); err != nil {
 		return err
 	}
 
