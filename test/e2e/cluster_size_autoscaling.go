@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/golang/glog"
@@ -166,7 +167,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	It("should increase cluster size if pods are pending due to host port conflict [Feature:ClusterSizeAutoscalingScaleUp]", func() {
-		CreateHostPortPods(f, "host-port", nodeCount+2, false)
+		scheduling.CreateHostPortPods(f, "host-port", nodeCount+2, false)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "host-port")
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
@@ -507,40 +508,6 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 	if expectRunning {
 		framework.ExpectNoError(err)
 	}
-}
-
-func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
-	By(fmt.Sprintf("Running RC which reserves host port"))
-	config := &testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Name:           id,
-		Namespace:      f.Namespace.Name,
-		Timeout:        defaultTimeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
-		Replicas:       replicas,
-		HostPorts:      map[string]int{"port1": 4321},
-	}
-	err := framework.RunRC(*config)
-	if expectRunning {
-		framework.ExpectNoError(err)
-	}
-}
-
-func ReserveCpu(f *framework.Framework, id string, replicas, millicores int) {
-	By(fmt.Sprintf("Running RC which reserves %v millicores", millicores))
-	request := int64(millicores / replicas)
-	config := &testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Name:           id,
-		Namespace:      f.Namespace.Name,
-		Timeout:        defaultTimeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
-		Replicas:       replicas,
-		CpuRequest:     request,
-	}
-	framework.ExpectNoError(framework.RunRC(*config))
 }
 
 func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool) {
