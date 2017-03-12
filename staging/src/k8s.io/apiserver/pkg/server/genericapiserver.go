@@ -366,6 +366,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Convertor:       apiGroupInfo.Scheme,
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
 		Copier:          apiGroupInfo.Scheme,
+		Defaulter:       apiGroupInfo.Scheme,
 		Typer:           apiGroupInfo.Scheme,
 		SubresourceGroupVersionKind: apiGroupInfo.SubresourceGroupVersionKind,
 		Linker: apiGroupInfo.GroupMeta.SelfLinker,

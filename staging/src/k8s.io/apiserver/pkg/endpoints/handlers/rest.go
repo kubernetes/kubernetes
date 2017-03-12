@@ -84,6 +84,7 @@ type RequestScope struct {
 
 	Creater         runtime.ObjectCreater
 	Convertor       runtime.ObjectConvertor
+	Defaulter       runtime.ObjectDefaulter
 	Copier          runtime.ObjectCopier
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
@@ -525,7 +526,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 
 		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS,
-			scope.Namer, scope.Copier, scope.Creater, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec)
+			scope.Namer, scope.Copier, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
@@ -556,6 +557,7 @@ func patchResource(
 	namer ScopeNamer,
 	copier runtime.ObjectCopier,
 	creater runtime.ObjectCreater,
+	defaulter runtime.ObjectDefaulter,
 	unsafeConvertor runtime.ObjectConvertor,
 	kind schema.GroupVersionKind,
 	resource schema.GroupVersionResource,
@@ -619,7 +621,7 @@ func patchResource(
 				if err != nil {
 					return nil, err
 				}
-				originalMap, patchMap, err := strategicPatchObject(codec, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
+				originalMap, patchMap, err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
 				if err != nil {
 					return nil, err
 				}
@@ -716,7 +718,7 @@ func patchResource(
 			if err != nil {
 				return nil, err
 			}
-			if err := applyPatchToObject(codec, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
+			if err := applyPatchToObject(codec, defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
 				return nil, err
 			}
 			// Convert the object back to unversioned.
