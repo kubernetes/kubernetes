@@ -71,7 +71,9 @@ function updateGodepManifest() {
     go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" --client-go-import-path="k8s.io/${repo}"
 
     # commit so that following repos do not see this repo as dirty
-    git add vendor >/dev/null
+    # pipe through true so that command script won't error if there are no
+    # files to add
+    git add vendor/ >/dev/null || true
     git commit -a -m "Updated Godeps.json" >/dev/null
   popd >/dev/null
 }
