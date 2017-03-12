@@ -133,7 +133,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
 
-	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
+	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
