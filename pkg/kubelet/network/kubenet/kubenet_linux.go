@@ -169,22 +169,33 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 		return fmt.Errorf("Failed to find nsenter binary: %v", err)
 	}
 
-	// Need to SNAT outbound traffic from cluster
-	if err = plugin.ensureMasqRule(); err != nil {
+	// Need to SNAT in a few cases.
+	if err = plugin.ensureMasqRules(); err != nil {
 		return err
 	}
 	return nil
 }
 
-// TODO: move thic logic into cni bridge plugin and remove this from kubenet
-func (plugin *kubenetNetworkPlugin) ensureMasqRule() error {
+// TODO: move this logic into cni bridge plugin and remove this from kubenet
+func (plugin *kubenetNetworkPlugin) ensureMasqRules() error {
+	// Need to SNAT traffic leaving the "local space".
 	if _, err := plugin.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting,
 		"-m", "comment", "--comment", "kubenet: SNAT for outbound traffic from cluster",
 		"-m", "addrtype", "!", "--dst-type", "LOCAL",
 		"!", "-d", plugin.nonMasqueradeCIDR,
 		"-j", "MASQUERADE"); err != nil {
-		return fmt.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
+		return fmt.Errorf("Failed to ensure extra-cluster MASQUERADE: %v", err)
 	}
+
+	// Need to SNAT traffic from localhost
+	if _, err := plugin.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting,
+		"-m", "comment", "--comment", "kubenet: SNAT for localhost access to port-forwards",
+		"-o", BridgeName,
+		"-s", "127.0.0.0/8",
+		"-j", "MASQUERADE"); err != nil {
+		return fmt.Errorf("Failed to ensure localhost MASQUERADE: %v", err)
+	}
+
 	return nil
 }
 
@@ -382,7 +393,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		}
 
 		newPodPortMapping := constructPodPortMapping(pod, ip4)
-		if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMappings); err != nil {
+		if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, activePodPortMappings); err != nil {
 			return err
 		}
 	} else {
@@ -398,7 +409,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 				PortMappings: portMappings,
 				IP:           ip4,
 				HostNetwork:  false,
-			}, BridgeName); err != nil {
+			}); err != nil {
 				return err
 			}
 		}
@@ -450,8 +461,8 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		return err
 	}
 
-	// Need to SNAT outbound traffic from cluster
-	if err := plugin.ensureMasqRule(); err != nil {
+	// Need to SNAT a few cases.
+	if err := plugin.ensureMasqRules(); err != nil {
 		glog.Errorf("Failed to ensure MASQ rule: %v", err)
 	}
 
@@ -488,7 +499,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	if plugin.host.SupportsLegacyFeatures() {
 		activePodPortMapping, err := plugin.getPodPortMappings()
 		if err == nil {
-			err = plugin.hostportSyncer.SyncHostports(BridgeName, activePodPortMapping)
+			err = plugin.hostportSyncer.SyncHostports(activePodPortMapping)
 		}
 		if err != nil {
 			errList = append(errList, err)
@@ -530,8 +541,8 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 		return err
 	}
 
-	// Need to SNAT outbound traffic from cluster
-	if err := plugin.ensureMasqRule(); err != nil {
+	// Need to SNAT in a few cases.
+	if err := plugin.ensureMasqRules(); err != nil {
 		glog.Errorf("Failed to ensure MASQ rule: %v", err)
 	}
 

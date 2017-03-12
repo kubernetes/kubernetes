@@ -168,14 +168,13 @@ func TestOpenPodHostports(t *testing.T) {
 		false,
 	}
 
-	err := h.OpenPodHostportsAndSync(tests[0].mapping, "br0", activePodPortMapping)
+	err := h.OpenPodHostportsAndSync(tests[0].mapping, activePodPortMapping)
 	if err != nil {
 		t.Fatalf("Failed to OpenPodHostportsAndSync: %v", err)
 	}
 
 	// Generic rules
 	genericRules := []*ruleMatch{
-		{-1, "POSTROUTING", "-m comment --comment \"SNAT for localhost access to hostports\" -o br0 -s 127.0.0.0/8 -j MASQUERADE"},
 		{-1, "PREROUTING", "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"},
 		{-1, "OUTPUT", "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"},
 	}

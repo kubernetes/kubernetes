@@ -110,7 +110,7 @@ func TestHostportManager(t *testing.T) {
 
 	// Add Hostports
 	for _, tc := range testCases {
-		err := manager.Add("id", tc.mapping, "cbr0")
+		err := manager.Add("id", tc.mapping)
 		if tc.expectError {
 			assert.Error(t, err)
 			continue
