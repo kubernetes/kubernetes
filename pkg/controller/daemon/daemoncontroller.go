@@ -844,12 +844,12 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	// Add infinite toleration for taint notReady:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns not ready.
-	_, err = v1.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+	updated := v1.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
 		Key:      metav1.TaintNodeNotReady,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
-	if err != nil {
+	if !updated {
 		return false, false, false, err
 	}
 
@@ -857,12 +857,12 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	// Add infinite toleration for taint unreachable:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns unreachable.
-	_, err = v1.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+	updated = v1.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
 		Key:      metav1.TaintNodeUnreachable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
-	if err != nil {
+	if !updated {
 		return false, false, false, err
 	}
 
