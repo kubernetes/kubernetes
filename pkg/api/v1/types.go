@@ -4367,7 +4367,7 @@ type RangeAllocation struct {
 
 const (
 	// "default-scheduler" is the name of default scheduler.
-	DefaultSchedulerName = "default-scheduler"
+	DefaultSchedulerName = "kube-scheduler"
 
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.

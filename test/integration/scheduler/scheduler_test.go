@@ -337,7 +337,7 @@ func TestMultiScheduler(t *testing.T) {
 		9. **check point-3**:
 			- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 should NOT be scheduled
 	*/
-	// 1. create and start default-scheduler
+	// 1. create and start kube-scheduler
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
@@ -366,7 +366,7 @@ func TestMultiScheduler(t *testing.T) {
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
 	informerFactory.Start(schedulerConfig.StopEverything)
 	scheduler.New(schedulerConfig).Run()
-	// default-scheduler will be stopped later
+	// kube-scheduler will be stopped later
 
 	// 2. create a node
 	node := &v1.Node{
@@ -387,7 +387,7 @@ func TestMultiScheduler(t *testing.T) {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	schedulerFitsDefault := "default-scheduler"
+	schedulerFitsDefault := v1.DefaultSchedulerName
 	podFitsDefault := createPod(clientSet, "pod-fits-default", schedulerFitsDefault)
 	testPodFitsDefault, err := clientSet.Core().Pods(ns.Name).Create(podFitsDefault)
 	if err != nil {
@@ -529,7 +529,7 @@ func TestAllocatable(t *testing.T) {
 	ns := framework.CreateTestingNamespace("allocatable", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	// 1. create and start default-scheduler
+	// 1. create and start kube-scheduler
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
@@ -558,7 +558,7 @@ func TestAllocatable(t *testing.T) {
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
 	informerFactory.Start(schedulerConfig.StopEverything)
 	scheduler.New(schedulerConfig).Run()
-	// default-scheduler will be stopped later
+	// kube-scheduler will be stopped later
 	defer close(schedulerConfig.StopEverything)
 
 	// 2. create a node without allocatable awareness

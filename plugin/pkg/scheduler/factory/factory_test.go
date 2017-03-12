@@ -296,7 +296,7 @@ func TestResponsibleForPod(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	defer server.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	// factory of "default-scheduler"
+	// factory of "kube-scheduler"
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	factoryDefaultScheduler := NewConfigFactory(
 		v1.DefaultSchedulerName,
@@ -324,7 +324,7 @@ func TestResponsibleForPod(t *testing.T) {
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
 	// scheduler annotations to be tested
-	schedulerFitsDefault := "default-scheduler"
+	schedulerFitsDefault := "kube-scheduler"
 	schedulerFitsFoo := "foo-scheduler"
 	schedulerFitsNone := "bar-scheduler"
 

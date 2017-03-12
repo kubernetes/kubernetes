@@ -76,7 +76,7 @@ func exampleFuncs(t apitesting.TestingCommon) []interface{} {
 			s.TerminationGracePeriodSeconds = &ttl
 
 			if s.SchedulerName == "" {
-				s.SchedulerName = "default-scheduler"
+				s.SchedulerName = "kube-scheduler"
 			}
 		},
 		func(j *example.PodPhase, c fuzz.Continue) {
