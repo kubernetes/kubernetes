@@ -70,9 +70,8 @@ func TestMultiContainerPodGPUAllocation(t *testing.T) {
 	}
 
 	// Expect that no devices are in use.
-	gpusInUse, err := testGpuManager.gpusInUse()
+	gpusInUse := testGpuManager.gpusInUse()
 	as := assert.New(t)
-	as.Nil(err)
 	as.Equal(len(gpusInUse.devices()), 0)
 
 	// Allocated GPUs for a pod with two containers.
@@ -121,9 +120,8 @@ func TestMultiPodGPUAllocation(t *testing.T) {
 	}
 
 	// Expect that no devices are in use.
-	gpusInUse, err := testGpuManager.gpusInUse()
+	gpusInUse := testGpuManager.gpusInUse()
 	as := assert.New(t)
-	as.Nil(err)
 	as.Equal(len(gpusInUse.devices()), 0)
 
 	// Allocated GPUs for a pod with two containers.
@@ -155,9 +153,8 @@ func TestPodContainerRestart(t *testing.T) {
 	}
 
 	// Expect that no devices are in use.
-	gpusInUse, err := testGpuManager.gpusInUse()
+	gpusInUse := testGpuManager.gpusInUse()
 	as := assert.New(t)
-	as.Nil(err)
 	as.Equal(len(gpusInUse.devices()), 0)
 
 	// Make a pod with one containers that requests two GPUs.

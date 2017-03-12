@@ -102,10 +102,7 @@ func (ngm *nvidiaGPUManager) Start() error {
 		return err
 	}
 	// It's possible that the runtime isn't available now.
-	allocatedGPUs, err := ngm.gpusInUse()
-	if err == nil {
-		ngm.allocated = allocatedGPUs
-	}
+	ngm.allocated = ngm.gpusInUse()
 	// We ignore errors when identifying allocated GPUs because it is possible that the runtime interfaces may be not be logically up.
 	return nil
 }
@@ -141,11 +138,7 @@ func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) (
 	defer ngm.Unlock()
 	if ngm.allocated == nil {
 		// Initialization is not complete. Try now. Failures can no longer be tolerated.
-		allocated, err := ngm.gpusInUse()
-		if err != nil {
-			return nil, fmt.Errorf("Failed to allocate GPUs because of issues identifying GPUs in use: %v", err)
-		}
-		ngm.allocated = allocated
+		ngm.allocated = ngm.gpusInUse()
 	} else {
 		// update internal list of GPUs in use prior to allocating new GPUs.
 		ngm.updateAllocatedGPUs()
@@ -217,7 +210,7 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 }
 
 // gpusInUse returns a list of GPUs in use along with the respective pods that are using it.
-func (ngm *nvidiaGPUManager) gpusInUse() (*podGPUs, error) {
+func (ngm *nvidiaGPUManager) gpusInUse() *podGPUs {
 	pods := ngm.activePodsLister.GetActivePods()
 	type containerIdentifier struct {
 		id   string
@@ -274,7 +267,7 @@ func (ngm *nvidiaGPUManager) gpusInUse() (*podGPUs, error) {
 			}
 		}
 	}
-	return ret, nil
+	return ret
 }
 
 func isValidPath(path string) bool {
