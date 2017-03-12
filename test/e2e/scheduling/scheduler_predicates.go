@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package scheduling
 
 import (
 	"fmt"
@@ -262,7 +262,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	It("validates that NodeSelector is respected if matching [Conformance]", func() {
-		nodeName := getNodeThatCanRunPod(f)
+		nodeName := GetNodeThatCanRunPod(f)
 
 		By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
@@ -336,7 +336,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	// Keep the same steps with the test on NodeSelector,
 	// but specify Affinity in Pod.Annotations, instead of NodeSelector.
 	It("validates that required NodeAffinity setting is respected if matching", func() {
-		nodeName := getNodeThatCanRunPod(f)
+		nodeName := GetNodeThatCanRunPod(f)
 
 		By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
@@ -760,7 +760,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			Affinity:     conf.Affinity,
 			Containers: []v1.Container{
 				{
-					Name:  podName,
+					Name:  conf.Name,
 					Image: framework.GetPauseImageName(f.ClientSet),
 				},
 			},
@@ -940,7 +940,7 @@ func runAndKeepPodWithLabelAndGetNodeName(f *framework.Framework) (string, strin
 	return pod.Spec.NodeName, pod.Name
 }
 
-func getNodeThatCanRunPod(f *framework.Framework) string {
+func GetNodeThatCanRunPod(f *framework.Framework) string {
 	By("Trying to launch a pod without a label to get a node which can launch it.")
 	return runPodAndGetNodeName(f, pausePodConfig{Name: "without-label"})
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package scheduling
 
 import (
 	"fmt"
@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 		By("Creating a vanilla pod")
 		requests := v1.ResourceList{v1.ResourceCPU: resource.MustParse("0.1")}
 		limits := v1.ResourceList{v1.ResourceCPU: resource.MustParse("0.2")}
-		pod := newTestPod(f, "without-oir", requests, limits)
+		pod := f.NewTestPod("without-oir", requests, limits)
 
 		By("Observing an event that indicates the pod was scheduled")
 		action := func() error {
@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 			v1.ResourceCPU: resource.MustParse("0.2"),
 			opaqueResName:  resource.MustParse("2"),
 		}
-		pod := newTestPod(f, "min-oir", requests, limits)
+		pod := f.NewTestPod("min-oir", requests, limits)
 
 		By("Observing an event that indicates the pod was scheduled")
 		action := func() error {
@@ -124,7 +124,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 
 		By("Observing an event that indicates the pod was not scheduled")
 		action := func() error {
-			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(newTestPod(f, "over-max-oir", requests, limits))
+			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(f.NewTestPod("over-max-oir", requests, limits))
 			return err
 		}
 		predicate := scheduleFailure("over-max-oir")
@@ -230,8 +230,8 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 			v1.ResourceCPU: resource.MustParse("0.2"),
 			opaqueResName:  resource.MustParse("3"),
 		}
-		pod1 := newTestPod(f, "oir-1", requests, limits)
-		pod2 := newTestPod(f, "oir-2", requests, limits)
+		pod1 := f.NewTestPod("oir-1", requests, limits)
+		pod2 := f.NewTestPod("oir-2", requests, limits)
 
 		By("Observing an event that indicates one pod was scheduled")
 		action := func() error {

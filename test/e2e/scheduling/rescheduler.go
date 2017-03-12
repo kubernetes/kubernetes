@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package scheduling
 
 import (
 	"fmt"
@@ -28,6 +28,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+)
+
+const (
+	defaultTimeout = 3 * time.Minute
 )
 
 // This test requires Rescheduler to be enabled.
@@ -74,7 +78,7 @@ func reserveAllCpu(f *framework.Framework, id string, millicores int) error {
 	timeout := 5 * time.Minute
 	replicas := millicores / 100
 
-	ReserveCpu(f, id, 1, 100)
+	reserveCpu(f, id, 1, 100)
 	framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.InternalClientset, f.Namespace.Name, id, uint(replicas), false))
 
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
@@ -108,4 +112,38 @@ func podRunningOrUnschedulable(pod *v1.Pod) bool {
 	}
 	running, _ := testutils.PodRunningReady(pod)
 	return running
+}
+
+func reserveCpu(f *framework.Framework, id string, replicas, millicores int) {
+	By(fmt.Sprintf("Running RC which reserves %v millicores", millicores))
+	request := int64(millicores / replicas)
+	config := &testutils.RCConfig{
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           id,
+		Namespace:      f.Namespace.Name,
+		Timeout:        defaultTimeout,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Replicas:       replicas,
+		CpuRequest:     request,
+	}
+	framework.ExpectNoError(framework.RunRC(*config))
+}
+
+func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
+	By(fmt.Sprintf("Running RC which reserves host port"))
+	config := &testutils.RCConfig{
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           id,
+		Namespace:      f.Namespace.Name,
+		Timeout:        defaultTimeout,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Replicas:       replicas,
+		HostPorts:      map[string]int{"port1": 4321},
+	}
+	err := framework.RunRC(*config)
+	if expectRunning {
+		framework.ExpectNoError(err)
+	}
 }
