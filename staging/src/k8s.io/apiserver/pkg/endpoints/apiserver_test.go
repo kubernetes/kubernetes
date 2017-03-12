@@ -284,6 +284,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		Creater:   scheme,
 		Convertor: scheme,
 		Copier:    scheme,
+		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
 		Mapper:    namespaceMapper,
@@ -2579,6 +2580,7 @@ func TestUpdateREST(t *testing.T) {
 			Creater:   scheme,
 			Convertor: scheme,
 			Copier:    scheme,
+			Defaulter: scheme,
 			Typer:     scheme,
 			Linker:    selfLinker,
 
@@ -2663,6 +2665,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Creater:   scheme,
 		Convertor: scheme,
 		Copier:    scheme,
+		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
 
@@ -2694,6 +2697,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Creater:   scheme,
 		Convertor: scheme,
 		Copier:    scheme,
+		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
 
@@ -3307,6 +3311,7 @@ func TestXGSubresource(t *testing.T) {
 		Creater:   scheme,
 		Convertor: scheme,
 		Copier:    scheme,
+		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
 		Mapper:    namespaceMapper,
