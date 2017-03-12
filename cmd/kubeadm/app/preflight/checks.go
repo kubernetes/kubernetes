@@ -335,8 +335,12 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 	// Run all validators
 	for _, v := range validators {
 		warn, err := v.Validate(system.DefaultSysSpec)
-		errs = append(errs, err)
-		warns = append(warns, warn)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if warn != nil {
+			warns = append(warns, warn)
+		}
 	}
 
 	err := utilerrors.NewAggregate(errs)
@@ -575,7 +579,7 @@ func RunChecks(checks []Checker, ww io.Writer) error {
 	for _, c := range checks {
 		warnings, errs := c.Check()
 		for _, w := range warnings {
-			io.WriteString(ww, fmt.Sprintf("[preflight] WARNING: %s\n", w))
+			io.WriteString(ww, fmt.Sprintf("[preflight] WARNING: %v\n", w))
 		}
 		found = append(found, errs...)
 	}
