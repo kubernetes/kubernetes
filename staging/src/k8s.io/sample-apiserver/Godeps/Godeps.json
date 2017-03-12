@@ -1,14 +1,14 @@
 {
 	"ImportPath": "k8s.io/sample-apiserver",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v74",
+	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
 	],
 	"Deps": [
 		{
 			"ImportPath": "bitbucket.org/ww/goautoneg",
-			"Rev": "'75cd24fc2f2c2a2088577d12123ddee5f54e0675'"
+			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
 		},
 		{
 			"ImportPath": "github.com/PuerkitoBio/purell",
