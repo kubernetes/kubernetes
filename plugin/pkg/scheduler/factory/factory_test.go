@@ -296,7 +296,7 @@ func TestResponsibleForPod(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	defer server.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	// factory of "default-scheduler"
+	// factory of "kube-scheduler"
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	factoryDefaultScheduler := NewConfigFactory(
 		v1.DefaultSchedulerName,
@@ -324,7 +324,7 @@ func TestResponsibleForPod(t *testing.T) {
 		v1.DefaultHardPodAffinitySymmetricWeight,
 	)
 	// scheduler annotations to be tested
-	schedulerFitsDefault := "default-scheduler"
+	schedulerFitsDefault := v1.DefaultSchedulerName
 	schedulerFitsFoo := "foo-scheduler"
 	schedulerFitsNone := "bar-scheduler"
 
@@ -334,22 +334,22 @@ func TestResponsibleForPod(t *testing.T) {
 		pickedByFoo     bool
 	}{
 		{
-			// pod with "spec.Schedulername=default-scheduler" should be picked
-			// by the scheduler of name "default-scheduler", NOT by the one of name "foo-scheduler"
+			// pod with "spec.Schedulername=kube-scheduler" should be picked
+			// by the scheduler of name "kube-scheduler", NOT by the one of name "foo-scheduler"
 			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}, Spec: v1.PodSpec{SchedulerName: schedulerFitsDefault}},
 			pickedByDefault: true,
 			pickedByFoo:     false,
 		},
 		{
 			// pod with "spec.SchedulerName=foo-scheduler" should be NOT
-			// be picked by the scheduler of name "default-scheduler", but by the one of name "foo-scheduler"
+			// be picked by the scheduler of name "kube-scheduler", but by the one of name "foo-scheduler"
 			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}, Spec: v1.PodSpec{SchedulerName: schedulerFitsFoo}},
 			pickedByDefault: false,
 			pickedByFoo:     true,
 		},
 		{
 			// pod with "spec.SchedulerName=foo-scheduler" should be NOT
-			// be picked by niether the scheduler of name "default-scheduler" nor the one of name "foo-scheduler"
+			// be picked by niether the scheduler of name "kube-scheduler" nor the one of name "foo-scheduler"
 			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}, Spec: v1.PodSpec{SchedulerName: schedulerFitsNone}},
 			pickedByDefault: false,
 			pickedByFoo:     false,
@@ -377,7 +377,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	// factory of "default-scheduler"
+	// factory of "kube-scheduler"
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	factory := NewConfigFactory(
 		v1.DefaultSchedulerName,

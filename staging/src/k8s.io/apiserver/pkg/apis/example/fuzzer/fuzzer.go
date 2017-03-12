@@ -24,6 +24,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 // overrideGenericFuncs override some generic fuzzer funcs from k8s.io/apiserver in order to have more realistic
@@ -76,7 +77,7 @@ func exampleFuncs(t apitesting.TestingCommon) []interface{} {
 			s.TerminationGracePeriodSeconds = &ttl
 
 			if s.SchedulerName == "" {
-				s.SchedulerName = "default-scheduler"
+				s.SchedulerName = v1.DefaultSchedulerName
 			}
 		},
 		func(j *example.PodPhase, c fuzz.Continue) {

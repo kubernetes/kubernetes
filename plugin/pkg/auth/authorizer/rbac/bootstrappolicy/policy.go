@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/kubernetes/pkg/api/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -342,7 +343,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				// this is for leaderlease access
 				// TODO: scope this to the kube-system namespace
 				rbac.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
-				rbac.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
+				rbac.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names(v1.DefaultSchedulerName).RuleOrDie(),
 
 				// fundamental resources
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("nodes", "pods").RuleOrDie(),

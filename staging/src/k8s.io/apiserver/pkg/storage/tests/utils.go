@@ -20,6 +20,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 
 	_ "k8s.io/client-go/pkg/api/install"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 func DeepEqualSafePodSpec() example.PodSpec {
@@ -27,6 +28,6 @@ func DeepEqualSafePodSpec() example.PodSpec {
 	return example.PodSpec{
 		RestartPolicy:                 "Always",
 		TerminationGracePeriodSeconds: &grace,
-		SchedulerName:                 "default-scheduler",
+		SchedulerName:                 v1.DefaultSchedulerName,
 	}
 }

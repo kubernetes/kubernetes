@@ -114,7 +114,7 @@ func Run(s *options.SchedulerServer) error {
 	rl := &resourcelock.EndpointsLock{
 		EndpointsMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
-			Name:      "kube-scheduler",
+			Name:      s.SchedulerName,
 		},
 		Client: kubecli,
 		LockConfig: resourcelock.ResourceLockConfig{

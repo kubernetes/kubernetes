@@ -9582,6 +9582,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apiserver/pkg/apis/example",
         "//vendor:k8s.io/apiserver/pkg/apis/example/v1",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
     ],
 )
 
@@ -11195,6 +11196,7 @@ go_library(
     deps = [
         "//vendor:k8s.io/apiserver/pkg/apis/example",
         "//vendor:k8s.io/client-go/pkg/api/install",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
     ],
 )
 
