@@ -204,6 +204,18 @@ func TestTaintAndToleration(t *testing.T) {
 				{Host: "nodeC", Score: 0},
 			},
 		},
+		{
+			test: "Default behaviour No taints and tolerations, lands on node with no taints",
+			//pod without tolerations
+			pod: podWithTolerations([]v1.Toleration{}),
+			nodes: []*v1.Node{
+				//Node without taints
+				nodeWithTaints("nodeA", []v1.Taint{}),
+			},
+			expectedList: []schedulerapi.HostPriority{
+				{Host: "nodeA", Score: 10},
+			},
+		},
 	}
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)

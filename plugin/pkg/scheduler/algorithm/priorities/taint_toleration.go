@@ -27,14 +27,13 @@ import (
 
 // CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
 func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.Toleration) (intolerableTaints int) {
-	for i := range taints {
-		taint := &taints[i]
+	for _, taint := range taints {
 		// check only on taints that have effect PreferNoSchedule
 		if taint.Effect != v1.TaintEffectPreferNoSchedule {
 			continue
 		}
 
-		if !v1.TolerationsTolerateTaint(tolerations, taint) {
+		if !v1.TolerationsTolerateTaint(tolerations, &taint) {
 			intolerableTaints++
 		}
 	}
@@ -43,17 +42,12 @@ func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.
 
 // getAllTolerationEffectPreferNoSchedule gets the list of all Toleration with Effect PreferNoSchedule
 func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationList []v1.Toleration) {
-	for i := range tolerations {
-		toleration := &tolerations[i]
-		if len(toleration.Effect) == 0 || toleration.Effect == v1.TaintEffectPreferNoSchedule {
-			tolerationList = append(tolerationList, *toleration)
+	for _, toleration := range tolerations {
+		if toleration.Effect == v1.TaintEffectPreferNoSchedule {
+			tolerationList = append(tolerationList, toleration)
 		}
 	}
 	return
-}
-
-func getTolerationListFromPod(pod *v1.Pod) ([]v1.Toleration, error) {
-	return getAllTolerationPreferNoSchedule(pod.Spec.Tolerations), nil
 }
 
 // ComputeTaintTolerationPriority prepares the priority list for all the nodes based on the number of intolerable taints on the node
@@ -62,21 +56,19 @@ func ComputeTaintTolerationPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
-
-	var tolerationList []v1.Toleration
+	// To hold all the tolerations with Effect PreferNoSchedule
+	var tolerationsPreferNoSchedule []v1.Toleration
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
-		tolerationList = priorityMeta.podTolerations
+		tolerationsPreferNoSchedule = priorityMeta.podTolerations
+
 	} else {
-		var err error
-		tolerationList, err = getTolerationListFromPod(pod)
-		if err != nil {
-			return schedulerapi.HostPriority{}, err
-		}
+		tolerations := pod.Spec.Tolerations
+		tolerationsPreferNoSchedule = getAllTolerationPreferNoSchedule(tolerations)
 	}
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, tolerationList),
+		Score: countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, tolerationsPreferNoSchedule),
 	}, nil
 }
 
