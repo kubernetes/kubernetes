@@ -63,17 +63,22 @@ var (
 	noExecuteTaints       = []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoExecute"}}
 )
 
+func nowPointer() *metav1.Time {
+	now := metav1.Now()
+	return &now
+}
+
 var (
 	nodeNotReady = []v1.Taint{{
 		Key:       algorithm.TaintNodeNotReady,
 		Effect:    v1.TaintEffectNoExecute,
-		TimeAdded: metav1.Now(),
+		TimeAdded: nowPointer(),
 	}}
 
 	nodeUnreachable = []v1.Taint{{
 		Key:       algorithm.TaintNodeUnreachable,
 		Effect:    v1.TaintEffectNoExecute,
-		TimeAdded: metav1.Now(),
+		TimeAdded: nowPointer(),
 	}}
 )
 

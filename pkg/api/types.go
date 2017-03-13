@@ -2229,7 +2229,7 @@ type Taint struct {
 	// TimeAdded represents the time at which the taint was added.
 	// It is only written for NoExecute taints.
 	// +optional
-	TimeAdded metav1.Time
+	TimeAdded *metav1.Time
 }
 
 type TaintEffect string
