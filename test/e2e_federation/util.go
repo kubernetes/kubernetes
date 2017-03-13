@@ -52,7 +52,9 @@ var (
 
 const (
 	federatedNamespaceTimeout    = 5 * time.Minute
+	federatedReplicasetTimeout   = 5 * time.Minute
 	federatedServiceTimeout      = 5 * time.Minute
+	federatedDeploymentTimeout   = 5 * time.Minute
 	federatedClustersWaitTimeout = 1 * time.Minute
 
 	// [30000, 32767] is the allowed default service nodeport range and our
@@ -318,7 +320,7 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 	err := clientset.Services(namespace).Delete(serviceName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
 	// Wait for the service to be deleted.
-	err = wait.Poll(5*time.Second, 10*wait.ForeverTestTimeout, func() (bool, error) {
+	err = wait.Poll(5*time.Second, federatedServiceTimeout, func() (bool, error) {
 		_, err := clientset.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
@@ -401,7 +403,7 @@ func cleanupServiceShardLoadBalancer(clusterName string, service *v1.Service, ti
 		err := lbi.EnsureLoadBalancerDeleted(clusterName, internalSvc)
 		if err != nil {
 			// Deletion failed with an error, try again.
-			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, service.Namespace, clusterName)
+			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q: %v", service.Name, service.Namespace, clusterName, err)
 			return false, nil
 		}
 		By(fmt.Sprintf("Cloud provider resources for Service %q in namespace %q in cluster %q deleted", service.Name, service.Namespace, clusterName))
@@ -551,7 +553,7 @@ func deleteBackendPodsOrFail(clusters map[string]*cluster, namespace string) {
 // waitForReplicatSetToBeDeletedOrFail waits for the named ReplicaSet in namespace to be deleted.
 // If the deletion fails, the enclosing test fails.
 func waitForReplicaSetToBeDeletedOrFail(clientset *fedclientset.Clientset, namespace string, replicaSet string) {
-	err := wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	err := wait.Poll(5*time.Second, federatedReplicasetTimeout, func() (bool, error) {
 		_, err := clientset.Extensions().ReplicaSets(namespace).Get(replicaSet, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil

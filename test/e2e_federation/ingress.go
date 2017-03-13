@@ -233,15 +233,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 			AfterEach(func() {
 				deleteBackendPodsOrFail(clusters, ns)
-				if jig.ing != nil {
-					deleteIngressOrFail(f.FederationClientset, ns, jig.ing.Name, nil)
-					for clusterName, cluster := range clusters {
-						deleteClusterIngressOrFail(clusterName, cluster.Clientset, ns, jig.ing.Name)
-					}
-					jig.ing = nil
-				} else {
-					By("No ingress to delete. Ingress is nil")
-				}
+				// Outer AfterEach handles deletion of all ingress objects in namespace.
 			})
 
 			PIt("should be able to discover a federated ingress service via DNS", func() {
@@ -261,6 +253,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			})
 
 			It("should be able to connect to a federated ingress via its load balancer", func() {
+				By(fmt.Sprintf("Waiting for Federated Ingress on %v", jig.ing.Name))
 				// check the traffic on federation ingress
 				jig.waitForFederatedIngress()
 			})
