@@ -402,6 +402,40 @@ func (gc *GarbageCollector) runAttemptToOrphanWorker() {
 	}
 }
 
+func (gc *GarbageCollector) isSafeToOrphan(n *node) (safe bool, reason string) {
+	latest, err := gc.getObject(n.identity)
+	switch {
+	case errors.IsNotFound(err):
+		glog.V(5).Infof("item %v not found, go ahead orphaning its dependents anyway", n.identity)
+		return true, ""
+	case err != nil:
+		err2 := fmt.Errorf("cannot get object %v: %v", n.identity, err)
+		utilruntime.HandleError(err2)
+		return false, err2.Error()
+	}
+	generation := latest.GetGeneration()
+	// if generation is 0, we assume it's because no controller
+	// sets the generation for this object (like "pod"), so no need to
+	// synchronize with the controller and it's safe to proceed with the
+	// orphaning procedures.
+	if generation == 0 {
+		return true, ""
+	}
+	observedGeneration := latest.GetObservedGeneration()
+	// if observedGeneration is 0, we assume it's because no
+	// controller sets the observedGeneration for this object (like "pod"), so
+	// no need to synchronize with the controller and it's safe to proceed with
+	// the orphaning procedures.
+	if observedGeneration == 0 {
+		return true, ""
+	}
+	deletionGeneration := n.setDeletionGenerationOnce(generation)
+	if observedGeneration >= deletionGeneration {
+		return true, ""
+	}
+	return false, fmt.Sprintf("observed generation %d is less than its deletion generation %d", observedGeneration, deletionGeneration)
+}
+
 // attemptToOrphanWorker dequeues a node from the attemptToOrphan, then finds its
 // dependents based on the graph maintained by the GC, then removes it from the
 // OwnerReferences of its dependents, and finally updates the owner to remove
@@ -413,11 +447,19 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 		return false
 	}
 	defer gc.attemptToOrphan.Done(item)
+
 	owner, ok := item.(*node)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
 		return true
 	}
+
+	if safeToOrphan, reason := gc.isSafeToOrphan(owner); !safeToOrphan {
+		glog.V(5).Infof("orphaning dependents of %s is deferred because %s", reason)
+		gc.attemptToOrphan.AddAfter(item, 2*time.Second)
+		return true
+	}
+
 	// we don't need to lock each element, because they never get updated
 	owner.dependentsLock.RLock()
 	dependents := make([]*node, 0, len(owner.dependents))

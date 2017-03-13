@@ -17,6 +17,7 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -560,6 +561,96 @@ func TestUnblockOwnerReference(t *testing.T) {
 		t.Errorf("expected: %#v,\ngot: %#v", expected.OwnerReferences, got.OwnerReferences)
 		for _, ref := range got.OwnerReferences {
 			t.Errorf("ref.UID=%s, ref.BlockOwnerDeletion=%v", ref.UID, *ref.BlockOwnerDeletion)
+		}
+	}
+}
+
+func TestSetDeletionGeneration(t *testing.T) {
+	n := &node{}
+	n.setDeletionGenerationOnce(1)
+	deletionGeneration := n.setDeletionGenerationOnce(100)
+	if deletionGeneration != 1 {
+		t.Errorf("expected deletionGeneration to be 1, got %d", deletionGeneration)
+	}
+}
+
+func newRC(generation, observedGeneration int64) *v1.ReplicationController {
+	return &v1.ReplicationController{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ReplicaitonController",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Generation: generation,
+		},
+		Status: v1.ReplicationControllerStatus{
+			ObservedGeneration: observedGeneration,
+		},
+	}
+}
+
+func TestIsSafeToOrphan(t *testing.T) {
+	cases := []struct {
+		name string
+		// the object returned by the apiserver; we choose ReplicationController
+		// because it has status.ObservedGeneration, so we can test both cases
+		// where observed generation is set or not.
+		obj  *v1.ReplicationController
+		safe bool
+	}{
+		{
+			name: "no generation",
+			obj:  newRC(0, 100),
+			safe: true,
+		},
+		{
+			name: "no observed generation",
+			obj:  newRC(100, 0),
+			safe: true,
+		},
+		{
+			name: "observed generation equal to generation",
+			obj:  newRC(100, 100),
+			safe: true,
+		},
+		{
+			name: "observed generation greater than generation",
+			obj:  newRC(1, 100),
+			safe: true,
+		},
+		{
+			name: "observed generation less than generation",
+			obj:  newRC(100, 1),
+			safe: false,
+		},
+	}
+	const namespace = "ns"
+	const name = "rc"
+	for _, tc := range cases {
+		testHandler := &fakeActionHandler{
+			response: map[string]FakeResponse{
+				"GET" + fmt.Sprintf("/api/v1/namespaces/%s/replicationcontrollers/%s", namespace, name): {
+					200,
+					serilizeOrDie(t, tc.obj),
+				},
+			},
+		}
+		srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+		defer srv.Close()
+		gc := setupGC(t, clientConfig)
+		n := &node{
+			identity: objectReference{
+				OwnerReference: metav1.OwnerReference{
+					APIVersion: "v1",
+					Kind:       "ReplicationController",
+					Name:       name,
+				},
+				Namespace: namespace,
+			},
+		}
+		safe, _ := gc.isSafeToOrphan(n)
+		if e, a := tc.safe, safe; e != a {
+			t.Errorf("test %q, expect %v, got %v", tc.name, e, a)
 		}
 	}
 }

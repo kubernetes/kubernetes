@@ -434,6 +434,20 @@ func (u *Unstructured) SetClusterName(clusterName string) {
 	u.setNestedField(clusterName, "metadata", "clusterName")
 }
 
+func (u *Unstructured) GetGeneration() int64 {
+	if generation, ok := getNestedField(u.Object, "metadata", "generation").(int64); ok {
+		return generation
+	}
+	return 0
+}
+
+func (u *Unstructured) GetObservedGeneration() int64 {
+	if observedGeneration, ok := getNestedField(u.Object, "status", "observedGeneration").(int64); ok {
+		return observedGeneration
+	}
+	return 0
+}
+
 // UnstructuredList allows lists that do not have Golang structs
 // registered to be manipulated generically. This can be used to deal
 // with the API lists from a plug-in.
