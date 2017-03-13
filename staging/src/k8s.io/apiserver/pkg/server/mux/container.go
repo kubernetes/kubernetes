@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	rt "runtime"
+	"sort"
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
@@ -56,6 +57,17 @@ func NewAPIContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer, default
 	c.Container.Handle("/", defaultMux)
 
 	return &c
+}
+
+func (c *APIContainer) ListedPaths() []string {
+	var handledPaths []string
+	// Extract the paths handled using restful.WebService
+	for _, ws := range c.RegisteredWebServices() {
+		handledPaths = append(handledPaths, ws.RootPath())
+	}
+	sort.Strings(handledPaths)
+
+	return handledPaths
 }
 
 //TODO: Unify with RecoverPanics?

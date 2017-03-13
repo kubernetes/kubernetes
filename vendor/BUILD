@@ -10717,6 +10717,7 @@ go_library(
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/openapi",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/version",
         "//vendor:k8s.io/apiserver/pkg/endpoints/handlers/responsewriters",
         "//vendor:k8s.io/apiserver/pkg/endpoints/metrics",

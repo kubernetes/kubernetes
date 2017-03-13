@@ -19,6 +19,7 @@ package mux
 import (
 	"net/http"
 	"runtime/debug"
+	"sort"
 
 	"github.com/golang/glog"
 )
@@ -41,9 +42,12 @@ func NewPathRecorderMux() *PathRecorderMux {
 	}
 }
 
-// HandledPaths returns the registered handler exposedPaths.
-func (m *PathRecorderMux) HandledPaths() []string {
-	return append([]string{}, m.exposedPaths...)
+// ListedPaths returns the registered handler exposedPaths.
+func (m *PathRecorderMux) ListedPaths() []string {
+	handledPaths := append([]string{}, m.exposedPaths...)
+	sort.Strings(handledPaths)
+
+	return handledPaths
 }
 
 // Handle registers the handler for the given pattern.
