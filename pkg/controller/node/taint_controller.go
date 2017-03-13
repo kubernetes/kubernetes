@@ -59,7 +59,7 @@ type podUpdateItem struct {
 	newTolerations []v1.Toleration
 }
 
-// NoExecuteTaint manager listens to Taint/Toleration changes and is resposible for removing Pods
+// NoExecuteTaintManager listens to Taint/Toleration changes and is resposible for removing Pods
 // from Nodes tainted with NoExecute Taints.
 type NoExecuteTaintManager struct {
 	client   clientset.Interface
@@ -126,30 +126,24 @@ func getPodsAssignedToNode(c clientset.Interface, nodeName string) ([]v1.Pod, er
 	return pods.Items, nil
 }
 
-// Returns minimal toleration time from the given slice, or -1 if it's infinite.
+// getMinTolerationTime returns minimal toleration time from the given slice, or -1 if it's infinite.
 func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 	minTolerationTime := int64(-1)
 	if len(tolerations) == 0 {
 		return 0
 	}
-	if tolerations[0].TolerationSeconds != nil {
-		tolerationSeconds := *(tolerations[0].TolerationSeconds)
-		if tolerationSeconds <= 0 {
-			return 0
-		} else {
-			minTolerationTime = tolerationSeconds
-		}
-	}
+
 	for i := range tolerations {
 		if tolerations[i].TolerationSeconds != nil {
 			tolerationSeconds := *(tolerations[i].TolerationSeconds)
 			if tolerationSeconds <= 0 {
 				return 0
-			} else if tolerationSeconds < minTolerationTime {
+			} else if tolerationSeconds < minTolerationTime || minTolerationTime == -1 {
 				minTolerationTime = tolerationSeconds
 			}
 		}
 	}
+
 	return time.Duration(minTolerationTime) * time.Second
 }
 
