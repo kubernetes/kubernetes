@@ -542,7 +542,10 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			ClassInformer:             sharedInformers.Storage().V1beta1().StorageClasses(),
 			EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
 		}
-		volumeController := persistentvolumecontroller.NewController(params)
+		volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
+		if volumeControllerErr != nil {
+			return fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)
+		}
 		go volumeController.Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	} else {
