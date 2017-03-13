@@ -281,6 +281,10 @@ func (f *federatedInformerImpl) Stop() {
 	for key, informer := range f.targetInformers {
 		glog.V(4).Infof("... Closing informer channel for %q.", key)
 		close(informer.stopChan)
+		// Remove each informer after it has been stopped to prevent
+		// subsequent cluster deletion from attempting to double close
+		// an informer's stop channel.
+		delete(f.targetInformers, key)
 	}
 }
 
