@@ -557,3 +557,23 @@ func TestZonesToSet(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateZone(t *testing.T) {
+	functionUnderTest := "ValidateZone"
+
+	// First part: want an error
+	errCases := []string{"", " 	 	 "}
+	for _, errCase := range errCases {
+		if got := ValidateZone(errCase); got == nil {
+			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, errCase, got, "an error")
+		}
+	}
+
+	// Second part: want no error
+	succCases := []string{" us-east-1a	"}
+	for _, succCase := range succCases {
+		if got := ValidateZone(succCase); got != nil {
+			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, succCase, got, nil)
+		}
+	}
+}
