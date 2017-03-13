@@ -10302,11 +10302,12 @@ func (x *PersistentVolumeClaimSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			yyq2[2] = true
 			yyq2[3] = x.VolumeName != ""
 			yyq2[4] = x.StorageClassName != nil
+			yyq2[5] = x.VolumeType != nil
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(6)
 			} else {
-				yynn2 = 1
+				yynn2 = 0
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -10462,30 +10463,36 @@ func (x *PersistentVolumeClaimSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.VolumeType == nil {
-					r.EncodeNil()
-				} else {
-					yy23 := *x.VolumeType
-					yym24 := z.EncBinary()
-					_ = yym24
-					if false {
+				if yyq2[5] {
+					if x.VolumeType == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(yy23))
+						yy23 := *x.VolumeType
+						yym24 := z.EncBinary()
+						_ = yym24
+						if false {
+						} else {
+							r.EncodeString(codecSelferC_UTF81234, string(yy23))
+						}
 					}
+				} else {
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("volumeType"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.VolumeType == nil {
-					r.EncodeNil()
-				} else {
-					yy25 := *x.VolumeType
-					yym26 := z.EncBinary()
-					_ = yym26
-					if false {
+				if yyq2[5] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("volumeType"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.VolumeType == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(yy25))
+						yy25 := *x.VolumeType
+						yym26 := z.EncBinary()
+						_ = yym26
+						if false {
+						} else {
+							r.EncodeString(codecSelferC_UTF81234, string(yy25))
+						}
 					}
 				}
 			}
