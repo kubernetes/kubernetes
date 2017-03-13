@@ -22,13 +22,9 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
-#A little hack to get the last zone. we always deploy federated cluster to the last zone.
-#TODO(colhom): deploy federated control plane to multiple underlying clusters in robust way
-lastZone=""
-for zone in ${E2E_ZONES};do
-    lastZone="$zone"
-done
+: "${FEDERATION_HOST_CLUSTER_ZONE?Must set FEDERATION_HOST_CLUSTER_ZONE env var}"
+
 (
-    set-federation-zone-vars "$zone"
+    set-federation-zone-vars "${FEDERATION_HOST_CLUSTER_ZONE}"
     "${KUBE_ROOT}/hack/ginkgo-e2e.sh" $@
 )

@@ -144,7 +144,6 @@ go_library(
         "//pkg/master/ports:go_default_library",
         "//pkg/metrics:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
-        "//pkg/security/apparmor:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/logs:go_default_library",

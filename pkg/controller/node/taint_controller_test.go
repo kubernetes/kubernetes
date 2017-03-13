@@ -549,3 +549,47 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 		close(stopCh)
 	}
 }
+
+func TestGetMinTolerationTime(t *testing.T) {
+	one := int64(1)
+	oneSec := 1 * time.Second
+
+	tests := []struct {
+		tolerations []v1.Toleration
+		expected    time.Duration
+	}{
+		{
+			tolerations: []v1.Toleration{},
+			expected:    0,
+		},
+		{
+			tolerations: []v1.Toleration{
+				{
+					TolerationSeconds: &one,
+				},
+				{
+					TolerationSeconds: nil,
+				},
+			},
+			expected: oneSec,
+		},
+		{
+			tolerations: []v1.Toleration{
+				{
+					TolerationSeconds: nil,
+				},
+				{
+					TolerationSeconds: &one,
+				},
+			},
+			expected: oneSec,
+		},
+	}
+
+	for _, test := range tests {
+		got := getMinTolerationTime(test.tolerations)
+		if got != test.expected {
+			t.Errorf("Incorrect min toleration time: got %v, expected %v", got, test.expected)
+		}
+	}
+}

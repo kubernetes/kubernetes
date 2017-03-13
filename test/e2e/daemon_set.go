@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"strings"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -116,7 +116,6 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods launch on every node of the cluster.")
-		Expect(err).NotTo(HaveOccurred())
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 		err = checkDaemonStatus(f, dsName)
@@ -219,7 +218,6 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods launch on every node of the cluster.")
-		Expect(err).NotTo(HaveOccurred())
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 		err = checkDaemonStatus(f, dsName)
@@ -245,7 +243,6 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(ds.Spec.TemplateGeneration).To(Equal(int64(1)))
 
 		By("Check that daemon pods launch on every node of the cluster.")
-		Expect(err).NotTo(HaveOccurred())
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 
@@ -269,7 +266,6 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods are still running on every node of the cluster.")
-		Expect(err).NotTo(HaveOccurred())
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 	})
@@ -286,7 +282,6 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration))
 
 		By("Check that daemon pods launch on every node of the cluster.")
-		Expect(err).NotTo(HaveOccurred())
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 
@@ -296,6 +291,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 
 		By("Update daemon pods image.")
 		ds, err = c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
 		ds.Spec.Template.Spec.Containers[0].Image = redisImage
 		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
 		ds, err = c.Extensions().DaemonSets(ns).Update(ds)
@@ -311,7 +307,6 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods are still running on every node of the cluster.")
-		Expect(err).NotTo(HaveOccurred())
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 	})
@@ -319,8 +314,9 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 	It("Should adopt or recreate existing pods when creating a RollingUpdate DaemonSet with matching or mismatching templateGeneration", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
+		// 1. Create a RollingUpdate DaemonSet
 		templateGeneration := int64(999)
-		framework.Logf("Creating simple daemon set %s with templateGeneration %d", dsName, templateGeneration)
+		framework.Logf("Creating simple RollingUpdate DaemonSet %s with templateGeneration %d", dsName, templateGeneration)
 		ds := newDaemonSet(dsName, image, label)
 		ds.Spec.TemplateGeneration = templateGeneration
 		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
@@ -329,7 +325,6 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration))
 
 		By("Check that daemon pods launch on every node of the cluster.")
-		Expect(err).NotTo(HaveOccurred())
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 
@@ -337,18 +332,17 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		err = checkDaemonPodsTemplateGeneration(c, ns, label, fmt.Sprint(templateGeneration))
 		Expect(err).NotTo(HaveOccurred())
 
-		dsPodsLastCreationTime := getDaemonPodsLastCreationTime(c, ns, label)
-
+		// 2. Orphan DaemonSet pods
 		By(fmt.Sprintf("Deleting DaemonSet %s and orphaning its pods", dsName))
-		trueVar := true
-		deleteOptions := &metav1.DeleteOptions{OrphanDependents: &trueVar}
-		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(ds.UID))
-		err = c.Extensions().DaemonSets(ns).Delete(ds.Name, deleteOptions)
+		err = orphanDaemonSetPods(c, ds)
 		Expect(err).NotTo(HaveOccurred())
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonSetPodsOrphaned(c, ns, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet pods to be orphaned")
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonSetDeleted(f, ns, ds.Name))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet to be deleted")
 
-		newDSName := dsName + "-new-adopt"
+		// 3. Adopt DaemonSet pods (no restart)
+		newDSName := "adopt"
 		By(fmt.Sprintf("Creating a new RollingUpdate DaemonSet %s to adopt pods", newDSName))
 		newDS := newDaemonSet(newDSName, image, label)
 		newDS.Spec.TemplateGeneration = templateGeneration
@@ -357,23 +351,29 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(newDS.Spec.TemplateGeneration).To(Equal(templateGeneration))
 
+		By(fmt.Sprintf("Wait for all pods to be adopted by DaemonSet %s", newDSName))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonSetPodsAdopted(c, ns, newDS.UID, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet pods to be orphaned")
+
 		By(fmt.Sprintf("Make sure no daemon pod updated its template generation %d", templateGeneration))
 		err = checkDaemonPodsTemplateGeneration(c, ns, label, fmt.Sprint(templateGeneration))
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Make sure no pods are recreated")
-		newDSPodsFirstCreationTime := getDaemonPodsFirstCreationTime(c, ns, label)
-		Expect(newDSPodsFirstCreationTime.Before(dsPodsLastCreationTime) ||
-			newDSPodsFirstCreationTime.Equal(dsPodsLastCreationTime)).To(BeTrue())
-
-		By(fmt.Sprintf("Deleting DaemonSet %s and orphaning its pods", newDSName))
-		orphanDependents := true
-		err = c.Extensions().DaemonSets(ns).Delete(newDSName, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+		By("Make sure no pods are recreated by looking at their names")
+		err = checkDaemonSetPodsName(c, ns, dsName, label)
 		Expect(err).NotTo(HaveOccurred())
+
+		// 4. Orphan DaemonSet pods again
+		By(fmt.Sprintf("Deleting DaemonSet %s and orphaning its pods", newDSName))
+		err = orphanDaemonSetPods(c, newDS)
+		Expect(err).NotTo(HaveOccurred())
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonSetPodsOrphaned(c, ns, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet pods to be orphaned")
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonSetDeleted(f, ns, newDSName))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet to be deleted")
 
-		newRestartDSName := dsName + "-new-restart"
+		// 4. Adopt DaemonSet pods (should kill and restart those pods)
+		newRestartDSName := "restart"
 		By(fmt.Sprintf("Creating a new RollingUpdate DaemonSet %s to restart adopted pods", newRestartDSName))
 		newRestartDS := newDaemonSet(newRestartDSName, image, label)
 		newRestartDS.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
@@ -381,15 +381,22 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(newRestartDS.Spec.TemplateGeneration).To(Equal(int64(1)))
 
-		By("Wait for all DaemonSet pods template Generation to be updated to 1")
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, templateGenerationMatch(c, ns, label, "1"))
-		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod template generation to be 1")
+		By("Wait for restarted DaemonSet pods launch on every node of the cluster.")
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonSetPodsNameMatch(c, ns, newRestartDSName, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to restart")
 
-		By("Make sure pods are recreated")
-		newRestartDSPodsFirstCreationTime := getDaemonPodsFirstCreationTime(c, ns, label)
-		Expect(dsPodsLastCreationTime.Before(newRestartDSPodsFirstCreationTime)).To(BeTrue())
+		By("Make sure restarted DaemonSet pods have correct template generation 1")
+		err = checkDaemonPodsTemplateGeneration(c, ns, label, "1")
+		Expect(err).NotTo(HaveOccurred())
 	})
 })
+
+func orphanDaemonSetPods(c clientset.Interface, ds *extensions.DaemonSet) error {
+	trueVar := true
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &trueVar}
+	deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(ds.UID))
+	return c.Extensions().DaemonSets(ds.Namespace).Delete(ds.Name, deleteOptions)
+}
 
 func newDaemonSet(dsName, image string, label map[string]string) *extensions.DaemonSet {
 	return &extensions.DaemonSet{
@@ -527,7 +534,7 @@ func checkRunningOnAllNodes(f *framework.Framework, selector map[string]string, 
 		nodeNames := make([]string, 0)
 		for _, node := range nodeList.Items {
 			if !canScheduleOnNode(node, ds) {
-				framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node, node.Spec.Taints)
+				framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
 				continue
 			}
 			nodeNames = append(nodeNames, node.Name)
@@ -586,20 +593,16 @@ func checkDaemonPodsImage(c clientset.Interface, ns string, selector map[string]
 	}
 }
 
-func templateGenerationMatch(c clientset.Interface, ns string, selector map[string]string, templateGeneration string) func() (bool, error) {
-	return func() (bool, error) {
-		err := checkDaemonPodsTemplateGeneration(c, ns, selector, templateGeneration)
-		match := err == nil
-		return match, nil
-	}
-}
-
 func checkDaemonPodsTemplateGeneration(c clientset.Interface, ns string, label map[string]string, templateGeneration string) error {
 	pods := listDaemonPods(c, ns, label)
 	for _, pod := range pods.Items {
+		// We don't care about inactive pods
+		if !controller.IsPodActive(&pod) {
+			continue
+		}
 		podTemplateGeneration := pod.Labels[extensions.DaemonSetTemplateGenerationKey]
 		if podTemplateGeneration != templateGeneration {
-			return fmt.Errorf("Expected pod %s/%s template generation %s, but got %s", pod.Namespace, pod.Name, templateGeneration, podTemplateGeneration)
+			return fmt.Errorf("expected pod %s/%s template generation %s, but got %s", pod.Namespace, pod.Name, templateGeneration, podTemplateGeneration)
 		}
 	}
 	return nil
@@ -615,34 +618,48 @@ func checkDaemonSetDeleted(f *framework.Framework, ns, name string) func() (bool
 	}
 }
 
-func getDaemonPodsLastCreationTime(c clientset.Interface, ns string, label map[string]string) metav1.Time {
-	sortedPods := getDaemonPodsSortedByCreationTime(c, ns, label)
-	return sortedPods[len(sortedPods)-1].ObjectMeta.CreationTimestamp
-}
-
-func getDaemonPodsFirstCreationTime(c clientset.Interface, ns string, label map[string]string) metav1.Time {
-	sortedPods := getDaemonPodsSortedByCreationTime(c, ns, label)
-	return sortedPods[0].ObjectMeta.CreationTimestamp
-}
-
-func getDaemonPodsSortedByCreationTime(c clientset.Interface, ns string, label map[string]string) []v1.Pod {
-	podList := listDaemonPods(c, ns, label)
-	pods := podList.Items
-	if len(pods) > 1 {
-		sort.Sort(podByCreationTimestamp(pods))
+func checkDaemonSetPodsOrphaned(c clientset.Interface, ns string, label map[string]string) func() (bool, error) {
+	return func() (bool, error) {
+		pods := listDaemonPods(c, ns, label)
+		for _, pod := range pods.Items {
+			// This pod is orphaned only when controller ref is cleared
+			if controllerRef := controller.GetControllerOf(&pod); controllerRef != nil {
+				return false, nil
+			}
+		}
+		return true, nil
 	}
-	return pods
 }
 
-// podByCreationTimestamp sorts a list of DaemonSet pods by creation timestamp, using their names as a tie breaker.
-type podByCreationTimestamp []v1.Pod
-
-func (o podByCreationTimestamp) Len() int      { return len(o) }
-func (o podByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o podByCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
+func checkDaemonSetPodsAdopted(c clientset.Interface, ns string, dsUID types.UID, label map[string]string) func() (bool, error) {
+	return func() (bool, error) {
+		pods := listDaemonPods(c, ns, label)
+		for _, pod := range pods.Items {
+			// This pod is adopted only when its controller ref is update
+			if controllerRef := controller.GetControllerOf(&pod); controllerRef == nil || controllerRef.UID != dsUID {
+				return false, nil
+			}
+		}
+		return true, nil
 	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+}
+
+func checkDaemonSetPodsNameMatch(c clientset.Interface, ns, prefix string, label map[string]string) func() (bool, error) {
+	return func() (bool, error) {
+		if err := checkDaemonSetPodsName(c, ns, prefix, label); err != nil {
+			framework.Logf("%v", err)
+			return false, nil
+		}
+		return true, nil
+	}
+}
+
+func checkDaemonSetPodsName(c clientset.Interface, ns, prefix string, label map[string]string) error {
+	pods := listDaemonPods(c, ns, label)
+	for _, pod := range pods.Items {
+		if !strings.HasPrefix(pod.Name, prefix) {
+			return fmt.Errorf("expected pod %s name to be prefixed %q", pod.Name, prefix)
+		}
+	}
+	return nil
 }

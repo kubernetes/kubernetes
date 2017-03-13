@@ -21,6 +21,8 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
+	"strconv"
+	"text/template"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -42,20 +44,25 @@ import (
 )
 
 var (
-	initDoneMsgf = dedent.Dedent(`
+	initDoneTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
 		Your Kubernetes master has initialized successfully!
 
-		To start using your cluster, you need to run:
-		export KUBECONFIG=%s
+		To start using your cluster, you need to run (as a regular user):
+
+		  sudo cp {{.KubeConfigPath}} $HOME/
+		  sudo chmod $(id -u):$(id -g) $HOME/{{.KubeConfigName}}
+		  export KUBECONFIG=$HOME/{{.KubeConfigName}}
 
 		You should now deploy a pod network to the cluster.
 		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
-		    http://kubernetes.io/docs/admin/addons/
+		  http://kubernetes.io/docs/admin/addons/
 
-		You can now join any number of machines by running the following on each node:
+		You can now join any number of machines by running the following on each node
+		as root:
 
-		kubeadm join --token %s %s:%d
-		`)
+		  kubeadm join --token {{.Token}} {{.MasterIP}}:{{.MasterPort}}
+
+		`)))
 )
 
 // NewCmdInit returns "kubeadm init" command.
@@ -133,7 +140,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
 
-	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
+	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
@@ -256,6 +263,13 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(out, initDoneMsgf, path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), i.cfg.Token, i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
-	return nil
+	ctx := map[string]string{
+		"KubeConfigPath": path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName),
+		"KubeConfigName": kubeadmconstants.AdminKubeConfigFileName,
+		"Token":          i.cfg.Token,
+		"MasterIP":       i.cfg.API.AdvertiseAddress,
+		"MasterPort":     strconv.Itoa(int(i.cfg.API.BindPort)),
+	}
+
+	return initDoneTempl.Execute(out, ctx)
 }
