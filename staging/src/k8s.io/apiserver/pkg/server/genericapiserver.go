@@ -130,6 +130,9 @@ type GenericAPIServer struct {
 	// It comes after all filters and the API handling
 	FallThroughHandler *mux.PathRecorderMux
 
+	// listedPathProvider is a lister which provides the set of paths to show at /
+	listedPathProvider routes.ListedPathProvider
+
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
 	apiGroupsForDiscoveryLock sync.RWMutex
@@ -150,6 +153,39 @@ type GenericAPIServer struct {
 	healthzLock    sync.Mutex
 	healthzChecks  []healthz.HealthzChecker
 	healthzCreated bool
+}
+
+// DelegationTarget is an interface which allows for composition of API servers with top level handling that works
+// as expected.
+type DelegationTarget interface {
+	// UnprotectedHandler returns a handler that is NOT protected by a normal chain
+	UnprotectedHandler() http.Handler
+
+	// RequestContextMapper returns the existing RequestContextMapper.  Because we cannot rewire all existing
+	// uses of this function, this will be used in any delegating API server
+	RequestContextMapper() apirequest.RequestContextMapper
+
+	// PostStartHooks returns the post-start hooks that need to be combined
+	PostStartHooks() map[string]postStartHookEntry
+
+	// HealthzChecks returns the healthz checks that need to be combined
+	HealthzChecks() []healthz.HealthzChecker
+
+	// ListedPaths returns the paths for supporting an index
+	ListedPaths() []string
+}
+
+func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
+	return s.HandlerContainer.ServeMux
+}
+func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
+	return s.postStartHooks
+}
+func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
+	return s.healthzChecks
+}
+func (s *GenericAPIServer) ListedPaths() []string {
+	return s.listedPathProvider.ListedPaths()
 }
 
 func init() {
