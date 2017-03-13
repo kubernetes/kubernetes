@@ -3274,7 +3274,11 @@ func DeepCopy_api_Taint(in interface{}, out interface{}, c *conversion.Cloner) e
 		in := in.(*Taint)
 		out := out.(*Taint)
 		*out = *in
-		out.TimeAdded = in.TimeAdded.DeepCopy()
+		if in.TimeAdded != nil {
+			in, out := &in.TimeAdded, &out.TimeAdded
+			*out = new(v1.Time)
+			**out = (*in).DeepCopy()
+		}
 		return nil
 	}
 }

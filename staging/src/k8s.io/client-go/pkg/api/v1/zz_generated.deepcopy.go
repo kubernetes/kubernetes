@@ -3247,7 +3247,11 @@ func DeepCopy_v1_Taint(in interface{}, out interface{}, c *conversion.Cloner) er
 		in := in.(*Taint)
 		out := out.(*Taint)
 		*out = *in
-		out.TimeAdded = in.TimeAdded.DeepCopy()
+		if in.TimeAdded != nil {
+			in, out := &in.TimeAdded, &out.TimeAdded
+			*out = new(meta_v1.Time)
+			**out = (*in).DeepCopy()
+		}
 		return nil
 	}
 }
