@@ -50,7 +50,7 @@ var (
 		To start using your cluster, you need to run (as a regular user):
 
 		  sudo cp {{.KubeConfigPath}} $HOME/
-		  sudo chmod $(id -u):$(id -g) $HOME/{{.KubeConfigName}}
+		  sudo chown $(id -u):$(id -g) $HOME/{{.KubeConfigName}}
 		  export KUBECONFIG=$HOME/{{.KubeConfigName}}
 
 		You should now deploy a pod network to the cluster.
