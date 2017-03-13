@@ -414,6 +414,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		return err
 	}
 
+	var nodeName types.NodeName
 	if kubeDeps == nil {
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
@@ -432,7 +433,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			}
 		}
 
-		nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+		nodeName, err = getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
 		if err != nil {
 			return err
 		}
@@ -481,9 +482,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		kubeDeps.EventClient = eventClient
 	}
 
-	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
-	if err != nil {
-		return err
+	if nodeName == "" {
+		nodeName, err = getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+		if err != nil {
+			return err
+		}
 	}
 
 	if kubeDeps.Auth == nil {
