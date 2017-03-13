@@ -808,7 +808,7 @@ func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w *PrefixWriter) {
 func printLocalVolumeSource(local *api.LocalStorageVolumeSource, w *PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tLocalStorage (a persistent volume backed by a local storage volume)\n"+
 		"    Path:\t%v\n"+
-		"    Node:\t%v\n"+
+		"    Node:\t%v\n",
 		local.Path, local.NodeName)
 }
 

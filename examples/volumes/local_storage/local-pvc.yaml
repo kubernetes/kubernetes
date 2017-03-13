@@ -1,0 +1,15 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: local-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Mi
+  volumeType: "" # For some reason I must have this field even though it's optional
+  storageClassName: ""
+  selector:
+    matchLabels:
+      storage: "local"

@@ -607,7 +607,7 @@ type PersistentVolumeClaimSpec struct {
 	// Defaults to "remote" storage.
 	// Accepted options include SemiPersistentLocalStorage.
 	// +optional
-	VolumeType *string `json:"volumeType" protobuf:"bytes,6,opt,name=volumeType"`
+	VolumeType *string `json:"volumeType,omitempty" protobuf:"bytes,6,opt,name=volumeType"`
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.

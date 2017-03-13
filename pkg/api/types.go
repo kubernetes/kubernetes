@@ -590,8 +590,8 @@ type HostPathVolumeSource struct {
 type LocalStorageVolumeSource struct {
 	// Path to the local storage logical partition represented by this volume.
 	// More info: http://kubernetes.io/docs/user-guide/volumes#local
-	Path     string `json:"path" protobuf:"bytes,1,opt,name=path"`
-	NodeName string `json:"nodeName"protobuf:"bytes,2,opt,name=nodeName"`
+	Path     string
+	NodeName string
 }
 
 // Represents an empty directory for a pod.
