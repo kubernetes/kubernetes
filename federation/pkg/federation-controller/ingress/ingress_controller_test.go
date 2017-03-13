@@ -252,14 +252,10 @@ func TestIngressController(t *testing.T) {
 	assert.True(t, reflect.DeepEqual(updatedIngress2.Spec, fedIngress.Spec), "Spec of updated ingress is not equal")
 	assert.Equal(t, updatedIngress2.ObjectMeta.Annotations["A"], fedIngress.ObjectMeta.Annotations["A"], "Updated annotation not transferred from federated to cluster ingress.")
 
-	// Test add cluster
-	t.Log("Adding a second cluster")
-
 	fedIngress.Annotations[staticIPNameKeyWritable] = "foo" // Make sure that the base object has a static IP name first.
 	fedIngressWatch.Modify(&fedIngress)
-	clusterWatch.Add(cluster2)
 
-	t.Log("Checking that the ingress got created in cluster 2")
+	t.Log("Checking that the ingress got created in cluster 2 after a global ip was assigned")
 	createdIngress2 := GetIngressFromChan(t, cluster2IngressCreateChan)
 	assert.NotNil(t, createdIngress2)
 	assert.True(t, reflect.DeepEqual(fedIngress.Spec, createdIngress2.Spec), "Spec of created ingress is not equal")
