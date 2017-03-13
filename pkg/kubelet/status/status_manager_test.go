@@ -334,7 +334,7 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 	pod := getTestPod()
 
 	// Setup fake client.
-	var ret v1.Pod
+	var ret *v1.Pod
 	var err error
 	client.AddReactor("*", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		switch action := action.(type) {
@@ -345,7 +345,7 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 		default:
 			assert.Fail(t, "Unexpected Action: %+v", action)
 		}
-		return true, &ret, err
+		return true, ret, err
 	})
 
 	pod.Status.ContainerStatuses = []v1.ContainerStatus{{State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}}}
@@ -354,7 +354,7 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 	updateAction := core.UpdateActionImpl{ActionImpl: core.ActionImpl{Verb: "update", Resource: schema.GroupVersionResource{Resource: "pods"}, Subresource: "status"}}
 
 	// Pod not found.
-	ret = *pod
+	ret = nil
 	err = errors.NewNotFound(api.Resource("pods"), pod.Name)
 	m.SetPodStatus(pod, getRandomPodStatus())
 	m.testSyncBatch()
@@ -362,6 +362,7 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 	client.ClearActions()
 
 	// Pod was recreated.
+	ret = getTestPod()
 	ret.UID = "other_pod"
 	err = nil
 	m.SetPodStatus(pod, getRandomPodStatus())
@@ -370,7 +371,7 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 	client.ClearActions()
 
 	// Pod not deleted (success case).
-	ret = *pod
+	ret = getTestPod()
 	m.SetPodStatus(pod, getRandomPodStatus())
 	m.testSyncBatch()
 	verifyActions(t, client, []core.Action{getAction, updateAction})
@@ -392,6 +393,7 @@ func TestSyncBatchNoDeadlock(t *testing.T) {
 	client.ClearActions()
 
 	// Error case.
+	ret = nil
 	err = fmt.Errorf("intentional test error")
 	m.SetPodStatus(pod, getRandomPodStatus())
 	m.testSyncBatch()

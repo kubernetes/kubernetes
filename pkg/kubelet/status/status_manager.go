@@ -462,7 +462,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 
 	// We failed to update status, wait for periodic sync to retry.
-	glog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
+	glog.Warningf("Failed to update status for pod %q: %v", format.PodDesc(status.podName, status.podNamespace, uid), err)
 }
 
 // needsUpdate returns whether the status is stale for the given pod UID.
