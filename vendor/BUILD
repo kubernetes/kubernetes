@@ -11757,21 +11757,26 @@ go_test(
 go_library(
     name = "k8s.io/client-go/examples/third-party-resources",
     srcs = [
+        "k8s.io/client-go/examples/third-party-resources/client.go",
         "k8s.io/client-go/examples/third-party-resources/main.go",
         "k8s.io/client-go/examples/third-party-resources/types.go",
+        "k8s.io/client-go/examples/third-party-resources/watcher.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
         "//vendor:k8s.io/client-go/plugin/pkg/client/auth/gcp",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
 )

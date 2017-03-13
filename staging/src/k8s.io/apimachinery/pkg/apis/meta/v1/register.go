@@ -48,6 +48,7 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&ExportOptions{},
 		&GetOptions{},
 		&DeleteOptions{},
+		&Status{},
 	)
 	scheme.AddConversionFuncs(
 		Convert_versioned_Event_to_watch_Event,

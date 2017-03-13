@@ -18,14 +18,13 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
@@ -52,17 +51,17 @@ func main() {
 	}
 
 	// initialize third party resource if it does not exist
-	tpr, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Get("example.k8s.io", metav1.GetOptions{})
+	tpr, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Get(ExampleResourceName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			tpr := &v1beta1.ThirdPartyResource{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "example.k8s.io",
+					Name: ExampleResourceName,
 				},
 				Versions: []v1beta1.APIVersion{
-					{Name: "v1"},
+					{Name: ExampleResourceVersion},
 				},
-				Description: "An Example ThirdPartyResource",
+				Description: ExampleResourceDescription,
 			}
 
 			result, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
@@ -78,19 +77,34 @@ func main() {
 	}
 
 	// make a new config for our extension's API group, using the first config as a baseline
-	var tprconfig *rest.Config
-	tprconfig = config
-	configureClient(tprconfig)
-
-	tprclient, err := rest.RESTClientFor(tprconfig)
+	exampleClient, exampleScheme, err := NewClient(config)
 	if err != nil {
 		panic(err)
 	}
 
+	// start a watcher on instances of our TPR
+	watcher := Watcher{
+		clientset:     clientset,
+		exampleClient: exampleClient,
+		exampleScheme: exampleScheme,
+	}
+
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	go watcher.Run(ctx)
+
+	// The sleep below is just to make sure that the watcher.Run() goroutine has successfully executed
+	// and the watcher is handling the events about Example TPR instances.
+	// In the normal application there is no need for it, because:
+	// 1. It's unlikely to create a watcher and a TPR instance at the same time in the same application.
+	// 2. The application with watcher would most probably keep running instead of exiting right after the watcher startup.
+	time.Sleep(5 * time.Second)
+
+	// GET/POST an instance of our TPR
 	var example Example
 
-	err = tprclient.Get().
-		Resource("examples").
+	err = exampleClient.Get().
+		Resource(ExampleResourcePath).
 		Namespace(api.NamespaceDefault).
 		Name("example1").
 		Do().Into(&example)
@@ -109,8 +123,8 @@ func main() {
 			}
 
 			var result Example
-			err = tprclient.Post().
-				Resource("examples").
+			err = exampleClient.Post().
+				Resource(ExampleResourcePath).
 				Namespace(api.NamespaceDefault).
 				Body(example).
 				Do().Into(&result)
@@ -128,7 +142,7 @@ func main() {
 
 	// Fetch a list of our TPRs
 	exampleList := ExampleList{}
-	err = tprclient.Get().Resource("examples").Do().Into(&exampleList)
+	err = exampleClient.Get().Resource(ExampleResourcePath).Do().Into(&exampleList)
 	if err != nil {
 		panic(err)
 	}
@@ -140,28 +154,4 @@ func buildConfig(kubeconfig string) (*rest.Config, error) {
 		return clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
 	return rest.InClusterConfig()
-}
-
-func configureClient(config *rest.Config) {
-	groupversion := schema.GroupVersion{
-		Group:   "k8s.io",
-		Version: "v1",
-	}
-
-	config.GroupVersion = &groupversion
-	config.APIPath = "/apis"
-	config.ContentType = runtime.ContentTypeJSON
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
-
-	schemeBuilder := runtime.NewSchemeBuilder(
-		func(scheme *runtime.Scheme) error {
-			scheme.AddKnownTypes(
-				groupversion,
-				&Example{},
-				&ExampleList{},
-			)
-			return nil
-		})
-	metav1.AddToGroupVersion(api.Scheme, groupversion)
-	schemeBuilder.AddToScheme(api.Scheme)
 }
