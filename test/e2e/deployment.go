@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/util"
@@ -43,6 +45,9 @@ import (
 )
 
 const (
+	dRetryPeriod  = 2 * time.Second
+	dRetryTimeout = 5 * time.Minute
+
 	// nginxImage defined in kubectl.go
 	nginxImageName = "nginx"
 	redisImage     = "gcr.io/google_containers/redis:e2e"
@@ -99,6 +104,9 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	})
 	It("iterative rollouts should eventually progress", func() {
 		testIterativeDeployments(f)
+	})
+	It("test Deployment ReplicaSet orphaning and adoption regarding controllerRef", func() {
+		testDeploymentsControllerRef(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
@@ -1288,4 +1296,93 @@ func replicaSetHasDesiredReplicas(rsClient extensionsclient.ReplicaSetsGetter, r
 		}
 		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *(rs.Spec.Replicas), nil
 	}
+}
+
+func testDeploymentsControllerRef(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+
+	deploymentName := "test-orphan-deployment"
+	By(fmt.Sprintf("Creating Deployment %q", deploymentName))
+	podLabels := map[string]string{"name": nginxImageName}
+	replicas := int32(1)
+	d := framework.NewDeployment(deploymentName, replicas, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType)
+	deploy, err := c.Extensions().Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+	err = framework.WaitForDeploymentStatus(c, deploy)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Checking its ReplicaSet has the right controllerRef")
+	err = checkDeploymentReplicaSetsControllerRef(c, ns, deploy.UID, podLabels)
+	Expect(err).NotTo(HaveOccurred())
+
+	By(fmt.Sprintf("Deleting Deployment %q and orphaning its ReplicaSets", deploymentName))
+	err = orphanDeploymentReplicaSets(c, deploy)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Wait for the ReplicaSet to be orphaned")
+	err = wait.Poll(dRetryPeriod, dRetryTimeout, waitDeploymentReplicaSetsOrphaned(c, ns, podLabels))
+	Expect(err).NotTo(HaveOccurred(), "error waiting for Deployment ReplicaSet to be orphaned")
+
+	deploymentName = "test-adopt-deployment"
+	By(fmt.Sprintf("Creating Deployment %q to adopt the ReplicaSet", deploymentName))
+	d = framework.NewDeployment(deploymentName, replicas, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType)
+	deploy, err = c.Extensions().Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+	err = framework.WaitForDeploymentStatus(c, deploy)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Waiting for the ReplicaSet to have the right controllerRef")
+	err = checkDeploymentReplicaSetsControllerRef(c, ns, deploy.UID, podLabels)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func waitDeploymentReplicaSetsControllerRef(c clientset.Interface, ns string, uid types.UID, label map[string]string) func() (bool, error) {
+	return func() (bool, error) {
+		err := checkDeploymentReplicaSetsControllerRef(c, ns, uid, label)
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	}
+}
+
+func checkDeploymentReplicaSetsControllerRef(c clientset.Interface, ns string, uid types.UID, label map[string]string) error {
+	rsList := listDeploymentReplicaSets(c, ns, label)
+	for _, rs := range rsList.Items {
+		// This rs is adopted only when its controller ref is update
+		if controllerRef := controller.GetControllerOf(&rs); controllerRef == nil || controllerRef.UID != uid {
+			return fmt.Errorf("ReplicaSet %s has unexpected controllerRef %v", rs.Name, controllerRef)
+		}
+	}
+	return nil
+}
+
+func waitDeploymentReplicaSetsOrphaned(c clientset.Interface, ns string, label map[string]string) func() (bool, error) {
+	return func() (bool, error) {
+		rsList := listDeploymentReplicaSets(c, ns, label)
+		for _, rs := range rsList.Items {
+			// This rs is orphaned only when controller ref is cleared
+			if controllerRef := controller.GetControllerOf(&rs); controllerRef != nil {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+}
+
+func listDeploymentReplicaSets(c clientset.Interface, ns string, label map[string]string) *extensions.ReplicaSetList {
+	selector := labels.Set(label).AsSelector()
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	rsList, err := c.Extensions().ReplicaSets(ns).List(options)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(rsList.Items)).To(BeNumerically(">", 0))
+	return rsList
+}
+
+func orphanDeploymentReplicaSets(c clientset.Interface, d *extensions.Deployment) error {
+	trueVar := true
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &trueVar}
+	deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(d.UID))
+	return c.Extensions().Deployments(d.Namespace).Delete(d.Name, deleteOptions)
 }
