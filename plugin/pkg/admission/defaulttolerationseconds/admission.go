@@ -97,29 +97,21 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 	}
 
 	if !toleratesNodeNotReady {
-		_, err := api.AddOrUpdateTolerationInPod(pod, &api.Toleration{
+		api.AddOrUpdateTolerationInPod(pod, &api.Toleration{
 			Key:               metav1.TaintNodeNotReady,
 			Operator:          api.TolerationOpExists,
 			Effect:            api.TaintEffectNoExecute,
 			TolerationSeconds: defaultNotReadyTolerationSeconds,
 		})
-		if err != nil {
-			return admission.NewForbidden(attributes,
-				fmt.Errorf("failed to add default tolerations for taints `notReady:NoExecute` and `unreachable:NoExecute`, err: %v", err))
-		}
 	}
 
 	if !toleratesNodeUnreachable {
-		_, err := api.AddOrUpdateTolerationInPod(pod, &api.Toleration{
+		api.AddOrUpdateTolerationInPod(pod, &api.Toleration{
 			Key:               metav1.TaintNodeUnreachable,
 			Operator:          api.TolerationOpExists,
 			Effect:            api.TaintEffectNoExecute,
 			TolerationSeconds: defaultUnreachableTolerationSeconds,
 		})
-		if err != nil {
-			return admission.NewForbidden(attributes,
-				fmt.Errorf("failed to add default tolerations for taints `notReady:NoExecute` and `unreachable:NoExecute`, err: %v", err))
-		}
 	}
 	return nil
 }
