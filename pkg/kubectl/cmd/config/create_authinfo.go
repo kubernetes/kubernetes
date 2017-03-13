@@ -105,11 +105,11 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 		Long:    create_authinfo_long,
 		Example: create_authinfo_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if !options.complete(cmd, out) {
+			err := options.complete(cmd, out)
+			if err != nil {
 				cmd.Help()
-				return
+				cmdutil.CheckErr(err)
 			}
-
 			cmdutil.CheckErr(options.run())
 			fmt.Fprintf(out, "User %q set.\n", options.name)
 		},
@@ -238,30 +238,28 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	return modifiedAuthInfo
 }
 
-func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) bool {
+func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) error {
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
-		return false
+		return fmt.Errorf("Unexpected args: %v", args)
 	}
 
 	authProviderArgs, err := cmd.Flags().GetStringSlice(flagAuthProviderArg)
 	if err != nil {
-		fmt.Fprintf(out, "Error: %s\n", err)
-		return false
+		return fmt.Errorf("Error: %s\n", err)
 	}
 
 	if len(authProviderArgs) > 0 {
 		newPairs, removePairs, err := cmdutil.ParsePairs(authProviderArgs, flagAuthProviderArg, true)
 		if err != nil {
-			fmt.Fprintf(out, "Error: %s\n", err)
-			return false
+			return fmt.Errorf("Error: %s\n", err)
 		}
 		o.authProviderArgs = newPairs
 		o.authProviderArgsToRemove = removePairs
 	}
 
 	o.name = args[0]
-	return true
+	return nil
 }
 
 func (o createAuthInfoOptions) validate() error {
