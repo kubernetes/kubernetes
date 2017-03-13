@@ -33033,7 +33033,7 @@ func (x *Taint) CodecEncodeSelf(e *codec1978.Encoder) {
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			yyq2[1] = x.Value != ""
-			yyq2[3] = true
+			yyq2[3] = x.TimeAdded != nil
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(4)
@@ -33103,17 +33103,20 @@ func (x *Taint) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[3] {
-					yy13 := &x.TimeAdded
-					yym14 := z.EncBinary()
-					_ = yym14
-					if false {
-					} else if z.HasExtensions() && z.EncExt(yy13) {
-					} else if yym14 {
-						z.EncBinaryMarshal(yy13)
-					} else if !yym14 && z.IsJSONHandle() {
-						z.EncJSONMarshal(yy13)
+					if x.TimeAdded == nil {
+						r.EncodeNil()
 					} else {
-						z.EncFallback(yy13)
+						yym13 := z.EncBinary()
+						_ = yym13
+						if false {
+						} else if z.HasExtensions() && z.EncExt(x.TimeAdded) {
+						} else if yym13 {
+							z.EncBinaryMarshal(x.TimeAdded)
+						} else if !yym13 && z.IsJSONHandle() {
+							z.EncJSONMarshal(x.TimeAdded)
+						} else {
+							z.EncFallback(x.TimeAdded)
+						}
 					}
 				} else {
 					r.EncodeNil()
@@ -33123,17 +33126,20 @@ func (x *Taint) CodecEncodeSelf(e *codec1978.Encoder) {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("timeAdded"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy15 := &x.TimeAdded
-					yym16 := z.EncBinary()
-					_ = yym16
-					if false {
-					} else if z.HasExtensions() && z.EncExt(yy15) {
-					} else if yym16 {
-						z.EncBinaryMarshal(yy15)
-					} else if !yym16 && z.IsJSONHandle() {
-						z.EncJSONMarshal(yy15)
+					if x.TimeAdded == nil {
+						r.EncodeNil()
 					} else {
-						z.EncFallback(yy15)
+						yym14 := z.EncBinary()
+						_ = yym14
+						if false {
+						} else if z.HasExtensions() && z.EncExt(x.TimeAdded) {
+						} else if yym14 {
+							z.EncBinaryMarshal(x.TimeAdded)
+						} else if !yym14 && z.IsJSONHandle() {
+							z.EncJSONMarshal(x.TimeAdded)
+						} else {
+							z.EncFallback(x.TimeAdded)
+						}
 					}
 				}
 			}
@@ -33231,19 +33237,23 @@ func (x *Taint) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "timeAdded":
 			if r.TryDecodeAsNil() {
-				x.TimeAdded = pkg2_v1.Time{}
+				if x.TimeAdded != nil {
+					x.TimeAdded = nil
+				}
 			} else {
-				yyv9 := &x.TimeAdded
+				if x.TimeAdded == nil {
+					x.TimeAdded = new(pkg2_v1.Time)
+				}
 				yym10 := z.DecBinary()
 				_ = yym10
 				if false {
-				} else if z.HasExtensions() && z.DecExt(yyv9) {
+				} else if z.HasExtensions() && z.DecExt(x.TimeAdded) {
 				} else if yym10 {
-					z.DecBinaryUnmarshal(yyv9)
+					z.DecBinaryUnmarshal(x.TimeAdded)
 				} else if !yym10 && z.IsJSONHandle() {
-					z.DecJSONUnmarshal(yyv9)
+					z.DecJSONUnmarshal(x.TimeAdded)
 				} else {
-					z.DecFallback(yyv9, false)
+					z.DecFallback(x.TimeAdded, false)
 				}
 			}
 		default:
@@ -33333,19 +33343,23 @@ func (x *Taint) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.TimeAdded = pkg2_v1.Time{}
+		if x.TimeAdded != nil {
+			x.TimeAdded = nil
+		}
 	} else {
-		yyv17 := &x.TimeAdded
+		if x.TimeAdded == nil {
+			x.TimeAdded = new(pkg2_v1.Time)
+		}
 		yym18 := z.DecBinary()
 		_ = yym18
 		if false {
-		} else if z.HasExtensions() && z.DecExt(yyv17) {
+		} else if z.HasExtensions() && z.DecExt(x.TimeAdded) {
 		} else if yym18 {
-			z.DecBinaryUnmarshal(yyv17)
+			z.DecBinaryUnmarshal(x.TimeAdded)
 		} else if !yym18 && z.IsJSONHandle() {
-			z.DecJSONUnmarshal(yyv17)
+			z.DecJSONUnmarshal(x.TimeAdded)
 		} else {
-			z.DecFallback(yyv17, false)
+			z.DecFallback(x.TimeAdded, false)
 		}
 	}
 	for {
@@ -71130,7 +71144,7 @@ func (x codecSelfer1234) decSliceTaint(v *[]Taint, d *codec1978.Decoder) {
 
 			yyrg1 := len(yyv1) > 0
 			yyv21 := yyv1
-			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 72)
+			yyrl1, yyrt1 = z.DecInferLen(yyl1, z.DecBasicHandle().MaxInitLen, 56)
 			if yyrt1 {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]
