@@ -23,20 +23,20 @@ Cluster size autoscaling should increase cluster size if pods are pending due to
 Cluster size autoscaling should scale up correct target pool,mikedanese,1,autoscaling
 Cluster size autoscaling shouldn't increase cluster size if pending pod is too large,rrati,0,autoscaling
 ClusterDns should create pod that uses dns,sttts,0,network
-ConfigMap optional updates should be reflected in volume,timothysc,1,apps
-ConfigMap should be consumable from pods in volume,alex-mohr,1,apps
-ConfigMap should be consumable from pods in volume as non-root,rrati,0,apps
-ConfigMap should be consumable from pods in volume as non-root with FSGroup,roberthbailey,1,apps
-ConfigMap should be consumable from pods in volume as non-root with defaultMode and fsGroup set,rrati,0,apps
-ConfigMap should be consumable from pods in volume with defaultMode set,Random-Liu,1,apps
-ConfigMap should be consumable from pods in volume with mappings,rrati,0,apps
-ConfigMap should be consumable from pods in volume with mappings and Item mode set,eparis,1,apps
-ConfigMap should be consumable from pods in volume with mappings as non-root,apelisse,1,apps
-ConfigMap should be consumable from pods in volume with mappings as non-root with FSGroup,zmerlynn,1,apps
-ConfigMap should be consumable in multiple volumes in the same pod,caesarxuchao,1,apps
-ConfigMap should be consumable via environment variable,ncdc,1,apps
-ConfigMap should be consumable via the environment,rkouj,0,apps
-ConfigMap updates should be reflected in volume,kevin-wangzefeng,1,apps
+ConfigMap optional updates should be reflected in volume,timothysc,1,node
+ConfigMap should be consumable from pods in volume,alex-mohr,1,node
+ConfigMap should be consumable from pods in volume as non-root,rrati,0,node
+ConfigMap should be consumable from pods in volume as non-root with FSGroup,roberthbailey,1,node
+ConfigMap should be consumable from pods in volume as non-root with defaultMode and fsGroup set,rrati,0,node
+ConfigMap should be consumable from pods in volume with defaultMode set,Random-Liu,1,node
+ConfigMap should be consumable from pods in volume with mappings,rrati,0,node
+ConfigMap should be consumable from pods in volume with mappings and Item mode set,eparis,1,node
+ConfigMap should be consumable from pods in volume with mappings as non-root,apelisse,1,node
+ConfigMap should be consumable from pods in volume with mappings as non-root with FSGroup,zmerlynn,1nodeapps
+ConfigMap should be consumable in multiple volumes in the same pod,caesarxuchao,1,node
+ConfigMap should be consumable via environment variable,ncdc,1,node
+ConfigMap should be consumable via the environment,rkouj,0,node
+ConfigMap updates should be reflected in volume,kevin-wangzefeng,1,node
 Container Lifecycle Hook when create a pod with lifecycle hook when it is exec hook should execute poststart exec hook properly,kargakis,1,node
 Container Lifecycle Hook when create a pod with lifecycle hook when it is exec hook should execute prestop exec hook properly,rrati,0,node
 Container Lifecycle Hook when create a pod with lifecycle hook when it is http hook should execute poststart http hook properly,vishh,1,node
