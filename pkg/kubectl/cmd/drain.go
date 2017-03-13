@@ -87,12 +87,12 @@ const (
 )
 
 var (
-	cordon_long = templates.LongDesc(`
-		Mark node as unschedulable.`)
+	cordon_long = templates.LongDesc(i18n.T(`
+		Mark node as unschedulable.`))
 
-	cordon_example = templates.Examples(`
+	cordon_example = templates.Examples(i18n.T(`
 		# Mark node "foo" as unschedulable.
-		kubectl cordon foo`)
+		kubectl cordon foo`))
 )
 
 func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -112,12 +112,12 @@ func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 var (
-	uncordon_long = templates.LongDesc(`
-		Mark node as schedulable.`)
+	uncordon_long = templates.LongDesc(i18n.T(`
+		Mark node as unschedulable.`))
 
-	uncordon_example = templates.Examples(`
-		# Mark node "foo" as schedulable.
-		$ kubectl uncordon foo`)
+	uncordon_example = templates.Examples(i18n.T(`
+		# Mark node "foo" as unschedulable.
+		kubectl cordon foo`))
 )
 
 func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -137,37 +137,12 @@ func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 var (
-	drain_long = templates.LongDesc(`
-		Drain node in preparation for maintenance.
+	drain_long = templates.LongDesc(i18n.T(`
+		Mark node as unschedulable.`))
 
-		The given node will be marked unschedulable to prevent new pods from arriving.
-		'drain' evicts the pods if the APIServer supports eviction
-		(http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use normal DELETE
-		to delete the pods.
-		The 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through
-		the API server).  If there are DaemonSet-managed pods, drain will not proceed
-		without --ignore-daemonsets, and regardless it will not delete any
-		DaemonSet-managed pods, because those pods would be immediately replaced by the
-		DaemonSet controller, which ignores unschedulable markings.  If there are any
-		pods that are neither mirror pods nor managed by ReplicationController,
-		ReplicaSet, DaemonSet, StatefulSet or Job, then drain will not delete any pods unless you
-		use --force.  --force will also allow deletion to proceed if the managing resource of one
-		or more pods is missing.
-
-		'drain' waits for graceful termination. You should not operate on the machine until
-		the command completes.
-
-		When you are ready to put the node back into service, use kubectl uncordon, which
-		will make the node schedulable again.
-
-		![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)`)
-
-	drain_example = templates.Examples(`
-		# Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.
-		$ kubectl drain foo --force
-
-		# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a grace period of 15 minutes.
-		$ kubectl drain foo --grace-period=900`)
+	drain_example = templates.Examples(i18n.T(`
+		# Mark node "foo" as unschedulable.
+		kubectl cordon foo`))
 )
 
 func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {

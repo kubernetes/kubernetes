@@ -67,14 +67,14 @@ type LabelOptions struct {
 }
 
 var (
-	label_long = templates.LongDesc(`
+	label_long = templates.LongDesc(i18n.T(`
 		Update the labels on a resource.
 
 		* A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
 		* If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
-		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`)
+		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`))
 
-	label_example = templates.Examples(`
+	label_example = templates.Examples(i18n.T(`
 		# Update pod 'foo' with the label 'unhealthy' and the value 'true'.
 		kubectl label pods foo unhealthy=true
 
@@ -92,7 +92,7 @@ var (
 
 		# Update pod 'foo' by removing a label named 'bar' if it exists.
 		# Does not require the --overwrite flag.
-		kubectl label pods foo bar-`)
+		kubectl label pods foo bar-`))
 )
 
 func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {

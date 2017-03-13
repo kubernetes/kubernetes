@@ -39,12 +39,12 @@ type CreateOptions struct {
 }
 
 var (
-	create_long = templates.LongDesc(`
+	create_long = templates.LongDesc(i18n.T(`
 		Create a resource by filename or stdin.
 
-		JSON and YAML formats are accepted.`)
+		JSON and YAML formats are accepted.`))
 
-	create_example = templates.Examples(`
+	create_example = templates.Examples(i18n.T(`
 		# Create a pod using the data in pod.json.
 		kubectl create -f ./pod.json
 
@@ -52,7 +52,7 @@ var (
 		cat pod.json | kubectl create -f -
 
 		# Edit the data in docker-registry.yaml in JSON using the v1 API format then create the resource using the edited data.
-		kubectl create -f docker-registry.yaml --edit --output-version=v1 -o json`)
+		kubectl create -f docker-registry.yaml --edit --output-version=v1 -o json`))
 )
 
 func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {

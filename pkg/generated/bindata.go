@@ -117,7 +117,15 @@ def string_flag_replace(match, file, line_number):
 
 STRING_FLAG_MATCH = MatchHandler('(\s+cmd\.Flags\(\).String\("[^"]*", "[^"]*", )"([^"]*)"\)', string_flag_replace)
 
-def replace(filename, matchers):
+
+def long_string_replace(match, file, line_number):
+    return '{}i18n.T({}){}'.format(match.group(1), match.group(2), match.group(3))
+
+LONG_DESC_MATCH = MatchHandler('(LongDesc\()(` + "`" + `[^` + "`" + `]+` + "`" + `)([^\n]\n)', long_string_replace)
+
+EXAMPLE_MATCH = MatchHandler('(Examples\()(` + "`" + `[^` + "`" + `]+` + "`" + `)([^\n]\n)', long_string_replace)
+
+def replace(filename, matchers, multiline_matchers):
     """Given a file and a set of matchers, run those matchers
     across the file and replace it with the results.
     """
@@ -135,12 +143,20 @@ def replace(filename, matchers):
         if not matched:
             sys.stdout.write(line)
     sys.stdout.flush()
+    with open(filename, 'r') as datafile:
+        content = datafile.read()
+        for matcher in multiline_matchers:
+            match = matcher.regex.search(content)
+            if match:
+                rep = matcher.replace_fn(match, filename, 0)
+                content = matcher.regex.sub(rep, content)
+        sys.stdout.write(content)
 
     # gofmt the file again
     from subprocess import call
     call(["goimports", "-w", filename])
 
-replace(sys.argv[1], [SHORT_MATCH, IMPORT_MATCH, STRING_FLAG_MATCH])
+replace(sys.argv[1], [SHORT_MATCH, IMPORT_MATCH, STRING_FLAG_MATCH], [LONG_DESC_MATCH, EXAMPLE_MATCH])
 `)
 
 func translationsExtractPyBytes() ([]byte, error) {
