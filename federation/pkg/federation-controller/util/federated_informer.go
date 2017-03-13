@@ -282,6 +282,11 @@ func (f *federatedInformerImpl) Stop() {
 		glog.V(4).Infof("... Closing informer channel for %q.", key)
 		close(informer.stopChan)
 	}
+
+	// Clear the informer map to prevent subsequent cluster deletion
+	// from attempting to double close any of the federated informer
+	// stop channels.
+	f.targetInformers = make(map[string]informer)
 }
 
 func (f *federatedInformerImpl) Start() {
