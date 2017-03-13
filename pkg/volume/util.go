@@ -424,3 +424,13 @@ func ZonesToSet(zonesString string) (sets.String, error) {
 	}
 	return zonesSet, nil
 }
+
+// ValidateZone returns:
+// - an error in case zone is an empty string or contains only any combination of spaces and tab characters
+// - nil otherwise
+func ValidateZone(zone string) error {
+	if strings.TrimSpace(zone) == "" {
+		return fmt.Errorf("the provided %q zone is not valid, it's an empty string or contains only spaces and tab characters", zone)
+	}
+	return nil
+}
