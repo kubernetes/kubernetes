@@ -366,9 +366,10 @@ func CleanupGCEIngressController(gceController *GCEIngressController) {
 		By(fmt.Sprintf("WARNING: possibly leaked static IP: %v\n", ipErr))
 	}
 
-	// Fail if the controller didn't cleanup
+	// Logging that the GLBC failed to cleanup GCE resources on ingress deletion
+	// See kubernetes/ingress#431
 	if pollErr != nil {
-		Failf("L7 controller failed to delete all cloud resources on time. %v", pollErr)
+		Logf("error: L7 controller failed to delete all cloud resources on time. %v", pollErr)
 	}
 }
 
