@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package discovery
 
 import (
 	"net"
@@ -22,22 +22,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type DiscoveryAddresses interface {
+type Addresses interface {
 	ServerAddressByClientCIDRs(net.IP) []metav1.ServerAddressByClientCIDR
 }
 
-// DefaultDiscoveryAddresses is a default implementation of DiscoveryAddresses that will work in most cases
-type DefaultDiscoveryAddresses struct {
-	// DiscoveryCIDRRules is a list of CIDRs and Addresses to use if a client is in the range
-	DiscoveryCIDRRules []DiscoveryCIDRRule
+// DefaultAddresses is a default implementation of Addresses that will work in most cases
+type DefaultAddresses struct {
+	// CIDRRules is a list of CIDRs and Addresses to use if a client is in the range
+	CIDRRules []CIDRRule
 
 	// DefaultAddress is the address (hostname or IP and port) that should be used in
 	// if no CIDR matches more specifically.
 	DefaultAddress string
 }
 
-// DiscoveryCIDRRule is a rule for adding an alternate path to the master based on matching CIDR
-type DiscoveryCIDRRule struct {
+// CIDRRule is a rule for adding an alternate path to the master based on matching CIDR
+type CIDRRule struct {
 	IPRange net.IPNet
 
 	// Address is the address (hostname or IP and port) that should be used in
@@ -45,7 +45,7 @@ type DiscoveryCIDRRule struct {
 	Address string
 }
 
-func (d DefaultDiscoveryAddresses) ServerAddressByClientCIDRs(clientIP net.IP) []metav1.ServerAddressByClientCIDR {
+func (d DefaultAddresses) ServerAddressByClientCIDRs(clientIP net.IP) []metav1.ServerAddressByClientCIDR {
 	addressCIDRMap := []metav1.ServerAddressByClientCIDR{
 		{
 			ClientCIDR:    "0.0.0.0/0",
@@ -53,13 +53,13 @@ func (d DefaultDiscoveryAddresses) ServerAddressByClientCIDRs(clientIP net.IP) [
 		},
 	}
 
-	for _, rule := range d.DiscoveryCIDRRules {
+	for _, rule := range d.CIDRRules {
 		addressCIDRMap = append(addressCIDRMap, rule.ServerAddressByClientCIDRs(clientIP)...)
 	}
 	return addressCIDRMap
 }
 
-func (d DiscoveryCIDRRule) ServerAddressByClientCIDRs(clientIP net.IP) []metav1.ServerAddressByClientCIDR {
+func (d CIDRRule) ServerAddressByClientCIDRs(clientIP net.IP) []metav1.ServerAddressByClientCIDR {
 	addressCIDRMap := []metav1.ServerAddressByClientCIDR{}
 
 	if d.IPRange.Contains(clientIP) {
