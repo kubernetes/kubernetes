@@ -313,6 +313,8 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 		utilsysctl.VmPanicOnOOM:       utilsysctl.VmPanicOnOOMInvokeOOMKiller,
 		utilsysctl.KernelPanic:        utilsysctl.KernelPanicRebootTimeout,
 		utilsysctl.KernelPanicOnOops:  utilsysctl.KernelPanicOnOopsAlways,
+		utilsysctl.RootMaxKeys:        utilsysctl.RootMaxKeysSetting,
+		utilsysctl.RootMaxBytes:       utilsysctl.RootMaxBytesSetting,
 	}
 
 	sysctl := utilsysctl.New()
