@@ -24,7 +24,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	goruntime "runtime"
 	"testing"
 	"time"
@@ -39,13 +38,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -139,7 +138,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
-	config.DiscoveryAddresses = DefaultDiscoveryAddresses{DefaultAddress: "ExternalAddress"}
+	config.DiscoveryAddresses = discovery.DefaultDiscoveryAddresses{DefaultAddress: "ExternalAddress"}
 
 	s, err := config.SkipComplete().New()
 	if err != nil {
@@ -459,218 +458,6 @@ func decodeResponse(resp *http.Response, obj interface{}) error {
 		return err
 	}
 	return nil
-}
-
-func getGroupList(server *httptest.Server) (*metav1.APIGroupList, error) {
-	resp, err := http.Get(server.URL + "/apis")
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected server response, expected %d, actual: %d", http.StatusOK, resp.StatusCode)
-	}
-
-	groupList := metav1.APIGroupList{}
-	err = decodeResponse(resp, &groupList)
-	return &groupList, err
-}
-
-func TestDiscoveryAtAPIS(t *testing.T) {
-	master, etcdserver, _, assert := newMaster(t)
-	defer etcdserver.Terminate(t)
-
-	server := httptest.NewServer(master.Handler)
-	groupList, err := getGroupList(server)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assert.Equal(0, len(groupList.Groups))
-
-	// Add a Group.
-	extensionsVersions := []metav1.GroupVersionForDiscovery{
-		{
-			GroupVersion: examplev1.SchemeGroupVersion.String(),
-			Version:      examplev1.SchemeGroupVersion.Version,
-		},
-	}
-	extensionsPreferredVersion := metav1.GroupVersionForDiscovery{
-		GroupVersion: extensionsGroupName + "/preferred",
-		Version:      "preferred",
-	}
-	master.AddAPIGroupForDiscovery(metav1.APIGroup{
-		Name:             extensionsGroupName,
-		Versions:         extensionsVersions,
-		PreferredVersion: extensionsPreferredVersion,
-	})
-
-	groupList, err = getGroupList(server)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assert.Equal(1, len(groupList.Groups))
-	groupListGroup := groupList.Groups[0]
-	assert.Equal(extensionsGroupName, groupListGroup.Name)
-	assert.Equal(extensionsVersions, groupListGroup.Versions)
-	assert.Equal(extensionsPreferredVersion, groupListGroup.PreferredVersion)
-	assert.Equal(master.discoveryAddresses.ServerAddressByClientCIDRs(utilnet.GetClientIP(&http.Request{})), groupListGroup.ServerAddressByClientCIDRs)
-
-	// Remove the group.
-	master.RemoveAPIGroupForDiscovery(extensionsGroupName)
-	groupList, err = getGroupList(server)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assert.Equal(0, len(groupList.Groups))
-}
-
-func TestDiscoveryOrdering(t *testing.T) {
-	master, etcdserver, _, assert := newMaster(t)
-	defer etcdserver.Terminate(t)
-
-	server := httptest.NewServer(master.Handler)
-	groupList, err := getGroupList(server)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assert.Equal(0, len(groupList.Groups))
-
-	// Register three groups
-	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "x"})
-	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "y"})
-	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "z"})
-	// Register three additional groups that come earlier alphabetically
-	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "a"})
-	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "b"})
-	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "c"})
-	// Make sure re-adding doesn't double-register or make a group lose its place
-	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "x"})
-
-	groupList, err = getGroupList(server)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assert.Equal(6, len(groupList.Groups))
-	assert.Equal("x", groupList.Groups[0].Name)
-	assert.Equal("y", groupList.Groups[1].Name)
-	assert.Equal("z", groupList.Groups[2].Name)
-	assert.Equal("a", groupList.Groups[3].Name)
-	assert.Equal("b", groupList.Groups[4].Name)
-	assert.Equal("c", groupList.Groups[5].Name)
-
-	// Remove a group.
-	master.RemoveAPIGroupForDiscovery("a")
-	groupList, err = getGroupList(server)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assert.Equal(5, len(groupList.Groups))
-
-	// Re-adding should move to the end.
-	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "a"})
-	groupList, err = getGroupList(server)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assert.Equal(6, len(groupList.Groups))
-	assert.Equal("x", groupList.Groups[0].Name)
-	assert.Equal("y", groupList.Groups[1].Name)
-	assert.Equal("z", groupList.Groups[2].Name)
-	assert.Equal("b", groupList.Groups[3].Name)
-	assert.Equal("c", groupList.Groups[4].Name)
-	assert.Equal("a", groupList.Groups[5].Name)
-}
-
-func TestGetServerAddressByClientCIDRs(t *testing.T) {
-	publicAddressCIDRMap := []metav1.ServerAddressByClientCIDR{
-		{
-			ClientCIDR:    "0.0.0.0/0",
-			ServerAddress: "ExternalAddress",
-		},
-	}
-	internalAddressCIDRMap := []metav1.ServerAddressByClientCIDR{
-		publicAddressCIDRMap[0],
-		{
-			ClientCIDR:    "10.0.0.0/24",
-			ServerAddress: "serviceIP",
-		},
-	}
-	internalIP := "10.0.0.1"
-	publicIP := "1.1.1.1"
-	testCases := []struct {
-		Request     http.Request
-		ExpectedMap []metav1.ServerAddressByClientCIDR
-	}{
-		{
-			Request:     http.Request{},
-			ExpectedMap: publicAddressCIDRMap,
-		},
-		{
-			Request: http.Request{
-				Header: map[string][]string{
-					"X-Real-Ip": {internalIP},
-				},
-			},
-			ExpectedMap: internalAddressCIDRMap,
-		},
-		{
-			Request: http.Request{
-				Header: map[string][]string{
-					"X-Real-Ip": {publicIP},
-				},
-			},
-			ExpectedMap: publicAddressCIDRMap,
-		},
-		{
-			Request: http.Request{
-				Header: map[string][]string{
-					"X-Forwarded-For": {internalIP},
-				},
-			},
-			ExpectedMap: internalAddressCIDRMap,
-		},
-		{
-			Request: http.Request{
-				Header: map[string][]string{
-					"X-Forwarded-For": {publicIP},
-				},
-			},
-			ExpectedMap: publicAddressCIDRMap,
-		},
-
-		{
-			Request: http.Request{
-				RemoteAddr: internalIP,
-			},
-			ExpectedMap: internalAddressCIDRMap,
-		},
-		{
-			Request: http.Request{
-				RemoteAddr: publicIP,
-			},
-			ExpectedMap: publicAddressCIDRMap,
-		},
-		{
-			Request: http.Request{
-				RemoteAddr: "invalidIP",
-			},
-			ExpectedMap: publicAddressCIDRMap,
-		},
-	}
-
-	_, ipRange, _ := net.ParseCIDR("10.0.0.0/24")
-	discoveryAddresses := DefaultDiscoveryAddresses{DefaultAddress: "ExternalAddress"}
-	discoveryAddresses.DiscoveryCIDRRules = append(discoveryAddresses.DiscoveryCIDRRules,
-		DiscoveryCIDRRule{IPRange: *ipRange, Address: "serviceIP"})
-
-	for i, test := range testCases {
-		if a, e := discoveryAddresses.ServerAddressByClientCIDRs(utilnet.GetClientIP(&test.Request)), test.ExpectedMap; reflect.DeepEqual(e, a) != true {
-			t.Fatalf("test case %d failed. expected: %v, actual: %v", i+1, e, a)
-		}
-	}
 }
 
 type testGetterStorage struct {

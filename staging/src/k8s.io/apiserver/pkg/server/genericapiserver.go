@@ -25,7 +25,6 @@ import (
 	"time"
 
 	systemd "github.com/coreos/go-systemd/daemon"
-	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 
@@ -36,10 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -84,7 +83,7 @@ type APIGroupInfo struct {
 // GenericAPIServer contains state for a Kubernetes cluster api server.
 type GenericAPIServer struct {
 	// discoveryAddresses is used to build cluster IPs for discovery.
-	discoveryAddresses DiscoveryAddresses
+	discoveryAddresses discovery.DiscoveryAddresses
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
@@ -130,12 +129,8 @@ type GenericAPIServer struct {
 	// listedPathProvider is a lister which provides the set of paths to show at /
 	listedPathProvider routes.ListedPathProvider
 
-	// Map storing information about all groups to be exposed in discovery response.
-	// The map is from name to the group.
-	// The slice preserves group name insertion order.
-	apiGroupsForDiscoveryLock sync.RWMutex
-	apiGroupsForDiscovery     map[string]metav1.APIGroup
-	apiGroupNamesForDiscovery []string
+	// RootDiscoveryConfig serves /apis
+	RootDiscoveryConfig discovery.DiscoveryGroupManager
 
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	swaggerConfig *swagger.Config
@@ -334,15 +329,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	}
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
-	genericapi.AddApiWebService(s.Serializer, s.HandlerContainer.Container, apiPrefix, func(req *restful.Request) *metav1.APIVersions {
-		clientIP := utilnet.GetClientIP(req.Request)
-
-		apiVersionsForDiscovery := metav1.APIVersions{
-			ServerAddressByClientCIDRs: s.discoveryAddresses.ServerAddressByClientCIDRs(clientIP),
-			Versions:                   apiVersions,
-		}
-		return &apiVersionsForDiscovery
-	})
+	s.HandlerContainer.Add(discovery.NewLegacyRootAPIDiscoveryHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions).WebService())
 	return nil
 }
 
@@ -385,41 +372,10 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		PreferredVersion: preferedVersionForDiscovery,
 	}
 
-	s.AddAPIGroupForDiscovery(apiGroup)
-	s.HandlerContainer.Add(genericapi.NewGroupWebService(s.Serializer, APIGroupPrefix+"/"+apiGroup.Name, apiGroup))
+	s.RootDiscoveryConfig.AddAPIGroup(apiGroup)
+	s.HandlerContainer.Add(discovery.NewAPIGroupDiscoveryHandler(s.Serializer, apiGroup).WebService())
 
 	return nil
-}
-
-// AddAPIGroupForDiscovery adds the specified group to the list served to discovery queries.
-// Groups are listed in the order they are added.
-func (s *GenericAPIServer) AddAPIGroupForDiscovery(apiGroup metav1.APIGroup) {
-	s.apiGroupsForDiscoveryLock.Lock()
-	defer s.apiGroupsForDiscoveryLock.Unlock()
-
-	// Insert the group into the ordered list if it is not already present
-	if _, exists := s.apiGroupsForDiscovery[apiGroup.Name]; !exists {
-		s.apiGroupNamesForDiscovery = append(s.apiGroupNamesForDiscovery, apiGroup.Name)
-	}
-
-	s.apiGroupsForDiscovery[apiGroup.Name] = apiGroup
-}
-
-func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
-	s.apiGroupsForDiscoveryLock.Lock()
-	defer s.apiGroupsForDiscoveryLock.Unlock()
-
-	// Remove the group from the ordered list
-	// https://github.com/golang/go/wiki/SliceTricks#filtering-without-allocating
-	newOrder := s.apiGroupNamesForDiscovery[:0]
-	for _, orderedGroupName := range s.apiGroupNamesForDiscovery {
-		if orderedGroupName != groupName {
-			newOrder = append(newOrder, orderedGroupName)
-		}
-	}
-	s.apiGroupNamesForDiscovery = newOrder
-
-	delete(s.apiGroupsForDiscovery, groupName)
 }
 
 func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) *genericapi.APIGroupVersion {
@@ -454,31 +410,6 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Context:           s.RequestContextMapper(),
 		MinRequestTimeout: s.minRequestTimeout,
 	}
-}
-
-// DynamicApisDiscovery returns a webservice serving api group discovery.
-// Note: during the server runtime apiGroupsForDiscovery might change.
-func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
-	return genericapi.NewApisWebService(s.Serializer, APIGroupPrefix, func(req *restful.Request) []metav1.APIGroup {
-		s.apiGroupsForDiscoveryLock.RLock()
-		defer s.apiGroupsForDiscoveryLock.RUnlock()
-
-		sortedGroups := []metav1.APIGroup{}
-
-		// ranging over apiGroupNamesForDiscovery preserves the registration order
-		for _, groupName := range s.apiGroupNamesForDiscovery {
-			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
-		}
-
-		clientIP := utilnet.GetClientIP(req.Request)
-		serverCIDR := s.discoveryAddresses.ServerAddressByClientCIDRs(clientIP)
-		groups := make([]metav1.APIGroup, len(sortedGroups))
-		for i := range sortedGroups {
-			groups[i] = sortedGroups[i]
-			groups[i].ServerAddressByClientCIDRs = serverCIDR
-		}
-		return groups
-	})
 }
 
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values

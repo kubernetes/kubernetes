@@ -33,7 +33,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/endpoints/handlers:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
