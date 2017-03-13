@@ -33,7 +33,6 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -47,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -115,7 +115,7 @@ type Config struct {
 	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
 	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
 	// always reported
-	DiscoveryAddresses DiscoveryAddresses
+	DiscoveryAddresses discovery.DiscoveryAddresses
 	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
 	HealthzChecks []healthz.HealthzChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
@@ -316,7 +316,7 @@ func (c *Config) Complete() completedConfig {
 		}
 	}
 	if c.DiscoveryAddresses == nil {
-		c.DiscoveryAddresses = DefaultDiscoveryAddresses{DefaultAddress: c.ExternalAddress}
+		c.DiscoveryAddresses = discovery.DefaultDiscoveryAddresses{DefaultAddress: c.ExternalAddress}
 	}
 
 	// If the loopbackclientconfig is specified AND it has a token for use against the API server
@@ -390,13 +390,13 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		InsecureServingInfo: c.InsecureServingInfo,
 		ExternalAddress:     c.ExternalAddress,
 
-		apiGroupsForDiscovery: map[string]metav1.APIGroup{},
-
 		swaggerConfig: c.SwaggerConfig,
 		openAPIConfig: c.OpenAPIConfig,
 
 		postStartHooks: map[string]postStartHookEntry{},
 		healthzChecks:  c.HealthzChecks,
+
+		RootDiscoveryConfig: discovery.NewRootAPIsDiscoveryHandler(c.DiscoveryAddresses, c.Serializer),
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
@@ -466,7 +466,8 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 		}
 	}
 	routes.Version{Version: c.Version}.Install(s.HandlerContainer)
-	s.HandlerContainer.Add(s.DynamicApisDiscovery())
+
+	s.HandlerContainer.Add(s.RootDiscoveryConfig.WebService())
 }
 
 func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {

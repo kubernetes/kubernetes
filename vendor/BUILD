@@ -9927,7 +9927,6 @@ go_library(
     name = "k8s.io/apiserver/pkg/endpoints",
     srcs = [
         "k8s.io/apiserver/pkg/endpoints/apiserver.go",
-        "k8s.io/apiserver/pkg/endpoints/discovery.go",
         "k8s.io/apiserver/pkg/endpoints/doc.go",
         "k8s.io/apiserver/pkg/endpoints/groupversion.go",
         "k8s.io/apiserver/pkg/endpoints/installer.go",
@@ -9944,9 +9943,9 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/discovery",
         "//vendor:k8s.io/apiserver/pkg/endpoints/handlers",
         "//vendor:k8s.io/apiserver/pkg/endpoints/handlers/negotiation",
-        "//vendor:k8s.io/apiserver/pkg/endpoints/handlers/responsewriters",
         "//vendor:k8s.io/apiserver/pkg/endpoints/metrics",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
@@ -10031,7 +10030,6 @@ go_test(
 go_library(
     name = "k8s.io/apiserver/pkg/endpoints/handlers",
     srcs = [
-        "k8s.io/apiserver/pkg/endpoints/handlers/discovery.go",
         "k8s.io/apiserver/pkg/endpoints/handlers/doc.go",
         "k8s.io/apiserver/pkg/endpoints/handlers/patch.go",
         "k8s.io/apiserver/pkg/endpoints/handlers/proxy.go",
@@ -10466,13 +10464,13 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
-        "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/version",
         "//vendor:k8s.io/apiserver/pkg/apis/example",
         "//vendor:k8s.io/apiserver/pkg/apis/example/v1",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/discovery",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/testing",
@@ -10485,7 +10483,6 @@ go_library(
     srcs = [
         "k8s.io/apiserver/pkg/server/config.go",
         "k8s.io/apiserver/pkg/server/config_selfclient.go",
-        "k8s.io/apiserver/pkg/server/discovery.go",
         "k8s.io/apiserver/pkg/server/doc.go",
         "k8s.io/apiserver/pkg/server/genericapiserver.go",
         "k8s.io/apiserver/pkg/server/healthz.go",
@@ -10495,7 +10492,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/coreos/go-systemd/daemon",
-        "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
@@ -10508,7 +10504,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
-        "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
@@ -10523,6 +10518,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizerfactory",
         "//vendor:k8s.io/apiserver/pkg/authorization/union",
         "//vendor:k8s.io/apiserver/pkg/endpoints",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/discovery",
         "//vendor:k8s.io/apiserver/pkg/endpoints/filters",
         "//vendor:k8s.io/apiserver/pkg/endpoints/openapi",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
@@ -16298,4 +16294,46 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/endpoints/discovery",
+    srcs = [
+        "k8s.io/apiserver/pkg/endpoints/discovery/addresses.go",
+        "k8s.io/apiserver/pkg/endpoints/discovery/group.go",
+        "k8s.io/apiserver/pkg/endpoints/discovery/legacy.go",
+        "k8s.io/apiserver/pkg/endpoints/discovery/root.go",
+        "k8s.io/apiserver/pkg/endpoints/discovery/util.go",
+        "k8s.io/apiserver/pkg/endpoints/discovery/version.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/handlers/negotiation",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/handlers/responsewriters",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/endpoints/discovery_test",
+    srcs = [
+        "k8s.io/apiserver/pkg/endpoints/discovery/addresses_test.go",
+        "k8s.io/apiserver/pkg/endpoints/discovery/root_test.go",
+    ],
+    library = ":k8s.io/apiserver/pkg/endpoints/discovery",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+    ],
 )
