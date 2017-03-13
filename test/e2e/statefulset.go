@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -125,6 +126,56 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			cmd = "if [ \"$(cat /data/hostname)\" = \"$(hostname)\" ]; then exit 0; else exit 1; fi"
 			By("Running " + cmd + " in all stateful pods")
 			framework.ExpectNoError(sst.ExecInStatefulPods(ss, cmd))
+		})
+
+		It("should adopt matching orphans and release non-matching pods", func() {
+			By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 1
+			framework.SetStatefulSetInitializedAnnotation(ss, "false")
+
+			_, err := c.Apps().StatefulSets(ns).Create(ss)
+			Expect(err).NotTo(HaveOccurred())
+
+			sst := framework.NewStatefulSetTester(c)
+
+			By("Saturating stateful set " + ss.Name)
+			sst.Saturate(ss)
+
+			By("Orphaning one of the stateful set's pods")
+			pod := sst.GetPodList(ss).Items[0]
+			f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+				pod.OwnerReferences = nil
+			})
+
+			By("Checking that the stateful set readopts the pod")
+			Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "adopted", framework.StatefulSetTimeout,
+				func(pod *v1.Pod) (bool, error) {
+					controllerRef := controller.GetControllerOf(pod)
+					if controllerRef == nil {
+						return false, nil
+					}
+					if controllerRef.Kind != ss.Kind || controllerRef.Name != ss.Name {
+						return false, fmt.Errorf("pod has wrong controllerRef: %v", controllerRef)
+					}
+					return true, nil
+				},
+			)).To(Succeed(), "wait for pod %q to be readopted", pod.Name)
+
+			By("Removing the labels from one of the stateful set's pods")
+			f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+				pod.Labels = nil
+			})
+
+			By("Checking that the stateful set releases the pod")
+			Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "adopted", framework.StatefulSetTimeout,
+				func(pod *v1.Pod) (bool, error) {
+					controllerRef := controller.GetControllerOf(pod)
+					if controllerRef != nil {
+						return false, nil
+					}
+					return true, nil
+				},
+			)).To(Succeed(), "wait for pod %q to be released", pod.Name)
 		})
 
 		It("should not deadlock when a pod's predecessor fails", func() {
