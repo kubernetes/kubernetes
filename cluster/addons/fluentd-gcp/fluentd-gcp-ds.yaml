@@ -9,6 +9,8 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     version: v2.0
 spec:
+  updateStrategy:
+    type: RollingUpdate
   template:
     metadata:
       labels:
