@@ -27,6 +27,6 @@ func TestSecretHandlers(t *testing.T) {
 	c := NewPathRecorderMux()
 	c.UnlistedHandleFunc("/secret", func(http.ResponseWriter, *http.Request) {})
 	c.HandleFunc("/nonswagger", func(http.ResponseWriter, *http.Request) {})
-	assert.NotContains(t, c.HandledPaths(), "/secret")
-	assert.Contains(t, c.HandledPaths(), "/nonswagger")
+	assert.NotContains(t, c.ListedPaths(), "/secret")
+	assert.Contains(t, c.ListedPaths(), "/nonswagger")
 }
