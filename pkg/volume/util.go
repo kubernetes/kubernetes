@@ -425,10 +425,10 @@ func zonesToSet(zonesString string) (sets.String, error) {
 	return zonesSet, nil
 }
 
-// ValidateZone returns:
+// validateZone returns:
 // - an error in case zone is an empty string or contains only any combination of spaces and tab characters
 // - nil otherwise
-func ValidateZone(zone string) error {
+func validateZone(zone string) error {
 	if strings.TrimSpace(zone) == "" {
 		return fmt.Errorf("the provided %q zone is not valid, it's an empty string or contains only spaces and tab characters", zone)
 	}
@@ -567,7 +567,7 @@ func (z *ZonesConf) SetZone(zone string) error {
 	if z.isSCZonesConfigured {
 		return fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
 	}
-	if err := ValidateZone(zone); err != nil {
+	if err := validateZone(zone); err != nil {
 		return err
 	}
 	z.resultingZones = make(sets.String)
