@@ -80,6 +80,8 @@ pkg/apis/componentconfig/install
 pkg/apis/extensions/install
 pkg/apis/extensions/v1beta1
 pkg/apis/imagepolicy/install
+pkg/apis/networking/install
+pkg/apis/networking/validation
 pkg/apis/policy/install
 pkg/apis/rbac/install
 pkg/apis/rbac/v1alpha1
