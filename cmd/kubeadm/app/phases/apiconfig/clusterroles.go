@@ -43,6 +43,11 @@ const (
 	anonymousUser      = "system:anonymous"
 )
 
+var (
+	// Default labels
+	defaultLabels = map[string]string{"kubernetes.io/bootstrapping": "kubeadm-defaults"}
+)
+
 // TODO: Are there any unit tests that could be made for this file other than duplicating all values and logic in a separate file?
 
 // CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
@@ -93,6 +98,7 @@ func CreateRoles(clientset *clientset.Clientset) error {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      BootstrapSignerClusterRoleName,
 				Namespace: metav1.NamespacePublic,
+				Labels:    defaultLabels,
 			},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("get").Groups("").Resources("configmaps").RuleOrDie(),
@@ -114,6 +120,7 @@ func CreateRoleBindings(clientset *clientset.Clientset) error {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "kubeadm:bootstrap-signer-clusterinfo",
 				Namespace: metav1.NamespacePublic,
+				Labels:    defaultLabels,
 			},
 			RoleRef: rbac.RoleRef{
 				APIGroup: rbacAPIGroup,
@@ -142,7 +149,8 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 	clusterRoleBindings := []rbac.ClusterRoleBinding{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "kubeadm:kubelet-bootstrap",
+				Name:   "kubeadm:kubelet-bootstrap",
+				Labels: defaultLabels,
 			},
 			RoleRef: rbac.RoleRef{
 				APIGroup: rbacAPIGroup,
@@ -158,7 +166,8 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "kubeadm:node-proxier",
+				Name:   "kubeadm:node-proxier",
+				Labels: defaultLabels,
 			},
 			RoleRef: rbac.RoleRef{
 				APIGroup: rbacAPIGroup,
