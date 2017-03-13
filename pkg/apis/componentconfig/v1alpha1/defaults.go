@@ -369,7 +369,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.HairpinMode = PromiscuousBridge
 	}
 	if obj.EvictionHard == nil {
-		temp := "memory.available<100Mi"
+		temp := "memory.available<250Mi,nodefs.available<10%,nodefs.inodesFree<5%"
 		obj.EvictionHard = &temp
 	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
