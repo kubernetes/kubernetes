@@ -32,11 +32,12 @@ import (
 )
 
 func createNoExecuteTaint(index int) v1.Taint {
+	now := metav1.Now()
 	return v1.Taint{
 		Key:       "testTaint" + fmt.Sprintf("%v", index),
 		Value:     "test" + fmt.Sprintf("%v", index),
 		Effect:    v1.TaintEffectNoExecute,
-		TimeAdded: metav1.Now(),
+		TimeAdded: &now,
 	}
 }
 

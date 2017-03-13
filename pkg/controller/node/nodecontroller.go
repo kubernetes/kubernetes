@@ -536,7 +536,8 @@ func (nc *NodeController) Run() {
 							return true, 0
 						}
 
-						taintToAdd.TimeAdded = metav1.Now()
+						now := metav1.Now()
+						taintToAdd.TimeAdded = &now
 						err = controller.AddOrUpdateTaintOnNode(nc.kubeClient, value.Value, &taintToAdd)
 						if err != nil {
 							utilruntime.HandleError(
