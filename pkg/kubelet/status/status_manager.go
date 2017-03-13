@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -455,6 +456,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 			deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
 			if err = m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err == nil {
 				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
+				metrics.PodDeletionLatency.Observe(metrics.SinceInMicroseconds(pod.DeletionTimestamp.Time))
 				m.deletePodStatus(uid)
 				return
 			}
