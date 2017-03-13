@@ -17,15 +17,18 @@ limitations under the License.
 package cm
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
 
 	"github.com/golang/glog"
+	proto "github.com/golang/protobuf/proto"
+	"github.com/pborman/uuid"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"k8s.io/kubernetes/pkg/util/uuid"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
 
@@ -34,15 +37,18 @@ import (
 type EventDispatcher interface {
 	// PreStartPod is invoked after the pod sandbox is created but before any
 	// of a pod's containers are started.
-	PreStartPod(cgroupPath string) error
+	PreStartPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error)
 
 	// PostStopPod is invoked after all of a pod's containers have permanently
 	// stopped running, but before the pod sandbox is destroyed.
-	PostStopPod(cgroupPath string) error
+	PostStopPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error)
 
 	// Start starts the dispatcher. After the dispatcher is started , handlers
 	// can register themselves to receive lifecycle events.
 	Start(socketAddress string)
+
+	// Retrieving information about CgroupResources from replies
+	ResourceConfigFromReplies(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig
 }
 
 // Represents a registered event handler
@@ -61,7 +67,6 @@ type eventDispatcher struct {
 	handlers map[string]*registeredHandler
 }
 
-
 var dispatcher *eventDispatcher
 var once sync.Once
 
@@ -75,7 +80,11 @@ func newEventDispatcher() *eventDispatcher {
 	return dispatcher
 }
 
-func (ed *eventDispatcher) dispatchEvent(cgroupPath string, kind lifecycle.Event_Kind) error {
+func (ed *eventDispatcher) dispatchEvent(pod *v1.Pod, cgroupPath string, kind lifecycle.Event_Kind) (*lifecycle.EventReply, error) {
+	jsonPod, err := json.Marshal(pod)
+	if err != nil {
+		return nil, err
+	}
 	// construct an event
 	ev := &lifecycle.Event{
 		Kind: kind,
@@ -83,8 +92,11 @@ func (ed *eventDispatcher) dispatchEvent(cgroupPath string, kind lifecycle.Event
 			Kind: lifecycle.CgroupInfo_POD,
 			Path: cgroupPath,
 		},
+		Pod: jsonPod,
 	}
 
+	mergedReplies := &lifecycle.EventReply{}
+	var errlist []error
 	// TODO(CD): Re-evaluate nondeterministic delegation order arising
 	//           from Go map iteration.
 	for name, handler := range ed.handlers {
@@ -96,6 +108,7 @@ func (ed *eventDispatcher) dispatchEvent(cgroupPath string, kind lifecycle.Event
 		cxn, err := grpc.Dial(handler.socketAddress, grpc.WithInsecure())
 		if err != nil {
 			glog.Fatalf("failed to connect to event handler [%s] at [%s]: %v", handler.name, handler.socketAddress, err)
+			errlist = append(errlist, err)
 		}
 		defer cxn.Close()
 		client := lifecycle.NewEventHandlerClient(cxn)
@@ -103,22 +116,20 @@ func (ed *eventDispatcher) dispatchEvent(cgroupPath string, kind lifecycle.Event
 		glog.Infof("Dispatching to event handler: %s", name)
 		reply, err := client.Notify(ctx, ev)
 		if err != nil {
-			return err
+			errlist = append(errlist, err)
 		}
-		if reply.Error != "" {
-			return errors.New(reply.Error)
-		}
+		proto.Merge(mergedReplies, reply)
+
 	}
-
-	return nil
+	return mergedReplies, utilerrors.NewAggregate(errlist)
 }
 
-func (ed *eventDispatcher) PreStartPod(cgroupPath string) error {
-	return ed.dispatchEvent(cgroupPath, lifecycle.Event_POD_PRE_START)
+func (ed *eventDispatcher) PreStartPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error) {
+	return ed.dispatchEvent(pod, cgroupPath, lifecycle.Event_POD_PRE_START)
 }
 
-func (ed *eventDispatcher) PostStopPod(cgroupPath string) error {
-	return ed.dispatchEvent(cgroupPath, lifecycle.Event_POD_POST_STOP)
+func (ed *eventDispatcher) PostStopPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error) {
+	return ed.dispatchEvent(pod, cgroupPath, lifecycle.Event_POD_POST_STOP)
 }
 
 func (ed *eventDispatcher) Start(socketAddress string) {
@@ -159,7 +170,7 @@ func (ed *eventDispatcher) Register(ctx context.Context, request *lifecycle.Regi
 	h := &registeredHandler{
 		name:          request.Name,
 		socketAddress: request.SocketAddress,
-		token:         string(uuid.NewUUID()),
+		token:         uuid.NewUUID().String(),
 	}
 
 	glog.Infof("attempting to register event handler [%s]", h.name)
@@ -195,6 +206,16 @@ func (ed *eventDispatcher) Unregister(ctx context.Context, request *lifecycle.Un
 	}
 	delete(ed.handlers, request.Name)
 	return &lifecycle.UnregisterReply{}, nil
+}
+
+func (ed *eventDispatcher) ResourceConfigFromReplies(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig {
+	updatedResources := resources
+	for _, cgroupResource := range reply.CgroupResource {
+		if cgroupResource.CgroupSubsystem == lifecycle.CgroupResource_CPUSET_CPUS {
+			updatedResources.CpusetCpus = &cgroupResource.Value
+		}
+	}
+	return updatedResources
 }
 
 func (ed *eventDispatcher) handler(name string) *registeredHandler {
