@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,11 +15,8 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/extensions
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/autoscaling
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/batch
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/networking
 // +k8s:openapi-gen=true
 // +k8s:defaulter-gen=TypeMeta
-
-package v1beta1 // import "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+// +groupName=networking.k8s.io
+package v1 // import "k8s.io/kubernetes/pkg/apis/networking/v1"
