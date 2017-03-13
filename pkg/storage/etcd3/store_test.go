@@ -555,3 +555,18 @@ func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *ap
 	}
 	return key, setOutput
 }
+
+func TestPrefix(t *testing.T) {
+	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
+	testcases := map[string]string{
+		"custom/prefix":     "/custom/prefix",
+		"/custom//prefix//": "/custom/prefix",
+		"/registry":         "/registry",
+	}
+	for configuredPrefix, effectivePrefix := range testcases {
+		store := newStore(cluster.RandClient(), false, testapi.Default.Codec(), configuredPrefix)
+		if store.pathPrefix != effectivePrefix {
+			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, store.pathPrefix)
+		}
+	}
+}
