@@ -35,11 +35,11 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			kubeadm: easily bootstrap a secure Kubernetes cluster.
 
 			    ┌──────────────────────────────────────────────────────────┐
-			    │ KUBEADM IS ALPHA, DO NOT USE IT FOR PRODUCTION CLUSTERS! │
+			    │ KUBEADM IS BETA, DO NOT USE IT FOR PRODUCTION CLUSTERS!  │
 			    │                                                          │
 			    │ But, please try it out! Give us feedback at:             │
 			    │ https://github.com/kubernetes/kubeadm/issues             │
-			    │ and at-mention @kubernetes/sig-cluster-lifecycle         │
+			    │ and at-mention @kubernetes/sig-cluster-lifecycle-misc    │
 			    └──────────────────────────────────────────────────────────┘
 
 			Example usage:
