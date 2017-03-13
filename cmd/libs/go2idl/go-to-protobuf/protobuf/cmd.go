@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -137,6 +138,7 @@ func Run(g *Generator) {
 
 	protobufNames := NewProtobufNamer()
 	outputPackages := generator.Packages{}
+	nonOutputPackages := sets.NewString()
 	for _, d := range strings.Split(g.Packages, ",") {
 		generateAllTypes, outputPackage := true, true
 		switch {
@@ -160,6 +162,8 @@ func Run(g *Generator) {
 		protobufNames.Add(p)
 		if outputPackage {
 			outputPackages = append(outputPackages, p)
+		} else {
+			nonOutputPackages.Insert(name)
 		}
 	}
 
@@ -198,6 +202,10 @@ func Run(g *Generator) {
 
 	var vendoredOutputPackages, localOutputPackages generator.Packages
 	for _, p := range protobufNames.packages {
+		if nonOutputPackages.Has(p.Name()) {
+			// if we're not outputting the package, don't include it in either package list
+			continue
+		}
 		p.Vendored = strings.Contains(c.Universe[p.PackagePath].SourcePath, "/vendor/")
 		if p.Vendored {
 			vendoredOutputPackages = append(vendoredOutputPackages, p)
