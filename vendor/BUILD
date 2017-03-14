@@ -7131,13 +7131,18 @@ go_library(
 )
 
 go_library(
+    name = "github.com/vmware/photon-controller-go-sdk/SSPI",
+    srcs = ["github.com/vmware/photon-controller-go-sdk/SSPI/sspi_unsupported.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/vmware/photon-controller-go-sdk/photon",
     srcs = [
         "github.com/vmware/photon-controller-go-sdk/photon/apitypes.go",
         "github.com/vmware/photon-controller-go-sdk/photon/auth.go",
         "github.com/vmware/photon-controller-go-sdk/photon/availabilityzones.go",
         "github.com/vmware/photon-controller-go-sdk/photon/client.go",
-        "github.com/vmware/photon-controller-go-sdk/photon/clusters.go",
         "github.com/vmware/photon-controller-go-sdk/photon/deployments.go",
         "github.com/vmware/photon-controller-go-sdk/photon/disks.go",
         "github.com/vmware/photon-controller-go-sdk/photon/flavors.go",
@@ -7148,7 +7153,10 @@ go_library(
         "github.com/vmware/photon-controller-go-sdk/photon/projects.go",
         "github.com/vmware/photon-controller-go-sdk/photon/resourcetickets.go",
         "github.com/vmware/photon-controller-go-sdk/photon/restclient.go",
+        "github.com/vmware/photon-controller-go-sdk/photon/routers.go",
+        "github.com/vmware/photon-controller-go-sdk/photon/services.go",
         "github.com/vmware/photon-controller-go-sdk/photon/status.go",
+        "github.com/vmware/photon-controller-go-sdk/photon/subnets.go",
         "github.com/vmware/photon-controller-go-sdk/photon/tasks.go",
         "github.com/vmware/photon-controller-go-sdk/photon/tenants.go",
         "github.com/vmware/photon-controller-go-sdk/photon/util.go",
@@ -7164,6 +7172,7 @@ go_library(
     srcs = [
         "github.com/vmware/photon-controller-go-sdk/photon/lightwave/jwttoken.go",
         "github.com/vmware/photon-controller-go-sdk/photon/lightwave/oidcclient.go",
+        "github.com/vmware/photon-controller-go-sdk/photon/lightwave/oidcclient_sspi_unsupported.go",
     ],
     tags = ["automanaged"],
 )
