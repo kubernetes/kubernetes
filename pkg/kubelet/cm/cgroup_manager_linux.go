@@ -449,6 +449,10 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 
 		// WalkFunc which is called for each file and directory in the pod cgroup dir
 		visitor := func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				glog.V(5).Infof("cgroup manager encountered error visiting cgroup path %v: %v", path, err)
+				return nil
+			}
 			if !info.IsDir() {
 				return nil
 			}
