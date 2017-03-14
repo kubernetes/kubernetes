@@ -5426,3 +5426,24 @@ func DescribeIng(ns string) {
 		"describe", "ing", fmt.Sprintf("--namespace=%v", ns))
 	Logf(desc)
 }
+
+// NewTestPod returns a pod that has the specified requests and limits
+func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.ResourceList) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "pause",
+					Image: GetPauseImageName(f.ClientSet),
+					Resources: v1.ResourceRequirements{
+						Requests: requests,
+						Limits:   limits,
+					},
+				},
+			},
+		},
+	}
+}
