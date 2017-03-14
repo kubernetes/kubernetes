@@ -471,11 +471,12 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			Spec: api.PodSpec{
+				// no containers specified
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: invalidSelector,
+				Labels: validSelector,
 			},
 		},
 	}
@@ -489,16 +490,18 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 
 	type dsUpdateTest struct {
-		old    extensions.DaemonSet
-		update extensions.DaemonSet
+		old            extensions.DaemonSet
+		update         extensions.DaemonSet
+		expectedErrNum int
 	}
-	successCases := []dsUpdateTest{
-		{
+	successCases := map[string]dsUpdateTest{
+		"no change": {
 			old: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
 					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 						Type: extensions.OnDeleteDaemonSetStrategyType,
 					},
@@ -507,20 +510,22 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
 					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 						Type: extensions.OnDeleteDaemonSetStrategyType,
 					},
 				},
 			},
 		},
-		{
+		"change template and selector": {
 			old: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 2,
+					Template:           validPodTemplateAbc.Template,
 					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 						Type: extensions.OnDeleteDaemonSetStrategyType,
 					},
@@ -529,20 +534,22 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector2},
-					Template: validPodTemplateAbc2.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
+					TemplateGeneration: 3,
+					Template:           validPodTemplateAbc2.Template,
 					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 						Type: extensions.OnDeleteDaemonSetStrategyType,
 					},
 				},
 			},
 		},
-		{
+		"change template": {
 			old: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 3,
+					Template:           validPodTemplateAbc.Template,
 					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 						Type: extensions.OnDeleteDaemonSetStrategyType,
 					},
@@ -551,20 +558,80 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateNodeSelector.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 4,
+					Template:           validPodTemplateNodeSelector.Template,
 					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
 						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+		},
+		"change container image name": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
+					TemplateGeneration: 2,
+					Template:           validPodTemplateDef.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+		},
+		"change update strategy": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 4,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 4,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &extensions.RollingUpdateDaemonSet{
+							MaxUnavailable: intstr.FromInt(1),
+						},
 					},
 				},
 			},
 		},
 	}
-	for _, successCase := range successCases {
+	for testName, successCase := range successCases {
+		// ResourceVersion is required for updates.
 		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "2"
+		// Check test setup
+		if successCase.expectedErrNum > 0 {
+			t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
+		}
+		if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
+			t.Errorf("%q has incorrect test setup with no resource version set", testName)
+		}
 		if errs := ValidateDaemonSetUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
+			t.Errorf("%q expected no error, but got: %v", testName, errs)
 		}
 	}
 	errorCases := map[string]dsUpdateTest{
@@ -572,102 +639,219 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
+			expectedErrNum: 1,
 		},
 		"invalid selector": {
 			old: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: invalidSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: invalidSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
+			expectedErrNum: 1,
 		},
 		"invalid pod": {
 			old: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: invalidPodTemplate.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 2,
+					Template:           invalidPodTemplate.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
+			expectedErrNum: 1,
 		},
-		"change container image": {
+		"invalid read-write volume": {
 			old: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateDef.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 2,
+					Template:           readWriteVolumePodTemplate.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
-		},
-		"read-write volume": {
-			old: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
-				},
-			},
-			update: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: readWriteVolumePodTemplate.Template,
-				},
-			},
+			expectedErrNum: 1,
 		},
 		"invalid update strategy": {
 			old: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: invalidSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: "Random",
+					},
 				},
 			},
+			expectedErrNum: 1,
+		},
+		"negative templateGeneration": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: -1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: -1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			expectedErrNum: 1,
+		},
+		"decreased templateGeneration": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					TemplateGeneration: 2,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					TemplateGeneration: 1,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			expectedErrNum: 1,
+		},
+		"unchanged templateGeneration upon template update": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					TemplateGeneration: 2,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					TemplateGeneration: 2,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
+					Template:           validPodTemplateAbc2.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			expectedErrNum: 1,
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidateDaemonSetUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
-			t.Errorf("expected failure: %s", testName)
+		// ResourceVersion is required for updates.
+		errorCase.old.ObjectMeta.ResourceVersion = "1"
+		errorCase.update.ObjectMeta.ResourceVersion = "2"
+		// Check test setup
+		if errorCase.expectedErrNum <= 0 {
+			t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
+		}
+		if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
+			t.Errorf("%q has incorrect test setup with no resource version set", testName)
+		}
+		// Run the tests
+		if errs := ValidateDaemonSetUpdate(&errorCase.update, &errorCase.old); len(errs) != errorCase.expectedErrNum {
+			t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
+		} else {
+			t.Logf("(PASS) %q got errors %v", testName, errs)
 		}
 	}
 }
