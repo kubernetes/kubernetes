@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -370,6 +371,12 @@ func (f *flexVolumeUnmounter) TearDown() error {
 
 // TearDownAt simply deletes everything in the directory.
 func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
+	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
+		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	} else if !pathExists {
+		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		return nil
+	}
 
 	notmnt, err := f.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
