@@ -47,7 +47,7 @@ spec:
     spec:
       tolerations:
       - key: "CriticalAddonsOnly"
-        operator": "Exists"
+        operator: "Exists"
       volumes:
       - name: kube-dns-config
         configMap:
