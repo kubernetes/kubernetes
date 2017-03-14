@@ -73,6 +73,8 @@ var _ = framework.KubeDescribe("Downward API", func() {
 						FieldPath:  "status.podIP",
 					},
 				},
+			},
+			{
 				Name: "HOST_IP",
 				ValueFrom: &v1.EnvVarSource{
 					FieldRef: &v1.ObjectFieldSelector{
