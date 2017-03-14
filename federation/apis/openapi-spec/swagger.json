@@ -9846,7 +9846,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ConfigMapKeySelector"
      },
      "fieldRef": {
-      "description": "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.podIP.",
+      "description": "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ObjectFieldSelector"
      },
      "resourceFieldRef": {
