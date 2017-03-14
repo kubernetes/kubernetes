@@ -78,7 +78,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 		}
 		// Here we don't check for the bound node name since it can land on
 		// any one (this pod doesn't require any of the opaque resource.)
-		predicate := scheduleSuccess(pod.Name, "")
+		predicate := scheduleSuccessEvent(pod.Name, "")
 		success, err := common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
@@ -103,7 +103,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
-		predicate := scheduleSuccess(pod.Name, node.Name)
+		predicate := scheduleSuccessEvent(pod.Name, node.Name)
 		success, err := common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
@@ -121,7 +121,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(f.NewTestPod("over-max-oir", requests, limits))
 			return err
 		}
-		predicate := scheduleFailure("over-max-oir")
+		predicate := scheduleFailureEvent("over-max-oir")
 		success, err := common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
@@ -166,7 +166,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
-		predicate := scheduleSuccess(pod.Name, node.Name)
+		predicate := scheduleSuccessEvent(pod.Name, node.Name)
 		success, err := common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
@@ -206,7 +206,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 			_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
-		predicate = scheduleFailure(pod.Name)
+		predicate = scheduleFailureEvent(pod.Name)
 		success, err = common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
@@ -232,7 +232,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod1)
 			return err
 		}
-		predicate := scheduleSuccess(pod1.Name, node.Name)
+		predicate := scheduleSuccessEvent(pod1.Name, node.Name)
 		success, err := common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
@@ -242,7 +242,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod2)
 			return err
 		}
-		predicate = scheduleFailure(pod2.Name)
+		predicate = scheduleFailureEvent(pod2.Name)
 		success, err = common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
@@ -252,7 +252,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 			err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod1.Name, nil)
 			return err
 		}
-		predicate = scheduleSuccess(pod2.Name, node.Name)
+		predicate = scheduleSuccessEvent(pod2.Name, node.Name)
 		success, err = common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
@@ -301,21 +301,4 @@ func escapeForJSONPatch(resName v1.ResourceName) string {
 	// Escape forward slashes in the resource name per the JSON Pointer spec.
 	// See https://tools.ietf.org/html/rfc6901#section-3
 	return strings.Replace(string(resName), "/", "~1", -1)
-}
-
-func scheduleSuccess(podName, nodeName string) func(*v1.Event) bool {
-	return func(e *v1.Event) bool {
-		return e.Type == v1.EventTypeNormal &&
-			e.Reason == "Scheduled" &&
-			strings.HasPrefix(e.Name, podName) &&
-			strings.Contains(e.Message, fmt.Sprintf("Successfully assigned %v to %v", podName, nodeName))
-	}
-}
-
-func scheduleFailure(podName string) func(*v1.Event) bool {
-	return func(e *v1.Event) bool {
-		return strings.HasPrefix(e.Name, podName) &&
-			e.Type == "Warning" &&
-			e.Reason == "FailedScheduling"
-	}
 }
