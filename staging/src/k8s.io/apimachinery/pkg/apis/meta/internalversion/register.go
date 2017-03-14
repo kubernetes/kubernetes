@@ -49,11 +49,11 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		return err
 	}
 	scheme.AddConversionFuncs(
-		Convert_string_To_labels_Selector,
-		Convert_labels_Selector_To_string,
+		metav1.Convert_string_To_labels_Selector,
+		metav1.Convert_labels_Selector_To_string,
 
-		Convert_string_To_fields_Selector,
-		Convert_fields_Selector_To_string,
+		metav1.Convert_string_To_fields_Selector,
+		metav1.Convert_fields_Selector_To_string,
 
 		Convert_map_to_v1_LabelSelector,
 		Convert_v1_LabelSelector_to_map,
