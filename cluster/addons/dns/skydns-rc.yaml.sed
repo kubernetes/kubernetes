@@ -82,7 +82,7 @@ spec:
           name: dns-tcp-local
           protocol: TCP
       - name: dnsmasq
-        image: gcr.io/google_containers/kube-dnsmasq-amd64:1.4
+        image: gcr.io/google_containers/kube-dnsmasq-amd64:1.4.1
         livenessProbe:
           httpGet:
             path: /healthz-dnsmasq
