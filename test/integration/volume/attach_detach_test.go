@@ -33,6 +33,7 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
+	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -128,6 +129,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		t.Fatalf("Pod not found in Pod Informer cache : %v", err)
 	}
 
+	waitForPodsInDSWP(t, ctrl.GetDesiredStateOfWorld())
 	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
 
 	if len(podsToAdd) == 0 {
@@ -163,6 +165,18 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 		} else {
 			return false, nil
 		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func waitForPodsInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld) {
+	if err := wait.Poll(10*time.Second, 30*time.Second, func() (bool, error) {
+		pods := dswp.GetPodToAdd()
+		if len(pods) > 0 {
+			return true, nil
+		}
+		return false, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
