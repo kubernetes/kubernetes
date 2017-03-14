@@ -190,9 +190,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, secretcontroller.ControllerName, secretcontroller.RequiredResources, true) {
-		secretcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "secret-controller"))
-		secretcontroller := secretcontroller.NewSecretController(secretcontrollerClientset)
-		secretcontroller.Run(wait.NeverStop)
+		secretcontroller.StartSecretController(restClientCfg, stopChan, minimizeLatency)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, configmapcontroller.ControllerName, configmapcontroller.RequiredResources, true) {
