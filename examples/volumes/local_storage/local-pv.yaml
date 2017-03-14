@@ -10,5 +10,5 @@ spec:
   accessModes:
     - ReadWriteMany
   localStorage:
-    path: "/tmp"
-    nodeName: "test-node"
+    path: "/tmp/node1"
+    nodeName: "kubernetes-minion-group-8t3c"

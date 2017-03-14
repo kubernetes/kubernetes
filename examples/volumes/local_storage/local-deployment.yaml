@@ -17,7 +17,7 @@ spec:
         - "/bin/sh"
         args:
         - "-c"
-        - "echo \"Testing local-test pod\" > /usr/test-pod/test_file"
+        - "date >> /usr/test-pod/test_file; echo \"Testing local-test pod\" >> /usr/test-pod/test_file; while [ 1 ]; do sleep 100; done"
         volumeMounts:
         - name: local-vol
           mountPath: /usr/test-pod
