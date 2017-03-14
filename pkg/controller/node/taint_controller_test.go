@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
@@ -90,99 +89,6 @@ func TestFilterNoExecuteTaints(t *testing.T) {
 	taints = getNoExecuteTaints(taints)
 	if len(taints) != 1 || taints[0].Key != "one" {
 		t.Errorf("Filtering doesn't work. Got %v", taints)
-	}
-}
-
-func TestComputeTaintDifference(t *testing.T) {
-	testCases := []struct {
-		lhs                []v1.Taint
-		rhs                []v1.Taint
-		expectedDifference []v1.Taint
-		description        string
-	}{
-		{
-			lhs: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-				{
-					Key:   "two",
-					Value: "two",
-				},
-			},
-			rhs: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-				{
-					Key:   "two",
-					Value: "two",
-				},
-			},
-			description: "Equal sets",
-		},
-		{
-			lhs: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-			},
-			expectedDifference: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-			},
-			description: "Right is empty",
-		},
-		{
-			rhs: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-			},
-			description: "Left is empty",
-		},
-		{
-			lhs: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-				{
-					Key:   "two",
-					Value: "two",
-				},
-			},
-			rhs: []v1.Taint{
-				{
-					Key:   "two",
-					Value: "two",
-				},
-				{
-					Key:   "three",
-					Value: "three",
-				},
-			},
-			expectedDifference: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-			},
-			description: "Intersecting arrays",
-		},
-	}
-
-	for _, item := range testCases {
-		difference := computeTaintDifference(item.lhs, item.rhs)
-		if !api.Semantic.DeepEqual(difference, item.expectedDifference) {
-			t.Errorf("%v: difference in not what expected. Got %v, expected %v", item.description, difference, item.expectedDifference)
-		}
 	}
 }
 
@@ -641,5 +547,49 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 		}
 
 		close(stopCh)
+	}
+}
+
+func TestGetMinTolerationTime(t *testing.T) {
+	one := int64(1)
+	oneSec := 1 * time.Second
+
+	tests := []struct {
+		tolerations []v1.Toleration
+		expected    time.Duration
+	}{
+		{
+			tolerations: []v1.Toleration{},
+			expected:    0,
+		},
+		{
+			tolerations: []v1.Toleration{
+				{
+					TolerationSeconds: &one,
+				},
+				{
+					TolerationSeconds: nil,
+				},
+			},
+			expected: oneSec,
+		},
+		{
+			tolerations: []v1.Toleration{
+				{
+					TolerationSeconds: nil,
+				},
+				{
+					TolerationSeconds: &one,
+				},
+			},
+			expected: oneSec,
+		},
+	}
+
+	for _, test := range tests {
+		got := getMinTolerationTime(test.tolerations)
+		if got != test.expected {
+			t.Errorf("Incorrect min toleration time: got %v, expected %v", got, test.expected)
+		}
 	}
 }

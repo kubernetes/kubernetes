@@ -259,11 +259,17 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
 	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	manager, _, rcInformer := newReplicationManagerFromClient(c, BurstReplicas)
+	manager, podInformer, rcInformer := newReplicationManagerFromClient(c, BurstReplicas)
 
-	// A controller with 2 replicas and no pods in the store, 2 creates expected
+	// A controller with 2 replicas and no active pods in the store.
+	// Inactive pods should be ignored. 2 creates expected.
 	rc := newReplicationController(2)
 	rcInformer.Informer().GetIndexer().Add(rc)
+	failedPod := newPod("failed-pod", rc, v1.PodFailed, nil, true)
+	deletedPod := newPod("deleted-pod", rc, v1.PodRunning, nil, true)
+	deletedPod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	podInformer.Informer().GetIndexer().Add(failedPod)
+	podInformer.Informer().GetIndexer().Add(deletedPod)
 
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl

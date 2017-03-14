@@ -30,4 +30,5 @@ func (d Profiling) Install(c *mux.APIContainer) {
 	c.UnlistedRoutes.HandleFunc("/debug/pprof/", pprof.Index)
 	c.UnlistedRoutes.HandleFunc("/debug/pprof/profile", pprof.Profile)
 	c.UnlistedRoutes.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	c.UnlistedRoutes.HandleFunc("/debug/pprof/trace", pprof.Trace)
 }

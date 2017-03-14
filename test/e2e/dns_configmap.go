@@ -18,68 +18,32 @@ package e2e
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-type dnsConfigMapTest struct {
-	f      *framework.Framework
-	c      clientset.Interface
-	ns     string
-	name   string
-	labels []string
+type dnsFederationsConfigMapTest struct {
+	dnsTestCommon
 
-	cm      *v1.ConfigMap
 	fedMap  map[string]string
 	isValid bool
-
-	dnsPod      *v1.Pod
-	utilPod     *v1.Pod
-	utilService *v1.Service
 }
 
-var _ = framework.KubeDescribe("DNS config map", func() {
-	test := &dnsConfigMapTest{
-		f:    framework.NewDefaultFramework("dns-config-map"),
-		ns:   "kube-system",
-		name: "kube-dns",
-	}
+var _ = framework.KubeDescribe("DNS configMap federations", func() {
+	t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
+	BeforeEach(func() { t.c = t.f.ClientSet })
 
-	BeforeEach(func() {
-		test.c = test.f.ClientSet
-	})
-
-	It("should be able to change configuration", func() {
-		test.run()
+	It("should be able to change federation configuration", func() {
+		t.run()
 	})
 })
 
-func (t *dnsConfigMapTest) init() {
-	By("Finding a DNS pod")
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
-	options := metav1.ListOptions{LabelSelector: label.String()}
-
-	pods, err := t.f.ClientSet.Core().Pods("kube-system").List(options)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(pods.Items)).Should(BeNumerically(">=", 1))
-
-	t.dnsPod = &pods.Items[0]
-	framework.Logf("Using DNS pod: %v", t.dnsPod.Name)
-}
-
-func (t *dnsConfigMapTest) run() {
+func (t *dnsFederationsConfigMapTest) run() {
 	t.init()
 
 	defer t.c.Core().ConfigMaps(t.ns).Delete(t.name, nil)
@@ -120,11 +84,7 @@ func (t *dnsConfigMapTest) run() {
 	t.validate()
 }
 
-func (t *dnsConfigMapTest) validate() {
-	t.validateFederation()
-}
-
-func (t *dnsConfigMapTest) validateFederation() {
+func (t *dnsFederationsConfigMapTest) validate() {
 	federations := t.fedMap
 
 	if len(federations) == 0 {
@@ -161,155 +121,76 @@ func (t *dnsConfigMapTest) validateFederation() {
 	}
 }
 
-func (t *dnsConfigMapTest) checkDNSRecord(name string, predicate func([]string) bool, timeout time.Duration) {
-	var actual []string
-
-	err := wait.PollImmediate(
-		time.Duration(1)*time.Second,
-		timeout,
-		func() (bool, error) {
-			actual = t.runDig(name)
-			if predicate(actual) {
-				return true, nil
-			}
-			return false, nil
-		})
-
-	if err != nil {
-		framework.Logf("dig result did not match: %#v after %v",
-			actual, timeout)
-	}
-}
-
-// runDig querying for `dnsName`. Returns a list of responses.
-func (t *dnsConfigMapTest) runDig(dnsName string) []string {
-	cmd := []string{
-		"/usr/bin/dig",
-		"+short",
-		"@" + t.dnsPod.Status.PodIP,
-		"-p", "10053", dnsName,
-	}
-	stdout, stderr, err := t.f.ExecWithOptions(framework.ExecOptions{
-		Command:       cmd,
-		Namespace:     t.f.Namespace.Name,
-		PodName:       t.utilPod.Name,
-		ContainerName: "util",
-		CaptureStdout: true,
-		CaptureStderr: true,
-	})
-
-	framework.Logf("Running dig: %v, stdout: %q, stderr: %q, err: %v",
-		cmd, stdout, stderr, err)
-
-	if stdout == "" {
-		return []string{}
-	} else {
-		return strings.Split(stdout, "\n")
-	}
-}
-
-func (t *dnsConfigMapTest) setConfigMap(cm *v1.ConfigMap, fedMap map[string]string, isValid bool) {
+func (t *dnsFederationsConfigMapTest) setConfigMap(cm *v1.ConfigMap, fedMap map[string]string, isValid bool) {
 	if isValid {
-		t.cm = cm
 		t.fedMap = fedMap
 	}
 	t.isValid = isValid
-
-	cm.ObjectMeta.Namespace = t.ns
-	cm.ObjectMeta.Name = t.name
-
-	options := metav1.ListOptions{
-		FieldSelector: fields.Set{
-			"metadata.namespace": t.ns,
-			"metadata.name":      t.name,
-		}.AsSelector().String(),
-	}
-	cmList, err := t.c.Core().ConfigMaps(t.ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
-
-	if len(cmList.Items) == 0 {
-		By(fmt.Sprintf("Creating the ConfigMap (%s:%s) %+v", t.ns, t.name, *cm))
-		_, err := t.c.Core().ConfigMaps(t.ns).Create(cm)
-		Expect(err).NotTo(HaveOccurred())
-	} else {
-		By(fmt.Sprintf("Updating the ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm))
-		_, err := t.c.Core().ConfigMaps(t.ns).Update(cm)
-		Expect(err).NotTo(HaveOccurred())
-	}
+	t.dnsTestCommon.setConfigMap(cm)
 }
 
-func (t *dnsConfigMapTest) deleteConfigMap() {
-	By(fmt.Sprintf("Deleting the ConfigMap (%s:%s)", t.ns, t.name))
-
-	t.cm = nil
+func (t *dnsFederationsConfigMapTest) deleteConfigMap() {
 	t.isValid = false
-
-	err := t.c.Core().ConfigMaps(t.ns).Delete(t.name, nil)
-	Expect(err).NotTo(HaveOccurred())
+	t.dnsTestCommon.deleteConfigMap()
 }
 
-func (t *dnsConfigMapTest) createUtilPod() {
-	// Actual port # doesn't matter, just need to exist.
-	const servicePort = 10101
-
-	t.utilPod = &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    t.f.Namespace.Name,
-			Labels:       map[string]string{"app": "e2e-dns-configmap"},
-			GenerateName: "e2e-dns-configmap-",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    "util",
-					Image:   "gcr.io/google_containers/dnsutils:e2e",
-					Command: []string{"sleep", "10000"},
-					Ports: []v1.ContainerPort{
-						{ContainerPort: servicePort, Protocol: "TCP"},
-					},
-				},
-			},
-		},
-	}
-
-	var err error
-	t.utilPod, err = t.c.Core().Pods(t.f.Namespace.Name).Create(t.utilPod)
-	Expect(err).NotTo(HaveOccurred())
-	framework.Logf("Created pod %v", t.utilPod)
-	Expect(t.f.WaitForPodRunning(t.utilPod.Name)).NotTo(HaveOccurred())
-
-	t.utilService = &v1.Service{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Service",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: t.f.Namespace.Name,
-			Name:      "e2e-dns-configmap",
-		},
-		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"app": "e2e-dns-configmap"},
-			Ports: []v1.ServicePort{
-				{
-					Protocol:   "TCP",
-					Port:       servicePort,
-					TargetPort: intstr.FromInt(servicePort),
-				},
-			},
-		},
-	}
-
-	t.utilService, err = t.c.Core().Services(t.f.Namespace.Name).Create(t.utilService)
-	Expect(err).NotTo(HaveOccurred())
-	framework.Logf("Created service %v", t.utilService)
+type dnsNameserverTest struct {
+	dnsTestCommon
 }
 
-func (t *dnsConfigMapTest) deleteUtilPod() {
-	podClient := t.c.Core().Pods(t.f.Namespace.Name)
-	if err := podClient.Delete(t.utilPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-		framework.Logf("Delete of pod %v:%v failed: %v",
-			t.utilPod.Namespace, t.utilPod.Name, err)
-	}
+func (t *dnsNameserverTest) run() {
+	t.init()
+
+	t.createUtilPod()
+	defer t.deleteUtilPod()
+
+	t.createDNSServer(map[string]string{
+		"abc.acme.local": "1.1.1.1",
+		"def.acme.local": "2.2.2.2",
+		"widget.local":   "3.3.3.3",
+	})
+	defer t.deleteDNSServerPod()
+
+	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
+		"stubDomains":         fmt.Sprintf(`{"acme.local":["%v"]}`, t.dnsServerPod.Status.PodIP),
+		"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
+	}})
+
+	// The ConfigMap update mechanism takes longer than the standard
+	// wait.ForeverTestTimeout.
+	moreForeverTestTimeout := 2 * 60 * time.Second
+
+	t.checkDNSRecordFrom(
+		"abc.acme.local",
+		func(actual []string) bool { return len(actual) == 1 && actual[0] == "1.1.1.1" },
+		"dnsmasq",
+		moreForeverTestTimeout)
+	t.checkDNSRecordFrom(
+		"def.acme.local",
+		func(actual []string) bool { return len(actual) == 1 && actual[0] == "2.2.2.2" },
+		"dnsmasq",
+		wait.ForeverTestTimeout)
+	t.checkDNSRecordFrom(
+		"widget.local",
+		func(actual []string) bool { return len(actual) == 1 && actual[0] == "3.3.3.3" },
+		"dnsmasq",
+		wait.ForeverTestTimeout)
+
+	t.c.Core().ConfigMaps(t.ns).Delete(t.name, nil)
+	// Wait for the deleted ConfigMap to take effect, otherwise the
+	// configuration can bleed into other tests.
+	t.checkDNSRecordFrom(
+		"abc.acme.local",
+		func(actual []string) bool { return len(actual) == 0 },
+		"dnsmasq",
+		moreForeverTestTimeout)
 }
+
+var _ = framework.KubeDescribe("DNS configMap nameserver", func() {
+	t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
+	BeforeEach(func() { t.c = t.f.ClientSet })
+
+	It("should be able to change stubDomain configuration", func() {
+		t.run()
+	})
+})

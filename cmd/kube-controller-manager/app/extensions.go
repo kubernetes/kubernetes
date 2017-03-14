@@ -36,7 +36,6 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
-		int(ctx.Options.LookupCacheSizeForDaemonSet),
 	).Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
 	return true, nil
 }

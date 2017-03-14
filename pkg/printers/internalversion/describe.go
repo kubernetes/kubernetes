@@ -626,6 +626,8 @@ func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
 			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, w)
 		case volume.VolumeSource.PortworxVolume != nil:
 			printPortworxVolumeSource(volume.VolumeSource.PortworxVolume, w)
+		case volume.VolumeSource.ScaleIO != nil:
+			printScaleIOVolumeSource(volume.VolumeSource.ScaleIO, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -789,6 +791,19 @@ func printCinderVolumeSource(cinder *api.CinderVolumeSource, w *PrefixWriter) {
 		cinder.VolumeID, cinder.FSType, cinder.ReadOnly)
 }
 
+func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tScaleIO (a persistent volume backed by a block device in ScaleIO)\n"+
+		"    Gateway:\t%v\n"+
+		"    System:\t%v\n"+
+		"    Protection Domain:\t%v\n"+
+		"    Storage Pool:\t%v\n"+
+		"    Storage Mode:\t%v\n"+
+		"    VolumeName:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, sio.FSType, sio.ReadOnly)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -853,6 +868,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, w)
 		case pv.Spec.PortworxVolume != nil:
 			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
+		case pv.Spec.ScaleIO != nil:
+			printScaleIOVolumeSource(pv.Spec.ScaleIO, w)
 		}
 
 		if events != nil {
@@ -1519,6 +1536,8 @@ func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, runn
 		printAnnotationsMultiline(w, "Annotations", daemon.Annotations)
 		w.Write(LEVEL_0, "Desired Number of Nodes Scheduled: %d\n", daemon.Status.DesiredNumberScheduled)
 		w.Write(LEVEL_0, "Current Number of Nodes Scheduled: %d\n", daemon.Status.CurrentNumberScheduled)
+		w.Write(LEVEL_0, "Number of Nodes Scheduled with Up-to-date Pods: %d\n", daemon.Status.UpdatedNumberScheduled)
+		w.Write(LEVEL_0, "Number of Nodes Scheduled with Available Pods: %d\n", daemon.Status.NumberAvailable)
 		w.Write(LEVEL_0, "Number of Nodes Misscheduled: %d\n", daemon.Status.NumberMisscheduled)
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		DescribePodTemplate(&daemon.Spec.Template, out)
@@ -2422,10 +2441,6 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 				newRSs = append(newRSs, newRS)
 			}
 			w.Write(LEVEL_0, "NewReplicaSet:\t%s\n", printReplicaSetsByLabels(newRSs))
-		}
-		overlapWith := d.Annotations[deploymentutil.OverlapAnnotation]
-		if len(overlapWith) > 0 {
-			w.Write(LEVEL_0, "!!!WARNING!!! This deployment has overlapping label selector with deployment %q and won't behave as expected. Please fix it before continue.\n", overlapWith)
 		}
 		if describerSettings.ShowEvents {
 			events, err := dd.Core().Events(namespace).Search(api.Scheme, d)

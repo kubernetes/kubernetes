@@ -103,9 +103,6 @@ const (
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	PodStartTimeout = 5 * time.Minute
 
-	// How long to wait for the pod to no longer be running
-	podNoLongerRunningTimeout = 30 * time.Second
-
 	// If there are any orphaned namespaces to clean up, this test is running
 	// on a long lived cluster. A long wait here is preferably to spurious test
 	// failures caused by leaked resources from a previous test run.
@@ -1252,10 +1249,10 @@ func podRunning(c clientset.Interface, podName, namespace string) wait.Condition
 	}
 }
 
-// Waits default amount of time (podNoLongerRunningTimeout) for the specified pod to stop running.
+// Waits default amount of time (DefaultPodDeletionTimeout) for the specified pod to stop running.
 // Returns an error if timeout occurs first.
 func WaitForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace string) error {
-	return WaitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, podNoLongerRunningTimeout)
+	return WaitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, DefaultPodDeletionTimeout)
 }
 
 func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
@@ -2214,18 +2211,30 @@ func (f *Framework) MatchContainerOutput(
 	createdPod := podClient.Create(pod)
 	defer func() {
 		By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, &metav1.DeleteOptions{}, podNoLongerRunningTimeout)
+		podClient.DeleteSync(createdPod.Name, &metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
 	}()
 
 	// Wait for client pod to complete.
-	if err := WaitForPodSuccessInNamespace(f.ClientSet, createdPod.Name, ns); err != nil {
-		return fmt.Errorf("expected pod %q success: %v", pod.Name, err)
-	}
+	podErr := WaitForPodSuccessInNamespace(f.ClientSet, createdPod.Name, ns)
 
 	// Grab its logs.  Get host first.
 	podStatus, err := podClient.Get(createdPod.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get pod status: %v", err)
+	}
+
+	if podErr != nil {
+		// Pod failed. Dump all logs from all containers to see what's wrong
+		for _, container := range podStatus.Spec.Containers {
+			logs, err := GetPodLogs(f.ClientSet, ns, podStatus.Name, container.Name)
+			if err != nil {
+				Logf("Failed to get logs from node %q pod %q container %q: %v",
+					podStatus.Spec.NodeName, podStatus.Name, container.Name, err)
+				continue
+			}
+			Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, container.Name, logs)
+		}
+		return fmt.Errorf("expected pod %q success: %v", pod.Name, err)
 	}
 
 	Logf("Trying to get logs from node %s pod %s container %s: %v",
@@ -2525,6 +2534,22 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		}
 		return allowedNotReadyReasons(notSchedulable), nil
 	})
+}
+
+func GetTTLAnnotationFromNode(node *v1.Node) (time.Duration, bool) {
+	if node.Annotations == nil {
+		return time.Duration(0), false
+	}
+	value, ok := node.Annotations[v1.ObjectTTLAnnotationKey]
+	if !ok {
+		return time.Duration(0), false
+	}
+	intValue, err := strconv.Atoi(value)
+	if err != nil {
+		Logf("Cannot convert TTL annotation from %#v to int", *node)
+		return time.Duration(0), false
+	}
+	return time.Duration(intValue) * time.Second, true
 }
 
 func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, labelValue string) {
@@ -3161,9 +3186,7 @@ func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deploymen
 		}
 
 		// When the deployment status and its underlying resources reach the desired state, we're done
-		if deployment.Status.Replicas == *(deployment.Spec.Replicas) &&
-			deployment.Status.UpdatedReplicas == *(deployment.Spec.Replicas) &&
-			deployment.Status.AvailableReplicas == *(deployment.Spec.Replicas) {
+		if deploymentutil.DeploymentComplete(deployment, &deployment.Status) {
 			return true, nil
 		}
 
@@ -3229,11 +3252,7 @@ func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment) er
 		}
 
 		// When the deployment status and its underlying resources reach the desired state, we're done
-		if deployment.Status.Replicas == *(deployment.Spec.Replicas) &&
-			deployment.Status.UpdatedReplicas == *(deployment.Spec.Replicas) {
-			return true, nil
-		}
-		return false, nil
+		return deploymentutil.DeploymentComplete(deployment, &deployment.Status), nil
 	})
 
 	if err == wait.ErrWaitTimeout {
@@ -3381,19 +3400,6 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	return nil
 }
 
-func WaitForOverlappingAnnotationMatch(c clientset.Interface, ns, deploymentName, expected string) error {
-	return wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
-		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		if deployment.Annotations[deploymentutil.OverlapAnnotation] == expected {
-			return true, nil
-		}
-		return false, nil
-	})
-}
-
 // CheckNewRSAnnotations check if the new RS's annotation is as expected
 func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, expectedAnnotations map[string]string) error {
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
@@ -3499,7 +3505,22 @@ func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, r
 
 func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deployment) {
 	minReadySeconds := deployment.Spec.MinReadySeconds
-	podList, err := deploymentutil.ListPods(deployment,
+	rsList, err := deploymentutil.ListReplicaSets(deployment,
+		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
+			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
+			if err != nil {
+				return nil, err
+			}
+			ret := make([]*extensions.ReplicaSet, 0, len(rsList.Items))
+			for i := range rsList.Items {
+				ret = append(ret, &rsList.Items[i])
+			}
+			return ret, nil
+		})
+	if err != nil {
+		Logf("Failed to list ReplicaSets of Deployment %s: %v", deployment.Name, err)
+	}
+	podList, err := deploymentutil.ListPods(deployment, rsList,
 		func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
 			return c.Core().Pods(namespace).List(options)
 		})
@@ -4331,7 +4352,9 @@ func sshRestartMaster() error {
 	}
 	var command string
 	if ProviderIs("gce") {
-		command = "sudo docker ps | grep /kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
+		// `kube-apiserver_kube-apiserver` matches the name of the apiserver
+		// container.
+		command = "sudo docker ps | grep kube-apiserver_kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
 	} else {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}

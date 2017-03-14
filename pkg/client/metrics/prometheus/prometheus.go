@@ -27,26 +27,22 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const restClientSubsystem = "rest_client"
-
 var (
 	// requestLatency is a Prometheus Summary metric type partitioned by
 	// "verb" and "url" labels. It is used for the rest client latency metrics.
-	requestLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: restClientSubsystem,
-			Name:      "request_latency_microseconds",
-			Help:      "Request latency in microseconds. Broken down by verb and URL",
-			MaxAge:    time.Hour,
+	requestLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "rest_client_request_latency_seconds",
+			Help:    "Request latency in seconds. Broken down by verb and URL.",
+			Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
 		},
 		[]string{"verb", "url"},
 	)
 
 	requestResult = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Subsystem: restClientSubsystem,
-			Name:      "request_status_codes",
-			Help:      "Number of http requests, partitioned by metadata",
+			Name: "rest_client_requests_total",
+			Help: "Number of HTTP requests, partitioned by status code, method, and host.",
 		},
 		[]string{"code", "method", "host"},
 	)
@@ -59,12 +55,11 @@ func init() {
 }
 
 type latencyAdapter struct {
-	m *prometheus.SummaryVec
+	m *prometheus.HistogramVec
 }
 
 func (l *latencyAdapter) Observe(verb string, u url.URL, latency time.Duration) {
-	microseconds := float64(latency) / float64(time.Microsecond)
-	l.m.WithLabelValues(verb, u.String()).Observe(microseconds)
+	l.m.WithLabelValues(verb, u.String()).Observe(latency.Seconds())
 }
 
 type resultAdapter struct {

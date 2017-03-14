@@ -305,10 +305,16 @@ func TestSyncReplicaSetCreates(t *testing.T) {
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
-	// A controller with 2 replicas and no pods in the store, 2 creates expected
+	// A controller with 2 replicas and no active pods in the store.
+	// Inactive pods should be ignored. 2 creates expected.
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
+	failedPod := newPod("failed-pod", rs, v1.PodFailed, nil, true)
+	deletedPod := newPod("deleted-pod", rs, v1.PodRunning, nil, true)
+	deletedPod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	informers.Core().V1().Pods().Informer().GetIndexer().Add(failedPod)
+	informers.Core().V1().Pods().Informer().GetIndexer().Add(deletedPod)
 
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl

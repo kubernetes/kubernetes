@@ -1249,7 +1249,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 			t.Errorf("%v: unexpected error: %v", item.description, err)
 		}
 		// Give some time for rate-limiter to reload
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 
 		for zone, state := range item.expectedFollowingStates {
 			if state != nodeController.zoneStates[zone] {
@@ -1258,6 +1258,8 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		}
 		zones := testutil.GetZones(fakeNodeHandler)
 		for _, zone := range zones {
+			// Time for rate-limiter reloading per node.
+			time.Sleep(50 * time.Millisecond)
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
 				uid, _ := value.UID.(string)
 				deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)

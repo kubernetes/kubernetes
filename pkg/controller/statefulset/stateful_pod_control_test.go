@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	podapi "k8s.io/kubernetes/pkg/api/v1/pod"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -470,7 +471,7 @@ func TestStatefulPodControlUpdatesSetStatus(t *testing.T) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), nil
 	})
-	if err := control.UpdateStatefulSetReplicas(set, 2); err != nil {
+	if err := control.UpdateStatefulSetStatus(set, 2, 1); err != nil {
 		t.Errorf("Error returned on successful status update: %s", err)
 	}
 	if set.Status.Replicas != 2 {
@@ -479,6 +480,24 @@ func TestStatefulPodControlUpdatesSetStatus(t *testing.T) {
 	events := collectEvents(recorder.Events)
 	if eventCount := len(events); eventCount != 0 {
 		t.Errorf("Expected 0 events for successful status update %d", eventCount)
+	}
+}
+
+func TestStatefulPodControlUpdatesObservedGeneration(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	set := newStatefulSet(3)
+	fakeClient := &fake.Clientset{}
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
+	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
+		update := action.(core.UpdateAction)
+		sts := update.GetObject().(*apps.StatefulSet)
+		if sts.Status.ObservedGeneration == nil || *sts.Status.ObservedGeneration != int64(3) {
+			t.Errorf("expected observedGeneration to be synced with generation for statefulset %q", sts.Name)
+		}
+		return true, sts, nil
+	})
+	if err := control.UpdateStatefulSetStatus(set, 2, 3); err != nil {
+		t.Errorf("Error returned on successful status update: %s", err)
 	}
 }
 
@@ -493,7 +512,7 @@ func TestStatefulPodControlUpdateReplicasFailure(t *testing.T) {
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
-	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
+	if err := control.UpdateStatefulSetStatus(set, 2, 1); err == nil {
 		t.Error("Failed update did not return error")
 	}
 	events := collectEvents(recorder.Events)
@@ -520,7 +539,7 @@ func TestStatefulPodControlUpdateReplicasConflict(t *testing.T) {
 			return true, update.GetObject(), nil
 		}
 	})
-	if err := control.UpdateStatefulSetReplicas(set, 2); err != nil {
+	if err := control.UpdateStatefulSetStatus(set, 2, 1); err != nil {
 		t.Errorf("UpdateStatefulSetStatus returned an error: %s", err)
 	}
 	if set.Status.Replicas != 2 {
@@ -544,7 +563,7 @@ func TestStatefulPodControlUpdateReplicasConflictFailure(t *testing.T) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
 	})
-	if err := control.UpdateStatefulSetReplicas(set, 2); err == nil {
+	if err := control.UpdateStatefulSetStatus(set, 2, 1); err == nil {
 		t.Error("UpdateStatefulSetStatus failed to return an error on get failure")
 	}
 	events := collectEvents(recorder.Events)

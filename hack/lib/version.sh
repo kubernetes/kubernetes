@@ -119,6 +119,7 @@ kube::version::ldflag() {
   local val=${2}
 
   echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}"
+  echo "-X ${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}"
 }
 
 # Prints the value that needs to be passed to the -ldflags parameter of go build

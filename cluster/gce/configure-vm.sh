@@ -18,15 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Note that this script is also used by AWS; we include it and then override
-# functions with AWS equivalents.  Note `#+AWS_OVERRIDES_HERE` below.
-# TODO(justinsb): Refactor into common script & GCE specific script?
-
 # If we have any arguments at all, this is a push and not just setup.
 is_push=$@
-
-readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 
 function ensure-basic-networking() {
   # Deal with GCE networking bring-up race. (We rely on DNS for a lot,
@@ -173,23 +166,6 @@ for k,v in yaml.load(sys.stdin).iteritems():
   print("""readonly {var}={value}""".format(var = k, value = pipes.quote(str(v))))
   print("""export {var}""".format(var = k))
   ' < """${kube_env_yaml}""")"
-}
-
-function set-kube-master-certs() {
-  local kube_master_certs_yaml="${INSTALL_DIR}/kube_master_certs.yaml"
-
-  until curl-metadata kube-master-certs > "${kube_master_certs_yaml}"; do
-    echo 'Waiting for kube-master-certs...'
-    sleep 3
-  done
-
-  eval "$(python -c '
-import pipes,sys,yaml
-
-for k,v in yaml.load(sys.stdin).iteritems():
-  print("""readonly {var}={value}""".format(var = k, value = pipes.quote(str(v))))
-  print("""export {var}""".format(var = k))
-  ' < """${kube_master_certs_yaml}""")"
 }
 
 function remove-docker-artifacts() {
@@ -418,51 +394,6 @@ find-master-pd() {
   MASTER_PD_DEVICE="/dev/disk/by-id/${relative_path}"
 }
 
-# Mounts a persistent disk (formatting if needed) to store the persistent data
-# on the master -- etcd's data, a few settings, and security certs/keys/tokens.
-#
-# This function can be reused to mount an existing PD because all of its
-# operations modifying the disk are idempotent -- safe_format_and_mount only
-# formats an unformatted disk, and mkdir -p will leave a directory be if it
-# already exists.
-mount-master-pd() {
-  find-master-pd
-  if [[ -z "${MASTER_PD_DEVICE:-}" ]]; then
-    return
-  fi
-
-  # Format and mount the disk, create directories on it for all of the master's
-  # persistent data, and link them to where they're used.
-  echo "Mounting master-pd"
-  mkdir -p /mnt/master-pd
-  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${MASTER_PD_DEVICE}" /mnt/master-pd &>/var/log/master-pd-mount.log || \
-    { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
-  # Contains all the data stored in etcd
-  mkdir -m 700 -p /mnt/master-pd/var/etcd
-  # Contains the dynamically generated apiserver auth certs and keys
-  mkdir -p /mnt/master-pd/srv/kubernetes
-  # Contains the cluster's initial config parameters and auth tokens
-  mkdir -p /mnt/master-pd/srv/salt-overlay
-  # Directory for kube-apiserver to store SSH key (if necessary)
-  mkdir -p /mnt/master-pd/srv/sshproxy
-
-  ln -s -f /mnt/master-pd/var/etcd /var/etcd
-  ln -s -f /mnt/master-pd/srv/kubernetes /srv/kubernetes
-  ln -s -f /mnt/master-pd/srv/sshproxy /srv/sshproxy
-  ln -s -f /mnt/master-pd/srv/salt-overlay /srv/salt-overlay
-
-  # This is a bit of a hack to get around the fact that salt has to run after the
-  # PD and mounted directory are already set up. We can't give ownership of the
-  # directory to etcd until the etcd user and group exist, but they don't exist
-  # until salt runs if we don't create them here. We could alternatively make the
-  # permissions on the directory more permissive, but this seems less bad.
-  if ! id etcd &>/dev/null; then
-    useradd -s /sbin/nologin -d /var/etcd etcd
-  fi
-  chown -R etcd /mnt/master-pd/var/etcd
-  chgrp -R etcd /mnt/master-pd/var/etcd
-}
-
 # Create the overlay files for the salt tree.  We create these in a separate
 # place so that we can blow away the rest of the salt configs on a kube-push and
 # re-apply these.
@@ -687,70 +618,6 @@ function convert-bytes-gce-kube() {
   echo "${storage_space}" | sed -e 's/^\([0-9]\+\)\([A-Z]\)\?i\?B$/\1\2/g' -e 's/\([A-Z]\)$/\1i/'
 }
 
-# This should only happen on cluster initialization.
-#
-#  - Uses KUBE_PASSWORD and KUBE_USER to generate basic_auth.csv.
-#  - Uses KUBE_BEARER_TOKEN, KUBELET_TOKEN, and KUBE_PROXY_TOKEN to generate
-#    known_tokens.csv (KNOWN_TOKENS_FILE).
-#  - Uses CA_CERT, MASTER_CERT, and MASTER_KEY to populate the SSL credentials
-#    for the apiserver.
-#  - Optionally uses KUBECFG_CERT and KUBECFG_KEY to store a copy of the client
-#    cert credentials.
-#
-# After the first boot and on upgrade, these files exist on the master-pd
-# and should never be touched again (except perhaps an additional service
-# account, see NB below.)
-function create-salt-master-auth() {
-  if [[ ! -e /srv/kubernetes/ca.crt ]]; then
-    if  [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${MASTER_CERT:-}" ]] && [[ ! -z "${MASTER_KEY:-}" ]]; then
-      mkdir -p /srv/kubernetes
-      (umask 077;
-        echo "${CA_CERT}" | base64 --decode > /srv/kubernetes/ca.crt;
-        echo "${MASTER_CERT}" | base64 --decode > /srv/kubernetes/server.cert;
-        echo "${MASTER_KEY}" | base64 --decode > /srv/kubernetes/server.key;
-        # Kubecfg cert/key are optional and included for backwards compatibility.
-        # TODO(roberthbailey): Remove these two lines once GKE no longer requires
-        # fetching clients certs from the master VM.
-        echo "${KUBECFG_CERT:-}" | base64 --decode > /srv/kubernetes/kubecfg.crt;
-        echo "${KUBECFG_KEY:-}" | base64 --decode > /srv/kubernetes/kubecfg.key)
-    fi
-  fi
-  if [ ! -e /srv/kubernetes/kubeapiserver.cert ]; then
-    if [[ ! -z "${KUBEAPISERVER_CERT:-}" ]] && [[ ! -z "${KUBEAPISERVER_KEY:-}" ]]; then
-      (umask 077;
-        echo "${KUBEAPISERVER_CERT}" | base64 --decode > /srv/kubernetes/kubeapiserver.cert;
-        echo "${KUBEAPISERVER_KEY}" | base64 --decode > /srv/kubernetes/kubeapiserver.key)
-    fi
-  fi
-  if [ ! -e "${BASIC_AUTH_FILE}" ]; then
-    mkdir -p /srv/salt-overlay/salt/kube-apiserver
-    (umask 077;
-      echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${BASIC_AUTH_FILE}")
-  fi
-  if [ ! -e "${KNOWN_TOKENS_FILE}" ]; then
-    mkdir -p /srv/salt-overlay/salt/kube-apiserver
-    (umask 077;
-      echo "${KUBE_BEARER_TOKEN},admin,admin" > "${KNOWN_TOKENS_FILE}";
-      echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}";
-      echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}")
-  fi
-}
-
-# This should happen only on cluster initialization. After the first boot
-# and on upgrade, the kubeconfig file exists on the master-pd and should
-# never be touched again.
-#
-#  - Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and
-#    KUBELET_KEY to generate a kubeconfig file for the kubelet to securely
-#    connect to the apiserver.
-function create-salt-master-kubelet-auth() {
-  # Only configure the kubelet on the master if the required variables are
-  # set in the environment.
-  if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-    create-salt-kubelet-auth
-  fi
-}
-
 # This should happen both on cluster initialization and node upgrades.
 #
 #  - Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and
@@ -888,164 +755,6 @@ log_level_logfile: debug
 EOF
 }
 
-function salt-master-role() {
-  cat <<EOF >/etc/salt/minion.d/grains.conf
-grains:
-  roles:
-    - kubernetes-master
-  cloud: gce
-EOF
-
-  cat <<EOF >/etc/gce.conf
-[global]
-EOF
-  CLOUD_CONFIG='' # Set to non-empty path if we are using the gce.conf file
-
-  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${TOKEN_BODY:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
-    cat <<EOF >>/etc/gce.conf
-token-url = ${TOKEN_URL}
-token-body = ${TOKEN_BODY}
-project-id = ${PROJECT_ID}
-network-name = ${NODE_NETWORK}
-EOF
-    CLOUD_CONFIG=/etc/gce.conf
-    EXTERNAL_IP=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  advertise_address: '${EXTERNAL_IP}'
-  proxy_ssh_user: '${PROXY_SSH_USER}'
-EOF
-  fi
-
-  if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
-    if [[ -n "${NODE_TAGS:-}" ]]; then
-      local -r node_tags="${NODE_TAGS}"
-    else
-      local -r node_tags="${NODE_INSTANCE_PREFIX}"
-    fi
-    cat <<EOF >>/etc/gce.conf
-node-tags = ${NODE_TAGS}
-node-instance-prefix = ${NODE_INSTANCE_PREFIX}
-EOF
-    CLOUD_CONFIG=/etc/gce.conf
-  fi
-
-  if [[ -n "${MULTIZONE:-}" ]]; then
-    cat <<EOF >>/etc/gce.conf
-multizone = ${MULTIZONE}
-EOF
-    CLOUD_CONFIG=/etc/gce.conf
-  fi
-
-  if [[ -n "${CLOUD_CONFIG:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  cloud_config: ${CLOUD_CONFIG}
-EOF
-  else
-    rm -f /etc/gce.conf
-  fi
-
-  if [[ -n "${GCP_AUTHN_URL:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  webhook_authentication_config: /etc/gcp_authn.config
-EOF
-    cat <<EOF >/etc/gcp_authn.config
-clusters:
-  - name: gcp-authentication-server
-    cluster:
-      server: ${GCP_AUTHN_URL}
-users:
-  - name: kube-apiserver
-    user:
-      auth-provider:
-        name: gcp
-current-context: webhook
-contexts:
-- context:
-    cluster: gcp-authentication-server
-    user: kube-apiserver
-  name: webhook
-EOF
-  fi
-
-  if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  webhook_authorization_config: /etc/gcp_authz.config
-EOF
-    cat <<EOF >/etc/gcp_authz.config
-clusters:
-  - name: gcp-authorization-server
-    cluster:
-      server: ${GCP_AUTHZ_URL}
-users:
-  - name: kube-apiserver
-    user:
-      auth-provider:
-        name: gcp
-current-context: webhook
-contexts:
-- context:
-    cluster: gcp-authorization-server
-    user: kube-apiserver
-  name: webhook
-EOF
-  fi
-
-
-  if [[ -n "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
-    # This is the config file for the image review webhook.
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  image_review_config: /etc/gcp_image_review.config
-EOF
-    cat <<EOF >/etc/gcp_image_review.config
-clusters:
-  - name: gcp-image-review-server
-    cluster:
-      server: ${GCP_IMAGE_VERIFICATION_URL}
-users:
-  - name: kube-apiserver
-    user:
-      auth-provider:
-        name: gcp
-current-context: webhook
-contexts:
-- context:
-    cluster: gcp-image-review-server
-    user: kube-apiserver
-  name: webhook
-EOF
-    # This is the config for the image review admission controller.
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  image_review_webhook_config: /etc/admission_controller.config
-EOF
-    cat <<EOF >/etc/admission_controller.config
-imagePolicy:
-  kubeConfigFile: /etc/gcp_image_review.config
-  allowTTL: 30
-  denyTTL: 30
-  retryBackoff: 500
-  defaultAllow: true
-EOF
-  fi
-
-
-  # If the kubelet on the master is enabled, give it the same CIDR range
-  # as a generic node.
-  if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  kubelet_api_servers: '${KUBELET_APISERVER}'
-EOF
-  else
-    # If the kubelet is running disconnected from a master, give it a fixed
-    # CIDR range.
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
-  cbr-cidr: ${MASTER_IP_RANGE}
-EOF
-  fi
-
-  env-to-grains "runtime_config"
-  env-to-grains "kube_user"
-}
-
 function salt-node-role() {
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
@@ -1091,15 +800,8 @@ function salt-grains() {
 function configure-salt() {
   mkdir -p /etc/salt/minion.d
   salt-run-local
-  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
-    salt-master-role
-    if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}"  ]; then
-        salt-apiserver-timeout-grain $KUBE_APISERVER_REQUEST_TIMEOUT
-    fi
-  else
-    salt-node-role
-    node-docker-opts
-  fi
+  salt-node-role
+  node-docker-opts
   salt-grains
   install-salt
   stop-salt-minion
@@ -1129,20 +831,10 @@ function run-user-script() {
   fi
 }
 
-function create-salt-master-etcd-auth {
-  if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
-    local -r auth_dir="/srv/kubernetes"
-    echo "${ETCD_CA_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-ca.crt"
-    echo "${ETCD_PEER_KEY}" | base64 --decode > "${auth_dir}/etcd-peer.key"
-    echo "${ETCD_PEER_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-peer.crt"
-  fi
-}
-
-# This script is re-used on AWS.  Some of the above functions will be replaced.
-# The AWS kube-up script looks for this marker:
-#+AWS_OVERRIDES_HERE
-
-####################################################################################
+if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+  echo "Support for debian master has been removed"
+  exit 1
+fi
 
 if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config starting =="
@@ -1156,17 +848,9 @@ if [[ -z "${is_push}" ]]; then
   auto-upgrade
   ensure-local-disks
   create-node-pki
-  [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
-  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
-    set-kube-master-certs
-    create-salt-master-auth
-    create-salt-master-etcd-auth
-    create-salt-master-kubelet-auth
-  else
-    create-salt-kubelet-auth
-    create-salt-kubeproxy-auth
-  fi
+  create-salt-kubelet-auth
+  create-salt-kubeproxy-auth
   download-release
   configure-salt
   remove-docker-artifacts

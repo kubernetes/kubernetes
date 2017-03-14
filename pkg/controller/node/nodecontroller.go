@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,11 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -50,6 +51,8 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
+
+	"github.com/golang/glog"
 )
 
 func init() {
@@ -261,6 +264,9 @@ func NewNodeController(
 		runTaintManager:                 runTaintManager,
 		useTaintBasedEvictions:          useTaintBasedEvictions && runTaintManager,
 	}
+	if useTaintBasedEvictions {
+		glog.Infof("NodeController is using taint based evictions.")
+	}
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
@@ -409,6 +415,53 @@ func NewNodeController(
 				}
 			},
 		}
+	} else {
+		nodeEventHandlerFuncs = cache.ResourceEventHandlerFuncs{
+			AddFunc: func(originalObj interface{}) {
+				obj, err := api.Scheme.DeepCopy(originalObj)
+				if err != nil {
+					utilruntime.HandleError(err)
+					return
+				}
+				node := obj.(*v1.Node)
+				if nc.taintManager != nil {
+					nc.taintManager.NodeUpdated(nil, node)
+				}
+			},
+			UpdateFunc: func(oldNode, newNode interface{}) {
+				node := newNode.(*v1.Node)
+				prevNode := oldNode.(*v1.Node)
+				if nc.taintManager != nil {
+					nc.taintManager.NodeUpdated(prevNode, node)
+
+				}
+			},
+			DeleteFunc: func(originalObj interface{}) {
+				obj, err := api.Scheme.DeepCopy(originalObj)
+				if err != nil {
+					utilruntime.HandleError(err)
+					return
+				}
+
+				node, isNode := obj.(*v1.Node)
+				// We can get DeletedFinalStateUnknown instead of *v1.Node here and we need to handle that correctly. #34692
+				if !isNode {
+					deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						glog.Errorf("Received unexpected object: %v", obj)
+						return
+					}
+					node, ok = deletedState.Obj.(*v1.Node)
+					if !ok {
+						glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+						return
+					}
+				}
+				if nc.taintManager != nil {
+					nc.taintManager.NodeUpdated(node, nil)
+				}
+			},
+		}
 	}
 
 	if nc.runTaintManager {
@@ -479,6 +532,7 @@ func (nc *NodeController) Run() {
 							oppositeTaint = *NotReadyTaintTemplate
 						} else {
 							// It seems that the Node is ready again, so there's no need to taint it.
+							glog.V(4).Infof("Node %v was in a taint queue, but it's ready now. Ignoring taint request.", value.Value)
 							return true, 0
 						}
 
@@ -492,6 +546,8 @@ func (nc *NodeController) Run() {
 									value.Value,
 									err))
 							return false, 0
+						} else {
+							glog.V(4).Info("Added %v Taint to Node %v", taintToAdd, value.Value)
 						}
 						err = controller.RemoveTaintOffNode(nc.kubeClient, value.Value, &oppositeTaint, node)
 						if err != nil {
@@ -502,6 +558,8 @@ func (nc *NodeController) Run() {
 									value.Value,
 									err))
 							return false, 0
+						} else {
+							glog.V(4).Info("Made sure that Node %v has no %v Taint", value.Value, oppositeTaint)
 						}
 						return true, 0
 					})
@@ -628,7 +686,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionFalse {
 				if nc.useTaintBasedEvictions {
 					if nc.markNodeForTainting(node) {
-						glog.V(2).Infof("Tainting Node %v with NotReady taint on %v",
+						glog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
 						)
@@ -636,7 +694,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				} else {
 					if decisionTimestamp.After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
 						if nc.evictPods(node) {
-							glog.V(2).Infof("Evicting pods on node %s: %v is later than %v + %v",
+							glog.V(2).Infof("Node is NotReady. Adding Pods on Node %s to eviction queue: %v is later than %v + %v",
 								node.Name,
 								decisionTimestamp,
 								nc.nodeStatusMap[node.Name].readyTransitionTimestamp,
@@ -649,7 +707,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			if observedReadyCondition.Status == v1.ConditionUnknown {
 				if nc.useTaintBasedEvictions {
 					if nc.markNodeForTainting(node) {
-						glog.V(2).Infof("Tainting Node %v with NotReady taint on %v",
+						glog.V(2).Infof("Node %v is unresponsive as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
 						)
@@ -657,7 +715,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				} else {
 					if decisionTimestamp.After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout)) {
 						if nc.evictPods(node) {
-							glog.V(2).Infof("Evicting pods on node %s: %v is later than %v + %v",
+							glog.V(2).Infof("Node is unresponsive. Adding Pods on Node %s to eviction queues: %v is later than %v + %v",
 								node.Name,
 								decisionTimestamp,
 								nc.nodeStatusMap[node.Name].readyTransitionTimestamp,

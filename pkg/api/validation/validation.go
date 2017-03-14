@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
-	"k8s.io/kubernetes/pkg/volume"
 )
 
 // TODO: delete this global variable when we enable the validation of common
@@ -64,11 +63,6 @@ var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), bo
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = genericvalidation.BannedOwners
-var volumePlugins []volume.VolumePlugin
-
-func init() {
-	volumePlugins = probeVolumePlugins()
-}
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -548,6 +542,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateProjectedVolumeSource(source.Projected, fldPath.Child("projected"))...)
+		}
+	}
+	if source.ScaleIO != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("scaleIO"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateScaleIOVolumeSource(source.ScaleIO, fldPath.Child("scaleIO"))...)
 		}
 	}
 
@@ -1035,6 +1037,20 @@ func validatePortworxVolumeSource(pwx *api.PortworxVolumeSource, fldPath *field.
 	return allErrs
 }
 
+func validateScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if sio.Gateway == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("gateway"), ""))
+	}
+	if sio.System == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("system"), ""))
+	}
+	if sio.VolumeName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
+	}
+	return allErrs
+}
+
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
 var ValidatePersistentVolumeName = NameIsDNSSubdomain
@@ -1070,20 +1086,6 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	if len(string(pv.Spec.PersistentVolumeReclaimPolicy)) > 0 {
 		if !supportedReclaimPolicy.Has(string(pv.Spec.PersistentVolumeReclaimPolicy)) {
 			allErrs = append(allErrs, field.NotSupported(specPath.Child("persistentVolumeReclaimPolicy"), pv.Spec.PersistentVolumeReclaimPolicy, supportedReclaimPolicy.List()))
-		}
-	}
-
-	volumePlugin := findPluginBySpec(volumePlugins, pv)
-	mountOptions := volume.MountOptionFromApiPV(pv)
-
-	metaField := field.NewPath("metadata")
-	if volumePlugin == nil && len(mountOptions) > 0 {
-		allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", volume.MountOptionAnnotation), "may not specify mount options for this volume type"))
-	}
-
-	if volumePlugin != nil {
-		if !volumePlugin.SupportsMountOption() && len(mountOptions) > 0 {
-			allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", volume.MountOptionAnnotation), "may not specify mount options for this volume type"))
 		}
 	}
 
@@ -1228,6 +1230,14 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateAzureDisk(pv.Spec.AzureDisk, specPath.Child("azureDisk"))...)
+		}
+	}
+	if pv.Spec.ScaleIO != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("scaleIO"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateScaleIOVolumeSource(pv.Spec.ScaleIO, specPath.Child("scaleIO"))...)
 		}
 	}
 

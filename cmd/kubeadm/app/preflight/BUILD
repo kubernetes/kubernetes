@@ -22,7 +22,6 @@ go_library(
         "//test/e2e_node/system:go_default_library",
         "//vendor:github.com/PuerkitoBio/purell",
         "//vendor:github.com/blang/semver",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
     ],
 )
 

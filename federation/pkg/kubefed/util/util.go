@@ -21,17 +21,18 @@ import (
 	"net"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	federationapi "k8s.io/kubernetes/federation/apis/federation"
 	fedclient "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-
-	utilnet "k8s.io/apimachinery/pkg/util/net"
-	restclient "k8s.io/client-go/rest"
-	federationapi "k8s.io/kubernetes/federation/apis/federation"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -54,7 +55,18 @@ const (
 	userAgentName = "kubefed-tool"
 	KubeAPIQPS    = 20.0
 	KubeAPIBurst  = 30
+
+	rbacAPINotAvailable = "RBAC API not available"
 )
+
+// used to identify the rbac api availability error.
+type NoRBACAPIError struct {
+	s string
+}
+
+func (n *NoRBACAPIError) Error() string {
+	return n.s
+}
 
 // AdminConfig provides a filesystem based kubeconfig (via
 // `PathOptions()`) and a mechanism to talk to the federation
@@ -210,4 +222,41 @@ func buildConfigFromSecret(secret *api.Secret, serverAddress string) (*restclien
 	clusterConfig.Burst = KubeAPIBurst
 
 	return clusterConfig, nil
+}
+
+// GetVersionedClientForRBACOrFail discovers the versioned rbac APIs and gets the versioned
+// clientset for either the preferred version or the first listed version (if no preference listed)
+// TODO: We need to evaluate the usage of RESTMapper interface to achieve te same functionality
+func GetVersionedClientForRBACOrFail(hostFactory cmdutil.Factory) (client.Interface, error) {
+	discoveryclient, err := hostFactory.DiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+	groupList, err := discoveryclient.ServerGroups()
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't get clientset to create RBAC roles in the host cluster: %v", err)
+	}
+
+	for _, g := range groupList.Groups {
+		if g.Name == rbac.GroupName {
+			if g.PreferredVersion.GroupVersion != "" {
+				gv, err := schema.ParseGroupVersion(g.PreferredVersion.GroupVersion)
+				if err != nil {
+					return nil, err
+				}
+				return hostFactory.ClientSetForVersion(&gv)
+			}
+			for i := 0; i < len(g.Versions); i++ {
+				if g.Versions[i].GroupVersion != "" {
+					gv, err := schema.ParseGroupVersion(g.Versions[i].GroupVersion)
+					if err != nil {
+						return nil, err
+					}
+					return hostFactory.ClientSetForVersion(&gv)
+				}
+			}
+		}
+	}
+
+	return nil, &NoRBACAPIError{rbacAPINotAvailable}
 }

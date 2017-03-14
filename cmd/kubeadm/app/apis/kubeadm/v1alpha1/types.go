@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,12 +26,15 @@ type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	API               API        `json:"api"`
-	Discovery         Discovery  `json:"discovery"`
 	Etcd              Etcd       `json:"etcd"`
 	Networking        Networking `json:"networking"`
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
 	AuthorizationMode string     `json:"authorizationMode"`
+
+	Token    string        `json:"token"`
+	TokenTTL time.Duration `json:"tokenTTL"`
+
 	// SelfHosted enables an alpha deployment type where the apiserver, scheduler, and
 	// controller manager are managed by Kubernetes itself. This option is likely to
 	// become the default in the future.
@@ -38,27 +43,18 @@ type MasterConfiguration struct {
 	APIServerExtraArgs         map[string]string `json:"apiServerExtraArgs"`
 	ControllerManagerExtraArgs map[string]string `json:"controllerManagerExtraArgs"`
 	SchedulerExtraArgs         map[string]string `json:"schedulerExtraArgs"`
+
+	// APIServerCertSANs sets extra Subject Alternative Names for the API Server signing cert
+	APIServerCertSANs []string `json:"apiServerCertSANs"`
+	// CertificatesDir specifies where to store or look for all required certificates
+	CertificatesDir string `json:"certificatesDir"`
 }
 
 type API struct {
-	// The address for the API server to advertise.
-	AdvertiseAddress string   `json:"advertiseAddress"`
-	ExternalDNSNames []string `json:"externalDNSNames"`
-	BindPort         int32    `json:"bindPort"`
-}
-
-type Discovery struct {
-	HTTPS *HTTPSDiscovery `json:"https"`
-	File  *FileDiscovery  `json:"file"`
-	Token *TokenDiscovery `json:"token"`
-}
-
-type HTTPSDiscovery struct {
-	URL string `json:"url"`
-}
-
-type FileDiscovery struct {
-	Path string `json:"path"`
+	// AdvertiseAddress sets the address for the API server to advertise.
+	AdvertiseAddress string `json:"advertiseAddress"`
+	// BindPort sets the secure port for the API Server to bind to
+	BindPort int32 `json:"bindPort"`
 }
 
 type TokenDiscovery struct {
@@ -89,12 +85,4 @@ type NodeConfiguration struct {
 	DiscoveryTokenAPIServers []string `json:"discoveryTokenAPIServers"`
 	TLSBootstrapToken        string   `json:"tlsBootstrapToken"`
 	Token                    string   `json:"token"`
-}
-
-// ClusterInfo TODO add description
-type ClusterInfo struct {
-	metav1.TypeMeta `json:",inline"`
-	// TODO(phase1+) this may become simply `api.Config`
-	CertificateAuthorities []string `json:"certificateAuthorities"`
-	Endpoints              []string `json:"endpoints"`
 }

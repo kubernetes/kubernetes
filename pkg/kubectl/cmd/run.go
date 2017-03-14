@@ -33,8 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/api"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -196,38 +198,55 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		return err
 	}
 
+	clientset, err := f.ClientSet()
+	if err != nil {
+		return err
+	}
+	resourcesList, err := clientset.Discovery().ServerResources()
+	// ServerResources ignores errors for old servers do not expose discovery
+	if err != nil {
+		return fmt.Errorf("failed to discover supported resources: %v", err)
+	}
+
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	schedule := cmdutil.GetFlagString(cmd, "schedule")
 	if len(schedule) != 0 && len(generatorName) == 0 {
-		generatorName = "cronjob/v2alpha1"
+		generatorName = cmdutil.CronJobV2Alpha1GeneratorName
 	}
 	if len(generatorName) == 0 {
-		clientset, err := f.ClientSet()
-		if err != nil {
-			return err
-		}
-		resourcesList, err := clientset.Discovery().ServerResources()
-		// ServerResources ignores errors for old servers do not expose discovery
-		if err != nil {
-			return fmt.Errorf("failed to discover supported resources: %v", err)
-		}
 		switch restartPolicy {
 		case api.RestartPolicyAlways:
-			if contains(resourcesList, v1beta1.SchemeGroupVersion.WithResource("deployments")) {
-				generatorName = "deployment/v1beta1"
+			// TODO: we need to deprecate this along with extensions/v1beta1.Deployments
+			// in favor of the new generator for apps/v1beta1.Deployments
+			if contains(resourcesList, extensionsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+				generatorName = cmdutil.DeploymentV1Beta1GeneratorName
 			} else {
-				generatorName = "run/v1"
+				generatorName = cmdutil.RunV1GeneratorName
 			}
 		case api.RestartPolicyOnFailure:
 			if contains(resourcesList, batchv1.SchemeGroupVersion.WithResource("jobs")) {
-				generatorName = "job/v1"
+				generatorName = cmdutil.JobV1GeneratorName
 			} else {
-				generatorName = "run-pod/v1"
+				generatorName = cmdutil.RunPodV1GeneratorName
 			}
 		case api.RestartPolicyNever:
-			generatorName = "run-pod/v1"
+			generatorName = cmdutil.RunPodV1GeneratorName
 		}
 	}
+
+	// TODO: this should be removed alongside with extensions/v1beta1 depployments generator
+	if generatorName == cmdutil.DeploymentAppsV1Beta1GeneratorName &&
+		!contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+		fmt.Fprintf(cmdErr, "WARNING: New deployments generator specified (%s), but apps/v1beta1.Deployments are not available, falling back to the old one (%s).\n",
+			cmdutil.DeploymentAppsV1Beta1GeneratorName, cmdutil.DeploymentV1Beta1GeneratorName)
+		generatorName = cmdutil.DeploymentV1Beta1GeneratorName
+	}
+
+	if generatorName == cmdutil.CronJobV2Alpha1GeneratorName &&
+		!contains(resourcesList, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs")) {
+		return fmt.Errorf("CronJob generator specified, but batch/v2alpha1.CronJobs are not available")
+	}
+
 	generators := f.Generators("run")
 	generator, found := generators[generatorName]
 	if !found {

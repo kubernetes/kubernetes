@@ -522,6 +522,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Creater:         a.group.Creater,
 		Convertor:       a.group.Convertor,
 		Copier:          a.group.Copier,
+		Defaulter:       a.group.Defaulter,
 		Typer:           a.group.Typer,
 		UnsafeConvertor: a.group.UnsafeConvertor,
 

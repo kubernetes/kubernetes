@@ -1,4 +1,5 @@
 cluster/addons/fluentd-elasticsearch/es-image
+cluster/gce/gci/mounter
 cluster/images/etcd/attachlease
 cluster/images/etcd/rollback
 cmd/clicheck
@@ -14,10 +15,10 @@ cmd/kube-apiserver/app
 cmd/kube-apiserver/app/options
 cmd/kube-controller-manager
 cmd/kube-controller-manager/app/options
-cmd/kube-discovery
 cmd/kube-proxy
 cmd/kubeadm
 cmd/kubeadm/app/apis/kubeadm/install
+cmd/kubeadm/app/discovery/https
 cmd/kubeadm/app/phases/apiconfig
 cmd/kubeadm/app/phases/certs
 cmd/kubeadm/app/phases/kubeconfig
@@ -262,6 +263,7 @@ pkg/volume/util/nestedpendingoperations
 pkg/volume/util/operationexecutor
 pkg/volume/util/types
 pkg/volume/util/volumehelper
+pkg/volume/validation
 pkg/watch
 pkg/watch/json
 pkg/watch/versioned
@@ -384,6 +386,7 @@ staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1alpha1
 staging/src/k8s.io/sample-apiserver
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/install
 test/e2e/perftype
+test/e2e_federation/upgrades
 test/e2e_node/runner/local
 test/images/clusterapi-tester
 test/images/entrypoint-tester

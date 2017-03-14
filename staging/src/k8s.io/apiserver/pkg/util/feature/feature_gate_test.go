@@ -119,9 +119,11 @@ func TestFeatureGateFlag(t *testing.T) {
 	}
 	for i, test := range tests {
 		fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
-		f := DefaultFeatureGate
-		f.known[testAlphaGate] = FeatureSpec{Default: false, PreRelease: Alpha}
-		f.known[testBetaGate] = FeatureSpec{Default: false, PreRelease: Beta}
+		f := NewFeatureGate()
+		f.Add(map[Feature]FeatureSpec{
+			testAlphaGate: {Default: false, PreRelease: Alpha},
+			testBetaGate:  {Default: false, PreRelease: Beta},
+		})
 		f.AddFlag(fs)
 
 		err := fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, test.arg)})
@@ -140,15 +142,45 @@ func TestFeatureGateFlag(t *testing.T) {
 	}
 }
 
+func TestFeatureGateOverride(t *testing.T) {
+	const testAlphaGate Feature = "TestAlpha"
+	const testBetaGate Feature = "TestBeta"
+
+	// Don't parse the flag, assert defaults are used.
+	var f FeatureGate = NewFeatureGate()
+	f.Add(map[Feature]FeatureSpec{
+		testAlphaGate: {Default: false, PreRelease: Alpha},
+		testBetaGate:  {Default: false, PreRelease: Beta},
+	})
+
+	f.Set("TestAlpha=true,TestBeta=true")
+	if f.Enabled(testAlphaGate) != true {
+		t.Errorf("Expected true")
+	}
+	if f.Enabled(testBetaGate) != true {
+		t.Errorf("Expected true")
+	}
+
+	f.Set("TestAlpha=false")
+	if f.Enabled(testAlphaGate) != false {
+		t.Errorf("Expected false")
+	}
+	if f.Enabled(testBetaGate) != true {
+		t.Errorf("Expected true")
+	}
+}
+
 func TestFeatureGateFlagDefaults(t *testing.T) {
 	// gates for testing
 	const testAlphaGate Feature = "TestAlpha"
 	const testBetaGate Feature = "TestBeta"
 
 	// Don't parse the flag, assert defaults are used.
-	f := DefaultFeatureGate
-	f.known[testAlphaGate] = FeatureSpec{Default: false, PreRelease: Alpha}
-	f.known[testBetaGate] = FeatureSpec{Default: true, PreRelease: Beta}
+	var f FeatureGate = NewFeatureGate()
+	f.Add(map[Feature]FeatureSpec{
+		testAlphaGate: {Default: false, PreRelease: Alpha},
+		testBetaGate:  {Default: true, PreRelease: Beta},
+	})
 
 	if f.Enabled(testAlphaGate) != false {
 		t.Errorf("Expected false")

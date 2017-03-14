@@ -30,7 +30,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/keystone"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
 	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
@@ -207,7 +206,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 
 	authenticator := union.New(authenticators...)
 
-	authenticator = group.NewGroupAdder(authenticator, []string{user.AllAuthenticated})
+	authenticator = group.NewAuthenticatedGroupAdder(authenticator)
 
 	if config.Anonymous {
 		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token anonymous).

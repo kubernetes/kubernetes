@@ -38,7 +38,6 @@ import (
 
 	"net/url"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -323,6 +322,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 	reporter := &system.StreamReporter{WriteStream: bufw}
 
 	var errs []error
+	var warns []error
 	// All the validators we'd like to run:
 	var validators = []system.Validator{
 		&system.OSValidator{Reporter: reporter},
@@ -333,17 +333,22 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 
 	// Run all validators
 	for _, v := range validators {
-		errs = append(errs, v.Validate(system.DefaultSysSpec))
+		warn, err := v.Validate(system.DefaultSysSpec)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if warn != nil {
+			warns = append(warns, warn)
+		}
 	}
 
-	err := utilerrors.NewAggregate(errs)
-	if err != nil {
+	if len(errs) != 0 {
 		// Only print the output from the system verification check if the check failed
 		fmt.Println("[preflight] The system verification failed. Printing the output from the verification:")
 		bufw.Flush()
-		return nil, []error{err}
+		return warns, errs
 	}
-	return nil, nil
+	return warns, nil
 }
 
 type etcdVersionResponse struct {
@@ -540,7 +545,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
-		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)},
+		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		InPathCheck{executable: "ip", mandatory: true},
@@ -572,7 +577,7 @@ func RunChecks(checks []Checker, ww io.Writer) error {
 	for _, c := range checks {
 		warnings, errs := c.Check()
 		for _, w := range warnings {
-			io.WriteString(ww, fmt.Sprintf("[preflight] WARNING: %s\n", w))
+			io.WriteString(ww, fmt.Sprintf("[preflight] WARNING: %v\n", w))
 		}
 		found = append(found, errs...)
 	}

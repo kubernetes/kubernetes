@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"runtime"
 	"strings"
 )
 
@@ -32,11 +31,9 @@ func SetEnvParams() *EnvParams {
 
 	envParams := map[string]string{
 		"kubernetes_dir":  "/etc/kubernetes",
-		"host_pki_path":   "/etc/kubernetes/pki",
 		"host_etcd_path":  "/var/lib/etcd",
 		"hyperkube_image": "",
 		"repo_prefix":     "gcr.io/google_containers",
-		"discovery_image": fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
 		"etcd_image":      "",
 	}
 
@@ -48,11 +45,9 @@ func SetEnvParams() *EnvParams {
 
 	return &EnvParams{
 		KubernetesDir:    path.Clean(envParams["kubernetes_dir"]),
-		HostPKIPath:      path.Clean(envParams["host_pki_path"]),
 		HostEtcdPath:     path.Clean(envParams["host_etcd_path"]),
 		HyperkubeImage:   envParams["hyperkube_image"],
 		RepositoryPrefix: envParams["repo_prefix"],
-		DiscoveryImage:   envParams["discovery_image"],
 		EtcdImage:        envParams["etcd_image"],
 	}
 }

@@ -54,8 +54,8 @@ type podPresetPlugin struct {
 	lister settingslisters.PodPresetLister
 }
 
-var _ = kubeapiserveradmission.WantsInformerFactory(&podPresetPlugin{})
-var _ = kubeapiserveradmission.WantsInternalClientSet(&podPresetPlugin{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&podPresetPlugin{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&podPresetPlugin{})
 
 // NewPlugin creates a new pod preset admission plugin.
 func NewPlugin() *podPresetPlugin {
@@ -74,11 +74,11 @@ func (plugin *podPresetPlugin) Validate() error {
 	return nil
 }
 
-func (a *podPresetPlugin) SetInternalClientSet(client internalclientset.Interface) {
+func (a *podPresetPlugin) SetInternalKubeClientSet(client internalclientset.Interface) {
 	a.client = client
 }
 
-func (a *podPresetPlugin) SetInformerFactory(f informers.SharedInformerFactory) {
+func (a *podPresetPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	podPresetInformer := f.Settings().InternalVersion().PodPresets()
 	a.lister = podPresetInformer.Lister()
 	a.SetReadyFunc(podPresetInformer.Informer().HasSynced)

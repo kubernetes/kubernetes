@@ -231,7 +231,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		AfterEach(func() {
 			for _, pod := range test.testPods {
 				By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				f.PodClient().DeleteSync(pod.podName, &metav1.DeleteOptions{}, defaultRuntimeRequestTimeoutDuration)
+				f.PodClient().DeleteSync(pod.podName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			}
 
 			By("Making sure all containers get cleaned up")

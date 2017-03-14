@@ -79,6 +79,9 @@ function init() {
   local -r kube_registry="${KUBE_REGISTRY:-gcr.io/${project}}"
   local -r kube_version="$(get_version)"
 
+  kube::log::status "DNS_ZONE_NAME: \"${DNS_ZONE_NAME}\", DNS_PROVIDER: \"${DNS_PROVIDER}\""
+  kube::log::status "Image: \"${kube_registry}/hyperkube-amd64:${kube_version}\""
+
   "${KUBE_ROOT}/federation/develop/kubefed.sh" init \
       "${FEDERATION_NAME}" \
       --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
@@ -101,18 +104,6 @@ function join_clusters() {
         --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
         --context="${FEDERATION_NAME}" \
         --secret-name="${context//_/-}"    # Replace "_" by "-"
-
-    # Create kube-dns configmap in each cluster for kube-dns to accept
-    # federation queries.
-    # TODO: This shouldn't be required after
-    # https://github.com/kubernetes/kubernetes/pull/39338.
-    # Remove this after the PR is merged.
-    kube::log::status "Creating \"kube-dns\" ConfigMap in \"kube-system\" namespace in cluster \"${context}\""
-    "${KUBE_ROOT}/cluster/kubectl.sh" create configmap \
-        --context="${context}" \
-        --namespace="${KUBEDNS_CONFIGMAP_NAMESPACE}" \
-        "${KUBEDNS_CONFIGMAP_NAME}" \
-        --from-literal="${KUBEDNS_FEDERATION_FLAG}"="${FEDERATIONS_DOMAIN_MAP}"
   done
 }
 

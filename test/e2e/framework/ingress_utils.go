@@ -84,7 +84,7 @@ const (
 	// Cloud resources created by the ingress controller older than this
 	// are automatically purged to prevent running out of quota.
 	// TODO(37335): write soak tests and bump this up to a week.
-	maxAge = -48 * time.Hour
+	maxAge = 48 * time.Hour
 
 	// IngressManifestPath is the parent path to yaml test manifests.
 	IngressManifestPath = "test/e2e/testing-manifests/ingress"
@@ -335,17 +335,26 @@ func createIngressTLSSecret(kubeClient clientset.Interface, ing *extensions.Ingr
 func CleanupGCEIngressController(gceController *GCEIngressController) {
 	pollErr := wait.Poll(5*time.Second, LoadBalancerCleanupTimeout, func() (bool, error) {
 		if err := gceController.Cleanup(false); err != nil {
-			Logf("Still waiting for glbc to cleanup:\n%v", err)
+			Logf("Monitoring glbc's cleanup of gce resources:\n%v", err)
 			return false, nil
 		}
 		return true, nil
 	})
 
+	// Always try to cleanup even if pollErr == nil, because the cleanup
+	// routine also purges old leaked resources based on creation timestamp.
+	By("Performing final delete of any remaining resources")
+	if cleanupErr := gceController.Cleanup(true); cleanupErr != nil {
+		By(fmt.Sprintf("WARNING: possibly leaked resources: %v\n", cleanupErr))
+	} else {
+		By("No resources leaked.")
+	}
+
 	// Static-IP allocated on behalf of the test, never deleted by the
 	// controller. Delete this IP only after the controller has had a chance
 	// to cleanup or it might interfere with the controller, causing it to
 	// throw out confusing events.
-	if ipErr := wait.Poll(5*time.Second, LoadBalancerCleanupTimeout, func() (bool, error) {
+	if ipErr := wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
 		if err := gceController.deleteStaticIPs(); err != nil {
 			Logf("Failed to delete static-ip: %v\n", err)
 			return false, nil
@@ -355,14 +364,6 @@ func CleanupGCEIngressController(gceController *GCEIngressController) {
 		// If this is a persistent error, the suite will fail when we run out
 		// of quota anyway.
 		By(fmt.Sprintf("WARNING: possibly leaked static IP: %v\n", ipErr))
-	}
-
-	// Always try to cleanup even if pollErr == nil, because the cleanup
-	// routine also purges old leaked resources based on creation timestamp.
-	if cleanupErr := gceController.Cleanup(true); cleanupErr != nil {
-		By(fmt.Sprintf("WARNING: possibly leaked resources: %v\n", cleanupErr))
-	} else {
-		By("No resources leaked.")
 	}
 
 	// Fail if the controller didn't cleanup
@@ -383,9 +384,10 @@ func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
 			if !cont.canDelete(f.Name, f.CreationTimestamp, del) {
 				continue
 			}
-			msg += fmt.Sprintf("%v (forwarding rule)\n", f.Name)
 			if del {
 				GcloudComputeResourceDelete("forwarding-rules", f.Name, cont.Cloud.ProjectID, "--global")
+			} else {
+				msg += fmt.Sprintf("%v (forwarding rule)\n", f.Name)
 			}
 		}
 	}
@@ -402,9 +404,10 @@ func (cont *GCEIngressController) deleteAddresses(del bool) string {
 			if !cont.canDelete(ip.Name, ip.CreationTimestamp, del) {
 				continue
 			}
-			msg += fmt.Sprintf("%v (static-ip)\n", ip.Name)
 			if del {
 				GcloudComputeResourceDelete("addresses", ip.Name, cont.Cloud.ProjectID, "--global")
+			} else {
+				msg += fmt.Sprintf("%v (static-ip)\n", ip.Name)
 			}
 		}
 	}
@@ -421,9 +424,10 @@ func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
 			if !cont.canDelete(t.Name, t.CreationTimestamp, del) {
 				continue
 			}
-			msg += fmt.Sprintf("%v (target-http-proxy)\n", t.Name)
 			if del {
 				GcloudComputeResourceDelete("target-http-proxies", t.Name, cont.Cloud.ProjectID)
+			} else {
+				msg += fmt.Sprintf("%v (target-http-proxy)\n", t.Name)
 			}
 		}
 	}
@@ -435,9 +439,10 @@ func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
 			if !cont.canDelete(t.Name, t.CreationTimestamp, del) {
 				continue
 			}
-			msg += fmt.Sprintf("%v (target-https-proxy)\n", t.Name)
 			if del {
 				GcloudComputeResourceDelete("target-https-proxies", t.Name, cont.Cloud.ProjectID)
+			} else {
+				msg += fmt.Sprintf("%v (target-https-proxy)\n", t.Name)
 			}
 		}
 	}
@@ -460,12 +465,14 @@ func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 		if !cont.canDelete(um.Name, um.CreationTimestamp, del) {
 			continue
 		}
-		msg += fmt.Sprintf("%v (url-map)\n", um.Name)
 		if del {
+			Logf("Deleting url-map: %s", um.Name)
 			if err := gceCloud.DeleteUrlMap(um.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete url map %v\n", um.Name)
 			}
+		} else {
+			msg += fmt.Sprintf("%v (url-map)\n", um.Name)
 		}
 	}
 	return msg
@@ -488,12 +495,14 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 		if !cont.canDelete(be.Name, be.CreationTimestamp, del) {
 			continue
 		}
-		msg += fmt.Sprintf("%v (backend-service)\n", be.Name)
 		if del {
+			Logf("Deleting backed-service: %s", be.Name)
 			if err := gceCloud.DeleteBackendService(be.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
-				msg += fmt.Sprintf("Failed to delete backend service %v\n", be.Name)
+				msg += fmt.Sprintf("Failed to delete backend service %v: %v\n", be.Name, err)
 			}
+		} else {
+			msg += fmt.Sprintf("%v (backend-service)\n", be.Name)
 		}
 	}
 	return msg
@@ -515,12 +524,14 @@ func (cont *GCEIngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 		if !cont.canDelete(hc.Name, hc.CreationTimestamp, del) {
 			continue
 		}
-		msg += fmt.Sprintf("%v (http-health-check)\n", hc.Name)
 		if del {
+			Logf("Deleting http-health-check: %s", hc.Name)
 			if err := gceCloud.DeleteHttpHealthCheck(hc.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete HTTP health check %v\n", hc.Name)
 			}
+		} else {
+			msg += fmt.Sprintf("%v (http-health-check)\n", hc.Name)
 		}
 	}
 	return msg
@@ -540,12 +551,14 @@ func (cont *GCEIngressController) deleteSSLCertificate(del bool) (msg string) {
 			if !cont.canDelete(s.Name, s.CreationTimestamp, del) {
 				continue
 			}
-			msg += fmt.Sprintf("%v (ssl-certificate)\n", s.Name)
 			if del {
+				Logf("Deleting ssl-certificate: %s", s.Name)
 				if err := gceCloud.DeleteSslCertificate(s.Name); err != nil &&
 					!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 					msg += fmt.Sprintf("Failed to delete ssl certificates: %v\n", s.Name)
 				}
+			} else {
+				msg += fmt.Sprintf("%v (ssl-certificate)\n", s.Name)
 			}
 		}
 	}
@@ -570,12 +583,14 @@ func (cont *GCEIngressController) deleteInstanceGroup(del bool) (msg string) {
 		if !cont.canDelete(ig.Name, ig.CreationTimestamp, del) {
 			continue
 		}
-		msg += fmt.Sprintf("%v (instance-group)\n", ig.Name)
 		if del {
+			Logf("Deleting instance-group: %s", ig.Name)
 			if err := gceCloud.DeleteInstanceGroup(ig.Name, cont.Cloud.Zone); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete instance group %v\n", ig.Name)
 			}
+		} else {
+			msg += fmt.Sprintf("%v (instance-group)\n", ig.Name)
 		}
 	}
 	return msg
@@ -587,11 +602,21 @@ func (cont *GCEIngressController) deleteInstanceGroup(del bool) (msg string) {
 // Ingress cloud resources.
 func (cont *GCEIngressController) canDelete(resourceName, creationTimestamp string, delOldResources bool) bool {
 	// ignore everything not created by an ingress controller.
-	if !strings.HasPrefix(resourceName, k8sPrefix) || len(strings.Split(resourceName, clusterDelimiter)) != 2 {
+	splitName := strings.Split(resourceName, clusterDelimiter)
+	if !strings.HasPrefix(resourceName, k8sPrefix) || len(splitName) != 2 {
 		return false
 	}
+
+	// Resources created by the GLBC have a "0"" appended to the end if truncation
+	// occurred. Removing the zero allows the following match.
+	truncatedClusterUID := splitName[1]
+	if len(truncatedClusterUID) >= 1 && strings.HasSuffix(truncatedClusterUID, "0") {
+		truncatedClusterUID = truncatedClusterUID[:len(truncatedClusterUID)-1]
+	}
+
 	// always delete things that are created by the current ingress controller.
-	if strings.HasSuffix(resourceName, cont.UID) {
+	// Because of resource name truncation, this looks for a common prefix
+	if strings.HasPrefix(cont.UID, truncatedClusterUID) {
 		return true
 	}
 	if !delOldResources {
@@ -602,7 +627,7 @@ func (cont *GCEIngressController) canDelete(resourceName, creationTimestamp stri
 		Logf("WARNING: Failed to parse creation timestamp %v for %v: %v", creationTimestamp, resourceName, err)
 		return false
 	}
-	if createdTime.Before(time.Now().Add(maxAge)) {
+	if time.Since(createdTime) > maxAge {
 		Logf("%v created on %v IS too old", resourceName, creationTimestamp)
 		return true
 	}
@@ -632,9 +657,10 @@ func (cont *GCEIngressController) deleteFirewallRule(del bool) (msg string) {
 			if !cont.canDelete(f.Name, f.CreationTimestamp, del) {
 				continue
 			}
-			msg += fmt.Sprintf("%v (firewall rule)\n", f.Name)
 			if del {
 				GcloudComputeResourceDelete("firewall-rules", f.Name, cont.Cloud.ProjectID)
+			} else {
+				msg += fmt.Sprintf("%v (firewall rule)\n", f.Name)
 			}
 		}
 	}
@@ -648,8 +674,7 @@ func (cont *GCEIngressController) isHTTPErrorCode(err error, code int) bool {
 
 // Cleanup cleans up cloud resources.
 // If del is false, it simply reports existing resources without deleting them.
-// It always deletes resources created through it's methods, like staticIP, even
-// if del is false.
+// If dle is true, it deletes resources it finds acceptable (see canDelete func).
 func (cont *GCEIngressController) Cleanup(del bool) error {
 	// Ordering is important here because we cannot delete resources that other
 	// resources hold references to.
@@ -737,7 +762,7 @@ func gcloudComputeResourceList(resource, regex, project string, out interface{})
 	// so we only look at stdout.
 	command := []string{
 		"compute", resource, "list",
-		fmt.Sprintf("--regexp=%v", regex),
+		fmt.Sprintf("--regexp=%q", regex),
 		fmt.Sprintf("--project=%v", project),
 		"-q", "--format=json",
 	}

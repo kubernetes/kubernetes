@@ -1052,7 +1052,7 @@ function generate-certs {
 # $1 master env (kube-env of master; result of calling get-master-env)
 # $2 env key to use
 function get-env-val() {
-  local match=`(echo "${1}" | grep ${2}) || echo ""`
+  local match=`(echo "${1}" | grep -E "^${2}:") || echo ""`
   if [[ -z ${match} ]]; then
     echo ""
   fi

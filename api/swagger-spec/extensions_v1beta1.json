@@ -6846,7 +6846,7 @@
       "$ref": "v1.Affinity",
       "description": "If specified, the pod's scheduling constraints"
      },
-     "schedulername": {
+     "schedulerName": {
       "type": "string",
       "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler."
      },
@@ -6969,6 +6969,10 @@
      "portworxVolume": {
       "$ref": "v1.PortworxVolumeSource",
       "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine"
+     },
+     "scaleIO": {
+      "$ref": "v1.ScaleIOVolumeSource",
+      "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
      }
     }
    },
@@ -7757,6 +7761,57 @@
      }
     }
    },
+   "v1.ScaleIOVolumeSource": {
+    "id": "v1.ScaleIOVolumeSource",
+    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+    "required": [
+     "gateway",
+     "system",
+     "secretRef"
+    ],
+    "properties": {
+     "gateway": {
+      "type": "string",
+      "description": "The host address of the ScaleIO API Gateway."
+     },
+     "system": {
+      "type": "string",
+      "description": "The name of the storage system as configured in ScaleIO."
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail."
+     },
+     "sslEnabled": {
+      "type": "boolean",
+      "description": "Flag to enable/disable SSL communication with Gateway, default false"
+     },
+     "protectionDomain": {
+      "type": "string",
+      "description": "The name of the Protection Domain for the configured storage (defaults to \"default\")."
+     },
+     "storagePool": {
+      "type": "string",
+      "description": "The Storage Pool associated with the protection domain (defaults to \"default\")."
+     },
+     "storageMode": {
+      "type": "string",
+      "description": "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\")."
+     },
+     "volumeName": {
+      "type": "string",
+      "description": "The name of a volume already created in the ScaleIO system that is associated with this volume source."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
    "v1.Container": {
     "id": "v1.Container",
     "description": "A single application container that you want to run within a pod.",
@@ -7802,7 +7857,7 @@
       "items": {
        "$ref": "v1.EnvFromSource"
       },
-      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. An invalid key will prevent the container from starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated."
+      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated."
      },
      "env": {
       "type": "array",

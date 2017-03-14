@@ -147,9 +147,31 @@ def update_kubelet_status():
         hookenv.status_set('waiting', 'Waiting for kubelet to start.')
 
 
+@when('certificates.available')
+def send_data(tls):
+    '''Send the data that is required to create a server certificate for
+    this server.'''
+    # Use the public ip of this unit as the Common Name for the certificate.
+    common_name = hookenv.unit_public_ip()
+
+    # Create SANs that the tls layer will add to the server cert.
+    sans = [
+        hookenv.unit_public_ip(),
+        hookenv.unit_private_ip(),
+        gethostname()
+    ]
+
+    # Create a path safe name by removing path characters from the unit name.
+    certificate_name = hookenv.local_unit().replace('/', '_')
+
+    # Request a server cert with this information.
+    tls.request_server_cert(common_name, sans, certificate_name)
+
+
 @when('kubernetes-worker.components.installed', 'kube-api-endpoint.available',
       'tls_client.ca.saved', 'tls_client.client.certificate.saved',
-      'tls_client.client.key.saved', 'kube-dns.available', 'cni.available')
+      'tls_client.client.key.saved', 'tls_client.server.certificate.saved',
+      'tls_client.server.key.saved', 'kube-dns.available', 'cni.available')
 def start_worker(kube_api, kube_dns, cni):
     ''' Start kubelet using the provided API and DNS info.'''
     servers = get_kube_api_servers(kube_api)
@@ -302,39 +324,37 @@ def render_init_scripts(api_servers):
     context = {}
     context.update(hookenv.config())
 
-    # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
-    context['ca_cert_path'] = layer_options.get('ca_certificate_path')
-    context['client_cert_path'] = layer_options.get('client_certificate_path')
-    context['client_key_path'] = layer_options.get('client_key_path')
+    ca_cert_path = layer_options.get('ca_certificate_path')
+    server_cert_path = layer_options.get('server_certificate_path')
+    server_key_path = layer_options.get('server_key_path')
 
     unit_name = os.getenv('JUJU_UNIT_NAME').replace('/', '-')
     context.update({'kube_api_endpoint': ','.join(api_servers),
                     'JUJU_UNIT_NAME': unit_name})
 
-    # Create a flag manager for kubelet to render kubelet_opts.
     kubelet_opts = FlagManager('kubelet')
-    # Declare to kubelet it needs to read from kubeconfig
     kubelet_opts.add('--require-kubeconfig', None)
     kubelet_opts.add('--kubeconfig', kubeconfig_path)
     kubelet_opts.add('--network-plugin', 'cni')
+    kubelet_opts.add('--anonymous-auth', 'false')
+    kubelet_opts.add('--client-ca-file', ca_cert_path)
+    kubelet_opts.add('--tls-cert-file', server_cert_path)
+    kubelet_opts.add('--tls-private-key-file', server_key_path)
     context['kubelet_opts'] = kubelet_opts.to_s()
-    # Create a flag manager for kube-proxy to render kube_proxy_opts.
+
     kube_proxy_opts = FlagManager('kube-proxy')
     kube_proxy_opts.add('--kubeconfig', kubeconfig_path)
     context['kube_proxy_opts'] = kube_proxy_opts.to_s()
 
     os.makedirs('/var/lib/kubelet', exist_ok=True)
-    # Set the user when rendering config
-    context['user'] = 'kubelet'
-    # Set the user when rendering config
-    context['user'] = 'kube-proxy'
+
     render('kube-default', '/etc/default/kube-default', context)
     render('kubelet.defaults', '/etc/default/kubelet', context)
+    render('kubelet.service', '/lib/systemd/system/kubelet.service', context)
     render('kube-proxy.defaults', '/etc/default/kube-proxy', context)
     render('kube-proxy.service', '/lib/systemd/system/kube-proxy.service',
            context)
-    render('kubelet.service', '/lib/systemd/system/kubelet.service', context)
 
 
 def create_kubeconfig(kubeconfig, server, ca, key, certificate, user='ubuntu',

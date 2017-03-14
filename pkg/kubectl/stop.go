@@ -420,7 +420,6 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	deployments := reaper.dClient.Deployments(namespace)
-	replicaSets := reaper.rsClient.ReplicaSets(namespace)
 	rsReaper := &ReplicaSetReaper{reaper.rsClient, reaper.pollInterval, reaper.timeout}
 
 	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
@@ -441,25 +440,26 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 		return err
 	}
 
-	// Do not cascade deletion for overlapping deployments.
-	if len(deployment.Annotations[deploymentutil.OverlapAnnotation]) > 0 {
-		return deployments.Delete(name, nil)
-	}
-
-	// Stop all replica sets.
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	// Stop all replica sets belonging to this Deployment.
+	rss, err := deploymentutil.ListReplicaSetsInternal(deployment,
+		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
+			rsList, err := reaper.rsClient.ReplicaSets(namespace).List(options)
+			if err != nil {
+				return nil, err
+			}
+			rss := make([]*extensions.ReplicaSet, 0, len(rsList.Items))
+			for i := range rsList.Items {
+				rss = append(rss, &rsList.Items[i])
+			}
+			return rss, nil
+		})
 	if err != nil {
 		return err
 	}
 
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	rsList, err := replicaSets.List(options)
-	if err != nil {
-		return err
-	}
 	errList := []error{}
-	for _, rc := range rsList.Items {
-		if err := rsReaper.Stop(rc.Namespace, rc.Name, timeout, gracePeriod); err != nil {
+	for _, rs := range rss {
+		if err := rsReaper.Stop(rs.Namespace, rs.Name, timeout, gracePeriod); err != nil {
 			scaleGetErr, ok := err.(ScaleError)
 			if errors.IsNotFound(err) || (ok && errors.IsNotFound(scaleGetErr.ActualError)) {
 				continue

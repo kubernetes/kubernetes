@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -78,6 +79,11 @@ const (
 	updateTimeout         = 30 * time.Second
 	allClustersKey        = "ALL_CLUSTERS"
 	clusterAvailableDelay = time.Second * 20
+	ControllerName        = "services"
+)
+
+var (
+	RequiredResources = []schema.GroupVersionResource{v1.SchemeGroupVersion.WithResource("services")}
 )
 
 type cachedService struct {
@@ -397,10 +403,12 @@ func (s *ServiceController) Run(workers int, stopCh <-chan struct{}) error {
 	go wait.Until(s.clusterEndpointWorker, time.Second, stopCh)
 	go wait.Until(s.clusterServiceWorker, time.Second, stopCh)
 	go wait.Until(s.clusterSyncLoop, time.Second, stopCh)
-	<-stopCh
-	glog.Infof("Shutting down Federation Service Controller")
-	s.queue.ShutDown()
-	s.federatedInformer.Stop()
+	go func() {
+		<-stopCh
+		glog.Infof("Shutting down Federation Service Controller")
+		s.queue.ShutDown()
+		s.federatedInformer.Stop()
+	}()
 	return nil
 }
 

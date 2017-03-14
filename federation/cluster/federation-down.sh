@@ -24,26 +24,33 @@ KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 # $KUBEDNS_CONFIGMAP_NAME and $KUBEDNS_CONFIGMAP_NAMESPACE.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
+# federation_clusters returns a list of all the clusters in
+# federation, if at all the federation control plane exists
+# and there are any clusters registerd.
+function federation_clusters() {
+  if clusters=$("${KUBE_ROOT}/cluster/kubectl.sh" \
+      --context="${FEDERATION_KUBE_CONTEXT}" \
+      -o jsonpath --template '{.items[*].metadata.name}' \
+      get clusters) ; then
+    echo ${clusters}
+    return
+  fi
+  echo ""
+}
+
 # unjoin_clusters unjoins all the clusters from federation.
 function unjoin_clusters() {
-  for context in $(federation_cluster_contexts); do
+  # Unjoin only those clusters that are registered with the
+  # given federation. This is slightly different than
+  # joining clusters where we join all the clusters in the
+  # current kubeconfig with the "federation" prefix.
+  for context in $(federation_clusters); do
     kube::log::status "Unjoining cluster \"${context}\" from federation \"${FEDERATION_NAME}\""
 
     "${KUBE_ROOT}/federation/develop/kubefed.sh" unjoin \
         "${context}" \
         --context="${FEDERATION_KUBE_CONTEXT}" \
         --host-cluster-context="${HOST_CLUSTER_CONTEXT}"
-
-    # Delete kube-dns configmap that contains federation
-    # configuration from each cluster.
-    # TODO: This shouldn't be required after
-    # https://github.com/kubernetes/kubernetes/pull/39338.
-    # Remove this after the PR is merged.
-    kube::log::status "Deleting \"kube-dns\" ConfigMap from \"kube-system\" namespace in cluster \"${context}\""
-    "${KUBE_ROOT}/cluster/kubectl.sh" delete configmap \
-        --context="${context}" \
-        --namespace="${KUBEDNS_CONFIGMAP_NAMESPACE}" \
-        "${KUBEDNS_CONFIGMAP_NAME}"
   done
 }
 
@@ -59,6 +66,7 @@ if cleanup-federation-api-objects; then
   # cloud provider cleanups are implemented in the individual test
   # `AfterEach` blocks.
   # Also, we wait only if the cleanup succeeds.
+  kube::log::status "Waiting for 2 minutes to allow controllers to clean up federation components..."
   sleep 2m
 else
   echo "Couldn't cleanup federation api objects"

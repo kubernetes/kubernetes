@@ -64,6 +64,8 @@ type ControllerManagerConfiguration struct {
 	APIServerBurst int `json:"federatedAPIBurst"`
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling bool `json:"enableProfiling"`
+	// enableContentionProfiling enables lock contention profiling, if enableProfiling is true.
+	EnableContentionProfiling bool `json:"enableContentionProfiling"`
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection componentconfig.LeaderElectionConfiguration `json:"leaderElection"`
 	// contentType is contentType of requests sent to apiserver.
@@ -115,6 +117,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.ConcurrentReplicaSetSyncs, "concurrent-replicaset-syncs", s.ConcurrentReplicaSetSyncs, "The number of ReplicaSets syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.DurationVar(&s.ClusterMonitorPeriod.Duration, "cluster-monitor-period", s.ClusterMonitorPeriod.Duration, "The period for syncing ClusterStatus in ClusterController.")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.BoolVar(&s.EnableContentionProfiling, "contention-profiling", false, "Enable lock contention profiling, if profiling is enabled")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the federation API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&s.ContentType, "kube-api-content-type", s.ContentType, "ContentType of requests sent to apiserver. Passing application/vnd.kubernetes.protobuf is an experimental feature now.")
@@ -123,8 +126,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DnsProvider, "dns-provider", s.DnsProvider, "DNS provider. Valid values are: "+fmt.Sprintf("%q", dnsprovider.RegisteredDnsProviders()))
 	fs.StringVar(&s.DnsConfigFile, "dns-provider-config", s.DnsConfigFile, "Path to config file for configuring DNS provider.")
 	fs.Var(&s.Controllers, "controllers", ""+
-		"A set of key=value pairs that describe controller configuration that may be passed "+
-		"to controller manager to enable/disable specific controllers. Valid options are: \n"+
-		"ingress=true|false (default=true)")
+		"A set of key=value pairs that describe controller configuration "+
+		"to enable/disable specific controllers. Key should be the resource name (like services) and value should be true or false. "+
+		"For example: services=false,ingresses=false")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }

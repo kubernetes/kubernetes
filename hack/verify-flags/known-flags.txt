@@ -20,6 +20,7 @@ apiserver-advertise-address
 apiserver-arg-overrides
 apiserver-arg-overrides
 apiserver-bind-port
+apiserver-cert-extra-sans
 apiserver-count
 apiserver-count
 apiserver-count
@@ -72,6 +73,7 @@ build-only
 build-tag
 ca-cert-path
 cadvisor-port
+cert-altnames
 cert-dir
 certificate-authority
 cgroup-driver
@@ -163,6 +165,7 @@ discovery-file
 discovery-port
 discovery-token
 dns-bind-address
+dns-domain
 dns-port
 dns-provider
 dns-provider-config
@@ -241,6 +244,7 @@ experimental-keystone-url
 experimental-mounter-path
 experimental-nvidia-gpus
 experimental-prefix
+experimental-qos-reserved
 external-etcd-cafile
 external-etcd-certfile
 external-etcd-endpoints
@@ -258,6 +262,7 @@ federated-api-qps
 federated-kube-context
 federation-name
 federation-system-namespace
+federation-upgrade-target
 file-check-frequency
 file_content_in_loop
 file-suffix
@@ -277,6 +282,7 @@ gather-metrics-at-teardown
 gather-resource-usage
 gce-project
 gce-service-account
+gce-upgrade-script
 gce-zone
 ginkgo-flags
 gke-cluster
@@ -659,6 +665,7 @@ tls-cert-file
 tls-private-key-file
 tls-sni-cert-key
 token-auth-file
+token-ttl
 to-version
 to-version
 ttl-keys-prefix
@@ -674,11 +681,9 @@ upgrade-target
 use-kubernetes-cluster-service
 use-kubernetes-version
 use-service-account-credentials
-use-taint-based-evictions
 user-whitelist
 use-service-account-credentials
 use-service-account-credentials
-use-taint-based-evictions
 verb
 verify-only
 versioned-clientset-package

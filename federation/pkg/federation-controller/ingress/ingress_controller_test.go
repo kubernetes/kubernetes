@@ -57,6 +57,7 @@ func TestIngressController(t *testing.T) {
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 	cfg1 := NewConfigMap("foo")
 	cfg2 := NewConfigMap("bar") // Different UID from cfg1, so that we can check that they get reconciled.
+	assert.NotEqual(t, cfg1.Data[uidKey], cfg2.Data[uidKey], fmt.Sprintf("ConfigMap in cluster 2 must initially not equal that in cluster 1 for this test - please fix test"))
 
 	t.Log("Creating fake infrastructure")
 	fedClient := &fakefedclientset.Clientset{}
@@ -74,6 +75,7 @@ func TestIngressController(t *testing.T) {
 	cluster1ConfigMapWatch := RegisterFakeWatch(configmaps, &cluster1Client.Fake)
 	cluster1IngressCreateChan := RegisterFakeCopyOnCreate(ingresses, &cluster1Client.Fake, cluster1IngressWatch)
 	cluster1IngressUpdateChan := RegisterFakeCopyOnUpdate(ingresses, &cluster1Client.Fake, cluster1IngressWatch)
+	cluster1ConfigMapUpdateChan := RegisterFakeCopyOnUpdate(configmaps, &cluster1Client.Fake, cluster1ConfigMapWatch)
 
 	cluster2Client := &fakekubeclientset.Clientset{}
 	RegisterFakeList(ingresses, &cluster2Client.Fake, &extensionsv1beta1.IngressList{Items: []extensionsv1beta1.Ingress{}})
@@ -138,11 +140,24 @@ func TestIngressController(t *testing.T) {
 	assert.NotNil(t, cluster)
 	assert.Equal(t, cluster.ObjectMeta.Annotations[uidAnnotationKey], cfg1.Data[uidKey])
 
+	t.Log("Adding cluster 2")
+	clusterWatch.Add(cluster2)
+	cluster2ConfigMapWatch.Add(cfg2)
+
+	t.Log("Checking that a configmap updates are propagated prior to Federated Ingress")
+	referenceUid := cfg1.Data[uidKey]
+	uid1, providerId1 := GetConfigMapUidAndProviderId(t, cluster1ConfigMapUpdateChan)
+	uid2, providerId2 := GetConfigMapUidAndProviderId(t, cluster2ConfigMapUpdateChan)
+	t.Logf("uid2 = %v and ref = %v", uid2, referenceUid)
+	assert.True(t, referenceUid == uid1, "Expected cluster1 configmap uid %q to be equal to referenceUid %q", uid1, referenceUid)
+	assert.True(t, referenceUid == uid2, "Expected cluster2 configmap uid %q to be equal to referenceUid %q", uid2, referenceUid)
+	assert.True(t, providerId1 != providerId2, "Expected cluster1 providerUid %q to be unique and different from cluster2 providerUid %q", providerId1, providerId2)
+
 	// Test add federated ingress.
 	t.Log("Adding Federated Ingress")
 	fedIngressWatch.Add(&fedIngress)
 
-	t.Logf("Checking that appropriate finalizers are added")
+	t.Log("Checking that appropriate finalizers are added")
 	// There should be an update to add both the finalizers.
 	updatedIngress := GetIngressFromChan(t, fedIngressUpdateChan)
 	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
@@ -243,9 +258,7 @@ func TestIngressController(t *testing.T) {
 	fedIngress.Annotations[staticIPNameKeyWritable] = "foo" // Make sure that the base object has a static IP name first.
 	fedIngressWatch.Modify(&fedIngress)
 	clusterWatch.Add(cluster2)
-	// First check that the original values are not equal - see above comment
-	assert.NotEqual(t, cfg1.Data[uidKey], cfg2.Data[uidKey], fmt.Sprintf("ConfigMap in cluster 2 must initially not equal that in cluster 1 for this test - please fix test"))
-	cluster2ConfigMapWatch.Add(cfg2)
+
 	t.Log("Checking that the ingress got created in cluster 2")
 	createdIngress2 := GetIngressFromChan(t, cluster2IngressCreateChan)
 	assert.NotNil(t, createdIngress2)
@@ -253,15 +266,20 @@ func TestIngressController(t *testing.T) {
 	t.Logf("created meta: %v fed meta: %v", createdIngress2.ObjectMeta, fedIngress.ObjectMeta)
 	assert.True(t, util.ObjectMetaEquivalent(fedIngress.ObjectMeta, createdIngress2.ObjectMeta), "Metadata of created object is not equivalent")
 
-	t.Log("Checking that the configmap in cluster 2 got updated.")
-	updatedConfigMap2 := GetConfigMapFromChan(cluster2ConfigMapUpdateChan)
-	assert.NotNil(t, updatedConfigMap2, fmt.Sprintf("ConfigMap in cluster 2 was not updated (or more likely the test is broken and the API type written is wrong)"))
-	if updatedConfigMap2 != nil {
-		assert.Equal(t, cfg1.Data[uidKey], updatedConfigMap2.Data[uidKey],
-			fmt.Sprintf("UID's in configmaps in cluster's 1 and 2 are not equal (%q != %q)", cfg1.Data["uid"], updatedConfigMap2.Data["uid"]))
-	}
-
 	close(stop)
+}
+
+func GetConfigMapUidAndProviderId(t *testing.T, c chan runtime.Object) (string, string) {
+	updatedConfigMap := GetConfigMapFromChan(c)
+	assert.NotNil(t, updatedConfigMap, "ConfigMap should have received an update")
+	assert.NotNil(t, updatedConfigMap.Data, "ConfigMap data is empty")
+
+	for _, key := range []string{uidKey, providerUidKey} {
+		val, ok := updatedConfigMap.Data[key]
+		assert.True(t, ok, fmt.Sprintf("Didn't receive an update for key %v: %v", key, updatedConfigMap.Data))
+		assert.True(t, len(val) > 0, fmt.Sprintf("Received an empty update for key %v", key))
+	}
+	return updatedConfigMap.Data[uidKey], updatedConfigMap.Data[providerUidKey]
 }
 
 func GetIngressFromChan(t *testing.T, c chan runtime.Object) *extensionsv1beta1.Ingress {

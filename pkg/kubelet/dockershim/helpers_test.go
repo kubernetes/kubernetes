@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/blang/semver"
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -265,29 +266,37 @@ func TestGetSecurityOptSeparator(t *testing.T) {
 }
 
 func TestEnsureSandboxImageExists(t *testing.T) {
+	sandboxImage := "gcr.io/test/image"
 	for desc, test := range map[string]struct {
-		inject error
-		calls  []string
-		err    bool
+		injectImage bool
+		injectErr   error
+		calls       []string
+		err         bool
 	}{
 		"should not pull image when it already exists": {
-			inject: nil,
-			calls:  []string{"inspect_image"},
+			injectImage: true,
+			injectErr:   nil,
+			calls:       []string{"inspect_image"},
 		},
 		"should pull image when it doesn't exist": {
-			inject: dockertools.ImageNotFoundError{ID: "image_id"},
-			calls:  []string{"inspect_image", "pull"},
+			injectImage: false,
+			injectErr:   dockertools.ImageNotFoundError{ID: "image_id"},
+			calls:       []string{"inspect_image", "pull"},
 		},
 		"should return error when inspect image fails": {
-			inject: fmt.Errorf("arbitrary error"),
-			calls:  []string{"inspect_image"},
-			err:    true,
+			injectImage: false,
+			injectErr:   fmt.Errorf("arbitrary error"),
+			calls:       []string{"inspect_image"},
+			err:         true,
 		},
 	} {
 		t.Logf("TestCase: %q", desc)
 		_, fakeDocker, _ := newTestDockerService()
-		fakeDocker.InjectError("inspect_image", test.inject)
-		err := ensureSandboxImageExists(fakeDocker, "gcr.io/test/image")
+		if test.injectImage {
+			fakeDocker.InjectImages([]dockertypes.Image{{ID: sandboxImage}})
+		}
+		fakeDocker.InjectError("inspect_image", test.injectErr)
+		err := ensureSandboxImageExists(fakeDocker, sandboxImage)
 		assert.NoError(t, fakeDocker.AssertCalls(test.calls))
 		assert.Equal(t, test.err, err != nil)
 	}

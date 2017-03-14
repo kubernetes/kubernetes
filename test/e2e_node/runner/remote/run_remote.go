@@ -198,8 +198,9 @@ func main() {
 					machine:  imageConfig.Machine,
 					tests:    imageConfig.Tests,
 				}
-				if isRegex {
-					name = shortName + "-" + image
+				if isRegex && len(images) > 1 {
+					// Use image name when shortName is not unique.
+					name = image
 				}
 				gceImages.images[name] = gceImage
 			}

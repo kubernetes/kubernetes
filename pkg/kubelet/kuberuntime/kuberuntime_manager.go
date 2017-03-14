@@ -225,7 +225,7 @@ func (m *kubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
 		return nil, err
 	}
 
-	return newRuntimeVersion(typedVersion.Version)
+	return newRuntimeVersion(typedVersion.RuntimeVersion)
 }
 
 // APIVersion returns the cached API version information of the container
@@ -619,6 +619,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 			glog.Errorf("createPodSandbox for pod %q failed: %v", format.Pod(pod), err)
 			return
 		}
+		glog.V(4).Infof("Created PodSandbox %q for pod %q", podSandboxID, format.Pod(pod))
 
 		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
 		if err != nil {

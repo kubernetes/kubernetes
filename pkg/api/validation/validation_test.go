@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/security/apparmor"
-	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -207,30 +206,6 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
 			}),
 		},
-		"volume with valid mount option for nfs": {
-			isExpectedFailure: false,
-			volume: testVolumeWithMountOption("good-nfs-mount-volume", "", "ro,nfsvers=3", api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-				},
-				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					NFS: &api.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
-				},
-			}),
-		},
-		"volume with mount option for host path": {
-			isExpectedFailure: true,
-			volume: testVolumeWithMountOption("bad-hostpath-mount-volume", "", "ro,nfsvers=3", api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-				},
-				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/a/.."},
-				},
-			}),
-		},
 		"invalid-storage-class-name": {
 			isExpectedFailure: true,
 			volume: testVolume("invalid-storage-class-name", "", api.PersistentVolumeSpec{
@@ -277,25 +252,6 @@ func testVolumeClaimStorageClass(name string, namespace string, annval string, s
 			Annotations: annotations,
 		},
 		Spec: spec,
-	}
-}
-
-func testVolumeWithMountOption(name string, namespace string, mountOptions string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
-	annotations := map[string]string{
-		volume.MountOptionAnnotation: mountOptions,
-	}
-	objMeta := metav1.ObjectMeta{
-		Name:        name,
-		Annotations: annotations,
-	}
-
-	if namespace != "" {
-		objMeta.Namespace = namespace
-	}
-
-	return &api.PersistentVolume{
-		ObjectMeta: objMeta,
-		Spec:       spec,
 	}
 }
 
@@ -1967,6 +1923,65 @@ func TestValidateVolumes(t *testing.T) {
 			},
 			errtype:  field.ErrorTypeRequired,
 			errfield: "azureDisk.diskURI",
+		},
+		// ScaleIO
+		{
+			name: "valid scaleio volume",
+			vol: api.Volume{
+				Name: "scaleio-volume",
+				VolumeSource: api.VolumeSource{
+					ScaleIO: &api.ScaleIOVolumeSource{
+						Gateway:    "http://abcd/efg",
+						System:     "test-system",
+						VolumeName: "test-vol-1",
+					},
+				},
+			},
+		},
+		{
+			name: "ScaleIO with empty name",
+			vol: api.Volume{
+				Name: "scaleio-volume",
+				VolumeSource: api.VolumeSource{
+					ScaleIO: &api.ScaleIOVolumeSource{
+						Gateway:    "http://abcd/efg",
+						System:     "test-system",
+						VolumeName: "",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "scaleIO.volumeName",
+		},
+		{
+			name: "ScaleIO with empty gateway",
+			vol: api.Volume{
+				Name: "scaleio-volume",
+				VolumeSource: api.VolumeSource{
+					ScaleIO: &api.ScaleIOVolumeSource{
+						Gateway:    "",
+						System:     "test-system",
+						VolumeName: "test-vol-1",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "scaleIO.gateway",
+		},
+		{
+			name: "ScaleIO with empty system",
+			vol: api.Volume{
+				Name: "scaleio-volume",
+				VolumeSource: api.VolumeSource{
+					ScaleIO: &api.ScaleIOVolumeSource{
+						Gateway:    "http://agc/efg/gateway",
+						System:     "",
+						VolumeName: "test-vol-1",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "scaleIO.system",
 		},
 	}
 

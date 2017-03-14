@@ -56,7 +56,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - ./kubemark.sh --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) {{kubelet_verbosity_level}} 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1
+        - ./kubemark.sh --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --alsologtostderr {{kubelet_verbosity_level}} 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
@@ -84,7 +84,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - ./kubemark.sh --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) {{kubeproxy_verbosity_level}} 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
+        - ./kubemark.sh --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --alsologtostderr {{kubeproxy_verbosity_level}} 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
@@ -96,7 +96,7 @@ spec:
             cpu: {{HOLLOW_PROXY_CPU}}m
             memory: {{HOLLOW_PROXY_MEM}}Ki
       - name: hollow-node-problem-detector
-        image: gcr.io/google_containers/node-problem-detector:v0.3.0-alpha.0
+        image: gcr.io/google_containers/node-problem-detector:v0.3.0-alpha.1
         env:
         - name: NODE_NAME
           valueFrom:
@@ -105,7 +105,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - /node-problem-detector --kernel-monitor=/config/kernel.monitor --apiserver-override="https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig" --alsologtostderr 1>>/var/log/npd-$(NODE_NAME).log 2>&1
+        - /node-problem-detector --system-log-monitors=/config/kernel.monitor --apiserver-override="https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig" --alsologtostderr 1>>/var/log/npd-$(NODE_NAME).log 2>&1
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig

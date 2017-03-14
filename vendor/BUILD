@@ -1108,6 +1108,35 @@ go_library(
 )
 
 go_library(
+    name = "github.com/codedellemc/goscaleio",
+    srcs = [
+        "github.com/codedellemc/goscaleio/api.go",
+        "github.com/codedellemc/goscaleio/certs.go",
+        "github.com/codedellemc/goscaleio/device.go",
+        "github.com/codedellemc/goscaleio/instance.go",
+        "github.com/codedellemc/goscaleio/protectiondomain.go",
+        "github.com/codedellemc/goscaleio/scsiinitiator.go",
+        "github.com/codedellemc/goscaleio/sdc.go",
+        "github.com/codedellemc/goscaleio/sds.go",
+        "github.com/codedellemc/goscaleio/storagepool.go",
+        "github.com/codedellemc/goscaleio/system.go",
+        "github.com/codedellemc/goscaleio/user.go",
+        "github.com/codedellemc/goscaleio/volume.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/Sirupsen/logrus",
+        "//vendor:github.com/codedellemc/goscaleio/types/v1",
+    ],
+)
+
+go_library(
+    name = "github.com/codedellemc/goscaleio/types/v1",
+    srcs = ["github.com/codedellemc/goscaleio/types/v1/types.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/codegangsta/negroni",
     srcs = [
         "github.com/codegangsta/negroni/doc.go",
@@ -9637,7 +9666,10 @@ go_test(
 
 go_library(
     name = "k8s.io/apiserver/pkg/authentication/group",
-    srcs = ["k8s.io/apiserver/pkg/authentication/group/group_adder.go"],
+    srcs = [
+        "k8s.io/apiserver/pkg/authentication/group/authenticated_group_adder.go",
+        "k8s.io/apiserver/pkg/authentication/group/group_adder.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
@@ -10023,6 +10055,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/streaming",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
+        "//vendor:k8s.io/apimachinery/pkg/util/json",
         "//vendor:k8s.io/apimachinery/pkg/util/mergepatch",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
@@ -10101,6 +10134,13 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/util/flushwriter",
         "//vendor:k8s.io/apiserver/pkg/util/wsstream",
     ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/endpoints/metrics_test",
+    srcs = ["k8s.io/apiserver/pkg/endpoints/metrics/metrics_test.go"],
+    library = ":k8s.io/apiserver/pkg/endpoints/metrics",
+    tags = ["automanaged"],
 )
 
 go_library(
@@ -10508,7 +10548,9 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apiserver/pkg/endpoints/filters",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
@@ -11884,7 +11926,6 @@ go_library(
     srcs = [
         "k8s.io/client-go/informers/batch/v2alpha1/cronjob.go",
         "k8s.io/client-go/informers/batch/v2alpha1/interface.go",
-        "k8s.io/client-go/informers/batch/v2alpha1/job.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -12662,7 +12703,6 @@ go_library(
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/cronjob.go",
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/doc.go",
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/generated_expansion.go",
-        "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/job.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -12682,7 +12722,6 @@ go_library(
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake/doc.go",
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake/fake_batch_client.go",
         "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake/fake_cronjob.go",
-        "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake/fake_job.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -13229,7 +13268,6 @@ go_library(
     srcs = [
         "k8s.io/client-go/listers/batch/v2alpha1/cronjob.go",
         "k8s.io/client-go/listers/batch/v2alpha1/expansion_generated.go",
-        "k8s.io/client-go/listers/batch/v2alpha1/job.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -13960,6 +13998,7 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/apis/batch",
+        "//vendor:k8s.io/client-go/pkg/apis/batch/v1",
     ],
 )
 

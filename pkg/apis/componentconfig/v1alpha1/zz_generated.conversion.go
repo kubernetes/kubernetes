@@ -293,6 +293,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableDebuggingHandlers, &out.EnableDebuggingHandlers, s); err != nil {
 		return err
 	}
+	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.MinimumGCAge = in.MinimumGCAge
 	out.MaxPerPodContainerCount = in.MaxPerPodContainerCount
 	if err := v1.Convert_Pointer_int32_To_int32(&in.MaxContainerCount, &out.MaxContainerCount, s); err != nil {
@@ -395,6 +396,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}
+	out.ExperimentalQOSReserved = *(*componentconfig.ConfigurationMap)(unsafe.Pointer(&in.ExperimentalQOSReserved))
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	if err := v1.Convert_Pointer_bool_To_bool(&in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains, s); err != nil {
 		return err
@@ -470,6 +472,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableDebuggingHandlers, &out.EnableDebuggingHandlers, s); err != nil {
 		return err
 	}
+	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.MinimumGCAge = in.MinimumGCAge
 	out.MaxPerPodContainerCount = in.MaxPerPodContainerCount
 	if err := v1.Convert_int32_To_Pointer_int32(&in.MaxContainerCount, &out.MaxContainerCount, s); err != nil {
@@ -572,6 +575,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}
+	out.ExperimentalQOSReserved = *(*map[string]string)(unsafe.Pointer(&in.ExperimentalQOSReserved))
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	if err := v1.Convert_bool_To_Pointer_bool(&in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains, s); err != nil {
 		return err

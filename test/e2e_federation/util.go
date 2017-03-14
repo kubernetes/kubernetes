@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -44,10 +44,21 @@ import (
 var (
 	KubeAPIQPS            float32 = 20.0
 	KubeAPIBurst                  = 30
-	DefaultFederationName         = "federation"
+	DefaultFederationName         = "e2e-federation"
 	UserAgentName                 = "federation-e2e"
 	// We use this to decide how long to wait for our DNS probes to succeed.
 	DNSTTL = 180 * time.Second // TODO: make k8s.io/kubernetes/federation/pkg/federation-controller/service.minDnsTtl exported, and import it here.
+)
+
+const (
+	federatedNamespaceTimeout    = 5 * time.Minute
+	federatedServiceTimeout      = 5 * time.Minute
+	federatedClustersWaitTimeout = 1 * time.Minute
+
+	// [30000, 32767] is the allowed default service nodeport range and our
+	// tests just use the defaults.
+	FederatedSvcNodePortFirst = 30000
+	FederatedSvcNodePortLast  = 32767
 )
 
 var FederationSuite common.Suite
@@ -102,7 +113,7 @@ func clusterIsReadyOrFail(f *fedframework.Framework, context *fedframework.E2ECo
 // return ClusterList until the listed cluster items equals clusterCount
 func waitForAllRegisteredClusters(f *fedframework.Framework, clusterCount int) *federationapi.ClusterList {
 	var clusterList *federationapi.ClusterList
-	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
+	if err := wait.PollImmediate(framework.Poll, federatedClustersWaitTimeout, func() (bool, error) {
 		var err error
 		clusterList, err = f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
 		if err != nil {
@@ -184,6 +195,22 @@ func unregisterClusters(clusters map[string]*cluster, f *fedframework.Framework)
 	}
 }
 
+// waitForNamespaceInFederatedClusters waits for the federated namespace to be created in federated clusters
+func waitForNamespaceInFederatedClusters(clusters map[string]*cluster, nsName string, timeout time.Duration) {
+	for name, c := range clusters {
+		err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+			_, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{})
+			if err != nil {
+				By(fmt.Sprintf("Waiting for namespace %q to be created in cluster %q, err: %v", nsName, name, err))
+				return false, nil
+			}
+			By(fmt.Sprintf("Namespace %q exists in cluster %q", nsName, name))
+			return true, nil
+		})
+		framework.ExpectNoError(err, "Failed to verify federated namespace %q creation in cluster %q", nsName, name)
+	}
+}
+
 // can not be moved to util, as By and Expect must be put in Ginkgo test unit
 func getRegisteredClusters(userAgentName string, f *fedframework.Framework) (map[string]*cluster, string) {
 	clusters := make(map[string]*cluster)
@@ -205,6 +232,7 @@ func getRegisteredClusters(userAgentName string, f *fedframework.Framework) (map
 		Expect(framework.TestContext.KubeConfig).ToNot(Equal(""), "KubeConfig must be specified to load clusters' client config")
 		clusters[c.Name] = &cluster{c.Name, createClientsetForCluster(c, i, userAgentName), false, nil}
 	}
+	waitForNamespaceInFederatedClusters(clusters, f.FederationNamespace.Name, federatedNamespaceTimeout)
 	return clusters, primaryClusterName
 }
 
@@ -235,7 +263,7 @@ func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, 
 func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters map[string]*cluster) {
 	framework.Logf("Waiting for service %q in %d clusters", service.Name, len(clusters))
 	for _, c := range clusters {
-		waitForServiceOrFail(c.Clientset, namespace, service, true, FederatedServiceTimeout)
+		waitForServiceOrFail(c.Clientset, namespace, service, true, federatedServiceTimeout)
 	}
 }
 
@@ -244,6 +272,12 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 		return nil, fmt.Errorf("Internal error: invalid parameters passed to createService: clientset: %v, namespace: %v", clientset, namespace)
 	}
 	By(fmt.Sprintf("Creating federated service %q in namespace %q", name, namespace))
+
+	// Tests can be run in parallel, so we need a different nodePort for
+	// each test.
+	// We add 1 to FederatedSvcNodePortLast because IntnRange's range end
+	// is not inclusive.
+	nodePort := int32(rand.IntnRange(FederatedSvcNodePortFirst, FederatedSvcNodePortLast+1))
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -259,6 +293,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 					Protocol:   v1.ProtocolTCP,
 					Port:       80,
 					TargetPort: intstr.FromInt(8080),
+					NodePort:   nodePort,
 				},
 			},
 			SessionAffinity: v1.ServiceAffinityNone,
@@ -279,10 +314,11 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
 	}
+	framework.Logf("Deleting service %q in namespace %v", serviceName, namespace)
 	err := clientset.Services(namespace).Delete(serviceName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
 	// Wait for the service to be deleted.
-	err = wait.Poll(5*time.Second, 3*wait.ForeverTestTimeout, func() (bool, error) {
+	err = wait.Poll(5*time.Second, 10*wait.ForeverTestTimeout, func() (bool, error) {
 		_, err := clientset.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
@@ -299,7 +335,7 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 	for name, c := range clusters {
 		var cSvc *v1.Service
 
-		err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
+		err := wait.PollImmediate(framework.Poll, federatedServiceTimeout, func() (bool, error) {
 			var err error
 			cSvc, err = c.Clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
@@ -316,15 +352,15 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 		})
 
 		if err != nil || cSvc == nil {
-			By(fmt.Sprintf("Failed to find service %q in namespace %q, in cluster %q in %s", service.Name, namespace, name, FederatedServiceTimeout))
+			By(fmt.Sprintf("Failed to find service %q in namespace %q, in cluster %q in %s", service.Name, namespace, name, federatedServiceTimeout))
 			continue
 		}
 
-		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, FederatedServiceTimeout)
+		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, federatedServiceTimeout)
 		if err != nil {
 			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", service.Name, namespace, name, err)
 		}
-		err = cleanupServiceShardLoadBalancer(name, cSvc, FederatedServiceTimeout)
+		err = cleanupServiceShardLoadBalancer(name, cSvc, federatedServiceTimeout)
 		if err != nil {
 			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
 		}

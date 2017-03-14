@@ -393,7 +393,7 @@ func (m *manager) syncBatch() {
 				}
 				syncedUID = mirrorUID
 			}
-			if m.needsUpdate(syncedUID, status) || m.couldBeDeleted(uid, status.status) {
+			if m.needsUpdate(syncedUID, status) {
 				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
 			} else if m.needsReconcile(uid, status.status) {
 				// Delete the apiStatusVersions here to force an update on the pod status
@@ -469,7 +469,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 // This method is not thread safe, and most only be accessed by the sync thread.
 func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 	latest, ok := m.apiStatusVersions[uid]
-	return !ok || latest < status.version
+	return !ok || latest < status.version || m.couldBeDeleted(uid, status.status)
 }
 
 func (m *manager) couldBeDeleted(uid types.UID, status v1.PodStatus) bool {
