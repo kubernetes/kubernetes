@@ -76,8 +76,8 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	return pods, nil
 }
 
-// getActivePods returns non-terminal pods
-func (kl *Kubelet) getActivePods() []*v1.Pod {
+// GetActivePods returns non-terminal pods
+func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	allPods := kl.podManager.GetPods()
 	activePods := kl.filterOutTerminatedPods(allPods)
 	return activePods
