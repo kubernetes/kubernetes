@@ -227,9 +227,15 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
 			}
+			serviceAccountYaml := mkpath("cassandra-serviceaccount.yaml")
+			roleBindingYaml := mkpath("cassandra-rolebinding.yaml")
 			serviceYaml := mkpath("cassandra-service.yaml")
 			controllerYaml := mkpath("cassandra-controller.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("Creating the cassandra serviceaccount and rolebinding")
+			framework.RunKubectlOrDie("create", "-f", serviceAccountYaml, nsFlag)
+			framework.RunKubectl("create", "-f", roleBindingYaml, nsFlag) // tolerate failure in case the cluster isn't using RBAC
 
 			By("Starting the cassandra service")
 			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
@@ -266,6 +272,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join("examples/storage/cassandra", file)
 			}
+			serviceAccountYaml := mkpath("cassandra-serviceaccount.yaml")
+			roleBindingYaml := mkpath("cassandra-rolebinding.yaml")
 			serviceYaml := mkpath("cassandra-service.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
@@ -278,6 +286,10 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			err := ioutil.WriteFile(statefulsetYaml, []byte(output), 0644)
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Creating the cassandra serviceaccount and rolebinding")
+			framework.RunKubectlOrDie("create", "-f", serviceAccountYaml, nsFlag)
+			framework.RunKubectl("create", "-f", roleBindingYaml, nsFlag) // tolerate failure in case the cluster isn't using RBAC
 
 			By("Starting the cassandra service")
 			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)

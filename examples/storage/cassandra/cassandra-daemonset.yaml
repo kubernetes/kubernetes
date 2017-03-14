@@ -13,6 +13,7 @@ spec:
       # Filter to specific nodes:
       # nodeSelector:
       #  app: cassandra
+      serviceAccountName: cassandra
       containers:
         - command:
             - /run.sh
