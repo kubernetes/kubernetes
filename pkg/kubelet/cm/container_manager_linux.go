@@ -337,7 +337,12 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 			glog.V(2).Infof("Updating kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val)
 			err = sysctl.SetSysctl(flag, expectedValue)
 			if err != nil {
-				errList = append(errList, err)
+				// Unprivileged containers cannot write to files in /proc/sys
+				if os.IsPermission(err) {
+					glog.Warningf("Failed to adjust kernel flag, assuming unprivileged system container execution, ignoring: %v", err)
+				} else {
+					errList = append(errList, err)
+				}
 			}
 		}
 	}
