@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
@@ -88,8 +89,20 @@ type SecretController struct {
 	updateTimeout         time.Duration
 }
 
-// NewSecretController returns a new secret controller
-func NewSecretController(client federationclientset.Interface) *SecretController {
+// StartSecretController starts a new secret controller
+func StartSecretController(config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
+	restclient.AddUserAgent(config, "secret-controller")
+	client := federationclientset.NewForConfigOrDie(config)
+	controller := newSecretController(client)
+	if minimizeLatency {
+		controller.minimizeLatency()
+	}
+	glog.Infof("Starting Secret controller")
+	controller.Run(stopChan)
+}
+
+// newSecretController returns a new secret controller
+func newSecretController(client federationclientset.Interface) *SecretController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
 	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "federated-secrets-controller"})
@@ -188,6 +201,14 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 	)
 
 	return secretcontroller
+}
+
+// minimizeLatency reduces delays and timeouts to make the controller more responsive (useful for testing).
+func (secretcontroller *SecretController) minimizeLatency() {
+	secretcontroller.clusterAvailableDelay = time.Second
+	secretcontroller.secretReviewDelay = 50 * time.Millisecond
+	secretcontroller.smallDelay = 20 * time.Millisecond
+	secretcontroller.updateTimeout = 5 * time.Second
 }
 
 // Returns true if the given object has the given finalizer in its ObjectMeta.
