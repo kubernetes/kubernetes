@@ -54,7 +54,7 @@ func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 	}
 
 	diskName := volumeSource.DiskName
-	hashedDiskUri := makeCRC32(volumeSource.DataDiskURI)
+	hashedDiskUri := makeCRC32(strings.ToLower(volumeSource.DataDiskURI))
 	glog.V(4).Infof("azureDisk - attempting to check if disk %s attached to node %s", diskName, nodeName)
 
 	isManagedDisk := (*volumeSource.Kind == v1.AzureManagedDisk)
@@ -233,7 +233,6 @@ func (d *azureDiskDetacher) Detach(deviceName string, nodeName types.NodeName) e
 			glog.Infof("azureDisk -error detaching  blob  disk (%s) from node %q. error:%s", deviceName, nodeName, err.Error())
 			return err
 		}
-
 	}
 
 	glog.V(2).Infof("azureDisk - disk:%s managed:%v was detached from node:%v", deviceName, isManagedDisk, nodeName)
@@ -242,7 +241,6 @@ func (d *azureDiskDetacher) Detach(deviceName string, nodeName types.NodeName) e
 
 // UnmountDevice unmounts the volume on the node
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
-
 	err := volumeutil.UnmountPath(deviceMountPath, detacher.plugin.host.GetMounter())
 	if err == nil {
 		glog.V(4).Infof("azureDisk - Device %s was unmounted", deviceMountPath)

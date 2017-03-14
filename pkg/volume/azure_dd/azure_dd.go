@@ -18,6 +18,7 @@ package azure_dd
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -76,7 +77,6 @@ func (plugin *azureDataDiskPlugin) Init(host volume.VolumeHost) error {
 	blobController, err := newBlobDiskController(common)
 	if err != nil {
 		return fmt.Errorf("AzureDisk -  failed to init Blob Disk Controller with error (%s)", err.Error())
-
 	}
 
 	// ManagedDiskController: contains the functions needed to
@@ -111,14 +111,13 @@ func (plugin *azureDataDiskPlugin) GetVolumeName(spec *volume.Spec) (string, err
 
 	isManaged := (*volumeSource.Kind == v1.AzureManagedDisk)
 	uniqueDiskNameTemplate := "%s%s"
-	hashedDiskUri := makeCRC32(volumeSource.DataDiskURI)
+	hashedDiskUri := makeCRC32(strings.ToLower(volumeSource.DataDiskURI))
 
 	prefix := "b"
 	if isManaged {
 		prefix = "m"
 	}
 	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskUri)
-
 	return diskName, nil
 }
 

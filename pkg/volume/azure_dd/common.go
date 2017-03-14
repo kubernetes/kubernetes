@@ -50,10 +50,19 @@ type dataDisk struct {
 	podUID     types.UID
 }
 
-var supportedCachingModes = sets.NewString(string(api.AzureDataDiskCachingNone), string(api.AzureDataDiskCachingReadOnly), string(api.AzureDataDiskCachingReadWrite))
-var supportedDiskKinds = sets.NewString(string(api.AzureSharedBlobDisk), string(api.AzureDedicatedBlobDisk), string(api.AzureManagedDisk))
-var supportedStorageAccountTypes = sets.NewString("premium_lrs", "standard_lrs")
+var supportedCachingModes = sets.NewString(
+	string(api.AzureDataDiskCachingNone),
+	string(api.AzureDataDiskCachingReadOnly),
+	string(api.AzureDataDiskCachingReadWrite),
+)
 
+var supportedDiskKinds = sets.NewString(
+	string(api.AzureSharedBlobDisk),
+	string(api.AzureDedicatedBlobDisk),
+	string(api.AzureManagedDisk),
+)
+
+var supportedStorageAccountTypes = sets.NewString("premium_lrs", "standard_lrs")
 var polyTable *crc32.Table = crc32.MakeTable(crc32.Koopman)
 
 func makeCRC32(str string) string {
@@ -69,6 +78,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 
 // creates a unique path for disks (even if they share the same *.vhd name)
 func makeGlobalPDPath(host volume.VolumeHost, diskUri string, isManaged bool) (string, error) {
+	diskUri = STRINGS.ToLower(diskUri) // always lower uri because users may enter it in caps.
 	uniqueDiskNameTemplate := "%s%s"
 	hashedDiskUri := makeCRC32(diskUri)
 	prefix := "b"
@@ -179,7 +189,7 @@ type ioHandler interface {
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 }
 
-//TODO: check if priming the iscsi interface is a actually needed
+//TODO: check if priming the iscsi interface is actually needed
 
 type osIOHandler struct{}
 
@@ -207,7 +217,6 @@ func scsiHostRescan(io ioHandler) {
 }
 
 // finds a device mounted to "current" node
-
 func findDiskByLun(lun int, exe exec.Interface) (string, error) {
 	var err error
 	sys_path := "/sys/bus/scsi/devices"
