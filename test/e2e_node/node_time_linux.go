@@ -20,6 +20,7 @@ package e2e_node
 
 import (
 	"time"
+	"syscall"
 )
 
 
