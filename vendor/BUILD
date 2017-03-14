@@ -4791,11 +4791,24 @@ go_library(
 )
 
 go_library(
+    name = "github.com/influxdata/influxdb/client/v2",
+    srcs = [
+        "github.com/influxdata/influxdb/client/v2/client.go",
+        "github.com/influxdata/influxdb/client/v2/udp.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/influxdata/influxdb/models"],
+)
+
+go_library(
     name = "github.com/influxdata/influxdb/models",
     srcs = [
         "github.com/influxdata/influxdb/models/consistency.go",
+        "github.com/influxdata/influxdb/models/inline_fnv.go",
+        "github.com/influxdata/influxdb/models/inline_strconv_parse.go",
         "github.com/influxdata/influxdb/models/points.go",
         "github.com/influxdata/influxdb/models/rows.go",
+        "github.com/influxdata/influxdb/models/statistic.go",
         "github.com/influxdata/influxdb/models/time.go",
     ],
     tags = ["automanaged"],
