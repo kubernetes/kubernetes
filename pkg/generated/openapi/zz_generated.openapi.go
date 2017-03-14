@@ -8595,6 +8595,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 							},
 						},
+						"host": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Optional: Host name to connect to, defaults to the pod IP.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
 					},
 					Required: []string{"port"},
 				},

@@ -4365,6 +4365,7 @@ func Convert_api_Sysctl_To_v1_Sysctl(in *api.Sysctl, out *Sysctl, s conversion.S
 
 func autoConvert_v1_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out *api.TCPSocketAction, s conversion.Scope) error {
 	out.Port = in.Port
+	out.Host = in.Host
 	return nil
 }
 
@@ -4374,6 +4375,7 @@ func Convert_v1_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out 
 
 func autoConvert_api_TCPSocketAction_To_v1_TCPSocketAction(in *api.TCPSocketAction, out *TCPSocketAction, s conversion.Scope) error {
 	out.Port = in.Port
+	out.Host = in.Host
 	return nil
 }
 
