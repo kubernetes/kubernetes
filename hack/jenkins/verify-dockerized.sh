@@ -31,6 +31,9 @@ retry() {
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
+# Set artifacts directory
+export ARTIFACTS_DIR=${WORKSPACE}/artifacts
+
 retry go get github.com/tools/godep && godep version
 
 export LOG_LEVEL=4
