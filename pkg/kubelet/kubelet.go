@@ -2137,6 +2137,14 @@ func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID str
 			// When an evicted pod has already synced, all containers can be removed.
 			removeAll = eviction.PodIsEvicted(syncedPod.Status)
 		}
+		if kl.gpuManager != nil {
+			inspectJSON, err := kl.dockerClient.InspectContainer(exitedContainerID)
+			if err != nil {
+				glog.Errorf("Failed to inspect exited container %q: %v", exitedContainerID, err)
+			} else {
+				kl.gpuManager.UpdateDevices(podId, inspectJSON)
+			}
+		}
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
 	}
 }

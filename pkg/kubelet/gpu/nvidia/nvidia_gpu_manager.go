@@ -24,9 +24,10 @@ import (
 	"regexp"
 	"sync"
 
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
-
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -115,6 +116,22 @@ func (ngm *nvidiaGPUManager) Capacity() v1.ResourceList {
 	gpus := resource.NewQuantity(int64(len(ngm.allGPUs)), resource.DecimalSI)
 	return v1.ResourceList{
 		v1.ResourceNvidiaGPU: *gpus,
+	}
+}
+
+// fixed #42412, release the GPU resources
+func (ngm *nvidiaGPUManager) UpdateDevices(podUID types.UID, inspectJSON *dockertypes.ContainerJSON) {
+	if value, ok := ngm.allocated.podGPUMapping[string(podUID)]; ok {
+		ngm.Lock()
+		defer ngm.Unlock()
+
+		devicesMapping := inspectJSON.HostConfig.Devices
+		for _, deviceMap := range devicesMapping {
+			if isValidPath(deviceMap.PathOnHost) && value.Has(deviceMap.PathOnHost) {
+				value.Delete(deviceMap.PathOnHost)
+				ngm.allocated.podGPUMapping[string(podUID)] = value
+			}
+		}
 	}
 }
 
