@@ -112,7 +112,7 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *extensions.DaemonSet,
 		}
 		available := false
 		for _, pod := range daemonPods {
-			if v1.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+			if v1.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) && pod.DeletionTimestamp == nil {
 				available = true
 				break
 			}
@@ -125,5 +125,6 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *extensions.DaemonSet,
 	if err != nil {
 		return -1, -1, fmt.Errorf("Invalid value for MaxUnavailable: %v", err)
 	}
+	glog.V(4).Infof(" DaemonSet %s/%s, maxUnavailable: %d, numUnavailable: %d", ds.Namespace, ds.Name, maxUnavailable, numUnavailable)
 	return maxUnavailable, numUnavailable, nil
 }

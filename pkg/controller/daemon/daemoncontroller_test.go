@@ -332,9 +332,13 @@ func markPodsReady(store cache.Store) {
 	// mark pods as ready
 	for _, obj := range store.List() {
 		pod := obj.(*v1.Pod)
-		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-		v1.UpdatePodCondition(&pod.Status, &condition)
+		markPodReady(pod)
 	}
+}
+
+func markPodReady(pod *v1.Pod) {
+	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+	v1.UpdatePodCondition(&pod.Status, &condition)
 }
 
 // DaemonSets without node selectors should launch pods on every node.
