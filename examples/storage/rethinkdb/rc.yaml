@@ -15,6 +15,7 @@ spec:
         db: rethinkdb
         role: replicas
     spec:
+      serviceAccountName: rethinkdb
       containers:
       - image: gcr.io/google_containers/rethinkdb:1.16.0_1
         name: rethinkdb

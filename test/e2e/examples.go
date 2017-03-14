@@ -511,12 +511,16 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			}
 			driverServiceYaml := mkpath("driver-service.yaml")
 			rethinkDbControllerYaml := mkpath("rc.yaml")
+			rethinkServiceAccountYaml := mkpath("serviceaccount.yaml")
+			rethinkRoleBindingYaml := mkpath("rolebinding.yaml")
 			adminPodYaml := mkpath("admin-pod.yaml")
 			adminServiceYaml := mkpath("admin-service.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("starting rethinkdb")
 			framework.RunKubectlOrDie("create", "-f", driverServiceYaml, nsFlag)
+			framework.RunKubectlOrDie("create", "-f", rethinkServiceAccountYaml, nsFlag)
+			framework.RunKubectl("create", "-f", rethinkRoleBindingYaml, nsFlag) // tolerate failure in case the cluster isn't using RBAC
 			framework.RunKubectlOrDie("create", "-f", rethinkDbControllerYaml, nsFlag)
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"db": "rethinkdb"}))
 			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)

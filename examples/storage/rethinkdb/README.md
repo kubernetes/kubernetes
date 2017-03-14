@@ -34,6 +34,8 @@ rethinkdb-driver  10.0.27.114      <none>            28015/TCP     db=rethinkdb 
 start the first server in the cluster
 
 ```sh
+$kubectl create -f examples/storage/rethinkdb/serviceaccount.yaml
+$kubectl create -f examples/storage/rethinkdb/rolebinding.yaml
 $kubectl create -f examples/storage/rethinkdb/rc.yaml
 ```
 

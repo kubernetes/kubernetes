@@ -307,6 +307,8 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"admin-service":  &api.Service{},
 			"driver-service": &api.Service{},
 			"rc":             &api.ReplicationController{},
+			"serviceaccount": &api.ServiceAccount{},
+			"rolebinding":    &rbac.RoleBinding{},
 		},
 		"../examples/spark": {
 			"namespace-spark-cluster":   &api.Namespace{},
