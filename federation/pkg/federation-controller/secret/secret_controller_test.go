@@ -66,7 +66,7 @@ func TestSecretController(t *testing.T) {
 	RegisterFakeList(secrets, &cluster2Client.Fake, &apiv1.SecretList{Items: []apiv1.Secret{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate(secrets, &cluster2Client.Fake, cluster2Watch)
 
-	secretController := NewSecretController(fakeClient)
+	secretController := newSecretController(fakeClient)
 	informerClientFactory := func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
@@ -79,10 +79,7 @@ func TestSecretController(t *testing.T) {
 	}
 	setClientFactory(secretController.secretFederatedInformer, informerClientFactory)
 
-	secretController.clusterAvailableDelay = time.Second
-	secretController.secretReviewDelay = 50 * time.Millisecond
-	secretController.smallDelay = 20 * time.Millisecond
-	secretController.updateTimeout = 5 * time.Second
+	secretController.minimizeLatency()
 
 	stop := make(chan struct{})
 	secretController.Run(stop)
