@@ -171,6 +171,14 @@ func defaultPredicates() sets.String {
 
 		// Fit is determined by node disk pressure condition.
 		factory.RegisterFitPredicate("CheckNodeDiskPressure", predicates.CheckNodeDiskPressurePredicate),
+
+		// Fit is determiend by local volume node constraints.
+		factory.RegisterFitPredicateFactory(
+			"NoVolumeNodeConflict",
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewVolumeNodePredicate(args.PVInfo, args.PVCInfo)
+			},
+		),
 	)
 }
 
