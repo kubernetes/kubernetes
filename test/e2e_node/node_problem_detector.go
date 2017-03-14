@@ -49,7 +49,6 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 	var uid string
 	var ns, name, configName, eventNamespace string
 	var bootTime, nodeTime time.Time
-	initTime := time.Now()
 
 	BeforeEach(func() {
 		c = f.ClientSet
@@ -96,7 +95,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		BeforeEach(func() {
 			By("Calculate Lookback duration")
 			var err error
-			nodeTime, bootTime, err = GetNodeTime(initTime)
+			nodeTime, bootTime, err = GetNodeTime()
 			Expect(err).To(BeNil())
 			// Set lookback duration longer than node up time.
 			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.

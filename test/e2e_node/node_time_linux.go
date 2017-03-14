@@ -19,15 +19,12 @@ limitations under the License.
 package e2e_node
 
 import (
-	"time"
 	"syscall"
+	"time"
 )
 
-
-
-
 // GetNodeTime gets node boot time and current time.
-func GetNodeTime(initTime time.Time) (time.Time, time.Time, error) {
+func GetNodeTime() (time.Time, time.Time, error) {
 	// Get node current time.
 	nodeTime := time.Now()
 
@@ -43,5 +40,3 @@ func GetNodeTime(initTime time.Time) (time.Time, time.Time, error) {
 
 	return nodeTime, bootTime, nil
 }
-
-
