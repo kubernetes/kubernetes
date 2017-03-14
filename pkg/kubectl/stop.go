@@ -322,7 +322,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 		return err
 	}
 
-	return reaper.client.DaemonSets(namespace).Delete(name, nil)
+	return reaper.client.DaemonSets(namespace).Delete(name, getNonOrphanDeleteOptions())
 }
 
 func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -366,7 +366,7 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 
 	// TODO: Cleanup volumes? We don't want to accidentally delete volumes from
 	// stop, so just leave this up to the statefulset.
-	return statefulsets.Delete(name, nil)
+	return statefulsets.Delete(name, getNonOrphanDeleteOptions())
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -409,7 +409,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 		return utilerrors.NewAggregate(errList)
 	}
 	// once we have all the pods removed we can safely remove the job itself
-	return jobs.Delete(name, nil)
+	return jobs.Delete(name, getNonOrphanDeleteOptions())
 }
 
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -467,7 +467,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 
 	// Delete deployment at the end.
 	// Note: We delete deployment at the end so that if removing RSs fails, we at least have the deployment to retry.
-	return deployments.Delete(name, nil)
+	return deployments.Delete(name, getNonOrphanDeleteOptions())
 }
 
 type updateDeploymentFunc func(d *extensions.Deployment)
@@ -508,4 +508,8 @@ func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration,
 		return err
 	}
 	return services.Delete(name, nil)
+}
+
+func getNonOrphanDeleteOptions() *api.DeleteOptions {
+	return &api.DeleteOptions{OrphanDependents: new(bool)}
 }
