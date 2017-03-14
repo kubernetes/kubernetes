@@ -18,7 +18,10 @@ limitations under the License.
 // features before, during, and after different types of upgrades.
 package upgrades
 
-import "k8s.io/kubernetes/test/e2e/framework"
+import (
+	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/kubernetes/test/e2e/framework"
+)
 
 // UpgradeType represents different types of upgrades.
 type UpgradeType int
@@ -56,4 +59,12 @@ type Test interface {
 	// TearDown should clean up any objects that are created that
 	// aren't already cleaned up by the framework.
 	Teardown(f *framework.Framework)
+}
+
+// VersionSkippable is an interface that an upgrade test can implement
+// to be able to indicate that it should be skipped.
+type VersionSkippable interface {
+	// SkipVersions should return true if test should be skipped
+	// for any of provided versions.
+	SkipVersions(versions ...version.Version) bool
 }
