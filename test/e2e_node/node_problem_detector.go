@@ -21,8 +21,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -385,8 +386,8 @@ func getNodeTime() (time.Time, time.Time, error) {
 	nodeTime := time.Now()
 
 	// Get system uptime.
-	var info syscall.Sysinfo_t
-	if err := syscall.Sysinfo(&info); err != nil {
+	var info unix.Sysinfo_t
+	if err := unix.Sysinfo(&info); err != nil {
 		return time.Time{}, time.Time{}, err
 	}
 	// Get node boot time. NOTE that because we get node current time before uptime, the boot time

@@ -40,6 +40,7 @@ go_library(
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/gomega",
         "//vendor:github.com/opencontainers/runc/libcontainer/cgroups",
+        "//vendor:golang.org/x/sys/unix",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
