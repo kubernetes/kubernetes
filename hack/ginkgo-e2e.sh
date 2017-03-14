@@ -33,6 +33,9 @@ GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
 # If 'y', will rerun failed tests once to give them a second chance.
 GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 
+# If 'true', will run many times until it fails..
+UNTIL_IT_FAILS=false
+
 # The number of tests that can run in parallel depends on what tests
 # are running and on the size of the cluster. Too many, and tests will
 # fail due to resource contention. 25 is a reasonable default for a
@@ -102,6 +105,10 @@ if [[ -n "${GINKGO_PARALLEL_NODES:-}" ]]; then
   ginkgo_args+=("--nodes=${GINKGO_PARALLEL_NODES}")
 elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("--nodes=25")
+fi
+
+if [[ "${GINKGO_UNTIL_IT_FAILS:-}" == true ]]; then
+ginkgo_args+=("--untilItFails=true")
 fi
 
 FLAKE_ATTEMPTS=1
