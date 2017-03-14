@@ -105,7 +105,8 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 		}
-		printersinternal.DescribePodTemplate(internalTemplate, buf)
+		w := printersinternal.NewPrefixWriter(buf)
+		printersinternal.DescribePodTemplate(internalTemplate, w)
 		return buf.String(), nil
 	}
 
