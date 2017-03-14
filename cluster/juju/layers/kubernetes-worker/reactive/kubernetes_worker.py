@@ -203,6 +203,11 @@ def install_cni_plugins():
         hookenv.log(install)
         check_call(install)
 
+    # Used by the "registry" action. The action is run on a single worker, but
+    # the registry pod can end up on any worker, so we need this directory on
+    # all the workers.
+    os.makedirs('/srv/registry', exist_ok=True)
+
     set_state('kubernetes-worker.cni-plugins.installed')
 
 
