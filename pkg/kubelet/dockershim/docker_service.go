@@ -164,6 +164,13 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		containerManager:  cm.NewContainerManager(cgroupsName, client),
 		checkpointHandler: checkpointHandler,
 	}
+
+	// check docker version compatibility.
+	if err = ds.checkVersionCompatibility(); err != nil {
+		return nil, err
+	}
+
+	// create streaming server if configured.
 	if streamingConfig != nil {
 		var err error
 		ds.streamingServer, err = streaming.NewServer(*streamingConfig, ds.streamingRuntime)
@@ -377,6 +384,27 @@ func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (stri
 	}
 	glog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)
 	return cgroupParent, nil
+}
+
+// checkVersionCompatibility verifies whether docker is in a compatible version.
+func (ds *dockerService) checkVersionCompatibility() error {
+	apiVersion, err := ds.getDockerAPIVersion()
+	if err != nil {
+		return err
+	}
+
+	minApiVersion, err := semver.Parse(fmt.Sprintf("%s.0", dockertools.MinimumDockerAPIVersion))
+	if err != nil {
+		return err
+	}
+
+	// Verify the docker version.
+	result := apiVersion.Compare(minApiVersion)
+	if result < 0 {
+		return fmt.Errorf("docker APIVersion is older than %s", dockertools.MinimumDockerAPIVersion)
+	}
+
+	return nil
 }
 
 // getDockerAPIVersion gets the semver-compatible docker api version.

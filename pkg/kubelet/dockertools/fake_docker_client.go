@@ -86,7 +86,7 @@ const (
 
 func NewFakeDockerClient() *FakeDockerClient {
 	return &FakeDockerClient{
-		VersionInfo:  dockertypes.Version{Version: fakeDockerVersion, APIVersion: minimumDockerAPIVersion},
+		VersionInfo:  dockertypes.Version{Version: fakeDockerVersion, APIVersion: MinimumDockerAPIVersion},
 		Errors:       make(map[string]error),
 		ContainerMap: make(map[string]*dockertypes.ContainerJSON),
 		Clock:        clock.RealClock{},

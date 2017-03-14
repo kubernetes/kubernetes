@@ -1587,7 +1587,7 @@ func TestCheckVersionCompatibility(t *testing.T) {
 	}
 	tests := []test{
 		// Minimum apiversion
-		{minimumDockerAPIVersion, true},
+		{MinimumDockerAPIVersion, true},
 		// Invalid apiversion
 		{"invalid_api_version", false},
 		// Older apiversion
