@@ -236,7 +236,7 @@ func TestFormatResourceName(t *testing.T) {
 		{"kind", "name", "kind/name"},
 	}
 	for _, tt := range tests {
-		if got := formatResourceName(tt.kind, tt.name, true); got != tt.want {
+		if got := printers.FormatResourceName(tt.kind, tt.name, true); got != tt.want {
 			t.Errorf("formatResourceName(%q, %q) = %q, want %q", tt.kind, tt.name, got, tt.want)
 		}
 	}

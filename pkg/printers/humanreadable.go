@@ -300,7 +300,7 @@ func printUnstructured(unstructured runtime.Unstructured, w io.Writer, additiona
 		}
 	}
 
-	name := formatResourceName(options.Kind, metadata.GetName(), options.WithKind)
+	name := FormatResourceName(options.Kind, metadata.GetName(), options.WithKind)
 
 	if _, err := fmt.Fprintf(w, "%s\t%s", name, kind); err != nil {
 		return err
@@ -319,10 +319,10 @@ func printUnstructured(unstructured runtime.Unstructured, w io.Writer, additiona
 			}
 		}
 	}
-	if _, err := fmt.Fprint(w, appendLabels(metadata.GetLabels(), options.ColumnLabels)); err != nil {
+	if _, err := fmt.Fprint(w, AppendLabels(metadata.GetLabels(), options.ColumnLabels)); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprint(w, appendAllLabels(options.ShowLabels, metadata.GetLabels())); err != nil {
+	if _, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, metadata.GetLabels())); err != nil {
 		return err
 	}
 
@@ -349,10 +349,9 @@ func formatShowLabelsHeader(showLabels bool, t reflect.Type) []string {
 	return nil
 }
 
-// formatResourceName receives a resource kind, name, and boolean specifying
+// FormatResourceName receives a resource kind, name, and boolean specifying
 // whether or not to update the current name to "kind/name"
-// TODO: dedup this with printers/internalversions
-func formatResourceName(kind, name string, withKind bool) string {
+func FormatResourceName(kind, name string, withKind bool) string {
 	if !withKind || kind == "" {
 		return name
 	}
@@ -360,8 +359,7 @@ func formatResourceName(kind, name string, withKind bool) string {
 	return kind + "/" + name
 }
 
-// TODO: dedup this with printers/internalversions
-func appendLabels(itemLabels map[string]string, columnLabels []string) string {
+func AppendLabels(itemLabels map[string]string, columnLabels []string) string {
 	var buffer bytes.Buffer
 
 	for _, cl := range columnLabels {
@@ -378,13 +376,25 @@ func appendLabels(itemLabels map[string]string, columnLabels []string) string {
 
 // Append all labels to a single column. We need this even when show-labels flag* is
 // false, since this adds newline delimiter to the end of each row.
-// TODO: dedup this with printers/internalversions
-func appendAllLabels(showLabels bool, itemLabels map[string]string) string {
+func AppendAllLabels(showLabels bool, itemLabels map[string]string) string {
 	var buffer bytes.Buffer
 
 	if showLabels {
 		buffer.WriteString(fmt.Sprint("\t"))
 		buffer.WriteString(labels.FormatLabels(itemLabels))
+	}
+	buffer.WriteString("\n")
+
+	return buffer.String()
+}
+
+// Append a set of tabs for each label column.  We need this in the case where
+// we have extra lines so that the tabwriter will still line things up.
+func AppendLabelTabs(columnLabels []string) string {
+	var buffer bytes.Buffer
+
+	for range columnLabels {
+		buffer.WriteString("\t")
 	}
 	buffer.WriteString("\n")
 
