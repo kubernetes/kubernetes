@@ -113,14 +113,10 @@ type controllerCommon struct {
 
 func (c *controllerCommon) isManagedArmVm(storageProfile map[string]interface{}) bool {
 	osDisk := storageProfile["osDisk"].(map[string]interface{})
-
-	_, ok := osDisk["managedDisk"]
-	if ok {
+	if _, ok := osDisk["managedDisk"]; ok {
 		return true
 	}
-
 	return false
-
 }
 
 func (c *controllerCommon) getAttachedDisks(nodeName string) ([]string, error) {

@@ -78,11 +78,12 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 		}
 	}
 
-	var storageAccountType, fsType string
-	var cachingMode v1.AzureDataDiskCachingMode
-	var kind v1.AzureDataDiskKind
-	var err error
-
+	var (
+		storageAccountType, fsType string
+		cachingMode                v1.AzureDataDiskCachingMode
+		kind                       v1.AzureDataDiskKind
+		err                        error
+	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := volume.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -94,15 +95,15 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 		case "skuname":
 			storageAccountType = strings.ToLower(v)
 		case "location":
-			return nil, fmt.Errorf("AzureDisk - location parameter is not suppoerted anymore in PVC, use PV to use storage accounts in different locations")
+			return nil, fmt.Errorf("AzureDisk - location parameter is not supported anymore in PVC, use PV to use named storage accounts in different locations")
 		case "storageaccount":
 			return nil, fmt.Errorf("AzureDisk - storage parameter is not suppoerted anymore in PVC, use PV to use named storage account")
 		case "storageaccounttype":
 			storageAccountType = strings.ToLower(v)
 		case "kind":
-			kind = v1.AzureDataDiskKind(strings.ToLower(v))
+			kind = v1.AzureDataDiskKind(v)
 		case "cachingmode":
-			cachingMode = v1.AzureDataDiskCachingMode(strings.ToLower(v))
+			cachingMode = v1.AzureDataDiskCachingMode(v)
 		case "fstype":
 			fsType = strings.ToLower(v)
 		default:
