@@ -101,12 +101,14 @@ func (s *StatefulSetTester) CreateStatefulSet(manifestPath, ns string) *apps.Sta
 		return filepath.Join(manifestPath, file)
 	}
 	ss := StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
+	svcYaml := generated.ReadOrDie(mkpath("service.yaml"))
+	ssYaml := generated.ReadOrDie(mkpath("statefulset.yaml"))
 
 	Logf(fmt.Sprintf("creating " + ss.Name + " service"))
-	RunKubectlOrDie("create", "-f", mkpath("service.yaml"), fmt.Sprintf("--namespace=%v", ns))
+	RunKubectlOrDieInput(string(svcYaml[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 
 	Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
-	RunKubectlOrDie("create", "-f", mkpath("statefulset.yaml"), fmt.Sprintf("--namespace=%v", ns))
+	RunKubectlOrDieInput(string(ssYaml[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 	s.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	return ss
 }
