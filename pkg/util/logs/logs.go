@@ -18,11 +18,14 @@ package logs
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -58,4 +61,30 @@ func FlushLogs() {
 // NewLogger creates a new log.Logger which sends logs to glog.Info.
 func NewLogger(prefix string) *log.Logger {
 	return log.New(GlogWriter{}, prefix, 0)
+}
+
+// PrintHyperStartupFlags prints the startup flags of deamon for debug-ability.
+func PrintHyperStartupFlags(fs *pflag.FlagSet) {
+	argsStr := ""
+
+	fs.VisitAll(func(f *pflag.Flag) {
+		argsStr += fmt.Sprintf(" --%s=%v", f.Name, f.Value)
+	})
+
+	if len(os.Args) == 1 {
+		glog.Infof("%s %s", os.Args[0], argsStr)
+	} else {
+		glog.Infof("%s %s%s", os.Args[0], os.Args[1], argsStr)
+	}
+}
+
+// PrintDeamonStartupFlags prints the startup flags of deamon for debug-ability.
+func PrintDeamonStartupFlags() {
+	argsStr := ""
+
+	pflag.VisitAll(func(f *pflag.Flag) {
+		argsStr += fmt.Sprintf(" --%s=%v", f.Name, f.Value)
+	})
+
+	glog.Infof("%s%s", os.Args[0], argsStr)
 }

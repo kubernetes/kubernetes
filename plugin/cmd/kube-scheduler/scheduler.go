@@ -37,6 +37,8 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
+	logs.PrintDeamonStartupFlags()
+
 	if err := app.Run(s); err != nil {
 		glog.Fatalf("scheduler app failed to run: %v", err)
 	}
