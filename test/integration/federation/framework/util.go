@@ -18,18 +18,46 @@ package framework
 
 import (
 	"testing"
+	"time"
 )
 
-// Setup is likely to be fixture-specific, but Teardown needs to be
-// consistent to enable TeardownOnPanic.
+const (
+	DefaultWaitInterval = 50 * time.Millisecond
+)
+
+// SetUp is likely to be fixture-specific, but TearDown needs to be
+// consistent to enable TearDownOnPanic.
 type TestFixture interface {
-	Teardown(t *testing.T)
+	TearDown(t *testing.T)
 }
 
-// TeardownOnPanic can be used to ensure cleanup on setup failure.
-func TeardownOnPanic(t *testing.T, f TestFixture) {
+// TearDownOnPanic can be used to ensure cleanup on setup failure.
+func TearDownOnPanic(t *testing.T, f TestFixture) {
 	if r := recover(); r != nil {
-		f.Teardown(t)
+		f.TearDown(t)
 		panic(r)
 	}
+}
+
+// TestLogger defines operations common across integration and e2e testing
+type TestLogger interface {
+	Fatalf(format string, args ...interface{})
+	Fatal(msg string)
+	Logf(format string, args ...interface{})
+}
+
+type IntegrationLogger struct {
+	t *testing.T
+}
+
+func (tr *IntegrationLogger) Logf(format string, args ...interface{}) {
+	tr.t.Logf(format, args...)
+}
+
+func (tr *IntegrationLogger) Fatalf(format string, args ...interface{}) {
+	tr.t.Fatalf(format, args...)
+}
+
+func (tr *IntegrationLogger) Fatal(msg string) {
+	tr.t.Fatal(msg)
 }
