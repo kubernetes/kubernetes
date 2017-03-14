@@ -554,11 +554,15 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/hazelcast", file)
 			}
+			serviceAccountYaml := mkpath("hazelcast-serviceaccount.yaml")
+			roleBindingYaml := mkpath("hazelcast-rolebinding.yaml")
 			serviceYaml := mkpath("hazelcast-service.yaml")
 			deploymentYaml := mkpath("hazelcast-deployment.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("starting hazelcast")
+			framework.RunKubectlOrDie("create", "-f", serviceAccountYaml, nsFlag)
+			framework.RunKubectl("create", "-f", roleBindingYaml, nsFlag) // tolerate failure in case the cluster isn't using RBAC
 			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", deploymentYaml, nsFlag)
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "hazelcast"}))
