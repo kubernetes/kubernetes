@@ -3,3 +3,5 @@
     import "vbom.ml/util/sortorder"
 
 Sort orders and comparison functions.
+
+<! -- BREAKING CHANGE -- >
