@@ -492,6 +492,10 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 	// Group Pods by Node name.
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
 	for _, pod := range claimedPods {
+		// Skip terminating pods
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
 		nodeName := pod.Spec.NodeName
 		nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
 	}
@@ -553,10 +557,6 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 			var daemonPodsRunning []*v1.Pod
 			for i := range daemonPods {
 				pod := daemonPods[i]
-				// Skip terminating pods. We won't delete them again or count them as running daemon pods.
-				if pod.DeletionTimestamp != nil {
-					continue
-				}
 				if pod.Status.Phase == v1.PodFailed {
 					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
 					glog.V(2).Infof(msg)
