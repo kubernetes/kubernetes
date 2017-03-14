@@ -46,8 +46,8 @@ type apiTestFunc func(t *testing.T, host string)
 
 func TestFederationAPI(t *testing.T) {
 	f := &framework.FederationAPIFixture{}
-	f.Setup(t)
-	defer f.Teardown(t)
+	f.SetUp(t)
+	defer f.TearDown(t)
 
 	testCases := map[string]apiTestFunc{
 		"swaggerSpec":     testSwaggerSpec,
