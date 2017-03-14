@@ -1,3 +1,5 @@
+// +build cgo,darwin
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -21,7 +23,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,6 +51,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 	var uid string
 	var ns, name, configName, eventNamespace string
 	var bootTime, nodeTime time.Time
+	initTime := time.Now()
+
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
@@ -95,11 +98,12 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		BeforeEach(func() {
 			By("Calculate Lookback duration")
 			var err error
-			nodeTime, bootTime, err = getNodeTime()
+			nodeTime, bootTime, err = getNodeTime(initTime)
 			Expect(err).To(BeNil())
 			// Set lookback duration longer than node up time.
 			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
 			lookback = nodeTime.Sub(bootTime) + time.Hour
+			fmt.Printf("loockback %s", lookback.String())
 
 			// Randomize the source name
 			source = "kernel-monitor-" + uid
@@ -380,19 +384,16 @@ func injectLog(file string, timestamp time.Time, log string, num int) error {
 }
 
 // getNodeTime gets node boot time and current time.
-func getNodeTime() (time.Time, time.Time, error) {
+func getNodeTime(initTime time.Time) (time.Time, time.Time, error) {
 	// Get node current time.
 	nodeTime := time.Now()
 
-	// Get system uptime.
-	var info syscall.Sysinfo_t
-	if err := syscall.Sysinfo(&info); err != nil {
-		return time.Time{}, time.Time{}, err
-	}
+	// TODO (aescobar): init time is a poor approximation for uptime, but darwin has little choice.
+	// Syscall is not supported on darwin so this change was necessary.
 	// Get node boot time. NOTE that because we get node current time before uptime, the boot time
 	// calculated will be a little earlier than the real boot time. This won't affect the correctness
 	// of the test result.
-	bootTime := nodeTime.Add(-time.Duration(info.Uptime) * time.Second)
+	bootTime := nodeTime.Add(-time.Duration(initTime.Unix()) * time.Second)
 
 	return nodeTime, bootTime, nil
 }
