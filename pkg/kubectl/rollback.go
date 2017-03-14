@@ -172,7 +172,8 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 		}
-		printersinternal.DescribePodTemplate(internalTemplate, buf)
+		w := printersinternal.NewPrefixWriter(buf)
+		printersinternal.DescribePodTemplate(internalTemplate, w)
 		return buf.String(), nil
 	}
 
@@ -190,6 +191,7 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 	}
-	printersinternal.DescribePodTemplate(internalTemplate, buf)
+	w := printersinternal.NewPrefixWriter(buf)
+	printersinternal.DescribePodTemplate(internalTemplate, w)
 	return buf.String(), nil
 }
