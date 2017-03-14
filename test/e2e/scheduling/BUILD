@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "events.go",
         "opaque_resource.go",
         "predicates.go",
         "rescheduler.go",
