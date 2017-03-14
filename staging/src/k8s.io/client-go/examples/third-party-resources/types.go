@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	ExampleDomain              = "k8s.io"
+	ExampleDomain              = "tpr.client-go.k8s.io"
 	ExampleResourceDescription = "An Example ThirdPartyResource"
 	ExampleResourceGroup       = ExampleDomain
 

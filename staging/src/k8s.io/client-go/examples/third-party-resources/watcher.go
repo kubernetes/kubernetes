@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"log"
 
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -81,7 +83,7 @@ func watchExamples(ctx context.Context, exampleClient cache.Getter, exampleSchem
 		// resyncPeriod
 		// Every resyncPeriod, all resources in the cache will retrigger events.
 		// Set to 0 to disable the resync.
-		0,
+		30*time.Minute,
 
 		// Your custom resource event handlers.
 		handler)

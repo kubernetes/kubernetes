@@ -36,18 +36,14 @@ func NewClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
 			groupVersion,
 			&Example{},
 			&ExampleList{},
-			&metav1.ListOptions{},
-			&metav1.DeleteOptions{},
-			&metav1.Status{},
 		)
+		scheme.AddUnversionedTypes(api.Unversioned, &metav1.Status{})
+		metav1.AddToGroupVersion(scheme, groupVersion)
 		return nil
 	})
 
 	scheme := runtime.NewScheme()
 	if err := schemeBuilder.AddToScheme(scheme); err != nil {
-		return nil, nil, err
-	}
-	if err := api.AddToScheme(scheme); err != nil {
 		return nil, nil, err
 	}
 
@@ -58,7 +54,6 @@ func NewClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)}
 
 	client, err := rest.RESTClientFor(&config)
-
 	if err != nil {
 		return nil, nil, err
 	}
