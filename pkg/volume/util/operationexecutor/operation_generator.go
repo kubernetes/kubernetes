@@ -115,12 +115,8 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 		volumePlugin, err :=
 			og.volumePluginMgr.FindPluginBySpec(volumeAttached.VolumeSpec)
 		if err != nil || volumePlugin == nil {
-			glog.Errorf(
-				"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
-				volumeAttached.VolumeName,
-				volumeAttached.VolumeSpec.Name(),
-				volumeAttached.NodeName,
-				err)
+			_, detailedErr := volumeAttached.GenerateError("VolumesAreAttached.FindPluginBySpec failed", err)
+			glog.Errorf(detailedErr.Error())
 		}
 		volumeSpecList, pluginExists := volumesPerPlugin[volumePlugin.GetPluginName()]
 		if !pluginExists {
@@ -248,22 +244,14 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	attachableVolumePlugin, err :=
 		og.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
 	if err != nil || attachableVolumePlugin == nil {
-		return nil, fmt.Errorf(
-			"AttachVolume.FindAttachablePluginBySpec failed for volume %q (spec.Name: %q) from node %q with: %v",
-			volumeToAttach.VolumeName,
-			volumeToAttach.VolumeSpec.Name(),
-			volumeToAttach.NodeName,
-			err)
+		_, detailedErr := volumeToAttach.GenerateError("AttachVolume.FindAttachablePluginBySpec failed", err)
+		return nil, detailedErr
 	}
 
 	volumeAttacher, newAttacherErr := attachableVolumePlugin.NewAttacher()
 	if newAttacherErr != nil {
-		return nil, fmt.Errorf(
-			"AttachVolume.NewAttacher failed for volume %q (spec.Name: %q) from node %q with: %v",
-			volumeToAttach.VolumeName,
-			volumeToAttach.VolumeSpec.Name(),
-			volumeToAttach.NodeName,
-			newAttacherErr)
+		_, detailedErr := volumeToAttach.GenerateError("AttachVolume.NewAttacher failed", newAttacherErr)
+		return nil, detailedErr
 	}
 
 	return func() error {
@@ -273,34 +261,23 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 
 		if attachErr != nil {
 			// On failure, return error. Caller will log and retry.
-			err := fmt.Errorf(
-				"Failed to attach volume %q on node %q with: %v",
-				volumeToAttach.VolumeSpec.Name(),
-				volumeToAttach.NodeName,
-				attachErr)
+			eventErr, detailedErr := volumeToAttach.GenerateError("Attach failed", attachErr)
 			for _, pod := range volumeToAttach.ScheduledPods {
-				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
 			}
-			return err
+			return detailedErr
 		}
 
-		glog.Infof(
-			"AttachVolume.Attach succeeded for volume %q (spec.Name: %q) from node %q.",
-			volumeToAttach.VolumeName,
-			volumeToAttach.VolumeSpec.Name(),
-			volumeToAttach.NodeName)
+		_, detailedMsg := volumeToAttach.GenerateMsg("AttachVolume.Attach succeeded", "")
+		glog.Infof(detailedMsg)
 
 		// Update actual state of world
 		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
 			v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
 		if addVolumeNodeErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"AttachVolume.MarkVolumeAsAttached failed for volume %q (spec.Name: %q) from node %q with: %v",
-				volumeToAttach.VolumeName,
-				volumeToAttach.VolumeSpec.Name(),
-				volumeToAttach.NodeName,
-				addVolumeNodeErr)
+			_, detailedErr := volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
+			return detailedErr
 		}
 
 		return nil
@@ -324,16 +301,16 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		attachableVolumePlugin, err =
 			og.volumePluginMgr.FindAttachablePluginBySpec(volumeToDetach.VolumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
-			return nil, fmt.Errorf(
-				"DetachVolume.FindAttachablePluginBySpec failed for volume %q (spec.Name: %q) from node %q with: %v",
-				volumeToDetach.VolumeName,
-				volumeToDetach.VolumeSpec.Name(),
-				volumeToDetach.NodeName,
-				err)
+			_, detailedErr := volumeToDetach.GenerateError("DetachVolume.FindAttachablePluginBySpec failed", err)
+			return nil, detailedErr
 		}
 
 		volumeName, err =
 			attachableVolumePlugin.GetVolumeName(volumeToDetach.VolumeSpec)
+		if err != nil {
+			_, detailedErr := volumeToDetach.GenerateError("DetachVolume.GetVolumeName failed", err)
+			return nil, detailedErr
+		}
 	} else {
 		var pluginName string
 		// Get attacher plugin and the volumeName by splitting the volume unique name in case
@@ -345,20 +322,15 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		}
 		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(pluginName)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"Failed to find plugin for volume %q from node %q with: %v",
-				volumeToDetach.VolumeName,
-				volumeToDetach.NodeName,
-				err)
+			_, detailedErr := volumeToDetach.GenerateError("DetachVolume.FindAttachablePluginBySpec failed", err)
+			return nil, detailedErr
+
 		}
 	}
 	volumeDetacher, err := attachableVolumePlugin.NewDetacher()
 	if err != nil {
-		return nil, fmt.Errorf(
-			"DetachVolume.NewDetacher failed for volume %q from node %q with: %v",
-			volumeToDetach.VolumeName,
-			volumeToDetach.NodeName,
-			err)
+		_, detailedErr := volumeToDetach.GenerateError("DetachVolume.NewDetacher failed", err)
+		return nil, detailedErr
 	}
 
 	return func() error {
@@ -373,17 +345,12 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			// On failure, add volume back to ReportAsAttached list
 			actualStateOfWorld.AddVolumeToReportAsAttached(
 				volumeToDetach.VolumeName, volumeToDetach.NodeName)
-			return fmt.Errorf(
-				"DetachVolume.Detach failed for volume %q from node %q with: %v",
-				volumeToDetach.VolumeName,
-				volumeToDetach.NodeName,
-				err)
+			_, detailedErr := volumeToDetach.GenerateError("DetachVolume.Detach failed", err)
+			return detailedErr
 		}
 
-		glog.Infof(
-			"DetachVolume.Detach succeeded for volume %q from node %q.",
-			volumeToDetach.VolumeName,
-			volumeToDetach.NodeName)
+		_, detailedMsg := volumeToDetach.GenerateMsg("DetachVolume.Detach succeeded", "")
+		glog.Infof(detailedMsg)
 
 		// Update actual state of world
 		actualStateOfWorld.MarkVolumeAsDetached(
@@ -401,13 +368,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
 	if err != nil || volumePlugin == nil {
-		return nil, fmt.Errorf(
-			"MountVolume.FindPluginBySpec failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-			volumeToMount.VolumeName,
-			volumeToMount.VolumeSpec.Name(),
-			volumeToMount.PodName,
-			volumeToMount.Pod.UID,
-			err)
+		_, detailedErr := volumeToMount.GenerateError("MountVolume.FindPluginBySpec failed", err)
+		return nil, detailedErr
 	}
 
 	volumeMounter, newMounterErr := volumePlugin.NewMounter(
@@ -415,15 +377,9 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		volumeToMount.Pod,
 		volume.VolumeOptions{})
 	if newMounterErr != nil {
-		errMsg := fmt.Errorf(
-			"MountVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-			volumeToMount.VolumeName,
-			volumeToMount.VolumeSpec.Name(),
-			volumeToMount.PodName,
-			volumeToMount.Pod.UID,
-			newMounterErr)
-		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, errMsg.Error())
-		return nil, errMsg
+		eventErr, detailedErr := volumeToMount.GenerateError("Mount initialization failed", newMounterErr)
+		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
+		return nil, detailedErr
 	}
 
 	mountCheckError := checkMountOptionSupport(og, volumeToMount, volumePlugin)
@@ -449,45 +405,26 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	return func() error {
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
-			glog.Infof(
-				"Entering MountVolume.WaitForAttach for volume %q (spec.Name: %q) pod %q (UID: %q) DevicePath: %q",
-				volumeToMount.VolumeName,
-				volumeToMount.VolumeSpec.Name(),
-				volumeToMount.PodName,
-				volumeToMount.Pod.UID,
-				volumeToMount.DevicePath)
+			_, detailedMsg := volumeToMount.GenerateMsg("Entering MountVolume.WaitForAttach", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath))
+			glog.Infof(detailedMsg)
 
 			devicePath, err := volumeAttacher.WaitForAttach(
 				volumeToMount.VolumeSpec, volumeToMount.DevicePath, waitForAttachTimeout)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
-				return fmt.Errorf(
-					"MountVolume.WaitForAttach failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-					volumeToMount.VolumeName,
-					volumeToMount.VolumeSpec.Name(),
-					volumeToMount.PodName,
-					volumeToMount.Pod.UID,
-					err)
+				_, detailedErr := volumeToMount.GenerateError("MountVolume.WaitForAttach failed", err)
+				return detailedErr
 			}
 
-			glog.Infof(
-				"MountVolume.WaitForAttach succeeded for volume %q (spec.Name: %q) pod %q (UID: %q).",
-				volumeToMount.VolumeName,
-				volumeToMount.VolumeSpec.Name(),
-				volumeToMount.PodName,
-				volumeToMount.Pod.UID)
+			_, detailedMsg = volumeToMount.GenerateMsg("MountVolume.WaitForAttach succeeded", "")
+			glog.Infof(detailedMsg)
 
 			deviceMountPath, err :=
 				volumeAttacher.GetDeviceMountPath(volumeToMount.VolumeSpec)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
-				return fmt.Errorf(
-					"MountVolume.GetDeviceMountPath failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-					volumeToMount.VolumeName,
-					volumeToMount.VolumeSpec.Name(),
-					volumeToMount.PodName,
-					volumeToMount.Pod.UID,
-					err)
+				_, detailedErr := volumeToMount.GenerateError("MountVolume.GetDeviceMountPath failed", err)
+				return detailedErr
 			}
 
 			// Mount device to global mount path
@@ -497,46 +434,32 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				deviceMountPath)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
-				err := fmt.Errorf(
-					"MountVolume.MountDevice failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-					volumeToMount.VolumeName,
-					volumeToMount.VolumeSpec.Name(),
-					volumeToMount.PodName,
-					volumeToMount.Pod.UID,
-					err)
-				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
-				return err
+				eventErr, detailedErr := volumeToMount.GenerateError("Mount device failed", err)
+				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
+				return detailedErr
 			}
 
-			glog.Infof(
-				"MountVolume.MountDevice succeeded for volume %q (spec.Name: %q) pod %q (UID: %q) device mount path %q",
-				volumeToMount.VolumeName,
-				volumeToMount.VolumeSpec.Name(),
-				volumeToMount.PodName,
-				volumeToMount.Pod.UID,
-				deviceMountPath)
+			_, detailedMsg = volumeToMount.GenerateMsg("MountVolume.MountDevice succeeded", fmt.Sprintf("device mount path %q", deviceMountPath))
+			glog.Infof(detailedMsg)
 
 			// Update actual state of world to reflect volume is globally mounted
 			markDeviceMountedErr := actualStateOfWorld.MarkDeviceAsMounted(
 				volumeToMount.VolumeName)
 			if markDeviceMountedErr != nil {
 				// On failure, return error. Caller will log and retry.
-				return fmt.Errorf(
-					"MountVolume.MarkDeviceAsMounted failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-					volumeToMount.VolumeName,
-					volumeToMount.VolumeSpec.Name(),
-					volumeToMount.PodName,
-					volumeToMount.Pod.UID,
-					markDeviceMountedErr)
+				_, detailedErr := volumeToMount.GenerateError("MountVolume.MarkDeviceAsMounted failed", markDeviceMountedErr)
+				return detailedErr
 			}
 		}
 
 		if og.checkNodeCapabilitiesBeforeMount {
 			if canMountErr := volumeMounter.CanMount(); canMountErr != nil {
-				errMsg := fmt.Sprintf("Unable to mount volume %v (spec.Name: %v) on pod %v (UID: %v). Verify that your node machine has the required components before attempting to mount this volume type. %s", volumeToMount.VolumeName, volumeToMount.VolumeSpec.Name(), volumeToMount.Pod.Name, volumeToMount.Pod.UID, canMountErr.Error())
-				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, errMsg)
-				glog.Errorf(errMsg)
-				return fmt.Errorf(errMsg)
+				err = fmt.Errorf(
+					"Verify that your node machine has the required components before attempting to mount this volume type. %s",
+					canMountErr)
+				eventErr, detailedErr := volumeToMount.GenerateError("Mount failed", err)
+				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
+				return detailedErr
 			}
 		}
 
@@ -544,23 +467,13 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		mountErr := volumeMounter.SetUp(fsGroup)
 		if mountErr != nil {
 			// On failure, return error. Caller will log and retry.
-			err := fmt.Errorf(
-				"MountVolume.SetUp failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-				volumeToMount.VolumeName,
-				volumeToMount.VolumeSpec.Name(),
-				volumeToMount.PodName,
-				volumeToMount.Pod.UID,
-				mountErr)
-			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
-			return err
+			eventErr, detailedErr := volumeToMount.GenerateError("Mount setup failed", mountErr)
+			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
+			return detailedErr
 		}
 
-		glog.Infof(
-			"MountVolume.SetUp succeeded for volume %q (spec.Name: %q) pod %q (UID: %q).",
-			volumeToMount.VolumeName,
-			volumeToMount.VolumeSpec.Name(),
-			volumeToMount.PodName,
-			volumeToMount.Pod.UID)
+		_, detailedMsg := volumeToMount.GenerateMsg("MountVolume.SetUp succeeded", "")
+		glog.Infof(detailedMsg)
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
@@ -572,13 +485,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			volumeToMount.VolumeGidValue)
 		if markVolMountedErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"MountVolume.MarkVolumeAsMounted failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-				volumeToMount.VolumeName,
-				volumeToMount.VolumeSpec.Name(),
-				volumeToMount.PodName,
-				volumeToMount.Pod.UID,
-				markVolMountedErr)
+			_, detailedErr := volumeToMount.GenerateError("MountVolume.MarkVolumeAsMounted failed", markVolMountedErr)
+			return detailedErr
 		}
 
 		return nil
@@ -592,25 +500,15 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginByName(volumeToUnmount.PluginName)
 	if err != nil || volumePlugin == nil {
-		return nil, fmt.Errorf(
-			"UnmountVolume.FindPluginByName failed for volume %q (volume.spec.Name: %q) pod %q (UID: %q) err=%v",
-			volumeToUnmount.VolumeName,
-			volumeToUnmount.OuterVolumeSpecName,
-			volumeToUnmount.PodName,
-			volumeToUnmount.PodUID,
-			err)
+		_, detailedErr := volumeToUnmount.GenerateError("UnmountVolume.FindPluginByName failed", err)
+		return nil, detailedErr
 	}
 
 	volumeUnmounter, newUnmounterErr := volumePlugin.NewUnmounter(
 		volumeToUnmount.InnerVolumeSpecName, volumeToUnmount.PodUID)
 	if newUnmounterErr != nil {
-		return nil, fmt.Errorf(
-			"UnmountVolume.NewUnmounter failed for volume %q (volume.spec.Name: %q) pod %q (UID: %q) err=%v",
-			volumeToUnmount.VolumeName,
-			volumeToUnmount.OuterVolumeSpecName,
-			volumeToUnmount.PodName,
-			volumeToUnmount.PodUID,
-			newUnmounterErr)
+		_, detailedErr := volumeToUnmount.GenerateError("UnmountVolume.NewUnmounter failed", newUnmounterErr)
+		return nil, detailedErr
 	}
 
 	return func() error {
@@ -618,13 +516,8 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		unmountErr := volumeUnmounter.TearDown()
 		if unmountErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"UnmountVolume.TearDown failed for volume %q (volume.spec.Name: %q) pod %q (UID: %q) with: %v",
-				volumeToUnmount.VolumeName,
-				volumeToUnmount.OuterVolumeSpecName,
-				volumeToUnmount.PodName,
-				volumeToUnmount.PodUID,
-				unmountErr)
+			_, detailedErr := volumeToUnmount.GenerateError("UnmountVolume.TearDown failed", unmountErr)
+			return detailedErr
 		}
 
 		glog.Infof(
@@ -642,13 +535,8 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 			volumeToUnmount.PodName, volumeToUnmount.VolumeName)
 		if markVolMountedErr != nil {
 			// On failure, just log and exit
-			glog.Errorf(
-				"UnmountVolume.MarkVolumeAsUnmounted failed for volume %q (volume.spec.Name: %q) pod %q (UID: %q) with: %v",
-				volumeToUnmount.VolumeName,
-				volumeToUnmount.OuterVolumeSpecName,
-				volumeToUnmount.PodName,
-				volumeToUnmount.PodUID,
-				markVolMountedErr)
+			_, detailedErr := volumeToUnmount.GenerateError("UnmountVolume.MarkVolumeAsUnmounted failed", markVolMountedErr)
+			glog.Errorf(detailedErr.Error())
 		}
 
 		return nil
@@ -663,29 +551,20 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 	attachableVolumePlugin, err :=
 		og.volumePluginMgr.FindAttachablePluginBySpec(deviceToDetach.VolumeSpec)
 	if err != nil || attachableVolumePlugin == nil {
-		return nil, fmt.Errorf(
-			"UnmountDevice.FindAttachablePluginBySpec failed for volume %q (spec.Name: %q) with: %v",
-			deviceToDetach.VolumeName,
-			deviceToDetach.VolumeSpec.Name(),
-			err)
+		_, detailedErr := deviceToDetach.GenerateError("UnmountDevice.FindAttachablePluginBySpec failed", err)
+		return nil, detailedErr
 	}
 
 	volumeDetacher, err := attachableVolumePlugin.NewDetacher()
 	if err != nil {
-		return nil, fmt.Errorf(
-			"UnmountDevice.NewDetacher failed for volume %q (spec.Name: %q) with: %v",
-			deviceToDetach.VolumeName,
-			deviceToDetach.VolumeSpec.Name(),
-			err)
+		_, detailedErr := deviceToDetach.GenerateError("UnmountDevice.NewDetacher failed", err)
+		return nil, detailedErr
 	}
 
 	volumeAttacher, err := attachableVolumePlugin.NewAttacher()
 	if err != nil {
-		return nil, fmt.Errorf(
-			"UnmountDevice.NewAttacher failed for volume %q (spec.Name: %q) with: %v",
-			deviceToDetach.VolumeName,
-			deviceToDetach.VolumeSpec.Name(),
-			err)
+		_, detailedErr := deviceToDetach.GenerateError("UnmountDevice.NewAttacher failed", err)
+		return nil, detailedErr
 	}
 
 	return func() error {
@@ -693,11 +572,8 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 			volumeAttacher.GetDeviceMountPath(deviceToDetach.VolumeSpec)
 		if err != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"GetDeviceMountPath failed for volume %q (spec.Name: %q) with: %v",
-				deviceToDetach.VolumeName,
-				deviceToDetach.VolumeSpec.Name(),
-				err)
+			_, detailedErr := deviceToDetach.GenerateError("GetDeviceMountPath failed", err)
+			return detailedErr
 		}
 		refs, err := attachableVolumePlugin.GetDeviceMountRefs(deviceMountPath)
 
@@ -705,21 +581,15 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 			if err == nil {
 				err = fmt.Errorf("The device mount path %q is still mounted by other references %v", deviceMountPath, refs)
 			}
-			return fmt.Errorf(
-				"GetDeviceMountRefs check failed for volume %q (spec.Name: %q) with: %v",
-				deviceToDetach.VolumeName,
-				deviceToDetach.VolumeSpec.Name(),
-				err)
+			_, detailedErr := deviceToDetach.GenerateError("GetDeviceMountRefs check failed", err)
+			return detailedErr
 		}
 		// Execute unmount
 		unmountDeviceErr := volumeDetacher.UnmountDevice(deviceMountPath)
 		if unmountDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"UnmountDevice failed for volume %q (spec.Name: %q) with: %v",
-				deviceToDetach.VolumeName,
-				deviceToDetach.VolumeSpec.Name(),
-				unmountDeviceErr)
+			_, detailedErr := deviceToDetach.GenerateError("UnmountDevice failed", unmountDeviceErr)
+			return detailedErr
 		}
 		// Before logging that UnmountDevice succeeded and moving on,
 		// use mounter.PathIsDevice to check if the path is a device,
@@ -736,36 +606,28 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		} else {
 			deviceOpened, deviceOpenedErr = mounter.DeviceOpened(deviceToDetach.DevicePath)
 			if deviceOpenedErr != nil {
-				return fmt.Errorf(
-					"UnmountDevice.DeviceOpened failed for volume %q (spec.Name: %q) with: %v",
-					deviceToDetach.VolumeName,
-					deviceToDetach.VolumeSpec.Name(),
-					deviceOpenedErr)
+				_, detailedErr := deviceToDetach.GenerateError("UnmountDevice.DeviceOpened failed", deviceOpenedErr)
+				return detailedErr
 			}
 		}
 		// The device is still in use elsewhere. Caller will log and retry.
 		if deviceOpened {
-			return fmt.Errorf(
-				"UnmountDevice failed for volume %q (spec.Name: %q) because the device is in use when it was no longer expected to be in use",
-				deviceToDetach.VolumeName,
-				deviceToDetach.VolumeSpec.Name())
+			_, detailedErr := deviceToDetach.GenerateError(
+				"UnmountDevice failed",
+				fmt.Errorf("the device is in use when it was no longer expected to be in use"))
+			return detailedErr
 		}
 
-		glog.Infof(
-			"UnmountDevice succeeded for volume %q (spec.Name: %q).",
-			deviceToDetach.VolumeName,
-			deviceToDetach.VolumeSpec.Name())
+		_, detailedMsg := deviceToDetach.GenerateMsg("UnmountDevice succeeded", "")
+		glog.Infof(detailedMsg)
 
 		// Update actual state of world
 		markDeviceUnmountedErr := actualStateOfWorld.MarkDeviceAsUnmounted(
 			deviceToDetach.VolumeName)
 		if markDeviceUnmountedErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"MarkDeviceAsUnmounted failed for device %q (spec.Name: %q) with: %v",
-				deviceToDetach.VolumeName,
-				deviceToDetach.VolumeSpec.Name(),
-				markDeviceUnmountedErr)
+			_, detailedErr := deviceToDetach.GenerateError("MarkDeviceAsUnmounted failed", markDeviceUnmountedErr)
+			return detailedErr
 		}
 
 		return nil
@@ -786,13 +648,8 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 				volumeToMount.VolumeName, volumeToMount.VolumeSpec, nodeName, "" /* devicePath */)
 			if addVolumeNodeErr != nil {
 				// On failure, return error. Caller will log and retry.
-				return fmt.Errorf(
-					"VerifyControllerAttachedVolume.MarkVolumeAsAttachedByUniqueVolumeName failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-					volumeToMount.VolumeName,
-					volumeToMount.VolumeSpec.Name(),
-					volumeToMount.PodName,
-					volumeToMount.Pod.UID,
-					addVolumeNodeErr)
+				_, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttachedByUniqueVolumeName failed", addVolumeNodeErr)
+				return detailedErr
 			}
 
 			return nil
@@ -805,67 +662,45 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			// periodically by kubelet, so it may take as much as 10 seconds
 			// before this clears.
 			// Issue #28141 to enable on demand status updates.
-			return fmt.Errorf("Volume %q (spec.Name: %q) pod %q (UID: %q) has not yet been added to the list of VolumesInUse in the node's volume status",
-				volumeToMount.VolumeName,
-				volumeToMount.VolumeSpec.Name(),
-				volumeToMount.PodName,
-				volumeToMount.Pod.UID)
+			_, detailedErr := volumeToMount.GenerateError("Volume has not been added to the list of VolumesInUse in the node's volume status", nil)
+			return detailedErr
 		}
 
 		// Fetch current node object
 		node, fetchErr := og.kubeClient.Core().Nodes().Get(string(nodeName), metav1.GetOptions{})
 		if fetchErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"VerifyControllerAttachedVolume failed fetching node from API server. Volume %q (spec.Name: %q) pod %q (UID: %q). Error: %v",
-				volumeToMount.VolumeName,
-				volumeToMount.VolumeSpec.Name(),
-				volumeToMount.PodName,
-				volumeToMount.Pod.UID,
-				fetchErr)
+			_, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume failed fetching node from API server", fetchErr)
+			return detailedErr
 		}
 
 		if node == nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"VerifyControllerAttachedVolume failed. Volume %q (spec.Name: %q) pod %q (UID: %q). Error: node object retrieved from API server is nil",
-				volumeToMount.VolumeName,
-				volumeToMount.VolumeSpec.Name(),
-				volumeToMount.PodName,
-				volumeToMount.Pod.UID)
+			_, detailedErr := volumeToMount.GenerateError(
+				"VerifyControllerAttachedVolume failed",
+				fmt.Errorf("Node object retrieved from API server is nil"))
+			return detailedErr
 		}
 
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if attachedVolume.Name == volumeToMount.VolumeName {
 				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
 					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
-				glog.Infof("Controller successfully attached volume %q (spec.Name: %q) pod %q (UID: %q) devicePath: %q",
-					volumeToMount.VolumeName,
-					volumeToMount.VolumeSpec.Name(),
-					volumeToMount.PodName,
-					volumeToMount.Pod.UID,
-					attachedVolume.DevicePath)
+				_, detailedMsg := volumeToMount.GenerateMsg("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath))
+				glog.Infof(detailedMsg)
 
 				if addVolumeNodeErr != nil {
 					// On failure, return error. Caller will log and retry.
-					return fmt.Errorf(
-						"VerifyControllerAttachedVolume.MarkVolumeAsAttached failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
-						volumeToMount.VolumeName,
-						volumeToMount.VolumeSpec.Name(),
-						volumeToMount.PodName,
-						volumeToMount.Pod.UID,
-						addVolumeNodeErr)
+					_, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
+					return detailedErr
 				}
 				return nil
 			}
 		}
 
 		// Volume not attached, return error. Caller will log and retry.
-		return fmt.Errorf("Volume %q (spec.Name: %q) pod %q (UID: %q) is not yet attached according to node status",
-			volumeToMount.VolumeName,
-			volumeToMount.VolumeSpec.Name(),
-			volumeToMount.PodName,
-			volumeToMount.Pod.UID)
+		_, detailedErr := volumeToMount.GenerateError("Volume not attached according to node status", nil)
+		return detailedErr
 	}, nil
 }
 
@@ -875,40 +710,36 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 	node, fetchErr := og.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		if errors.IsNotFound(fetchErr) {
-			glog.Warningf("Node %q not found on API server. DetachVolume will skip safe to detach check.",
-				volumeToDetach.NodeName,
-				volumeToDetach.VolumeName)
+			_, detailedMsg := volumeToDetach.GenerateMsg("Node not found on API server. DetachVolume will skip safe to detach check", "")
+			glog.Warningf(detailedMsg)
 			return nil
 		}
 
 		// On failure, return error. Caller will log and retry.
-		return fmt.Errorf(
-			"DetachVolume failed fetching node from API server for volume %q from node %q with: %v",
-			volumeToDetach.VolumeName,
-			volumeToDetach.NodeName,
-			fetchErr)
+		_, detailedErr := volumeToDetach.GenerateError("DetachVolume failed fetching node from API server", fetchErr)
+		return detailedErr
 	}
 
 	if node == nil {
 		// On failure, return error. Caller will log and retry.
-		return fmt.Errorf(
-			"DetachVolume failed fetching node from API server for volume %q from node %q. Error: node object retrieved from API server is nil",
-			volumeToDetach.VolumeName,
-			volumeToDetach.NodeName)
+		_, detailedErr := volumeToDetach.GenerateError(
+			"DetachVolume failed fetching node from API server",
+			fmt.Errorf("node object retrieved from API server is nil"))
+		return detailedErr
 	}
 
 	for _, inUseVolume := range node.Status.VolumesInUse {
 		if inUseVolume == volumeToDetach.VolumeName {
-			return fmt.Errorf("DetachVolume failed for volume %q from node %q. Error: volume is still in use by node, according to Node status",
-				volumeToDetach.VolumeName,
-				volumeToDetach.NodeName)
+			_, detailedErr := volumeToDetach.GenerateError(
+				"DetachVolume failed",
+				fmt.Errorf("volume is still in use by node, according to Node status"))
+			return detailedErr
 		}
 	}
 
 	// Volume is not marked as in use by node
-	glog.Infof("Verified volume is safe to detach for volume %q from node %q.",
-		volumeToDetach.VolumeName,
-		volumeToDetach.NodeName)
+	_, detailedMsg := volumeToDetach.GenerateMsg("Verified volume is safe to detach", "")
+	glog.Infof(detailedMsg)
 	return nil
 }
 
@@ -916,15 +747,9 @@ func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount
 	mountOptions := volume.MountOptionFromSpec(volumeToMount.VolumeSpec)
 
 	if len(mountOptions) > 0 && !plugin.SupportsMountOption() {
-		err := fmt.Errorf(
-			"MountVolume.checkMountOptionSupport failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %q",
-			volumeToMount.VolumeName,
-			volumeToMount.VolumeSpec.Name(),
-			volumeToMount.PodName,
-			volumeToMount.Pod.UID,
-			"Mount options are not supported for this volume type")
-		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.UnsupportedMountOption, err.Error())
-		return err
+		eventErr, detailedErr := volumeToMount.GenerateError("Mount options are not supported for this volume type", nil)
+		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.UnsupportedMountOption, eventErr.Error())
+		return detailedErr
 	}
 	return nil
 }
