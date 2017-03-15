@@ -4,10 +4,10 @@ Want to hack on Kubernetes? Yay!
 
 ## Developer Guide
 
-We have a [Developer's Guide](docs/devel/README.md) that outlines everything
-you need to know from setting up your dev environment to how to get faster Pull
-Request reviews. If you find something undocumented or incorrect along the way,
-please feel free to send a Pull Request.
+We have a [Developer's Guide](https://github.com/kubernetes/community/blob/master/contributors/devel/README.md)
+that outlines everything you need to know from setting up your dev
+environment to how to get faster Pull Request reviews. If you find something
+undocumented or incorrect along the way, please feel free to send a Pull Request.
 
 ## Filing issues
 
@@ -28,7 +28,8 @@ Please fill out either the individual or corporate Contributor License
 Agreement (CLA).
 
 Once you are CLA'ed, we'll be able to accept your pull requests. For any issues that you face during this process,
-please add a comment [here](https://github.com/kubernetes/kubernetes/issues/27796) explaining the issue and we will help get it sorted out.
+please add contact the Linux Foundation Support Desk, helpdesk@rt.linuxfoundation.org,
+explaining the issue and we will help get it sorted out.
 
 ***NOTE***: Only original source code from you and other people that have
 signed the CLA can be accepted into the repository. This policy does not
@@ -42,11 +43,11 @@ of the system.  [Have a look and see if anything sounds
 interesting](https://github.com/kubernetes/kubernetes/issues?q=is%3Aopen+is%3Aissue+label%3Ahelp-wanted).
 
 Alternatively, read some of the many docs on the system, for example [the
-architecture](docs/design/architecture.md), and pick a component that seems
-interesting.  Start with `main()` (look in the [cmd](cmd/) directory) and read
-until you find something you want to fix.  The best way to learn is to hack!
-There's always code that can be clarified and variables or functions that can
-be renamed or commented.
+architecture](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/architecture.md),
+and pick a component that seems interesting.  Start with `main()`
+(look in the [cmd](cmd/) directory) and read until you find something you
+want to fix.  The best way to learn is to hack!  There's always code that
+can be clarified and variables or functions that can be renamed or commented.
 
 ### Contributing A Patch
 
@@ -111,21 +112,22 @@ can pass the `WHAT` variable to `make`: e.g. `make test WHAT=pkg/kubelet`.
 
 ### Protocols for Collaborative Development
 
-Please read [this doc](docs/devel/collab.md) for information on how we're
-running development for the project.  Also take a look at the [development
-guide](docs/devel/development.md) for information on how to set up your
-environment, run tests, manage dependencies, etc.
+Please read [this doc](https://github.com/kubernetes/community/blob/master/contributors/devel/collab.md)
+for information on how we're running development for the project.  Also
+take a look at the [development guide](https://github.com/kubernetes/community/blob/master/contributors/devel/development.md)
+for information on how to set up your environment, run tests, manage
+dependencies, etc.
 
 ### Adding dependencies
 
 If your patch depends on new packages, add that package with
 [`godep`](https://github.com/tools/godep).  Follow the [instructions to add a
-dependency](docs/devel/development.md#godep-and-dependency-management).
+dependency](https://github.com/kubernetes/community/blob/master/contributors/devel/development.md#godep-dependency-management).
 
 ### Community Expectations
 
-Please see our [expectations](docs/devel/community-expectations.md) for members
-of the Kubernetes community.
+Please see our [expectations](https://github.com/kubernetes/community/blob/master/contributors/devel/community-expectations.md)
+for members of the Kubernetes community.
 
 
 
