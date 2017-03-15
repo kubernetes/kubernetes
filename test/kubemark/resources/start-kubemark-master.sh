@@ -347,6 +347,9 @@ function compute-kube-apiserver-params {
 	params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
 	params+=" --target-ram-mb=$((${NUM_NODES} * 60))"
 	params+=" --storage-backend=${STORAGE_BACKEND}"
+	if [[ -n "${STORAGE_MEDIA_TYPE}" ]]; then
+		params+=" --storage-media-type=${STORAGE_MEDIA_TYPE}"
+	fi
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 	params+=" --admission-control=${CUSTOM_ADMISSION_PLUGINS}"
 	params+=" --authorization-mode=RBAC"

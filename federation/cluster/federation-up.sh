@@ -88,7 +88,7 @@ function init() {
       --dns-zone-name="${DNS_ZONE_NAME}" \
       --dns-provider="${DNS_PROVIDER}" \
       --image="${kube_registry}/hyperkube-amd64:${kube_version}" \
-      --apiserver-arg-overrides="--storage-backend=etcd2" \
+      --apiserver-arg-overrides="--storage-backend=etcd2 --storage-media-type=application/json" \
       --apiserver-enable-basic-auth=true \
       --apiserver-enable-token-auth=true
 }

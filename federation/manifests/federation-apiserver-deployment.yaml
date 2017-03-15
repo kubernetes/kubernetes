@@ -33,6 +33,7 @@ spec:
         - --token-auth-file=/srv/kubernetes/known-tokens.csv
         - --anonymous-auth=false
         - --storage-backend=etcd2
+        - --storage-media-type=application/json
         ports:
         - containerPort: 443
           name: https
