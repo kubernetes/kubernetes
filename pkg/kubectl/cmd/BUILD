@@ -207,6 +207,7 @@ go_test(
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
+        "//pkg/util/i18n:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/util/term:go_default_library",
         "//vendor:github.com/spf13/cobra",

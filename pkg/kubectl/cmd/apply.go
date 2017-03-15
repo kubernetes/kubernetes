@@ -72,16 +72,16 @@ const (
 )
 
 var (
-	apply_long = templates.LongDesc(`
+	apply_long = templates.LongDesc(i18n.T(`
 		Apply a configuration to a resource by filename or stdin.
 		This resource will be created if it doesn't exist yet.
 		To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
 
 		JSON and YAML formats are accepted.
 
-		Alpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.`)
+		Alpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.`))
 
-	apply_example = templates.Examples(`
+	apply_example = templates.Examples(i18n.T(`
 		# Apply the configuration in pod.json to a pod.
 		kubectl apply -f ./pod.json
 
@@ -93,7 +93,7 @@ var (
 		kubectl apply --prune -f manifest.yaml -l app=nginx
 
 		# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.
-		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`)
+		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
 )
 
 func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {

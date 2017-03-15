@@ -51,7 +51,7 @@ var (
 
 		` + valid_resources)
 
-	describe_example = templates.Examples(`
+	describe_example = templates.Examples(i18n.T(`
 		# Describe a node
 		kubectl describe nodes kubernetes-node-emt8.c.myproject.internal
 
@@ -69,7 +69,7 @@ var (
 
 		# Describe all pods managed by the 'frontend' replication controller (rc-created pods
 		# get the name of the rc as a prefix in the pod the name).
-		kubectl describe pods frontend`)
+		kubectl describe pods frontend`))
 )
 
 func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
