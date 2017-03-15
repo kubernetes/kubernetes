@@ -17,6 +17,9 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
+	"time"
+
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,7 +33,7 @@ import (
 )
 
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
-var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
+var _ = framework.KubeDescribe("PersistentVolumes:vsphere [Volume]", func() {
 	var (
 		c          clientset.Interface
 		ns         string
@@ -99,11 +102,12 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		if c != nil {
 			if clientPod != nil {
 				clientPod, err = c.CoreV1().Pods(ns).Get(clientPod.Name, metav1.GetOptions{})
-				if !apierrs.IsNotFound(err) {
+				if err == nil {
 					framework.DeletePodWithWait(f, c, clientPod)
+				} else {
+					Expect(apierrs.IsNotFound(err)).To(BeTrue(), fmt.Sprintf("unexpected api error re-getting pod %q: %v", clientPod.Name, err))
 				}
 			}
-
 			if pv != nil {
 				framework.DeletePersistentVolume(c, pv.Name)
 			}
@@ -137,7 +141,6 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 	It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach", func() {
 		By("Deleting the Claim")
 		framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
-
 		pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 		if !apierrs.IsNotFound(err) {
 			Expect(err).NotTo(HaveOccurred())
@@ -165,5 +168,41 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		pv = nil
 		By("Deleting the pod")
 		framework.DeletePodWithWait(f, c, clientPod)
+	})
+	/*
+		This test verifies that a volume mounted to a pod that is deleted while the kubelet is down
+		unmounts volume when the kubelet returns
+
+		Test reads KUBE_SSH_PASSWORD and KUBE_USER environment variable to perform SSH in to node to stop and start kubelet
+
+		Steps:
+		1. Verify volume is mounted on the node.
+		2. Stop kubelet.
+		3. Delete pod.
+		4. Start kubelet.
+		5. Verify that volume mount not to be found.
+	*/
+	It("should test that a volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func() {
+		testVolumeUnmountsFromDeletedPod(c, f, clientPod, pvc, pv)
+	})
+
+	/*
+		This test verifies that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk
+
+		Steps:
+		1. Delete Namespace.
+		2. Wait for namespace to get deleted. (Namespace deletion should trigger deletion of belonging pods)
+		3. Verify volume should be detached from the node.
+	*/
+	It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk", func() {
+		By("Deleting the Namespace")
+		err := c.CoreV1().Namespaces().Delete(ns, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = framework.WaitForNamespacesDeleted(c, []string{ns}, 3*time.Minute)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Verifying Persistent Disk detaches")
+		waitForVSphereDiskToDetach(vsp, volumePath, node)
 	})
 })

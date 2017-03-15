@@ -3782,22 +3782,31 @@ type SSHResult struct {
 // is no error performing the SSH, the stdout, stderr, and exit code are
 // returned.
 func SSH(cmd, host, provider string) (SSHResult, error) {
+	var (
+		stdout string
+		stderr string
+		code   int
+		err    error
+	)
 	result := SSHResult{Host: host, Cmd: cmd}
+	if provider == "vsphere" {
+		result.User = os.Getenv("KUBE_SSH_USER")
+		stdout, stderr, code, err = sshutil.RunSSHCommand(cmd, result.User, host, nil)
+	} else {
+		// Get a signer for the provider.
+		signer, err := GetSigner(provider)
+		if err != nil {
+			return result, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
+		}
 
-	// Get a signer for the provider.
-	signer, err := GetSigner(provider)
-	if err != nil {
-		return result, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
+		// RunSSHCommand will default to Getenv("USER") if user == "", but we're
+		// defaulting here as well for logging clarity.
+		result.User = os.Getenv("KUBE_SSH_USER")
+		if result.User == "" {
+			result.User = os.Getenv("USER")
+		}
+		stdout, stderr, code, err = sshutil.RunSSHCommand(cmd, result.User, host, signer)
 	}
-
-	// RunSSHCommand will default to Getenv("USER") if user == "", but we're
-	// defaulting here as well for logging clarity.
-	result.User = os.Getenv("KUBE_SSH_USER")
-	if result.User == "" {
-		result.User = os.Getenv("USER")
-	}
-
-	stdout, stderr, code, err := sshutil.RunSSHCommand(cmd, result.User, host, signer)
 	result.Stdout = stdout
 	result.Stderr = stderr
 	result.Code = code

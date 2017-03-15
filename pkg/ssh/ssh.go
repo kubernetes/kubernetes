@@ -203,13 +203,21 @@ func RunSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, i
 
 // Internal implementation of runSSHCommand, for testing
 func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, retry bool) (string, string, int, error) {
+	var config *ssh.ClientConfig
 	if user == "" {
 		user = os.Getenv("USER")
 	}
-	// Setup the config, dial the server, and open a session.
-	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+	if signer != nil {
+		// Setup the config, dial the server, and open a session.
+		config = &ssh.ClientConfig{
+			User: user,
+			Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		}
+	} else {
+		config = &ssh.ClientConfig{
+			User: user,
+			Auth: []ssh.AuthMethod{ssh.Password(os.Getenv("KUBE_SSH_PASSWORD"))},
+		}
 	}
 	client, err := dialer.Dial("tcp", host, config)
 	if err != nil && retry {

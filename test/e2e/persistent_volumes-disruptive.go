@@ -159,7 +159,7 @@ func testKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 	By("Testing that written file is accessible.")
 	_, err = podExec(clientPod, "cat "+file)
 	Expect(err).NotTo(HaveOccurred())
-	framework.Logf("Pod %s detected %s after kubelet restart", clientPod.Name, file)
+	framework.Logf("Volume mount detected on pod and written file %s is readable post-restart.", file)
 }
 
 // testVolumeUnmountsFromDeletedPod tests that a volume unmounts if the client pod was deleted while the kubelet was down.
@@ -182,8 +182,6 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 	result, err = framework.SSH("mount| grep "+string(clientPod.UID), nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(result.Code).NotTo(BeZero())
-
-	framework.Logf("Volume mount detected on pod and written file is readable post-restart.")
 }
 
 // initTestCase initializes spec resources (pv, pvc, and pod) and returns pointers to be consumed by the test
