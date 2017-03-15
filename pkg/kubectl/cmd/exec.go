@@ -38,7 +38,7 @@ import (
 )
 
 var (
-	exec_example = templates.Examples(`
+	exec_example = templates.Examples(i18n.T(`
 		# Get output from running 'date' from pod 123456-7890, using the first container by default
 		kubectl exec 123456-7890 date
 
@@ -47,7 +47,7 @@ var (
 
 		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
 		# and sends stdout/stderr from 'bash' back to the client
-		kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`)
+		kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`))
 )
 
 const (

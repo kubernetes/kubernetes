@@ -61,7 +61,7 @@ var (
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resources.`)
 
-	get_example = templates.Examples(`
+	get_example = templates.Examples(i18n.T(`
 		# List all pods in ps output format.
 		kubectl get pods
 
@@ -87,7 +87,7 @@ var (
 		kubectl get rc/web service/frontend pods/web-pod-13je7
 
 		# List all resources with different types.
-		kubectl get all`)
+		kubectl get all`))
 )
 
 // NewCmdGet creates a command object for the generic "get" action, which

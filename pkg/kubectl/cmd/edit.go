@@ -53,7 +53,7 @@ import (
 )
 
 var (
-	editLong = templates.LongDesc(`
+	editLong = templates.LongDesc(i18n.T(`
 		Edit a resource from the default editor.
 
 		The edit command allows you to directly edit any API resource you can retrieve via the
@@ -75,9 +75,9 @@ var (
 		that contains your unapplied changes. The most common error when updating a resource
 		is another editor changing the resource on the server. When this occurs, you will have
 		to apply your changes to the newer version of the resource, or update your temporary
-		saved copy to include the latest resource version.`)
+		saved copy to include the latest resource version.`))
 
-	editExample = templates.Examples(`
+	editExample = templates.Examples(i18n.T(`
 		# Edit the service named 'docker-registry':
 		kubectl edit svc/docker-registry
 
@@ -88,7 +88,7 @@ var (
 		kubectl edit job.v1.batch/myjob -o json
 
 		# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation:
-		kubectl edit deployment/mydeployment -o yaml --save-config`)
+		kubectl edit deployment/mydeployment -o yaml --save-config`))
 )
 
 func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
