@@ -36,11 +36,11 @@ type StatefulSetUpgradeTest struct {
 
 func (StatefulSetUpgradeTest) Name() string { return "statefulset-upgrade" }
 
-func (StatefulSetUpgradeTest) SkipVersions(versions ...version.Version) bool {
+func (StatefulSetUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 	minVersion := version.MustParseSemantic("1.5.0")
 
-	for _, v := range versions {
-		if v.LessThan(minVersion) {
+	for _, vCtx := range upgCtx.Versions {
+		if vCtx.Version.LessThan(minVersion) {
 			return true
 		}
 	}

@@ -61,10 +61,23 @@ type Test interface {
 	Teardown(f *framework.Framework)
 }
 
-// VersionSkippable is an interface that an upgrade test can implement
-// to be able to indicate that it should be skipped.
-type VersionSkippable interface {
-	// SkipVersions should return true if test should be skipped
-	// for any of provided versions.
-	SkipVersions(versions ...version.Version) bool
+// Skippable is an interface that an upgrade test can implement to be
+// able to indicate that it should be skipped.
+type Skippable interface {
+	// Skip should return true if test should be skipped. upgCtx
+	// provides information about the upgrade that is going to
+	// occur.
+	Skip(upgCtx UpgradeContext) bool
+}
+
+// UpgradeContext contains information about all the stages of the
+// upgrade that is going to occur.
+type UpgradeContext struct {
+	Versions []VersionContext
+}
+
+// VersionContext represents a stage of the upgrade.
+type VersionContext struct {
+	Version   version.Version
+	NodeImage string
 }
