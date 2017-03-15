@@ -36,7 +36,10 @@ func (AppArmorUpgradeTest) Name() string { return "apparmor-upgrade" }
 
 // Setup creates a secret and then verifies that a pod can consume it.
 func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
-	common.SkipIfAppArmorNotSupported()
+	// only setup on platforms that support app armor
+	if !common.IsAppArmorSupported() {
+		return
+	}
 	By("Loading AppArmor profiles to nodes")
 	common.LoadAppArmorProfiles(f)
 
@@ -52,6 +55,7 @@ func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 // Test waits for the upgrade to complete, and then verifies that a
 // pod can still consume the secret.
 func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+	common.SkipIfAppArmorNotSupported()
 	<-done
 	if upgrade == MasterUpgrade {
 		t.verifyPodStillUp(f)

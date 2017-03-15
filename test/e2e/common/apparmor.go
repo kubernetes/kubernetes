@@ -32,8 +32,20 @@ const (
 	appArmorDeniedPath    = "/expect_permission_denied"
 )
 
+var (
+	// AppArmorPlatforms are platforms with AppArmor support.
+	AppArmorPlatforms = []string{"gci", "ubuntu"}
+)
+
 func SkipIfAppArmorNotSupported() {
-	framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
+	if !IsAppArmorSupported() {
+		framework.Skipf("Only supported for distros with AppArmor %v (not %s)", AppArmorPlatforms, framework.TestContext.NodeOSDistro)
+	}
+}
+
+// IsAppArmorSupported returns true if the current OS distro supports AppArmor.
+func IsAppArmorSupported() bool {
+	return framework.NodeOSDistroIs(AppArmorPlatforms...)
 }
 
 func LoadAppArmorProfiles(f *framework.Framework) {
