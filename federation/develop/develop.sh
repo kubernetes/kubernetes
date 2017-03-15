@@ -138,9 +138,7 @@ function push() {
 readonly ACTION="${1:-}"
 case "${ACTION}" in
   "")
-  echo 'Action must be one of [init, build_binaries, build_image, push, \
-    deploy_clusters, deploy_federation, destroy_federation, destroy_clusters \
-    redeploy_federation], \
+  echo 'Action must be one of [build_binaries, build_image, push], \
     got: '"${ACTION}"
   exit 1
   ;;
@@ -152,33 +150,5 @@ case "${ACTION}" in
   ;;
   "push")
   push
-  ;;
-  # Following functions belong to deploy.sh, they are driven from here
-  # convenience during development because FEDERATION_OUTPUT_ROOT is
-  # already defined during development here in this script. Also, we
-  # execute the following commands in their own subshells to avoid them
-  # messing with variables in this script.
-  "init")
-  (
-    "${DEPLOY_ROOT}/deploy.sh" init
-  )
-  ;;
-  "deploy_federation")
-  (
-    export FEDERATION_OUTPUT_ROOT
-    "${DEPLOY_ROOT}/deploy.sh" deploy_federation
-  )
-  ;;
-  "destroy_federation")
-  (
-    export FEDERATION_OUTPUT_ROOT
-    "${DEPLOY_ROOT}/deploy.sh" destroy_federation
-  )
-  ;;
-  "redeploy_federation")
-  (
-    export FEDERATION_OUTPUT_ROOT
-    "${DEPLOY_ROOT}/deploy.sh" redeploy_federation
-  )
   ;;
 esac
