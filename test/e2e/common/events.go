@@ -34,9 +34,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+type Action func() error
+
 // Returns true if a node update matching the predicate was emitted from the
 // system after performing the supplied action.
-func ObserveNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodePredicate func(*v1.Node) bool, action func() error) (bool, error) {
+func ObserveNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodePredicate func(*v1.Node) bool, action Action) (bool, error) {
 	observedMatchingNode := false
 	nodeSelector := fields.OneTermEqualSelector("metadata.name", nodeName)
 	informerStartedChan := make(chan struct{})
@@ -94,7 +96,7 @@ func ObserveNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodeP
 
 // Returns true if an event matching the predicate was emitted from the system
 // after performing the supplied action.
-func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Event) bool, action func() error) (bool, error) {
+func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Event) bool, action Action) (bool, error) {
 	observedMatchingEvent := false
 	informerStartedChan := make(chan struct{})
 	var informerStartedGuard sync.Once
