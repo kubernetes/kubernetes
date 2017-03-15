@@ -73,6 +73,21 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 	// The generated UID is the hash of the file.
 	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = string(pod.UID)
 
+	if isFile {
+		// Applying the default Taint tolerations to static pods,
+		// so they are not evicted when there are node problems.
+		api.AddOrUpdateTolerationInPod(pod, &api.Toleration{
+			Key:      metav1.TaintNodeUnreachable,
+			Operator: "Exists",
+			Effect:   api.TaintEffectNoExecute,
+		})
+		api.AddOrUpdateTolerationInPod(pod, &api.Toleration{
+			Key:      metav1.TaintNodeNotReady,
+			Operator: "Exists",
+			Effect:   api.TaintEffectNoExecute,
+		})
+	}
+
 	// Set the default status to pending.
 	pod.Status.Phase = api.PodPending
 	return nil
