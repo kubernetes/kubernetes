@@ -178,7 +178,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
 		glog.Infof("Running service controller")
 		if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
-			glog.Errorf("Failed to start service controller: %v", err)
+			glog.Fatalf("Failed to start service controller: %v", err)
 		}
 	}
 
