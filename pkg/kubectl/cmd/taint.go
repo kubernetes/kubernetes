@@ -55,16 +55,16 @@ type TaintOptions struct {
 }
 
 var (
-	taint_long = templates.LongDesc(`
+	taint_long = templates.LongDesc(i18n.T(`
 		Update the taints on one or more nodes.
 
 		* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
 		* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
 		* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.
 		* The effect must be NoSchedule, PreferNoSchedule or NoExecute.
-		* Currently taint can only apply to node.`)
+		* Currently taint can only apply to node.`))
 
-	taint_example = templates.Examples(`
+	taint_example = templates.Examples(i18n.T(`
 		# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.
 		# If a taint with that key and effect already exists, its value is replaced as specified.
 		kubectl taint nodes foo dedicated=special-user:NoSchedule
@@ -73,7 +73,7 @@ var (
 		kubectl taint nodes foo dedicated:NoSchedule-
 
 		# Remove from node 'foo' all the taints with key 'dedicated'
-		kubectl taint nodes foo dedicated-`)
+		kubectl taint nodes foo dedicated-`))
 )
 
 func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {

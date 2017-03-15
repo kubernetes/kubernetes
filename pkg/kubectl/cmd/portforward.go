@@ -50,7 +50,7 @@ type PortForwardOptions struct {
 }
 
 var (
-	portforward_example = templates.Examples(`
+	portforward_example = templates.Examples(i18n.T(`
 		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
 		kubectl port-forward mypod 5000 6000
 
@@ -61,7 +61,7 @@ var (
 		kubectl port-forward mypod :5000
 
 		# Listen on a random port locally, forwarding to 5000 in the pod
-		kubectl port-forward mypod 0:5000`)
+		kubectl port-forward mypod 0:5000`))
 )
 
 func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {

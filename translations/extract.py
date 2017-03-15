@@ -94,7 +94,6 @@ def replace(filename, matchers, multiline_matchers):
                 # (And escape for Python)
                 # (And escape for regex)
                 rep = re.sub('\\\\(\\d)', '\\\\\\\\\\1', rep)
-                sys.stderr.write(rep)
                 content = matcher.regex.sub(rep, content, 1)
                 match = matcher.regex.search(content)
         sys.stdout.write(content)

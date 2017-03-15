@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	logs_example = templates.Examples(`
+	logs_example = templates.Examples(i18n.T(`
 		# Return snapshot logs from pod nginx with only one container
 		kubectl logs nginx
 
@@ -60,7 +60,7 @@ var (
 		kubectl logs job/hello
 
 		# Return snapshot logs from container nginx-1 of a deployment named nginx
-		kubectl logs deployment/nginx -c nginx-1`)
+		kubectl logs deployment/nginx -c nginx-1`))
 
 	selectorTail int64 = 10
 )

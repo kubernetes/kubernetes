@@ -30,12 +30,12 @@ import (
 type TopOptions struct{}
 
 var (
-	topLong = templates.LongDesc(`
+	topLong = templates.LongDesc(i18n.T(`
 		Display Resource (CPU/Memory/Storage) usage.
 
 		The top command allows you to see the resource consumption for nodes or pods.
 
-		This command requires Heapster to be correctly configured and working on the server. `)
+		This command requires Heapster to be correctly configured and working on the server. `))
 )
 
 func NewCmdTop(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {

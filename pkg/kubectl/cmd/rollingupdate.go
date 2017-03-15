@@ -42,16 +42,16 @@ import (
 )
 
 var (
-	rollingUpdate_long = templates.LongDesc(`
+	rollingUpdate_long = templates.LongDesc(i18n.T(`
 		Perform a rolling update of the given ReplicationController.
 
 		Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
 		new PodTemplate. The new-controller.json must specify the same namespace as the
 		existing replication controller and overwrite at least one (common) label in its replicaSelector.
 
-		![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)`)
+		![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)`))
 
-	rollingUpdate_example = templates.Examples(`
+	rollingUpdate_example = templates.Examples(i18n.T(`
 		# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.
 		kubectl rolling-update frontend-v1 -f frontend-v2.json
 
@@ -66,7 +66,7 @@ var (
 		kubectl rolling-update frontend --image=image:v2
 
 		# Abort and reverse an existing rollout in progress (from frontend-v1 to frontend-v2).
-		kubectl rolling-update frontend-v1 frontend-v2 --rollback`)
+		kubectl rolling-update frontend-v1 frontend-v2 --rollback`))
 )
 
 var (

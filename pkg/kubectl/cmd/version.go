@@ -29,9 +29,9 @@ import (
 )
 
 var (
-	version_example = templates.Examples(`
+	version_example = templates.Examples(i18n.T(`
 		# Print the client and server versions for the current context
-		kubectl version`)
+		kubectl version`))
 )
 
 func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {

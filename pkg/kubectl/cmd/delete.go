@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	delete_long = templates.LongDesc(`
+	delete_long = templates.LongDesc(i18n.T(`
 		Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 
 		JSON and YAML formats are accepted. Only one type of the arguments may be specified: filenames,
@@ -63,9 +63,9 @@ var (
 
 		Note that the delete command does NOT do resource version checks, so if someone
 		submits an update to a resource right when you submit a delete, their update
-		will be lost along with the rest of the resource.`)
+		will be lost along with the rest of the resource.`))
 
-	delete_example = templates.Examples(`
+	delete_example = templates.Examples(i18n.T(`
 		# Delete a pod using the type and name specified in pod.json.
 		kubectl delete -f ./pod.json
 
@@ -85,7 +85,7 @@ var (
 		kubectl delete pod foo --grace-period=0 --force
 
 		# Delete all pods
-		kubectl delete pods --all`)
+		kubectl delete pods --all`))
 )
 
 type DeleteOptions struct {
