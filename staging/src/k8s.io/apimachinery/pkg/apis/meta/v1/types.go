@@ -50,6 +50,8 @@ type TypeMeta struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
+
+	FooBar  int      `json:"foobar,omitempty"`
 }
 
 // ListMeta describes metadata that synthetic resources must have, including lists and
