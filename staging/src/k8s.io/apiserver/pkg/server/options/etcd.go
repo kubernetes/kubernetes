@@ -58,6 +58,10 @@ func (s *EtcdOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("--etcd-servers must be specified"))
 	}
 
+	if s.StorageConfig.Type == storagebackend.StorageTypeETCD2 && s.DefaultStorageMediaType != "application/json" {
+		allErrors = append(allErrors, fmt.Errorf("only --storage-media-type=application/json is supported with --storage-backend=%s", storagebackend.StorageTypeETCD2))
+	}
+
 	return allErrors
 }
 
@@ -68,7 +72,7 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
 
 	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
-		"The media type to use to store objects in storage. Defaults to application/json. "+
+		"The media type to use to store objects in storage. "+
 		"Some resources may only support a specific media type and will ignore this setting.")
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")

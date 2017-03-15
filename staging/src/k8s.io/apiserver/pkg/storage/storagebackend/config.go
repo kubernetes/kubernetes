@@ -49,6 +49,7 @@ type Config struct {
 
 func NewDefaultConfig(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *Config {
 	return &Config{
+		Type:   StorageTypeETCD3,
 		Prefix: prefix,
 		// Default cache size to 0 - if unset, its size will be set based on target
 		// memory usage.
