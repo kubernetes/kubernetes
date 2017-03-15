@@ -50,10 +50,10 @@ func ObserveNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodeP
 				return ls, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				// Signal parent goroutine that watching has begun.
+				defer informerStartedGuard.Do(func() { close(informerStartedChan) })
 				options.FieldSelector = nodeSelector.String()
 				w, err := f.ClientSet.Core().Nodes().Watch(options)
-				// Signal parent goroutine that watching has begun.
-				informerStartedGuard.Do(func() { close(informerStartedChan) })
 				return w, err
 			},
 		},
@@ -96,6 +96,8 @@ func ObserveNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodeP
 // after performing the supplied action.
 func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Event) bool, action func() error) (bool, error) {
 	observedMatchingEvent := false
+	informerStartedChan := make(chan struct{})
+	var informerStartedGuard sync.Once
 
 	// Create an informer to list/watch events from the test framework namespace.
 	_, controller := cache.NewInformer(
@@ -105,6 +107,8 @@ func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 				return ls, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				// Signal parent goroutine that watching has begun.
+				defer informerStartedGuard.Do(func() { close(informerStartedChan) })
 				w, err := f.ClientSet.Core().Events(f.Namespace.Name).Watch(options)
 				return w, err
 			},
@@ -123,9 +127,11 @@ func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 		},
 	)
 
+	// Start the informer and block this goroutine waiting for the started signal.
 	informerStopChan := make(chan struct{})
 	defer func() { close(informerStopChan) }()
 	go controller.Run(informerStopChan)
+	<-informerStartedChan
 
 	// Invoke the action function.
 	err := action()
