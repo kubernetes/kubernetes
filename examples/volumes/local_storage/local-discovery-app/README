@@ -1,0 +1,5 @@
+1. make local-discovery
+2. make push
+3. gcloud container clusters create mycluster --local-ssd-count=3
+4. kubectl create -f admin_account.yaml
+5. kubectl create -f discovery-daemonset.yaml

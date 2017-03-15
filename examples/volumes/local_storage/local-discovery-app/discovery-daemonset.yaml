@@ -1,0 +1,34 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: local-storage-discovery
+spec:
+  template:
+    metadata:
+      labels:
+        app: local-storage-discovery
+    spec:
+      containers:
+      - name: discovery
+        image: "gcr.io/msau-gke-dev/local-discovery:v1.3"
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: discovery-vol
+          mountPath: "/local-disks"
+        env:
+        - name: MY_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      - name: kubectl
+        image: "gcr.io/msau-gke-dev/kubectl:v1.7.0-alpha.0.1080"
+        imagePullPolicy: Always
+        args:
+        - proxy
+        - -p
+        - "8001"
+      volumes:
+      - name: discovery-vol
+        hostPath:
+          path: "/"
+      serviceAccount: local-storage-admin
