@@ -115,18 +115,18 @@ function split-commas {
 }
 
 function install-gci-mounter-tools {
-    CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
-    mkdir "${CONTAINERIZED_MOUNTER_HOME}"
-    chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
-    mkdir "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
-    local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
-    download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
-    cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
-    chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
-    mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
-    tar xvf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
-    rm /tmp/mounter.tar
-    mkdir "${CONTAINERIZED_MOUNTER_HOME}/rootfs/var/lib/kubelet"
+  CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
+  mkdir -p "${CONTAINERIZED_MOUNTER_HOME}"
+  chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
+  mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
+  local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
+  download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
+  cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
+  chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
+  mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
+  tar xvf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
+  rm /tmp/mounter.tar
+  mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs/var/lib/kubelet"
 }
 
 # Install node problem detector binary.
