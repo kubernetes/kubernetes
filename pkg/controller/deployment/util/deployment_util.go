@@ -494,11 +494,33 @@ func getReplicaSetFraction(rs extensions.ReplicaSet, d extensions.Deployment) in
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 // The third returned value is the new replica set, and it may be nil if it doesn't exist yet.
 func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
-	rsList, err := listReplicaSets(deployment, c)
+	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	podList, err := listPods(deployment, rsList, c)
+	podList, err := ListPods(deployment, rsList, podListFromClient(c))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList, podList)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	newRS, err := FindNewReplicaSet(deployment, rsList)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return oldRSes, allOldRSes, newRS, nil
+}
+
+// GetAllReplicaSetsV15 is a compatibility function that behaves the way
+// GetAllReplicaSets() used to in v1.5.x.
+func GetAllReplicaSetsV15(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
+	rsList, err := ListReplicaSetsV15(deployment, rsListFromClient(c))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	podList, err := ListPodsV15(deployment, podListFromClient(c))
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -516,11 +538,11 @@ func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 // GetOldReplicaSets returns the old replica sets targeted by the given Deployment; get PodList and ReplicaSetList from client interface.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	rsList, err := listReplicaSets(deployment, c)
+	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
 	if err != nil {
 		return nil, nil, err
 	}
-	podList, err := listPods(deployment, rsList, c)
+	podList, err := ListPods(deployment, rsList, podListFromClient(c))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -530,35 +552,43 @@ func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
 // Returns nil if the new replica set doesn't exist yet.
 func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
-	rsList, err := listReplicaSets(deployment, c)
+	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
 	if err != nil {
 		return nil, err
 	}
 	return FindNewReplicaSet(deployment, rsList)
 }
 
-// listReplicaSets lists all RSes the given deployment targets with the given client interface.
-func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, error) {
-	return ListReplicaSets(deployment,
-		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
-			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
-			if err != nil {
-				return nil, err
-			}
-			ret := []*extensions.ReplicaSet{}
-			for i := range rsList.Items {
-				ret = append(ret, &rsList.Items[i])
-			}
-			return ret, err
-		})
+// GetNewReplicaSetV15 is a compatibility function that behaves the way
+// GetNewReplicaSet() used to in v1.5.x.
+func GetNewReplicaSetV15(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
+	rsList, err := ListReplicaSetsV15(deployment, rsListFromClient(c))
+	if err != nil {
+		return nil, err
+	}
+	return FindNewReplicaSet(deployment, rsList)
 }
 
-// listReplicaSets lists all Pods the given deployment targets with the given client interface.
-func listPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, c clientset.Interface) (*v1.PodList, error) {
-	return ListPods(deployment, rsList,
-		func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-			return c.Core().Pods(namespace).List(options)
-		})
+// rsListFromClient returns an rsListFunc that wraps the given client.
+func rsListFromClient(c clientset.Interface) rsListFunc {
+	return func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
+		rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
+		if err != nil {
+			return nil, err
+		}
+		ret := []*extensions.ReplicaSet{}
+		for i := range rsList.Items {
+			ret = append(ret, &rsList.Items[i])
+		}
+		return ret, err
+	}
+}
+
+// podListFromClient returns a podListFunc that wraps the given client.
+func podListFromClient(c clientset.Interface) podListFunc {
+	return func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
+		return c.Core().Pods(namespace).List(options)
+	}
 }
 
 // TODO: switch this to full namespacers
@@ -591,6 +621,18 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 		}
 	}
 	return owned, nil
+}
+
+// ListReplicaSetsV15 is a compatibility function that behaves the way
+// ListReplicaSets() used to in v1.5.x.
+func ListReplicaSetsV15(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
+	namespace := deployment.Namespace
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	return getRSList(namespace, options)
 }
 
 // ListReplicaSets returns a slice of RSes the given deployment targets.
@@ -654,6 +696,18 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 		}
 	}
 	return owned, nil
+}
+
+// ListPodsV15 is a compatibility function that behaves the way
+// ListPods() used to in v1.5.x.
+func ListPodsV15(deployment *extensions.Deployment, getPodList podListFunc) (*v1.PodList, error) {
+	namespace := deployment.Namespace
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	return getPodList(namespace, options)
 }
 
 // EqualIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
