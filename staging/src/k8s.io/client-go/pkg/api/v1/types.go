@@ -334,6 +334,9 @@ type VolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,25,opt,name=scaleIO"`
+	// LocalStorage represents a logical storage partition that is local to a node
+	// +optional
+	LocalStorage *LocalStorageVolumeSource `json:"localStorage,omitempty" protobuf:"bytes,27,opt,name=localStorage"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -425,6 +428,9 @@ type PersistentVolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,19,opt,name=scaleIO"`
+	// LocalStorage represents a logical storage partition that is local to a node
+	// +optional
+	LocalStorage *LocalStorageVolumeSource `json:"localStorage,omitempty" protobuf:"bytes,20,opt,name=localStorage"`
 }
 
 const (
@@ -571,6 +577,11 @@ type PersistentVolumeClaimList struct {
 	Items []PersistentVolumeClaim `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+const (
+	// SemiPersistentLocalStorage refers to local storage that cannot be accessed outside of a specific node.
+	SemiPersistentLocalStorage string = "SemiPersistentLocalStorage"
+)
+
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
@@ -592,6 +603,11 @@ type PersistentVolumeClaimSpec struct {
 	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
+	// VolumeType refers to the storage type required by this claim.
+	// Defaults to "remote" storage.
+	// Accepted options include SemiPersistentLocalStorage.
+	// +optional
+	VolumeType *string `json:"volumeType,omitempty" protobuf:"bytes,6,opt,name=volumeType"`
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -658,6 +674,15 @@ type HostPathVolumeSource struct {
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 }
 
+// Represents a local storage logical partition path mapped into a pod.
+// Local storage volumes are local to nodes.
+type LocalStorageVolumeSource struct {
+	// Path to the local storage logical partition represented by this volume.
+	// More info: http://kubernetes.io/docs/user-guide/volumes#local
+	Path     string `json:"path" protobuf:"bytes,1,opt,name=path"`
+	NodeName string `json:"nodeName"protobuf:"bytes,2,opt,name=nodeName"`
+}
+
 // Represents an empty directory for a pod.
 // Empty directory volumes support ownership management and SELinux relabeling.
 type EmptyDirVolumeSource struct {
@@ -667,6 +692,11 @@ type EmptyDirVolumeSource struct {
 	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	// +optional
 	Medium StorageMedium `json:"medium,omitempty" protobuf:"bytes,1,opt,name=medium,casttype=StorageMedium"`
+	// Total amount of local storage required for this directory.
+	// The default is nil which means that the directory can use all available local storage on the node.
+	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
+	// +optional
+	// Size resource.Quantity `json:"size,omitempty" protobuf:"bytes,2,opt,name=Size"`
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.
@@ -3348,6 +3378,10 @@ const (
 	ResourceMemory ResourceName = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
+	// Local Storage for overlay filesystem, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceStorageOverlay = "storage.kubernetes.io/overlay"
+	// Local Storage for scratch space, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceStorageScratch = "storage.kubernetes.io/scratch"
 	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
 	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
 	// Number of Pods that may be running on this Node: see ResourcePods

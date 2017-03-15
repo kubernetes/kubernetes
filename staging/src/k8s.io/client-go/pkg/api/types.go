@@ -302,6 +302,9 @@ type VolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource
+	// LocalStorage represents a logical storage partition that is local to a node
+	// +optional
+	LocalStorage *LocalStorageVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -370,6 +373,9 @@ type PersistentVolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource
+	// LocalStorage represents a logical storage partition that is local to a node
+	// +optional
+	LocalStorage *LocalStorageVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -486,6 +492,11 @@ type PersistentVolumeClaimList struct {
 	Items []PersistentVolumeClaim
 }
 
+const (
+	// SemiPersistentLocalStorage refers to local storage that cannot be accessed outside of a specific node.
+	SemiPersistentLocalStorage string = "SemiPersistentLocalStorage"
+)
+
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
@@ -507,6 +518,11 @@ type PersistentVolumeClaimSpec struct {
 	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
 	// +optional
 	StorageClassName *string
+	// VolumeType refers to the storage type required by this claim.
+	// Defaults to "remote" storage.
+	// Accepted options include SemiPersistentLocalStorage.
+	// +optional
+	VolumeType *string
 }
 
 type PersistentVolumeClaimStatus struct {
@@ -569,6 +585,15 @@ type HostPathVolumeSource struct {
 	Path string
 }
 
+// Represents a local storage logical partition path mapped into a pod.
+// Local storage volumes are local to nodes.
+type LocalStorageVolumeSource struct {
+	// Path to the local storage logical partition represented by this volume.
+	// More info: http://kubernetes.io/docs/user-guide/volumes#local
+	Path     string
+	NodeName string
+}
+
 // Represents an empty directory for a pod.
 // Empty directory volumes support ownership management and SELinux relabeling.
 type EmptyDirVolumeSource struct {
@@ -580,6 +605,11 @@ type EmptyDirVolumeSource struct {
 	// The default is "" which means to use the node's default medium.
 	// +optional
 	Medium StorageMedium
+	// Total amount of local storage required for this directory.
+	// The default is nil which means that the directory can use all available local storage on the node.
+	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
+	// +optional
+	//	Size resource.Quantity
 }
 
 // StorageMedium defines ways that storage can be allocated to a volume.
@@ -2933,6 +2963,10 @@ const (
 	ResourceMemory ResourceName = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
+	// Local Storage for overlay filesystem, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceStorageOverlay = "storage.kubernetes.io/overlay"
+	// Local Storage for scratch space, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceStorageScratch = "storage.kubernetes.io/scratch"
 	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
 	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
 	// Number of Pods that may be running on this Node: see ResourcePods

@@ -1402,6 +1402,16 @@ message LocalObjectReference {
   optional string name = 1;
 }
 
+// Represents a local storage logical partition path mapped into a pod.
+// Local storage volumes are local to nodes.
+message LocalStorageVolumeSource {
+  // Path to the local storage logical partition represented by this volume.
+  // More info: http://kubernetes.io/docs/user-guide/volumes#local
+  optional string path = 1;
+
+  optional string nodeName = 2;
+}
+
 // Represents an NFS mount that lasts the lifetime of a pod.
 // NFS volumes do not support ownership management or SELinux relabeling.
 message NFSVolumeSource {
@@ -2006,6 +2016,12 @@ message PersistentVolumeClaimSpec {
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
   // +optional
   optional string storageClassName = 5;
+
+  // VolumeType refers to the storage type required by this claim.
+  // Defaults to "remote" storage.
+  // Accepted options include SemiPersistentLocalStorage.
+  // +optional
+  optional string volumeType = 6;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2144,6 +2160,10 @@ message PersistentVolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 19;
+
+  // LocalStorage represents a logical storage partition that is local to a node
+  // +optional
+  optional LocalStorageVolumeSource localStorage = 20;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -3897,6 +3917,10 @@ message VolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 25;
+
+  // LocalStorage represents a logical storage partition that is local to a node
+  // +optional
+  optional LocalStorageVolumeSource localStorage = 27;
 }
 
 // Represents a vSphere volume resource.
