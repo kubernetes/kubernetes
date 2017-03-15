@@ -164,6 +164,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	serverResources, err := discoveryClient.ServerResources()
 	if err != nil {
 		glog.Fatalf("Could not find resources from API Server: %v", err)
+		return err
 	}
 
 	go clustercontroller.NewclusterController(ccClientset, s.ClusterMonitorPeriod.Duration).Run()
@@ -172,6 +173,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		dns, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.DnsConfigFile)
 		if err != nil {
 			glog.Fatalf("Cloud provider could not be initialized: %v", err)
+			return err
 		}
 		glog.Infof("Loading client config for service controller %q", servicecontroller.UserAgentName)
 		scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
@@ -179,6 +181,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		glog.Infof("Running service controller")
 		if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
 			glog.Errorf("Failed to start service controller: %v", err)
+			return err
 		}
 	}
 
