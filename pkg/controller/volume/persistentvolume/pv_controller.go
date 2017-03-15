@@ -233,6 +233,11 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 	if claim.Spec.VolumeName == "" {
 		// User did not care which PV they get.
 
+		// Ignore local PVs.
+		if claim.Spec.VolumeType == v1.SemiPersistentLocalStorage {
+			glog.V(2).Infof("ignoring unbound PersistentVolumeClaim[%s] since its volume type is semi persistent local storage which is handled by the scheduler", claimToClaimKey(claim))
+			return nil
+		}
 		// [Unit test set 1]
 		volume, err := ctrl.volumes.findBestMatchForClaim(claim)
 		if err != nil {
@@ -916,7 +921,7 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume
 			volumeClone.Annotations = nil
 		}
 	} else {
-		// The volume was pre-bound by user. Clear only the binging UID.
+		// The volume was pre-bound by user. Clear only the binding UID.
 		volumeClone.Spec.ClaimRef.UID = ""
 	}
 
