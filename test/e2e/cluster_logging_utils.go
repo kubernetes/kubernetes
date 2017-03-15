@@ -18,8 +18,8 @@ package e2e
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,6 +40,11 @@ const (
 
 	// Amount of requested memory for logging container in bytes
 	loggingContainerMemoryRequest = 10 * 1024 * 1024
+)
+
+var (
+	// Regexp, matching the contents of log entries, parsed or not
+	logEntryMessageRegex = regexp.MustCompile("(?:I\\d+ \\d+:\\d+:\\d+.\\d+       \\d+ logs_generator.go:67] )?(\\d+) .*")
 )
 
 // Type to track the progress of logs generating pod
@@ -77,8 +82,12 @@ type loggingTestConfig struct {
 }
 
 func (entry *logEntry) getLogEntryNumber() (int, bool) {
-	chunks := strings.Split(entry.Payload, " ")
-	lineNumber, err := strconv.Atoi(strings.TrimSpace(chunks[0]))
+	submatch := logEntryMessageRegex.FindStringSubmatch(entry.Payload)
+	if submatch == nil || len(submatch) < 2 {
+		return 0, false
+	}
+
+	lineNumber, err := strconv.Atoi(submatch[1])
 	return lineNumber, err == nil
 }
 
@@ -211,6 +220,8 @@ func pullMissingLogsCount(logsProvider logsProvider, pod *loggingPod) int {
 
 func getMissingLinesCount(logsProvider logsProvider, pod *loggingPod) (int, error) {
 	entries := logsProvider.ReadEntries(pod)
+
+	framework.Logf("Got %d entries from provider", len(entries))
 
 	for _, entry := range entries {
 		lineNumber, ok := entry.getLogEntryNumber()
