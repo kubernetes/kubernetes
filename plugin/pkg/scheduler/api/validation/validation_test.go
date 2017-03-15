@@ -30,14 +30,14 @@ func TestValidatePriorityWithNoWeight(t *testing.T) {
 }
 
 func TestValidatePriorityWithZeroWeight(t *testing.T) {
-	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "NoWeightPriority", Weight: 0}}}
+	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "ZeroWeightPriority", Weight: 0}}}
 	if ValidatePolicy(policy) == nil {
 		t.Errorf("Expected error about priority weight not being positive")
 	}
 }
 
-func TestValidatePriorityWithNonZeroWeight(t *testing.T) {
-	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: 2}}}
+func TestValidatePriorityWithPositiveWeight(t *testing.T) {
+	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "PositiveWeightPriority", Weight: 2}}}
 	errs := ValidatePolicy(policy)
 	if errs != nil {
 		t.Errorf("Unexpected errors %v", errs)
@@ -45,8 +45,51 @@ func TestValidatePriorityWithNonZeroWeight(t *testing.T) {
 }
 
 func TestValidatePriorityWithNegativeWeight(t *testing.T) {
-	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: -2}}}
+	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "NegativeWeightPriority", Weight: -2}}}
 	if ValidatePolicy(policy) == nil {
 		t.Errorf("Expected error about priority weight not being positive")
+	}
+}
+
+func TestValidateExtenderConfigWithNoWeight(t *testing.T) {
+	policy := api.Policy{
+		Priorities:      []api.PriorityPolicy{{Name: "PositiveWeightPriority", Weight: 2}},
+		ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://NoWeightExtenderConfig"}},
+	}
+	errs := ValidatePolicy(policy)
+	if errs != nil {
+		t.Errorf("Unexpected errors %v", errs)
+	}
+}
+
+func TestValidateExtenderConfigWithZeroWeight(t *testing.T) {
+	policy := api.Policy{
+		Priorities:      []api.PriorityPolicy{{Name: "PositiveWeightPriority", Weight: 2}},
+		ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://ZeroWeightExtenderConfig", Weight: 0}},
+	}
+	errs := ValidatePolicy(policy)
+	if errs != nil {
+		t.Errorf("Unexpected errors %v", errs)
+	}
+}
+
+func TestValidateExtenderConfigWithPositiveWeight(t *testing.T) {
+	policy := api.Policy{
+		Priorities:      []api.PriorityPolicy{{Name: "PositiveWeightPriority", Weight: 2}},
+		ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://PositiveWeightExtenderConfig", Weight: 2}},
+	}
+	errs := ValidatePolicy(policy)
+	if errs != nil {
+		t.Errorf("Unexpected errors %v", errs)
+	}
+}
+
+func TestValidateExtenderConfigWithNegativeWeight(t *testing.T) {
+	policy := api.Policy{
+		Priorities:      []api.PriorityPolicy{{Name: "PositiveWeightPriority", Weight: 2}},
+		ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://NegativeWeightExtenderConfig", Weight: -2}},
+	}
+	if ValidatePolicy(policy) == nil {
+		t.Errorf("Expected error about extender config weight being negative")
 	}
 }
