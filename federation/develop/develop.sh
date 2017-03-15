@@ -163,12 +163,6 @@ case "${ACTION}" in
     "${DEPLOY_ROOT}/deploy.sh" init
   )
   ;;
-  "deploy_clusters")
-  (
-    export FEDERATION_OUTPUT_ROOT
-    "${DEPLOY_ROOT}/deploy.sh" deploy_clusters
-  )
-  ;;
   "deploy_federation")
   (
     export FEDERATION_OUTPUT_ROOT
@@ -179,12 +173,6 @@ case "${ACTION}" in
   (
     export FEDERATION_OUTPUT_ROOT
     "${DEPLOY_ROOT}/deploy.sh" destroy_federation
-  )
-  ;;
-  "destroy_clusters")
-  (
-    export FEDERATION_OUTPUT_ROOT
-    "${DEPLOY_ROOT}/deploy.sh" destroy_clusters
   )
   ;;
   "redeploy_federation")
