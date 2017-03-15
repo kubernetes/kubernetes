@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -51,16 +52,11 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 
 	framework.KubeDescribe("master upgrade", func() {
 		It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
-			target, err := framework.RealVersion(framework.TestContext.UpgradeTarget)
-			framework.ExpectNoError(err)
-
-			current, err := f.ClientSet.Discovery().ServerVersion()
-			framework.ExpectNoError(err)
-
-			versions, err := parseVersions(target, current.String())
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
 
 			cm := chaosmonkey.New(func() {
+				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
 			})
@@ -69,7 +65,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 					test:        t,
 					framework:   testFrameworks[t.Name()],
 					upgradeType: upgrades.MasterUpgrade,
-					versions:    versions,
+					upgCtx:      *upgCtx,
 				}
 				cm.Register(cma.Test)
 			}
@@ -80,16 +76,11 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 
 	framework.KubeDescribe("node upgrade", func() {
 		It("should maintain a functioning cluster [Feature:NodeUpgrade]", func() {
-			target, err := framework.RealVersion(framework.TestContext.UpgradeTarget)
-			framework.ExpectNoError(err)
-
-			current, err := f.ClientSet.Discovery().ServerVersion()
-			framework.ExpectNoError(err)
-
-			versions, err := parseVersions(target, current.String())
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
 
 			cm := chaosmonkey.New(func() {
+				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 			})
@@ -98,7 +89,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 					test:        t,
 					framework:   testFrameworks[t.Name()],
 					upgradeType: upgrades.NodeUpgrade,
-					versions:    versions,
+					upgCtx:      *upgCtx,
 				}
 				cm.Register(cma.Test)
 			}
@@ -108,16 +99,11 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 
 	framework.KubeDescribe("cluster upgrade", func() {
 		It("should maintain a functioning cluster [Feature:ClusterUpgrade]", func() {
-			target, err := framework.RealVersion(framework.TestContext.UpgradeTarget)
-			framework.ExpectNoError(err)
-
-			current, err := f.ClientSet.Discovery().ServerVersion()
-			framework.ExpectNoError(err)
-
-			versions, err := parseVersions(target, current.String())
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
 
 			cm := chaosmonkey.New(func() {
+				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
@@ -128,7 +114,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 					test:        t,
 					framework:   testFrameworks[t.Name()],
 					upgradeType: upgrades.ClusterUpgrade,
-					versions:    versions,
+					upgCtx:      *upgCtx,
 				}
 				cm.Register(cma.Test)
 			}
@@ -149,17 +135,12 @@ var _ = framework.KubeDescribe("Downgrade [Feature:Downgrade]", func() {
 
 	framework.KubeDescribe("cluster downgrade", func() {
 		It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
-			target, err := framework.RealVersion(framework.TestContext.UpgradeTarget)
-			framework.ExpectNoError(err)
-
-			current, err := f.ClientSet.Discovery().ServerVersion()
-			framework.ExpectNoError(err)
-
-			versions, err := parseVersions(target, current.String())
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
 
 			cm := chaosmonkey.New(func() {
 				// Yes this really is a downgrade. And nodes must downgrade first.
+				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgrade(target))
@@ -170,7 +151,7 @@ var _ = framework.KubeDescribe("Downgrade [Feature:Downgrade]", func() {
 					test:        t,
 					framework:   testFrameworks[t.Name()],
 					upgradeType: upgrades.ClusterUpgrade,
-					versions:    versions,
+					upgCtx:      *upgCtx,
 				}
 				cm.Register(cma.Test)
 			}
@@ -191,10 +172,7 @@ var _ = framework.KubeDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 
 	framework.KubeDescribe("etcd upgrade", func() {
 		It("should maintain a functioning cluster", func() {
-			current, err := f.ClientSet.Discovery().ServerVersion()
-			framework.ExpectNoError(err)
-
-			versions, err := parseVersions(current.String())
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), "")
 			framework.ExpectNoError(err)
 
 			cm := chaosmonkey.New(func() {
@@ -206,7 +184,7 @@ var _ = framework.KubeDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 					test:        t,
 					framework:   testFrameworks[t.Name()],
 					upgradeType: upgrades.EtcdUpgrade,
-					versions:    versions,
+					upgCtx:      *upgCtx,
 				}
 				cm.Register(cma.Test)
 			}
@@ -220,11 +198,11 @@ type chaosMonkeyAdapter struct {
 	test        upgrades.Test
 	framework   *framework.Framework
 	upgradeType upgrades.UpgradeType
-	versions    []version.Version
+	upgCtx      upgrades.UpgradeContext
 }
 
 func (cma *chaosMonkeyAdapter) Test(sem *chaosmonkey.Semaphore) {
-	if skippable, ok := cma.test.(upgrades.VersionSkippable); ok && skippable.SkipVersions(cma.versions...) {
+	if skippable, ok := cma.test.(upgrades.Skippable); ok && skippable.Skip(cma.upgCtx) {
 		By("skipping test " + cma.test.Name())
 		sem.Ready()
 		return
@@ -236,14 +214,44 @@ func (cma *chaosMonkeyAdapter) Test(sem *chaosmonkey.Semaphore) {
 	cma.test.Test(cma.framework, sem.StopCh, cma.upgradeType)
 }
 
-func parseVersions(vs ...string) ([]version.Version, error) {
-	var ret []version.Version
-	for _, v := range vs {
-		semver, err := version.ParseSemantic(v)
-		if err != nil {
-			return nil, err
-		}
-		ret = append(ret, *semver)
+func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget string) (*upgrades.UpgradeContext, error) {
+	current, err := c.ServerVersion()
+	if err != nil {
+		return nil, err
 	}
-	return ret, nil
+
+	curVer, err := version.ParseSemantic(current.String())
+	if err != nil {
+		return nil, err
+	}
+
+	upgCtx := &upgrades.UpgradeContext{
+		Versions: []upgrades.VersionContext{
+			{
+				Version:   *curVer,
+				NodeImage: framework.TestContext.NodeOSDistro,
+			},
+		},
+	}
+
+	if len(upgradeTarget) == 0 {
+		return upgCtx, nil
+	}
+
+	next, err := framework.RealVersion(upgradeTarget)
+	if err != nil {
+		return nil, err
+	}
+
+	nextVer, err := version.ParseSemantic(next)
+	if err != nil {
+		return nil, err
+	}
+
+	upgCtx.Versions = append(upgCtx.Versions, upgrades.VersionContext{
+		Version:   *nextVer,
+		NodeImage: framework.TestContext.UpgradeImage,
+	})
+
+	return upgCtx, nil
 }
