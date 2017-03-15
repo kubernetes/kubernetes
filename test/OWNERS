@@ -14,8 +14,12 @@ reviewers:
   - soltysh
 approvers:
   - deads2k
+  - enisoc
+  - erictune
   - fejta
+  - foxish # for test/e2e/network-partition.go
   - ixdy
+  - kow3ns # for test/e2e/statefulset.go
   - krousey
   - liggitt
   - madhusudancs

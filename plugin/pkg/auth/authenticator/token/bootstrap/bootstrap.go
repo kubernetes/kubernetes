@@ -20,6 +20,7 @@ Package bootstrap provides a token authenticator for TLS bootstrap secrets.
 package bootstrap
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"regexp"
 	"time"
@@ -95,7 +96,7 @@ func (t *TokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, e
 	}
 
 	ts := getSecretString(secret, bootstrapapi.BootstrapTokenSecretKey)
-	if ts != tokenSecret {
+	if subtle.ConstantTimeCompare([]byte(ts), []byte(tokenSecret)) != 1 {
 		return nil, false, nil
 	}
 

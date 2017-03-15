@@ -372,6 +372,8 @@ def start_kube_dns():
     }
 
     try:
+        create_addon('kubedns-sa.yaml', context)
+        create_addon('kubedns-cm.yaml', context)
         create_addon('kubedns-controller.yaml', context)
         create_addon('kubedns-svc.yaml', context)
     except CalledProcessError:

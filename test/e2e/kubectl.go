@@ -62,6 +62,7 @@ import (
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
+	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -1416,7 +1417,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				Effect: v1.TaintEffectNoSchedule,
 			}
 
-			nodeName := getNodeThatCanRunPod(f)
+			nodeName := scheduling.GetNodeThatCanRunPod(f)
 
 			By("adding the taint " + testTaint.ToString() + " to a node")
 			runKubectlRetryOrDie("taint", "nodes", nodeName, testTaint.ToString())
@@ -1447,7 +1448,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				Effect: v1.TaintEffectNoSchedule,
 			}
 
-			nodeName := getNodeThatCanRunPod(f)
+			nodeName := scheduling.GetNodeThatCanRunPod(f)
 
 			By("adding the taint " + testTaint.ToString() + " to a node")
 			runKubectlRetryOrDie("taint", "nodes", nodeName, testTaint.ToString())
