@@ -51,7 +51,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
@@ -164,7 +163,7 @@ func runKubectlRetryOrDie(args ...string) string {
 	var output string
 	for i := 0; i < 5; i++ {
 		output, err = framework.RunKubectl(args...)
-		if err == nil || (!strings.Contains(err.Error(), genericregistry.OptimisticLockErrorMsg) && !strings.Contains(err.Error(), "Operation cannot be fulfilled")) {
+		if err == nil || (!strings.Contains(err.Error(), "the object has been modified") && !strings.Contains(err.Error(), "Operation cannot be fulfilled")) {
 			break
 		}
 		time.Sleep(time.Second)
