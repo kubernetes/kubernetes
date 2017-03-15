@@ -109,8 +109,11 @@ func RunServer(config *master.Config, sharedInformers informers.SharedInformerFa
 	if err != nil {
 		return err
 	}
+	m.GenericAPIServer.AddPostStartHook("start-kube-apiserver-informers", func(context genericapiserver.PostStartHookContext) error {
+		sharedInformers.Start(stopCh)
+		return nil
+	})
 
-	sharedInformers.Start(stopCh)
 	return m.GenericAPIServer.PrepareRun().Run(stopCh)
 }
 
