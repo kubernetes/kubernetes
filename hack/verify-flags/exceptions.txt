@@ -96,21 +96,6 @@ examples/storage/cassandra/image/files/run.sh:  cluster_name \
 examples/storage/cassandra/image/files/run.sh:  listen_address \
 examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)
 federation/cluster/common.sh:  local cert_dir="${kube_temp}/easy-rsa-master/easyrsa3"
-federation/deploy/config.json.sample:      "cloud_provider": "gce",
-federation/deploy/config.json.sample:      "cloud_provider": "gce",
-federation/deploy/config.json.sample:      "cloud_provider": "gce",
-federation/deploy/config.json.sample:      "cluster_cidr": "10.180.0.0/14",
-federation/deploy/config.json.sample:      "cluster_cidr": "10.184.0.0/14",
-federation/deploy/config.json.sample:      "cluster_cidr": "10.188.0.0/14",
-federation/deploy/config.json.sample:      "cluster_name": "cluster1-kubernetes",
-federation/deploy/config.json.sample:      "cluster_name": "cluster2-kubernetes",
-federation/deploy/config.json.sample:      "cluster_name": "cluster3-kubernetes",
-federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
-federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
-federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
-federation/deploy/config.json.sample:      "num_nodes": 3,
-federation/deploy/config.json.sample:      "num_nodes": 3,
-federation/deploy/config.json.sample:      "num_nodes": 3,
 hack/lib/util.sh:    local api_port=$5
 hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST_IP}"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
