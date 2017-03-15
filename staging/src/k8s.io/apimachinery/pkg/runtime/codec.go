@@ -183,15 +183,16 @@ func (c *parameterCodec) EncodeParameters(obj Object, to schema.GroupVersion) (u
 	if err != nil {
 		return nil, err
 	}
-	gvk := gvks[0]
-	if to != gvk.GroupVersion() {
-		out, err := c.convertor.ConvertToVersion(obj, to)
-		if err != nil {
-			return nil, err
+	for _, gvk := range gvks {
+		if to == gvk.GroupVersion() {
+			return queryparams.Convert(obj)
 		}
-		obj = out
 	}
-	return queryparams.Convert(obj)
+	out, err := c.convertor.ConvertToVersion(obj, to)
+	if err != nil {
+		return nil, err
+	}
+	return queryparams.Convert(out)
 }
 
 type base64Serializer struct {
