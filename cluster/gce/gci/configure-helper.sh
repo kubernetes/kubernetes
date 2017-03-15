@@ -1108,9 +1108,9 @@ function start-kube-apiserver {
 
   # Load existing ABAC policy files written by versions < 1.6 of this script
   # TODO: only default to this legacy path when in upgrade mode
-  ABAC_AUTHZ_FILE="${ABAC_AUTHZ_FILE:-/etc/srv/kubernetes/abac-authz-policy.jsonl}"
-  if [[ -n "${ABAC_AUTHZ_FILE:-}" && -e "${ABAC_AUTHZ_FILE}" ]]; then
-    params+=" --authorization-policy-file=${ABAC_AUTHZ_FILE}"
+  local abac_authorization_file="${ABAC_AUTHZ_FILE:-/etc/srv/kubernetes/abac-authz-policy.jsonl}"
+  if [[ -n "${abac_authorization_file:-}" && -e "${abac_authorization_file}" ]]; then
+    params+=" --authorization-policy-file=${abac_authorization_file}"
     authorization_mode+=",ABAC"
   fi
   local webhook_config_mount=""
