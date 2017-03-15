@@ -18,6 +18,7 @@ package kubeconfig
 
 import (
 	"fmt"
+	"os"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -68,6 +69,10 @@ func CreateWithToken(serverURL, clusterName, userName string, caCert []byte, tok
 
 // ClientSetFromFile returns a ready-to-use client from a KubeConfig file
 func ClientSetFromFile(path string) (*clientset.Clientset, error) {
+	if len(path) == 0 {
+		// get the default kubeconfig from env
+		path = os.Getenv("KUBECONFIG")
+	}
 	config, err := clientcmd.LoadFromFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load admin kubeconfig [%v]", err)
