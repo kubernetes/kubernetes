@@ -263,8 +263,8 @@ func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 	}
 	readOnly, err := strconv.ParseBool(v.configData[confKey.readOnly])
 	if err != nil {
-		glog.Warning(log("failed to parse parameter readOnly, setting it to true"))
-		readOnly = true
+		glog.Warning(log("failed to parse parameter readOnly, setting it to false"))
+		readOnly = false
 	}
 
 	// describe created pv

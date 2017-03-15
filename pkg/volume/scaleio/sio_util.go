@@ -125,8 +125,8 @@ func applyConfigDefaults(config map[string]string) {
 	config[confKey.fsType] = defaultString(config[confKey.fsType], "xfs")
 	b, err = strconv.ParseBool(config[confKey.readOnly])
 	if err != nil {
-		glog.Warning(log("failed to parse param readOnly, setting it to true"))
-		b = true
+		glog.Warning(log("failed to parse param readOnly, setting it to false"))
+		b = false
 	}
 	config[confKey.readOnly] = strconv.FormatBool(b)
 }

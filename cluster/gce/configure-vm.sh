@@ -66,6 +66,10 @@ function create-node-pki {
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
     echo "${KUBELET_KEY}" | base64 --decode > "${KUBELET_KEY_PATH}"
   fi
+
+  # TODO(mikedanese): remove this when we don't support downgrading to versions
+  # < 1.6.
+  ln -s "${CA_CERT_BUNDLE_PATH}" /etc/kubernetes/ca.crt
 }
 
 # A hookpoint for setting up local devices
