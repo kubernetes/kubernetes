@@ -144,6 +144,16 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 				glog.Warningf("Both sandbox container and checkpoint for id %q could not be found. "+
 					"Proceed without further sandbox information.", podSandboxID)
 			} else {
+				if checkpointErr == errors.CorruptCheckpointError {
+					// Remove the corrupted checkpoint so that the next
+					// StopPodSandbox call can proceed. This may indicate that
+					// some resources won't be reclaimed.
+					// TODO (#43021): Fix this properly.
+					glog.Warningf("Removing corrupted checkpoint %q: %+v", podSandboxID, *checkpoint)
+					if err := ds.checkpointHandler.RemoveCheckpoint(podSandboxID); err != nil {
+						glog.Warningf("Unable to remove corrupted checkpoint %q: %v", podSandboxID, err)
+					}
+				}
 				return utilerrors.NewAggregate([]error{
 					fmt.Errorf("failed to get checkpoint for sandbox %q: %v", podSandboxID, checkpointErr),
 					fmt.Errorf("failed to get sandbox status: %v", statusErr)})
@@ -393,8 +403,10 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 			glog.Errorf("Failed to retrieve checkpoint for sandbox %q: %v", id, err)
 
 			if err == errors.CorruptCheckpointError {
-				glog.V(2).Info("Removing corrupted checkpoint %q: %+v", id, *checkpoint)
-				ds.checkpointHandler.RemoveCheckpoint(id)
+				glog.Warningf("Removing corrupted checkpoint %q: %+v", id, *checkpoint)
+				if err := ds.checkpointHandler.RemoveCheckpoint(id); err != nil {
+					glog.Warningf("Unable to remove corrupted checkpoint %q: %v", id, err)
+				}
 			}
 			continue
 		}
