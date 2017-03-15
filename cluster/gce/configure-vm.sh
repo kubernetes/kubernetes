@@ -69,7 +69,7 @@ function create-node-pki {
 
   # TODO(mikedanese): remove this when we don't support downgrading to versions
   # < 1.6.
-  ln -s "${CA_CERT_BUNDLE_PATH}" /etc/kubernetes/ca.crt
+  ln -sf "${CA_CERT_BUNDLE_PATH}" /etc/kubernetes/ca.crt
 }
 
 # A hookpoint for setting up local devices
