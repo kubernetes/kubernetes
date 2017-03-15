@@ -73,6 +73,20 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 	// The generated UID is the hash of the file.
 	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = string(pod.UID)
 
+	if isFile {
+		// Applying the default Taint tolerations to static pods
+		pod.Spec.Tolerations = append(pod.Spec.Tolerations, api.Toleration{
+			Key:      "node.alpha.kubernetes.io/unreachable",
+			Operator: "Exists",
+			Effect:   api.TaintEffectNoExecute,
+		})
+		pod.Spec.Tolerations = append(pod.Spec.Tolerations, api.Toleration{
+			Key:      "node.alpha.kubernetes.io/nodeReady",
+			Operator: "Exists",
+			Effect:   api.TaintEffectNoExecute,
+		})
+	}
+
 	// Set the default status to pending.
 	pod.Status.Phase = api.PodPending
 	return nil
