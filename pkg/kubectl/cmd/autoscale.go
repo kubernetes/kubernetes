@@ -112,7 +112,6 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	}
 	names := generator.ParamNames()
 
-	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -162,7 +161,11 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			object = hpa.Object
 		}
 		if cmdutil.GetDryRunFlag(cmd) {
-			return f.PrintObject(cmd, mapper, object, out)
+			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
+				return f.PrintObject(cmd, mapper, object, out)
+			}
+			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, true, "autoscaled")
+			return nil
 		}
 
 		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), hpa, f.JSONEncoder()); err != nil {
@@ -174,20 +177,17 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return err
 		}
 
-		count++
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
 			return f.PrintObject(cmd, mapper, object, out)
 		}
 
-		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, cmdutil.GetDryRunFlag(cmd), "autoscaled")
+		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "autoscaled")
 		return nil
 	})
 	if err != nil {
 		return err
 	}
-	if count == 0 {
-		return fmt.Errorf("no objects passed to autoscale")
-	}
+
 	return nil
 }
 
