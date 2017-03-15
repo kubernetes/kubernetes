@@ -6,6 +6,10 @@ import (
 	"github.com/aws/aws-sdk-go/private/waiter"
 )
 
+// WaitUntilBundleTaskComplete uses the Amazon EC2 API operation
+// DescribeBundleTasks to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilBundleTaskComplete(input *DescribeBundleTasksInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeBundleTasks",
@@ -35,6 +39,10 @@ func (c *EC2) WaitUntilBundleTaskComplete(input *DescribeBundleTasksInput) error
 	return w.Wait()
 }
 
+// WaitUntilConversionTaskCancelled uses the Amazon EC2 API operation
+// DescribeConversionTasks to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilConversionTaskCancelled(input *DescribeConversionTasksInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeConversionTasks",
@@ -58,6 +66,10 @@ func (c *EC2) WaitUntilConversionTaskCancelled(input *DescribeConversionTasksInp
 	return w.Wait()
 }
 
+// WaitUntilConversionTaskCompleted uses the Amazon EC2 API operation
+// DescribeConversionTasks to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilConversionTaskCompleted(input *DescribeConversionTasksInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeConversionTasks",
@@ -93,6 +105,10 @@ func (c *EC2) WaitUntilConversionTaskCompleted(input *DescribeConversionTasksInp
 	return w.Wait()
 }
 
+// WaitUntilConversionTaskDeleted uses the Amazon EC2 API operation
+// DescribeConversionTasks to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilConversionTaskDeleted(input *DescribeConversionTasksInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeConversionTasks",
@@ -116,6 +132,10 @@ func (c *EC2) WaitUntilConversionTaskDeleted(input *DescribeConversionTasksInput
 	return w.Wait()
 }
 
+// WaitUntilCustomerGatewayAvailable uses the Amazon EC2 API operation
+// DescribeCustomerGateways to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilCustomerGatewayAvailable(input *DescribeCustomerGatewaysInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeCustomerGateways",
@@ -151,6 +171,10 @@ func (c *EC2) WaitUntilCustomerGatewayAvailable(input *DescribeCustomerGatewaysI
 	return w.Wait()
 }
 
+// WaitUntilExportTaskCancelled uses the Amazon EC2 API operation
+// DescribeExportTasks to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilExportTaskCancelled(input *DescribeExportTasksInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeExportTasks",
@@ -174,6 +198,10 @@ func (c *EC2) WaitUntilExportTaskCancelled(input *DescribeExportTasksInput) erro
 	return w.Wait()
 }
 
+// WaitUntilExportTaskCompleted uses the Amazon EC2 API operation
+// DescribeExportTasks to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilExportTaskCompleted(input *DescribeExportTasksInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeExportTasks",
@@ -197,6 +225,10 @@ func (c *EC2) WaitUntilExportTaskCompleted(input *DescribeExportTasksInput) erro
 	return w.Wait()
 }
 
+// WaitUntilImageAvailable uses the Amazon EC2 API operation
+// DescribeImages to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilImageAvailable(input *DescribeImagesInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeImages",
@@ -226,23 +258,27 @@ func (c *EC2) WaitUntilImageAvailable(input *DescribeImagesInput) error {
 	return w.Wait()
 }
 
-func (c *EC2) WaitUntilInstanceExists(input *DescribeInstancesInput) error {
+// WaitUntilImageExists uses the Amazon EC2 API operation
+// DescribeImages to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
+func (c *EC2) WaitUntilImageExists(input *DescribeImagesInput) error {
 	waiterCfg := waiter.Config{
-		Operation:   "DescribeInstances",
-		Delay:       5,
+		Operation:   "DescribeImages",
+		Delay:       15,
 		MaxAttempts: 40,
 		Acceptors: []waiter.WaitAcceptor{
 			{
 				State:    "success",
-				Matcher:  "status",
-				Argument: "",
-				Expected: 200,
+				Matcher:  "path",
+				Argument: "length(Images[]) > `0`",
+				Expected: true,
 			},
 			{
 				State:    "retry",
 				Matcher:  "error",
 				Argument: "",
-				Expected: "InvalidInstanceIDNotFound",
+				Expected: "InvalidAMIID.NotFound",
 			},
 		},
 	}
@@ -255,6 +291,43 @@ func (c *EC2) WaitUntilInstanceExists(input *DescribeInstancesInput) error {
 	return w.Wait()
 }
 
+// WaitUntilInstanceExists uses the Amazon EC2 API operation
+// DescribeInstances to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
+func (c *EC2) WaitUntilInstanceExists(input *DescribeInstancesInput) error {
+	waiterCfg := waiter.Config{
+		Operation:   "DescribeInstances",
+		Delay:       5,
+		MaxAttempts: 40,
+		Acceptors: []waiter.WaitAcceptor{
+			{
+				State:    "success",
+				Matcher:  "path",
+				Argument: "length(Reservations[]) > `0`",
+				Expected: true,
+			},
+			{
+				State:    "retry",
+				Matcher:  "error",
+				Argument: "",
+				Expected: "InvalidInstanceID.NotFound",
+			},
+		},
+	}
+
+	w := waiter.Waiter{
+		Client: c,
+		Input:  input,
+		Config: waiterCfg,
+	}
+	return w.Wait()
+}
+
+// WaitUntilInstanceRunning uses the Amazon EC2 API operation
+// DescribeInstances to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilInstanceRunning(input *DescribeInstancesInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeInstances",
@@ -285,28 +358,11 @@ func (c *EC2) WaitUntilInstanceRunning(input *DescribeInstancesInput) error {
 				Argument: "Reservations[].Instances[].State.Name",
 				Expected: "stopping",
 			},
-		},
-	}
-
-	w := waiter.Waiter{
-		Client: c,
-		Input:  input,
-		Config: waiterCfg,
-	}
-	return w.Wait()
-}
-
-func (c *EC2) WaitUntilInstanceStatusOk(input *DescribeInstanceStatusInput) error {
-	waiterCfg := waiter.Config{
-		Operation:   "DescribeInstanceStatus",
-		Delay:       15,
-		MaxAttempts: 40,
-		Acceptors: []waiter.WaitAcceptor{
 			{
-				State:    "success",
-				Matcher:  "pathAll",
-				Argument: "InstanceStatuses[].InstanceStatus.Status",
-				Expected: "ok",
+				State:    "retry",
+				Matcher:  "error",
+				Argument: "",
+				Expected: "InvalidInstanceID.NotFound",
 			},
 		},
 	}
@@ -319,6 +375,43 @@ func (c *EC2) WaitUntilInstanceStatusOk(input *DescribeInstanceStatusInput) erro
 	return w.Wait()
 }
 
+// WaitUntilInstanceStatusOk uses the Amazon EC2 API operation
+// DescribeInstanceStatus to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
+func (c *EC2) WaitUntilInstanceStatusOk(input *DescribeInstanceStatusInput) error {
+	waiterCfg := waiter.Config{
+		Operation:   "DescribeInstanceStatus",
+		Delay:       15,
+		MaxAttempts: 40,
+		Acceptors: []waiter.WaitAcceptor{
+			{
+				State:    "success",
+				Matcher:  "pathAll",
+				Argument: "InstanceStatuses[].InstanceStatus.Status",
+				Expected: "ok",
+			},
+			{
+				State:    "retry",
+				Matcher:  "error",
+				Argument: "",
+				Expected: "InvalidInstanceID.NotFound",
+			},
+		},
+	}
+
+	w := waiter.Waiter{
+		Client: c,
+		Input:  input,
+		Config: waiterCfg,
+	}
+	return w.Wait()
+}
+
+// WaitUntilInstanceStopped uses the Amazon EC2 API operation
+// DescribeInstances to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilInstanceStopped(input *DescribeInstancesInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeInstances",
@@ -354,6 +447,10 @@ func (c *EC2) WaitUntilInstanceStopped(input *DescribeInstancesInput) error {
 	return w.Wait()
 }
 
+// WaitUntilInstanceTerminated uses the Amazon EC2 API operation
+// DescribeInstances to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilInstanceTerminated(input *DescribeInstancesInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeInstances",
@@ -389,6 +486,10 @@ func (c *EC2) WaitUntilInstanceTerminated(input *DescribeInstancesInput) error {
 	return w.Wait()
 }
 
+// WaitUntilKeyPairExists uses the Amazon EC2 API operation
+// DescribeKeyPairs to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilKeyPairExists(input *DescribeKeyPairsInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeKeyPairs",
@@ -405,7 +506,7 @@ func (c *EC2) WaitUntilKeyPairExists(input *DescribeKeyPairsInput) error {
 				State:    "retry",
 				Matcher:  "error",
 				Argument: "",
-				Expected: "InvalidKeyPairNotFound",
+				Expected: "InvalidKeyPair.NotFound",
 			},
 		},
 	}
@@ -418,6 +519,61 @@ func (c *EC2) WaitUntilKeyPairExists(input *DescribeKeyPairsInput) error {
 	return w.Wait()
 }
 
+// WaitUntilNatGatewayAvailable uses the Amazon EC2 API operation
+// DescribeNatGateways to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
+func (c *EC2) WaitUntilNatGatewayAvailable(input *DescribeNatGatewaysInput) error {
+	waiterCfg := waiter.Config{
+		Operation:   "DescribeNatGateways",
+		Delay:       15,
+		MaxAttempts: 40,
+		Acceptors: []waiter.WaitAcceptor{
+			{
+				State:    "success",
+				Matcher:  "pathAll",
+				Argument: "NatGateways[].State",
+				Expected: "available",
+			},
+			{
+				State:    "failure",
+				Matcher:  "pathAny",
+				Argument: "NatGateways[].State",
+				Expected: "failed",
+			},
+			{
+				State:    "failure",
+				Matcher:  "pathAny",
+				Argument: "NatGateways[].State",
+				Expected: "deleting",
+			},
+			{
+				State:    "failure",
+				Matcher:  "pathAny",
+				Argument: "NatGateways[].State",
+				Expected: "deleted",
+			},
+			{
+				State:    "retry",
+				Matcher:  "error",
+				Argument: "",
+				Expected: "NatGatewayNotFound",
+			},
+		},
+	}
+
+	w := waiter.Waiter{
+		Client: c,
+		Input:  input,
+		Config: waiterCfg,
+	}
+	return w.Wait()
+}
+
+// WaitUntilNetworkInterfaceAvailable uses the Amazon EC2 API operation
+// DescribeNetworkInterfaces to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilNetworkInterfaceAvailable(input *DescribeNetworkInterfacesInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeNetworkInterfaces",
@@ -434,7 +590,7 @@ func (c *EC2) WaitUntilNetworkInterfaceAvailable(input *DescribeNetworkInterface
 				State:    "failure",
 				Matcher:  "error",
 				Argument: "",
-				Expected: "InvalidNetworkInterfaceIDNotFound",
+				Expected: "InvalidNetworkInterfaceID.NotFound",
 			},
 		},
 	}
@@ -447,6 +603,10 @@ func (c *EC2) WaitUntilNetworkInterfaceAvailable(input *DescribeNetworkInterface
 	return w.Wait()
 }
 
+// WaitUntilPasswordDataAvailable uses the Amazon EC2 API operation
+// GetPasswordData to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilPasswordDataAvailable(input *GetPasswordDataInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "GetPasswordData",
@@ -470,6 +630,10 @@ func (c *EC2) WaitUntilPasswordDataAvailable(input *GetPasswordDataInput) error 
 	return w.Wait()
 }
 
+// WaitUntilSnapshotCompleted uses the Amazon EC2 API operation
+// DescribeSnapshots to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilSnapshotCompleted(input *DescribeSnapshotsInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeSnapshots",
@@ -493,6 +657,10 @@ func (c *EC2) WaitUntilSnapshotCompleted(input *DescribeSnapshotsInput) error {
 	return w.Wait()
 }
 
+// WaitUntilSpotInstanceRequestFulfilled uses the Amazon EC2 API operation
+// DescribeSpotInstanceRequests to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilSpotInstanceRequestFulfilled(input *DescribeSpotInstanceRequestsInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeSpotInstanceRequests",
@@ -540,6 +708,10 @@ func (c *EC2) WaitUntilSpotInstanceRequestFulfilled(input *DescribeSpotInstanceR
 	return w.Wait()
 }
 
+// WaitUntilSubnetAvailable uses the Amazon EC2 API operation
+// DescribeSubnets to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilSubnetAvailable(input *DescribeSubnetsInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeSubnets",
@@ -563,6 +735,10 @@ func (c *EC2) WaitUntilSubnetAvailable(input *DescribeSubnetsInput) error {
 	return w.Wait()
 }
 
+// WaitUntilSystemStatusOk uses the Amazon EC2 API operation
+// DescribeInstanceStatus to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilSystemStatusOk(input *DescribeInstanceStatusInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeInstanceStatus",
@@ -586,6 +762,10 @@ func (c *EC2) WaitUntilSystemStatusOk(input *DescribeInstanceStatusInput) error 
 	return w.Wait()
 }
 
+// WaitUntilVolumeAvailable uses the Amazon EC2 API operation
+// DescribeVolumes to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilVolumeAvailable(input *DescribeVolumesInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeVolumes",
@@ -615,6 +795,10 @@ func (c *EC2) WaitUntilVolumeAvailable(input *DescribeVolumesInput) error {
 	return w.Wait()
 }
 
+// WaitUntilVolumeDeleted uses the Amazon EC2 API operation
+// DescribeVolumes to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilVolumeDeleted(input *DescribeVolumesInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeVolumes",
@@ -631,7 +815,7 @@ func (c *EC2) WaitUntilVolumeDeleted(input *DescribeVolumesInput) error {
 				State:    "success",
 				Matcher:  "error",
 				Argument: "",
-				Expected: "InvalidVolumeNotFound",
+				Expected: "InvalidVolume.NotFound",
 			},
 		},
 	}
@@ -644,6 +828,10 @@ func (c *EC2) WaitUntilVolumeDeleted(input *DescribeVolumesInput) error {
 	return w.Wait()
 }
 
+// WaitUntilVolumeInUse uses the Amazon EC2 API operation
+// DescribeVolumes to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilVolumeInUse(input *DescribeVolumesInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeVolumes",
@@ -673,6 +861,10 @@ func (c *EC2) WaitUntilVolumeInUse(input *DescribeVolumesInput) error {
 	return w.Wait()
 }
 
+// WaitUntilVpcAvailable uses the Amazon EC2 API operation
+// DescribeVpcs to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilVpcAvailable(input *DescribeVpcsInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeVpcs",
@@ -696,6 +888,76 @@ func (c *EC2) WaitUntilVpcAvailable(input *DescribeVpcsInput) error {
 	return w.Wait()
 }
 
+// WaitUntilVpcExists uses the Amazon EC2 API operation
+// DescribeVpcs to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
+func (c *EC2) WaitUntilVpcExists(input *DescribeVpcsInput) error {
+	waiterCfg := waiter.Config{
+		Operation:   "DescribeVpcs",
+		Delay:       1,
+		MaxAttempts: 5,
+		Acceptors: []waiter.WaitAcceptor{
+			{
+				State:    "success",
+				Matcher:  "status",
+				Argument: "",
+				Expected: 200,
+			},
+			{
+				State:    "retry",
+				Matcher:  "error",
+				Argument: "",
+				Expected: "InvalidVpcID.NotFound",
+			},
+		},
+	}
+
+	w := waiter.Waiter{
+		Client: c,
+		Input:  input,
+		Config: waiterCfg,
+	}
+	return w.Wait()
+}
+
+// WaitUntilVpcPeeringConnectionExists uses the Amazon EC2 API operation
+// DescribeVpcPeeringConnections to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
+func (c *EC2) WaitUntilVpcPeeringConnectionExists(input *DescribeVpcPeeringConnectionsInput) error {
+	waiterCfg := waiter.Config{
+		Operation:   "DescribeVpcPeeringConnections",
+		Delay:       15,
+		MaxAttempts: 40,
+		Acceptors: []waiter.WaitAcceptor{
+			{
+				State:    "success",
+				Matcher:  "status",
+				Argument: "",
+				Expected: 200,
+			},
+			{
+				State:    "retry",
+				Matcher:  "error",
+				Argument: "",
+				Expected: "InvalidVpcPeeringConnectionID.NotFound",
+			},
+		},
+	}
+
+	w := waiter.Waiter{
+		Client: c,
+		Input:  input,
+		Config: waiterCfg,
+	}
+	return w.Wait()
+}
+
+// WaitUntilVpnConnectionAvailable uses the Amazon EC2 API operation
+// DescribeVpnConnections to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilVpnConnectionAvailable(input *DescribeVpnConnectionsInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeVpnConnections",
@@ -731,6 +993,10 @@ func (c *EC2) WaitUntilVpnConnectionAvailable(input *DescribeVpnConnectionsInput
 	return w.Wait()
 }
 
+// WaitUntilVpnConnectionDeleted uses the Amazon EC2 API operation
+// DescribeVpnConnections to wait for a condition to be met before returning.
+// If the condition is not meet within the max attempt window an error will
+// be returned.
 func (c *EC2) WaitUntilVpnConnectionDeleted(input *DescribeVpnConnectionsInput) error {
 	waiterCfg := waiter.Config{
 		Operation:   "DescribeVpnConnections",

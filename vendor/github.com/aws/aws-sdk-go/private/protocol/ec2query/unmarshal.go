@@ -1,6 +1,6 @@
 package ec2query
 
-//go:generate go run ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/output/ec2.json unmarshal_test.go
+//go:generate go run -tags codegen ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/output/ec2.json unmarshal_test.go
 
 import (
 	"encoding/xml"
@@ -10,6 +10,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil"
 )
+
+// UnmarshalHandler is a named request handler for unmarshaling ec2query protocol requests
+var UnmarshalHandler = request.NamedHandler{Name: "awssdk.ec2query.Unmarshal", Fn: Unmarshal}
+
+// UnmarshalMetaHandler is a named request handler for unmarshaling ec2query protocol request metadata
+var UnmarshalMetaHandler = request.NamedHandler{Name: "awssdk.ec2query.UnmarshalMeta", Fn: UnmarshalMeta}
+
+// UnmarshalErrorHandler is a named request handler for unmarshaling ec2query protocol request errors
+var UnmarshalErrorHandler = request.NamedHandler{Name: "awssdk.ec2query.UnmarshalError", Fn: UnmarshalError}
 
 // Unmarshal unmarshals a response body for the EC2 protocol.
 func Unmarshal(r *request.Request) {
@@ -33,7 +42,7 @@ type xmlErrorResponse struct {
 	XMLName   xml.Name `xml:"Response"`
 	Code      string   `xml:"Errors>Error>Code"`
 	Message   string   `xml:"Errors>Error>Message"`
-	RequestID string   `xml:"RequestId"`
+	RequestID string   `xml:"RequestID"`
 }
 
 // UnmarshalError unmarshals a response error for the EC2 protocol.
