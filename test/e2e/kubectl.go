@@ -1333,6 +1333,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Kubectl taint", func() {
 		It("should update the taint on a node", func() {
+			framework.SkipUnlessKubectlVersionLTE(version.MustParse("v1.6.0-alpha.3"))
 			testTaint := api.Taint{
 				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-001-%s", string(uuid.NewUUID())),
 				Value:  "testing-taint-value",
@@ -1364,6 +1365,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		It("should remove all the taints with the same key off a node", func() {
+			framework.SkipUnlessKubectlVersionLTE(version.MustParse("v1.6.0-alpha.3"))
 			testTaint := api.Taint{
 				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-002-%s", string(uuid.NewUUID())),
 				Value:  "testing-taint-value",
