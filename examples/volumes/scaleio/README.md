@@ -42,14 +42,15 @@ This document shows how to configure Kubernetes resources to consume storage fro
 
 This document assumes you are familiar with ScaleIO and have a cluster ready to go.  If you are *not familiar* with ScaleIO, please review *Learn how to setup a 3-node* [ScaleIO cluster on Vagrant](https://github.com/codedellemc/labs/tree/master/setup-scaleio-vagrant) and see *General instructions on* [setting up ScaleIO](https://www.emc.com/products-solutions/trial-software-download/scaleio.htm)
 
-For this demonstration, ensure the followings: 
+For this demonstration, ensure the following: 
 
- - the ScaleIO `SDC` component is installed and properly configured on all Kubernetes nodes where deployed pods will consume ScaleIO-backed volumes.
+ - The ScaleIO `SDC` component is installed and properly configured on all Kubernetes nodes where deployed pods will consume ScaleIO-backed volumes.
  - You have a configured ScaleIO gateway that is accessible from the Kubernetes nodes. 
 
 ## Deploy Kubernetes Secret for ScaleIO
 
-The ScaleIO plugin uses Kubernetes Secret object to store the `username` and `password` credentials used to connect to the ScaleIO gateway API server.  In this step, let us create a secret object to save the data.  To avoid storing secrets in as clear text, let us encode the ScaleIO credentials as `base64` using the following steps.
+The ScaleIO plugin uses a Kubernetes Secret object to store the `username` and `password` credentials.  
+Kuberenetes requires the secret values to be base64-encoded to simply obfuscate (not encrypt) the clear text as shown below.
 
 ```
 $> echo -n "siouser" | base64
@@ -57,7 +58,8 @@ c2lvdXNlcg==
 $> echo -n "sc@l3I0" | base64
 c2NAbDNJMA==
 ```
-The previous will generate `base64-encoded` values for the username and password.  Remember to generate the credentials for your own environment (not the username/password shown above) .  Next, create a secret file, with the encoded values from above, as shown in the following.
+The previous will generate `base64-encoded` values for the username and password.  
+Remember to generate the credentials for your own environment and copy them in a secret file similar to the following.  
 
 File: [secret.yaml](secret.yaml)
 
@@ -80,7 +82,20 @@ $ kubectl create -f ./examples/volumes/scaleio/secret.yaml
 
 ## Deploying Pods with Persistent Volumes
 
-The following example shows how the ScaleIO volume plugin for Kubernetes automatically attach, format, and mount a volume for a deployed pod. This approach requires an existing ScaleIO volume.
+The example presented in this section shows how the ScaleIO volume plugin can automatically attach, format, and mount an existing ScaleIO volume for pod. 
+The Kubernetes ScaleIO volume spec supports the following attributes:
+
+| Attribute | Description |
+|-----------|-------------|
+| gateway | address to a ScaleIO API gateway (required)|
+| system  | the name of the ScaleIO system (required)|
+| protectionDomain| the name of the ScaleIO protection domain (default `default`)|
+| storagePool| the name of the volume storage pool (default `default`)|
+| storageMode| the storage provision mode: `ThinProvisionned` (default) or `ThickProvisionned`|
+| volumeName| the name of an existing volume in ScaleIO (required)|
+| secretRef:name| reference to a configuered Secret object (required, see Secret earlier)|
+| readOnly| specifies the access mode to the mounted volume (default `false`)|
+| fsType| the file system to use for the volume (default `ext4`)|
 
 ### Create Volume
 
@@ -114,12 +129,11 @@ spec:
         name: sio-secret
       fsType: xfs
 ```
-
 Notice the followings in the previous YAML:
 
-- Update the `gatewway` to point to your ScaleIO gateway endpoint.  
-- The `volumeName` attribute refers to the name of an existing volume in ScaleIO.  
-- The  `secretRef` attribute references the name of the secret object deployed earlier.
+- Update the `gatewway` to point to your ScaleIO gateway endpoint.
+- The `volumeName` attribute refers to the name of an existing volume in ScaleIO.
+- The `secretRef:name` attribute references the name of the secret object deployed earlier.
 
 Next, deploy the pod.
 
@@ -146,9 +160,22 @@ scinia      252:0    0    8G  0 disk /var/lib/kubelet/pods/135986c7-dcb7-11e6-9f
 
 ## StorageClass and Dynamic Provisioning
 
-In this example, we will see how the ScaleIO volume plugin can automatically provision a new volume as described in a `StorageClass`.
+In the example in this section, we will see how the ScaleIO volume plugin can automatically provision described in a `StorageClass`.
+The ScaleIO volume plugin is a dynamic provisioner identified as `kubernetes.io/scaleio` and supports the following parameters:
 
-### StorageClass
+| Parameter | Description |
+|-----------|-------------|
+| gateway | address to a ScaleIO API gateway (required)|
+| system  | the name of the ScaleIO system (required)|
+| protectionDomain| the name of the ScaleIO protection domain (default `default`)|
+| storagePool| the name of the volume storage pool (default `default`)|
+| storageMode| the storage provision mode: `ThinProvisionned` (default) or `ThickProvisionned`|
+| secretRef| reference to the name of a configuered Secret object (required)|
+| readOnly| specifies the access mode to the mounted volume (default `false`)|
+| fsType| the file system to use for the volume (default `ext4`)|
+
+
+### ScaleIO StorageClass
 
 Define a new `StorageClass` as shown in the following YAML.
 
@@ -156,7 +183,7 @@ File [sc.yaml](sc.yaml)
 
 ```
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: sio-small
 provisioner: kubernetes.io/scaleio
@@ -167,12 +194,9 @@ parameters:
   secretRef: sio-secret
   fsType: xfs
 ```
-
 Note the followings:
 
-- The `name` attribute is set to `sio-small` . It will be referenced later.
-- The `provisioner` attribute is set to `kubernetes.io/scaleio` to trigger the ScaleIO plugin.
-- The use of the `parameters:` section in the yaml for configurations.  
+- The `name` attribute is set to sio-small . It will be referenced later.
 - The `secretRef` attribute matches the name of the Secret object created earlier.
 
 Next, deploy the storage class file.
