@@ -23,12 +23,53 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	serviceaccountregistry "k8s.io/kubernetes/pkg/registry/core/serviceaccount"
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
+
+// internalClientGetter implements ServiceAccountTokenGetter using an internalclientset.Interface
+type internalClientGetter struct {
+	client internalclientset.Interface
+}
+
+// NewGetterFromClient returns a ServiceAccountTokenGetter that
+// uses the specified client to retrieve service accounts and secrets.
+// The client should NOT authenticate using a service account token
+// the returned getter will be used to retrieve, or recursion will result.
+func NewGetterFromInternalClient(c internalclientset.Interface) serviceaccount.ServiceAccountTokenGetter {
+	return internalClientGetter{c}
+}
+func (c internalClientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
+	unversioned, err := c.client.Core().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	ret := &v1.ServiceAccount{}
+	// these are nearly free conversions
+	if err := v1.Convert_api_ServiceAccount_To_v1_ServiceAccount(unversioned, ret, nil); err != nil {
+		return nil, err
+	}
+	return ret, err
+
+}
+func (c internalClientGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
+	unversioned, err := c.client.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	ret := &v1.Secret{}
+	// these are nearly free conversions
+	if err := v1.Convert_api_Secret_To_v1_Secret(unversioned, ret, nil); err != nil {
+		return nil, err
+	}
+	return ret, err
+}
 
 // clientGetter implements ServiceAccountTokenGetter using a clientset.Interface
 type clientGetter struct {
