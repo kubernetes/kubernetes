@@ -33,19 +33,19 @@ const (
 )
 
 var (
-	// AppArmorPlatforms are platforms with AppArmor support.
-	AppArmorPlatforms = []string{"gci", "ubuntu"}
+	// AppArmorDistros are distributions with AppArmor support.
+	AppArmorDistros = []string{"gci", "ubuntu"}
 )
 
 func SkipIfAppArmorNotSupported() {
 	if !IsAppArmorSupported() {
-		framework.Skipf("Only supported for distros with AppArmor %v (not %s)", AppArmorPlatforms, framework.TestContext.NodeOSDistro)
+		framework.Skipf("Only supported for distros with AppArmor %v (not %s)", AppArmorDistros, framework.TestContext.NodeOSDistro)
 	}
 }
 
 // IsAppArmorSupported returns true if the current OS distro supports AppArmor.
 func IsAppArmorSupported() bool {
-	return framework.NodeOSDistroIs(AppArmorPlatforms...)
+	return framework.NodeOSDistroIs(AppArmorDistros...)
 }
 
 func LoadAppArmorProfiles(f *framework.Framework) {
