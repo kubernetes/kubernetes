@@ -43,6 +43,9 @@ readonly TMP_DIR="$(mktemp -d)"
 readonly FEDERATION_OUTPUT_ROOT="${LOCAL_OUTPUT_ROOT}/federation"
 readonly VERSIONS_FILE="${FEDERATION_OUTPUT_ROOT}/versions"
 
+readonly KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
+readonly KUBE_ARCH=${KUBE_ARCH:-amd64}
+
 if [[ "${KUBERNETES_PROVIDER}" == "gke" || "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   detect-project
   readonly KUBE_PROJECT="${KUBE_PROJECT:-${PROJECT:-}}"
@@ -67,7 +70,7 @@ function dirty_sha() {
   local -r index="${KUBE_ROOT}/.git/index"
   local -r objects_dir="${KUBE_ROOT}/.git/objects"
 
-  local -r tmp_dir="${TMP_DIR}/.git"
+  local -r tmp_dir="${TMP_DIR}/git/.git"
   local -r tmp_index="${tmp_dir}/index"
   local -r tmp_objects_dir="${tmp_dir}/objects"
 
@@ -83,7 +86,7 @@ function build_binaries() {
   cd "${KUBE_ROOT}"
   kube::build::verify_prereqs
   kube::build::build_image
-  kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube"
+  kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube federation/cmd/kubefed"
   kube::build::copy_output
 }
 
@@ -109,10 +112,35 @@ function build_image() {
 }" > "${VERSIONS_FILE}"
   kube::log::status "Wrote to version file ${VERSIONS_FILE}: ${kube_version}"
 
-  BASEIMAGE="ubuntu:16.04" \
-    REGISTRY="${KUBE_REGISTRY}" \
-    VERSION="${kube_version}" \
-    make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
+  local -r binary="hyperkube"
+  local -r image="hyperkube-amd64"
+  local -r bin_path="${LOCAL_OUTPUT_BINPATH}/${KUBE_PLATFORM}/${KUBE_ARCH}/hyperkube"
+
+  if [[ ! -f "${bin_path}" ]]; then
+    echo "${bin_path} does not exist"
+    exit 1
+  fi
+
+  local docker_build_path="${TMP_DIR}/dockerbuild"
+  local docker_file_path="${docker_build_path}/Dockerfile"
+
+  rm -rf ${docker_build_path}
+  mkdir -p ${docker_build_path}
+
+  cp "${bin_path}" "${docker_build_path}/${binary}"
+  printf " FROM ubuntu:16.04 \n ADD ${binary} /${binary}\n" > ${docker_file_path}
+
+  local docker_image_tag="${KUBE_REGISTRY}:${kube_version}"
+
+  # Build the docker image on-the-fly.
+  #
+  # NOTE: This is only a temporary fix until the proposal in issue
+  # https://github.com/kubernetes/kubernetes/issues/28630 is implemented.
+  # Also, the new turn up mechanism completely obviates this step.
+  kube::log::status "Building docker image ${docker_image_tag} from the binary"
+  docker build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+
+  rm -rf ${docker_build_path}
 }
 
 function get_version() {
