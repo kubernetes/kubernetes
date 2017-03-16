@@ -29,7 +29,7 @@ func TestAddFlagsFlag(t *testing.T) {
 	s.AddFlags(f)
 
 	if s.Features.EnableSwaggerUI || s.Features.EnableContentionProfiling || !s.Features.EnableProfiling {
-		t.Errorf("Expected s.EnableSwaggerUI to be false by default")
+		t.Errorf("Expected SwaggerUI,ContentionProfiling to be false,Profiling to be true by default")
 	}
 
 	args := []string{
@@ -39,6 +39,6 @@ func TestAddFlagsFlag(t *testing.T) {
 	}
 	f.Parse(args)
 	if !s.Features.EnableSwaggerUI || !s.Features.EnableContentionProfiling || !s.Features.EnableProfiling {
-		t.Errorf("Expected s.EnableSwaggerUI to be true")
+		t.Errorf("Expected s.EnableSwaggerUI,ContentionProfiling to be true,EnableProfiling to be false")
 	}
 }
