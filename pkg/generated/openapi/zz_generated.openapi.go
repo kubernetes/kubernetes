@@ -358,7 +358,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"propagationPolicy": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+								Description: "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
 								Type:        []string{"string"},
 								Format:      "",
 							},

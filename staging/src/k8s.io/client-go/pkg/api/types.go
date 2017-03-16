@@ -3090,8 +3090,9 @@ type DeleteOptions struct {
 	OrphanDependents *bool
 
 	// Whether and how garbage collection will be performed.
-	// Defaults to Default.
 	// Either this field or OrphanDependents may be set, but not both.
+	// The default policy is decided by the existing finalizer set in the
+	// metadata.finalizers and the resource-specific default policy.
 	// +optional
 	PropagationPolicy *DeletionPropagation
 }
