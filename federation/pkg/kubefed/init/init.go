@@ -105,7 +105,7 @@ var (
 		# Initialize federation control plane for a federation
 		# named foo in the host cluster whose local kubeconfig
 		# context is bar.
-		kubectl init foo --host-cluster-context=bar`)
+		kubefed init foo --host-cluster-context=bar`)
 
 	componentLabel = map[string]string{
 		"app": "federated-cluster",
