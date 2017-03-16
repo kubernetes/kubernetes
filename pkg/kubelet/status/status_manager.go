@@ -426,43 +426,46 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		// If the Pod is deleted the status will be cleared in
 		// RemoveOrphanedStatuses, so we just ignore the update here.
 		return
-	}
-	if err == nil {
-		translatedUID := m.podManager.TranslatePodUID(pod.UID)
-		if len(translatedUID) > 0 && translatedUID != uid {
-			glog.V(2).Infof("Pod %q was deleted and then recreated, skipping status update; old UID %q, new UID %q", format.Pod(pod), uid, translatedUID)
-			m.deletePodStatus(uid)
-			return
-		}
-		pod.Status = status.status
-		if err := podutil.SetInitContainersStatusesAnnotations(pod); err != nil {
-			glog.Error(err)
-		}
-		// TODO: handle conflict as a retry, make that easier too.
-		pod, err = m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
-		if err == nil {
-			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
-			m.apiStatusVersions[pod.UID] = status.version
-			if kubepod.IsMirrorPod(pod) {
-				// We don't handle graceful deletion of mirror pods.
-				return
-			}
-			if !m.podDeletionSafety.OkToDeletePod(pod) {
-				return
-			}
-			deleteOptions := metav1.NewDeleteOptions(0)
-			// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
-			deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
-			if err = m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err == nil {
-				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
-				m.deletePodStatus(uid)
-				return
-			}
-		}
+	} else if err != nil {
+		glog.Warningf("Failed to get status for pod %q: %v", format.PodDesc(status.podName, status.podNamespace, uid), err)
+		return
 	}
 
-	// We failed to update status, wait for periodic sync to retry.
-	glog.Warningf("Failed to update status for pod %q: %v", format.PodDesc(status.podName, status.podNamespace, uid), err)
+	translatedUID := m.podManager.TranslatePodUID(pod.UID)
+	if len(translatedUID) > 0 && translatedUID != uid {
+		glog.V(2).Infof("Pod %q was deleted and then recreated, skipping status update; old UID %q, new UID %q", format.Pod(pod), uid, translatedUID)
+		m.deletePodStatus(uid)
+		return
+	}
+	pod.Status = status.status
+	if err := podutil.SetInitContainersStatusesAnnotations(pod); err != nil {
+		glog.Error(err)
+	}
+	// TODO: handle conflict as a retry, make that easier too.
+	newPod, err := m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
+	if err != nil {
+		glog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
+		return
+	}
+	pod = newPod
+
+	glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
+	m.apiStatusVersions[pod.UID] = status.version
+
+	// We don't handle graceful deletion of mirror pods.
+	if !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.OkToDeletePod(pod) {
+		deleteOptions := metav1.NewDeleteOptions(0)
+		// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
+		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
+		err = m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
+		if err != nil {
+			glog.Warningf("Failed to delete status for pod %q: %v", format.Pod(pod), err)
+			return
+		}
+
+		glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
+		m.deletePodStatus(uid)
+	}
 }
 
 // needsUpdate returns whether the status is stale for the given pod UID.
