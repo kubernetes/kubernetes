@@ -4,12 +4,9 @@ metadata:
   name: local-pvc
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
-      storage: 1Mi
+      storage: 10Gi
   volumeType: "" # For some reason I must have this field even though it's optional
-  storageClassName: ""
-  selector:
-    matchLabels:
-      storage: "local"
+  storageClassName: "local-fast"

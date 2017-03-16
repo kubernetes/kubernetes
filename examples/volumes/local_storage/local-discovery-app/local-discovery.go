@@ -63,6 +63,7 @@ func createPV(c *kubernetes.Clientset, file, node string) {
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
+			StorageClassName: "local-fast",
 		},
 	}
 

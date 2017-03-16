@@ -21,15 +21,16 @@
 GOARCH?=$(shell go env GOARCH)
 GOOS?=$(shell go env GOOS)
 TAG="v1.3"
+PROJECT="msau-k8s-dev"
 
 local-discovery:
 	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' local-discovery.go
 
 container:
-	docker build --pull -t gcr.io/msau-gke-dev/local-discovery:$(TAG) .
+	docker build --pull -t gcr.io/$(PROJECT)/local-discovery:$(TAG) .
 
 push: container
-	gcloud docker -- push gcr.io/msau-gke-dev/local-discovery:$(TAG)
+	gcloud docker -- push gcr.io/$(PROJECT)/local-discovery:$(TAG)
 
 clean:
 	rm -f local-discovery

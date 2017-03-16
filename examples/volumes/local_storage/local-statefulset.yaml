@@ -1,0 +1,33 @@
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: local-test
+spec:
+  serviceName: "local-service"
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: local-test
+    spec:
+      containers:
+      - name: test-container
+        image: gcr.io/google_containers/busybox:1.24
+        command: 
+        - "/bin/sh"
+        args:
+        - "-c"
+        - "date >> /usr/test-pod/test_file; echo \"Testing local-test pod\" >> /usr/test-pod/test_file; while [ 1 ]; do sleep 100; done"
+        volumeMounts:
+        - name: local-vol
+          mountPath: /usr/test-pod
+  volumeClaimTemplates:
+  - metadata:
+      name: local-vol
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "local-fast"
+      resources:
+        requests:
+          storage: 1Gi
+
