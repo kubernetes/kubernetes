@@ -18,6 +18,8 @@ package e2e_node
 
 import (
 	"fmt"
+	"io/ioutil"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -37,9 +39,14 @@ var _ = framework.KubeDescribe("Summary API", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	Context("when querying /stats/summary", func() {
 		AfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+			if !CurrentGinkgoTestDescription().Failed {
+				return
+			}
+			if framework.TestContext.DumpLogsOnFailure {
 				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 			}
+			By("Recording processes in system cgroups")
+			recordSystemCgroupProcesses()
 		})
 		It("should report resource usage through the stats api", func() {
 			const pod0 = "stats-busybox-0"
@@ -298,4 +305,40 @@ func recent(d time.Duration) types.GomegaMatcher {
 		BeTemporally(">=", time.Now().Add(-d)),
 		// Now() is the test start time, not the match time, so permit a few extra minutes.
 		BeTemporally("<", time.Now().Add(2*time.Minute))))
+}
+
+func recordSystemCgroupProcesses() {
+	cfg, err := getCurrentKubeletConfig()
+	if err != nil {
+		framework.Logf("Failed to read kubelet config: %v", err)
+		return
+	}
+	cgroups := map[string]string{
+		"kubelet": cfg.KubeletCgroups,
+		"runtime": cfg.RuntimeCgroups,
+		"misc":    cfg.SystemCgroups,
+	}
+	for name, cgroup := range cgroups {
+		if cgroup == "" {
+			framework.Logf("Skipping unconfigured cgroup %s", name)
+			continue
+		}
+
+		pids, err := ioutil.ReadFile(fmt.Sprintf("/sys/fs/cgroup/cpu/%s/cgroup.procs", cgroup))
+		if err != nil {
+			framework.Logf("Failed to read processes in cgroup %s: %v", name, err)
+			continue
+		}
+
+		framework.Logf("Processes in %s cgroup (%s):", name, cgroup)
+		for _, pid := range strings.Fields(string(pids)) {
+			path := fmt.Sprintf("/proc/%s/cmdline", pid)
+			cmd, err := ioutil.ReadFile(path)
+			if err != nil {
+				framework.Logf("  Failed to read %s: %v", path, err)
+			} else {
+				framework.Logf("  %s", cmd)
+			}
+		}
+	}
 }

@@ -54,7 +54,7 @@ if ! $ALL ; then
 	echo "Running in short-circuit mode; run with -a to force all scripts to run."
 fi
 
-kube::util::ensure_godep_version v74
+kube::util::ensure_godep_version v79
 
 if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
 	echo "Running godep restore"
@@ -95,4 +95,3 @@ for t in $BASH_TARGETS; do
 done
 
 echo -e "${color_green}Update scripts completed successfully${color_norm}"
-

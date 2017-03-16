@@ -219,7 +219,7 @@ function create-node-pki {
 
   # TODO(mikedanese): remove this when we don't support downgrading to versions
   # < 1.6.
-  ln -s "${CA_CERT_BUNDLE_PATH}" /etc/srv/kubernetes/ca.crt
+  ln -sf "${CA_CERT_BUNDLE_PATH}" /etc/srv/kubernetes/ca.crt
 }
 
 function create-master-pki {
@@ -272,8 +272,8 @@ function create-master-pki {
 
   # TODO(mikedanese): remove this when we don't support downgrading to versions
   # < 1.6.
-  ln -s "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.key
-  ln -s "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.cert
+  ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.key
+  ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.cert
 }
 
 # After the first boot and on upgrade, these files exist on the master-pd

@@ -22,7 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-kube::util::ensure_godep_version v74
+kube::util::ensure_godep_version v79
 
 # Some things we want in godeps aren't code dependencies, so ./...
 # won't pick them up.
