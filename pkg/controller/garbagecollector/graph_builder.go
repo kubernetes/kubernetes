@@ -157,7 +157,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 	return monitor, nil
 }
 
-func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionResource]struct{}) error {
+func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionResource]struct{}) {
 	for resource := range resources {
 		if _, ok := ignoredResources[resource]; ok {
 			glog.V(5).Infof("ignore resource %#v", resource)
@@ -165,15 +165,17 @@ func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionRe
 		}
 		kind, err := gb.restMapper.KindFor(resource)
 		if err != nil {
-			return err
+			nonCoreMsg := fmt.Sprintf(nonCoreMessage, resource)
+			utilruntime.HandleError(fmt.Errorf("%v. %s", err, nonCoreMsg))
+			continue
 		}
 		monitor, err := gb.controllerFor(resource, kind)
 		if err != nil {
-			return err
+			utilruntime.HandleError(err)
+			continue
 		}
 		gb.monitors = append(gb.monitors, monitor)
 	}
-	return nil
 }
 
 func (gb *GraphBuilder) HasSynced() bool {

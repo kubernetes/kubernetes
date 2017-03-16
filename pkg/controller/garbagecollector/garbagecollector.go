@@ -95,9 +95,7 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 	}
-	if err := gb.monitorsForResources(deletableResources); err != nil {
-		return nil, err
-	}
+	gb.monitorsForResources(deletableResources)
 	gc.dependencyGraphBuilder = gb
 
 	return gc, nil
