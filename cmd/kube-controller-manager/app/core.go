@@ -104,7 +104,10 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 
 	// Find the list of namespaced resources via discovery that the namespace controller must manage
 	namespaceKubeClient := ctx.ClientBuilder.ClientOrDie("namespace-controller")
-	namespaceClientPool := dynamic.NewClientPool(ctx.ClientBuilder.ConfigOrDie("namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
+	pool := ctx.ClientBuilder.ConfigOrDie("namespace-controller")
+	pool.QPS *= 3
+	pool.Burst *= 2
+	namespaceClientPool := dynamic.NewClientPool(pool, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
 	resources, err := namespaceKubeClient.Discovery().ServerResources()
 	if err != nil {
