@@ -17,6 +17,10 @@ spec:
         env:
         - name: "DNS_DOMAIN"
           value: "cluster.local"
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         ports: 
         - name: hazelcast
           containerPort: 5701
