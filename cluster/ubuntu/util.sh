@@ -19,7 +19,15 @@
 set -e
 
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
-source "${KUBE_ROOT}/cluster/common.sh"
+#KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+#source "${KUBE_ROOT}/cluster/common.sh"
+if [ -f "${KUBE_ROOT}/cluster/common.sh" ]; then
+        source "${KUBE_ROOT}/cluster/common.sh"
+else
+	KUBE_ROOT=$(dirname "${BASH_SOURCE}")
+        source "${KUBE_ROOT}/common.sh"
+fi
+
 
 MASTER=""
 MASTER_IP=""
@@ -509,6 +517,8 @@ function provision-node() {
   # copy the binaries and scripts to the ~/kube directory on the node
   scp -r $SSH_OPTS \
     "${KUBE_CONFIG_FILE}" \
+    common.sh \
+    lib \
     ubuntu/util.sh \
     ubuntu/reconfDocker.sh \
     ubuntu/minion/* \
@@ -593,6 +603,8 @@ function provision-masterandnode() {
     saltbase/salt/generate-cert/make-ca-cert.sh \
     easy-rsa.tar.gz \
     "${KUBE_CONFIG_FILE}" \
+    common.sh \
+    lib \
     ubuntu/util.sh \
     ubuntu/minion/* \
     ubuntu/master/* \

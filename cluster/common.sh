@@ -20,12 +20,21 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
+#KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
 
 DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
-source "${KUBE_ROOT}/cluster/lib/util.sh"
-source "${KUBE_ROOT}/cluster/lib/logging.sh"
+#source "${KUBE_ROOT}/cluster/lib/util.sh"
+#source "${KUBE_ROOT}/cluster/lib/logging.sh"
+if [ -f "${KUBE_ROOT}/cluster/lib/util.sh" ]; then
+	source "${KUBE_ROOT}/cluster/lib/util.sh"
+	source "${KUBE_ROOT}/cluster/lib/logging.sh"
+else	
+	source "${KUBE_ROOT}/lib/util.sh"
+	source "${KUBE_ROOT}/lib/logging.sh"
+	source "${KUBE_ROOT}/config-default.sh"
+fi
+
 # KUBE_RELEASE_VERSION_REGEX matches things like "v1.2.3" or "v1.2.3-alpha.4"
 #
 # NOTE This must match the version_regex in build/common.sh
