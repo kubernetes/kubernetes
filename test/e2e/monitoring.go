@@ -45,12 +45,13 @@ var _ = framework.KubeDescribe("Monitoring", func() {
 })
 
 const (
-	influxdbService      = "monitoring-influxdb"
-	influxdbDatabaseName = "k8s"
-	podlistQuery         = "show tag values from \"cpu/usage\" with key = pod_id"
-	nodelistQuery        = "show tag values from \"cpu/usage\" with key = hostname"
-	sleepBetweenAttempts = 5 * time.Second
-	testTimeout          = 5 * time.Minute
+	influxdbService       = "monitoring-influxdb"
+	influxdbDatabaseName  = "k8s"
+	podlistQuery          = "show tag values from \"cpu/usage\" with key = pod_id"
+	nodelistQuery         = "show tag values from \"cpu/usage\" with key = hostname"
+	sleepBetweenAttempts  = 5 * time.Second
+	testTimeout           = 5 * time.Minute
+	initializationTimeout = 5 * time.Minute
 )
 
 var (
@@ -286,10 +287,18 @@ func validatePodsAndNodes(c clientset.Interface, expectedPods, expectedNodes []s
 
 func testMonitoringUsingHeapsterInfluxdb(c clientset.Interface) {
 	// Check if heapster pods and services are up.
-	expectedPods, err := verifyExpectedRcsExistAndGetExpectedPods(c)
-	framework.ExpectNoError(err)
-	framework.ExpectNoError(expectedServicesExist(c))
-	// TODO: Wait for all pods and services to be running.
+	var expectedPods []string
+	rcErr := fmt.Errorf("Failed to verify expected RCs within timeout")
+	serviceErr := fmt.Errorf("Failed to verify expected services within timeout")
+	for start := time.Now(); time.Since(start) < initializationTimeout; time.Sleep(sleepBetweenAttempts) {
+		expectedPods, rcErr = verifyExpectedRcsExistAndGetExpectedPods(c)
+		serviceErr = expectedServicesExist(c)
+		if rcErr == nil && serviceErr == nil {
+			break
+		}
+	}
+	framework.ExpectNoError(rcErr)
+	framework.ExpectNoError(serviceErr)
 
 	expectedNodes, err := getAllNodesInCluster(c)
 	framework.ExpectNoError(err)
