@@ -508,6 +508,12 @@ EOF
 kubelet_test_args: '$(echo "$KUBELET_TEST_ARGS" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${KUBELET_ARGS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kubelet_args: '$(echo "$KUBELET_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+
     if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 kubelet_test_log_level: '$(echo "$KUBELET_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
