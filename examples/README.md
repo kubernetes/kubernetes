@@ -19,7 +19,7 @@ and best practices, and to refresh command syntax, output, changed
 prerequisites, as needed.
 
 Name | Description | Notable Features Used | Complexity Level
-------------- | ------------- | ------------ | ------------ | ------------
+------------- | ------------- | ------------ | ------------ 
 [Guestbook](guestbook/) | PHP app with Redis | Replication Controller, Service | Beginner
 [WordPress](mysql-wordpress-pd/) | WordPress with MySQL | Deployment, Persistent Volume with Claim | Beginner
 [Cassandra](storage/cassandra/) | Cloud Native Cassandra | Daemon Set | Intermediate
