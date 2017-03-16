@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -158,6 +159,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 }
 
 func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionResource]struct{}) error {
+	var errors []error
 	for resource := range resources {
 		if _, ok := ignoredResources[resource]; ok {
 			glog.V(5).Infof("ignore resource %#v", resource)
@@ -165,15 +167,18 @@ func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionRe
 		}
 		kind, err := gb.restMapper.KindFor(resource)
 		if err != nil {
-			return err
+			tprMsg := fmt.Sprintf(tprMessage, resource)
+			errors = append(errors, fmt.Errorf("%v. %s", err, tprMsg))
+			continue
 		}
 		monitor, err := gb.controllerFor(resource, kind)
 		if err != nil {
-			return err
+			errors = append(errors, err)
+			continue
 		}
 		gb.monitors = append(gb.monitors, monitor)
 	}
-	return nil
+	return utilerrors.NewAggregate(errors)
 }
 
 func (gb *GraphBuilder) HasSynced() bool {
