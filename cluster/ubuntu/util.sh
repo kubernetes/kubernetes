@@ -19,8 +19,6 @@
 set -e
 
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
-#KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-#source "${KUBE_ROOT}/cluster/common.sh"
 if [ -f "${KUBE_ROOT}/cluster/common.sh" ]; then
         source "${KUBE_ROOT}/cluster/common.sh"
 else

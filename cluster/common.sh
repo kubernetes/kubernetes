@@ -20,12 +20,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-#KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
-
 DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
-#source "${KUBE_ROOT}/cluster/lib/util.sh"
-#source "${KUBE_ROOT}/cluster/lib/logging.sh"
 if [ -f "${KUBE_ROOT}/cluster/lib/util.sh" ]; then
 	source "${KUBE_ROOT}/cluster/lib/util.sh"
 	source "${KUBE_ROOT}/cluster/lib/logging.sh"
