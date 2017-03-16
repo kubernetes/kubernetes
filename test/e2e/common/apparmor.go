@@ -32,8 +32,11 @@ const (
 	appArmorDeniedPath    = "/expect_permission_denied"
 )
 
+// AppArmorDistros are distros with AppArmor support
+var AppArmorDistros = []string{"gci", "ubuntu"}
+
 func SkipIfAppArmorNotSupported() {
-	framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
+	framework.SkipUnlessNodeOSDistroIs(AppArmorDistros...)
 }
 
 func LoadAppArmorProfiles(f *framework.Framework) {
