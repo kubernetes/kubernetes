@@ -25,7 +25,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "gcr.io/google_containers/cluster-autoscaler:v0.5.0-beta1",
+                "image": "gcr.io/google_containers/cluster-autoscaler:v0.5.0-beta2",
                 "command": [
                     "./run.sh",
                     "--kubernetes=http://127.0.0.1:8080?inClusterConfig=f",
