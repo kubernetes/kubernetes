@@ -131,8 +131,8 @@ function install-gci-mounter-tools {
 
 # Install node problem detector binary.
 function install-node-problem-detector {
-  local -r npd_version="v0.3.0-alpha.1"
-  local -r npd_sha1="46f963fac14d92021c8b2a648a6cb0337c1bc833"
+  local -r npd_version="v0.3.0"
+  local -r npd_sha1="2e6423c5798e14464271d9c944e56a637ee5a4bc"
   local -r npd_release_path="https://storage.googleapis.com/kubernetes-release"
   local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
   download-or-bust "${npd_sha1}" "${npd_release_path}/node-problem-detector/${npd_tar}"
