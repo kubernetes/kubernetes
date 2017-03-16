@@ -32,7 +32,12 @@ KUBE_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 DEPLOY_ROOT="${KUBE_ROOT}/federation/deploy"
 CUR_ROOT="$(pwd)"
 
+# This script is only used for dev and testing where
+# we only care about fast builds.
+KUBE_FASTBUILD="true"
+
 source "${KUBE_ROOT}/build/common.sh"
+source "${KUBE_ROOT}/build/lib/release.sh"
 source "${KUBE_ROOT}/build/util.sh"
 # Provides the detect-project function
 source "${KUBE_ROOT}/cluster/kube-util.sh"
@@ -45,6 +50,10 @@ readonly VERSIONS_FILE="${FEDERATION_OUTPUT_ROOT}/versions"
 
 readonly KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
 readonly KUBE_ARCH=${KUBE_ARCH:-amd64}
+
+readonly FEDERATION_TARGET=(
+  cmd/hyperkube
+)
 
 if [[ "${KUBERNETES_PROVIDER}" == "gke" || "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   detect-project
@@ -88,6 +97,29 @@ function build_binaries() {
   kube::build::build_image
   kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube federation/cmd/kubefed"
   kube::build::copy_output
+}
+
+function package_test() {
+  targets_arr=(
+    "${KUBE_CLIENT_TARGETS[@]}"
+    "${KUBE_TEST_TARGETS[@]}"
+    "${KUBE_TEST_SERVER_TARGETS[@]}"
+    "${FEDERATION_TARGET[@]}"
+  )
+
+  # Convert the array to a string of space separated items.
+  # "make WHAT" below doesn't take newline separated string.
+  targets=${targets_arr[@]//\\n/ }
+
+  cd "${KUBE_ROOT}"
+
+  kube::build::verify_prereqs
+  kube::build::build_image
+  kube::build::run_build_command make WHAT="${targets}"
+  kube::build::copy_output
+  kube::release::package_test_tarball
+
+  build_image
 }
 
 function build_image() {
@@ -177,6 +209,9 @@ case "${ACTION}" in
   ;;
   "build_image")
   build_image
+  ;;
+  "package_test")
+  package_test
   ;;
   "push")
   push
