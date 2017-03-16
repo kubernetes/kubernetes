@@ -165,7 +165,9 @@ func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionRe
 		}
 		kind, err := gb.restMapper.KindFor(resource)
 		if err != nil {
-			return err
+			nonCoreMsg := fmt.Sprintf(nonCoreMessage, resource)
+			utilruntime.HandleError(fmt.Errorf("%v. %s", err, nonCoreMsg))
+			continue
 		}
 		monitor, err := gb.controllerFor(resource, kind)
 		if err != nil {

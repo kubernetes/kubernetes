@@ -11,6 +11,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "errors.go",
         "garbagecollector.go",
         "graph.go",
         "graph_builder.go",
