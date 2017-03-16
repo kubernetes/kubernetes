@@ -73,6 +73,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"name": {
 							SchemaProps: spec.SchemaProps{
 								Description: "name is the name of the group.",
@@ -113,7 +119,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"name", "versions", "serverAddressByClientCIDRs"},
+					Required: []string{"foobar", "name", "versions", "serverAddressByClientCIDRs"},
 				},
 			},
 			Dependencies: []string{
@@ -138,6 +144,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"groups": {
 							SchemaProps: spec.SchemaProps{
 								Description: "groups is a list of APIGroup.",
@@ -152,7 +164,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"groups"},
+					Required: []string{"foobar", "groups"},
 				},
 			},
 			Dependencies: []string{
@@ -237,6 +249,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"groupVersion": {
 							SchemaProps: spec.SchemaProps{
 								Description: "groupVersion is the group and version this APIResourceList is for.",
@@ -258,7 +276,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"groupVersion", "resources"},
+					Required: []string{"foobar", "groupVersion", "resources"},
 				},
 			},
 			Dependencies: []string{
@@ -281,6 +299,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"versions": {
@@ -311,7 +335,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"versions", "serverAddressByClientCIDRs"},
+					Required: []string{"foobar", "versions", "serverAddressByClientCIDRs"},
 				},
 			},
 			Dependencies: []string{
@@ -334,6 +358,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"gracePeriodSeconds": {
@@ -364,6 +394,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -405,6 +436,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"export": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Should this value be exported.  Export strips fields that a user can not specify.",
@@ -420,7 +457,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"export", "exact"},
+					Required: []string{"foobar", "export", "exact"},
 				},
 			},
 			Dependencies: []string{},
@@ -444,6 +481,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"resourceVersion": {
 							SchemaProps: spec.SchemaProps{
 								Description: "When specified: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
@@ -452,6 +495,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{},
@@ -752,6 +796,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"labelSelector": {
 							SchemaProps: spec.SchemaProps{
 								Description: "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
@@ -788,6 +838,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{},
@@ -1081,6 +1132,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -1122,6 +1179,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -1255,7 +1313,14 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{},
@@ -1452,12 +1517,19 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"status": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1.TestTypeStatus"),
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -1481,6 +1553,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
@@ -1499,7 +1577,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -1540,6 +1618,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -1559,6 +1643,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -1635,6 +1720,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -1655,7 +1746,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -1976,6 +2067,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -1989,7 +2086,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"target"},
+					Required: []string{"foobar", "target"},
 				},
 			},
 			Dependencies: []string{
@@ -2183,6 +2280,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -2203,6 +2306,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -2227,6 +2331,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -2247,7 +2357,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -2272,6 +2382,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -2293,6 +2409,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -2373,6 +2490,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -2393,7 +2516,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -3208,6 +3331,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -3228,7 +3357,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"subsets"},
+					Required: []string{"foobar", "subsets"},
 				},
 			},
 			Dependencies: []string{
@@ -3253,6 +3382,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -3273,7 +3408,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -3395,6 +3530,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -3454,7 +3595,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"metadata", "involvedObject"},
+					Required: []string{"foobar", "metadata", "involvedObject"},
 				},
 			},
 			Dependencies: []string{
@@ -3479,6 +3620,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -3499,7 +3646,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -4044,6 +4191,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -4057,6 +4210,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -4164,6 +4318,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -4184,7 +4344,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -4234,6 +4394,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -4254,7 +4420,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -4376,6 +4542,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -4395,6 +4567,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -4419,6 +4592,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -4439,7 +4618,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -4505,6 +4684,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -4524,6 +4709,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -4672,6 +4858,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -4692,7 +4884,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -4717,6 +4909,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"path": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Path is the URL path to use for the current proxy request to node.",
@@ -4725,6 +4923,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{},
@@ -5201,6 +5400,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -5220,6 +5425,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -5244,6 +5450,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -5263,6 +5475,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -5287,6 +5500,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -5307,7 +5526,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -5453,6 +5672,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -5473,7 +5698,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -5851,6 +6076,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -5870,6 +6101,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -6007,6 +6239,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"stdin": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Stdin if true, redirects the standard input stream of the pod for this call. Defaults to false.",
@@ -6043,6 +6281,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{},
@@ -6118,6 +6357,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"stdin": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Redirect the standard input stream of the pod for this call. Defaults to false.",
@@ -6168,7 +6413,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"command"},
+					Required: []string{"foobar", "command"},
 				},
 			},
 			Dependencies: []string{},
@@ -6192,6 +6437,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -6212,7 +6463,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -6235,6 +6486,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"container": {
@@ -6293,6 +6550,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -6317,6 +6575,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"ports": {
 							SchemaProps: spec.SchemaProps{
 								Description: "List of ports to forward Required when using WebSockets",
@@ -6332,6 +6596,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{},
@@ -6355,6 +6620,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"path": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Path is the URL path to use for the current proxy request to pod.",
@@ -6363,6 +6634,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{},
@@ -6754,6 +7026,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -6767,6 +7045,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -6791,6 +7070,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -6804,6 +7089,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -6828,6 +7114,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -6848,7 +7140,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -7207,6 +7499,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -7228,7 +7526,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"range", "data"},
+					Required: []string{"foobar", "range", "data"},
 				},
 			},
 			Dependencies: []string{
@@ -7253,6 +7551,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "If the Labels of a ReplicationController are empty, they are defaulted to be the same as the Pod(s) that the replication controller manages. Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -7272,6 +7576,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -7342,6 +7647,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -7362,7 +7673,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -7524,6 +7835,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -7543,6 +7860,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -7567,6 +7885,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -7587,7 +7911,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -7843,6 +8167,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -7885,6 +8215,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -7965,6 +8296,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -7985,7 +8322,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -8144,6 +8481,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"reference": {
 							SchemaProps: spec.SchemaProps{
 								Description: "The reference to an object in the system.",
@@ -8151,6 +8494,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -8175,6 +8519,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -8194,6 +8544,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -8216,6 +8567,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"metadata": {
@@ -8258,6 +8615,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -8282,6 +8640,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -8302,7 +8666,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -8327,6 +8691,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -8347,7 +8717,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -8418,6 +8788,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"path": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
@@ -8426,6 +8802,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{},
@@ -9174,6 +9551,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"spec": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Spec describes the policy rule",
@@ -9181,7 +9564,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"spec"},
+					Required: []string{"foobar", "spec"},
 				},
 			},
 			Dependencies: []string{
@@ -9265,6 +9648,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object metadata.",
@@ -9284,6 +9673,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -9360,6 +9750,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata.",
@@ -9380,7 +9776,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -9403,6 +9799,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"name": {
@@ -9433,7 +9835,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"name", "rollbackTo"},
+					Required: []string{"foobar", "name", "rollbackTo"},
 				},
 			},
 			Dependencies: []string{
@@ -9658,6 +10060,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
@@ -9677,6 +10085,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -9757,6 +10166,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -9775,6 +10190,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -9799,6 +10215,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
@@ -9817,7 +10239,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -9918,6 +10340,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -9936,7 +10364,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"spec"},
+					Required: []string{"foobar", "spec"},
 				},
 			},
 			Dependencies: []string{
@@ -10068,6 +10496,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -10086,7 +10520,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"spec"},
+					Required: []string{"foobar", "spec"},
 				},
 			},
 			Dependencies: []string{
@@ -10218,6 +10652,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -10236,7 +10676,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"spec"},
+					Required: []string{"foobar", "spec"},
 				},
 			},
 			Dependencies: []string{
@@ -10344,6 +10784,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -10362,7 +10808,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"spec"},
+					Required: []string{"foobar", "spec"},
 				},
 			},
 			Dependencies: []string{
@@ -10410,6 +10856,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -10428,7 +10880,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"spec"},
+					Required: []string{"foobar", "spec"},
 				},
 			},
 			Dependencies: []string{
@@ -10550,6 +11002,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -10568,7 +11026,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"spec"},
+					Required: []string{"foobar", "spec"},
 				},
 			},
 			Dependencies: []string{
@@ -10676,6 +11134,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -10694,7 +11158,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"spec"},
+					Required: []string{"foobar", "spec"},
 				},
 			},
 			Dependencies: []string{
@@ -10742,6 +11206,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -10760,7 +11230,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"spec"},
+					Required: []string{"foobar", "spec"},
 				},
 			},
 			Dependencies: []string{
@@ -10914,6 +11384,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -10933,6 +11409,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -10957,6 +11434,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata.",
@@ -10977,7 +11460,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -11337,6 +11820,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
@@ -11356,6 +11845,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -11454,6 +11944,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "metadata is the standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -11473,6 +11969,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -11497,6 +11994,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "metadata is the standard list metadata.",
@@ -11517,7 +12020,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -11889,6 +12392,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -11908,6 +12417,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -11984,6 +12494,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -12004,7 +12520,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -12138,6 +12654,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -12157,6 +12679,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -12181,6 +12704,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -12201,7 +12730,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -12316,6 +12845,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -12329,6 +12864,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -12376,6 +12912,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -12394,6 +12936,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -12455,6 +12998,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
@@ -12473,7 +13022,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -12606,6 +13155,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"bindAddress": {
@@ -12751,7 +13306,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "iptablesMinSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
+					Required: []string{"foobar", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "iptablesMinSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
 				},
 			},
 			Dependencies: []string{
@@ -12773,6 +13328,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"port": {
@@ -12866,7 +13427,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection"},
+					Required: []string{"foobar", "port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection"},
 				},
 			},
 			Dependencies: []string{
@@ -12958,6 +13519,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"podManifestPath": {
@@ -13856,7 +14423,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "enableContentionProfiling", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "experimentalQOSReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "systemReserved", "kubeReserved"},
+					Required: []string{"foobar", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "enableContentionProfiling", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "experimentalQOSReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "systemReserved", "kubeReserved"},
 				},
 			},
 			Dependencies: []string{
@@ -14094,6 +14661,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -14113,6 +14686,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -14137,6 +14711,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -14157,7 +14737,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -14316,6 +14896,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object metadata.",
@@ -14335,6 +14921,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -14411,6 +14998,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata.",
@@ -14431,7 +15024,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -14454,6 +15047,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"name": {
@@ -14484,7 +15083,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"name", "rollbackTo"},
+					Required: []string{"foobar", "name", "rollbackTo"},
 				},
 			},
 			Dependencies: []string{
@@ -14801,6 +15400,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -14820,6 +15425,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -14869,6 +15475,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -14889,7 +15501,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -15043,6 +15655,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -15056,6 +15674,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -15117,6 +15736,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -15137,7 +15762,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -15237,6 +15862,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -15250,6 +15881,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -15274,6 +15906,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -15294,7 +15932,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -15459,6 +16097,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "If the Labels of a ReplicaSet are empty, they are defaulted to be the same as the Pod(s) that the ReplicaSet manages. Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -15478,6 +16122,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -15548,6 +16193,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -15568,7 +16219,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -15690,7 +16341,14 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{},
@@ -15827,6 +16485,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
@@ -15846,6 +16510,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -15957,6 +16622,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object metadata",
@@ -15984,6 +16655,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -16008,6 +16680,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object metadata.",
@@ -16022,6 +16700,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -16046,6 +16725,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -16066,7 +16751,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -16091,6 +16776,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata.",
@@ -16111,7 +16802,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -16136,6 +16827,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -16154,7 +16851,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"spec"},
+					Required: []string{"foobar", "spec"},
 				},
 			},
 			Dependencies: []string{
@@ -16266,6 +16963,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "ObjectMeta describes the pod that is being evicted.",
@@ -16279,6 +16982,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -16303,6 +17007,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -16321,6 +17031,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -16345,6 +17056,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
@@ -16363,7 +17080,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -16471,6 +17188,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -16491,7 +17214,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"rules"},
+					Required: []string{"foobar", "rules"},
 				},
 			},
 			Dependencies: []string{
@@ -16514,6 +17237,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"metadata": {
@@ -16542,7 +17271,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"subjects", "roleRef"},
+					Required: []string{"foobar", "subjects", "roleRef"},
 				},
 			},
 			Dependencies: []string{
@@ -16584,6 +17313,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -16604,7 +17339,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -16629,6 +17364,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -16649,7 +17390,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -16772,6 +17513,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -16792,7 +17539,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"rules"},
+					Required: []string{"foobar", "rules"},
 				},
 			},
 			Dependencies: []string{
@@ -16815,6 +17562,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"metadata": {
@@ -16843,7 +17596,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"subjects", "roleRef"},
+					Required: []string{"foobar", "subjects", "roleRef"},
 				},
 			},
 			Dependencies: []string{
@@ -16868,6 +17621,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -16888,7 +17647,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -16913,6 +17672,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -16933,7 +17698,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -17029,6 +17794,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -17049,7 +17820,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"rules"},
+					Required: []string{"foobar", "rules"},
 				},
 			},
 			Dependencies: []string{
@@ -17072,6 +17843,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"metadata": {
@@ -17100,7 +17877,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"subjects", "roleRef"},
+					Required: []string{"foobar", "subjects", "roleRef"},
 				},
 			},
 			Dependencies: []string{
@@ -17142,6 +17919,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -17162,7 +17945,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -17187,6 +17970,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -17207,7 +17996,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -17330,6 +18119,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -17350,7 +18145,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"rules"},
+					Required: []string{"foobar", "rules"},
 				},
 			},
 			Dependencies: []string{
@@ -17373,6 +18168,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"metadata": {
@@ -17401,7 +18202,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"subjects", "roleRef"},
+					Required: []string{"foobar", "subjects", "roleRef"},
 				},
 			},
 			Dependencies: []string{
@@ -17426,6 +18227,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -17446,7 +18253,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -17471,6 +18278,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata.",
@@ -17491,7 +18304,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -17587,6 +18400,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
@@ -17598,6 +18417,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
+					Required: []string{"foobar"},
 				},
 			},
 			Dependencies: []string{
@@ -17622,6 +18442,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -17642,7 +18468,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -17736,6 +18562,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -17764,7 +18596,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"provisioner"},
+					Required: []string{"foobar", "provisioner"},
 				},
 			},
 			Dependencies: []string{
@@ -17789,6 +18621,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -17809,7 +18647,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
@@ -17832,6 +18670,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
 								Type:        []string{"string"},
 								Format:      "",
+							},
+						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
 							},
 						},
 						"metadata": {
@@ -17862,7 +18706,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"provisioner"},
+					Required: []string{"foobar", "provisioner"},
 				},
 			},
 			Dependencies: []string{
@@ -17887,6 +18731,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"foobar": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
 						"metadata": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -17907,7 +18757,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"items"},
+					Required: []string{"foobar", "items"},
 				},
 			},
 			Dependencies: []string{
