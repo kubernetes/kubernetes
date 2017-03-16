@@ -581,6 +581,20 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 
+	// This is the point at which we used to add/remove the overlap annotation.
+	// Now we always remove it if it exists, because it is obsolete as of 1.6.
+	// Although the server no longer adds or looks at the annotation,
+	// it's important to remove it from controllers created before the upgrade,
+	// so that old clients (e.g. kubectl reaper) know they can no longer assume
+	// the controller is blocked due to selector overlap and has no dependents.
+	if _, ok := d.Annotations[util.OverlapAnnotation]; ok {
+		delete(d.Annotations, util.OverlapAnnotation)
+		d, err = dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d)
+		if err != nil {
+			return fmt.Errorf("couldn't remove obsolete overlap annotation from deployment %v: %v", key, err)
+		}
+	}
+
 	// List ReplicaSets owned by this Deployment, while reconciling ControllerRef
 	// through adoption/orphaning.
 	rsList, err := dc.getReplicaSetsForDeployment(d)
