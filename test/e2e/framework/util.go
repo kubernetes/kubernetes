@@ -1721,6 +1721,46 @@ func KubectlVersion() (*utilversion.Version, error) {
 	return utilversion.ParseSemantic(matches[1])
 }
 
+// NodeVersion returns the oldest node version among all the nodes.
+func OldestNodeVersion() *utilversion.Version {
+	output := RunKubectlOrDie("get", "node")
+	nodeInfos := strings.Split(output, "\n")
+	var oldestNodeVersion *utilversion.Version
+	for _, nodeInfo := range nodeInfos {
+		// skip the 1st line if necessary
+		if strings.HasPrefix(nodeInfo, "NAME") || len(nodeInfo) == 0 {
+			continue
+		}
+		fields := strings.Fields(nodeInfo)
+		if len(fields) < 4 {
+			Failf("Unexpected node info format: %s", nodeInfo)
+		}
+		nodeName := fields[0]
+		nodeVersion := fields[3]
+		if system.IsMasterNode(nodeName) {
+			continue
+		}
+
+		typedNodeVersion, err := utilversion.ParseSemantic(nodeVersion)
+		if err != nil {
+			Failf("Failed to parse node version: %s", err)
+		}
+		if oldestNodeVersion == nil {
+			oldestNodeVersion = typedNodeVersion
+		} else {
+			if gte := oldestNodeVersion.AtLeast(typedNodeVersion); gte {
+				oldestNodeVersion = typedNodeVersion
+			}
+		}
+	}
+	return oldestNodeVersion
+}
+
+func OldestNodeVersionGTE(v *utilversion.Version) bool {
+	onv := OldestNodeVersion()
+	return onv.AtLeast(v)
+}
+
 func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods *v1.PodList) error {
 	By("trying to dial each unique pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))

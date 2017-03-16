@@ -139,6 +139,10 @@ var (
 	// Returning container command exit codes in kubectl run/exec was introduced in #26541 (v1.4)
 	// so we don't expect tests that verifies return code to work on kubectl clients before that.
 	kubectlContainerExitCodeVersion = utilversion.MustParseSemantic("v1.4.0-alpha.3")
+
+	// #38989 add QoSClass as a field of Pod.Status. kubectl 1.6 or later won't work with 1.5 nodes.
+	// https://github.com/kubernetes/kubernetes/issues/42831#issuecomment-286869806
+	kubectlDescribeQoSVersion = utilversion.MustParseSemantic("v1.6.0-alpha.1")
 )
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
@@ -735,7 +739,11 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 					{"Controllers:", "ReplicationController/redis-master"},
 					{"Image:", redisImage},
 					{"State:", "Running"},
-					{"QoS Class:", "BestEffort"},
+				}
+				if framework.OldestNodeVersionGTE(kubectlDescribeQoSVersion) {
+					requiredStrings = append(requiredStrings, []string{"QoS Class:", "BestEffort"})
+				} else {
+					framework.Logf("kubectl describe pod skip checking QoS Class=BestEffort")
 				}
 				checkOutput(output, requiredStrings)
 			})
