@@ -325,6 +325,13 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 	}
 	baseConfigMap := baseConfigMapObj.(*apiv1.ConfigMap)
 
+	obj, err := api.Scheme.DeepCopy(baseConfigMapObj)
+	baseConfigMap, ok := obj.(*apiv1.ConfigMap)
+	if err != nil || !ok {
+		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
+		return
+	}
+
 	// Check if deletion has been requested.
 	if baseConfigMap.DeletionTimestamp != nil {
 		if err := configmapcontroller.delete(baseConfigMap); err != nil {

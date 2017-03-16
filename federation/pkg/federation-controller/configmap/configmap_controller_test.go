@@ -143,11 +143,18 @@ func TestConfigMapController(t *testing.T) {
 	}
 
 	configmapWatch.Modify(configmap1)
-	updatedConfigMap = GetConfigMapFromChan(cluster1UpdateChan)
-	assert.NotNil(t, updatedConfigMap)
-	assert.Equal(t, configmap1.Name, updatedConfigMap.Name)
-	assert.Equal(t, configmap1.Namespace, updatedConfigMap.Namespace)
-	assert.True(t, util.ConfigMapEquivalent(configmap1, updatedConfigMap))
+	for {
+		updatedConfigMap := GetConfigMapFromChan(cluster1UpdateChan)
+		assert.NotNil(t, updatedConfigMap)
+		if updatedConfigMap == nil {
+			break
+		}
+		assert.Equal(t, configmap1.Name, updatedConfigMap.Name)
+		assert.Equal(t, configmap1.Namespace, updatedConfigMap.Namespace)
+		if util.ConfigMapEquivalent(configmap1, updatedConfigMap) {
+			break
+		}
+	}
 
 	// Test add cluster
 	clusterWatch.Add(cluster2)
