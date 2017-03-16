@@ -361,12 +361,12 @@ func updateDefaultStorageClass(c clientset.Interface, defaultStr string) {
 	Expect(err).NotTo(HaveOccurred())
 
 	if defaultStr == "" {
-		delete(sc.Annotations, storageutil.IsDefaultStorageClassAnnotation)
+		delete(sc.Annotations, storageutil.BetaIsDefaultStorageClassAnnotation)
 	} else {
 		if sc.Annotations == nil {
 			sc.Annotations = make(map[string]string)
 		}
-		sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = defaultStr
+		sc.Annotations[storageutil.BetaIsDefaultStorageClassAnnotation] = defaultStr
 	}
 
 	sc, err = c.StorageV1().StorageClasses().Update(sc)
