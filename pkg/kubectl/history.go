@@ -65,7 +65,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
 	}
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, versionedClient)
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSetsV15(deployment, versionedClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", name, err)
 	}
