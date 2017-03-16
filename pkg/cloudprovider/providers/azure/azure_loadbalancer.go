@@ -31,39 +31,61 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// ServiceAnnotationLoadBalancerInternal is the annotation used on the service
+const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/azure-load-balancer-internal"
+
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
-	lbName := getLoadBalancerName(clusterName)
-	pipName := getPublicIPName(clusterName, service)
+	isInternal := isLoadBalancerInternal(service)
+	lbName := getLoadBalancerName(clusterName, isInternal)
 	serviceName := getServiceName(service)
 
-	_, existsLb, err := az.getAzureLoadBalancer(lbName)
+	lb, existsLb, err := az.getAzureLoadBalancer(lbName)
 	if err != nil {
 		return nil, false, err
 	}
 	if !existsLb {
-		glog.V(5).Infof("get(%s): lb(%s) - doesn't exist", serviceName, pipName)
+		glog.V(5).Infof("get(%s): lb(%s) - doesn't exist", serviceName, lbName)
 		return nil, false, nil
 	}
 
-	pip, existsPip, err := az.getPublicIPAddress(pipName)
-	if err != nil {
-		return nil, false, err
+	var lbIP *string
+
+	if isInternal {
+		lbFrontendIPConfigName := getFrontendIPConfigName(service)
+		for _, ipConfiguration := range *lb.FrontendIPConfigurations {
+			if lbFrontendIPConfigName == *ipConfiguration.Name {
+				lbIP = ipConfiguration.PrivateIPAddress
+				break
+			}
+		}
+	} else {
+		// TODO: Consider also read address from lb's FrontendIPConfigurations
+		pipName := getPublicIPName(clusterName, service)
+		pip, existsPip, err := az.getPublicIPAddress(pipName)
+		if err != nil {
+			return nil, false, err
+		}
+		if existsPip {
+			lbIP = pip.IPAddress
+		}
 	}
-	if !existsPip {
-		glog.V(5).Infof("get(%s): pip(%s) - doesn't exist", serviceName, pipName)
+
+	if lbIP == nil {
+		glog.V(5).Infof("get(%s): lb(%s) - IP doesn't exist", serviceName, lbName)
 		return nil, false, nil
 	}
 
 	return &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{{IP: *pip.IPAddress}},
+		Ingress: []v1.LoadBalancerIngress{{IP: *lbIP}},
 	}, true, nil
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	lbName := getLoadBalancerName(clusterName)
+	isInternal := isLoadBalancerInternal(service)
+	lbName := getLoadBalancerName(clusterName, isInternal)
 	pipName := getPublicIPName(clusterName, service)
 	serviceName := getServiceName(service)
 	glog.V(2).Infof("ensure(%s): START clusterName=%q lbName=%q", serviceName, clusterName, lbName)
@@ -157,7 +179,8 @@ func (az *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nod
 // have multiple underlying components, meaning a Get could say that the LB
 // doesn't exist even if some part of it is still laying around.
 func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error {
-	lbName := getLoadBalancerName(clusterName)
+	isInternal := isLoadBalancerInternal(service)
+	lbName := getLoadBalancerName(clusterName, isInternal)
 	pipName := getPublicIPName(clusterName, service)
 	serviceName := getServiceName(service)
 
@@ -268,7 +291,8 @@ func (az *Cloud) ensurePublicIPDeleted(serviceName, pipName string) error {
 // This also reconciles the Service's Ports  with the LoadBalancer config.
 // This entails adding rules/probes for expected Ports and removing stale rules/ports.
 func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.PublicIPAddress, clusterName string, service *v1.Service, nodes []*v1.Node) (network.LoadBalancer, bool, error) {
-	lbName := getLoadBalancerName(clusterName)
+	isInternal := isLoadBalancerInternal(service)
+	lbName := getLoadBalancerName(clusterName, isInternal)
 	serviceName := getServiceName(service)
 	lbFrontendIPConfigName := getFrontendIPConfigName(service)
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbFrontendIPConfigName)
@@ -673,4 +697,13 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 		}
 	}
 	return nil
+}
+
+// Check if service requests an internal load balancer.
+func isLoadBalancerInternal(service *v1.Service) bool {
+	if l, ok := service.Annotations[ServiceAnnotationLoadBalancerInternal]; ok {
+		return l == "true"
+	}
+
+	return false
 }
