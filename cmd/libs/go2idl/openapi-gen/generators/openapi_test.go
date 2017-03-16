@@ -227,7 +227,7 @@ Format: "byte",
 },
 },
 "WithExtension": {
-spec.VendorExtensible: {
+VendorExtensible: spec.VendorExtensible{
 Extensions: spec.Extensions{
 "x-kubernetes-member-tag": "member_test",
 },
@@ -241,13 +241,13 @@ Format: "",
 },
 Required: []string{"String","Int64","Int32","Int16","Int8","Uint","Uint64","Uint32","Uint16","Uint8","Byte","Bool","Float64","Float32","ByteArray","WithExtension"},
 },
-},
-Dependencies: []string{
-},
-spec.VendorExtensible: {
+VendorExtensible: spec.VendorExtensible{
 Extensions: spec.Extensions{
 "x-kubernetes-type-tag": "type_test",
 },
+},
+},
+Dependencies: []string{
 },
 },
 `, buffer.String())
