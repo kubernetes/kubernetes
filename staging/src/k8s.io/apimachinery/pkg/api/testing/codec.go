@@ -58,7 +58,7 @@ func TestStorageCodec(codecs runtimeserializer.CodecFactory, gvs ...schema.Group
 		// TODO: remove for etcd3 / make parameterizable
 		serializer := serializerInfo.Serializer
 		if !serializerInfo.EncodesAsText {
-			serializer = runtime.NewBase64Serializer(serializer)
+			serializer = runtime.NewBase64Serializer(serializer, serializer)
 		}
 
 		decoder := recognizer.NewDecoder(serializer, codecs.UniversalDeserializer())
