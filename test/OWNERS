@@ -1,37 +1,51 @@
 reviewers:
   - deads2k
-  - fejta
-  - ixdy
-  - krousey
-  - liggitt
-  - madhusudancs
-  - ncdc
-  - rmmh
-  - smarterclayton
-  - spiffxp
-  - spxtr
-  - sttts
-  - soltysh
-approvers:
-  - deads2k
   - enisoc
   - erictune
+  - fabianofranz # for test/e2e/kubectl.go
   - fejta
   - foxish # for test/e2e/network-partition.go
+  - gmarek
   - ixdy
+  - janetkuo
+  - kargakis
   - kow3ns # for test/e2e/statefulset.go
   - krousey
   - liggitt
   - madhusudancs
+  - marun
+  - mikedanese
   - ncdc
+  - pwittrock # for test/e2e/kubectl.go
+  - rmmh
+  - saad-ali
   - smarterclayton
+  - soltysh
   - spiffxp
   - spxtr
   - sttts
-  - mikedanese
+approvers:
+  - deads2k
+  - enisoc
+  - erictune
+  - fabianofranz # for test/e2e/kubectl.go
+  - fejta
+  - foxish # for test/e2e/network-partition.go
+  - gmarek
+  - ixdy
   - janetkuo
   - kargakis
-  - gmarek
-  - soltysh
+  - kow3ns # for test/e2e/statefulset.go
+  - krousey
+  - liggitt
+  - madhusudancs
+  - marun
+  - mikedanese
+  - ncdc
   - pwittrock # for test/e2e/kubectl.go
-  - fabianofranz # for test/e2e/kubectl.go
+  - saad-ali
+  - smarterclayton
+  - soltysh
+  - spiffxp
+  - spxtr
+  - sttts
