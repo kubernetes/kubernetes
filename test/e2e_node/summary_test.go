@@ -69,36 +69,50 @@ var _ = framework.KubeDescribe("Summary API", func() {
 			)
 			fsCapacityBounds := bounded(100*mb, 100*gb)
 			// Expectations for system containers.
-			sysContExpectations := gstruct.MatchAllFields(gstruct.Fields{
-				"Name":      gstruct.Ignore(),
-				"StartTime": recent(maxStartAge),
-				"CPU": ptrMatchAllFields(gstruct.Fields{
-					"Time":                 recent(maxStatsAge),
-					"UsageNanoCores":       bounded(10000, 2E9),
-					"UsageCoreNanoSeconds": bounded(10000000, 1E15),
-				}),
-				"Memory": ptrMatchAllFields(gstruct.Fields{
-					"Time": recent(maxStatsAge),
-					// We don't limit system container memory.
-					"AvailableBytes":  BeNil(),
-					"UsageBytes":      bounded(1*mb, 10*gb),
-					"WorkingSetBytes": bounded(1*mb, 10*gb),
-					"RSSBytes":        bounded(1*mb, 1*gb),
-					"PageFaults":      bounded(1000, 1E9),
-					"MajorPageFaults": bounded(0, 100000),
-				}),
-				"Rootfs":             BeNil(),
-				"Logs":               BeNil(),
-				"UserDefinedMetrics": BeEmpty(),
-			})
+			sysContExpectations := func() types.GomegaMatcher {
+				return gstruct.MatchAllFields(gstruct.Fields{
+					"Name":      gstruct.Ignore(),
+					"StartTime": recent(maxStartAge),
+					"CPU": ptrMatchAllFields(gstruct.Fields{
+						"Time":                 recent(maxStatsAge),
+						"UsageNanoCores":       bounded(10000, 2E9),
+						"UsageCoreNanoSeconds": bounded(10000000, 1E15),
+					}),
+					"Memory": ptrMatchAllFields(gstruct.Fields{
+						"Time": recent(maxStatsAge),
+						// We don't limit system container memory.
+						"AvailableBytes":  BeNil(),
+						"UsageBytes":      bounded(1*mb, 10*gb),
+						"WorkingSetBytes": bounded(1*mb, 10*gb),
+						"RSSBytes":        bounded(1*mb, 1*gb),
+						"PageFaults":      bounded(1000, 1E9),
+						"MajorPageFaults": bounded(0, 100000),
+					}),
+					"Rootfs":             BeNil(),
+					"Logs":               BeNil(),
+					"UserDefinedMetrics": BeEmpty(),
+				})
+			}
 			systemContainers := gstruct.Elements{
-				"kubelet": sysContExpectations,
-				"runtime": sysContExpectations,
+				"kubelet": sysContExpectations(),
+				"runtime": sysContExpectations(),
 			}
 			// The Kubelet only manages the 'misc' system container if the host is not running systemd.
 			if !systemdutil.IsRunningSystemd() {
 				framework.Logf("Host not running systemd; expecting 'misc' system container.")
-				systemContainers["misc"] = sysContExpectations
+				miscContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
+				// Misc processes are system-dependent, so relax the memory constraints.
+				miscContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
+					"Time": recent(maxStatsAge),
+					// We don't limit system container memory.
+					"AvailableBytes":  BeNil(),
+					"UsageBytes":      bounded(100*kb, 10*gb),
+					"WorkingSetBytes": bounded(100*kb, 10*gb),
+					"RSSBytes":        bounded(100*kb, 1*gb),
+					"PageFaults":      bounded(1000, 1E9),
+					"MajorPageFaults": bounded(0, 100000),
+				})
+				systemContainers["misc"] = miscContExpectations
 			}
 			// Expectations for pods.
 			podExpectations := gstruct.MatchAllFields(gstruct.Fields{
