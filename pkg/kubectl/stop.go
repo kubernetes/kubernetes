@@ -440,6 +440,13 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 		return err
 	}
 
+	// Do not cascade deletion for overlapping deployments.
+	// A Deployment with this annotation will not create or manage anything,
+	// so we can assume any matching ReplicaSets belong to another Deployment.
+	if len(deployment.Annotations[deploymentutil.OverlapAnnotation]) > 0 {
+		return deployments.Delete(name, nil)
+	}
+
 	// Stop all replica sets belonging to this Deployment.
 	rss, err := deploymentutil.ListReplicaSetsInternal(deployment,
 		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
