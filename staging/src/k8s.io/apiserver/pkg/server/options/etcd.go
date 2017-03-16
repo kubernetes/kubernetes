@@ -68,8 +68,8 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
 
 	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
-		"The media type to use to store objects in storage. Defaults to application/json. "+
-		"Some resources may only support a specific media type and will ignore this setting.")
+		"The media type to use to store objects in storage. "+
+		"Some resources or storage backends may only support a specific media type and will ignore this setting.")
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
 

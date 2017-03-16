@@ -349,7 +349,7 @@ func (g TestGroup) StorageCodec() runtime.Codec {
 	// etcd2 only supports string data - we must wrap any result before returning
 	// TODO: remove for etcd3 / make parameterizable
 	if !storageSerializer.EncodesAsText {
-		s = runtime.NewBase64Serializer(s)
+		s = runtime.NewBase64Serializer(s, s)
 	}
 	ds := recognizer.NewDecoder(s, api.Codecs.UniversalDeserializer())
 
