@@ -133,10 +133,10 @@ type ControllerExpectations struct {
 
 // GetExpectations returns the ControlleeExpectations of the given controller.
 func (r *ControllerExpectations) GetExpectations(controllerKey string) (*ControlleeExpectations, bool, error) {
-	if exp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
+	if exp, exists, _ := r.GetByKey(controllerKey); exists {
 		return exp.(*ControlleeExpectations), true, nil
 	} else {
-		return nil, false, err
+		return nil, false, nil
 	}
 }
 
@@ -153,18 +153,15 @@ func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
 // Add/del counts are established by the controller at sync time, and updated as controllees are observed by the controller
 // manager.
 func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
-	if exp, exists, err := r.GetExpectations(controllerKey); exists {
+	if exp, exists, _ := r.GetExpectations(controllerKey); exists {
 		if exp.Fulfilled() {
-			return true
+			glog.V(4).Infof("Controller expectations fulfilled %#v", exp)
 		} else if exp.isExpired() {
 			glog.V(4).Infof("Controller expectations expired %#v", exp)
-			return true
 		} else {
 			glog.V(4).Infof("Controller still waiting on expectations %#v", exp)
 			return false
 		}
-	} else if err != nil {
-		glog.V(2).Infof("Error encountered while checking expectations %#v, forcing sync", err)
 	} else {
 		// When a new controller is created, it doesn't have expectations.
 		// When it doesn't see expected watch events for > TTL, the expectations expire.
@@ -284,7 +281,7 @@ type UIDSet struct {
 // UIDTrackingControllerExpectations tracks the UID of the pods it deletes.
 // This cache is needed over plain old expectations to safely handle graceful
 // deletion. The desired behavior is to treat an update that sets the
-// DeletionTimestamp on an object as a delete. To do so consistenly, one needs
+// DeletionTimestamp on an object as a delete. To do so consistently, one needs
 // to remember the expected deletes so they aren't double counted.
 // TODO: Track creates as well (#22599)
 type UIDTrackingControllerExpectations struct {
