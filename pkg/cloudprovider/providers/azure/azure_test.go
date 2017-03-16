@@ -36,11 +36,11 @@ var testClusterName = "testCluster"
 func TestReconcileLoadBalancerAddPort(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", 80)
-	pip := getTestPublicIP()
+	configProperties := getTestPublicFipConfigurationProperties()
 	lb := getTestLoadBalancer()
 	nodes := []*v1.Node{}
 
-	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, nodes)
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -64,12 +64,12 @@ func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
 		serviceapi.BetaAnnotationExternalTraffic:     serviceapi.AnnotationValueExternalTrafficLocal,
 		serviceapi.BetaAnnotationHealthCheckNodePort: "32456",
 	}
-	pip := getTestPublicIP()
+	configProperties := getTestPublicFipConfigurationProperties()
 	lb := getTestLoadBalancer()
 
 	nodes := []*v1.Node{}
 
-	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, nodes)
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -91,10 +91,10 @@ func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) 
 	az := getTestCloud()
 	svc := getTestService("servicea", 80)
 	lb := getTestLoadBalancer()
-	pip := getTestPublicIP()
+	configProperties := getTestPublicFipConfigurationProperties()
 	nodes := []*v1.Node{}
 
-	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, nodes)
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -121,13 +121,13 @@ func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) 
 func TestReconcileLoadBalancerRemovesPort(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", 80, 443)
-	pip := getTestPublicIP()
+	configProperties := getTestPublicFipConfigurationProperties()
 	nodes := []*v1.Node{}
 
 	existingLoadBalancer := getTestLoadBalancer(svc)
 
 	svcUpdated := getTestService("servicea", 80)
-	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &pip, testClusterName, &svcUpdated, nodes)
+	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &configProperties, testClusterName, &svcUpdated, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -140,17 +140,17 @@ func TestReconcileLoadBalancerMultipleServices(t *testing.T) {
 	az := getTestCloud()
 	svc1 := getTestService("servicea", 80, 443)
 	svc2 := getTestService("serviceb", 80)
-	pip := getTestPublicIP()
+	configProperties := getTestPublicFipConfigurationProperties()
 	nodes := []*v1.Node{}
 
 	existingLoadBalancer := getTestLoadBalancer()
 
-	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &pip, testClusterName, &svc1, nodes)
+	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &configProperties, testClusterName, &svc1, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 
-	updatedLoadBalancer, _, err = az.reconcileLoadBalancer(updatedLoadBalancer, &pip, testClusterName, &svc2, nodes)
+	updatedLoadBalancer, _, err = az.reconcileLoadBalancer(updatedLoadBalancer, &configProperties, testClusterName, &svc2, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -223,10 +223,10 @@ func getBackendPort(port int32) int32 {
 	return port + 10000
 }
 
-func getTestPublicIP() network.PublicIPAddress {
-	pip := network.PublicIPAddress{}
-	pip.ID = to.StringPtr("/this/is/a/public/ip/address/id")
-	return pip
+func getTestPublicFipConfigurationProperties() network.FrontendIPConfigurationPropertiesFormat {
+	return network.FrontendIPConfigurationPropertiesFormat{
+		PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("/this/is/a/public/ip/address/id")},
+	}
 }
 
 func getTestService(identifier string, requestedPorts ...int32) v1.Service {

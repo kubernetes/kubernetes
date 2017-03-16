@@ -124,3 +124,20 @@ func (az *Cloud) getPublicIPAddress(name string) (pip network.PublicIPAddress, e
 
 	return pip, exists, err
 }
+
+func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet network.Subnet, exists bool, err error) {
+	var realErr error
+
+	subnet, err = az.SubnetsClient.Get(az.ResourceGroup, virtualNetworkName, subnetName, "")
+
+	exists, realErr = checkResourceExistsFromError(err)
+	if realErr != nil {
+		return subnet, false, realErr
+	}
+
+	if !exists {
+		return subnet, false, nil
+	}
+
+	return subnet, exists, err
+}
