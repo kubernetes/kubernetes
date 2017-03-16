@@ -140,7 +140,7 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 		return "", fmt.Errorf("failed to convert deployment, %v", err)
 	}
 	versionedClient := versionedClientsetForDeployment(c)
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(externalDeployment, versionedClient)
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSetsV15(externalDeployment, versionedClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", deployment.Name, err)
 	}
