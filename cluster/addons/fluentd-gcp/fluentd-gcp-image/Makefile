@@ -28,12 +28,12 @@
 
 .PHONY:	kbuild kpush
 
-TAG = 1.21
+TAG = 1.21.2
 
 # Rules for building the test image for deployment to Dockerhub with user kubernetes.
 
 kbuild:
-	docker build -t kubernetes/fluentd-gcp:$(TAG) .
+	docker build --pull -t kubernetes/fluentd-gcp:$(TAG) .
 
 
 kpush:
@@ -43,7 +43,7 @@ kpush:
 # Rules for building the real image for deployment to gcr.io
 
 build:
-	docker build -t gcr.io/google_containers/fluentd-gcp:$(TAG) .
+	docker build --pull -t gcr.io/google_containers/fluentd-gcp:$(TAG) .
 
 
 push:
