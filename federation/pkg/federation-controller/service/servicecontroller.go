@@ -487,6 +487,10 @@ func wantsDNSRecords(service *v1.Service) bool {
 // update DNS records and update the service info with DNS entries to federation apiserver.
 // the function returns any error caught
 func (s *ServiceController) processServiceForCluster(cachedService *cachedService, clusterName string, service *v1.Service, client *kubeclientset.Clientset) error {
+	if service.DeletionTimestamp != nil {
+		glog.Infof("Service has already been deleted %v", service.Name)
+		return nil
+	}
 	glog.V(4).Infof("Process service %s/%s for cluster %s", service.Namespace, service.Name, clusterName)
 	// Create or Update k8s Service
 	err := s.ensureClusterService(cachedService, clusterName, service, client)
@@ -528,6 +532,12 @@ func (s *ServiceController) ensureClusterService(cachedService *cachedService, c
 	var err error
 	var needUpdate bool
 	for i := 0; i < clientRetryCount; i++ {
+		if key, err := cache.MetaNamespaceKeyFunc(service); err == nil {
+			if _, ok := s.serviceCache.get(key); !ok {
+				glog.Info(fmt.Sprintf("Service %v has been marked for deletion", key))
+				return nil
+			}
+		}
 		svc, err := client.Core().Services(service.Namespace).Get(service.Name, metav1.GetOptions{})
 		if err == nil {
 			// service exists
@@ -998,6 +1008,9 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	defer cachedService.rwlock.Unlock()
 
 	if service.DeletionTimestamp != nil {
+		// Ensure that we propagate the DeletionTimestamp
+		cachedService.lastState = service
+		s.serviceCache.set(key, cachedService)
 		if err := s.delete(service); err != nil {
 			glog.Errorf("Failed to delete %s: %v", service, err)
 			s.eventRecorder.Eventf(service, api.EventTypeNormal, "DeleteFailed",
