@@ -136,7 +136,7 @@ func main() {
 
 		iptInterface := fakeiptables.NewFake()
 
-		serviceConfig := proxyconfig.NewServiceConfig()
+		serviceConfig := proxyconfig.NewServiceConfig(internalClientset.Core().RESTClient(), 15*time.Minute)
 		serviceConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
 		endpointsConfig := proxyconfig.NewEndpointsConfig(internalClientset.Core().RESTClient(), 15*time.Minute)
