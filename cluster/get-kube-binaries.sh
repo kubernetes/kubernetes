@@ -44,6 +44,10 @@ KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://storage.googleapis.com/kubernetes-release/release}"
 
 function detect_kube_release() {
+  if [[ -n "${KUBE_VERSION:-}" ]]; then
+    return 0  # Allow caller to explicitly set version
+  fi
+
   if [[ ! -e "${KUBE_ROOT}/version" ]]; then
     echo "Can't determine Kubernetes release." >&2
     echo "${BASH_SOURCE} should only be run from a prebuilt Kubernetes release." >&2
@@ -51,8 +55,7 @@ function detect_kube_release() {
     exit 1
   fi
 
-  KUBERNETES_RELEASE=$(cat "${KUBE_ROOT}/version")
-  DOWNLOAD_URL_PREFIX="${KUBERNETES_RELEASE_URL}/${KUBERNETES_RELEASE}"
+  KUBE_VERSION=$(cat "${KUBE_ROOT}/version")
 }
 
 function detect_client_info() {
@@ -153,6 +156,7 @@ function extract_arch_tarball() {
 }
 
 detect_kube_release
+DOWNLOAD_URL_PREFIX="${KUBERNETES_RELEASE_URL}/${KUBE_VERSION}"
 
 SERVER_PLATFORM="linux"
 SERVER_ARCH="${KUBERNETES_SERVER_ARCH:-amd64}"
@@ -161,7 +165,7 @@ SERVER_TAR="kubernetes-server-${SERVER_PLATFORM}-${SERVER_ARCH}.tar.gz"
 detect_client_info
 CLIENT_TAR="kubernetes-client-${CLIENT_PLATFORM}-${CLIENT_ARCH}.tar.gz"
 
-echo "Kubernetes release: ${KUBERNETES_RELEASE}"
+echo "Kubernetes release: ${KUBE_VERSION}"
 echo "Server: ${SERVER_PLATFORM}/${SERVER_ARCH}  (to override, set KUBERNETES_SERVER_ARCH)"
 echo "Client: ${CLIENT_PLATFORM}/${CLIENT_ARCH}  (autodetected)"
 echo
