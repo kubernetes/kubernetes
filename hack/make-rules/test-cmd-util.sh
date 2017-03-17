@@ -2960,6 +2960,16 @@ runTests() {
   ## test if a short name is exported during discovery
   kube::test::if_has_string "${output_message}" '{"name":"configmaps","singularName":"","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
 
+  #########################
+  # Assert categories     #
+  #########################
+
+  kube::log::status "Testing propagation of categories for resources"
+  output_message=$(kubectl get --raw=/api/v1)
+
+  ## test if a short name is exported during discovery
+  kube::test::if_has_string "${output_message}" '{"name":"pods","singularName":"","namespaced":true,"kind":"Pod","verbs":\["create","delete","deletecollection","get","list","patch","proxy","update","watch"\],"shortNames":\["po"\],"categories":\["all"\]}'
+
   ###########################
   # POD creation / deletion #
   ###########################
