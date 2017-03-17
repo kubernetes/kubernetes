@@ -111,6 +111,14 @@ func (r *REST) ShortNames() []string {
 	return []string{"po"}
 }
 
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return []string{"all"}
+}
+
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
 type BindingREST struct {
 	store *genericregistry.Store

@@ -182,3 +182,11 @@ func newBool(val bool) *bool {
 	*p = val
 	return p
 }
+
+func TestCategories(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Job.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage.Job, expected)
+}

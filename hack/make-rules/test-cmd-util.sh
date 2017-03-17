@@ -3069,6 +3069,17 @@ runTests() {
   ## test if a short name is exported during discovery
   kube::test::if_has_string "${output_message}" '{"name":"configmaps","singularName":"","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
 
+  #########################
+  # Assert categories     #
+  #########################
+
+  ## test if a category is exported during discovery
+  if kube::test::if_supports_resource "${pods}" ; then
+    kube::log::status "Testing propagation of categories for resources"
+    output_message=$(kubectl get --raw=/api/v1 | grep -Po '"name":"pods".*?}')
+    kube::test::if_has_string "${output_message}" '"categories":\["all"\]'
+  fi
+
   ###########################
   # POD creation / deletion #
   ###########################

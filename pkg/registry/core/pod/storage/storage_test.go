@@ -803,3 +803,11 @@ func TestShortNames(t *testing.T) {
 	expected := []string{"po"}
 	registrytest.AssertShortNames(t, storage, expected)
 }
+
+func TestCategories(t *testing.T) {
+	storage, _, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage, expected)
+}
