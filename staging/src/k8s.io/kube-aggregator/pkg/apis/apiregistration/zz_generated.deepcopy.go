@@ -53,8 +53,10 @@ func DeepCopy_apiregistration_APIService(in interface{}, out interface{}, c *con
 		} else {
 			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
-		if err := DeepCopy_apiregistration_APIServiceSpec(&in.Spec, &out.Spec, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.Spec); err != nil {
 			return err
+		} else {
+			out.Spec = *newVal.(*APIServiceSpec)
 		}
 		return nil
 	}
@@ -69,8 +71,10 @@ func DeepCopy_apiregistration_APIServiceList(in interface{}, out interface{}, c 
 			in, out := &in.Items, &out.Items
 			*out = make([]APIService, len(*in))
 			for i := range *in {
-				if err := DeepCopy_apiregistration_APIService(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*APIService)
 				}
 			}
 		}
