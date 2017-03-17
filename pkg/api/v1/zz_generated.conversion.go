@@ -1674,6 +1674,7 @@ func autoConvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *ISCSIVolumeSo
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	out.Portals = *(*[]string)(unsafe.Pointer(&in.Portals))
+	out.SecretRef = (*api.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -1689,6 +1690,7 @@ func autoConvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in *api.ISCSIVolu
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
 	out.Portals = *(*[]string)(unsafe.Pointer(&in.Portals))
+	out.SecretRef = (*LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 

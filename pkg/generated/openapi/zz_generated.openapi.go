@@ -3964,11 +3964,18 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"secretRef": {
+							SchemaProps: spec.SchemaProps{
+								Description: "CHAP secret for iSCSI target and initiator authentication",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.LocalObjectReference"),
+							},
+						},
 					},
 					Required: []string{"targetPortal", "iqn", "lun"},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.LocalObjectReference"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.KeyToPath": {
 			Schema: spec.Schema{
