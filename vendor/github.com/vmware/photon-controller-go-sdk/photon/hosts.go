@@ -19,7 +19,7 @@ type HostsAPI struct {
 	client *Client
 }
 
-var hostUrl string = "/hosts"
+var hostUrl string = rootUrl + "/hosts"
 
 // Creates a host.
 func (api *HostsAPI) Create(hostSpec *HostCreateSpec, deploymentId string) (task *Task, err error) {
@@ -28,10 +28,10 @@ func (api *HostsAPI) Create(hostSpec *HostCreateSpec, deploymentId string) (task
 		return
 	}
 	res, err := api.client.restClient.Post(
-		api.client.Endpoint+deploymentUrl+"/"+deploymentId+hostUrl,
+		api.client.Endpoint+deploymentUrl+"/"+deploymentId+"/hosts",
 		"application/json",
-		bytes.NewBuffer(body),
-		api.client.options.TokenOptions.AccessToken)
+		bytes.NewReader(body),
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -42,7 +42,7 @@ func (api *HostsAPI) Create(hostSpec *HostCreateSpec, deploymentId string) (task
 
 // Deletes a host with specified ID.
 func (api *HostsAPI) Delete(id string) (task *Task, err error) {
-	res, err := api.client.restClient.Delete(api.client.Endpoint+hostUrl+"/"+id, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Delete(api.client.Endpoint+hostUrl+"/"+id, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -53,7 +53,7 @@ func (api *HostsAPI) Delete(id string) (task *Task, err error) {
 
 // Returns all hosts
 func (api *HostsAPI) GetAll() (result *Hosts, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+hostUrl, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.client.Endpoint+hostUrl, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -69,7 +69,7 @@ func (api *HostsAPI) GetAll() (result *Hosts, err error) {
 
 // Gets a host with the specified ID.
 func (api *HostsAPI) Get(id string) (host *Host, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+hostUrl+"/"+id, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.client.Endpoint+hostUrl+"/"+id, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -93,8 +93,8 @@ func (api *HostsAPI) SetAvailabilityZone(id string, availabilityZone *HostSetAva
 	res, err := api.client.restClient.Post(
 		api.client.Endpoint+hostUrl+"/"+id+"/set_availability_zone",
 		"application/json",
-		bytes.NewBuffer(body),
-		api.client.options.TokenOptions.AccessToken)
+		bytes.NewReader(body),
+		api.client.options.TokenOptions)
 
 	if err != nil {
 		return
@@ -112,7 +112,7 @@ func (api *HostsAPI) GetTasks(id string, options *TaskGetOptions) (result *TaskL
 	if options != nil {
 		uri += getQueryString(options)
 	}
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -122,9 +122,9 @@ func (api *HostsAPI) GetTasks(id string, options *TaskGetOptions) (result *TaskL
 	return
 }
 
-// Gets all the vms with the specified deployment ID.
+// Gets all the vms with the specified host ID.
 func (api *HostsAPI) GetVMs(id string) (result *VMs, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+hostUrl+"/"+id+"/vms", api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.client.Endpoint+hostUrl+"/"+id+"/vms", api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -138,6 +138,22 @@ func (api *HostsAPI) GetVMs(id string) (result *VMs, err error) {
 	return
 }
 
+// provision the host with the specified id
+func (api *HostsAPI) Provision(id string) (task *Task, err error) {
+	body := []byte{}
+	res, err := api.client.restClient.Post(
+		api.client.Endpoint+hostUrl+"/"+id+"/provision",
+		"application/json",
+		bytes.NewReader(body),
+		api.client.options.TokenOptions)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+	task, err = getTask(getError(res))
+	return
+}
+
 // Suspend the host with the specified id
 func (api *HostsAPI) Suspend(id string) (task *Task, err error) {
 	body := []byte{}
@@ -145,7 +161,7 @@ func (api *HostsAPI) Suspend(id string) (task *Task, err error) {
 		api.client.Endpoint+hostUrl+"/"+id+"/suspend",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -161,7 +177,7 @@ func (api *HostsAPI) Resume(id string) (task *Task, err error) {
 		api.client.Endpoint+hostUrl+"/"+id+"/resume",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -177,7 +193,7 @@ func (api *HostsAPI) EnterMaintenanceMode(id string) (task *Task, err error) {
 		api.client.Endpoint+hostUrl+"/"+id+"/enter_maintenance",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -193,7 +209,7 @@ func (api *HostsAPI) ExitMaintenanceMode(id string) (task *Task, err error) {
 		api.client.Endpoint+hostUrl+"/"+id+"/exit_maintenance",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}

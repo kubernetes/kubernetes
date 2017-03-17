@@ -24,8 +24,8 @@ type VirtualSubnetGetOptions struct {
 	Name string `urlParam:"name"`
 }
 
-var subnetsUrl = "/subnets"
-var projectsUrl = "/projects"
+var subnetsUrl = rootUrl + "/subnets"
+var projectsUrl = rootUrl + "/projects"
 
 // Create a virtual network
 func (api *VirtualSubnetsAPI) Create(projectId string,
@@ -39,8 +39,8 @@ func (api *VirtualSubnetsAPI) Create(projectId string,
 	res, err := api.client.restClient.Post(
 		api.client.Endpoint+projectsUrl+"/"+projectId+"/subnets",
 		"application/json",
-		bytes.NewBuffer(body),
-		api.client.options.TokenOptions.AccessToken)
+		bytes.NewReader(body),
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -54,7 +54,7 @@ func (api *VirtualSubnetsAPI) Create(projectId string,
 // Delete a virtual network with the specified ID.
 func (api *VirtualSubnetsAPI) Delete(id string) (task *Task, err error) {
 	res, err := api.client.restClient.Delete(api.client.Endpoint+subnetsUrl+"/"+id,
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -68,7 +68,7 @@ func (api *VirtualSubnetsAPI) Delete(id string) (task *Task, err error) {
 // Get the virtual subnet with the specified id
 func (api *VirtualSubnetsAPI) Get(id string) (subnet *VirtualSubnet, err error) {
 	res, err := api.client.restClient.Get(api.client.Endpoint+subnetsUrl+"/"+id,
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -94,7 +94,7 @@ func (api *VirtualSubnetsAPI) GetAll(projectId string,
 		uri += getQueryString(options)
 	}
 
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -109,8 +109,8 @@ func (api *VirtualSubnetsAPI) SetDefault(id string) (task *Task, err error) {
 	res, err := api.client.restClient.Post(
 		api.client.Endpoint+subnetsUrl+"/"+id+"/set_default",
 		"application/json",
-		bytes.NewBuffer([]byte("")),
-		api.client.options.TokenOptions.AccessToken)
+		bytes.NewReader([]byte("")),
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}

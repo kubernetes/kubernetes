@@ -18,11 +18,11 @@ type DisksAPI struct {
 	client *Client
 }
 
-var diskUrl string = "/disks/"
+var diskUrl string = rootUrl + "/disks/"
 
 // Gets a PersistentDisk for the disk with specified ID.
 func (api *DisksAPI) Get(diskID string) (disk *PersistentDisk, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+diskUrl+diskID, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.client.Endpoint+diskUrl+diskID, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -38,7 +38,7 @@ func (api *DisksAPI) Get(diskID string) (disk *PersistentDisk, err error) {
 
 // Deletes a disk with the specified ID.
 func (api *DisksAPI) Delete(diskID string) (task *Task, err error) {
-	res, err := api.client.restClient.Delete(api.client.Endpoint+diskUrl+diskID, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Delete(api.client.Endpoint+diskUrl+diskID, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -54,7 +54,7 @@ func (api *DisksAPI) GetTasks(id string, options *TaskGetOptions) (result *TaskL
 	if options != nil {
 		uri += getQueryString(options)
 	}
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
