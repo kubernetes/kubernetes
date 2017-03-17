@@ -10,15 +10,9 @@ rules:
   - ""
   resources:
   - nodes/proxy
-  verbs:
-  - create
-  - get
-- apiGroups:
-  - ""
-  resources:
   - nodes/log
   - nodes/stats
   - nodes/metrics
   - nodes/spec
   verbs:
-  - get
+  - "*"
