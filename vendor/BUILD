@@ -16312,3 +16312,9 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
+
+go_test(
+    name = "k8s.io/client-go/util/cert_xtest",
+    srcs = ["k8s.io/client-go/util/cert/pem_test.go"],
+    tags = ["automanaged"],
+)
