@@ -19,7 +19,9 @@ package api_test
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
+	"reflect"
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
@@ -57,6 +59,41 @@ func TestUniversalDeserializer(t *testing.T) {
 			t.Fatalf("%s: %#v", mediaType, obj)
 		}
 	}
+}
+
+func TestAllFieldsHaveTags(t *testing.T) {
+	for gvk, obj := range api.Scheme.AllKnownTypes() {
+		if gvk.Version == runtime.APIVersionInternal {
+			// internal versions are not serialized to protobuf
+			continue
+		}
+		if gvk.Group == "componentconfig" {
+			// component config is not serialized to protobuf
+			continue
+		}
+		if err := fieldsHaveProtobufTags(obj); err != nil {
+			t.Errorf("type %s as gvk %v is missing tags: %v", obj, gvk, err)
+		}
+	}
+}
+
+func fieldsHaveProtobufTags(obj reflect.Type) error {
+	switch obj.Kind() {
+	case reflect.Slice, reflect.Map, reflect.Ptr, reflect.Array:
+		return fieldsHaveProtobufTags(obj.Elem())
+	case reflect.Struct:
+		for i := 0; i < obj.NumField(); i++ {
+			f := obj.Field(i)
+			if f.Name == "TypeMeta" && f.Type.Name() == "TypeMeta" {
+				// TypeMeta is not included in external protobuf because we use an envelope type with TypeMeta
+				continue
+			}
+			if len(f.Tag.Get("json")) > 0 && len(f.Tag.Get("protobuf")) == 0 {
+				return fmt.Errorf("field %s in %s has a 'json' tag but no protobuf tag", f.Name, obj)
+			}
+		}
+	}
+	return nil
 }
 
 func TestProtobufRoundTrip(t *testing.T) {

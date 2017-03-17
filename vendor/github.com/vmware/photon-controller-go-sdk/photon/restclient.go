@@ -10,10 +10,12 @@
 package photon
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -22,8 +24,10 @@ import (
 )
 
 type restClient struct {
-	httpClient *http.Client
-	logger     *log.Logger
+	httpClient                *http.Client
+	logger                    *log.Logger
+	Auth                      *AuthAPI
+	UpdateAccessTokenCallback TokenCallback
 }
 
 type request struct {
@@ -31,7 +35,7 @@ type request struct {
 	URL         string
 	ContentType string
 	Body        io.Reader
-	Token       string
+	Tokens      *TokenOptions
 }
 
 type page struct {
@@ -44,7 +48,12 @@ type documentList struct {
 	Items []interface{}
 }
 
+type bodyRewinder func() io.Reader
+
 const appJson string = "application/json"
+
+// Root URL specifies the API version.
+const rootUrl string = "/v1"
 
 // From https://golang.org/src/mime/multipart/writer.go
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
@@ -65,15 +74,15 @@ func (client *restClient) AppendSlice(origSlice []interface{}, dataToAppend []in
 	return origSlice
 }
 
-func (client *restClient) Get(url string, token string) (res *http.Response, err error) {
-	req := request{"GET", url, "", nil, token}
-	res, err = client.Do(&req)
+func (client *restClient) Get(url string, tokens *TokenOptions) (res *http.Response, err error) {
+	req := request{"GET", url, "", nil, tokens}
+	res, err = client.SendRequest(&req, nil)
 	return
 }
 
-func (client *restClient) GetList(endpoint string, url string, token string) (result []byte, err error) {
-	req := request{"GET", url, "", nil, token}
-	res, err := client.Do(&req)
+func (client *restClient) GetList(endpoint string, url string, tokens *TokenOptions) (result []byte, err error) {
+	req := request{"GET", url, "", nil, tokens}
+	res, err := client.SendRequest(&req, nil)
 	if err != nil {
 		return
 	}
@@ -95,8 +104,8 @@ func (client *restClient) GetList(endpoint string, url string, token string) (re
 	documentList.Items = client.AppendSlice(documentList.Items, page.Items)
 
 	for page.NextPageLink != "" {
-		req = request{"GET", endpoint + page.NextPageLink, "", nil, token}
-		res, err = client.Do(&req)
+		req = request{"GET", endpoint + page.NextPageLink, "", nil, tokens}
+		res, err = client.SendRequest(&req, nil)
 		if err != nil {
 			return
 		}
@@ -124,23 +133,111 @@ func (client *restClient) GetList(endpoint string, url string, token string) (re
 	return
 }
 
-func (client *restClient) Post(url string, contentType string, body io.Reader, token string) (res *http.Response, err error) {
+func (client *restClient) Post(url string, contentType string, body io.ReadSeeker, tokens *TokenOptions) (res *http.Response, err error) {
 	if contentType == "" {
 		contentType = appJson
 	}
 
-	req := request{"POST", url, contentType, body, token}
-	res, err = client.Do(&req)
+	req := request{"POST", url, contentType, body, tokens}
+	rewinder := func() io.Reader {
+		body.Seek(0, 0)
+		return body
+	}
+	res, err = client.SendRequest(&req, rewinder)
 	return
 }
 
-func (client *restClient) Delete(url string, token string) (res *http.Response, err error) {
-	req := request{"DELETE", url, "", nil, token}
-	res, err = client.Do(&req)
+func (client *restClient) Patch(url string, contentType string, body io.ReadSeeker, tokens *TokenOptions) (res *http.Response, err error) {
+	if contentType == "" {
+		contentType = appJson
+	}
+
+	req := request{"PATCH", url, contentType, body, tokens}
+	rewinder := func() io.Reader {
+		body.Seek(0, 0)
+		return body
+	}
+	res, err = client.SendRequest(&req, rewinder)
 	return
 }
 
-func (client *restClient) Do(req *request) (res *http.Response, err error) {
+func (client *restClient) Put(url string, contentType string, body io.ReadSeeker, tokens *TokenOptions) (res *http.Response, err error) {
+	if contentType == "" {
+		contentType = appJson
+	}
+
+	req := request{"PUT", url, contentType, body, tokens}
+	rewinder := func() io.Reader {
+		body.Seek(0, 0)
+		return body
+	}
+	res, err = client.SendRequest(&req, rewinder)
+	return
+}
+
+func (client *restClient) Delete(url string, tokens *TokenOptions) (res *http.Response, err error) {
+	req := request{"DELETE", url, "", nil, tokens}
+	res, err = client.SendRequest(&req, nil)
+	return
+}
+
+func (client *restClient) SendRequest(req *request, bodyRewinder bodyRewinder) (res *http.Response, err error) {
+	res, err = client.sendRequestHelper(req)
+	// In most cases, we'll return immediately
+	// If the operation succeeded, but we got a 401 response and if we're using
+	// authentication, then we'll look into the body to see if the token expired
+	if err != nil {
+		return res, err
+	}
+	if res.StatusCode != 401 {
+		// It's not a 401, so the token didn't expire
+		return res, err
+	}
+	if req.Tokens == nil || req.Tokens.AccessToken == "" {
+		// We don't have a token, so we can't renew the token, no need to proceed
+		return res, err
+	}
+
+	// We're going to look in the body to see if it failed because the token expired
+	// This means we need to read the body, but the functions that call us also
+	// expect to read the body. So we read the body, then create a new reader
+	// so they can read the body as normal.
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return res, err
+	}
+	res.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+	// Now see if we had an expired token or not
+	var apiError ApiError
+	err = json.Unmarshal(body, &apiError)
+	if err != nil {
+		return res, err
+	}
+	if apiError.Code != "ExpiredAuthToken" {
+		return res, nil
+	}
+
+	// We were told that the access token expired, so try to renew it.
+	// Note that this looks recursive because GetTokensByRefreshToken() will
+	// call the /auth API, and therefore SendRequest(). However, it calls
+	// without a token, so we avoid having a loop
+	newTokens, err := client.Auth.GetTokensByRefreshToken(req.Tokens.RefreshToken)
+	if err != nil {
+		return res, err
+	}
+	req.Tokens.AccessToken = newTokens.AccessToken
+	if client.UpdateAccessTokenCallback != nil {
+		client.UpdateAccessTokenCallback(newTokens.AccessToken)
+	}
+	if req.Body != nil && bodyRewinder != nil {
+		req.Body = bodyRewinder()
+	}
+	res, err = client.sendRequestHelper(req)
+	return res, nil
+}
+
+func (client *restClient) sendRequestHelper(req *request) (res *http.Response, err error) {
 	r, err := http.NewRequest(req.Method, req.URL, req.Body)
 	if err != nil {
 		client.logger.Printf("An error occured creating request %s on %s. Error: %s", req.Method, req.URL, err)
@@ -149,8 +246,8 @@ func (client *restClient) Do(req *request) (res *http.Response, err error) {
 	if req.ContentType != "" {
 		r.Header.Add("Content-Type", req.ContentType)
 	}
-	if req.Token != "" {
-		r.Header.Add("Authorization", "Bearer "+req.Token)
+	if req.Tokens != nil && req.Tokens.AccessToken != "" {
+		r.Header.Add("Authorization", "Bearer "+req.Tokens.AccessToken)
 	}
 	res, err = client.httpClient.Do(r)
 	if err != nil {
@@ -162,21 +259,33 @@ func (client *restClient) Do(req *request) (res *http.Response, err error) {
 	return
 }
 
-func (client *restClient) MultipartUploadFile(url, filePath string, params map[string]string, token string) (res *http.Response, err error) {
+func (client *restClient) MultipartUploadFile(url, filePath string, params map[string]string, tokens *TokenOptions) (res *http.Response, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return
 	}
 	defer file.Close()
-	return client.MultipartUpload(url, file, filepath.Base(filePath), params, token)
+	return client.MultipartUpload(url, file, filepath.Base(filePath), params, tokens)
 }
 
-func (client *restClient) MultipartUpload(url string, reader io.Reader, filename string, params map[string]string, token string) (res *http.Response, err error) {
+func (client *restClient) MultipartUpload(url string, reader io.ReadSeeker, filename string, params map[string]string, tokens *TokenOptions) (res *http.Response, err error) {
+	boundary := client.randomBoundary()
+	multiReader, contentType := client.createMultiReader(reader, filename, params, boundary)
+	rewinder := func() io.Reader {
+		reader.Seek(0, 0)
+		multiReader, _ := client.createMultiReader(reader, filename, params, boundary)
+		return multiReader
+	}
+	res, err = client.SendRequest(&request{"POST", url, contentType, multiReader, tokens}, rewinder)
+
+	return
+}
+
+func (client *restClient) createMultiReader(reader io.ReadSeeker, filename string, params map[string]string, boundary string) (io.Reader, string) {
 	// The mime/multipart package does not support streaming multipart data from disk,
 	// at least not without complicated, problematic goroutines that simultaneously read/write into a buffer.
 	// A much easier approach is to just construct the multipart request by hand, using io.MultiPart to
 	// concatenate the parts of the request together into a single io.Reader.
-	boundary := client.randomBoundary()
 	parts := []io.Reader{}
 
 	// Create a part for each key, val pair in params
@@ -195,9 +304,7 @@ func (client *restClient) MultipartUpload(url string, reader io.Reader, filename
 
 	contentType := fmt.Sprintf("multipart/form-data; boundary=%s", boundary)
 
-	res, err = client.Do(&request{"POST", url, contentType, io.MultiReader(parts...), token})
-
-	return
+	return io.MultiReader(parts...), contentType
 }
 
 // From https://golang.org/src/mime/multipart/writer.go
