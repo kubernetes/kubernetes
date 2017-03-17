@@ -2279,9 +2279,7 @@ message PodAffinityTerm {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
 
   // namespaces specifies which namespaces the labelSelector applies to (matches against);
-  // nil list means "this pod's namespace," empty list means "all namespaces"
-  // The json tag here is not "omitempty" since we need to distinguish nil and empty.
-  // See https://golang.org/pkg/encoding/json/#Marshal for more details.
+  // null or empty list means "this pod's namespace"
   repeated string namespaces = 2;
 
   // This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
