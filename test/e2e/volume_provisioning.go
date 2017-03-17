@@ -303,16 +303,20 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by changing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+			scName, found, err := getDefaultStorageClassName(c)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(Equal(true))
+			framework.Logf("Default storage class: %q", scName)
 
 			By("setting the is-default StorageClass annotation to false")
-			verifyDefaultStorageClass(c, true)
-			defer updateDefaultStorageClass(c, "true")
-			updateDefaultStorageClass(c, "false")
+			verifyDefaultStorageClass(c, scName, true)
+			defer updateDefaultStorageClass(c, scName, "true")
+			updateDefaultStorageClass(c, scName, "false")
 
 			By("creating a claim with default storageclass and expecting it to timeout")
 			claim := newClaim(ns)
 			defer c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
-			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
 			// The claim should timeout phase:Pending
@@ -327,16 +331,20 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by removing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+			scName, found, err := getDefaultStorageClassName(c)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(Equal(true))
+			framework.Logf("Default storage class: %q", scName)
 
 			By("removing the is-default StorageClass annotation")
-			verifyDefaultStorageClass(c, true)
-			defer updateDefaultStorageClass(c, "true")
-			updateDefaultStorageClass(c, "")
+			verifyDefaultStorageClass(c, scName, true)
+			defer updateDefaultStorageClass(c, scName, "true")
+			updateDefaultStorageClass(c, scName, "")
 
 			By("creating a claim with default storageclass and expecting it to timeout")
 			claim := newClaim(ns)
 			defer c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
-			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
 			// The claim should timeout phase:Pending
@@ -350,14 +358,27 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	})
 })
 
-func verifyDefaultStorageClass(c clientset.Interface, expectedDefault bool) {
-	sc, err := c.StorageV1().StorageClasses().Get("default", metav1.GetOptions{})
+func getDefaultStorageClassName(c clientset.Interface) (name string, found bool, err error) {
+	list, err := c.StorageV1().StorageClasses().List(metav1.ListOptions{})
+	if err != nil {
+		return "", false, err
+	}
+	for _, sc := range list.Items {
+		if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
+			return sc.Name, true, nil
+		}
+	}
+	return "", false, nil
+}
+
+func verifyDefaultStorageClass(c clientset.Interface, scName string, expectedDefault bool) {
+	sc, err := c.StorageV1().StorageClasses().Get(scName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(storageutil.IsDefaultAnnotation(sc.ObjectMeta)).To(Equal(expectedDefault))
 }
 
-func updateDefaultStorageClass(c clientset.Interface, defaultStr string) {
-	sc, err := c.StorageV1().StorageClasses().Get("default", metav1.GetOptions{})
+func updateDefaultStorageClass(c clientset.Interface, scName string, defaultStr string) {
+	sc, err := c.StorageV1().StorageClasses().Get(scName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	if defaultStr == "" {
@@ -376,7 +397,7 @@ func updateDefaultStorageClass(c clientset.Interface, defaultStr string) {
 	if defaultStr == "true" {
 		expectedDefault = true
 	}
-	verifyDefaultStorageClass(c, expectedDefault)
+	verifyDefaultStorageClass(c, scName, expectedDefault)
 }
 
 func newClaim(ns string) *v1.PersistentVolumeClaim {
