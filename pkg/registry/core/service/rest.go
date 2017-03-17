@@ -93,9 +93,6 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runti
 		}
 	}()
 
-	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts)
-	defer nodePortOp.Finish()
-
 	if api.IsServiceIPRequested(service) {
 		// Allocate next available.
 		ip, err := rs.serviceIPs.AllocateNext()
@@ -116,6 +113,9 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runti
 		}
 		releaseServiceIP = true
 	}
+
+	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts)
+	defer nodePortOp.Finish()
 
 	assignNodePorts := shouldAssignNodePorts(service)
 	svcPortToNodePort := map[int]int{}
@@ -436,7 +436,7 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 	// The comparison loops are O(N^2), but we don't expect N to be huge
 	// (there's a hard-limit at 2^16, because they're ports; and even 4 ports would be a lot)
 	for _, oldNodePort := range oldNodePorts {
-		if !contains(newNodePorts, oldNodePort) {
+		if contains(newNodePorts, oldNodePort) {
 			continue
 		}
 		nodePortOp.ReleaseDeferred(oldNodePort)
