@@ -18,6 +18,7 @@ package master
 
 import (
 	"fmt"
+	"net/http"
 	"runtime"
 	"time"
 
@@ -75,7 +76,12 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 func WaitForAPI(client *clientset.Clientset) {
 	start := time.Now()
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
-		// TODO: use /healthz API instead of this
+		healthStatus := 0
+		client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		if healthStatus != http.StatusOK {
+			return false, nil
+		}
+
 		cs, err := client.ComponentStatuses().List(metav1.ListOptions{})
 		if err != nil {
 			if apierrs.IsForbidden(err) {
