@@ -35,6 +35,10 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_APIServerAuditLogOptions, InType: reflect.TypeOf(&APIServerAuditLogOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_APIServerConfiguration, InType: reflect.TypeOf(&APIServerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_APIServerEtcdConfiguration, InType: reflect.TypeOf(&APIServerEtcdConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_APIServerStorageSerializationOptions, InType: reflect.TypeOf(&APIServerStorageSerializationOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_IPVar, InType: reflect.TypeOf(&IPVar{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeControllerManagerConfiguration, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
@@ -51,6 +55,95 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(&PortRangeVar{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_VolumeConfiguration, InType: reflect.TypeOf(&VolumeConfiguration{})},
 	)
+}
+
+func DeepCopy_componentconfig_APIServerAuditLogOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*APIServerAuditLogOptions)
+		out := out.(*APIServerAuditLogOptions)
+		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_APIServerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*APIServerConfiguration)
+		out := out.(*APIServerConfiguration)
+		*out = *in
+		if in.CorsAllowedOriginList != nil {
+			in, out := &in.CorsAllowedOriginList, &out.CorsAllowedOriginList
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if in.WatchCacheSizes != nil {
+			in, out := &in.WatchCacheSizes, &out.WatchCacheSizes
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if err := DeepCopy_componentconfig_APIServerEtcdConfiguration(&in.StorageConfig, &out.StorageConfig, c); err != nil {
+			return err
+		}
+		if in.EtcdServersOverrides != nil {
+			in, out := &in.EtcdServersOverrides, &out.EtcdServersOverrides
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if in.AllowPrivileged != nil {
+			in, out := &in.AllowPrivileged, &out.AllowPrivileged
+			*out = new(bool)
+			**out = **in
+		}
+		if in.KubernetesServiceNodePort != nil {
+			in, out := &in.KubernetesServiceNodePort, &out.KubernetesServiceNodePort
+			*out = new(int)
+			**out = **in
+		}
+		if in.MasterCount != nil {
+			in, out := &in.MasterCount, &out.MasterCount
+			*out = new(int)
+			**out = **in
+		}
+		if in.MaxConnectionBytesPerSec != nil {
+			in, out := &in.MaxConnectionBytesPerSec, &out.MaxConnectionBytesPerSec
+			*out = new(int64)
+			**out = **in
+		}
+		if in.ServiceClusterIPRange != nil {
+			in, out := &in.ServiceClusterIPRange, &out.ServiceClusterIPRange
+			*out = new(string)
+			**out = **in
+		}
+		if in.ServiceNodePortRange != nil {
+			in, out := &in.ServiceNodePortRange, &out.ServiceNodePortRange
+			*out = new(string)
+			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_APIServerEtcdConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*APIServerEtcdConfiguration)
+		out := out.(*APIServerEtcdConfiguration)
+		*out = *in
+		if in.ServerList != nil {
+			in, out := &in.ServerList, &out.ServerList
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_APIServerStorageSerializationOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*APIServerStorageSerializationOptions)
+		out := out.(*APIServerStorageSerializationOptions)
+		*out = *in
+		return nil
+	}
 }
 
 func DeepCopy_componentconfig_IPVar(in interface{}, out interface{}, c *conversion.Cloner) error {
