@@ -35,7 +35,7 @@ type AppArmorUpgradeTest struct {
 func (AppArmorUpgradeTest) Name() string { return "apparmor-upgrade" }
 
 func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
-	var supportedImages map[string]bool
+	supportedImages := make(map[string]bool)
 	for _, d := range common.AppArmorDistros {
 		supportedImages[d] = true
 	}
