@@ -287,9 +287,7 @@ func TestReentrantRollback(t *testing.T) {
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
 
 	d.Spec.RollbackTo = &extensions.RollbackConfig{Revision: 0}
-	// TODO: This is 1 for now until FindOldReplicaSets gets fixed.
-	// See https://github.com/kubernetes/kubernetes/issues/42570.
-	d.Annotations = map[string]string{util.RevisionAnnotation: "1"}
+	d.Annotations = map[string]string{util.RevisionAnnotation: "2"}
 	f.dLister = append(f.dLister, d)
 
 	rs1 := newReplicaSet(d, "deploymentrs-old", 0)
