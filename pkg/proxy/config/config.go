@@ -17,12 +17,20 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
+	listers "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/util/config"
 )
 
@@ -69,102 +77,102 @@ type EndpointsConfigHandler interface {
 // EndpointsConfig tracks a set of endpoints configurations.
 // It accepts "set", "add" and "remove" operations of endpoints via channels, and invokes registered handlers on change.
 type EndpointsConfig struct {
-	mux     *config.Mux
-	bcaster *config.Broadcaster
-	store   *endpointsStore
+	informer cache.Controller
+	lister   listers.EndpointsLister
+	handlers []EndpointsConfigHandler
+	// updates channel is used to trigger registered handlers.
+	updates chan struct{}
 }
 
 // NewEndpointsConfig creates a new EndpointsConfig.
-// It immediately runs the created EndpointsConfig.
-func NewEndpointsConfig() *EndpointsConfig {
-	// The updates channel is used to send interrupts to the Endpoints handler.
-	// It's buffered because we never want to block for as long as there is a
-	// pending interrupt, but don't want to drop them if the handler is doing
-	// work.
-	updates := make(chan struct{}, 1)
-	store := &endpointsStore{updates: updates, endpoints: make(map[string]map[types.NamespacedName]*api.Endpoints)}
-	mux := config.NewMux(store)
-	bcaster := config.NewBroadcaster()
-	go watchForUpdates(bcaster, store, updates)
-	return &EndpointsConfig{mux, bcaster, store}
+func NewEndpointsConfig(c cache.Getter, period time.Duration) *EndpointsConfig {
+	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", metav1.NamespaceAll, fields.Everything())
+	return newEndpointsConfig(endpointsLW, period)
+}
+
+func newEndpointsConfig(lw cache.ListerWatcher, period time.Duration) *EndpointsConfig {
+	result := &EndpointsConfig{}
+
+	store, informer := cache.NewIndexerInformer(
+		lw,
+		&api.Endpoints{},
+		period,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    result.handleAddEndpoints,
+			UpdateFunc: result.handleUpdateEndpoints,
+			DeleteFunc: result.handleDeleteEndpoints,
+		},
+		cache.Indexers{},
+	)
+	result.informer = informer
+	result.lister = listers.NewEndpointsLister(store)
+	return result
 }
 
 // RegisterHandler registers a handler which is called on every endpoints change.
 func (c *EndpointsConfig) RegisterHandler(handler EndpointsConfigHandler) {
-	c.bcaster.Add(config.ListenerFunc(func(instance interface{}) {
-		glog.V(3).Infof("Calling handler.OnEndpointsUpdate()")
-		handler.OnEndpointsUpdate(instance.([]api.Endpoints))
-	}))
+	c.handlers = append(c.handlers, handler)
 }
 
-// Channel returns a channel to which endpoints updates should be delivered.
-func (c *EndpointsConfig) Channel(source string) chan EndpointsUpdate {
-	ch := c.mux.Channel(source)
-	endpointsCh := make(chan EndpointsUpdate)
+func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
+	// The updates channel is used to send interrupts to the Endpoints handler.
+	// It's buffered because we never want to block for as long as there is a
+	// pending interrupt, but don't want to drop them if the handler is doing
+	// work.
+	c.updates = make(chan struct{}, 1)
+	go c.informer.Run(stopCh)
+	if !cache.WaitForCacheSync(stopCh, c.informer.HasSynced) {
+		utilruntime.HandleError(fmt.Errorf("endpoint controller not synced"))
+		return
+	}
+
+	// We have synced informers. Now we can start delivering updates
+	// to the registered handler.
 	go func() {
-		for update := range endpointsCh {
-			ch <- update
+		for range c.updates {
+			endpoints, err := c.lister.List(labels.Everything())
+			if err != nil {
+				glog.Errorf("Error while listing endpoints from cache: %v", err)
+				// This will cause a retry (if there isn't any other trigger in-flight).
+				c.dispatchUpdate()
+				continue
+			}
+			// TODO: This will no longer be needed with #42989
+			eps := make([]api.Endpoints, 0, len(endpoints))
+			for i := range endpoints {
+				eps = append(eps, *endpoints[i])
+			}
+			for i := range c.handlers {
+				glog.V(3).Infof("Calling handler.OnEndpointsUpdate()")
+				c.handlers[i].OnEndpointsUpdate(eps)
+			}
 		}
 	}()
-	return endpointsCh
+	// Close updates channel when stopCh is closed.
+	go func() {
+		<-stopCh
+		close(c.updates)
+	}()
 }
 
-// Config returns list of all endpoints from underlying store.
-func (c *EndpointsConfig) Config() []api.Endpoints {
-	return c.store.MergedState().([]api.Endpoints)
+func (c *EndpointsConfig) handleAddEndpoints(_ interface{}) {
+	c.dispatchUpdate()
 }
 
-type endpointsStore struct {
-	endpointLock sync.RWMutex
-	endpoints    map[string]map[types.NamespacedName]*api.Endpoints
-	synced       bool
-	updates      chan<- struct{}
+func (c *EndpointsConfig) handleUpdateEndpoints(_, _ interface{}) {
+	c.dispatchUpdate()
 }
 
-func (s *endpointsStore) Merge(source string, change interface{}) error {
-	s.endpointLock.Lock()
-	endpoints := s.endpoints[source]
-	if endpoints == nil {
-		endpoints = make(map[types.NamespacedName]*api.Endpoints)
-	}
-	update := change.(EndpointsUpdate)
-	switch update.Op {
-	case ADD, UPDATE:
-		glog.V(5).Infof("Adding new endpoint from source %s : %s", source, spew.Sdump(update.Endpoints))
-		name := types.NamespacedName{Namespace: update.Endpoints.Namespace, Name: update.Endpoints.Name}
-		endpoints[name] = update.Endpoints
-	case REMOVE:
-		glog.V(5).Infof("Removing an endpoint %s", spew.Sdump(update.Endpoints))
-		name := types.NamespacedName{Namespace: update.Endpoints.Namespace, Name: update.Endpoints.Name}
-		delete(endpoints, name)
-	case SYNCED:
-		s.synced = true
+func (c *EndpointsConfig) handleDeleteEndpoints(_ interface{}) {
+	c.dispatchUpdate()
+}
+
+func (c *EndpointsConfig) dispatchUpdate() {
+	select {
+	case c.updates <- struct{}{}:
 	default:
-		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
+		glog.V(4).Infof("Endpoints handler already has a pending interrupt.")
 	}
-	s.endpoints[source] = endpoints
-	synced := s.synced
-	s.endpointLock.Unlock()
-	if s.updates != nil && synced {
-		select {
-		case s.updates <- struct{}{}:
-		default:
-			glog.V(4).Infof("Endpoints handler already has a pending interrupt.")
-		}
-	}
-	return nil
-}
-
-func (s *endpointsStore) MergedState() interface{} {
-	s.endpointLock.RLock()
-	defer s.endpointLock.RUnlock()
-	endpoints := make([]api.Endpoints, 0)
-	for _, sourceEndpoints := range s.endpoints {
-		for _, value := range sourceEndpoints {
-			endpoints = append(endpoints, *value)
-		}
-	}
-	return endpoints
 }
 
 // ServiceConfig tracks a set of service configurations.

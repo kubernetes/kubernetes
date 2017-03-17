@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
@@ -71,11 +72,12 @@ func NewHollowProxyOrDie(
 		UID:       types.UID(nodeName),
 		Namespace: "",
 	}
+
+	go endpointsConfig.Run(wait.NeverStop)
 	proxyconfig.NewSourceAPI(
 		client.Core().RESTClient(),
 		15*time.Minute,
 		serviceConfig.Channel("api"),
-		endpointsConfig.Channel("api"),
 	)
 
 	hollowProxy, err := proxyapp.NewProxyServer(client, eventClient, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake")

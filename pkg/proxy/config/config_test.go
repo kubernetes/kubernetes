@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -228,98 +229,110 @@ func TestNewMultipleSourcesServicesMultipleHandlersAddedAndNotified(t *testing.T
 	handler2.ValidateServices(t, services)
 }
 
-func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
-	config := NewEndpointsConfig()
-	config.store.synced = true
-	channelOne := config.Channel("one")
-	channelTwo := config.Channel("two")
+func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
+	fakeWatch := watch.NewFake()
+	lw := fakeLW{
+		listResp:  &api.EndpointsList{Items: []api.Endpoints{}},
+		watchResp: fakeWatch,
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	config := newEndpointsConfig(lw, time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	endpointsUpdate1 := CreateEndpointsUpdate(ADD, &api.Endpoints{
+	go config.Run(stopCh)
+
+	endpoints1 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	endpointsUpdate2 := CreateEndpointsUpdate(ADD, &api.Endpoints{
+	}
+	endpoints2 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	channelOne <- endpointsUpdate1
-	channelTwo <- endpointsUpdate2
+	}
+	fakeWatch.Add(endpoints1)
+	fakeWatch.Add(endpoints2)
 
-	endpoints := []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints}
+	endpoints := []api.Endpoints{*endpoints2, *endpoints1}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 }
 
-func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
-	config := NewEndpointsConfig()
-	config.store.synced = true
-	channelOne := config.Channel("one")
-	channelTwo := config.Channel("two")
+func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
+	fakeWatch := watch.NewFake()
+	lw := fakeLW{
+		listResp:  &api.EndpointsList{Items: []api.Endpoints{}},
+		watchResp: fakeWatch,
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	config := newEndpointsConfig(lw, time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	endpointsUpdate1 := CreateEndpointsUpdate(ADD, &api.Endpoints{
+	go config.Run(stopCh)
+
+	endpoints1 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	endpointsUpdate2 := CreateEndpointsUpdate(ADD, &api.Endpoints{
+	}
+	endpoints2 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	channelOne <- endpointsUpdate1
-	channelTwo <- endpointsUpdate2
+	}
+	fakeWatch.Add(endpoints1)
+	fakeWatch.Add(endpoints2)
 
-	endpoints := []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints}
+	endpoints := []api.Endpoints{*endpoints2, *endpoints1}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Add one more
-	endpointsUpdate3 := CreateEndpointsUpdate(ADD, &api.Endpoints{
+	endpoints3 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "5.5.5.5"}, {IP: "6.6.6.6"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	channelTwo <- endpointsUpdate3
-	endpoints = []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints, *endpointsUpdate3.Endpoints}
+	}
+	fakeWatch.Add(endpoints3)
+	endpoints = []api.Endpoints{*endpoints2, *endpoints1, *endpoints3}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Update the "foo" service with new endpoints
-	endpointsUpdate1 = CreateEndpointsUpdate(ADD, &api.Endpoints{
+	endpoints1v2 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "7.7.7.7"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	channelOne <- endpointsUpdate1
-	endpoints = []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints, *endpointsUpdate3.Endpoints}
+	}
+	fakeWatch.Modify(endpoints1v2)
+	endpoints = []api.Endpoints{*endpoints2, *endpoints1v2, *endpoints3}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 
-	// Remove "bar" service
-	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, &api.Endpoints{ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"}})
-	channelTwo <- endpointsUpdate2
-
-	endpoints = []api.Endpoints{*endpointsUpdate1.Endpoints, *endpointsUpdate3.Endpoints}
+	// Remove "bar" endpoints
+	fakeWatch.Delete(endpoints2)
+	endpoints = []api.Endpoints{*endpoints1v2, *endpoints3}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 }
