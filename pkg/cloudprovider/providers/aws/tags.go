@@ -19,11 +19,12 @@ package aws
 import (
 	"fmt"
 
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"strings"
 )
 
 // TagNameKubernetesClusterPrefix is the tag name we use to differentiate multiple
@@ -129,6 +130,10 @@ func (t *awsTagging) clusterTagKey() string {
 }
 
 func (t *awsTagging) hasClusterTag(tags []*ec2.Tag) bool {
+	// if the clusterID is not configured -- we consider all instances.
+	if len(t.ClusterID) == 0 {
+		return true
+	}
 	clusterTagKey := t.clusterTagKey()
 	for _, tag := range tags {
 		tagKey := aws.StringValue(tag.Key)
@@ -227,17 +232,23 @@ func (t *awsTagging) createTags(client EC2, resourceID string, lifecycle Resourc
 // Add additional filters, to match on our tags
 // This lets us run multiple k8s clusters in a single EC2 AZ
 func (t *awsTagging) addFilters(filters []*ec2.Filter) []*ec2.Filter {
+	// if there are no clusterID configured - no filtering by special tag names
+	// should be applied to revert to legacy behaviour.
+	if len(t.ClusterID) == 0 {
+		if len(filters) == 0 {
+			// We can't pass a zero-length Filters to AWS (it's an error)
+			// So if we end up with no filters; just return nil
+			return nil
+		}
+		return filters
+	}
 	// For 1.6, we always recognize the legacy tag, for the 1.5 -> 1.6 upgrade
 	// There are no "or" filters by key, so we look for both the legacy and new key, and then we have to post-filter
 	f := newEc2Filter("tag-key", TagNameKubernetesClusterLegacy, t.clusterTagKey())
+
+	// We can't pass a zero-length Filters to AWS (it's an error)
+	// So if we end up with no filters; we need to return nil
 	filters = append(filters, f)
-
-	if len(filters) == 0 {
-		// We can't pass a zero-length Filters to AWS (it's an error)
-		// So if we end up with no filters; just return nil
-		return nil
-	}
-
 	return filters
 }
 
@@ -246,6 +257,13 @@ func (t *awsTagging) buildTags(lifecycle ResourceLifecycle, additionalTags map[s
 	for k, v := range additionalTags {
 		tags[k] = v
 	}
+
+	// no clusterID is a sign of misconfigured cluster, but we can't be tagging the resources with empty
+	// strings
+	if len(t.ClusterID) == 0 {
+		return tags
+	}
+
 	// We only create legacy tags if we are using legacy tags, i.e. if we have seen a legacy tag on our instance
 	if t.usesLegacyTags {
 		tags[TagNameKubernetesClusterLegacy] = t.ClusterID
