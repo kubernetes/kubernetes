@@ -7,6 +7,19 @@ import (
 
 const GINKGO_FOCUS_EXIT_CODE = 197
 
+/*
+SuiteSummary represents the a summary of the test suite and is passed to both
+Reporter.SpecSuiteWillBegin
+Reporter.SpecSuiteDidEnd
+
+this is unfortunate as these two methods should receive different objects.  When running in parallel
+each node does not deterministically know how many specs it will end up running.
+
+Unfortunately making such a change would break backward compatibility.
+
+Until Ginkgo 2.0 comes out we will continue to reuse this struct but populate unkown fields
+with -1.
+*/
 type SuiteSummary struct {
 	SuiteDescription string
 	SuiteSucceeded   bool
