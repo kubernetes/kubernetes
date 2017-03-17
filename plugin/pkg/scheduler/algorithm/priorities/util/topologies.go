@@ -26,13 +26,13 @@ import (
 
 // GetNamespacesFromPodAffinityTerm returns a set of names
 // according to the namespaces indicated in podAffinityTerm.
-// 1. If the namespaces is nil considers the given pod's namespace
-// 2. If the namespaces is empty list then considers all the namespaces
+// 1. If the namespaces is nil or empty list then considers the given pod's namespace
+// 2. If the namespaces is singleton list containing "*" then considers all the namespaces
 func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
 	names := sets.String{}
-	if podAffinityTerm.Namespaces == nil {
+	if podAffinityTerm.Namespaces == nil || len(podAffinityTerm.Namespaces) == 0 {
 		names.Insert(pod.Namespace)
-	} else if len(podAffinityTerm.Namespaces) != 0 {
+	} else if !(len(podAffinityTerm.Namespaces == 1 && podAffinityTerm.Namespaces[0] == "*")) {
 		names.Insert(podAffinityTerm.Namespaces...)
 	}
 	return names

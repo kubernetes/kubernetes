@@ -2389,6 +2389,103 @@ func TestInterPodAffinity(t *testing.T) {
 		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabel2,
+					Namespace: "foo",
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"securityscan", "value2"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"securityscan", "value2"},
+											},
+										},
+									},
+									Namespaces: []string{"*"},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel, Namespace:"bar"}}},
+			node: &node1,
+			fits: false,
+			test: "satisfies the PodAffinity but doesn't satisfy the PodAntiAffinity with the existing pod; PodAntiAffinity pods are in different namespaces but pod to be scheduled specifies * Namespace in PodAntiAffinity which matches all namespaces and thus there is a conflict XXX",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabel2,
+					Namespace: "foo",
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"securityscan", "value2"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"securityscan", "value2"},
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel, Namespace:"bar"}}},
+			node: &node1,
+			fits: true,
+			test: "like previous but pod to be scheduled specifies no Namespace which means its own namespace which does not match the running pod hence the anti-affinity rule does not prevent the pod from scheduling XXX",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel,
 				},
 				Spec: v1.PodSpec{
