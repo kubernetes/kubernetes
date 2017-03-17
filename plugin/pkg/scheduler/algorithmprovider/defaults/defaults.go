@@ -176,7 +176,7 @@ func defaultPredicates() sets.String {
 		factory.RegisterFitPredicateFactory(
 			"NoVolumeNodeConflict",
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewVolumeNodePredicate(args.PVInfo, args.PVCInfo)
+				return predicates.NewVolumeNodePredicate(args.PVInfo, args.PVCInfo, args.Client)
 			},
 		),
 	)

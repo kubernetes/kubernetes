@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -68,6 +69,10 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.Pe
 		}
 	}
 	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
+}
+
+func (pvs FakePersistentVolumeInfo) List(selector labels.Selector) (ret []*v1.PersistentVolume, err error) {
+	return
 }
 
 var (

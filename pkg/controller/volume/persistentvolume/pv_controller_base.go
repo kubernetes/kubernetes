@@ -197,13 +197,6 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 		return
 	}
 
-	// Ignore Local Persistent Volumes.
-	// They are handled by the scheduler.
-	if volume.Spec.LocalStorage != nil {
-		glog.V(2).Infof("Ignoring Local Persistent Volume[%s]: %s", volume.Name, getVolumeStatusForLogging(volume))
-		return
-	}
-
 	// Store the new volume version in the cache and do not process it if this
 	// is an old version.
 	new, err := ctrl.storeVolumeUpdate(volume)
@@ -231,7 +224,7 @@ func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume
 	_ = ctrl.volumes.store.Delete(volume)
 	glog.V(4).Infof("volume %q deleted", volume.Name)
 
-	if volume.Spec.ClaimRef == nil || volume.Spec.LocalStorage != nil {
+	if volume.Spec.ClaimRef == nil {
 		return
 	}
 	// sync the claim when its volume is deleted. Explicitly syncing the

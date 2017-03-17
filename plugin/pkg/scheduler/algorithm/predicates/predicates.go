@@ -56,6 +56,7 @@ type NodeInfo interface {
 }
 
 type PersistentVolumeInfo interface {
+	List(selector labels.Selector) (ret []*v1.PersistentVolume, err error)
 	GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error)
 }
 
@@ -66,6 +67,10 @@ type CachedPersistentVolumeInfo struct {
 
 func (c *CachedPersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error) {
 	return c.Get(pvID)
+}
+
+func (c *CachedPersistentVolumeInfo) List(selector labels.Selector) (ret []*v1.PersistentVolume, err error) {
+	return c.List(selector)
 }
 
 type PersistentVolumeClaimInfo interface {
@@ -1264,83 +1269,5 @@ func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *sch
 	if nodeInfo.DiskPressureCondition() == v1.ConditionTrue {
 		return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
 	}
-	return true, nil, nil
-}
-
-type VolumeNodeChecker struct {
-	pvInfo  PersistentVolumeInfo
-	pvcInfo PersistentVolumeClaimInfo
-}
-
-// VolumeNodePredicate evaluates if a pod can fit due to the volumes it requests, given
-// that some volumes have node scheduling constraints, particularly when using LocalStorage PVs.
-// The requirement is that any pod that uses a PVC that is bound to a LocalStorage PV must be scheduled to the
-// LocalStorage PV's node
-func NewVolumeNodePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
-	c := &VolumeNodeChecker{
-		pvInfo:  pvInfo,
-		pvcInfo: pvcInfo,
-	}
-	return c.predicate
-}
-
-func (c *VolumeNodeChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	// If a pod doesn't have any volume attached to it, the predicate will always be true.
-	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
-	if len(pod.Spec.Volumes) == 0 {
-		return true, nil, nil
-	}
-
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
-	namespace := pod.Namespace
-	manifest := &(pod.Spec)
-	for i := range manifest.Volumes {
-		volume := &manifest.Volumes[i]
-		if volume.PersistentVolumeClaim != nil {
-			pvcName := volume.PersistentVolumeClaim.ClaimName
-			if pvcName == "" {
-				return false, nil, fmt.Errorf("PersistentVolumeClaim had no name")
-			}
-			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
-			if err != nil {
-				return false, nil, err
-			}
-
-			if pvc == nil {
-				return false, nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
-			}
-
-			pvName := pvc.Spec.VolumeName
-			if pvName == "" {
-				return false, nil, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
-			}
-
-			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
-			if err != nil {
-				return false, nil, err
-			}
-
-			if pv == nil {
-				return false, nil, fmt.Errorf("PersistentVolume not found: %q", pvName)
-			}
-
-			// Check specifically for LocalStorage PV. TODO: generalize this
-			localSpec := pv.Spec.PersistentVolumeSource.LocalStorage
-			if localSpec != nil {
-				if localSpec.NodeName == node.Name {
-					glog.V(2).Infof("VolumeNode predicate allows node %q for pod %q due to volume %q", node.Name, pod.Name, pvName)
-				} else {
-					glog.V(2).Infof("Won't schedule pod %q onto node %q due to volume %q node mismatch", pod.Name, node.Name, pvName)
-					return false, []algorithm.PredicateFailureReason{ErrVolumeNodeConflict}, nil
-				}
-			}
-
-		}
-	}
-
 	return true, nil, nil
 }

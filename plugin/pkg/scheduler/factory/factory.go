@@ -443,6 +443,7 @@ func (f *ConfigFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		PVInfo:     &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: f.pVLister},
 		PVCInfo:    &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: f.pVCLister},
 		HardPodAffinitySymmetricWeight: f.hardPodAffinitySymmetricWeight,
+		Client: f.client,
 	}, nil
 }
 
