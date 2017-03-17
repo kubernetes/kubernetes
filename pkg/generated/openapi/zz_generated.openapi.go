@@ -14102,13 +14102,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"spec": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "The desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetSpec"),
 							},
 						},
 						"status": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+								Description: "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetStatus"),
 							},
 						},
@@ -14145,7 +14145,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"items": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Items is a list of daemon sets.",
+								Description: "A list of daemon sets.",
 								Type:        []string{"array"},
 								Items: &spec.SchemaOrArray{
 									Schema: &spec.Schema{
@@ -14170,25 +14170,25 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"selector": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+								Description: "A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
 							},
 						},
 						"template": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
+								Description: "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.PodTemplateSpec"),
 							},
 						},
 						"updateStrategy": {
 							SchemaProps: spec.SchemaProps{
-								Description: "UpdateStrategy to replace existing DaemonSet pods with new pods.",
+								Description: "An update strategy to replace existing DaemonSet pods with new pods.",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetUpdateStrategy"),
 							},
 						},
 						"minReadySeconds": {
 							SchemaProps: spec.SchemaProps{
-								Description: "MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+								Description: "The minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
@@ -14214,56 +14214,56 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"currentNumberScheduled": {
 							SchemaProps: spec.SchemaProps{
-								Description: "CurrentNumberScheduled is the number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+								Description: "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"numberMisscheduled": {
 							SchemaProps: spec.SchemaProps{
-								Description: "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+								Description: "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"desiredNumberScheduled": {
 							SchemaProps: spec.SchemaProps{
-								Description: "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+								Description: "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"numberReady": {
 							SchemaProps: spec.SchemaProps{
-								Description: "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
+								Description: "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"observedGeneration": {
 							SchemaProps: spec.SchemaProps{
-								Description: "ObservedGeneration is the most recent generation observed by the daemon set controller.",
+								Description: "The most recent generation observed by the daemon set controller.",
 								Type:        []string{"integer"},
 								Format:      "int64",
 							},
 						},
 						"updatedNumberScheduled": {
 							SchemaProps: spec.SchemaProps{
-								Description: "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod",
+								Description: "The total number of nodes that are running updated daemon pod",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"numberAvailable": {
 							SchemaProps: spec.SchemaProps{
-								Description: "NumberAvailable is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least minReadySeconds)",
+								Description: "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least spec.minReadySeconds)",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
 						},
 						"numberUnavailable": {
 							SchemaProps: spec.SchemaProps{
-								Description: "NumberUnavailable is the number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least minReadySeconds)",
+								Description: "The number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least spec.minReadySeconds)",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
@@ -14287,7 +14287,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"rollingUpdate": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.",
+								Description: "Rolling update config params. Present only if type = \"RollingUpdate\".",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/extensions/v1beta1.RollingUpdateDaemonSet"),
 							},
 						},
@@ -15718,7 +15718,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"maxUnavailable": {
 							SchemaProps: spec.SchemaProps{
-								Description: "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+								Description: "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
 								Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 							},
 						},
