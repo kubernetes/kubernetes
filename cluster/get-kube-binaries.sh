@@ -44,6 +44,10 @@ KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://storage.googleapis.com/kubernetes-release/release}"
 
 function detect_kube_release() {
+  if [[ -n "${KUBERNETES_RELEASE:-}" ]]; then
+    return 0  # Allow caller to explicitly set version
+  fi
+
   if [[ ! -e "${KUBE_ROOT}/version" ]]; then
     echo "Can't determine Kubernetes release." >&2
     echo "${BASH_SOURCE} should only be run from a prebuilt Kubernetes release." >&2
@@ -52,7 +56,6 @@ function detect_kube_release() {
   fi
 
   KUBERNETES_RELEASE=$(cat "${KUBE_ROOT}/version")
-  DOWNLOAD_URL_PREFIX="${KUBERNETES_RELEASE_URL}/${KUBERNETES_RELEASE}"
 }
 
 function detect_client_info() {
@@ -153,6 +156,7 @@ function extract_arch_tarball() {
 }
 
 detect_kube_release
+DOWNLOAD_URL_PREFIX="${KUBERNETES_RELEASE_URL}/${KUBERNETES_RELEASE}"
 
 SERVER_PLATFORM="linux"
 SERVER_ARCH="${KUBERNETES_SERVER_ARCH:-amd64}"
