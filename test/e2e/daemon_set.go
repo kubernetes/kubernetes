@@ -251,9 +251,8 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Update daemon pods image.")
-		ds, err = c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
-		ds.Spec.Template.Spec.Containers[0].Image = redisImage
-		ds, err = c.Extensions().DaemonSets(ns).Update(ds)
+		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, redisImage)
+		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ds.Spec.TemplateGeneration).To(Equal(int64(2)))
 
@@ -277,6 +276,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		framework.Logf("Creating simple daemon set %s with templateGeneration %d", dsName, templateGeneration)
 		ds := newDaemonSet(dsName, image, label)
 		ds.Spec.TemplateGeneration = templateGeneration
+		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
 		ds, err := c.Extensions().DaemonSets(ns).Create(ds)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration))
@@ -290,11 +290,8 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Update daemon pods image.")
-		ds, err = c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		ds.Spec.Template.Spec.Containers[0].Image = redisImage
-		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
-		ds, err = c.Extensions().DaemonSets(ns).Update(ds)
+		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, redisImage)
+		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration + 1))
 
@@ -390,6 +387,11 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
+
+// getDaemonSetImagePatch generates a patch for updating a DaemonSet's container image
+func getDaemonSetImagePatch(containerName, containerImage string) string {
+	return fmt.Sprintf(`{"spec":{"template":{"spec":{"containers":[{"name":"%s","image":"%s"}]}}}}`, containerName, containerImage)
+}
 
 func orphanDaemonSetPods(c clientset.Interface, ds *extensions.DaemonSet) error {
 	trueVar := true
