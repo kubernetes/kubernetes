@@ -201,7 +201,7 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 	// They are handled by the scheduler.
 	if volume.Spec.LocalStorage != nil {
 		glog.V(2).Infof("Ignoring Local Persistent Volume[%s]: %s", volume.Name, getVolumeStatusForLogging(volume))
-		return nil
+		return
 	}
 
 	// Store the new volume version in the cache and do not process it if this

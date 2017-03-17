@@ -234,7 +234,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 		// User did not care which PV they get.
 
 		// Ignore local PVs.
-		if claim.Spec.VolumeType == v1.SemiPersistentLocalStorage {
+		if *claim.Spec.VolumeType == v1.SemiPersistentLocalStorage {
 			glog.V(2).Infof("ignoring unbound PersistentVolumeClaim[%s] since its volume type is semi persistent local storage which is handled by the scheduler", claimToClaimKey(claim))
 			return nil
 		}
