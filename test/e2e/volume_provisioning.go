@@ -26,8 +26,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
+	storagebeta "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -104,46 +105,44 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 		ns = f.Namespace.Name
 	})
 
-	/*
-		TODO: enable when GKE is updated with the new API
-		framework.KubeDescribe("DynamicProvisioner", func() {
-			It("should create and delete persistent volumes [Slow] [Volume]", func() {
-				framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+	framework.KubeDescribe("DynamicProvisioner", func() {
+		It("should create and delete persistent volumes [Slow] [Volume]", func() {
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
 
-				By("creating a StorageClass")
-				class := newStorageClass("", "internal")
-				class, err := c.StorageV1beta1().StorageClasses().Create(class)
-				defer c.StorageV1beta1().StorageClasses().Delete(class.Name, nil)
-				Expect(err).NotTo(HaveOccurred())
+			By("creating a StorageClass")
+			class := newStorageClass("", "internal")
+			class, err := c.StorageV1().StorageClasses().Create(class)
+			defer c.StorageV1().StorageClasses().Delete(class.Name, nil)
+			Expect(err).NotTo(HaveOccurred())
 
-				By("creating a claim with a dynamic provisioning annotation")
-				claim := newClaim(ns)
-				claim.Spec.StorageClassName = &class.Name
+			By("creating a claim with a dynamic provisioning annotation")
+			claim := newClaim(ns)
+			claim.Spec.StorageClassName = &class.Name
 
-				defer func() {
-					c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
-				}()
-				claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
-				Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+			}()
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
 
-				if framework.ProviderIs("vsphere") {
-					// vsphere provider does not allocate volumes in 1GiB chunks, so setting expected size
-					// equal to requestedSize
-					testDynamicProvisioning(c, claim, requestedSize)
-				} else {
-					// Expected size of the volume is 2GiB, because the other three supported cloud
-					// providers allocate volumes in 1GiB chunks.
-					testDynamicProvisioning(c, claim, "2Gi")
-				}
-			})
+			if framework.ProviderIs("vsphere") {
+				// vsphere provider does not allocate volumes in 1GiB chunks, so setting expected size
+				// equal to requestedSize
+				testDynamicProvisioning(c, claim, requestedSize)
+			} else {
+				// Expected size of the volume is 2GiB, because the other three supported cloud
+				// providers allocate volumes in 1GiB chunks.
+				testDynamicProvisioning(c, claim, "2Gi")
+			}
 		})
-	*/
+	})
+
 	framework.KubeDescribe("DynamicProvisioner Beta", func() {
 		It("should create and delete persistent volumes [Slow] [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
 
 			By("creating a StorageClass")
-			class := newStorageClass("", "beta")
+			class := newBetaStorageClass("", "beta")
 			_, err := c.StorageV1beta1().StorageClasses().Create(class)
 			defer c.StorageV1beta1().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
@@ -199,17 +198,13 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			sc := newStorageClass("", suffix)
 			// Set an unmanaged zone.
 			sc.Parameters = map[string]string{"zone": unmanagedZone}
-			sc, err = c.StorageV1beta1().StorageClasses().Create(sc)
-			defer Expect(c.StorageV1beta1().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
+			sc, err = c.StorageV1().StorageClasses().Create(sc)
+			defer Expect(c.StorageV1().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Creating a claim and expecting it to timeout")
 			pvc := newClaim(ns)
-			// TODO: switch to attribute when GKE is updated
-			pvc.Annotations = map[string]string{
-				v1.BetaStorageClassAnnotation: sc.Name,
-			}
-			//pvc.Spec.StorageClassName = &className
+			pvc.Spec.StorageClassName = &sc.Name
 			pvc, err = c.Core().PersistentVolumeClaims(ns).Create(pvc)
 			defer Expect(c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
@@ -261,16 +256,19 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 			By("creating a StorageClass")
 			class := newStorageClass(externalPluginName, "external")
-			_, err = c.StorageV1beta1().StorageClasses().Create(class)
-			defer c.StorageV1beta1().StorageClasses().Delete(class.Name, nil)
+			_, err = c.StorageV1().StorageClasses().Create(class)
+			defer c.StorageV1().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating a claim with a dynamic provisioning annotation")
 			claim := newClaim(ns)
 			className := class.Name
-			// TODO: switch to attribute when GKE is updated
-			claim.Annotations = map[string]string{v1.BetaStorageClassAnnotation: className}
-			//claim.Spec.StorageClassName = &className
+			// the external provisioner understands Beta only right now, see
+			// https://github.com/kubernetes-incubator/external-storage/issues/37
+			// claim.Spec.StorageClassName = &className
+			claim.Annotations = map[string]string{
+				v1.BetaStorageClassAnnotation: className,
+			}
 			defer func() {
 				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
 			}()
@@ -385,11 +383,13 @@ func updateDefaultStorageClass(c clientset.Interface, scName string, defaultStr 
 
 	if defaultStr == "" {
 		delete(sc.Annotations, storageutil.BetaIsDefaultStorageClassAnnotation)
+		delete(sc.Annotations, storageutil.IsDefaultStorageClassAnnotation)
 	} else {
 		if sc.Annotations == nil {
 			sc.Annotations = make(map[string]string)
 		}
 		sc.Annotations[storageutil.BetaIsDefaultStorageClassAnnotation] = defaultStr
+		sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = defaultStr
 	}
 
 	sc, err = c.StorageV1().StorageClasses().Update(sc)
@@ -470,21 +470,44 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
 }
 
+func getDefaultPluginName() string {
+	switch {
+	case framework.ProviderIs("gke"), framework.ProviderIs("gce"):
+		return "kubernetes.io/gce-pd"
+	case framework.ProviderIs("aws"):
+		return "kubernetes.io/aws-ebs"
+	case framework.ProviderIs("openstack"):
+		return "kubernetes.io/cinder"
+	case framework.ProviderIs("vsphere"):
+		return "kubernetes.io/vsphere-volume"
+	}
+	return ""
+}
+
 func newStorageClass(pluginName, suffix string) *storage.StorageClass {
 	if pluginName == "" {
-		switch {
-		case framework.ProviderIs("gke"), framework.ProviderIs("gce"):
-			pluginName = "kubernetes.io/gce-pd"
-		case framework.ProviderIs("aws"):
-			pluginName = "kubernetes.io/aws-ebs"
-		case framework.ProviderIs("openstack"):
-			pluginName = "kubernetes.io/cinder"
-		case framework.ProviderIs("vsphere"):
-			pluginName = "kubernetes.io/vsphere-volume"
-		}
+		pluginName = getDefaultPluginName()
 	}
 
 	return &storage.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "myclass-" + suffix,
+		},
+		Provisioner: pluginName,
+	}
+}
+
+// TODO: remove when storage.k8s.io/v1beta1 and beta storage class annotations
+// are removed.
+func newBetaStorageClass(pluginName, suffix string) *storagebeta.StorageClass {
+	if pluginName == "" {
+		pluginName = getDefaultPluginName()
+	}
+
+	return &storagebeta.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
