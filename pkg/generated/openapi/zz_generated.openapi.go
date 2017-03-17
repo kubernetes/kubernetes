@@ -165,7 +165,14 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"name": {
 							SchemaProps: spec.SchemaProps{
-								Description: "name is the name of the resource.",
+								Description: "name is the plural name of the resource.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"singular": {
+							SchemaProps: spec.SchemaProps{
+								Description: "singular is the singular name of the resource.  This allows clients to handle plural and singular opaquely.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -213,7 +220,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"name", "namespaced", "kind", "verbs"},
+					Required: []string{"name", "singular", "namespaced", "kind", "verbs"},
 				},
 			},
 			Dependencies: []string{},

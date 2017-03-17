@@ -36855,6 +36855,7 @@
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",
+     "singular",
      "namespaced",
      "kind",
      "verbs"
@@ -36865,7 +36866,7 @@
       "type": "string"
      },
      "name": {
-      "description": "name is the name of the resource.",
+      "description": "name is the plural name of the resource.",
       "type": "string"
      },
      "namespaced": {
@@ -36878,6 +36879,10 @@
       "items": {
        "type": "string"
       }
+     },
+     "singular": {
+      "description": "singular is the singular name of the resource.  This allows clients to handle plural and singular opaquely.",
+      "type": "string"
      },
      "verbs": {
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",

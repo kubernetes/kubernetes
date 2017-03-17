@@ -20872,6 +20872,7 @@
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",
+     "singular",
      "namespaced",
      "kind",
      "verbs"
@@ -20879,7 +20880,11 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "name is the name of the resource."
+      "description": "name is the plural name of the resource."
+     },
+     "singular": {
+      "type": "string",
+      "description": "singular is the singular name of the resource.  This allows clients to handle plural and singular opaquely."
      },
      "namespaced": {
       "type": "boolean",
