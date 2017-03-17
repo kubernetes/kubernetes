@@ -29,31 +29,24 @@ import (
 )
 
 // NewSourceAPI creates config source that watches for changes to the services and endpoints.
-func NewSourceAPI(c cache.Getter, period time.Duration, servicesChan chan<- ServiceUpdate, endpointsChan chan<- EndpointsUpdate) {
+func NewSourceAPI(c cache.Getter, period time.Duration, servicesChan chan<- ServiceUpdate) {
 	servicesLW := cache.NewListWatchFromClient(c, "services", metav1.NamespaceAll, fields.Everything())
-	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", metav1.NamespaceAll, fields.Everything())
-	newSourceAPI(servicesLW, endpointsLW, period, servicesChan, endpointsChan, wait.NeverStop)
+	newSourceAPI(servicesLW, period, servicesChan, wait.NeverStop)
 }
 
 func newSourceAPI(
 	servicesLW cache.ListerWatcher,
-	endpointsLW cache.ListerWatcher,
 	period time.Duration,
 	servicesChan chan<- ServiceUpdate,
-	endpointsChan chan<- EndpointsUpdate,
 	stopCh <-chan struct{}) {
 	serviceController := NewServiceController(servicesLW, period, servicesChan)
 	go serviceController.Run(stopCh)
 
-	endpointsController := NewEndpointsController(endpointsLW, period, endpointsChan)
-	go endpointsController.Run(stopCh)
-
-	if !cache.WaitForCacheSync(stopCh, serviceController.HasSynced, endpointsController.HasSynced) {
+	if !cache.WaitForCacheSync(stopCh, serviceController.HasSynced) {
 		utilruntime.HandleError(fmt.Errorf("source controllers not synced"))
 		return
 	}
 	servicesChan <- ServiceUpdate{Op: SYNCED}
-	endpointsChan <- EndpointsUpdate{Op: SYNCED}
 }
 
 func sendAddService(servicesChan chan<- ServiceUpdate) func(obj interface{}) {
@@ -99,49 +92,6 @@ func sendDeleteService(servicesChan chan<- ServiceUpdate) func(obj interface{}) 
 	}
 }
 
-func sendAddEndpoints(endpointsChan chan<- EndpointsUpdate) func(obj interface{}) {
-	return func(obj interface{}) {
-		endpoints, ok := obj.(*api.Endpoints)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Endpoints: %v", obj))
-			return
-		}
-		endpointsChan <- EndpointsUpdate{Op: ADD, Endpoints: endpoints}
-	}
-}
-
-func sendUpdateEndpoints(endpointsChan chan<- EndpointsUpdate) func(oldObj, newObj interface{}) {
-	return func(_, newObj interface{}) {
-		endpoints, ok := newObj.(*api.Endpoints)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Endpoints: %v", newObj))
-			return
-		}
-		endpointsChan <- EndpointsUpdate{Op: UPDATE, Endpoints: endpoints}
-	}
-}
-
-func sendDeleteEndpoints(endpointsChan chan<- EndpointsUpdate) func(obj interface{}) {
-	return func(obj interface{}) {
-		var endpoints *api.Endpoints
-		switch t := obj.(type) {
-		case *api.Endpoints:
-			endpoints = t
-		case cache.DeletedFinalStateUnknown:
-			var ok bool
-			endpoints, ok = t.Obj.(*api.Endpoints)
-			if !ok {
-				utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Endpoints: %v", t.Obj))
-				return
-			}
-		default:
-			utilruntime.HandleError(fmt.Errorf("cannot convert to *api.Endpoints: %v", obj))
-			return
-		}
-		endpointsChan <- EndpointsUpdate{Op: REMOVE, Endpoints: endpoints}
-	}
-}
-
 // NewServiceController creates a controller that is watching services and sending
 // updates into ServiceUpdate channel.
 func NewServiceController(lw cache.ListerWatcher, period time.Duration, ch chan<- ServiceUpdate) cache.Controller {
@@ -156,20 +106,4 @@ func NewServiceController(lw cache.ListerWatcher, period time.Duration, ch chan<
 		},
 	)
 	return serviceController
-}
-
-// NewEndpointsController creates a controller that is watching endpoints and sending
-// updates into EndpointsUpdate channel.
-func NewEndpointsController(lw cache.ListerWatcher, period time.Duration, ch chan<- EndpointsUpdate) cache.Controller {
-	_, endpointsController := cache.NewInformer(
-		lw,
-		&api.Endpoints{},
-		period,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    sendAddEndpoints(ch),
-			UpdateFunc: sendUpdateEndpoints(ch),
-			DeleteFunc: sendDeleteEndpoints(ch),
-		},
-	)
-	return endpointsController
 }

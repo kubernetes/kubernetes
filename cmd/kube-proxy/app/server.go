@@ -308,14 +308,14 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	serviceConfig := proxyconfig.NewServiceConfig()
 	serviceConfig.RegisterHandler(proxier)
 
-	endpointsConfig := proxyconfig.NewEndpointsConfig()
+	endpointsConfig := proxyconfig.NewEndpointsConfig(client.Core().RESTClient(), config.ConfigSyncPeriod)
 	endpointsConfig.RegisterHandler(endpointsHandler)
+	go endpointsConfig.Run(wait.NeverStop)
 
 	proxyconfig.NewSourceAPI(
 		client.Core().RESTClient(),
 		config.ConfigSyncPeriod,
 		serviceConfig.Channel("api"),
-		endpointsConfig.Channel("api"),
 	)
 
 	config.NodeRef = &clientv1.ObjectReference{
