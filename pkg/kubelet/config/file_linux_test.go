@@ -208,6 +208,10 @@ func getTestCases(hostname types.NodeName) []*testCase {
 					RestartPolicy:                 v1.RestartPolicyAlways,
 					DNSPolicy:                     v1.DNSClusterFirst,
 					TerminationGracePeriodSeconds: &grace,
+					Tolerations: []v1.Toleration{{
+						Operator: "Exists",
+						Effect:   "NoExecute",
+					}},
 					Containers: []v1.Container{{
 						Name:  "image",
 						Image: "test/image",
