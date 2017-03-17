@@ -17,8 +17,6 @@ limitations under the License.
 package kubemark
 
 import (
-	"time"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -74,11 +72,7 @@ func NewHollowProxyOrDie(
 	}
 
 	go endpointsConfig.Run(wait.NeverStop)
-	proxyconfig.NewSourceAPI(
-		client.Core().RESTClient(),
-		15*time.Minute,
-		serviceConfig.Channel("api"),
-	)
+	go serviceConfig.Run(wait.NeverStop)
 
 	hollowProxy, err := proxyapp.NewProxyServer(client, eventClient, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake")
 	if err != nil {

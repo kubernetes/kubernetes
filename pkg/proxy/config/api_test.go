@@ -23,10 +23,8 @@ import (
 	"testing"
 	"time"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
@@ -65,68 +63,40 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 		watchResp: fakeWatch,
 	}
 
-	ch := make(chan ServiceUpdate)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 
-	serviceController := NewServiceController(lw, 30*time.Second, ch)
-	go serviceController.Run(wait.NeverStop)
+	ch := make(chan struct{})
+	handler := newSvcHandler(t, nil, func() { ch <- struct{}{} })
+
+	serviceConfig := newServiceConfig(lw, time.Minute)
+	serviceConfig.RegisterHandler(handler)
+	go serviceConfig.Run(stopCh)
 
 	// Add the first service
+	handler.expected = []api.Service{*service1v1}
 	fakeWatch.Add(service1v1)
-	got, ok := <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected := ServiceUpdate{Op: ADD, Service: service1v1}
-	if !apiequality.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
-	}
+	<-ch
 
 	// Add another service
+	handler.expected = []api.Service{*service1v1, *service2}
 	fakeWatch.Add(service2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	// Could be sorted either of these two ways:
-	expected = ServiceUpdate{Op: ADD, Service: service2}
-
-	if !apiequality.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
-	}
+	<-ch
 
 	// Modify service1
+	handler.expected = []api.Service{*service1v2, *service2}
 	fakeWatch.Modify(service1v2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected = ServiceUpdate{Op: UPDATE, Service: service1v2}
-
-	if !apiequality.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
-	}
+	<-ch
 
 	// Delete service1
+	handler.expected = []api.Service{*service2}
 	fakeWatch.Delete(service1v2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected = ServiceUpdate{Op: REMOVE, Service: service1v2}
-	if !apiequality.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
-	}
+	<-ch
 
 	// Delete service2
+	handler.expected = []api.Service{}
 	fakeWatch.Delete(service2)
-	got, ok = <-ch
-	if !ok {
-		t.Errorf("Unable to read from channel when expected")
-	}
-	expected = ServiceUpdate{Op: REMOVE, Service: service2}
-	if !apiequality.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
-	}
+	<-ch
 }
 
 func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
@@ -270,7 +240,7 @@ func TestInitialSync(t *testing.T) {
 		watchResp: fakeEpsWatch,
 	}
 
-	svcConfig := NewServiceConfig()
+	svcConfig := newServiceConfig(svcLW, time.Minute)
 	epsConfig := newEndpointsConfig(epsLW, time.Minute)
 	svcHandler := newSvcHandler(t, []api.Service{*svc2, *svc1}, wg.Done)
 	svcConfig.RegisterHandler(svcHandler)
@@ -279,7 +249,7 @@ func TestInitialSync(t *testing.T) {
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+	go svcConfig.Run(stopCh)
 	go epsConfig.Run(stopCh)
-	newSourceAPI(svcLW, time.Minute, svcConfig.Channel("one"), stopCh)
 	wg.Wait()
 }
