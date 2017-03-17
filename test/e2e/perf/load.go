@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package perf
 
 import (
 	"fmt"
@@ -344,13 +344,13 @@ func generateConfigs(
 	secretConfigs := make([]*testutils.SecretConfig, 0)
 
 	smallGroupCount, mediumGroupCount, bigGroupCount := computePodCounts(totalPods)
-	newConfigs, newSecretConfigs := generateConfigsForGroup(nss, smallGroupName, smallGroupSize, smallGroupCount, image, command, kind, secretsPerPod)
+	newConfigs, newSecretConfigs := GenerateConfigsForGroup(nss, smallGroupName, smallGroupSize, smallGroupCount, image, command, kind, secretsPerPod)
 	configs = append(configs, newConfigs...)
 	secretConfigs = append(secretConfigs, newSecretConfigs...)
-	newConfigs, newSecretConfigs = generateConfigsForGroup(nss, mediumGroupName, mediumGroupSize, mediumGroupCount, image, command, kind, secretsPerPod)
+	newConfigs, newSecretConfigs = GenerateConfigsForGroup(nss, mediumGroupName, mediumGroupSize, mediumGroupCount, image, command, kind, secretsPerPod)
 	configs = append(configs, newConfigs...)
 	secretConfigs = append(secretConfigs, newSecretConfigs...)
-	newConfigs, newSecretConfigs = generateConfigsForGroup(nss, bigGroupName, bigGroupSize, bigGroupCount, image, command, kind, secretsPerPod)
+	newConfigs, newSecretConfigs = GenerateConfigsForGroup(nss, bigGroupName, bigGroupSize, bigGroupCount, image, command, kind, secretsPerPod)
 	configs = append(configs, newConfigs...)
 	secretConfigs = append(secretConfigs, newSecretConfigs...)
 
@@ -371,7 +371,7 @@ func generateConfigs(
 	return configs, secretConfigs
 }
 
-func generateConfigsForGroup(
+func GenerateConfigsForGroup(
 	nss []*v1.Namespace,
 	groupName string,
 	size, count int,
