@@ -404,13 +404,14 @@ type RollingUpdateDaemonSet struct {
 	// number is calculated from percentage by rounding up.
 	// This cannot be 0.
 	// Default value is 1.
-	// Example: when this is set to 30%, 30% of the currently running DaemonSet
-	// pods can be stopped for an update at any given time. The update starts
-	// by stopping at most 30% of the currently running DaemonSet pods and then
-	// brings up new DaemonSet pods in their place. Once the new pods are ready,
-	// it then proceeds onto other DaemonSet pods, thus ensuring that at least
-	// 70% of original number of DaemonSet pods are available at all times
-	// during the update.
+	// Example: when this is set to 30%, at most 30% of the total number of nodes
+	// that should be running the daemon pod (i.e. DesiredNumberScheduled in
+	// DaemonSetStatus) can have their pods stopped for an update at any given
+	// time. The update starts by stopping at most 30% of those DaemonSet pods
+	// and then brings up new DaemonSet pods in their place. Once the new pods
+	// are available, it then proceeds onto other DaemonSet pods, thus ensuring
+	// that at least 70% of original number of DaemonSet pods are available at
+	// all times during the update.
 	// +optional
 	MaxUnavailable intstr.IntOrString
 }
@@ -435,7 +436,7 @@ type DaemonSetSpec struct {
 	// +optional
 	UpdateStrategy DaemonSetUpdateStrategy
 
-	// MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should
+	// The minimum number of seconds for which a newly created DaemonSet pod should
 	// be ready without any of its container crashing, for it to be considered
 	// available. Defaults to 0 (pod will be considered available as soon as it
 	// is ready).
