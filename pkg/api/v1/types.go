@@ -1047,6 +1047,15 @@ type ISCSIVolumeSource struct {
 	// is other than default (typically TCP ports 860 and 3260).
 	// +optional
 	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
+	// whether support iSCSI Discovery CHAP authentication
+	// +optional
+	DiscoveryCHAPAuth bool `json:"chapAuthDiscovery,omitempty" protobuf:"varint,8,opt,name=chapAuthDiscovery"`
+	// whether support iSCSI Session CHAP authentication
+	// +optional
+	SessionCHAPAuth bool `json:"chapAuthSession,omitempty" protobuf:"varint,11,opt,name=chapAuthSession"`
+	// CHAP secret for iSCSI target and initiator authentication
+	// +optional
+	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,10,opt,name=secretRef"`
 }
 
 // Represents a Fibre Channel volume.
