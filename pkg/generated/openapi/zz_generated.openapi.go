@@ -165,7 +165,14 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"name": {
 							SchemaProps: spec.SchemaProps{
-								Description: "name is the name of the resource.",
+								Description: "name is the plural name of the resource.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"singularName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -213,7 +220,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"name", "namespaced", "kind", "verbs"},
+					Required: []string{"name", "singularName", "namespaced", "kind", "verbs"},
 				},
 			},
 			Dependencies: []string{},
