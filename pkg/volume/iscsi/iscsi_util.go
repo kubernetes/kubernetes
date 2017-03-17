@@ -31,6 +31,60 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+var (
+	chap_st = []string{
+		"discovery.sendtargets.auth.username",
+		"discovery.sendtargets.auth.password",
+		"discovery.sendtargets.auth.username_in",
+		"discovery.sendtargets.auth.password_in"}
+	chap_sess = []string{
+		"node.session.auth.username",
+		"node.session.auth.password",
+		"node.session.auth.username_in",
+		"node.session.auth.password_in"}
+)
+
+func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
+	if b.chap_discovery {
+		out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.iface, "-o", "update", "-n", "discovery.sendtargets.auth.authmethod", "-v", "CHAP"})
+		if err != nil {
+			return fmt.Errorf("iscsi: failed to update discoverydb with CHAP, output: %v", string(out))
+		}
+
+	}
+	for _, k := range chap_st {
+		v := b.secret[k]
+		if len(v) > 0 {
+			out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.iface, "-o", "update", "-n", k, "-v", v})
+			if err != nil {
+				return fmt.Errorf("iscsi: failed to update discoverydb key %q with value %q error: %v", k, v, string(out))
+			}
+		}
+	}
+	return nil
+}
+
+func updateISCSINode(b iscsiDiskMounter, tp string) error {
+	if b.chap_session {
+		out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", tp, "-T", b.iqn, "-I", b.iface, "-o", "update", "-n", "node.session.auth.authmethod", "-v", "CHAP"})
+		if err != nil {
+			return fmt.Errorf("iscsi: failed to update node with CHAP, output: %v", string(out))
+		}
+
+	}
+	for _, k := range chap_sess {
+		v := b.secret[k]
+		if len(v) > 0 {
+			out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", tp, "-T", b.iqn, "-I", b.iface, "-o", "update", "-n", k, "-v", v})
+			if err != nil {
+				return fmt.Errorf("iscsi: failed to update node session key %q with value %q error: %v", k, v, string(out))
+			}
+		}
+	}
+	return nil
+
+}
+
 // stat a path, if not exists, retry maxRetries times
 // when iscsi transports other than default are used,  use glob instead as pci id of device is unknown
 type StatFunc func(string) (os.FileInfo, error)
@@ -105,6 +159,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 	var devicePath string
 	var devicePaths []string
 	var iscsiTransport string
+	var last_err error
 
 	out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "iface", "-I", b.iface, "-o", "show"})
 	if err != nil {
@@ -133,16 +188,28 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 		}
 		exist := waitForPathToExist(devicePath, 1, iscsiTransport)
 		if exist == false {
-			// discover iscsi target
-			out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", tp, "-I", b.iface})
+			// build discoverydb and discover iscsi target
+			b.plugin.execCommand("iscsiadm", []string{"-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.iface, "-o", "new"})
+			// update discoverydb with CHAP secret
+			err = updateISCSIDiscoverydb(b, tp)
 			if err != nil {
-				glog.Errorf("iscsi: failed to sendtargets to portal %s error: %s", tp, string(out))
+				last_err = fmt.Errorf("iscsi: failed to update discoverydb to portal %s error: %v", tp, err)
+				continue
+			}
+			out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.iface, "--discover"})
+			if err != nil {
+				last_err = fmt.Errorf("iscsi: failed to sendtargets to portal %s output: %s, err %v", tp, string(out), err)
+				continue
+			}
+			err = updateISCSINode(b, tp)
+			if err != nil {
+				last_err = fmt.Errorf("iscsi: failed to update iscsi node to portal %s error: %v", tp, err)
 				continue
 			}
 			// login to iscsi target
 			out, err = b.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", tp, "-T", b.iqn, "-I", b.iface, "--login"})
 			if err != nil {
-				glog.Errorf("iscsi: failed to attach disk:Error: %s (%v)", string(out), err)
+				last_err = fmt.Errorf("iscsi: failed to attach disk:Error: %s (%v)", string(out), err)
 				continue
 			}
 			exist = waitForPathToExist(devicePath, 10, iscsiTransport)
@@ -158,8 +225,8 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 	}
 
 	if len(devicePaths) == 0 {
-		glog.Errorf("iscsi: failed to get any path for iscsi disk")
-		return errors.New("failed to get any path for iscsi disk")
+		glog.Errorf("iscsi: failed to get any path for iscsi disk, last err seen: %v", last_err)
+		return fmt.Errorf("failed to get any path for iscsi disk, last err seen: %v", last_err)
 	}
 
 	//Make sure we use a valid devicepath to find mpio device.

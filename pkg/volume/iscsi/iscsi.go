@@ -99,10 +99,23 @@ func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 
 func (plugin *iscsiPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newMounterInternal(spec, pod.UID, &ISCSIUtil{}, plugin.host.GetMounter())
+	var secret map[string]string
+	source, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	if source.SecretRef != nil {
+		if secret, err = ioutil.GetSecretForPod(pod, source.SecretRef.Name, plugin.host.GetKubeClient()); err != nil {
+			glog.Errorf("Couldn't get secret from %v/%v", pod.Namespace, source.SecretRef)
+			return nil, err
+		}
+	}
+
+	return plugin.newMounterInternal(spec, pod.UID, &ISCSIUtil{}, plugin.host.GetMounter(), secret)
 }
 
-func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Mounter, error) {
+func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret map[string]string) (volume.Mounter, error) {
 	// iscsi volumes used directly in a pod have a ReadOnly flag set by the pod author.
 	// iscsi volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	iscsi, readOnly, err := getVolumeSource(spec)
@@ -121,14 +134,17 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 
 	return &iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
-			podUID:  podUID,
-			volName: spec.Name(),
-			portals: bkportal,
-			iqn:     iscsi.IQN,
-			lun:     lun,
-			iface:   iface,
-			manager: manager,
-			plugin:  plugin},
+			podUID:         podUID,
+			volName:        spec.Name(),
+			portals:        bkportal,
+			iqn:            iscsi.IQN,
+			lun:            lun,
+			iface:          iface,
+			chap_discovery: iscsi.DiscoveryCHAPAuth,
+			chap_session:   iscsi.SessionCHAPAuth,
+			secret:         secret,
+			manager:        manager,
+			plugin:         plugin},
 		fsType:       iscsi.FSType,
 		readOnly:     readOnly,
 		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
@@ -173,13 +189,16 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 }
 
 type iscsiDisk struct {
-	volName string
-	podUID  types.UID
-	portals []string
-	iqn     string
-	lun     string
-	iface   string
-	plugin  *iscsiPlugin
+	volName        string
+	podUID         types.UID
+	portals        []string
+	iqn            string
+	lun            string
+	iface          string
+	chap_discovery bool
+	chap_session   bool
+	secret         map[string]string
+	plugin         *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 	volume.MetricsNil
