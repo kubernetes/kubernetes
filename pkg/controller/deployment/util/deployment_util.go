@@ -67,6 +67,10 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
+	// OverlapAnnotation marks deployments with overlapping selector with other deployments
+	// TODO: Delete this annotation when we no longer need to support a client
+	//       talking to a server older than v1.6.
+	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
 
 	// Reasons for deployment conditions
 	//
@@ -287,6 +291,7 @@ var annotationsToSkip = map[string]bool{
 	RevisionHistoryAnnotation:               true,
 	DesiredReplicasAnnotation:               true,
 	MaxReplicasAnnotation:                   true,
+	OverlapAnnotation:                       true,
 }
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
@@ -513,14 +518,15 @@ func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 	return oldRSes, allOldRSes, newRS, nil
 }
 
-// GetAllReplicaSetsV15 is a compatibility function that behaves the way
-// GetAllReplicaSets() used to in v1.5.x.
+// GetAllReplicaSetsV15 is a compatibility function that emulates the behavior
+// from v1.5.x (list matching objects by selector) except that it leaves out
+// objects that are explicitly marked as being controlled by something else.
 func GetAllReplicaSetsV15(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
 	rsList, err := ListReplicaSetsV15(deployment, rsListFromClient(c))
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	podList, err := ListPodsV15(deployment, podListFromClient(c))
+	podList, err := ListPodsV15(deployment, rsList, podListFromClient(c))
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -559,8 +565,9 @@ func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) 
 	return FindNewReplicaSet(deployment, rsList)
 }
 
-// GetNewReplicaSetV15 is a compatibility function that behaves the way
-// GetNewReplicaSet() used to in v1.5.x.
+// GetNewReplicaSetV15 is a compatibility function that emulates the behavior
+// from v1.5.x (list matching objects by selector) except that it leaves out
+// objects that are explicitly marked as being controlled by something else.
 func GetNewReplicaSetV15(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
 	rsList, err := ListReplicaSetsV15(deployment, rsListFromClient(c))
 	if err != nil {
@@ -623,26 +630,10 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 	return owned, nil
 }
 
-// ListReplicaSetsV15 is a compatibility function that behaves the way
-// ListReplicaSets() used to in v1.5.x.
+// ListReplicaSetsV15 is a compatibility function that emulates the behavior
+// from v1.5.x (list matching objects by selector) except that it leaves out
+// objects that are explicitly marked as being controlled by something else.
 func ListReplicaSetsV15(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
-	namespace := deployment.Namespace
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	return getRSList(namespace, options)
-}
-
-// ListReplicaSets returns a slice of RSes the given deployment targets.
-// Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),
-// because only the controller itself should do that.
-// However, it does filter out anything whose ControllerRef doesn't match.
-// TODO: Remove the duplicate.
-func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSList func(string, metav1.ListOptions) ([]*internalextensions.ReplicaSet, error)) ([]*internalextensions.ReplicaSet, error) {
-	// TODO: Right now we list replica sets by their labels. We should list them by selector, i.e. the replica set's selector
-	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830.
 	namespace := deployment.Namespace
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
@@ -651,17 +642,49 @@ func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSLis
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	all, err := getRSList(namespace, options)
 	if err != nil {
-		return all, err
+		return nil, err
 	}
-	// Only include those whose ControllerRef matches the Deployment.
-	owned := make([]*internalextensions.ReplicaSet, 0, len(all))
+	// Since this function maintains compatibility with v1.5, the objects we want
+	// do not necessarily have ControllerRefs pointing to us.
+	// However, we can at least avoid interfering with other controllers that do
+	// use ControllerRef.
+	filtered := make([]*extensions.ReplicaSet, 0, len(all))
 	for _, rs := range all {
 		controllerRef := controller.GetControllerOf(rs)
-		if controllerRef != nil && controllerRef.UID == deployment.UID {
-			owned = append(owned, rs)
+		if controllerRef != nil && controllerRef.UID != deployment.UID {
+			continue
 		}
+		filtered = append(filtered, rs)
 	}
-	return owned, nil
+	return filtered, nil
+}
+
+// ListReplicaSetsInternalV15 is ListReplicaSetsV15 for internalextensions.
+// TODO: Remove the duplicate when call sites are updated to ListReplicaSetsV15.
+func ListReplicaSetsInternalV15(deployment *internalextensions.Deployment, getRSList func(string, metav1.ListOptions) ([]*internalextensions.ReplicaSet, error)) ([]*internalextensions.ReplicaSet, error) {
+	namespace := deployment.Namespace
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	all, err := getRSList(namespace, options)
+	if err != nil {
+		return nil, err
+	}
+	// Since this function maintains compatibility with v1.5, the objects we want
+	// do not necessarily have ControllerRefs pointing to us.
+	// However, we can at least avoid interfering with other controllers that do
+	// use ControllerRef.
+	filtered := make([]*internalextensions.ReplicaSet, 0, len(all))
+	for _, rs := range all {
+		controllerRef := controller.GetControllerOf(rs)
+		if controllerRef != nil && controllerRef.UID != deployment.UID {
+			continue
+		}
+		filtered = append(filtered, rs)
+	}
+	return filtered, nil
 }
 
 // ListPods returns a list of pods the given deployment targets.
@@ -698,16 +721,39 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 	return owned, nil
 }
 
-// ListPodsV15 is a compatibility function that behaves the way
-// ListPods() used to in v1.5.x.
-func ListPodsV15(deployment *extensions.Deployment, getPodList podListFunc) (*v1.PodList, error) {
+// ListPodsV15 is a compatibility function that emulates the behavior
+// from v1.5.x (list matching objects by selector) except that it leaves out
+// objects that are explicitly marked as being controlled by something else.
+func ListPodsV15(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, getPodList podListFunc) (*v1.PodList, error) {
 	namespace := deployment.Namespace
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	return getPodList(namespace, options)
+	podList, err := getPodList(namespace, options)
+	if err != nil {
+		return nil, err
+	}
+	// Since this function maintains compatibility with v1.5, the objects we want
+	// do not necessarily have ControllerRefs pointing to one of our ReplicaSets.
+	// However, we can at least avoid interfering with other controllers that do
+	// use ControllerRef.
+	rsMap := make(map[types.UID]bool, len(rsList))
+	for _, rs := range rsList {
+		rsMap[rs.UID] = true
+	}
+	filtered := make([]v1.Pod, 0, len(podList.Items))
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		controllerRef := controller.GetControllerOf(pod)
+		if controllerRef != nil && !rsMap[controllerRef.UID] {
+			continue
+		}
+		filtered = append(filtered, *pod)
+	}
+	podList.Items = filtered
+	return podList, nil
 }
 
 // EqualIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
