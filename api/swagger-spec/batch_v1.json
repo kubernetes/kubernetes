@@ -3042,9 +3042,6 @@
    "v1.PodAffinityTerm": {
     "id": "v1.PodAffinityTerm",
     "description": "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key \u003ctopologyKey\u003e tches that of any node on which a pod of the set of pods is running",
-    "required": [
-     "namespaces"
-    ],
     "properties": {
      "labelSelector": {
       "$ref": "v1.LabelSelector",
@@ -3055,7 +3052,7 @@
       "items": {
        "type": "string"
       },
-      "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); nil list means \"this pod's namespace,\" empty list means \"all namespaces\" The json tag here is not \"omitempty\" since we need to distinguish nil and empty. See https://golang.org/pkg/encoding/json/#Marshal for more details."
+      "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\""
      },
      "topologyKey": {
       "type": "string",

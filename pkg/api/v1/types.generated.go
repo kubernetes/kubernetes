@@ -32190,12 +32190,13 @@ func (x *PodAffinityTerm) CodecEncodeSelf(e *codec1978.Encoder) {
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			yyq2[0] = x.LabelSelector != nil
+			yyq2[1] = len(x.Namespaces) != 0
 			yyq2[2] = x.TopologyKey != ""
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(3)
 			} else {
-				yynn2 = 1
+				yynn2 = 0
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -32241,28 +32242,34 @@ func (x *PodAffinityTerm) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.Namespaces == nil {
-					r.EncodeNil()
-				} else {
-					yym7 := z.EncBinary()
-					_ = yym7
-					if false {
+				if yyq2[1] {
+					if x.Namespaces == nil {
+						r.EncodeNil()
 					} else {
-						z.F.EncSliceStringV(x.Namespaces, false, e)
+						yym7 := z.EncBinary()
+						_ = yym7
+						if false {
+						} else {
+							z.F.EncSliceStringV(x.Namespaces, false, e)
+						}
 					}
+				} else {
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("namespaces"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.Namespaces == nil {
-					r.EncodeNil()
-				} else {
-					yym8 := z.EncBinary()
-					_ = yym8
-					if false {
+				if yyq2[1] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("namespaces"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Namespaces == nil {
+						r.EncodeNil()
 					} else {
-						z.F.EncSliceStringV(x.Namespaces, false, e)
+						yym8 := z.EncBinary()
+						_ = yym8
+						if false {
+						} else {
+							z.F.EncSliceStringV(x.Namespaces, false, e)
+						}
 					}
 				}
 			}

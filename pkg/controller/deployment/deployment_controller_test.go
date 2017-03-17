@@ -254,6 +254,32 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	f.run(getKey(d, t))
 }
 
+func TestSyncDeploymentClearsOverlapAnnotation(t *testing.T) {
+	f := newFixture(t)
+
+	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d.Annotations[util.OverlapAnnotation] = "overlap"
+	f.dLister = append(f.dLister, d)
+	f.objects = append(f.objects, d)
+
+	rs := newReplicaSet(d, "deploymentrs-4186632231", 1)
+
+	f.expectUpdateDeploymentStatusAction(d)
+	f.expectCreateRSAction(rs)
+	f.expectUpdateDeploymentStatusAction(d)
+	f.expectUpdateDeploymentStatusAction(d)
+
+	f.run(getKey(d, t))
+
+	d, err := f.client.ExtensionsV1beta1().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("can't get deployment: %v", err)
+	}
+	if _, ok := d.Annotations[util.OverlapAnnotation]; ok {
+		t.Errorf("OverlapAnnotation = %q, wanted absent", d.Annotations[util.OverlapAnnotation])
+	}
+}
+
 func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	f := newFixture(t)
 
@@ -287,9 +313,7 @@ func TestReentrantRollback(t *testing.T) {
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
 
 	d.Spec.RollbackTo = &extensions.RollbackConfig{Revision: 0}
-	// TODO: This is 1 for now until FindOldReplicaSets gets fixed.
-	// See https://github.com/kubernetes/kubernetes/issues/42570.
-	d.Annotations = map[string]string{util.RevisionAnnotation: "1"}
+	d.Annotations = map[string]string{util.RevisionAnnotation: "2"}
 	f.dLister = append(f.dLister, d)
 
 	rs1 := newReplicaSet(d, "deploymentrs-old", 0)
