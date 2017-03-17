@@ -31,31 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/config"
 )
 
-// Operation is a type of operation of services or endpoints.
-type Operation int
-
-// These are the available operation types.
-const (
-	ADD Operation = iota
-	UPDATE
-	REMOVE
-	SYNCED
-)
-
-// ServiceUpdate describes an operation of services, sent on the channel.
-// You can add, update or remove single service by setting Op == ADD|UPDATE|REMOVE.
-type ServiceUpdate struct {
-	Service *api.Service
-	Op      Operation
-}
-
-// EndpointsUpdate describes an operation of endpoints, sent on the channel.
-// You can add, update or remove single endpoints by setting Op == ADD|UPDATE|REMOVE.
-type EndpointsUpdate struct {
-	Endpoints *api.Endpoints
-	Op        Operation
-}
-
 // ServiceConfigHandler is an abstract interface of objects which receive update notifications for the set of services.
 type ServiceConfigHandler interface {
 	// OnServiceUpdate gets called when a configuration has been changed by one of the sources.
@@ -111,6 +86,8 @@ func (c *EndpointsConfig) RegisterHandler(handler EndpointsConfigHandler) {
 	c.handlers = append(c.handlers, handler)
 }
 
+// Run starts the underlying informer and goroutine responsible for calling
+// registered handlers.
 func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
 	// The updates channel is used to send interrupts to the Endpoints handler.
 	// It's buffered because we never want to block for as long as there is a
@@ -212,6 +189,8 @@ func (c *ServiceConfig) RegisterHandler(handler ServiceConfigHandler) {
 	c.handlers = append(c.handlers, handler)
 }
 
+// Run starts the underlying informer and goroutine responsible for calling
+// registered handlers.
 func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 	// The updates channel is used to send interrupts to the Services handler.
 	// It's buffered because we never want to block for as long as there is a

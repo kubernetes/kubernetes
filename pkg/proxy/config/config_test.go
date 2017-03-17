@@ -28,16 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-const TomcatPort int = 8080
-const TomcatName = "tomcat"
-
-var TomcatEndpoints = map[string]string{"c0": "1.1.1.1:18080", "c1": "2.2.2.2:18081"}
-
-const MysqlPort int = 3306
-const MysqlName = "mysql"
-
-var MysqlEndpoints = map[string]string{"c0": "1.1.1.1:13306", "c3": "2.2.2.2:13306"}
-
 type sortedServices []api.Service
 
 func (s sortedServices) Len() int {
@@ -128,14 +118,6 @@ func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints
 			return
 		}
 	}
-}
-
-func CreateServiceUpdate(op Operation, service *api.Service) ServiceUpdate {
-	return ServiceUpdate{Op: op, Service: service}
-}
-
-func CreateEndpointsUpdate(op Operation, endpoints *api.Endpoints) EndpointsUpdate {
-	return EndpointsUpdate{Op: op, Endpoints: endpoints}
 }
 
 func TestNewServiceAddedAndNotified(t *testing.T) {
