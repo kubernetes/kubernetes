@@ -100,7 +100,7 @@ func setSecurityGroups(client *Client, entityUrl string, securityGroups *Securit
 		url,
 		"application/json",
 		bytes.NewReader(body),
-		client.options.TokenOptions.AccessToken)
+		client.options.TokenOptions)
 	if err != nil {
 		return
 	}
