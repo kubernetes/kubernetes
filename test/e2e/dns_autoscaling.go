@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"math"
-	"reflect"
 	"strings"
 	"time"
 
@@ -185,11 +184,8 @@ var _ = framework.KubeDescribe("DNS horizontal autoscaling", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Wait for the ConfigMap got re-created")
-		configMap, err := waitForDNSConfigMapCreated(c, DNSdefaultTimeout)
+		_, err = waitForDNSConfigMapCreated(c, DNSdefaultTimeout)
 		Expect(err).NotTo(HaveOccurred())
-
-		By("Check the new created ConfigMap got the same data as we have")
-		Expect(reflect.DeepEqual(previousParams, configMap.Data)).To(Equal(true))
 
 		By("Replace the dns autoscaling parameters with another testing parameters")
 		err = updateDNSScalingConfigMap(c, packDNSScalingConfigMap(packLinearParams(&DNSParams_2)))
