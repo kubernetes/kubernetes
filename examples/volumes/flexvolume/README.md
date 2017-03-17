@@ -1,54 +1,94 @@
 # Flexvolume
 
-Flexvolume enables users to mount vendor volumes into kubernetes. It expects vendor drivers are installed in the volume plugin path on every kubelet node.
-
-It allows for vendors to develop their own drivers to mount volumes on nodes.
+Flexvolume enables users to write their own drivers and add support for their volumes in Kubernetes. Vendor drivers should be installed in the volume plugin path on every Kubelet node and on master node(s) if "-enable-controller-attach-detach" Kubelet option is enabled. 
 
 *Note: Flexvolume is an alpha feature and is most likely to change in future*
 
 ## Prerequisites
 
-Install the vendor driver on all nodes in the kubelet plugin path. Path for installing the plugin: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/\<vendor~driver\>/\<driver\>
+Install the vendor driver on all nodes (also on master nodes if "-enable-controller-attach-detach" Kubelet option is enabled) in the plugin path. Path for installing the plugin: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/\<vendor~driver\>/\<driver\>
 
 For example to add a 'cifs' driver, by vendor 'foo' install the driver at: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/\<foo~cifs\>/cifs
 
 ## Plugin details
-
-Driver will be invoked with 'Init' to initialize the driver. It will be invoked with 'attach' to attach the volume and with 'detach' to detach the volume from the kubelet node. It also supports custom mounts using 'mount' and 'unmount' callouts to the driver.
+The plugin expects the following call-outs are implemented for the backend drivers. Some call-outs are optional. Call-outs are invoked from the Kubelet & Controller manager nodes.
 
 ### Driver invocation model:
 
-Init:
+#### Init:
+Initializes the driver.
 
 ```
 <driver executable> init
 ```
 
-Attach:
+#### Get volume name:
+Get a cluster wide unique volume name for the volume.
 
 ```
-<driver executable> attach <json options>
+<driver executable> getvolumename <json options>
 ```
 
-Detach:
+#### Attach:
+Attach the volume specified by the given spec on the given host. On success, returns the device path where the device is attached on the node. Nodename param is only valid if "-enable-controller-attach-detach" Kubelet option is enabled.
+
+This call-out does not pass "secrets" specified in Flexvolume spec. If your driver requires secrets, do not implement this call-out and instead use "mount" call-out and implement attach and mount in that call-out.
 
 ```
-<driver executable> detach <mount device>
+<driver executable> attach <json options> <node name>
 ```
 
-Mount:
+#### Detach:
+Detach the volume from the Kubelet node. Nodename param is only valid if "-enable-controller-attach-detach" Kubelet option is enabled.
+```
+<driver executable> detach <mount device> <node name>
+```
+
+#### Wait for attach:
+Wait for the volume to be attached on the remote node. On success, the path to the device is returned.
 
 ```
-<driver executable> mount <target mount dir> <mount device> <json options>
+<driver executable> waitfordetach <mount device> <json options>
 ```
 
-Unmount:
+#### Volume is Attached:
+Check the volume is attached on the node.
+
+```
+<driver executable> isattached <json options> <node name>
+```
+
+#### Mount device:
+Mount device mounts the device to a global path which individual pods can then bind mount.
+
+This call-out does not pass "secrets" specified in Flexvolume spec. If your driver requires secrets, do not implement this call-out and instead use "mount" call-out and implement attach and mount in that call-out.
+
+```
+<driver executable> mountdevice <mount dir> <mount device> <json options>
+```
+
+#### Unmount device:
+Unmounts the global mount for the device. This is called once all bind mounts have been unmounted.
+
+```
+<driver executable> unmountdevice <mount device>
+```
+
+#### Mount:
+Mount the volume at the mount dir. This call-out defaults to bind mount for drivers which implement attach & mount-device call-outs.
+
+```
+<driver executable> mount <mount dir> <json options>
+```
+
+#### Unmount:
+Unmount the volume. This call-out defaults to bind mount for drivers which implement attach & mount-device call-outs.
 
 ```
 <driver executable> unmount <mount dir>
 ```
 
-See [lvm](lvm) for a quick example on how to write a simple flexvolume driver.
+See [lvm](lvm) & [nfs](nfs) for a quick example on how to write a simple flexvolume driver.
 
 ### Driver output:
 
@@ -57,15 +97,18 @@ following format.
 
 ```
 {
-	"status": "<Success/Failure>",
+	"status": "<Success/Failure/Not supported>",
 	"message": "<Reason for success/failure>",
-	"device": "<Path to the device attached. This field is valid only for attach calls>"
+	"device": "<Path to the device attached. This field is valid only for attach & waitforattach call-outs>"
+	"volumeName": "<Cluster wide unique name of the volume. Valid only for getvolumename call-out>"
+	"attached": <True/False (Return true if volume is attached on the node. Valid only for isattached call-out)>
 }
 ```
 
 ### Default Json options
 
 In addition to the flags specified by the user in the Options field of the FlexVolumeSource, the following flags are also passed to the executable.
+Note: Secrets are passed only to "mount/unmount" call-outs.
 
 ```
 "kubernetes.io/fsType":"<FS type>",
@@ -77,7 +120,7 @@ In addition to the flags specified by the user in the Options field of the FlexV
 
 ### Example of Flexvolume
 
-See [nginx.yaml](nginx.yaml) for a quick example on how to use Flexvolume in a pod.
+See [nginx.yaml](nginx.yaml) & [nginx-nfs.yaml](nginx-nfs.yaml) for a quick example on how to use Flexvolume in a pod.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/flexvolume/README.md?pixel)]()
