@@ -476,6 +476,7 @@ func TestDeploymentStop(t *testing.T) {
 				&deployment, // GET
 				&extensions.ReplicaSetList{ // LIST
 					Items: []extensions.ReplicaSet{
+						// ReplicaSet owned by this Deployment.
 						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
@@ -484,9 +485,75 @@ func TestDeploymentStop(t *testing.T) {
 								OwnerReferences: []metav1.OwnerReference{
 									{
 										APIVersion: extensions.SchemeGroupVersion.String(),
-										Kind:       "ReplicaSet",
+										Kind:       "Deployment",
 										Name:       deployment.Name,
 										UID:        deployment.UID,
+										Controller: &trueVar,
+									},
+								},
+							},
+							Spec: extensions.ReplicaSetSpec{
+								Template: template,
+							},
+						},
+						// ReplicaSet owned by something else (should be ignored).
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "rs2",
+								Namespace: ns,
+								Labels:    map[string]string{"k1": "v1"},
+								OwnerReferences: []metav1.OwnerReference{
+									{
+										APIVersion: extensions.SchemeGroupVersion.String(),
+										Kind:       "Deployment",
+										Name:       "somethingelse",
+										UID:        uuid.NewUUID(),
+										Controller: &trueVar,
+									},
+								},
+							},
+							Spec: extensions.ReplicaSetSpec{
+								Template: template,
+							},
+						},
+					},
+				},
+			},
+			StopError: nil,
+			ExpectedActions: []string{"get:deployments", "update:deployments",
+				"get:deployments", "list:replicasets", "get:replicasets",
+				"get:replicasets", "update:replicasets", "get:replicasets",
+				"get:replicasets", "delete:replicasets", "delete:deployments"},
+		},
+		{
+			Name: "Deployment with single replicaset, no ControllerRef (old cluster)",
+			Objs: []runtime.Object{
+				&deployment, // GET
+				&extensions.ReplicaSetList{ // LIST
+					Items: []extensions.ReplicaSet{
+						// ReplicaSet that matches but with no ControllerRef.
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      name,
+								Namespace: ns,
+								Labels:    map[string]string{"k1": "v1"},
+							},
+							Spec: extensions.ReplicaSetSpec{
+								Template: template,
+							},
+						},
+						// ReplicaSet owned by something else (should be ignored).
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "rs2",
+								Namespace: ns,
+								Labels:    map[string]string{"k1": "v1"},
+								OwnerReferences: []metav1.OwnerReference{
+									{
+										APIVersion: extensions.SchemeGroupVersion.String(),
+										Kind:       "Deployment",
+										Name:       "somethingelse",
+										UID:        uuid.NewUUID(),
 										Controller: &trueVar,
 									},
 								},

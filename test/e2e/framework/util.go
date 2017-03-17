@@ -3555,7 +3555,7 @@ func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deploymen
 	var podList *v1.PodList
 	var err error
 	if v15Compatible {
-		podList, err = deploymentutil.ListPodsV15(deployment, podListFunc)
+		podList, err = deploymentutil.ListPodsV15(deployment, rsList, podListFunc)
 	} else {
 		podList, err = deploymentutil.ListPods(deployment, rsList, podListFunc)
 	}
