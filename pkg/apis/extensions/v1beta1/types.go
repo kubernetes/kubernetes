@@ -375,8 +375,7 @@ type DaemonSetUpdateStrategy struct {
 	// +optional
 	Type DaemonSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
 
-	// Rolling update config params. Present only if DaemonSetUpdateStrategy =
-	// RollingUpdate.
+	// Rolling update config params. Present only if type = "RollingUpdate".
 	//---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be. Same as DeploymentStrategy.RollingUpdate.
@@ -404,8 +403,8 @@ type RollingUpdateDaemonSet struct {
 	// This cannot be 0.
 	// Default value is 1.
 	// Example: when this is set to 30%, at most 30% of the total number of nodes
-	// that should be running the daemon pod (i.e. DesiredNumberScheduled in
-	// DaemonSetStatus) can have their pods stopped for an update at any given
+	// that should be running the daemon pod (i.e. status.desiredNumberScheduled)
+	// can have their pods stopped for an update at any given
 	// time. The update starts by stopping at most 30% of those DaemonSet pods
 	// and then brings up new DaemonSet pods in their place. Once the new pods
 	// are available, it then proceeds onto other DaemonSet pods, thus ensuring
@@ -417,21 +416,21 @@ type RollingUpdateDaemonSet struct {
 
 // DaemonSetSpec is the specification of a daemon set.
 type DaemonSetSpec struct {
-	// Selector is a label query over pods that are managed by the daemon set.
+	// A label query over pods that are managed by the daemon set.
 	// Must match in order to be controlled.
 	// If empty, defaulted to labels on Pod template.
 	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,1,opt,name=selector"`
 
-	// Template is the object that describes the pod that will be created.
+	// An object that describes the pod that will be created.
 	// The DaemonSet will create exactly one copy of this pod on every node
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
 	// More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
-	// UpdateStrategy to replace existing DaemonSet pods with new pods.
+	// An update strategy to replace existing DaemonSet pods with new pods.
 	// +optional
 	UpdateStrategy DaemonSetUpdateStrategy `json:"updateStrategy,omitempty" protobuf:"bytes,3,opt,name=updateStrategy"`
 
@@ -450,43 +449,42 @@ type DaemonSetSpec struct {
 
 // DaemonSetStatus represents the current status of a daemon set.
 type DaemonSetStatus struct {
-	// CurrentNumberScheduled is the number of nodes that are running at least 1
+	// The number of nodes that are running at least 1
 	// daemon pod and are supposed to run the daemon pod.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
 	CurrentNumberScheduled int32 `json:"currentNumberScheduled" protobuf:"varint,1,opt,name=currentNumberScheduled"`
 
-	// NumberMisscheduled is the number of nodes that are running the daemon pod, but are
+	// The number of nodes that are running the daemon pod, but are
 	// not supposed to run the daemon pod.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
 	NumberMisscheduled int32 `json:"numberMisscheduled" protobuf:"varint,2,opt,name=numberMisscheduled"`
 
-	// DesiredNumberScheduled is the total number of nodes that should be running the daemon
+	// The total number of nodes that should be running the daemon
 	// pod (including nodes correctly running the daemon pod).
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled" protobuf:"varint,3,opt,name=desiredNumberScheduled"`
 
-	// NumberReady is the number of nodes that should be running the daemon pod and have one
+	// The number of nodes that should be running the daemon pod and have one
 	// or more of the daemon pod running and ready.
 	NumberReady int32 `json:"numberReady" protobuf:"varint,4,opt,name=numberReady"`
 
-	// ObservedGeneration is the most recent generation observed by the daemon set controller.
+	// The most recent generation observed by the daemon set controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,5,opt,name=observedGeneration"`
 
-	// UpdatedNumberScheduled is the total number of nodes that are running updated
-	// daemon pod
+	// The total number of nodes that are running updated daemon pod
 	// +optional
 	UpdatedNumberScheduled int32 `json:"updatedNumberScheduled,omitempty" protobuf:"varint,6,opt,name=updatedNumberScheduled"`
 
-	// NumberAvailable is the number of nodes that should be running the
+	// The number of nodes that should be running the
 	// daemon pod and have one or more of the daemon pod running and
-	// available (ready for at least minReadySeconds)
+	// available (ready for at least spec.minReadySeconds)
 	// +optional
 	NumberAvailable int32 `json:"numberAvailable,omitempty" protobuf:"varint,7,opt,name=numberAvailable"`
 
-	// NumberUnavailable is the number of nodes that should be running the
+	// The number of nodes that should be running the
 	// daemon pod and have none of the daemon pod running and available
-	// (ready for at least minReadySeconds)
+	// (ready for at least spec.minReadySeconds)
 	// +optional
 	NumberUnavailable int32 `json:"numberUnavailable,omitempty" protobuf:"varint,8,opt,name=numberUnavailable"`
 }
@@ -501,12 +499,12 @@ type DaemonSet struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec defines the desired behavior of this daemon set.
+	// The desired behavior of this daemon set.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	// +optional
 	Spec DaemonSetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status is the current status of this daemon set. This data may be
+	// The current status of this daemon set. This data may be
 	// out of date by some window of time.
 	// Populated by the system.
 	// Read-only.
@@ -530,7 +528,7 @@ type DaemonSetList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is a list of daemon sets.
+	// A list of daemon sets.
 	Items []DaemonSet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
