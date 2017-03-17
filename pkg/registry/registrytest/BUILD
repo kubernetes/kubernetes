@@ -13,6 +13,7 @@ go_library(
         "doc.go",
         "endpoint.go",
         "etcd.go",
+        "groupNamesProvider.go",
         "node.go",
         "service.go",
         "shortNamesProvider.go",
