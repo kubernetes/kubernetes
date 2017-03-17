@@ -2169,9 +2169,11 @@ func ValidatePreferredSchedulingTerms(terms []api.PreferredSchedulingTerm, fldPa
 func validatePodAffinityTerm(podAffinityTerm api.PodAffinityTerm, allowEmptyTopologyKey bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
-	for _, name := range podAffinityTerm.Namespaces {
-		for _, msg := range ValidateNamespaceName(name, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
+	if !(len(podAffinityTerm.Namespaces) == 1 && podAffinityTerm.Namespaces[0] == "*") {
+		for _, name := range podAffinityTerm.Namespaces {
+			for _, msg := range ValidateNamespaceName(name, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
+			}
 		}
 	}
 	if !allowEmptyTopologyKey && len(podAffinityTerm.TopologyKey) == 0 {

@@ -1885,10 +1885,9 @@ type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
 	// +optional
 	LabelSelector *metav1.LabelSelector
-	// namespaces specifies which namespaces the labelSelector applies to (matches against);
-	// nil list means "this pod's namespace," empty list means "all namespaces"
-	// The json tag here is not "omitempty" since we need to distinguish nil and empty.
-	// See https://golang.org/pkg/encoding/json/#Marshal for more details.
+	// namespaces specifies which namespaces the labelSelector applies to (matches against).
+	// As a special case, a singleton list containing "*" means "all namespaces."
+	// As a special case, a nil or empty list means "this pod's namespace." 
 	Namespaces []string
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
