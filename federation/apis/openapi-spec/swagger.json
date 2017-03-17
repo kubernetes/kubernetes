@@ -10203,6 +10203,14 @@
      "lun"
     ],
     "properties": {
+     "chapAuthDiscovery": {
+      "description": "whether support iSCSI Discovery CHAP authentication",
+      "type": "boolean"
+     },
+     "chapAuthSession": {
+      "description": "whether support iSCSI Session CHAP authentication",
+      "type": "boolean"
+     },
      "fsType": {
       "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi",
       "type": "string"
@@ -10230,6 +10238,10 @@
      "readOnly": {
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
       "type": "boolean"
+     },
+     "secretRef": {
+      "description": "CHAP secret for iSCSI target and initiator authentication",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalObjectReference"
      },
      "targetPortal": {
       "description": "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",

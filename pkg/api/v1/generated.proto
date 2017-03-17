@@ -1227,6 +1227,18 @@ message ISCSIVolumeSource {
   // is other than default (typically TCP ports 860 and 3260).
   // +optional
   repeated string portals = 7;
+
+  // whether support iSCSI Discovery CHAP authentication
+  // +optional
+  optional bool chapAuthDiscovery = 8;
+
+  // whether support iSCSI Session CHAP authentication
+  // +optional
+  optional bool chapAuthSession = 11;
+
+  // CHAP secret for iSCSI target and initiator authentication
+  // +optional
+  optional LocalObjectReference secretRef = 10;
 }
 
 // Maps a string key to a path within a volume.
