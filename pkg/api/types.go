@@ -609,7 +609,7 @@ type EmptyDirVolumeSource struct {
 	// The default is nil which means that the directory can use all available local storage on the node.
 	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	// +optional
-	//	Size resource.Quantity
+	SizeLimit resource.Quantity
 }
 
 // StorageMedium defines ways that storage can be allocated to a volume.

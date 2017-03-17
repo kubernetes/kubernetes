@@ -696,7 +696,7 @@ type EmptyDirVolumeSource struct {
 	// The default is nil which means that the directory can use all available local storage on the node.
 	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	// +optional
-	// Size resource.Quantity `json:"size,omitempty" protobuf:"bytes,2,opt,name=Size"`
+	SizeLimit resource.Quantity `json:"size,omitempty" protobuf:"bytes,2,opt,name=size"`
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.
