@@ -1984,8 +1984,8 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">namespaces</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">namespaces specifies which namespaces the labelSelector applies to (matches against); nil list means "this pod&#8217;s namespace," empty list means "all namespaces" The json tag here is not "omitempty" since we need to distinguish nil and empty. See <a href="https://golang.org/pkg/encoding/json/#Marshal">https://golang.org/pkg/encoding/json/#Marshal</a> for more details.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means "this pod&#8217;s namespace"</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
