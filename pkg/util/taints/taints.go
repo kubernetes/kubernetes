@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// ParseTaint parses a taint from a string. Taint must be off the format '<key>=<value>:<effect>'.
+// ParseTaint parses a taint from a string. Taint must be of the format '<key>=<value>:<effect>'.
 func ParseTaint(st string) (v1.Taint, error) {
 	var taint v1.Taint
 	parts := strings.Split(st, "=")
