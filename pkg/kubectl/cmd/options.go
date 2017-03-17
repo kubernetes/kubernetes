@@ -17,8 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"io"
-
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	"k8s.io/kubernetes/pkg/util/i18n"
 
@@ -32,7 +30,7 @@ var (
 )
 
 // NewCmdOptions implements the options command
-func NewCmdOptions(out io.Writer) *cobra.Command {
+func NewCmdOptions() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "options",
 		Short:   i18n.T("Print the list of flags inherited by all commands"),
