@@ -103,20 +103,6 @@ func NewAttachDetachController(
 		cloud:      cloud,
 	}
 
-	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
-		AddFunc:    adc.podAdd,
-		UpdateFunc: adc.podUpdate,
-		DeleteFunc: adc.podDelete,
-	})
-	adc.podsSynced = podInformer.Informer().HasSynced
-
-	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
-		AddFunc:    adc.nodeAdd,
-		UpdateFunc: adc.nodeUpdate,
-		DeleteFunc: adc.nodeDelete,
-	})
-	adc.nodesSynced = nodeInformer.Informer().HasSynced
-
 	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
@@ -152,6 +138,20 @@ func NewAttachDetachController(
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
 		podInformer.Lister(),
 		adc.desiredStateOfWorld)
+
+	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+		AddFunc:    adc.podAdd,
+		UpdateFunc: adc.podUpdate,
+		DeleteFunc: adc.podDelete,
+	})
+	adc.podsSynced = podInformer.Informer().HasSynced
+
+	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+		AddFunc:    adc.nodeAdd,
+		UpdateFunc: adc.nodeUpdate,
+		DeleteFunc: adc.nodeDelete,
+	})
+	adc.nodesSynced = nodeInformer.Informer().HasSynced
 
 	return adc, nil
 }
