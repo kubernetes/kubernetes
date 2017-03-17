@@ -91,7 +91,7 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			if err := options.Complete(f, out, cmd, args); err != nil {
 				cmdutil.CheckErr(err)
 			}
-			if err := options.Validate(args); err != nil {
+			if err := options.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
 			if err := options.RunTaint(); err != nil {
@@ -249,7 +249,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 }
 
 // Validate checks to the TaintOptions to see if there is sufficient information run the command.
-func (o TaintOptions) Validate(args []string) error {
+func (o TaintOptions) Validate() error {
 	resourceType := strings.ToLower(o.resources[0])
 	validResources, isValidResource := append(kubectl.ResourceAliases([]string{"node"}), "node"), false
 	for _, validResource := range validResources {
