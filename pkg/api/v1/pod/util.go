@@ -176,7 +176,10 @@ func VisitPodSecretNames(pod *v1.Pod, visitor func(string) bool) bool {
 			if source.ScaleIO.SecretRef != nil && !visitor(source.ScaleIO.SecretRef.Name) {
 				return false
 			}
-
+		case source.ISCSI != nil:
+			if source.ISCSI.SecretRef != nil && !visitor(source.ISCSI.SecretRef.Name) {
+				return false
+			}
 		}
 	}
 	return true
