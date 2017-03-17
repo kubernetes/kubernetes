@@ -186,4 +186,12 @@ func TestWatch(t *testing.T) {
 	)
 }
 
+func TestGroupNames(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertGroupNames(t, storage, expected)
+}
+
 // TODO: Test generation number.

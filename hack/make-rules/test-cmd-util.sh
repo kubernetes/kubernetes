@@ -2957,6 +2957,16 @@ runTests() {
   ## test if a short name is exported during discovery
   kube::test::if_has_string "${output_message}" '{"name":"configmaps","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
 
+  #########################
+  # Assert group name     #
+  #########################
+
+  kube::log::status "Testing propagation of group names for resources"
+  output_message=$(kubectl get --raw=/api/v1)
+
+  ## test if a short name is exported during discovery
+  kube::test::if_has_string "${output_message}" '{"name":"pods","namespaced":true,"kind":"Pod","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"groupNames":\["all"\]}'
+
   ###########################
   # POD creation / deletion #
   ###########################

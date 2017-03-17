@@ -68,6 +68,14 @@ func (r *REST) ShortNames() []string {
 	return []string{"hpa"}
 }
 
+/// Implement GroupNamesProvider
+var _ rest.GroupNamesProvider = &REST{}
+
+// GroupNames implements the GroupNamesProvider interface. Returns a list of group names a resource is part of.
+func (r *REST) GroupNames() []string {
+	return []string{"all"}
+}
+
 // StatusREST implements the REST endpoint for changing the status of a daemonset
 type StatusREST struct {
 	store *genericregistry.Store

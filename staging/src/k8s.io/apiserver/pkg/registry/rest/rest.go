@@ -70,6 +70,12 @@ type ShortNamesProvider interface {
 	ShortNames() []string
 }
 
+// GroupNamesProvider allows a resource to specify which group names it's part of. Group names can be used by API clients
+// to refer to a batch of resources by using a single name (e.g. "all" could translate to "pod,rc,svc,...").
+type GroupNamesProvider interface {
+	GroupNames() []string
+}
+
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
 type Lister interface {
 	// NewList returns an empty object that can be used with the List call.

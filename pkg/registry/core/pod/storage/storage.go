@@ -113,6 +113,14 @@ func (r *REST) ShortNames() []string {
 	return []string{"po"}
 }
 
+// Implement GroupNamesProvider
+var _ rest.GroupNamesProvider = &REST{}
+
+// GroupNames implements the GroupNamesProvider interface. Returns a list of group names a resource is part of.
+func (r *REST) GroupNames() []string {
+	return []string{"all"}
+}
+
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
 type BindingREST struct {
 	store *genericregistry.Store
