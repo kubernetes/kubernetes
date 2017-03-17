@@ -77,7 +77,7 @@ func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Comma
 		Long:    "Forward one or more local ports to a pod.",
 		Example: portforward_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := opts.Complete(f, cmd, args, cmdOut, cmdErr); err != nil {
+			if err := opts.Complete(f, cmd, args); err != nil {
 				cmdutil.CheckErr(err)
 			}
 			if err := opts.Validate(); err != nil {
@@ -114,7 +114,7 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 }
 
 // Complete completes all the required options for port-forward cmd.
-func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, cmdOut io.Writer, cmdErr io.Writer) error {
+func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 	o.PodName = cmdutil.GetFlagString(cmd, "pod")
 	if len(o.PodName) == 0 && len(args) == 0 {

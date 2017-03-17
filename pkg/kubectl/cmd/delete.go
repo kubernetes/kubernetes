@@ -137,7 +137,7 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 			if err := options.Complete(f, out, errOut, args); err != nil {
 				cmdutil.CheckErr(err)
 			}
-			if err := options.Validate(f, cmd); err != nil {
+			if err := options.Validate(cmd); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
 			if err := options.RunDelete(); err != nil {
@@ -198,7 +198,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 	return nil
 }
 
-func (o *DeleteOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
 	if o.DeleteAll {
 		f := cmd.Flags().Lookup("ignore-not-found")
 		// The flag should never be missing

@@ -115,7 +115,7 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    fmt.Sprintf(label_long, validation.LabelValueMaxLength),
 		Example: label_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.Complete(f, out, cmd, args); err != nil {
+			if err := options.Complete(out, cmd, args); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
 			if err := options.Validate(); err != nil {
@@ -142,7 +142,7 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *LabelOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+func (o *LabelOptions) Complete(out io.Writer, cmd *cobra.Command, args []string) (err error) {
 	o.out = out
 	o.local = cmdutil.GetFlagBool(cmd, "local")
 	o.overwrite = cmdutil.GetFlagBool(cmd, "overwrite")

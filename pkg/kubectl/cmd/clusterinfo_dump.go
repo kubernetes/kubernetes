@@ -40,7 +40,7 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Long:    dumpLong,
 		Example: dumpExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(dumpClusterInfo(f, cmd, args, cmdOut))
+			cmdutil.CheckErr(dumpClusterInfo(f, cmd, cmdOut))
 		},
 	}
 	cmd.Flags().String("output-directory", "", i18n.T("Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"))
@@ -88,7 +88,7 @@ func setupOutputWriter(cmd *cobra.Command, defaultWriter io.Writer, filename str
 	return file
 }
 
-func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
 	timeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
 		return cmdutil.UsageError(cmd, err.Error())
