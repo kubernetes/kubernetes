@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -271,6 +272,12 @@ func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string
 	err = cninet.DelNetwork(netconf, rt)
 	if err != nil {
 		glog.Errorf("Error deleting network: %v", err)
+		if network.NetworkConfig.Network.Type == "flannel" {
+			subStr := "no such file or directory"
+			if strings.Contains(err.Error(), subStr) {
+				return nil
+			}
+		}
 		return err
 	}
 	return nil
