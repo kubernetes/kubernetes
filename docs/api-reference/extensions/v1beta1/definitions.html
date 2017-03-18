@@ -628,56 +628,56 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">currentNumberScheduled</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">CurrentNumberScheduled is the number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: <a href="http://releases.k8s.io/HEAD/docs/admin/daemons.md">http://releases.k8s.io/HEAD/docs/admin/daemons.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: <a href="http://releases.k8s.io/HEAD/docs/admin/daemons.md">http://releases.k8s.io/HEAD/docs/admin/daemons.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">numberMisscheduled</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: <a href="http://releases.k8s.io/HEAD/docs/admin/daemons.md">http://releases.k8s.io/HEAD/docs/admin/daemons.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: <a href="http://releases.k8s.io/HEAD/docs/admin/daemons.md">http://releases.k8s.io/HEAD/docs/admin/daemons.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">desiredNumberScheduled</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: <a href="http://releases.k8s.io/HEAD/docs/admin/daemons.md">http://releases.k8s.io/HEAD/docs/admin/daemons.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: <a href="http://releases.k8s.io/HEAD/docs/admin/daemons.md">http://releases.k8s.io/HEAD/docs/admin/daemons.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">numberReady</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">observedGeneration</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ObservedGeneration is the most recent generation observed by the daemon set controller.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The most recent generation observed by the daemon set controller.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">updatedNumberScheduled</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The total number of nodes that are running updated daemon pod</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">numberAvailable</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">NumberAvailable is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least minReadySeconds)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least spec.minReadySeconds)</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">numberUnavailable</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">NumberUnavailable is the number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least minReadySeconds)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least spec.minReadySeconds)</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1987,7 +1987,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">maxUnavailable</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2222,28 +2222,28 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">selector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: <a href="http://kubernetes.io/docs/user-guide/labels#label-selectors">http://kubernetes.io/docs/user-guide/labels#label-selectors</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: <a href="http://kubernetes.io/docs/user-guide/labels#label-selectors">http://kubernetes.io/docs/user-guide/labels#label-selectors</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_labelselector">v1.LabelSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">template</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template&#8217;s node selector (or on every node if no node selector is specified). More info: <a href="http://kubernetes.io/docs/user-guide/replication-controller#pod-template">http://kubernetes.io/docs/user-guide/replication-controller#pod-template</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template&#8217;s node selector (or on every node if no node selector is specified). More info: <a href="http://kubernetes.io/docs/user-guide/replication-controller#pod-template">http://kubernetes.io/docs/user-guide/replication-controller#pod-template</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_podtemplatespec">v1.PodTemplateSpec</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">updateStrategy</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">UpdateStrategy to replace existing DaemonSet pods with new pods.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">An update strategy to replace existing DaemonSet pods with new pods.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_daemonsetupdatestrategy">v1beta1.DaemonSetUpdateStrategy</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">minReadySeconds</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3375,7 +3375,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rollingUpdate</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rolling update config params. Present only if type = "RollingUpdate".</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_rollingupdatedaemonset">v1beta1.RollingUpdateDaemonSet</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3756,7 +3756,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Items is a list of daemon sets.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A list of daemon sets.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_daemonset">v1beta1.DaemonSet</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -6729,14 +6729,14 @@ Both these may change in the future. Incoming requests are matched against the h
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">spec</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Spec defines the desired behavior of this daemon set. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The desired behavior of this daemon set. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_daemonsetspec">v1beta1.DaemonSetSpec</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">status</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_daemonsetstatus">v1beta1.DaemonSetStatus</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -7903,7 +7903,7 @@ Both these may change in the future. Incoming requests are matched against the h
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-03-16 22:51:35 UTC
+Last updated 2017-03-17 21:32:50 UTC
 </div>
 </div>
 </body>
