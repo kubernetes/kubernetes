@@ -1,4 +1,4 @@
-This file has moved to: https://github.com/kubernetes/kubernetes/blob/master/docs/devel/local-cluster/docker.md
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/local-cluster/docker.md](https://github.com/kubernetes/community/blob/master/contributors/devel/local-cluster/docker.md)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
