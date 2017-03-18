@@ -81,9 +81,9 @@ KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(be
 #   KUBE_VERSION
 function set_binary_version() {
   if [[ "${1}" =~ "/" ]]; then
-    KUBE_VERSION=$(curl -fL "https://dl.k8s.io/${1}.txt")
+    export KUBE_VERSION=$(curl -fL "https://dl.k8s.io/${1}.txt")
   else
-    KUBE_VERSION=${1}
+    export KUBE_VERSION=${1}
   fi
 }
 
