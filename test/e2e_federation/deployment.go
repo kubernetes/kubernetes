@@ -36,8 +36,7 @@ import (
 )
 
 const (
-	FederationDeploymentName   = "federation-deployment"
-	FederatedDeploymentTimeout = 120 * time.Second
+	FederationDeploymentName = "federation-deployment"
 )
 
 // Create/delete deployment api objects
@@ -186,7 +185,7 @@ func waitForDeploymentOrFail(c *fedclientset.Clientset, namespace string, deploy
 }
 
 func waitForDeployment(c *fedclientset.Clientset, namespace string, deploymentName string, clusters map[string]*cluster) error {
-	err := wait.Poll(10*time.Second, FederatedDeploymentTimeout, func() (bool, error) {
+	err := wait.Poll(10*time.Second, federatedDeploymentTimeout, func() (bool, error) {
 		fdep, err := c.Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -260,7 +259,7 @@ func deleteDeploymentOrFail(clientset *fedclientset.Clientset, nsName string, de
 	}
 
 	// Wait for the deployment to be deleted.
-	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	err = wait.Poll(10*time.Second, federatedDeploymentTimeout, func() (bool, error) {
 		_, err := clientset.Extensions().Deployments(nsName).Get(deploymentName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
