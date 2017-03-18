@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -112,7 +113,7 @@ func ValidateDaemonSetSpecUpdate(newSpec, oldSpec *extensions.DaemonSetSpec, fld
 	}
 
 	// TemplateGeneration should be increased when and only when template is changed
-	templateUpdated := !reflect.DeepEqual(newSpec.Template, oldSpec.Template)
+	templateUpdated := !apiequality.Semantic.DeepEqual(newSpec.Template, oldSpec.Template)
 	if newSpec.TemplateGeneration == oldSpec.TemplateGeneration && templateUpdated {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("templateGeneration"), newSpec.TemplateGeneration, "must be incremented upon template update"))
 	} else if newSpec.TemplateGeneration > oldSpec.TemplateGeneration && !templateUpdated {
