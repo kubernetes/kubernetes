@@ -46,6 +46,7 @@ import (
 const (
 	MaxRetriesOnFederatedApiserver = 3
 	FederatedIngressTimeout        = 10 * time.Minute
+	FederatedIngressDeleteTimeout  = 2 * time.Minute
 	FederatedIngressName           = "federated-ingress"
 	FederatedIngressServiceName    = "federated-ingress-service"
 	FederatedIngressTLSSecretName  = "federated-ingress-tls-secret"
@@ -173,6 +174,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			nsName := f.FederationNamespace.Name
 			deleteAllIngressesOrFail(f.FederationClientset, nsName)
 			if secret != nil {
+				By("Deleting secret")
 				orphanDependents := false
 				deleteSecretOrFail(f.FederationClientset, ns, secret.Name, &orphanDependents)
 				secret = nil
@@ -180,7 +182,9 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				By("No secret to delete. Secret is nil")
 			}
 			if service != nil {
+				By("Deleting service")
 				deleteServiceOrFail(f.FederationClientset, ns, service.Name, nil)
+				By("Cleanup service shards and provider resources")
 				cleanupServiceShardsAndProviderResources(ns, service, clusters)
 				service = nil
 			} else {
@@ -229,11 +233,13 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				jig.ing = createIngressOrFail(f.FederationClientset, ns, service.Name, FederatedIngressTLSSecretName)
 				// wait for ingress objects sync
 				waitForIngressShardsOrFail(ns, jig.ing, clusters)
+				By(fmt.Sprintf("Ingress created as %v", jig.ing.Name))
 			})
 
 			AfterEach(func() {
 				deleteBackendPodsOrFail(clusters, ns)
 				if jig.ing != nil {
+					By(fmt.Sprintf("Deleting ingress %v on all clusters", jig.ing.Name))
 					deleteIngressOrFail(f.FederationClientset, ns, jig.ing.Name, nil)
 					for clusterName, cluster := range clusters {
 						deleteClusterIngressOrFail(clusterName, cluster.Clientset, ns, jig.ing.Name)
@@ -261,6 +267,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			})
 
 			It("should be able to connect to a federated ingress via its load balancer", func() {
+				By(fmt.Sprintf("Waiting for Federated Ingress on %v", jig.ing.Name))
 				// check the traffic on federation ingress
 				jig.waitForFederatedIngress()
 			})
@@ -387,7 +394,7 @@ func deleteIngressOrFail(clientset *fedclientset.Clientset, namespace string, in
 	err := clientset.Ingresses(namespace).Delete(ingressName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting ingress %q from namespace %q", ingressName, namespace)
 	// Wait for the ingress to be deleted.
-	err = wait.Poll(framework.Poll, wait.ForeverTestTimeout, func() (bool, error) {
+	err = wait.Poll(framework.Poll, FederatedIngressDeleteTimeout, func() (bool, error) {
 		_, err := clientset.Extensions().Ingresses(namespace).Get(ingressName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
