@@ -337,7 +337,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			g.Do("Required: []string{\"$.$\"},\n", strings.Join(required, "\",\""))
 		}
 		g.Do("},\n", nil)
-		if err := g.generateExtensions(t.CommentLines); err != nil {
+		if err := g.generateExtensionsWithoutTags(t.CommentLines); err != nil {
 			return err
 		}
 		g.Do("},\n", nil)
@@ -362,26 +362,68 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 	return nil
 }
 
-func (g openAPITypeWriter) generateExtensions(CommentLines []string) error {
+// getTagsMap extract the key-value pairs from openapi tags and struct tags returns a map[string]string
+func getTagsMap(CommentLines []string, tags string) (map[string]string, error) {
+	tagMap := make(map[string]string)
+
+	// Handle openapi tags
 	tagValues := getOpenAPITagValue(CommentLines)
-	anyExtension := false
 	for _, val := range tagValues {
 		if strings.HasPrefix(val, tagExtensionPrefix) {
-			if !anyExtension {
-				g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
-				anyExtension = true
-			}
 			parts := strings.SplitN(val, ":", 2)
 			if len(parts) != 2 {
-				return fmt.Errorf("Invalid extension value: %v", val)
+				return nil, fmt.Errorf("Invalid extension value: %v", val)
 			}
-			g.Do("\"$.$\": ", parts[0])
-			g.Do("\"$.$\",\n", parts[1])
+			tagMap[parts[0]] = parts[1]
 		}
 	}
-	if anyExtension {
-		g.Do("},\n},\n", nil)
+
+	// Handle struct tags
+	tagPairs := strings.Fields(tags)
+	for _, tagPair := range tagPairs {
+		parts := strings.SplitN(tagPair, ":", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("Invalid extension value: %v", tagPair)
+		}
+		switch parts[0] {
+		case "patchStrategy":
+			tagMap["x-kubernetes-patch-strategy"] = strings.Trim(parts[1], `"`)
+		case "patchMergeKey":
+			tagMap["x-kubernetes-patch-merge-key"] = strings.Trim(parts[1], `"`)
+		}
 	}
+
+	return tagMap, nil
+}
+
+func (g openAPITypeWriter) generateExtensionsWithoutTags(CommentLines []string) error {
+	tagsMap, err := getTagsMap(CommentLines, "")
+	if err != nil {
+		return err
+	}
+	return g.generateExtensions(tagsMap)
+}
+
+func (g openAPITypeWriter) generateExtensionsWithTags(CommentLines []string, tags string) error {
+	tagsMap, err := getTagsMap(CommentLines, tags)
+	if err != nil {
+		return err
+	}
+	return g.generateExtensions(tagsMap)
+}
+
+func (g openAPITypeWriter) generateExtensions(tagsMap map[string]string) error {
+	if len(tagsMap) == 0 {
+		return nil
+	}
+
+	g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
+	for key, val := range tagsMap {
+		g.Do("\"$.$\": ", key)
+		g.Do("\"$.$\",\n", val)
+	}
+	g.Do("},\n},\n", nil)
+
 	return nil
 }
 
@@ -434,7 +476,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member) error {
 		return nil
 	}
 	g.Do("\"$.$\": {\n", name)
-	if err := g.generateExtensions(m.CommentLines); err != nil {
+	if err := g.generateExtensionsWithTags(m.CommentLines, m.Tags); err != nil {
 		return err
 	}
 	g.Do("SchemaProps: spec.SchemaProps{\n", nil)
