@@ -294,7 +294,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 	//				GCE PD
 	///////////////////////////////////////////////////////////////////////
 	// Testing configurations of single a PV/PVC pair attached to a GCE PD
-	framework.KubeDescribe("PersistentVolumes:GCEPD", func() {
+	framework.KubeDescribe("PersistentVolumes:GCEPD[Flaky]", func() {
 
 		var (
 			diskName  string
