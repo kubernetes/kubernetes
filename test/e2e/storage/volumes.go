@@ -40,7 +40,7 @@ limitations under the License.
 // test/e2e/common/volumes.go duplicates the GlusterFS test from this file.  Any changes made to this
 // test should be made there as well.
 
-package e2e
+package storage
 
 import (
 	"os/exec"
