@@ -319,7 +319,9 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 		// "closer" to kubelet (from the deployment to the ReplicationController controller).
 		if !v1.IsPodReady(oldPod) && v1.IsPodReady(curPod) && rc.Spec.MinReadySeconds > 0 {
 			glog.V(2).Infof("ReplicationController %q will be enqueued after %ds for availability check", rc.Name, rc.Spec.MinReadySeconds)
-			rm.enqueueControllerAfter(rc, time.Duration(rc.Spec.MinReadySeconds)*time.Second)
+			// Add a second to avoid milliseconds skew in AddAfter.
+			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
+			rm.enqueueControllerAfter(rc, (time.Duration(rc.Spec.MinReadySeconds)*time.Second)+time.Second)
 		}
 		return
 	}
