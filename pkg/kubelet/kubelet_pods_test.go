@@ -187,7 +187,7 @@ func TestGenerateRunContainerOptions_DNSConfigurationParams(t *testing.T) {
 	options := make([]*kubecontainer.RunContainerOptions, 4)
 	for i, pod := range pods {
 		var err error
-		options[i], _, err = kubelet.GenerateRunContainerOptions(pod, &v1.Container{}, "")
+		options[i], _, err = kubelet.GenerateRunContainerOptions(pod, &v1.Container{}, "", "")
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -220,7 +220,7 @@ func TestGenerateRunContainerOptions_DNSConfigurationParams(t *testing.T) {
 	kubelet.resolverConfig = "/etc/resolv.conf"
 	for i, pod := range pods {
 		var err error
-		options[i], _, err = kubelet.GenerateRunContainerOptions(pod, &v1.Container{}, "")
+		options[i], _, err = kubelet.GenerateRunContainerOptions(pod, &v1.Container{}, "", "")
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -1152,13 +1152,11 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				ServiceAccountName: "special",
 				NodeName:           "node-name",
 			},
-			Status: v1.PodStatus{
-				HostIP: "5.6.7.8",
-			},
 		}
 		podIP := "1.2.3.4"
+		hostIP := "5.6.7.8"
 
-		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP)
+		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP, hostIP)
 		select {
 		case e := <-fakeRecorder.Events:
 			assert.Equal(t, tc.expectedEvent, e)

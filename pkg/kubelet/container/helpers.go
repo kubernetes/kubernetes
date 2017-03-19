@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"hash/adler32"
 	"hash/fnv"
+	"net"
 	"strings"
 	"time"
 
@@ -46,9 +47,9 @@ type HandlerRunner interface {
 }
 
 // RuntimeHelper wraps kubelet to make container runtime
-// able to get necessary informations like the RunContainerOptions, DNS settings.
+// able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (contOpts *RunContainerOptions, useClusterFirstPolicy bool, err error)
+	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP, hostIP string) (contOpts *RunContainerOptions, useClusterFirstPolicy bool, err error)
 	GetClusterDNS(pod *v1.Pod) (dnsServers []string, dnsSearches []string, useClusterFirstPolicy bool, err error)
 	// GetPodCgroupParent returns the the CgroupName identifer, and its literal cgroupfs form on the host
 	// of a pod.
@@ -59,6 +60,8 @@ type RuntimeHelper interface {
 	// supplemental groups for the Pod. These extra supplemental groups come
 	// from annotations on persistent volumes that the pod depends on.
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
+
+	GetHostIP() (net.IP, error)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
