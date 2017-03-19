@@ -28,7 +28,7 @@ const (
 	DefaultServicesSubnet    = "10.96.0.0/12"
 	DefaultKubernetesVersion = "latest-1.6"
 	// This is only for clusters without internet, were the latest stable version can't be determined
-	DefaultKubernetesFallbackVersion = "v1.6.0-beta.1"
+	DefaultKubernetesFallbackVersion = "v1.6.0"
 	DefaultAPIBindPort               = 6443
 	DefaultDiscoveryBindPort         = 9898
 	DefaultAuthorizationMode         = "RBAC"
@@ -46,7 +46,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	if obj.KubernetesVersion == "" {
-		obj.KubernetesVersion = DefaultKubernetesVersion
+		obj.KubernetesVersion = DefaultKubernetesFallbackVersion
 	}
 
 	if obj.API.BindPort == 0 {
