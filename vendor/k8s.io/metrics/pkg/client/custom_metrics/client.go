@@ -102,54 +102,35 @@ type rootScopedMetrics struct {
 	client *customMetricsClient
 }
 
-func (m *rootScopedMetrics) getForNamespace(namespace string, metricName string) (*v1alpha1.MetricValue, error) {
-	res := &v1alpha1.MetricValueList{}
-	err := m.client.client.Get().
-		Resource("metrics").
-		Namespace(namespace).
-		Name(metricName).
-		Do().
-		Into(res)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if len(res.Items) != 1 {
-		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one", len(res.Items))
-	}
-
-	return &res.Items[0], nil
-}
-
 func (m *rootScopedMetrics) GetForObject(groupKind schema.GroupKind, name string, metricName string) (*v1alpha1.MetricValue, error) {
+	var req *rest.Request
+	res := &v1alpha1.MetricValue{}
 	// handle namespace separately
 	if groupKind.Kind == "Namespace" && groupKind.Group == "" {
-		return m.getForNamespace(name, metricName)
-	}
+		req = m.client.client.Get().
+			Resource("metrics").
+			Namespace(name).
+			Name(metricName)
+	} else {
+		resourceName, err := m.client.qualResourceForKind(groupKind)
+		if err != nil {
+			return nil, err
+		}
 
-	resourceName, err := m.client.qualResourceForKind(groupKind)
+		req = m.client.client.Get().
+			Resource(resourceName).
+			Name(name).
+			SubResource(metricName)
+	}
+	err := req.Do().Into(res)
 	if err != nil {
 		return nil, err
 	}
-
-	res := &v1alpha1.MetricValueList{}
-	err = m.client.client.Get().
-		Resource(resourceName).
-		Name(name).
-		SubResource(metricName).
-		Do().
-		Into(res)
-
-	if err != nil {
-		return nil, err
+	if res == nil {
+		return nil, fmt.Errorf("the custom metrics API server didn't return a result on query: %s", req.URL())
 	}
 
-	if len(res.Items) != 1 {
-		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one", len(res.Items))
-	}
-
-	return &res.Items[0], nil
+	return res, nil
 }
 
 func (m *rootScopedMetrics) GetForObjects(groupKind schema.GroupKind, selector labels.Selector, metricName string) (*v1alpha1.MetricValueList, error) {
@@ -190,24 +171,21 @@ func (m *namespacedMetrics) GetForObject(groupKind schema.GroupKind, name string
 		return nil, err
 	}
 
-	res := &v1alpha1.MetricValueList{}
-	err = m.client.client.Get().
+	res := &v1alpha1.MetricValue{}
+	req := m.client.client.Get().
 		Resource(resourceName).
 		Namespace(m.namespace).
 		Name(name).
-		SubResource(metricName).
-		Do().
-		Into(res)
+		SubResource(metricName)
 
+	err = req.Do().Into(res)
 	if err != nil {
 		return nil, err
 	}
-
-	if len(res.Items) != 1 {
-		return nil, fmt.Errorf("the custom metrics API server returned %v results when we asked for exactly one")
+	if res == nil {
+		return nil, fmt.Errorf("the custom metrics API server didn't return a result on query: %s", req.URL())
 	}
-
-	return &res.Items[0], nil
+	return res, nil
 }
 
 func (m *namespacedMetrics) GetForObjects(groupKind schema.GroupKind, selector labels.Selector, metricName string) (*v1alpha1.MetricValueList, error) {
