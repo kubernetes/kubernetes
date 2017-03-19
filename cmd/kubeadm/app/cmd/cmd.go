@@ -56,7 +56,7 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			    ┌──────────────────────────────────────────────────────────┐
 			    │ On the second machine                                    │
 			    ├──────────────────────────────────────────────────────────┤
-			    │ node# kubeadm join --token=<token> <ip-of-master>        │
+			    │ node# kubeadm join --token=<token> <ip-of-master>:<port> │
 			    └──────────────────────────────────────────────────────────┘
 
 			    You can then repeat the second step on as many other machines as you like.
