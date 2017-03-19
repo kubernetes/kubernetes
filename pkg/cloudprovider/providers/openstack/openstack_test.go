@@ -17,15 +17,16 @@ limitations under the License.
 package openstack
 
 import (
+	"fmt"
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -81,8 +82,10 @@ func TestReadConfig(t *testing.T) {
  monitor-timeout = 30s
  monitor-max-retries = 3
  [BlockStorage]
- trust-device-path = yes
+ auto-allow-supported = false
  bs-version = auto
+ trust-device-path = yes
+
  `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -108,6 +111,9 @@ func TestReadConfig(t *testing.T) {
 	}
 	if cfg.BlockStorage.BSVersion != "auto" {
 		t.Errorf("incorrect bs.bs-version: %v", cfg.BlockStorage.BSVersion)
+	}
+	if cfg.BlockStorage.AllowAutoSupported != false {
+		t.Errorf("incorrect bs.auto-allow-supported: %v", cfg.BlockStorage.AllowAutoSupported)
 	}
 }
 
@@ -388,4 +394,48 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) deleted\n", vol)
 
+}
+
+func TestCinderAutoDetectApiVersion(t *testing.T) {
+	updated := "" // not relevant to this test, can be set to any value
+	status_current := "CURRENT"
+	status_supported := "SUPPORTED"
+	status_deprecated := "DEPRECATED"
+
+	var result_version, api_version [4]string
+
+	for ver := 0; ver <= 3; ver++ {
+		api_version[ver] = fmt.Sprintf("v%d.0", ver)
+		result_version[ver] = fmt.Sprintf("v%d", ver)
+	}
+	result_version[0] = ""
+	api_current_v1 := apiversions.APIVersion{api_version[1], status_current, updated}
+	api_current_v2 := apiversions.APIVersion{api_version[2], status_current, updated}
+	api_current_v3 := apiversions.APIVersion{api_version[3], status_current, updated}
+
+	api_supported_v1 := apiversions.APIVersion{api_version[1], status_supported, updated}
+	api_supported_v2 := apiversions.APIVersion{api_version[2], status_supported, updated}
+
+	api_deprecated_v1 := apiversions.APIVersion{api_version[1], status_deprecated, updated}
+	api_deprecated_v2 := apiversions.APIVersion{api_version[2], status_deprecated, updated}
+
+	var testCases = []struct {
+		test_case       []apiversions.APIVersion
+		allow_supported bool
+		wanted_result   string
+	}{
+		{[]apiversions.APIVersion{api_supported_v1, api_current_v2}, false, result_version[2]},                    // current always selected
+		{[]apiversions.APIVersion{api_current_v1, api_supported_v2}, false, result_version[1]},                    // current always selected
+		{[]apiversions.APIVersion{api_current_v1, api_supported_v2}, true, result_version[1]},                     // prioritize current
+		{[]apiversions.APIVersion{api_current_v3, api_supported_v2, api_deprecated_v1}, false, result_version[0]}, // with current v3, no fallback
+		{[]apiversions.APIVersion{api_current_v3, api_supported_v2, api_deprecated_v1}, true, result_version[2]},  // with current v3, but should fall back to v2
+		{[]apiversions.APIVersion{api_current_v3, api_supported_v2, api_supported_v1}, true, result_version[2]},   // with current v3, but should fall back to v2, not v1
+		{[]apiversions.APIVersion{api_current_v3, api_deprecated_v2, api_deprecated_v1}, true, result_version[0]}, // v3 is not supported
+	}
+
+	for _, suite := range testCases {
+		if autodetectedVersion := doBsApiVersionAutodetect(suite.test_case, suite.allow_supported); autodetectedVersion != suite.wanted_result {
+			t.Fatalf("Autodetect for suite: %s, allow supported version: %v, failed with result: '%s', wanted '%s'", suite.test_case, suite.allow_supported, autodetectedVersion, suite.wanted_result)
+		}
+	}
 }
