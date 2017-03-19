@@ -153,7 +153,7 @@ type Disks interface {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return NewGCECloud(config) })
 }
 
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
@@ -259,8 +259,14 @@ func getZonesForRegion(svc *compute.Service, projectID, region string) ([]string
 	return zones, nil
 }
 
-// newGCECloud creates a new instance of GCECloud.
-func newGCECloud(config io.Reader) (*GCECloud, error) {
+// NewGCECloud creates a new instance of GCECloud.
+//
+// Warning: invoking this method directly in non-GCE environments is not
+// guaranteed to throw an error. Clients that are not aware of which
+// cloudprovider they're running on should invoke GetCloudProvider instead.
+// That works better because we initialize a map of known cloud providers
+// at import time, so eg: on AWS the map won't contain the GCE provider.
+func NewGCECloud(config io.Reader) (*GCECloud, error) {
 	projectID, zone, err := getProjectAndZone()
 	if err != nil {
 		return nil, err
