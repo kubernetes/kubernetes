@@ -1743,7 +1743,7 @@ func (dm *DockerManager) applyOOMScoreAdj(pod *v1.Pod, container *v1.Container, 
 
 // Run a single container from a pod. Returns the docker container ID
 // If do not need to pass labels, just pass nil.
-func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container, netMode, ipcMode, pidMode, podIP, imageRef string, restartCount int) (kubecontainer.ContainerID, error) {
+func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container, netMode, ipcMode, pidMode, podIP, hostIP, imageRef string, restartCount int) (kubecontainer.ContainerID, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("runContainerInPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1756,7 +1756,7 @@ func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container,
 		glog.V(5).Infof("Generating ref for container %s: %#v", container.Name, ref)
 	}
 
-	opts, useClusterFirstPolicy, err := dm.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
+	opts, useClusterFirstPolicy, err := dm.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP, hostIP)
 	if err != nil {
 		return kubecontainer.ContainerID{}, fmt.Errorf("GenerateRunContainerOptions: %v", err)
 	}
@@ -1993,7 +1993,8 @@ func (dm *DockerManager) createPodInfraContainer(pod *v1.Pod) (kubecontainer.Doc
 	}
 
 	// Currently we don't care about restart count of infra container, just set it to 0.
-	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), "", imageRef, 0)
+	// We also don't care about podIP and hostIP since their only passed in during runtime because of downward API
+	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), "", "", imageRef, 0)
 	if err != nil {
 		return "", kubecontainer.ErrRunContainer, err.Error()
 	}
@@ -2269,6 +2270,12 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		podIP = podStatus.IP
 	}
 
+	rawHostIP, err := dm.runtimeHelper.GetHostIP()
+	hostIP := rawHostIP.String()
+	if err != nil {
+		glog.Errorf("Failed to get Host IP for pod: %s; %v", format.Pod(pod), err)
+	}
+
 	// If we should create infra container then we do it first.
 	podInfraContainerID := containerChanges.InfraContainerId
 	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
@@ -2369,7 +2376,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		}
 
 		glog.V(4).Infof("Creating init container %+v in pod %v", container, format.Pod(pod))
-		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
+		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP, hostIP); err != nil {
 			startContainerResult.Fail(err, msg)
 			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
 			return
@@ -2407,7 +2414,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		}
 
 		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
-		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
+		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP, hostIP); err != nil {
 			startContainerResult.Fail(err, msg)
 			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
 			continue
@@ -2418,7 +2425,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 
 // tryContainerStart attempts to pull and start the container, returning an error and a reason string if the start
 // was not successful.
-func (dm *DockerManager) tryContainerStart(container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, namespaceMode, pidMode, podIP string) (err error, reason string) {
+func (dm *DockerManager) tryContainerStart(container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, namespaceMode, pidMode, podIP, hostIP string) (err error, reason string) {
 	imageRef, msg, err := dm.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
 		return err, msg
@@ -2445,7 +2452,7 @@ func (dm *DockerManager) tryContainerStart(container *v1.Container, pod *v1.Pod,
 		netMode = namespaceMode
 	}
 
-	_, err = dm.runContainerInPod(pod, container, netMode, namespaceMode, pidMode, podIP, imageRef, restartCount)
+	_, err = dm.runContainerInPod(pod, container, netMode, namespaceMode, pidMode, podIP, hostIP, imageRef, restartCount)
 	if err != nil {
 		// TODO(bburns) : Perhaps blacklist a container after N failures?
 		return kubecontainer.ErrRunContainer, err.Error()

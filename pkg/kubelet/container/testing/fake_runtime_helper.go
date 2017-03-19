@@ -17,6 +17,8 @@ limitations under the License.
 package testing
 
 import (
+	"net"
+
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -32,7 +34,7 @@ type FakeRuntimeHelper struct {
 	Err             error
 }
 
-func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
+func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP, hostIP string) (*kubecontainer.RunContainerOptions, bool, error) {
 	var opts kubecontainer.RunContainerOptions
 	if len(container.TerminationMessagePath) != 0 {
 		opts.PodContainerDir = f.PodContainerDir
@@ -59,4 +61,8 @@ func (f *FakeRuntimeHelper) GetPodDir(podUID kubetypes.UID) string {
 
 func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	return nil
+}
+
+func (f *FakeRuntimeHelper) GetHostIP() (net.IP, error) {
+	return []byte{}, nil
 }
