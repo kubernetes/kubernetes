@@ -19872,6 +19872,11 @@
      "topologyKey": {
       "type": "string",
       "description": "This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. For PreferredDuringScheduling pod anti-affinity, empty topologyKey is interpreted as \"all topologies\" (\"all topologies\" here means all the topologyKeys indicated by scheduler command-line argument --failure-domains); for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed."
+     },
+     "minMatchingPods": {
+      "type": "integer",
+      "format": "int32",
+      "description": "MinMatchingPods specifies the minimal number of pod that matching the selector; the term is considered to be matched if and only if the matching number is larger than minMatchingPods. The default value is 1. Only available for hard pod anti-affinity (RequiredDuringSchedulingIgnoredDuringExecution)."
      }
     }
    },

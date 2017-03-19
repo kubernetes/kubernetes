@@ -39823,6 +39823,11 @@
       "description": "A label query over a set of resources, in this case pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
+     "minMatchingPods": {
+      "description": "MinMatchingPods specifies the minimal number of pod that matching the selector; the term is considered to be matched if and only if the matching number is larger than minMatchingPods. The default value is 1. Only available for hard pod anti-affinity (RequiredDuringSchedulingIgnoredDuringExecution).",
+      "type": "integer",
+      "format": "int32"
+     },
      "namespaces": {
       "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\"",
       "type": "array",
