@@ -17,7 +17,17 @@ limitations under the License.
 package common
 
 import (
+	"fmt"
+	"os/exec"
+	"regexp"
+	"time"
+
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
+
 	"k8s.io/apimachinery/pkg/util/sets"
+	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 type Suite string
@@ -49,3 +59,50 @@ var CommonImageWhiteList = sets.NewString(
 	"gcr.io/google_containers/volume-nfs:0.8",
 	"gcr.io/google_containers/volume-gluster:0.2",
 )
+
+// TODO: This is a temporary home, it needs to find a clean landing location
+func GroupSize(group string) (int, error) {
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
+		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
+		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
+		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
+			"list-instances", group, "--project="+framework.TestContext.CloudConfig.ProjectID,
+			"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
+		if err != nil {
+			return -1, err
+		}
+		re := regexp.MustCompile("RUNNING")
+		return len(re.FindAllString(string(output), -1)), nil
+	} else if framework.TestContext.Provider == "aws" {
+		client := autoscaling.New(session.New())
+		instanceGroup, err := awscloud.DescribeInstanceGroup(client, group)
+		if err != nil {
+			return -1, fmt.Errorf("error describing instance group: %v", err)
+		}
+		if instanceGroup == nil {
+			return -1, fmt.Errorf("instance group not found: %s", group)
+		}
+		return instanceGroup.CurrentSize()
+	} else {
+		return -1, fmt.Errorf("provider does not support InstanceGroups")
+	}
+}
+
+// TODO: This is a temporary home, it needs to find a clean landing location
+func WaitForGroupSize(group string, size int32) error {
+	timeout := 30 * time.Minute
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
+		currentSize, err := GroupSize(group)
+		if err != nil {
+			framework.Logf("Failed to get node instance group size: %v", err)
+			continue
+		}
+		if currentSize != int(size) {
+			framework.Logf("Waiting for node instance group size %d, current size %d", size, currentSize)
+			continue
+		}
+		framework.Logf("Node instance group has reached the desired size %d", size)
+		return nil
+	}
+	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)
+}

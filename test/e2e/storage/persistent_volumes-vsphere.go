@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package storage
 
 import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -119,7 +119,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		2. Delete PV
 		3. Delete Volume (vmdk)
 	*/
-	AddCleanupAction(func() {
+	framework.AddCleanupAction(func() {
 		if len(volumePath) > 0 {
 			waitForVSphereDiskToDetach(vsp, volumePath, node)
 			vsp.DeleteVolume(volumePath)

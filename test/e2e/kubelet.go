@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage"
+
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -128,21 +130,6 @@ func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRem
 		}
 		Expect(err).NotTo(HaveOccurred())
 	}
-}
-
-// Calls startVolumeServer to create and run a nfs-server pod. Returns server pod and its
-// ip address.
-// Note: startVolumeServer() waits for the nfs-server pod to be Running and sleeps some
-//   so that the nfs server can start up.
-func createNfsServerPod(c clientset.Interface, config VolumeTestConfig) (*v1.Pod, string) {
-
-	pod := startVolumeServer(c, config)
-	Expect(pod).NotTo(BeNil())
-	ip := pod.Status.PodIP
-	Expect(len(ip)).NotTo(BeZero())
-	framework.Logf("NFS server IP address: %v", ip)
-
-	return pod, ip
 }
 
 // Creates a pod that mounts an nfs volume that is served by the nfs-server pod. The container
@@ -387,7 +374,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			var (
 				nfsServerPod *v1.Pod
 				nfsIP        string
-				NFSconfig    VolumeTestConfig
+				NFSconfig    storage.VolumeTestConfig
 				pod          *v1.Pod // client pod
 			)
 
@@ -404,14 +391,14 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			}
 
 			BeforeEach(func() {
-				NFSconfig = VolumeTestConfig{
-					namespace:   ns,
-					prefix:      "nfs",
-					serverImage: NfsServerImage,
-					serverPorts: []int{2049},
-					serverArgs:  []string{"-G", "777", "/exports"},
+				NFSconfig = storage.VolumeTestConfig{
+					Namespace:   ns,
+					Prefix:      "nfs",
+					ServerImage: storage.NfsServerImage,
+					ServerPorts: []int{2049},
+					ServerArgs:  []string{"-G", "777", "/exports"},
 				}
-				nfsServerPod, nfsIP = createNfsServerPod(c, NFSconfig)
+				nfsServerPod, nfsIP = storage.CreateNfsServerPod(c, NFSconfig)
 			})
 
 			AfterEach(func() {
@@ -439,7 +426,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 					checkPodCleanup(c, pod, false)
 
 					By("Recreate the nfs server pod")
-					nfsServerPod, nfsIP = createNfsServerPod(c, NFSconfig)
+					nfsServerPod, nfsIP = storage.CreateNfsServerPod(c, NFSconfig)
 					By("Verify host running the deleted pod is now cleaned up")
 					// expect the pod's host to be cleaned up
 					checkPodCleanup(c, pod, true)

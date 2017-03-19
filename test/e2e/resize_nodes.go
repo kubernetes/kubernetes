@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -88,51 +89,6 @@ func GetGroupNodes(group string) ([]string, error) {
 	} else {
 		return nil, fmt.Errorf("provider does not support InstanceGroups")
 	}
-}
-
-func GroupSize(group string) (int, error) {
-	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
-		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
-		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
-		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
-			"list-instances", group, "--project="+framework.TestContext.CloudConfig.ProjectID,
-			"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
-		if err != nil {
-			return -1, err
-		}
-		re := regexp.MustCompile("RUNNING")
-		return len(re.FindAllString(string(output), -1)), nil
-	} else if framework.TestContext.Provider == "aws" {
-		client := autoscaling.New(session.New())
-		instanceGroup, err := awscloud.DescribeInstanceGroup(client, group)
-		if err != nil {
-			return -1, fmt.Errorf("error describing instance group: %v", err)
-		}
-		if instanceGroup == nil {
-			return -1, fmt.Errorf("instance group not found: %s", group)
-		}
-		return instanceGroup.CurrentSize()
-	} else {
-		return -1, fmt.Errorf("provider does not support InstanceGroups")
-	}
-}
-
-func WaitForGroupSize(group string, size int32) error {
-	timeout := 30 * time.Minute
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		currentSize, err := GroupSize(group)
-		if err != nil {
-			framework.Logf("Failed to get node instance group size: %v", err)
-			continue
-		}
-		if currentSize != int(size) {
-			framework.Logf("Waiting for node instance group size %d, current size %d", size, currentSize)
-			continue
-		}
-		framework.Logf("Node instance group has reached the desired size %d", size)
-		return nil
-	}
-	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)
 }
 
 func svcByName(name string, port int) *v1.Service {
@@ -228,7 +184,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 				By("waiting 5 minutes for all dead tunnels to be dropped")
 				time.Sleep(5 * time.Minute)
 			}
-			if err := WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+			if err := common.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			if err := framework.WaitForClusterSize(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
@@ -255,7 +211,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			By(fmt.Sprintf("decreasing cluster size to %d", replicas-1))
 			err = ResizeGroup(group, replicas-1)
 			Expect(err).NotTo(HaveOccurred())
-			err = WaitForGroupSize(group, replicas-1)
+			err = common.WaitForGroupSize(group, replicas-1)
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForClusterSize(c, int(replicas-1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
@@ -283,7 +239,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			By(fmt.Sprintf("increasing cluster size to %d", replicas+1))
 			err = ResizeGroup(group, replicas+1)
 			Expect(err).NotTo(HaveOccurred())
-			err = WaitForGroupSize(group, replicas+1)
+			err = common.WaitForGroupSize(group, replicas+1)
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForClusterSize(c, int(replicas+1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())

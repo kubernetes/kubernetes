@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package storage
 
 import (
 	"fmt"
@@ -89,11 +89,11 @@ func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig framework.
 // commonly used by persistent volume testing
 func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
 	return startVolumeServer(c, VolumeTestConfig{
-		namespace:   ns,
-		prefix:      "nfs",
-		serverImage: NfsServerImage,
-		serverPorts: []int{2049},
-		serverArgs:  []string{"-G", "777", "/exports"},
+		Namespace:   ns,
+		Prefix:      "nfs",
+		ServerImage: NfsServerImage,
+		ServerPorts: []int{2049},
+		ServerArgs:  []string{"-G", "777", "/exports"},
 	})
 }
 
@@ -340,7 +340,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			node, clientPod, pvc, pv = "", nil, nil, nil
 		})
 
-		AddCleanupAction(func() {
+		framework.AddCleanupAction(func() {
 			if len(diskName) > 0 {
 				framework.DeletePDWithRetry(diskName)
 			}

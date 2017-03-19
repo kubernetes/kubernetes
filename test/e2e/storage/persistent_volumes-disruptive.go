@@ -18,7 +18,7 @@ limitations under the License.
 // persistent_volumes.go
 // volumes.go
 
-package e2e
+package storage
 
 import (
 	"fmt"

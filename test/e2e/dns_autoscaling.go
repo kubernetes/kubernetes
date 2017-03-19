@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -119,7 +120,7 @@ var _ = framework.KubeDescribe("DNS horizontal autoscaling", func() {
 		originalSizes := make(map[string]int)
 		sum := 0
 		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
-			size, err := GroupSize(mig)
+			size, err := common.GroupSize(mig)
 			Expect(err).NotTo(HaveOccurred())
 			By(fmt.Sprintf("Initial size of %s: %d", mig, size))
 			originalSizes[mig] = size
