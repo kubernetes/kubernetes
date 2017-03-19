@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	It("should provide pod IP as an env var [Conformance]", func() {
+	It("should provide pod and host IP as an env var [Conformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{

@@ -607,7 +607,7 @@ func setApp(imgManifest *appcschema.ImageManifest, c *v1.Container,
 }
 
 // makePodManifest transforms a kubelet pod spec to the rkt pod manifest.
-func (r *Runtime) makePodManifest(pod *v1.Pod, podIP string, pullSecrets []v1.Secret) (*appcschema.PodManifest, error) {
+func (r *Runtime) makePodManifest(pod *v1.Pod, podIP, hostIP string, pullSecrets []v1.Secret) (*appcschema.PodManifest, error) {
 	manifest := appcschema.BlankPodManifest()
 
 	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
@@ -654,7 +654,7 @@ func (r *Runtime) makePodManifest(pod *v1.Pod, podIP string, pullSecrets []v1.Se
 	}
 
 	for _, c := range pod.Spec.Containers {
-		err := r.newAppcRuntimeApp(pod, podIP, c, requiresPrivileged, pullSecrets, manifest)
+		err := r.newAppcRuntimeApp(pod, podIP, hostIP, c, requiresPrivileged, pullSecrets, manifest)
 		if err != nil {
 			return nil, err
 		}
@@ -776,7 +776,7 @@ func (r *Runtime) makeContainerLogMount(opts *kubecontainer.RunContainerOptions,
 	return &mnt, nil
 }
 
-func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, requiresPrivileged bool, pullSecrets []v1.Secret, manifest *appcschema.PodManifest) error {
+func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP, hostIP string, c v1.Container, requiresPrivileged bool, pullSecrets []v1.Secret, manifest *appcschema.PodManifest) error {
 	var annotations appctypes.Annotations = []appctypes.Annotation{
 		{
 			Name:  *appctypes.MustACIdentifier(k8sRktContainerHashAnno),
@@ -810,7 +810,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 	}
 
 	// TODO: determine how this should be handled for rkt
-	opts, _, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
+	opts, _, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP, hostIP)
 	if err != nil {
 		return err
 	}
@@ -1135,9 +1135,9 @@ func constructSyslogIdentifier(generateName string, podName string) string {
 //
 // On success, it will return a string that represents name of the unit file
 // and the runtime pod.
-func (r *Runtime) preparePod(pod *v1.Pod, podIP string, pullSecrets []v1.Secret, netnsName string) (string, *kubecontainer.Pod, error) {
+func (r *Runtime) preparePod(pod *v1.Pod, podIP, hostIP string, pullSecrets []v1.Secret, netnsName string) (string, *kubecontainer.Pod, error) {
 	// Generate the appc pod manifest from the k8s pod spec.
-	manifest, err := r.makePodManifest(pod, podIP, pullSecrets)
+	manifest, err := r.makePodManifest(pod, podIP, hostIP, pullSecrets)
 	if err != nil {
 		return "", nil, err
 	}
@@ -1329,7 +1329,13 @@ func (r *Runtime) RunPod(pod *v1.Pod, pullSecrets []v1.Secret) error {
 		return err
 	}
 
-	name, runtimePod, prepareErr := r.preparePod(pod, podIP, pullSecrets, netnsName)
+	rawHostIP, err := r.runtimeHelper.GetHostIP()
+	hostIP := rawHostIP.String()
+	if err != nil {
+		glog.Errorf("Failed to get Host IP for pod: %s; %v", format.Pod(pod), err)
+	}
+
+	name, runtimePod, prepareErr := r.preparePod(pod, podIP, hostIP, pullSecrets, netnsName)
 
 	// Set container references and generate events.
 	// If preparedPod fails, then send out 'failed' events for each container.

@@ -1902,7 +1902,7 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 	for i, testCase := range testCases {
 		hint := fmt.Sprintf("case #%d", i)
 
-		result, err := r.makePodManifest(testCase.in, "", []v1.Secret{})
+		result, err := r.makePodManifest(testCase.in, "", "", []v1.Secret{})
 		assert.Equal(t, testCase.outerr, err, hint)
 		if err == nil {
 			sort.Sort(annotationsByName(result.Annotations))
