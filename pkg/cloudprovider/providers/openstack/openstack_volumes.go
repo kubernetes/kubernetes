@@ -85,7 +85,10 @@ func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, error) {
 	}
 
 	vol, err := volumes_v1.Create(volumes.blockstorage, create_opts).Extract()
-	return vol.ID, err
+	if err != nil {
+		return "", err
+	}
+	return vol.ID, nil
 }
 
 func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, error) {
@@ -99,7 +102,10 @@ func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, error) {
 	}
 
 	vol, err := volumes_v2.Create(volumes.blockstorage, create_opts).Extract()
-	return vol.ID, err
+	if err != nil {
+		return "", err
+	}
+	return vol.ID, nil
 }
 
 func (volumes *VolumesV1) getVolume(diskName string) (Volume, error) {
@@ -137,7 +143,7 @@ func (volumes *VolumesV1) getVolume(diskName string) (Volume, error) {
 		volume.AttachedDevice = volume_v1.Attachments[0]["device"].(string)
 	}
 
-	return volume, err
+	return volume, nil
 }
 
 func (volumes *VolumesV2) getVolume(diskName string) (Volume, error) {
@@ -175,7 +181,7 @@ func (volumes *VolumesV2) getVolume(diskName string) (Volume, error) {
 		volume.AttachedDevice = volume_v2.Attachments[0].Device
 	}
 
-	return volume, err
+	return volume, nil
 }
 
 func (volumes *VolumesV1) deleteVolume(volumeName string) error {
@@ -267,7 +273,7 @@ func (os *OpenStack) DetachDisk(instanceID string, partialDiskId string) error {
 // Takes a partial/full disk id or diskname
 func (os *OpenStack) getVolume(diskName string) (Volume, error) {
 
-	volumes, err := os.volumeService()
+	volumes, err := os.volumeService("")
 	if err != nil || volumes == nil {
 		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
 		return Volume{}, err
@@ -279,7 +285,7 @@ func (os *OpenStack) getVolume(diskName string) (Volume, error) {
 // Create a volume of given size (in GiB)
 func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error) {
 
-	volumes, err := os.volumeService()
+	volumes, err := os.volumeService("")
 	if err != nil || volumes == nil {
 		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
 		return "", err
@@ -301,7 +307,7 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 	}
 
 	glog.Infof("Created volume %v", volume_id)
-	return volume_id, err
+	return volume_id, nil
 }
 
 // GetDevicePath returns the path of an attached block storage volume, specified by its id.
@@ -339,7 +345,7 @@ func (os *OpenStack) DeleteVolume(volumeName string) error {
 		return k8s_volume.NewDeletedVolumeInUseError(msg)
 	}
 
-	volumes, err := os.volumeService()
+	volumes, err := os.volumeService("")
 	if err != nil || volumes == nil {
 		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
 		return err
@@ -349,7 +355,7 @@ func (os *OpenStack) DeleteVolume(volumeName string) error {
 	if err != nil {
 		glog.Errorf("Cannot delete volume %s: %v", volumeName, err)
 	}
-	return err
+	return nil
 
 }
 

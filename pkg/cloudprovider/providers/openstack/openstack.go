@@ -91,8 +91,9 @@ type LoadBalancerOpts struct {
 }
 
 type BlockStorageOpts struct {
-	BSVersion       string `gcfg:"bs-version"`        // overrides autodetection. v1 or v2. Defaults to auto
-	TrustDevicePath bool   `gcfg:"trust-device-path"` // See Issue #33128
+	AllowAutoSupported bool   `gcfg:"auto-allow-supported"` // Allow autodetection to fall back to SUPPORTED api versions
+	BSVersion          string `gcfg:"bs-version"`           // overrides autodetection. v1 or v2. Defaults to auto
+	TrustDevicePath    bool   `gcfg:"trust-device-path"`    // See Issue #33128
 }
 
 type RouterOpts struct {
@@ -178,6 +179,7 @@ func readConfig(config io.Reader) (Config, error) {
 	// Set default values for config params
 	cfg.BlockStorage.BSVersion = "auto"
 	cfg.BlockStorage.TrustDevicePath = false
+	cfg.BlockStorage.AllowAutoSupported = false
 
 	err := gcfg.ReadInto(&cfg, config)
 	return cfg, err
@@ -555,8 +557,60 @@ func (apiVersions APIVersionsByID) Less(i, j int) bool {
 	return apiVersions[i].ID > apiVersions[j].ID
 }
 
-func (os *OpenStack) volumeService() (volumeService, error) {
-	switch os.bsOpts.BSVersion {
+func autoVersionSelector(apiVersion *apiversions_v1.APIVersion) string {
+	switch apiVersion.ID {
+	case "v2.0":
+		return "v2"
+	case "v1.0":
+		return "v1"
+	default:
+		return ""
+	}
+}
+
+func doBsApiVersionAutodetect(availableApiVersions []apiversions_v1.APIVersion, AllowAutoSupported bool) string {
+	// search for CURRENT api version
+	// There should be only one api version with CURRENT status
+	for _, version := range availableApiVersions {
+		if version.Status == "CURRENT" {
+			if detectedApiVersion := autoVersionSelector(&version); detectedApiVersion != "" {
+				glog.V(3).Infof("Blockstorage API version probing has found a suitable CURRENT api version: %s", detectedApiVersion)
+				return detectedApiVersion
+			} else {
+				break
+			}
+		}
+	}
+	// Only if we don't support CURRENT api version we get this far
+	glog.Warningf("I don't support the CURRENT blockstorage API version")
+	if AllowAutoSupported {
+		glog.Info("Blockstorage api version autodetection is allowed to search in SUPPORTED versions")
+		sort.Sort(APIVersionsByID(availableApiVersions))
+		for _, version := range availableApiVersions {
+			if version.Status == "SUPPORTED" {
+				if detectedApiVersion := autoVersionSelector(&version); detectedApiVersion != "" {
+					glog.V(3).Infof("Blockstorage API version probing has found a suitable SUPPORTED api version: %s", detectedApiVersion)
+					return detectedApiVersion
+				}
+			}
+		}
+	}
+	// Nothing suitable found, failed autodetection
+	errMsg := "Autoprobing for blockstorage API failed to find a suitable api version See auto-allow-supported and bs-version settings."
+	glog.Error(errMsg)
+	return ""
+
+}
+
+func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
+	bsVersion := ""
+	if forceVersion == "" {
+		bsVersion = os.bsOpts.BSVersion
+	} else {
+		bsVersion = forceVersion
+	}
+
+	switch bsVersion {
 	case "v1":
 		sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
 			Region: os.region,
@@ -583,48 +637,27 @@ func (os *OpenStack) volumeService() (volumeService, error) {
 			glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
 			return nil, err
 		}
-
+		availableApiVersions := []apiversions_v1.APIVersion{}
 		err = apiversions_v1.List(sClient).EachPage(func(page pagination.Page) (bool, error) {
+			// returning false from this handler stops page iteration, error is propagated to the upper function
 			apiversions, err := apiversions_v1.ExtractAPIVersions(page)
 			if err != nil {
-				glog.Errorf("Unable to list blockstorage API versions for region: %s", os.region)
+				glog.Errorf("Unable to extract api versions from page: %v", err)
 				return false, err
 			}
-
-			sort.Sort(APIVersionsByID(apiversions))
-			// take first CURRENT or SUPPORTED version
-			for _, version := range apiversions {
-				if version.Status == "CURRENT" || version.Status == "SUPPORTED" {
-					switch version.ID {
-					case "v2.0":
-						os.bsOpts.BSVersion = "v2"
-						break
-					case "v1.0":
-						os.bsOpts.BSVersion = "v1"
-						break
-					}
-				}
-			}
-
+			availableApiVersions = append(availableApiVersions, apiversions...)
 			return true, nil
 		})
 
 		if err != nil {
-			glog.Errorf("Unable to list blockstorage API versions for region: %s", os.region)
+			glog.Errorf("Error when retrieving list of supported blockstorage api versions: %v", err)
 			return nil, err
 		}
-
-		// Autoprobing failed, no supported versions available
-		if os.bsOpts.BSVersion == "auto" {
-			errMsg := "Autoprobing for blockstorage API failed"
-			glog.Error(errMsg)
-			return nil, errors.New(errMsg)
+		if autodetectedVersion := doBsApiVersionAutodetect(availableApiVersions, os.bsOpts.AllowAutoSupported); autodetectedVersion != "" {
+			return os.volumeService(autodetectedVersion)
+		} else {
+			return nil, errors.New("BS API version autodetection failed.")
 		}
-
-		glog.V(3).Infof("Blockstorage API version probing decided %s", os.bsOpts.BSVersion)
-
-		// autoprobing has changed the version in settings
-		return os.volumeService()
 
 	default:
 		err_txt := fmt.Sprintf("Config error: unrecognised bs-version \"%v\"", os.bsOpts.BSVersion)
