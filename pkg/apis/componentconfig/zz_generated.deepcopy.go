@@ -35,7 +35,6 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_APIServerAuditLogOptions, InType: reflect.TypeOf(&APIServerAuditLogOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_APIServerConfiguration, InType: reflect.TypeOf(&APIServerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_APIServerEtcdConfiguration, InType: reflect.TypeOf(&APIServerEtcdConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_APIServerStorageSerializationOptions, InType: reflect.TypeOf(&APIServerStorageSerializationOptions{})},
@@ -57,15 +56,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	)
 }
 
-func DeepCopy_componentconfig_APIServerAuditLogOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIServerAuditLogOptions)
-		out := out.(*APIServerAuditLogOptions)
-		*out = *in
-		return nil
-	}
-}
-
 func DeepCopy_componentconfig_APIServerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIServerConfiguration)
@@ -78,14 +68,6 @@ func DeepCopy_componentconfig_APIServerConfiguration(in interface{}, out interfa
 		}
 		if in.WatchCacheSizes != nil {
 			in, out := &in.WatchCacheSizes, &out.WatchCacheSizes
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if err := DeepCopy_componentconfig_APIServerEtcdConfiguration(&in.StorageConfig, &out.StorageConfig, c); err != nil {
-			return err
-		}
-		if in.EtcdServersOverrides != nil {
-			in, out := &in.EtcdServersOverrides, &out.EtcdServersOverrides
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
@@ -128,11 +110,6 @@ func DeepCopy_componentconfig_APIServerEtcdConfiguration(in interface{}, out int
 		in := in.(*APIServerEtcdConfiguration)
 		out := out.(*APIServerEtcdConfiguration)
 		*out = *in
-		if in.ServerList != nil {
-			in, out := &in.ServerList, &out.ServerList
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
 		return nil
 	}
 }

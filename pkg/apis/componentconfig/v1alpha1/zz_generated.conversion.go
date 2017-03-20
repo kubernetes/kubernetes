@@ -38,8 +38,6 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_APIServerAuditLogOptions_To_componentconfig_APIServerAuditLogOptions,
-		Convert_componentconfig_APIServerAuditLogOptions_To_v1alpha1_APIServerAuditLogOptions,
 		Convert_v1alpha1_APIServerConfiguration_To_componentconfig_APIServerConfiguration,
 		Convert_componentconfig_APIServerConfiguration_To_v1alpha1_APIServerConfiguration,
 		Convert_v1alpha1_APIServerEtcdConfiguration_To_componentconfig_APIServerEtcdConfiguration,
@@ -69,30 +67,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 	)
 }
 
-func autoConvert_v1alpha1_APIServerAuditLogOptions_To_componentconfig_APIServerAuditLogOptions(in *APIServerAuditLogOptions, out *componentconfig.APIServerAuditLogOptions, s conversion.Scope) error {
-	out.Path = in.Path
-	out.MaxAge = in.MaxAge
-	out.MaxBackups = in.MaxBackups
-	out.MaxSize = in.MaxSize
-	return nil
-}
-
-func Convert_v1alpha1_APIServerAuditLogOptions_To_componentconfig_APIServerAuditLogOptions(in *APIServerAuditLogOptions, out *componentconfig.APIServerAuditLogOptions, s conversion.Scope) error {
-	return autoConvert_v1alpha1_APIServerAuditLogOptions_To_componentconfig_APIServerAuditLogOptions(in, out, s)
-}
-
-func autoConvert_componentconfig_APIServerAuditLogOptions_To_v1alpha1_APIServerAuditLogOptions(in *componentconfig.APIServerAuditLogOptions, out *APIServerAuditLogOptions, s conversion.Scope) error {
-	out.Path = in.Path
-	out.MaxAge = in.MaxAge
-	out.MaxBackups = in.MaxBackups
-	out.MaxSize = in.MaxSize
-	return nil
-}
-
-func Convert_componentconfig_APIServerAuditLogOptions_To_v1alpha1_APIServerAuditLogOptions(in *componentconfig.APIServerAuditLogOptions, out *APIServerAuditLogOptions, s conversion.Scope) error {
-	return autoConvert_componentconfig_APIServerAuditLogOptions_To_v1alpha1_APIServerAuditLogOptions(in, out, s)
-}
-
 func autoConvert_v1alpha1_APIServerConfiguration_To_componentconfig_APIServerConfiguration(in *APIServerConfiguration, out *componentconfig.APIServerConfiguration, s conversion.Scope) error {
 	out.AdmissionControl = in.AdmissionControl
 	out.AdmissionControlConfigFile = in.AdmissionControlConfigFile
@@ -104,16 +78,12 @@ func autoConvert_v1alpha1_APIServerConfiguration_To_componentconfig_APIServerCon
 	out.MinRequestTimeout = in.MinRequestTimeout
 	out.TargetRAMMB = in.TargetRAMMB
 	out.WatchCacheSizes = *(*[]string)(unsafe.Pointer(&in.WatchCacheSizes))
-	if err := Convert_v1alpha1_APIServerAuditLogOptions_To_componentconfig_APIServerAuditLogOptions(&in.AuditLogOptions, &out.AuditLogOptions, s); err != nil {
-		return err
-	}
 	out.EnableProfiling = in.EnableProfiling
 	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.EnableSwaggerUI = in.EnableSwaggerUI
 	if err := Convert_v1alpha1_APIServerEtcdConfiguration_To_componentconfig_APIServerEtcdConfiguration(&in.StorageConfig, &out.StorageConfig, s); err != nil {
 		return err
 	}
-	out.EtcdServersOverrides = *(*[]string)(unsafe.Pointer(&in.EtcdServersOverrides))
 	out.DefaultStorageMediaType = in.DefaultStorageMediaType
 	out.DeleteCollectionWorkers = in.DeleteCollectionWorkers
 	out.EnableGarbageCollection = in.EnableGarbageCollection
@@ -148,16 +118,12 @@ func autoConvert_componentconfig_APIServerConfiguration_To_v1alpha1_APIServerCon
 	out.MinRequestTimeout = in.MinRequestTimeout
 	out.TargetRAMMB = in.TargetRAMMB
 	out.WatchCacheSizes = *(*[]string)(unsafe.Pointer(&in.WatchCacheSizes))
-	if err := Convert_componentconfig_APIServerAuditLogOptions_To_v1alpha1_APIServerAuditLogOptions(&in.AuditLogOptions, &out.AuditLogOptions, s); err != nil {
-		return err
-	}
 	out.EnableProfiling = in.EnableProfiling
 	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.EnableSwaggerUI = in.EnableSwaggerUI
 	if err := Convert_componentconfig_APIServerEtcdConfiguration_To_v1alpha1_APIServerEtcdConfiguration(&in.StorageConfig, &out.StorageConfig, s); err != nil {
 		return err
 	}
-	out.EtcdServersOverrides = *(*[]string)(unsafe.Pointer(&in.EtcdServersOverrides))
 	out.DefaultStorageMediaType = in.DefaultStorageMediaType
 	out.DeleteCollectionWorkers = in.DeleteCollectionWorkers
 	out.EnableGarbageCollection = in.EnableGarbageCollection
@@ -183,11 +149,7 @@ func Convert_componentconfig_APIServerConfiguration_To_v1alpha1_APIServerConfigu
 
 func autoConvert_v1alpha1_APIServerEtcdConfiguration_To_componentconfig_APIServerEtcdConfiguration(in *APIServerEtcdConfiguration, out *componentconfig.APIServerEtcdConfiguration, s conversion.Scope) error {
 	out.Type = in.Type
-	out.Prefix = in.Prefix
-	out.ServerList = *(*[]string)(unsafe.Pointer(&in.ServerList))
-	out.KeyFile = in.KeyFile
-	out.CertFile = in.CertFile
-	out.CAFile = in.CAFile
+	out.ServerSize = in.ServerSize
 	out.Quorum = in.Quorum
 	out.DeserializationCacheSize = in.DeserializationCacheSize
 	return nil
@@ -199,11 +161,7 @@ func Convert_v1alpha1_APIServerEtcdConfiguration_To_componentconfig_APIServerEtc
 
 func autoConvert_componentconfig_APIServerEtcdConfiguration_To_v1alpha1_APIServerEtcdConfiguration(in *componentconfig.APIServerEtcdConfiguration, out *APIServerEtcdConfiguration, s conversion.Scope) error {
 	out.Type = in.Type
-	out.Prefix = in.Prefix
-	out.ServerList = *(*[]string)(unsafe.Pointer(&in.ServerList))
-	out.KeyFile = in.KeyFile
-	out.CertFile = in.CertFile
-	out.CAFile = in.CAFile
+	out.ServerSize = in.ServerSize
 	out.Quorum = in.Quorum
 	out.DeserializationCacheSize = in.DeserializationCacheSize
 	return nil

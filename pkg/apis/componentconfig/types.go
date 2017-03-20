@@ -44,11 +44,6 @@ type APIServerConfiguration struct {
 	WatchCacheSizes             []string
 
 	//
-	// Server Run Options: Audit Options
-	//
-	AuditLogOptions APIServerAuditLogOptions
-
-	//
 	// Server Run Options: Feature Options
 	//
 	EnableProfiling           bool
@@ -59,7 +54,6 @@ type APIServerConfiguration struct {
 	// Server Run Options: Etcd
 	//
 	StorageConfig           APIServerEtcdConfiguration
-	EtcdServersOverrides    []string
 	DefaultStorageMediaType string
 	DeleteCollectionWorkers int
 	EnableGarbageCollection bool
@@ -91,14 +85,8 @@ type APIServerConfiguration struct {
 type APIServerEtcdConfiguration struct {
 	// Type defines the type of storage backend, e.g. "etcd2", etcd3". Default ("") is "etcd3".
 	Type string
-	// Prefix is the prefix to all keys passed to storage.Interface methods.
-	Prefix string
-	// ServerList is the list of storage servers to connect with.
-	ServerList []string
-	// TLS credentials
-	KeyFile  string
-	CertFile string
-	CAFile   string
+	// Number of nodes in etcd cluster.
+	ServerSize int
 	// Quorum indicates that whether read operations should be quorum-level consistent.
 	Quorum bool
 	// DeserializationCacheSize is the size of cache of deserialized objects.
@@ -113,13 +101,6 @@ type APIServerStorageSerializationOptions struct {
 	// these; you can change this if you want to change the defaults (e.g.,
 	// for testing). This is not actually exposed as a flag.
 	DefaultStorageVersions string
-}
-
-type APIServerAuditLogOptions struct {
-	Path       string
-	MaxAge     int
-	MaxBackups int
-	MaxSize    int
 }
 
 type KubeProxyConfiguration struct {

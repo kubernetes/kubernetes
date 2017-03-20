@@ -40,11 +40,6 @@ type APIServerConfiguration struct {
 	WatchCacheSizes             []string `json:"watchCacheSizes"`
 
 	//
-	// Server Run Options: Audit Options
-	//
-	AuditLogOptions APIServerAuditLogOptions `json:"auditLogOptions"`
-
-	//
 	// Server Run Options: Feature Options
 	//
 	EnableProfiling           bool `json:"enableProfiling"`
@@ -55,7 +50,6 @@ type APIServerConfiguration struct {
 	// Server Run Options: Etcd
 	//
 	StorageConfig           APIServerEtcdConfiguration `json:"storageConfig"`
-	EtcdServersOverrides    []string                   `json:"etcdServersOverrides"`
 	DefaultStorageMediaType string                     `json:"defaultStorageMediaType"`
 	DeleteCollectionWorkers int                        `json:"deleteCollectionWorkers"`
 	EnableGarbageCollection bool                       `json:"enableGarbageCollection"`
@@ -87,14 +81,8 @@ type APIServerConfiguration struct {
 type APIServerEtcdConfiguration struct {
 	// Type defines the type of storage backend, e.g. "etcd2", etcd3". Default ("") is "etcd3".
 	Type string `json:"type"`
-	// Prefix is the prefix to all keys passed to storage.Interface methods.
-	Prefix string `json:"prefix"`
-	// ServerList is the list of storage servers to connect with.
-	ServerList []string `json:"serverList"`
-	// TLS credentials
-	KeyFile  string `json:"keyFile"`
-	CertFile string `json:"certFile"`
-	CAFile   string `json:"caFile"`
+	// Number of nodes in etcd cluster.
+	ServerSize int `json:"serverSize"`
 	// Quorum indicates that whether read operations should be quorum-level consistent.
 	Quorum bool `json:"quorum"`
 	// DeserializationCacheSize is the size of cache of deserialized objects.
@@ -109,13 +97,6 @@ type APIServerStorageSerializationOptions struct {
 	// these; you can change this if you want to change the defaults (e.g.,
 	// for testing). This is not actually exposed as a flag.
 	DefaultStorageVersions string `json:"defaultStorageVersions"`
-}
-
-type APIServerAuditLogOptions struct {
-	Path       string `json:"path"`
-	MaxAge     int    `json:"maxAge"`
-	MaxBackups int    `json:"maxBackups"`
-	MaxSize    int    `json:"maxSize"`
 }
 
 type KubeProxyConfiguration struct {

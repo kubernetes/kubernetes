@@ -12590,40 +12590,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/apis/certificates/v1beta1.CertificateSigningRequestCondition"},
 		},
-		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerAuditLogOptions": {
-			Schema: spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Properties: map[string]spec.Schema{
-						"path": {
-							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
-							},
-						},
-						"maxAge": {
-							SchemaProps: spec.SchemaProps{
-								Type:   []string{"integer"},
-								Format: "int32",
-							},
-						},
-						"maxBackups": {
-							SchemaProps: spec.SchemaProps{
-								Type:   []string{"integer"},
-								Format: "int32",
-							},
-						},
-						"maxSize": {
-							SchemaProps: spec.SchemaProps{
-								Type:   []string{"integer"},
-								Format: "int32",
-							},
-						},
-					},
-					Required: []string{"path", "maxAge", "maxBackups", "maxSize"},
-				},
-			},
-			Dependencies: []string{},
-		},
 		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerConfiguration": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -12717,12 +12683,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
-						"auditLogOptions": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Server Run Options: Audit Options",
-								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerAuditLogOptions"),
-							},
-						},
 						"enableProfiling": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Server Run Options: Feature Options",
@@ -12746,19 +12706,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							SchemaProps: spec.SchemaProps{
 								Description: "Server Run Options: Etcd",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerEtcdConfiguration"),
-							},
-						},
-						"etcdServersOverrides": {
-							SchemaProps: spec.SchemaProps{
-								Type: []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Type:   []string{"string"},
-											Format: "",
-										},
-									},
-								},
 							},
 						},
 						"defaultStorageMediaType": {
@@ -12847,11 +12794,11 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"admissionControl", "admissionControlConfigFile", "advertiseAddress", "corsAllowedOriginList", "externalHost", "maxRequestsInFlight", "maxMutatingRequestsInFlight", "minRequestTimeout", "targetRAMMB", "watchCacheSizes", "auditLogOptions", "enableProfiling", "enableContentionProfiling", "enableSwaggerUI", "storageConfig", "etcdServersOverrides", "defaultStorageMediaType", "deleteCollectionWorkers", "enableGarbageCollection", "enableWatchCache", "cloudConfigFile", "cloudProvider", "storageSerialization", "eventTTL"},
+					Required: []string{"admissionControl", "admissionControlConfigFile", "advertiseAddress", "corsAllowedOriginList", "externalHost", "maxRequestsInFlight", "maxMutatingRequestsInFlight", "minRequestTimeout", "targetRAMMB", "watchCacheSizes", "enableProfiling", "enableContentionProfiling", "enableSwaggerUI", "storageConfig", "defaultStorageMediaType", "deleteCollectionWorkers", "enableGarbageCollection", "enableWatchCache", "cloudConfigFile", "cloudProvider", "storageSerialization", "eventTTL"},
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerAuditLogOptions", "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerEtcdConfiguration", "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerStorageSerializationOptions"},
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerEtcdConfiguration", "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerStorageSerializationOptions"},
 		},
 		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerEtcdConfiguration": {
 			Schema: spec.Schema{
@@ -12864,44 +12811,11 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"prefix": {
+						"serverSize": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Prefix is the prefix to all keys passed to storage.Interface methods.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"serverList": {
-							SchemaProps: spec.SchemaProps{
-								Description: "ServerList is the list of storage servers to connect with.",
-								Type:        []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Type:   []string{"string"},
-											Format: "",
-										},
-									},
-								},
-							},
-						},
-						"keyFile": {
-							SchemaProps: spec.SchemaProps{
-								Description: "TLS credentials",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
-						"certFile": {
-							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
-							},
-						},
-						"caFile": {
-							SchemaProps: spec.SchemaProps{
-								Type:   []string{"string"},
-								Format: "",
+								Description: "Number of nodes in etcd cluster.",
+								Type:        []string{"integer"},
+								Format:      "int32",
 							},
 						},
 						"quorum": {
@@ -12919,7 +12833,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"type", "prefix", "serverList", "keyFile", "certFile", "caFile", "quorum", "deserializationCacheSize"},
+					Required: []string{"type", "serverSize", "quorum", "deserializationCacheSize"},
 				},
 			},
 			Dependencies: []string{},

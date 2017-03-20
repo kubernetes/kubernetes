@@ -35,7 +35,6 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServerAuditLogOptions, InType: reflect.TypeOf(&APIServerAuditLogOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServerConfiguration, InType: reflect.TypeOf(&APIServerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServerEtcdConfiguration, InType: reflect.TypeOf(&APIServerEtcdConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_APIServerStorageSerializationOptions, InType: reflect.TypeOf(&APIServerStorageSerializationOptions{})},
@@ -52,15 +51,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	)
 }
 
-func DeepCopy_v1alpha1_APIServerAuditLogOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIServerAuditLogOptions)
-		out := out.(*APIServerAuditLogOptions)
-		*out = *in
-		return nil
-	}
-}
-
 func DeepCopy_v1alpha1_APIServerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*APIServerConfiguration)
@@ -73,14 +63,6 @@ func DeepCopy_v1alpha1_APIServerConfiguration(in interface{}, out interface{}, c
 		}
 		if in.WatchCacheSizes != nil {
 			in, out := &in.WatchCacheSizes, &out.WatchCacheSizes
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if err := DeepCopy_v1alpha1_APIServerEtcdConfiguration(&in.StorageConfig, &out.StorageConfig, c); err != nil {
-			return err
-		}
-		if in.EtcdServersOverrides != nil {
-			in, out := &in.EtcdServersOverrides, &out.EtcdServersOverrides
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
@@ -123,11 +105,6 @@ func DeepCopy_v1alpha1_APIServerEtcdConfiguration(in interface{}, out interface{
 		in := in.(*APIServerEtcdConfiguration)
 		out := out.(*APIServerEtcdConfiguration)
 		*out = *in
-		if in.ServerList != nil {
-			in, out := &in.ServerList, &out.ServerList
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
 		return nil
 	}
 }
