@@ -219,6 +219,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"categories": {
+							SchemaProps: spec.SchemaProps{
+								Description: "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
 					},
 					Required: []string{"name", "singularName", "namespaced", "kind", "verbs"},
 				},
