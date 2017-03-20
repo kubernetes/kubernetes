@@ -2900,14 +2900,13 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 // Gets the named instance, returning cloudprovider.InstanceNotFound if the instance is not found
 func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 	// Avoid changing behaviour when not managing multiple zones
-	if len(gce.managedZones) == 1 {
+	for _, zone := range gce.managedZones {
 		name = canonicalizeInstanceName(name)
-		zone := gce.managedZones[0]
 		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Do()
 		if err != nil {
-			glog.Errorf("getInstanceByName/single-zone: failed to get instance %s; err: %v", name, err)
+			glog.Errorf("getInstanceByName: failed to get instance %s; err: %v", name, err)
 			if isHTTPErrorCode(err, http.StatusNotFound) {
-				return nil, cloudprovider.InstanceNotFound
+				continue
 			}
 			return nil, err
 		}
@@ -2920,16 +2919,7 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 		}, nil
 	}
 
-	instances, err := gce.getInstancesByNames([]string{name})
-	if err != nil {
-		glog.Errorf("getInstanceByName/multiple-zones: failed to get instance %s; err: %v", name, err)
-		return nil, err
-	}
-	if len(instances) != 1 || instances[0] == nil {
-		// getInstancesByNames not obeying its contract
-		return nil, fmt.Errorf("unexpected return value from getInstancesByNames: %v", instances)
-	}
-	return instances[0], nil
+	return nil, cloudprovider.InstanceNotFound
 }
 
 // Returns the last component of a URL, i.e. anything after the last slash
