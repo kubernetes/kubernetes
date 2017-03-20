@@ -19,6 +19,7 @@ limitations under the License.
 package replicaset
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http/httptest"
@@ -39,6 +40,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -87,7 +89,7 @@ func skipListerFunc(verb string, url url.URL) bool {
 	if verb != "GET" {
 		return false
 	}
-	if strings.HasSuffix(url.Path, "/pods") || strings.HasSuffix(url.Path, "/replicasets") {
+	if strings.HasSuffix(url.Path, "/pods") || strings.Contains(url.Path, "/replicasets") {
 		return true
 	}
 	return false
@@ -247,7 +249,9 @@ func TestSyncReplicaSetDoesNothing(t *testing.T) {
 }
 
 func TestSyncReplicaSetDeletes(t *testing.T) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	labelMap := map[string]string{"foo": "bar"}
+	rsSpec := newReplicaSet(1, labelMap)
+	client := fake.NewSimpleClientset(rsSpec)
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -255,8 +259,6 @@ func TestSyncReplicaSetDeletes(t *testing.T) {
 	manager.podControl = &fakePodControl
 
 	// 2 running pods and a controller with 1 replica, one pod delete expected
-	labelMap := map[string]string{"foo": "bar"}
-	rsSpec := newReplicaSet(1, labelMap)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
 	newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 2, v1.PodRunning, labelMap, rsSpec, "pod")
 
@@ -300,15 +302,15 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 }
 
 func TestSyncReplicaSetCreates(t *testing.T) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	labelMap := map[string]string{"foo": "bar"}
+	rs := newReplicaSet(2, labelMap)
+	client := fake.NewSimpleClientset(rs)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 
 	// A controller with 2 replicas and no active pods in the store.
 	// Inactive pods should be ignored. 2 creates expected.
-	labelMap := map[string]string{"foo": "bar"}
-	rs := newReplicaSet(2, labelMap)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	failedPod := newPod("failed-pod", rs, v1.PodFailed, nil, true)
 	deletedPod := newPod("deleted-pod", rs, v1.PodRunning, nil, true)
@@ -778,21 +780,20 @@ func TestUpdatePods(t *testing.T) {
 
 func TestControllerUpdateRequeue(t *testing.T) {
 	// This server should force a requeue of the controller because it fails to update status.Replicas.
-	fakeHandler := utiltesting.FakeHandler{
-		StatusCode:    500,
-		ResponseBody:  "{}",
-		SkipRequestFn: skipListerFunc,
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
-
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
-
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(1, labelMap)
+	client := fake.NewSimpleClientset(rs)
+	client.PrependReactor("update", "replicasets",
+		func(action core.Action) (bool, runtime.Object, error) {
+			if action.GetSubresource() != "status" {
+				return false, nil, nil
+			}
+			return true, nil, errors.New("failed to update status")
+		})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
+
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	rs.Status = extensions.ReplicaSetStatus{Replicas: 2}
 	newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 1, v1.PodRunning, labelMap, rs, "pod")
@@ -800,13 +801,14 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 
-	// an error from the sync function will be requeued, check to make sure we returned an error
-	err := manager.syncReplicaSet(getKey(rs, t))
-	if err == nil {
-		t.Errorf("missing error for requeue")
+	// Enqueue once. Then process it. Disable rate-limiting for this.
+	manager.queue = workqueue.NewRateLimitingQueue(workqueue.NewMaxOfRateLimiter())
+	manager.enqueueReplicaSet(rs)
+	manager.processNextWorkItem()
+	// It should have been requeued.
+	if got, want := manager.queue.Len(), 1; got != want {
+		t.Errorf("queue.Len() = %v, want %v", got, want)
 	}
-	// 1 Update and 1 GET, both of which fail
-	fakeHandler.ValidateRequestCount(t, 2)
 }
 
 func TestControllerUpdateStatusWithFailure(t *testing.T) {
@@ -856,15 +858,15 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 
 // TODO: This test is too hairy for a unittest. It should be moved to an E2E suite.
 func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	labelMap := map[string]string{"foo": "bar"}
+	rsSpec := newReplicaSet(numReplicas, labelMap)
+	client := fake.NewSimpleClientset(rsSpec)
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, burstReplicas)
 	manager.podControl = &fakePodControl
 
-	labelMap := map[string]string{"foo": "bar"}
-	rsSpec := newReplicaSet(numReplicas, labelMap)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
 
 	expectedPods := int32(0)
@@ -1044,12 +1046,12 @@ func TestRSSyncExpectations(t *testing.T) {
 }
 
 func TestDeleteControllerAndExpectations(t *testing.T) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	rs := newReplicaSet(1, map[string]string{"foo": "bar"})
+	client := fake.NewSimpleClientset(rs)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, 10)
 
-	rs := newReplicaSet(1, map[string]string{"foo": "bar"})
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 
 	fakePodControl := controller.FakePodControl{}
@@ -1440,11 +1442,11 @@ func TestUpdateSelectorControllerRef(t *testing.T) {
 func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
+	now := metav1.Now()
+	rs.DeletionTimestamp = &now
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
-	now := metav1.Now()
-	rs.DeletionTimestamp = &now
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	pod1 := newPod("pod1", rs, v1.PodRunning, nil, false)
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
@@ -1454,6 +1456,33 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	validateSyncReplicaSet(t, fakePodControl, 0, 0, 0)
+}
+
+func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
+	labelMap := map[string]string{"foo": "bar"}
+	// Bare client says it IS deleted.
+	rs := newReplicaSet(2, labelMap)
+	now := metav1.Now()
+	rs.DeletionTimestamp = &now
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	manager, fakePodControl, informers := setupManagerWithGCEnabled(stopCh, rs)
+	// Lister (cache) says it's NOT deleted.
+	rs2 := *rs
+	rs2.DeletionTimestamp = nil
+	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(&rs2)
+
+	// Recheck occurs if a matching orphan is present.
+	pod1 := newPod("pod1", rs, v1.PodRunning, nil, false)
+	informers.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+
+	// sync should abort.
+	err := manager.syncReplicaSet(getKey(rs, t))
+	if err == nil {
+		t.Error("syncReplicaSet() err = nil, expected non-nil")
+	}
+	// no patch, no create.
 	validateSyncReplicaSet(t, fakePodControl, 0, 0, 0)
 }
 
