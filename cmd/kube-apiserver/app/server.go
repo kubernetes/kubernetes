@@ -119,6 +119,7 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	}
 	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, stopCh)
 	if err != nil {
+		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return err
 	}
 	return aggregatorServer.GenericAPIServer.PrepareRun().Run(stopCh)

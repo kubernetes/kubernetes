@@ -25,7 +25,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -331,13 +330,10 @@ func TestAggregatedAPIServer(t *testing.T) {
 	_, err = aggregatorClient.ApiregistrationV1alpha1().APIServices().Create(&apiregistrationv1alpha1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1."},
 		Spec: apiregistrationv1alpha1.APIServiceSpec{
-			Service: &apiregistrationv1alpha1.ServiceReference{
-				Namespace: "default",
-				Name:      "kubernetes",
-			},
+			// register this as a loca service so it doesn't try to lookup the default kubernetes service
+			// which will have an unroutable IP address since its fake.
 			Group:    "",
 			Version:  "v1",
-			CABundle: kubeClientConfig.CAData,
 			Priority: 100,
 		},
 	})
@@ -349,7 +345,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	// (the service is missing), we don't have an external signal.
 	time.Sleep(100 * time.Millisecond)
 	_, err = aggregatorDiscoveryClient.Discovery().ServerResources()
-	if err != nil && !strings.Contains(err.Error(), "lookup kubernetes.default.svc") {
+	if err != nil {
 		t.Fatal(err)
 	}
 

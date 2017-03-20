@@ -176,20 +176,21 @@ func (r *responder) Error(err error) {
 
 // these methods provide locked access to fields
 
-func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIService) {
+func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIService, destinationHost string) {
 	if apiService.Spec.Service == nil {
 		r.handlingInfo.Store(proxyHandlingInfo{local: true})
 		return
 	}
 
 	newInfo := proxyHandlingInfo{
-		destinationHost: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
+		destinationHost: destinationHost,
 		restConfig: &restclient.Config{
 			TLSClientConfig: restclient.TLSClientConfig{
-				Insecure: apiService.Spec.InsecureSkipTLSVerify,
-				CertData: r.proxyClientCert,
-				KeyData:  r.proxyClientKey,
-				CAData:   apiService.Spec.CABundle,
+				Insecure:   apiService.Spec.InsecureSkipTLSVerify,
+				ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
+				CertData:   r.proxyClientCert,
+				KeyData:    r.proxyClientKey,
+				CAData:     apiService.Spec.CABundle,
 			},
 		},
 	}
