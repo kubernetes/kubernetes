@@ -117,7 +117,7 @@ func (jm *CronJobController) syncAll() {
 	js := jl.Items
 	glog.V(4).Infof("Found %d jobs", len(js))
 
-	jobsBySj := groupJobsByParent(sjs, js)
+	jobsBySj := groupJobsByParent(js)
 	glog.V(4).Infof("Found %d groups", len(jobsBySj))
 
 	for _, sj := range sjs {
