@@ -307,6 +307,13 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 					glog.Errorf("iscsi: failed to detach disk Error: %s", string(out))
 				}
 			}
+			// delete the node record from database
+			glog.Infof("iscsi: delete node record target %s iqn %s", portal, iqn)
+			out, err := c.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", portal, "-T", iqn, "-o", "delete"})
+			if err != nil {
+				glog.Errorf("iscsi: failed to delete node record Error: %s", string(out))
+			}
+
 		}
 	}
 	return nil
