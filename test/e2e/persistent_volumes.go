@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -85,16 +86,27 @@ func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
 	})
 }
 
-var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
+var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
 
 	// global vars for the Context()s and It()'s below
 	f := framework.NewDefaultFramework("pv")
-	var c clientset.Interface
-	var ns string
+	var (
+		c         clientset.Interface
+		ns        string
+		pvConfig  framework.PersistentVolumeConfig
+		pvcConfig framework.PersistentVolumeClaimConfig
+		volLabel  labels.Set
+		selector  *metav1.LabelSelector
+		pv        *v1.PersistentVolume
+		pvc       *v1.PersistentVolumeClaim
+	)
 
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
+		// Enforce binding only within test space via selector labels
+		volLabel = labels.Set{framework.VolumeSelectorKey: ns}
+		selector = metav1.SetAsLabelSelector(volLabel)
 	})
 
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
@@ -104,7 +116,6 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 		var (
 			nfsServerPod *v1.Pod
 			serverIP     string
-			pvConfig     framework.PersistentVolumeConfig
 		)
 
 		BeforeEach(func() {
@@ -114,6 +125,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			framework.Logf("[BeforeEach] Configuring PersistentVolume")
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "nfs-",
+				Labels:     volLabel,
 				PVSource: v1.PersistentVolumeSource{
 					NFS: &v1.NFSVolumeSource{
 						Server:   serverIP,
@@ -122,16 +134,21 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 					},
 				},
 			}
+			pvcConfig = framework.PersistentVolumeClaimConfig{
+				Annotations: map[string]string{
+					v1.BetaStorageClassAnnotation: "",
+				},
+				Selector: selector,
+			}
 		})
 
 		AfterEach(func() {
 			framework.DeletePodWithWait(f, c, nfsServerPod)
+			pv, pvc = nil, nil
+			pvConfig, pvcConfig = framework.PersistentVolumeConfig{}, framework.PersistentVolumeClaimConfig{}
 		})
 
 		Context("with Single PV - PVC pairs", func() {
-
-			var pv *v1.PersistentVolume
-			var pvc *v1.PersistentVolumeClaim
 
 			// Note: this is the only code where the pv is deleted.
 			AfterEach(func() {
@@ -145,7 +162,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			// contains the claim. Verify that the PV and PVC bind correctly, and
 			// that the pod can write to the nfs volume.
 			It("should create a non-pre-bound PV and PVC: test write access ", func() {
-				pv, pvc = framework.CreatePVPVC(c, pvConfig, ns, false)
+				pv, pvc = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -153,7 +170,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			// pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
 			It("create a PVC and non-pre-bound PV: test write access", func() {
-				pv, pvc = framework.CreatePVCPV(c, pvConfig, ns, false)
+				pv, pvc = framework.CreatePVCPV(c, pvConfig, pvcConfig, ns, false)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -161,7 +178,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			// and a pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
 			It("create a PVC and a pre-bound PV: test write access", func() {
-				pv, pvc = framework.CreatePVCPV(c, pvConfig, ns, true)
+				pv, pvc = framework.CreatePVCPV(c, pvConfig, pvcConfig, ns, true)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -169,7 +186,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			// and a pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
 			It("create a PV and a pre-bound PVC: test write access", func() {
-				pv, pvc = framework.CreatePVPVC(c, pvConfig, ns, true)
+				pv, pvc = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
 				completeTest(f, c, ns, pv, pvc)
 			})
 		})
@@ -201,7 +218,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			// Note: PVs are created before claims and no pre-binding
 			It("should create 2 PVs and 4 PVCs: test write access", func() {
 				numPVs, numPVCs := 2, 4
-				pvols, claims = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
+				pvols, claims = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
 				framework.WaitAndVerifyBinds(c, ns, pvols, claims, true)
 				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
 			})
@@ -210,7 +227,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			// Note: PVs are created before claims and no pre-binding
 			It("should create 3 PVs and 3 PVCs: test write access", func() {
 				numPVs, numPVCs := 3, 3
-				pvols, claims = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
+				pvols, claims = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
 				framework.WaitAndVerifyBinds(c, ns, pvols, claims, true)
 				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
 			})
@@ -219,7 +236,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			// Note: PVs are created before claims and no pre-binding.
 			It("should create 4 PVs and 2 PVCs: test write access", func() {
 				numPVs, numPVCs := 4, 2
-				pvols, claims = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
+				pvols, claims = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
 				framework.WaitAndVerifyBinds(c, ns, pvols, claims, true)
 				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
 			})
@@ -229,12 +246,9 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 		// Recycler, this entire context can be removed without affecting the test suite or leaving behind
 		// dead code.
 		Context("when invoking the Recycle reclaim policy", func() {
-			var pv *v1.PersistentVolume
-			var pvc *v1.PersistentVolumeClaim
-
 			BeforeEach(func() {
 				pvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimRecycle
-				pv, pvc = framework.CreatePVPVC(c, pvConfig, ns, false)
+				pv, pvc = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
 				framework.WaitOnPVandPVC(c, ns, pv, pvc)
 			})
 
@@ -246,7 +260,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			// This It() tests a scenario where a PV is written to by a Pod, recycled, then the volume checked
 			// for files. If files are found, the checking Pod fails, failing the test.  Otherwise, the pod
 			// (and test) succeed.
-			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume][Serial][Flaky]", func() {
+			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume] [Flaky]", func() {
 				By("Writing to the volume.")
 				pod := framework.MakeWritePod(ns, pvc.Name)
 				pod, err := c.CoreV1().Pods(ns).Create(pod)
@@ -257,7 +271,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 				framework.DeletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable)
 
 				By("Re-mounting the volume.")
-				pvc = framework.MakePersistentVolumeClaim(ns)
+				pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns)
 				pvc = framework.CreatePVC(c, ns, pvc)
 				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second)
 				Expect(err).NotTo(HaveOccurred())

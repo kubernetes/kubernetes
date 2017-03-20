@@ -27,6 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
@@ -39,9 +40,12 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		pvc        *v1.PersistentVolumeClaim
 		clientPod  *v1.Pod
 		pvConfig   framework.PersistentVolumeConfig
+		pvcConfig  framework.PersistentVolumeClaimConfig
 		vsp        *vsphere.VSphere
 		err        error
 		node       types.NodeName
+		volLabel   labels.Set
+		selector   *metav1.LabelSelector
 	)
 
 	f := framework.NewDefaultFramework("pv")
@@ -62,6 +66,9 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		pvc = nil
 		pv = nil
 
+		volLabel = labels.Set{framework.VolumeSelectorKey: ns}
+		selector = metav1.SetAsLabelSelector(volLabel)
+
 		if vsp == nil {
 			vsp, err = vsphere.GetVSphere()
 			Expect(err).NotTo(HaveOccurred())
@@ -71,6 +78,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 			Expect(err).NotTo(HaveOccurred())
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "vspherepv-",
+				Labels:     volLabel,
 				PVSource: v1.PersistentVolumeSource{
 					VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
 						VolumePath: volumePath,
@@ -79,9 +87,15 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 				},
 				Prebind: nil,
 			}
+			pvcConfig = framework.PersistentVolumeClaimConfig{
+				Annotations: map[string]string{
+					v1.BetaStorageClassAnnotation: "",
+				},
+				Selector: selector,
+			}
 		}
 		By("Creating the PV and PVC")
-		pv, pvc = framework.CreatePVPVC(c, pvConfig, ns, false)
+		pv, pvc = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
 		framework.WaitOnPVandPVC(c, ns, pv, pvc)
 
 		By("Creating the Client Pod")
