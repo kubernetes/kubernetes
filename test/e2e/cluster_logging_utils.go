@@ -141,7 +141,41 @@ func createLogsGeneratorPod(f *framework.Framework, podName string, linesCount i
 	})
 }
 
-func waitForLogsIngestion(f *framework.Framework, config *loggingTestConfig) error {
+func waitForSomeLogs(f *framework.Framework, config *loggingTestConfig) error {
+	podHasIngestedLogs := make([]bool, len(config.Pods))
+	podWithIngestedLogsCount := 0
+
+	for start := time.Now(); podWithIngestedLogsCount < len(config.Pods) && time.Since(start) < config.IngestionTimeout; time.Sleep(ingestionRetryDelay) {
+		for podIdx, pod := range config.Pods {
+			if podHasIngestedLogs[podIdx] {
+				continue
+			}
+
+			entries := config.LogsProvider.ReadEntries(pod)
+			if len(entries) == 0 {
+				framework.Logf("No log entries from pod %s", pod.Name)
+				continue
+			}
+
+			for _, entry := range entries {
+				if _, ok := entry.getLogEntryNumber(); ok {
+					framework.Logf("Found some log entries from pod %s", pod.Name)
+					podHasIngestedLogs[podIdx] = true
+					podWithIngestedLogsCount++
+					break
+				}
+			}
+		}
+	}
+
+	if podWithIngestedLogsCount < len(config.Pods) {
+		return fmt.Errorf("some logs were ingested for %d pods out of %d", podWithIngestedLogsCount, len(config.Pods))
+	}
+
+	return nil
+}
+
+func waitForFullLogsIngestion(f *framework.Framework, config *loggingTestConfig) error {
 	expectedLinesNumber := 0
 	for _, pod := range config.Pods {
 		expectedLinesNumber += pod.ExpectedLinesNumber

@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 			MaxAllowedLostFraction:    loadTestMaxAllowedLostFraction,
 			MaxAllowedFluentdRestarts: loadTestMaxAllowedFluentdRestarts,
 		}
-		err = waitForLogsIngestion(f, config)
+		err = waitForFullLogsIngestion(f, config)
 		if err != nil {
 			framework.Failf("Failed to ingest logs: %v", err)
 		} else {
@@ -113,7 +113,7 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 			MaxAllowedLostFraction:    loadTestMaxAllowedLostFraction,
 			MaxAllowedFluentdRestarts: loadTestMaxAllowedFluentdRestarts,
 		}
-		err = waitForLogsIngestion(f, config)
+		err = waitForFullLogsIngestion(f, config)
 		if err != nil {
 			framework.Failf("Failed to ingest logs: %v", err)
 		} else {
