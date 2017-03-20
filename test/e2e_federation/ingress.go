@@ -48,7 +48,7 @@ const (
 	FederatedIngressTimeout        = 10 * time.Minute
 	FederatedIngressDeleteTimeout  = 2 * time.Minute
 	FederatedIngressName           = "federated-ingress"
-	FederatedIngressServiceName    = "federated-ingress-service"
+	FederatedIngressServicePrefix  = "federated-ingress-service-"
 	FederatedIngressTLSSecretName  = "federated-ingress-tls-secret"
 	FederatedIngressServicePodName = "federated-ingress-service-test-pod"
 	FederatedIngressHost           = "test-f8n.k8s.io."
@@ -130,7 +130,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			fedframework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			nsName := f.FederationNamespace.Name
-			ingress := createIngressOrFail(f.FederationClientset, nsName, FederatedIngressServiceName, FederatedIngressTLSSecretName)
+			ingress := createIngressOrFail(f.FederationClientset, nsName, "federated-ingress-service", FederatedIngressTLSSecretName)
 			By(fmt.Sprintf("Creation of ingress %q in namespace %q succeeded.  Deleting ingress.", ingress.Name, nsName))
 			// Cleanup
 			err := f.FederationClientset.Extensions().Ingresses(nsName).Delete(ingress.Name, &metav1.DeleteOptions{})
@@ -147,6 +147,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			jig                                    *federationTestJig
 			service                                *v1.Service
 			secret                                 *v1.Secret
+			federatedIngressServiceName            string
 		)
 
 		// register clusters in federation apiserver
@@ -160,7 +161,8 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			clusters, primaryClusterName = getRegisteredClusters(UserAgentName, f)
 			ns = f.FederationNamespace.Name
 			// create backend service
-			service = createServiceOrFail(f.FederationClientset, ns, FederatedIngressServiceName)
+			service = createServiceOrFail(f.FederationClientset, ns, FederatedIngressServicePrefix)
+			federatedIngressServiceName = service.Name
 			// create the TLS secret
 			secret = createTLSSecretOrFail(f.FederationClientset, ns, FederatedIngressTLSSecretName)
 			// wait for services objects sync
@@ -193,7 +195,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		})
 
 		It("should create and update matching ingresses in underlying clusters", func() {
-			ingress := createIngressOrFail(f.FederationClientset, ns, FederatedIngressServiceName, FederatedIngressTLSSecretName)
+			ingress := createIngressOrFail(f.FederationClientset, ns, federatedIngressServiceName, FederatedIngressTLSSecretName)
 			// wait for ingress shards being created
 			waitForIngressShardsOrFail(ns, ingress, clusters)
 			ingress = updateIngressOrFail(f.FederationClientset, ns)
@@ -204,7 +206,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := false
-			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, &orphanDependents, nsName, federatedIngressServiceName)
 			By(fmt.Sprintf("Verified that ingresses were deleted from underlying clusters"))
 		})
 
@@ -212,14 +214,14 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := true
-			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, &orphanDependents, nsName, federatedIngressServiceName)
 			By(fmt.Sprintf("Verified that ingresses were not deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
-			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, nil, nsName)
+			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, nil, nsName, federatedIngressServiceName)
 			By(fmt.Sprintf("Verified that ingresses were not deleted from underlying clusters"))
 		})
 
@@ -253,8 +255,8 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			PIt("should be able to discover a federated ingress service via DNS", func() {
 				// we are about the ingress name
 				svcDNSNames := []string{
-					fmt.Sprintf("%s.%s", FederatedIngressServiceName, ns),
-					fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedIngressServiceName, ns),
+					fmt.Sprintf("%s.%s", federatedIngressServiceName, ns),
+					fmt.Sprintf("%s.%s.svc.cluster.local.", federatedIngressServiceName, ns),
 					// TODO these two entries are not set yet
 					//fmt.Sprintf("%s.%s.%s", FederatedIngressServiceName, ns, federationName),
 					//fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedIngressServiceName, ns, federationName),
@@ -291,8 +293,8 @@ func equivalentIngress(federatedIngress, clusterIngress v1beta1.Ingress) bool {
 // verifyCascadingDeletionForIngress verifies that ingresses are deleted from
 // underlying clusters when orphan dependents is false and they are not deleted
 // when orphan dependents is true.
-func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
-	ingress := createIngressOrFail(clientset, nsName, FederatedIngressServiceName, FederatedIngressTLSSecretName)
+func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName, serviceName string) {
+	ingress := createIngressOrFail(clientset, nsName, serviceName, FederatedIngressTLSSecretName)
 	ingressName := ingress.Name
 	// Check subclusters if the ingress was created there.
 	By(fmt.Sprintf("Waiting for ingress %s to be created in all underlying clusters", ingressName))
