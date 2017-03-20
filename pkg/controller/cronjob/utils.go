@@ -86,7 +86,7 @@ func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
 
 // groupJobsByParent groups jobs into a map keyed by the job parent UID (e.g. scheduledJob).
 // It has no receiver, to facilitate testing.
-func groupJobsByParent(sjs []batchv2alpha1.CronJob, js []batchv1.Job) map[types.UID][]batchv1.Job {
+func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 	jobsBySj := make(map[types.UID][]batchv1.Job)
 	for _, job := range js {
 		parentUID, found := getParentUIDFromJob(job)
