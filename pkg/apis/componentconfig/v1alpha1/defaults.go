@@ -158,6 +158,12 @@ func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
 	if obj.FailureDomains == "" {
 		obj.FailureDomains = api.DefaultFailureDomains
 	}
+	if obj.LockObjectNamespace == "" {
+		obj.LockObjectNamespace = api.NamespaceSystem
+	}
+	if obj.LockObjectName == "" {
+		obj.LockObjectName = api.DefaultLockObjectName
+	}
 }
 
 func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {

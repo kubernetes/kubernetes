@@ -113,8 +113,8 @@ func Run(s *options.SchedulerServer) error {
 	// TODO: enable other lock types
 	rl := &resourcelock.EndpointsLock{
 		EndpointsMeta: metav1.ObjectMeta{
-			Namespace: "kube-system",
-			Name:      "kube-scheduler",
+			Namespace: s.LockObjectNamespace,
+			Name:      s.LockObjectName,
 		},
 		Client: kubecli,
 		LockConfig: resourcelock.ResourceLockConfig{
