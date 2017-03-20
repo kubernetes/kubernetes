@@ -164,7 +164,7 @@ func TestProxyHandler(t *testing.T) {
 		handler.contextMapper = &fakeRequestContextMapper{user: tc.user}
 		handler.removeAPIService()
 		if tc.apiService != nil {
-			handler.updateAPIService(tc.apiService)
+			handler.updateAPIService(tc.apiService, tc.apiService.Spec.Service.Name+"."+tc.apiService.Spec.Service.Namespace+".svc")
 			curr := handler.handlingInfo.Load().(proxyHandlingInfo)
 			curr.destinationHost = targetServer.Listener.Addr().String()
 			handler.handlingInfo.Store(curr)

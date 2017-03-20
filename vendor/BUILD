@@ -15443,6 +15443,7 @@ go_library(
 go_test(
     name = "k8s.io/kube-aggregator/pkg/apiserver_test",
     srcs = [
+        "k8s.io/kube-aggregator/pkg/apiserver/apiservice_controller_test.go",
         "k8s.io/kube-aggregator/pkg/apiserver/handler_apis_test.go",
         "k8s.io/kube-aggregator/pkg/apiserver/handler_proxy_test.go",
     ],
@@ -15493,8 +15494,10 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
         "//vendor:k8s.io/apiserver/pkg/server",
         "//vendor:k8s.io/client-go/informers",
+        "//vendor:k8s.io/client-go/informers/core/v1",
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/listers/core/v1",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/version",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/cache",
