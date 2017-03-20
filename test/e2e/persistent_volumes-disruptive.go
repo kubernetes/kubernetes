@@ -55,8 +55,10 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 		ns                        string
 		nfsServerPod              *v1.Pod
 		nfsPVconfig               framework.PersistentVolumeConfig
+		pvcConfig                 framework.PersistentVolumeClaimConfig
 		nfsServerIP, clientNodeIP string
 		clientNode                *v1.Node
+		volSelLab                 map[string]string
 	)
 
 	BeforeEach(func() {
@@ -64,6 +66,9 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 		framework.SkipUnlessNodeCountIsAtLeast(MinNodes)
 		c = f.ClientSet
 		ns = f.Namespace.Name
+		/* -[DEBUG]- Volume Selector Label */
+		volSelLab = make(map[string]string)
+		volSelLab[framework.VolumeSelectorKey] = ns
 
 		// Start the NFS server pod.
 		framework.Logf("[BeforeEach] Creating NFS Server Pod")
@@ -74,12 +79,22 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 		Expect(nfsServerIP).NotTo(BeEmpty())
 		nfsPVconfig = framework.PersistentVolumeConfig{
 			NamePrefix: "nfs-",
+			Labels:     volSelLab, /* -[DEBUG]- Selector Label */
 			PVSource: v1.PersistentVolumeSource{
 				NFS: &v1.NFSVolumeSource{
 					Server:   nfsServerIP,
 					Path:     "/exports",
 					ReadOnly: false,
 				},
+			},
+		}
+		/* -[DEBUG]-  PVC CONFIG */
+		pvcConfig = framework.PersistentVolumeClaimConfig{
+			Annotations: map[string]string{
+				v1.BetaStorageClassAnnotation: "",
+			},
+			Selector: metav1.LabelSelector{
+				MatchLabels: volSelLab,
 			},
 		}
 		// Get the first ready node IP that is not hosting the NFS pod.
@@ -111,7 +126,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 
 		BeforeEach(func() {
 			framework.Logf("Initializing test spec")
-			clientPod, pv, pvc = initTestCase(f, c, nfsPVconfig, ns, clientNode.Name)
+			clientPod, pv, pvc = initTestCase(f, c, nfsPVconfig, pvcConfig, ns, clientNode.Name)
 		})
 
 		AfterEach(func() {
@@ -187,8 +202,8 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 }
 
 // initTestCase initializes spec resources (pv, pvc, and pod) and returns pointers to be consumed by the test
-func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framework.PersistentVolumeConfig, ns, nodeName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
-	pv, pvc := framework.CreatePVPVC(c, pvConfig, ns, false)
+func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, ns, nodeName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+	pv, pvc := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
 	pod := framework.MakePod(ns, pvc.Name, true, "")
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating nfs client Pod %s on node %s", pod.Name, nodeName)

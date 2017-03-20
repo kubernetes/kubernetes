@@ -42,8 +42,9 @@ import (
 )
 
 const (
-	PDRetryTimeout  = 5 * time.Minute
-	PDRetryPollTime = 5 * time.Second
+	PDRetryTimeout    = 5 * time.Minute
+	PDRetryPollTime   = 5 * time.Second
+	VolumeSelectorKey = "e2e-pv-pool" // TODO or just "Namespace" ?
 )
 
 // Map of all PVs used in the multi pv-pvc tests. The key is the PV's name, which is
@@ -74,6 +75,14 @@ type PersistentVolumeConfig struct {
 	Prebind       *v1.PersistentVolumeClaim
 	ReclaimPolicy v1.PersistentVolumeReclaimPolicy
 	NamePrefix    string
+	Labels        map[string]string
+}
+
+// TODO fancy comment
+// TODO add AccessModes
+type PersistentVolumeClaimConfig struct {
+	Annotations map[string]string
+	Selector    metav1.LabelSelector
 }
 
 // Clean up a pv and pvc in a single pv/pvc test case.
@@ -187,6 +196,7 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, 
 func createPV(c clientset.Interface, pv *v1.PersistentVolume) *v1.PersistentVolume {
 
 	pv, err := c.Core().PersistentVolumes().Create(pv)
+	Logf("DEBUG --- createPV labels: %v", pv.Labels)
 	Expect(err).NotTo(HaveOccurred())
 	return pv
 }
@@ -195,6 +205,7 @@ func createPV(c clientset.Interface, pv *v1.PersistentVolume) *v1.PersistentVolu
 func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 
 	pvc, err := c.Core().PersistentVolumeClaims(ns).Create(pvc)
+	Logf("DEBUG --- createPVC Selector:  %v", pvc.Spec.Selector.MatchLabels)
 	Expect(err).NotTo(HaveOccurred())
 	return pvc
 }
@@ -205,12 +216,12 @@ func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) 
 // Note: in the pre-bind case the real PVC name, which is generated, is not
 //   known until after the PVC is instantiated. This is why the pvc is created
 //   before the pv.
-func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 
 	var preBindMsg string
 
 	// make the pvc definition first
-	pvc := MakePersistentVolumeClaim(ns)
+	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
 	if preBind {
 		preBindMsg = " pre-bound"
 		pvConfig.Prebind = pvc
@@ -238,7 +249,7 @@ func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, ns stri
 // Note: in the pre-bind case the real PV name, which is generated, is not
 //   known until after the PV is instantiated. This is why the pv is created
 //   before the pvc.
-func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 
 	preBindMsg := ""
 	if preBind {
@@ -248,7 +259,7 @@ func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, ns stri
 
 	// make the pv and pvc definitions
 	pv := makePersistentVolume(pvConfig)
-	pvc := MakePersistentVolumeClaim(ns)
+	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
 
 	// instantiate the pv
 	pv = createPV(c, pv)
@@ -264,7 +275,7 @@ func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, ns stri
 // Create the desired number of PVs and PVCs and return them in separate maps. If the
 // number of PVs != the number of PVCs then the min of those two counts is the number of
 // PVs expected to bind.
-func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConfig PersistentVolumeConfig) (PVMap, PVCMap) {
+func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig) (PVMap, PVCMap) {
 
 	var i int
 	var pv *v1.PersistentVolume
@@ -282,7 +293,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 
 	// create pvs and pvcs
 	for i = 0; i < pvsToCreate; i++ {
-		pv, pvc = CreatePVPVC(c, pvConfig, ns, false)
+		pv, pvc = CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
 		pvMap[pv.Name] = pvval{}
 		pvcMap[makePvcKey(ns, pvc.Name)] = pvcval{}
 	}
@@ -294,7 +305,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 		pvMap[pv.Name] = pvval{}
 	}
 	for i = 0; i < extraPVCs; i++ {
-		pvc = MakePersistentVolumeClaim(ns)
+		pvc = MakePersistentVolumeClaim(pvcConfig, ns)
 		pvc = CreatePVC(c, ns, pvc)
 		pvcMap[makePvcKey(ns, pvc.Name)] = pvcval{}
 	}
@@ -453,6 +464,9 @@ func makePvcKey(ns, name string) types.NamespacedName {
 func makePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
 	// Specs are expected to match this test's PersistentVolumeClaim
 
+	//TODO Handle default values
+	Logf("DEBUG --- MakePVC Selector: %v", pvConfig.Labels)
+
 	var claimRef *v1.ObjectReference
 	// If the reclaimPolicy is not provided, assume Retain
 	if pvConfig.ReclaimPolicy == "" {
@@ -467,6 +481,7 @@ func makePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
+			Labels:       pvConfig.Labels,
 			Annotations: map[string]string{
 				volumehelper.VolumeGidAnnotationKey: "777",
 			},
@@ -491,18 +506,20 @@ func makePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 // Note: if this PVC is intended to be pre-bound to a PV, whose name is not
 //   known until the PV is instantiated, then the func CreatePVPVC will add
 //   pvc.Spec.VolumeName to this claim.
-func MakePersistentVolumeClaim(ns string) *v1.PersistentVolumeClaim {
+func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.PersistentVolumeClaim {
 	// Specs are expected to match this test's PersistentVolume
+
+	// TODO handle default values
+	Logf("DEBUG --- MakePVC Selector: %v", cfg.Selector)
 
 	return &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
-			Annotations: map[string]string{
-				"volume.beta.kubernetes.io/storage-class": "",
-			},
+			Annotations:  cfg.Annotations,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
+			Selector: &cfg.Selector,
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 				v1.ReadOnlyMany,
