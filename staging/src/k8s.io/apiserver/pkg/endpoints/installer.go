@@ -50,9 +50,9 @@ type APIInstaller struct {
 	minRequestTimeout time.Duration
 }
 
-// Struct capturing information about an action ("GET", "POST", "WATCH", PROXY", etc).
+// Struct capturing information about an action ("GET", "POST", "WATCH", "PROXY", etc).
 type action struct {
-	Verb          string               // Verb identifying the action ("GET", "POST", "WATCH", PROXY", etc).
+	Verb          string               // Verb identifying the action ("GET", "POST", "WATCH", "PROXY", etc).
 	Path          string               // The path of the action
 	Params        []*restful.Parameter // List of parameters associated with the action.
 	Namer         handlers.ScopeNamer
