@@ -684,12 +684,17 @@ type KubeControllerManagerConfiguration struct {
 	ConcurrentSATokenSyncs int32
 	// lookupCacheSizeForRC is the size of lookup cache for replication controllers.
 	// Larger number = more responsive replica management, but more MEM load.
+	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
+	// DEPRECATED: This is no longer used.
 	LookupCacheSizeForRC int32
 	// lookupCacheSizeForRS is the size of lookup cache for replicatsets.
 	// Larger number = more responsive replica management, but more MEM load.
+	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
+	// DEPRECATED: This is no longer used.
 	LookupCacheSizeForRS int32
 	// lookupCacheSizeForDaemonSet is the size of lookup cache for daemonsets.
 	// Larger number = more responsive daemonset, but more MEM load.
+	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
 	// DEPRECATED: This is no longer used.
 	LookupCacheSizeForDaemonSet int32
 	// serviceSyncPeriod is the period for syncing services with their external
