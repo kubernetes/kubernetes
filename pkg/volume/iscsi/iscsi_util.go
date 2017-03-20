@@ -17,7 +17,6 @@ limitations under the License.
 package iscsi
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path"
