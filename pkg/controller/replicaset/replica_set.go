@@ -181,6 +181,27 @@ func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*extensions.Re
 	return rss
 }
 
+// resolveControllerRef returns the controller referenced by a ControllerRef,
+// or nil if the ControllerRef could not be resolved to a matching controller
+// of the corrrect Kind.
+func (rsc *ReplicaSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.ReplicaSet {
+	// We can't look up by UID, so look up by Name and then verify UID.
+	// Don't even try to look up by Name if it's the wrong Kind.
+	if controllerRef.Kind != controllerKind.Kind {
+		return nil
+	}
+	rs, err := rsc.rsLister.ReplicaSets(namespace).Get(controllerRef.Name)
+	if err != nil {
+		return nil
+	}
+	if rs.UID != controllerRef.UID {
+		// The controller we found with this Name is not the same one that the
+		// ControllerRef points to.
+		return nil
+	}
+	return rs
+}
+
 // callback when RS is updated
 func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 	oldRS := old.(*extensions.ReplicaSet)
@@ -217,19 +238,15 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
-		if controllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
-			return
-		}
-		glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
-		rs, err := rsc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
-		if err != nil {
+		rs := rsc.resolveControllerRef(pod.Namespace, controllerRef)
+		if rs == nil {
 			return
 		}
 		rsKey, err := controller.KeyFunc(rs)
 		if err != nil {
 			return
 		}
+		glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
 		rsc.expectations.CreationObserved(rsKey)
 		rsc.enqueueReplicaSet(rs)
 		return
@@ -279,26 +296,20 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 	curControllerRef := controller.GetControllerOf(curPod)
 	oldControllerRef := controller.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
-	if controllerRefChanged &&
-		oldControllerRef != nil && oldControllerRef.Kind == controllerKind.Kind {
+	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
-		rs, err := rsc.rsLister.ReplicaSets(oldPod.Namespace).Get(oldControllerRef.Name)
-		if err == nil {
+		if rs := rsc.resolveControllerRef(oldPod.Namespace, oldControllerRef); rs != nil {
 			rsc.enqueueReplicaSet(rs)
 		}
 	}
 
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
-		if curControllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
+		rs := rsc.resolveControllerRef(curPod.Namespace, curControllerRef)
+		if rs == nil {
 			return
 		}
 		glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
-		rs, err := rsc.rsLister.ReplicaSets(curPod.Namespace).Get(curControllerRef.Name)
-		if err != nil {
-			return
-		}
 		rsc.enqueueReplicaSet(rs)
 		// TODO: MinReadySeconds in the Pod will generate an Available condition to be added in
 		// the Pod status which in turn will trigger a requeue of the owning replica set thus
@@ -355,20 +366,15 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 		// No controller should care about orphans being deleted.
 		return
 	}
-	if controllerRef.Kind != controllerKind.Kind {
-		// It's controlled by a different type of controller.
-		return
-	}
-	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
-
-	rs, err := rsc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
-	if err != nil {
+	rs := rsc.resolveControllerRef(pod.Namespace, controllerRef)
+	if rs == nil {
 		return
 	}
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
 		return
 	}
+	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
 	rsc.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
 	rsc.enqueueReplicaSet(rs)
 }
