@@ -1073,10 +1073,26 @@ func (proxier *Proxier) syncProxyRules() {
 				"-m", protocol, "-p", protocol,
 				"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
 			}
+
 			// Nodeports need SNAT.
 			writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 			// Jump to the service chain.
 			writeLine(natRules, append(args, "-j", string(svcChain))...)
+
+			// If the service has no endpoints then reject packets.  The filter
+			// table doesn't currently have the same per-service structure that
+			// the nat table does, so we just stick this into the kube-services
+			// chain.
+			if len(proxier.endpointsMap[svcName]) == 0 {
+				writeLine(filterRules,
+					"-A", string(kubeServicesChain),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcName.String()),
+					"-m", "addrtype", "--dst-type", "LOCAL",
+					"-m", protocol, "-p", protocol,
+					"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
+					"-j", "REJECT",
+				)
+			}
 		}
 
 		// If the service has no endpoints then reject packets.
@@ -1091,6 +1107,8 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 			continue
 		}
+
+		// From here on, we assume there are active endpoints.
 
 		// Generate the per-endpoint chains.  We do this in multiple passes so we
 		// can group rules together.
