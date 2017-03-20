@@ -281,7 +281,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			// our config.EndpointsConfigHandler.
 			loadBalancer := userspace.NewLoadBalancerRR()
 			// set EndpointsConfigHandler to our loadBalancer
-			endpointsHandler = loadBalancer
+			endpointsEventHandler = loadBalancer
 			proxierUserspace, err := userspace.NewProxier(
 				loadBalancer,
 				net.ParseIP(config.BindAddress),
