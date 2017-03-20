@@ -501,7 +501,19 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(d *extensions.Deploy
 	if err != nil {
 		return nil, fmt.Errorf("deployment %s/%s has invalid label selector: %v", d.Namespace, d.Name, err)
 	}
-	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, d, deploymentSelector, controllerKind)
+	// If any adoptions are attempted, we should first recheck for deletion with
+	// an uncached quorum read sometime after listing ReplicaSets (see #42639).
+	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+		fresh, err := dc.client.ExtensionsV1beta1().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		if fresh.UID != d.UID {
+			return nil, fmt.Errorf("original Deployment %v/%v is gone: got uid %v, wanted %v", d.Namespace, d.Name, fresh.UID, d.UID)
+		}
+		return fresh, nil
+	})
+	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, d, deploymentSelector, controllerKind, canAdoptFunc)
 	return cm.ClaimReplicaSets(rsList)
 }
 

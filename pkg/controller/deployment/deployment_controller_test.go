@@ -148,6 +148,11 @@ type fixture struct {
 	objects []runtime.Object
 }
 
+func (f *fixture) expectGetDeploymentAction(d *extensions.Deployment) {
+	action := core.NewGetAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d.Name)
+	f.actions = append(f.actions, action)
+}
+
 func (f *fixture) expectUpdateDeploymentStatusAction(d *extensions.Deployment) {
 	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
 	action.Subresource = "status"
@@ -190,15 +195,25 @@ func (f *fixture) newController() (*DeploymentController, informers.SharedInform
 	return c, informers
 }
 
+func (f *fixture) runExpectError(deploymentName string) {
+	f.run_(deploymentName, true)
+}
+
 func (f *fixture) run(deploymentName string) {
+	f.run_(deploymentName, false)
+}
+
+func (f *fixture) run_(deploymentName string, expectError bool) {
 	c, informers := f.newController()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
 
 	err := c.syncDeployment(deploymentName)
-	if err != nil {
+	if !expectError && err != nil {
 		f.t.Errorf("error syncing deployment: %v", err)
+	} else if expectError && err == nil {
+		f.t.Error("expected error syncing deployment, got nil")
 	}
 
 	actions := filterInformerActions(f.client.Actions())
@@ -291,6 +306,30 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 
 	f.expectUpdateDeploymentStatusAction(d)
 	f.run(getKey(d, t))
+}
+
+func TestSyncDeploymentDeletionRace(t *testing.T) {
+	f := newFixture(t)
+
+	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d2 := *d
+	// Lister (cache) says NOT deleted.
+	f.dLister = append(f.dLister, d)
+	// Bare client says it IS deleted. This should be presumed more up-to-date.
+	now := metav1.Now()
+	d2.DeletionTimestamp = &now
+	f.objects = append(f.objects, &d2)
+
+	// The recheck is only triggered if a matching orphan exists.
+	rs := newReplicaSet(d, "rs1", 1)
+	rs.OwnerReferences = nil
+	f.objects = append(f.objects, rs)
+	f.rsLister = append(f.rsLister, rs)
+
+	// Expect to only recheck DeletionTimestamp.
+	f.expectGetDeploymentAction(d)
+	// Sync should fail and requeue to let cache catch up.
+	f.runExpectError(getKey(d, t))
 }
 
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
