@@ -405,15 +405,15 @@ func TestCinderAutoDetectApiVersion(t *testing.T) {
 		result_version[ver] = fmt.Sprintf("v%d", ver)
 	}
 	result_version[0] = ""
-	api_current_v1 := apiversions.APIVersion{api_version[1], status_current, updated}
-	api_current_v2 := apiversions.APIVersion{api_version[2], status_current, updated}
-	api_current_v3 := apiversions.APIVersion{api_version[3], status_current, updated}
+	api_current_v1 := apiversions.APIVersion{ID: api_version[1], Status: status_current, Updated: updated}
+	api_current_v2 := apiversions.APIVersion{ID: api_version[2], Status: status_current, Updated: updated}
+	api_current_v3 := apiversions.APIVersion{ID: api_version[3], Status: status_current, Updated: updated}
 
-	api_supported_v1 := apiversions.APIVersion{api_version[1], status_supported, updated}
-	api_supported_v2 := apiversions.APIVersion{api_version[2], status_supported, updated}
+	api_supported_v1 := apiversions.APIVersion{ID: api_version[1], Status: status_supported, Updated: updated}
+	api_supported_v2 := apiversions.APIVersion{ID: api_version[2], Status: status_supported, Updated: updated}
 
-	api_deprecated_v1 := apiversions.APIVersion{api_version[1], status_deprecated, updated}
-	api_deprecated_v2 := apiversions.APIVersion{api_version[2], status_deprecated, updated}
+	api_deprecated_v1 := apiversions.APIVersion{ID: api_version[1], Status: status_deprecated, Updated: updated}
+	api_deprecated_v2 := apiversions.APIVersion{ID: api_version[2], Status: status_deprecated, Updated: updated}
 
 	var testCases = []struct {
 		test_case     []apiversions.APIVersion
