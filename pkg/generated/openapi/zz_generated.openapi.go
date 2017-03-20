@@ -212,6 +212,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"groupNames": {
+							SchemaProps: spec.SchemaProps{
+								Description: "groupNames is a list of group aliases this resource belongs to (e.g. 'all')",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
 					},
 					Required: []string{"name", "namespaced", "kind", "verbs"},
 				},

@@ -120,6 +120,11 @@ func DeepCopy_v1_APIResource(in interface{}, out interface{}, c *conversion.Clon
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
+		if in.GroupNames != nil {
+			in, out := &in.GroupNames, &out.GroupNames
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		return nil
 	}
 }

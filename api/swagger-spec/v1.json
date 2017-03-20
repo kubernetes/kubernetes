@@ -20902,6 +20902,13 @@
        "type": "string"
       },
       "description": "shortNames is a list of suggested short names of the resource."
+     },
+     "groupNames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "groupNames is a list of group aliases this resource belongs to (e.g. 'all')"
      }
     }
    }
