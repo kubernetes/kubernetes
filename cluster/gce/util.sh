@@ -1187,6 +1187,8 @@ function create-nodes() {
 # - ZONE
 # - AUTOSCALER_MAX_NODES
 # - AUTOSCALER_MIN_NODES
+# - AUTOSCALER_ENABLE_SCALE_DOWN
+# - (optional)AUTOSCALER_EXTRA_FLAGS
 # Exports
 # - AUTOSCALER_MIG_CONFIG
 function create-cluster-autoscaler-mig-config() {
@@ -1230,6 +1232,10 @@ function create-cluster-autoscaler-mig-config() {
   done
 
   AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --scale-down-enabled=${AUTOSCALER_ENABLE_SCALE_DOWN}"
+
+  if [[ ! -z "${AUTOSCALER_EXTRA_FLAGS}" ]]; then
+    AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} ${AUTOSCALER_EXTRA_FLAGS}"
+  fi
 }
 
 # Assumes:
