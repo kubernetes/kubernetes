@@ -108,12 +108,16 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// sense to test it that way
 		isSystemd = true
 		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
-		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--remain-after-exit", builder.GetKubeletServerBin())
+		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--slice=runtime.slice", "--remain-after-exit", builder.GetKubeletServerBin())
 		killCommand = exec.Command("systemctl", "kill", unitName)
 		restartCommand = exec.Command("systemctl", "restart", unitName)
 		e.logFiles["kubelet.log"] = logFileData{
 			journalctlCommand: []string{"-u", unitName},
 		}
+		cmdArgs = append(cmdArgs,
+			"--kubelet-cgroups=/kubelet.slice",
+			"--cgroup-root=/",
+		)
 	} else {
 		cmdArgs = append(cmdArgs, builder.GetKubeletServerBin())
 		cmdArgs = append(cmdArgs,
