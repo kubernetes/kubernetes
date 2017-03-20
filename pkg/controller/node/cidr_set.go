@@ -35,13 +35,28 @@ type cidrSet struct {
 	subNetMaskSize  int
 }
 
+const (
+	// The subnet mask size cannot be greater than 16 more than the cluster mask size
+	// TODO: https://github.com/kubernetes/kubernetes/issues/44918
+	// clusterSubnetMaxDiff limited to 16 due to the uncompressed bitmap
+	clusterSubnetMaxDiff = 16
+	// maximum 64 bits of prefix
+	maxPrefixLength = 64
+)
+
 func newCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) *cidrSet {
 	clusterMask := clusterCIDR.Mask
 	clusterMaskSize, _ := clusterMask.Size()
-	maxCIDRs := 1 << uint32(subNetMaskSize-clusterMaskSize)
+
+	var maxCIDRs int
+	if ((clusterCIDR.IP.To4() == nil) && (subNetMaskSize-clusterMaskSize > clusterSubnetMaxDiff)) || (subNetMaskSize > maxPrefixLength) {
+		maxCIDRs = 0
+	} else {
+		maxCIDRs = 1 << uint32(subNetMaskSize-clusterMaskSize)
+	}
 	return &cidrSet{
 		clusterCIDR:     clusterCIDR,
-		clusterIP:       clusterCIDR.IP.To4(),
+		clusterIP:       clusterCIDR.IP,
 		clusterMaskSize: clusterMaskSize,
 		maxCIDRs:        maxCIDRs,
 		subNetMaskSize:  subNetMaskSize,
@@ -67,14 +82,31 @@ func (s *cidrSet) allocateNext() (*net.IPNet, error) {
 
 	s.used.SetBit(&s.used, nextUnused, 1)
 
-	j := uint32(nextUnused) << uint32(32-s.subNetMaskSize)
-	ipInt := (binary.BigEndian.Uint32(s.clusterIP)) | j
-	ip := make([]byte, 4)
-	binary.BigEndian.PutUint32(ip, ipInt)
+	var ip []byte
+	var mask int
 
+	switch /*v4 or v6*/ {
+	case s.clusterIP.To4() != nil:
+		{
+			j := uint32(nextUnused) << uint32(32-s.subNetMaskSize)
+			ipInt := (binary.BigEndian.Uint32(s.clusterIP)) | j
+			ip = make([]byte, 4)
+			binary.BigEndian.PutUint32(ip, ipInt)
+			mask = 32
+
+		}
+	case s.clusterIP.To16() != nil:
+		{
+			j := uint64(nextUnused) << uint64(64-s.subNetMaskSize)
+			ipInt := (binary.BigEndian.Uint64(s.clusterIP)) | j
+			ip = make([]byte, 16)
+			binary.BigEndian.PutUint64(ip, ipInt)
+			mask = 128
+		}
+	}
 	return &net.IPNet{
 		IP:   ip,
-		Mask: net.CIDRMask(s.subNetMaskSize, 32),
+		Mask: net.CIDRMask(s.subNetMaskSize, mask),
 	}, nil
 }
 
@@ -88,24 +120,45 @@ func (s *cidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err
 	}
 
 	if s.clusterMaskSize < maskSize {
-		subNetMask := net.CIDRMask(s.subNetMaskSize, 32)
-		begin, err = s.getIndexForCIDR(&net.IPNet{
-			IP:   cidr.IP.To4().Mask(subNetMask),
-			Mask: subNetMask,
-		})
-		if err != nil {
-			return -1, -1, err
-		}
+		if cidr.IP.To4() != nil {
+			subNetMask := net.CIDRMask(s.subNetMaskSize, 32)
+			begin, err = s.getIndexForCIDR(&net.IPNet{
+				IP:   cidr.IP.Mask(subNetMask),
+				Mask: subNetMask,
+			})
+			if err != nil {
+				return -1, -1, err
+			}
 
-		ip := make([]byte, 4)
-		ipInt := binary.BigEndian.Uint32(cidr.IP) | (^binary.BigEndian.Uint32(cidr.Mask))
-		binary.BigEndian.PutUint32(ip, ipInt)
-		end, err = s.getIndexForCIDR(&net.IPNet{
-			IP:   net.IP(ip).To4().Mask(subNetMask),
-			Mask: subNetMask,
-		})
-		if err != nil {
-			return -1, -1, err
+			ip := make([]byte, 4)
+			ipInt := binary.BigEndian.Uint32(cidr.IP) | (^binary.BigEndian.Uint32(cidr.Mask))
+			binary.BigEndian.PutUint32(ip, ipInt)
+			end, err = s.getIndexForCIDR(&net.IPNet{
+				IP:   net.IP(ip).Mask(subNetMask),
+				Mask: subNetMask,
+			})
+			if err != nil {
+				return -1, -1, err
+			}
+		} else if cidr.IP.To16() != nil {
+			subNetMask := net.CIDRMask(s.subNetMaskSize, 128)
+			begin, err = s.getIndexForCIDR(&net.IPNet{
+				IP:   cidr.IP.Mask(subNetMask),
+				Mask: subNetMask,
+			})
+			if err != nil {
+				return -1, -1, err
+			}
+			ip := make([]byte, 16)
+			ipInt := binary.BigEndian.Uint64(cidr.IP) | (^binary.BigEndian.Uint64(cidr.Mask))
+			binary.BigEndian.PutUint64(ip, ipInt)
+			end, err = s.getIndexForCIDR(&net.IPNet{
+				IP:   net.IP(ip).Mask(subNetMask),
+				Mask: subNetMask,
+			})
+			if err != nil {
+				return -1, -1, err
+			}
 		}
 	}
 	return begin, end, nil
@@ -140,11 +193,20 @@ func (s *cidrSet) occupy(cidr *net.IPNet) (err error) {
 }
 
 func (s *cidrSet) getIndexForCIDR(cidr *net.IPNet) (int, error) {
-	cidrIndex := (binary.BigEndian.Uint32(s.clusterIP) ^ binary.BigEndian.Uint32(cidr.IP.To4())) >> uint32(32-s.subNetMaskSize)
+	var cidrIndex uint32
+	if cidr.IP.To4() != nil {
+		cidrIndex = (binary.BigEndian.Uint32(s.clusterIP) ^ binary.BigEndian.Uint32(cidr.IP.To4())) >> uint32(32-s.subNetMaskSize)
+		if cidrIndex >= uint32(s.maxCIDRs) {
+			return 0, fmt.Errorf("CIDR: %v is out of the range of CIDR allocator", cidr)
+		}
+	} else if cidr.IP.To16() != nil {
+		cidrIndex64 := (binary.BigEndian.Uint64(s.clusterIP) ^ binary.BigEndian.Uint64(cidr.IP.To16())) >> uint64(64-s.subNetMaskSize)
 
-	if cidrIndex >= uint32(s.maxCIDRs) {
-		return 0, fmt.Errorf("CIDR: %v is out of the range of CIDR allocator", cidr)
+		if cidrIndex64 >= uint64(s.maxCIDRs) {
+			return 0, fmt.Errorf("CIDR: %v is out of the range of CIDR allocator", cidr)
+		}
+		cidrIndex = uint32(cidrIndex64)
+
 	}
-
 	return int(cidrIndex), nil
 }
