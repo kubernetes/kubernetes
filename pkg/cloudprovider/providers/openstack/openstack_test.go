@@ -82,7 +82,6 @@ func TestReadConfig(t *testing.T) {
  monitor-timeout = 30s
  monitor-max-retries = 3
  [BlockStorage]
- auto-allow-supported = false
  bs-version = auto
  trust-device-path = yes
 
@@ -111,9 +110,6 @@ func TestReadConfig(t *testing.T) {
 	}
 	if cfg.BlockStorage.BSVersion != "auto" {
 		t.Errorf("incorrect bs.bs-version: %v", cfg.BlockStorage.BSVersion)
-	}
-	if cfg.BlockStorage.AllowAutoSupported != false {
-		t.Errorf("incorrect bs.auto-allow-supported: %v", cfg.BlockStorage.AllowAutoSupported)
 	}
 }
 
@@ -399,7 +395,7 @@ func TestVolumes(t *testing.T) {
 func TestCinderAutoDetectApiVersion(t *testing.T) {
 	updated := "" // not relevant to this test, can be set to any value
 	status_current := "CURRENT"
-	status_supported := "SUPPORTED"
+	status_supported := "SUPpORTED" // lowercase to test regression resitance if api returns different case
 	status_deprecated := "DEPRECATED"
 
 	var result_version, api_version [4]string
@@ -420,22 +416,20 @@ func TestCinderAutoDetectApiVersion(t *testing.T) {
 	api_deprecated_v2 := apiversions.APIVersion{api_version[2], status_deprecated, updated}
 
 	var testCases = []struct {
-		test_case       []apiversions.APIVersion
-		allow_supported bool
-		wanted_result   string
+		test_case     []apiversions.APIVersion
+		wanted_result string
 	}{
-		{[]apiversions.APIVersion{api_supported_v1, api_current_v2}, false, result_version[2]},                    // current always selected
-		{[]apiversions.APIVersion{api_current_v1, api_supported_v2}, false, result_version[1]},                    // current always selected
-		{[]apiversions.APIVersion{api_current_v1, api_supported_v2}, true, result_version[1]},                     // prioritize current
-		{[]apiversions.APIVersion{api_current_v3, api_supported_v2, api_deprecated_v1}, false, result_version[0]}, // with current v3, no fallback
-		{[]apiversions.APIVersion{api_current_v3, api_supported_v2, api_deprecated_v1}, true, result_version[2]},  // with current v3, but should fall back to v2
-		{[]apiversions.APIVersion{api_current_v3, api_supported_v2, api_supported_v1}, true, result_version[2]},   // with current v3, but should fall back to v2, not v1
-		{[]apiversions.APIVersion{api_current_v3, api_deprecated_v2, api_deprecated_v1}, true, result_version[0]}, // v3 is not supported
+		{[]apiversions.APIVersion{api_current_v1}, result_version[1]},
+		{[]apiversions.APIVersion{api_current_v2}, result_version[2]},
+		{[]apiversions.APIVersion{api_supported_v1, api_current_v2}, result_version[2]},                     // current always selected
+		{[]apiversions.APIVersion{api_current_v1, api_supported_v2}, result_version[1]},                     // current always selected
+		{[]apiversions.APIVersion{api_current_v3, api_supported_v2, api_deprecated_v1}, result_version[2]},  // with current v3, but should fall back to v2
+		{[]apiversions.APIVersion{api_current_v3, api_deprecated_v2, api_deprecated_v1}, result_version[0]}, // v3 is not supported
 	}
 
 	for _, suite := range testCases {
-		if autodetectedVersion := doBsApiVersionAutodetect(suite.test_case, suite.allow_supported); autodetectedVersion != suite.wanted_result {
-			t.Fatalf("Autodetect for suite: %s, allow supported version: %v, failed with result: '%s', wanted '%s'", suite.test_case, suite.allow_supported, autodetectedVersion, suite.wanted_result)
+		if autodetectedVersion := doBsApiVersionAutodetect(suite.test_case); autodetectedVersion != suite.wanted_result {
+			t.Fatalf("Autodetect for suite: %s, failed with result: '%s', wanted '%s'", suite.test_case, autodetectedVersion, suite.wanted_result)
 		}
 	}
 }

@@ -91,9 +91,8 @@ type LoadBalancerOpts struct {
 }
 
 type BlockStorageOpts struct {
-	AllowAutoSupported bool   `gcfg:"auto-allow-supported"` // Allow autodetection to fall back to SUPPORTED api versions
-	BSVersion          string `gcfg:"bs-version"`           // overrides autodetection. v1 or v2. Defaults to auto
-	TrustDevicePath    bool   `gcfg:"trust-device-path"`    // See Issue #33128
+	BSVersion       string `gcfg:"bs-version"`        // overrides autodetection. v1 or v2. Defaults to auto
+	TrustDevicePath bool   `gcfg:"trust-device-path"` // See Issue #33128
 }
 
 type RouterOpts struct {
@@ -179,7 +178,6 @@ func readConfig(config io.Reader) (Config, error) {
 	// Set default values for config params
 	cfg.BlockStorage.BSVersion = "auto"
 	cfg.BlockStorage.TrustDevicePath = false
-	cfg.BlockStorage.AllowAutoSupported = false
 
 	err := gcfg.ReadInto(&cfg, config)
 	return cfg, err
@@ -558,7 +556,7 @@ func (apiVersions APIVersionsByID) Less(i, j int) bool {
 }
 
 func autoVersionSelector(apiVersion *apiversions_v1.APIVersion) string {
-	switch apiVersion.ID {
+	switch strings.ToLower(apiVersion.ID) {
 	case "v2.0":
 		return "v2"
 	case "v1.0":
@@ -568,36 +566,19 @@ func autoVersionSelector(apiVersion *apiversions_v1.APIVersion) string {
 	}
 }
 
-func doBsApiVersionAutodetect(availableApiVersions []apiversions_v1.APIVersion, AllowAutoSupported bool) string {
-	// search for CURRENT api version
-	// There should be only one api version with CURRENT status
-	for _, version := range availableApiVersions {
-		if version.Status == "CURRENT" {
-			if detectedApiVersion := autoVersionSelector(&version); detectedApiVersion != "" {
-				glog.V(3).Infof("Blockstorage API version probing has found a suitable CURRENT api version: %s", detectedApiVersion)
-				return detectedApiVersion
-			} else {
-				break
-			}
-		}
-	}
-	// Only if we don't support CURRENT api version we get this far
-	glog.Warningf("I don't support the CURRENT blockstorage API version")
-	if AllowAutoSupported {
-		glog.Info("Blockstorage api version autodetection is allowed to search in SUPPORTED versions")
-		sort.Sort(APIVersionsByID(availableApiVersions))
+func doBsApiVersionAutodetect(availableApiVersions []apiversions_v1.APIVersion) string {
+	sort.Sort(APIVersionsByID(availableApiVersions))
+	for _, status := range []string{"CURRENT", "SUPPORTED"} {
 		for _, version := range availableApiVersions {
-			if version.Status == "SUPPORTED" {
+			if strings.ToUpper(version.Status) == status {
 				if detectedApiVersion := autoVersionSelector(&version); detectedApiVersion != "" {
-					glog.V(3).Infof("Blockstorage API version probing has found a suitable SUPPORTED api version: %s", detectedApiVersion)
+					glog.V(3).Infof("Blockstorage API version probing has found a suitable %s api version: %s", status, detectedApiVersion)
 					return detectedApiVersion
 				}
 			}
 		}
 	}
-	// Nothing suitable found, failed autodetection
-	errMsg := "Autoprobing for blockstorage API failed to find a suitable api version See auto-allow-supported and bs-version settings."
-	glog.Error(errMsg)
+
 	return ""
 
 }
@@ -653,9 +634,10 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 			glog.Errorf("Error when retrieving list of supported blockstorage api versions: %v", err)
 			return nil, err
 		}
-		if autodetectedVersion := doBsApiVersionAutodetect(availableApiVersions, os.bsOpts.AllowAutoSupported); autodetectedVersion != "" {
+		if autodetectedVersion := doBsApiVersionAutodetect(availableApiVersions); autodetectedVersion != "" {
 			return os.volumeService(autodetectedVersion)
 		} else {
+			// Nothing suitable found, failed autodetection
 			return nil, errors.New("BS API version autodetection failed.")
 		}
 
