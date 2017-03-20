@@ -693,6 +693,8 @@ type APIResource struct {
 	Verbs Verbs `json:"verbs" protobuf:"bytes,4,opt,name=verbs"`
 	// shortNames is a list of suggested short names of the resource.
 	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,5,rep,name=shortNames"`
+	// groupNames is a list of group aliases this resource belongs to (e.g. 'all')
+	GroupNames []string `json:"groupNames,omitempty" protobuf:"bytes,6,rep,name=groupNames"`
 }
 
 // Verbs masks the value so protobuf can generate
