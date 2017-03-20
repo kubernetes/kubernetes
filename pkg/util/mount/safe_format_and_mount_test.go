@@ -98,7 +98,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'")},
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
-				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "ext4", nil},
+				{"lsblk", []string{"-n", "-o", "FSTYPE", "/dev/foo"}, "ext4\n", nil},
 			},
 			expectedError: fmt.Errorf("unknown filesystem type '(null)'"),
 		},
@@ -108,7 +108,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'")},
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
-				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "", nil},
+				{"lsblk", []string{"-n", "-o", "FSTYPE", "/dev/foo"}, "\n", nil},
 				{"mkfs.ext4", []string{"-F", "/dev/foo"}, "", fmt.Errorf("formatting failed")},
 			},
 			expectedError: fmt.Errorf("formatting failed"),
@@ -119,7 +119,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'"), fmt.Errorf("Still cannot mount")},
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
-				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "", nil},
+				{"lsblk", []string{"-n", "-o", "FSTYPE", "/dev/foo"}, "\n", nil},
 				{"mkfs.ext4", []string{"-F", "/dev/foo"}, "", nil},
 			},
 			expectedError: fmt.Errorf("Still cannot mount"),
@@ -130,7 +130,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'"), nil},
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
-				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "", nil},
+				{"lsblk", []string{"-n", "-o", "FSTYPE", "/dev/foo"}, "\n", nil},
 				{"mkfs.ext4", []string{"-F", "/dev/foo"}, "", nil},
 			},
 			expectedError: nil,
@@ -141,7 +141,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'"), nil},
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
-				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "", nil},
+				{"lsblk", []string{"-n", "-o", "FSTYPE", "/dev/foo"}, "\n", nil},
 				{"mkfs.ext3", []string{"-F", "/dev/foo"}, "", nil},
 			},
 			expectedError: nil,
@@ -152,10 +152,30 @@ func TestSafeFormatAndMount(t *testing.T) {
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'"), nil},
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
-				{"lsblk", []string{"-nd", "-o", "FSTYPE", "/dev/foo"}, "", nil},
+				{"lsblk", []string{"-n", "-o", "FSTYPE", "/dev/foo"}, "\n", nil},
 				{"mkfs.xfs", []string{"/dev/foo"}, "", nil},
 			},
 			expectedError: nil,
+		},
+		{
+			description: "Test that 'lsblk' is called and reports ext4 partition",
+			fstype:      "ext3",
+			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'")},
+			execScripts: []ExecArgs{
+				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
+				{"lsblk", []string{"-n", "-o", "FSTYPE", "/dev/foo"}, "\next4\n", nil},
+			},
+			expectedError: fmt.Errorf("failed to mount the volume as \"ext3\", it already contains unknown data, probably partitions. Mount error: unknown filesystem type '(null)'"),
+		},
+		{
+			description: "Test that 'lsblk' is called and reports empty partition",
+			fstype:      "ext3",
+			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'")},
+			execScripts: []ExecArgs{
+				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
+				{"lsblk", []string{"-n", "-o", "FSTYPE", "/dev/foo"}, "\n\n", nil},
+			},
+			expectedError: fmt.Errorf("failed to mount the volume as \"ext3\", it already contains unknown data, probably partitions. Mount error: unknown filesystem type '(null)'"),
 		},
 	}
 
