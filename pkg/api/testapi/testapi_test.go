@@ -48,6 +48,24 @@ func TestResourcePathWithPrefix(t *testing.T) {
 	}
 }
 
+func TestSelfLink(t *testing.T) {
+	testCases := []struct {
+		group    string
+		resource string
+		name     string
+		expected string
+	}{
+		{"group", "myresourse", "myname", "/apis/group/v1/myresourse/myname"},
+		{"", "myresourse", "myname", "/api/v1/myresourse/myname"}, //reset Default.externalGroupVersion.Group to ""，if not,other test will fail.
+	}
+	for _, item := range testCases {
+		Default.externalGroupVersion.Group = item.group
+		if actual := Default.SelfLink(item.resource, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for resource: %s,name: %s", item.expected, actual, item.resource, item.name)
+		}
+	}
+}
+
 func TestResourcePath(t *testing.T) {
 	testCases := []struct {
 		resource  string
