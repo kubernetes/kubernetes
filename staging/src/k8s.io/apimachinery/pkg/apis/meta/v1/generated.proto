@@ -81,6 +81,9 @@ message APIResource {
 
   // shortNames is a list of suggested short names of the resource.
   repeated string shortNames = 5;
+
+  // categories is a list of the grouped resources this resource belongs to (e.g. 'all')
+  repeated string categories = 7;
 }
 
 // APIResourceList is a list of APIResource, it is used to expose the name of the

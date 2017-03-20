@@ -9991,6 +9991,13 @@
        "type": "string"
       },
       "description": "shortNames is a list of suggested short names of the resource."
+     },
+     "categories": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')"
      }
     }
    }

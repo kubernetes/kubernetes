@@ -36861,6 +36861,13 @@
      "verbs"
     ],
     "properties": {
+     "categories": {
+      "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "kind": {
       "description": "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
       "type": "string"

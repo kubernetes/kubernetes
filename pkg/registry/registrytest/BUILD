@@ -10,10 +10,10 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "categoriesProvider.go",
         "doc.go",
         "endpoint.go",
         "etcd.go",
-        "groupNamesProvider.go",
         "node.go",
         "service.go",
         "shortNamesProvider.go",
