@@ -83,7 +83,9 @@ var _ http.Hijacker = &fancyResponseWriterDelegator{}
 //    - source ip of the request
 //    - HTTP method being invoked
 //    - original user invoking the operation
+//    - original user's groups info
 //    - impersonated user for the operation
+//    - impersonated groups info
 //    - namespace of the request or <none>
 //    - uri is the full URI as requested
 // 2. the response line containing:
