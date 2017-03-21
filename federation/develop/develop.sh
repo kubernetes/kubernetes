@@ -51,7 +51,7 @@ readonly VERSIONS_FILE="${FEDERATION_OUTPUT_ROOT}/versions"
 readonly KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
 readonly KUBE_ARCH=${KUBE_ARCH:-amd64}
 
-readonly FEDERATION_TARGET=(
+readonly FEDERATION_TARGETS=(
   cmd/hyperkube
 )
 
@@ -92,34 +92,20 @@ function dirty_sha() {
 }
 
 function build_binaries() {
-  cd "${KUBE_ROOT}"
-  kube::build::verify_prereqs
-  kube::build::build_image
-  kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube federation/cmd/kubefed"
-  kube::build::copy_output
-}
-
-function package_test() {
   targets_arr=(
     "${KUBE_CLIENT_TARGETS[@]}"
-    "${KUBE_TEST_TARGETS[@]}"
-    "${KUBE_TEST_SERVER_TARGETS[@]}"
-    "${FEDERATION_TARGET[@]}"
+    "${FEDERATION_TARGETS[@]}"
   )
 
-  # Convert the array to a string of space separated items.
+  # Convert the array to a string of space separated elements.
   # "make WHAT" below doesn't take newline separated string.
-  targets=${targets_arr[@]//\\n/ }
+  targets="${targets_arr[@]//\\n/ }"
 
   cd "${KUBE_ROOT}"
-
   kube::build::verify_prereqs
   kube::build::build_image
   kube::build::run_build_command make WHAT="${targets}"
   kube::build::copy_output
-  kube::release::package_test_tarball
-
-  build_image
 }
 
 function build_image() {
@@ -173,6 +159,29 @@ function build_image() {
   docker build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
 
   rm -rf ${docker_build_path}
+}
+
+function package_test() {
+  targets_arr=(
+    "${KUBE_CLIENT_TARGETS[@]}"
+    "${KUBE_TEST_TARGETS[@]}"
+    "${KUBE_TEST_SERVER_TARGETS[@]}"
+    "${FEDERATION_TARGETS[@]}"
+  )
+
+  # Convert the array to a string of space separated elements.
+  # "make WHAT" below doesn't take newline separated string.
+  targets=${targets_arr[@]//\\n/ }
+
+  cd "${KUBE_ROOT}"
+
+  kube::build::verify_prereqs
+  kube::build::build_image
+  kube::build::run_build_command make WHAT="${targets}"
+  kube::build::copy_output
+  kube::release::package_test_tarball
+
+  build_image
 }
 
 function get_version() {
