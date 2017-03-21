@@ -206,7 +206,11 @@ func Convert_v1beta1_CustomMetricCurrentStatusList_To_extensions_CustomMetricCur
 }
 
 func autoConvert_extensions_CustomMetricCurrentStatusList_To_v1beta1_CustomMetricCurrentStatusList(in *extensions.CustomMetricCurrentStatusList, out *CustomMetricCurrentStatusList, s conversion.Scope) error {
-	out.Items = *(*[]CustomMetricCurrentStatus)(unsafe.Pointer(&in.Items))
+	if in.Items == nil {
+		out.Items = make([]CustomMetricCurrentStatus, 0)
+	} else {
+		out.Items = *(*[]CustomMetricCurrentStatus)(unsafe.Pointer(&in.Items))
+	}
 	return nil
 }
 
@@ -244,7 +248,11 @@ func Convert_v1beta1_CustomMetricTargetList_To_extensions_CustomMetricTargetList
 }
 
 func autoConvert_extensions_CustomMetricTargetList_To_v1beta1_CustomMetricTargetList(in *extensions.CustomMetricTargetList, out *CustomMetricTargetList, s conversion.Scope) error {
-	out.Items = *(*[]CustomMetricTarget)(unsafe.Pointer(&in.Items))
+	if in.Items == nil {
+		out.Items = make([]CustomMetricTarget, 0)
+	} else {
+		out.Items = *(*[]CustomMetricTarget)(unsafe.Pointer(&in.Items))
+	}
 	return nil
 }
 
@@ -313,7 +321,7 @@ func autoConvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *extension
 			}
 		}
 	} else {
-		out.Items = nil
+		out.Items = make([]DaemonSet, 0)
 	}
 	return nil
 }
@@ -513,7 +521,7 @@ func autoConvert_extensions_DeploymentList_To_v1beta1_DeploymentList(in *extensi
 			}
 		}
 	} else {
-		out.Items = nil
+		out.Items = make([]Deployment, 0)
 	}
 	return nil
 }
@@ -698,7 +706,11 @@ func Convert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(in 
 }
 
 func autoConvert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *extensions.HTTPIngressRuleValue, out *HTTPIngressRuleValue, s conversion.Scope) error {
-	out.Paths = *(*[]HTTPIngressPath)(unsafe.Pointer(&in.Paths))
+	if in.Paths == nil {
+		out.Paths = make([]HTTPIngressPath, 0)
+	} else {
+		out.Paths = *(*[]HTTPIngressPath)(unsafe.Pointer(&in.Paths))
+	}
 	return nil
 }
 
@@ -808,7 +820,11 @@ func Convert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, out 
 
 func autoConvert_extensions_IngressList_To_v1beta1_IngressList(in *extensions.IngressList, out *IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]Ingress)(unsafe.Pointer(&in.Items))
+	if in.Items == nil {
+		out.Items = make([]Ingress, 0)
+	} else {
+		out.Items = *(*[]Ingress)(unsafe.Pointer(&in.Items))
+	}
 	return nil
 }
 
@@ -980,7 +996,11 @@ func Convert_v1beta1_NetworkPolicyList_To_extensions_NetworkPolicyList(in *Netwo
 
 func autoConvert_extensions_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *extensions.NetworkPolicyList, out *NetworkPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]NetworkPolicy)(unsafe.Pointer(&in.Items))
+	if in.Items == nil {
+		out.Items = make([]NetworkPolicy, 0)
+	} else {
+		out.Items = *(*[]NetworkPolicy)(unsafe.Pointer(&in.Items))
+	}
 	return nil
 }
 
@@ -1103,7 +1123,7 @@ func autoConvert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyLi
 			}
 		}
 	} else {
-		out.Items = nil
+		out.Items = make([]PodSecurityPolicy, 0)
 	}
 	return nil
 }
@@ -1279,7 +1299,7 @@ func autoConvert_extensions_ReplicaSetList_To_v1beta1_ReplicaSetList(in *extensi
 			}
 		}
 	} else {
-		out.Items = nil
+		out.Items = make([]ReplicaSet, 0)
 	}
 	return nil
 }
@@ -1571,7 +1591,11 @@ func Convert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResource
 
 func autoConvert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResourceDataList(in *extensions.ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]ThirdPartyResourceData)(unsafe.Pointer(&in.Items))
+	if in.Items == nil {
+		out.Items = make([]ThirdPartyResourceData, 0)
+	} else {
+		out.Items = *(*[]ThirdPartyResourceData)(unsafe.Pointer(&in.Items))
+	}
 	return nil
 }
 
@@ -1591,7 +1615,11 @@ func Convert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList
 
 func autoConvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList(in *extensions.ThirdPartyResourceList, out *ThirdPartyResourceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]ThirdPartyResource)(unsafe.Pointer(&in.Items))
+	if in.Items == nil {
+		out.Items = make([]ThirdPartyResource, 0)
+	} else {
+		out.Items = *(*[]ThirdPartyResource)(unsafe.Pointer(&in.Items))
+	}
 	return nil
 }
 
