@@ -140,7 +140,7 @@ func autoConvert_batch_JobList_To_v1_JobList(in *batch.JobList, out *JobList, s 
 			}
 		}
 	} else {
-		out.Items = nil
+		out.Items = make([]Job, 0)
 	}
 	return nil
 }
