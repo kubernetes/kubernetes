@@ -230,14 +230,14 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	updatePodsFunc := func(newPods []*v1.Pod, oldPods, pods map[string]*v1.Pod) {
 		filtered := filterInvalidPods(newPods, source, s.recorder)
 		for _, ref := range filtered {
-			name := kubecontainer.GetPodFullName(ref)
+			key := string(ref.UID)
 			// Annotate the pod with the source before any comparison.
 			if ref.Annotations == nil {
 				ref.Annotations = make(map[string]string)
 			}
 			ref.Annotations[kubetypes.ConfigSourceAnnotationKey] = source
-			if existing, found := oldPods[name]; found {
-				pods[name] = existing
+			if existing, found := oldPods[key]; found {
+				pods[key] = existing
 				needUpdate, needReconcile, needGracefulDelete := checkAndUpdatePod(existing, ref)
 				if needUpdate {
 					updatePods = append(updatePods, existing)
@@ -249,7 +249,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				continue
 			}
 			recordFirstSeenTime(ref)
-			pods[name] = ref
+			pods[key] = ref
 			addPods = append(addPods, ref)
 		}
 	}
@@ -280,10 +280,10 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	case kubetypes.REMOVE:
 		glog.V(4).Infof("Removing pods from source %s : %v", source, update.Pods)
 		for _, value := range update.Pods {
-			name := kubecontainer.GetPodFullName(value)
-			if existing, found := pods[name]; found {
+			key := string(value.UID)
+			if existing, found := pods[key]; found {
 				// this is a delete
-				delete(pods, name)
+				delete(pods, key)
 				removePods = append(removePods, existing)
 				continue
 			}
@@ -297,8 +297,8 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		oldPods := pods
 		pods = make(map[string]*v1.Pod)
 		updatePodsFunc(update.Pods, oldPods, pods)
-		for name, existing := range oldPods {
-			if _, found := pods[name]; !found {
+		for key, existing := range oldPods {
+			if _, found := pods[key]; !found {
 				// this is a delete
 				removePods = append(removePods, existing)
 			}
