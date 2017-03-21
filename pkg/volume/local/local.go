@@ -18,8 +18,6 @@ package local
 
 import (
 	"fmt"
-	"os"
-	"regexp"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -46,7 +44,7 @@ type localPlugin struct {
 
 var _ volume.VolumePlugin = &localPlugin{}
 var _ volume.PersistentVolumePlugin = &localPlugin{}
-var _ volume.DeletableVolumePlugin = &localPlugin{}
+var _ volume.DeletableVolumePlugin = nil
 var _ volume.RecyclableVolumePlugin = nil
 var _ volume.ProvisionableVolumePlugin = nil
 
@@ -111,10 +109,6 @@ func (plugin *localPlugin) NewUnmounter(volName string, podUID types.UID) (volum
 	}}, nil
 }
 
-func (plugin *localPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	return newDeleter(spec, plugin.host)
-}
-
 func (plugin *localPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	localVolume := &v1.Volume{
 		Name: volumeName,
@@ -126,14 +120,6 @@ func (plugin *localPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 		},
 	}
 	return volume.NewSpecFromVolume(localVolume), nil
-}
-
-func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error) {
-	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.LocalStorage == nil {
-		return nil, fmt.Errorf("spec.PersistentVolumeSource.Local is nil")
-	}
-	path := spec.PersistentVolume.Spec.LocalStorage.Path
-	return &localDeleter{name: spec.Name(), path: path, host: host}, nil
 }
 
 // Local volumes represent a bare host file or directory mount.
@@ -197,30 +183,6 @@ func (c *localUnmounter) TearDown() error {
 // TearDownAt does not make sense for host paths - probably programmer error.
 func (c *localUnmounter) TearDownAt(dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
-}
-
-// localDeleter deletes a local PV from the cluster.
-// This deleter only works on a single host cluster and is for testing purposes only.
-type localDeleter struct {
-	name string
-	path string
-	host volume.VolumeHost
-	volume.MetricsNil
-}
-
-func (r *localDeleter) GetPath() string {
-	return r.path
-}
-
-// Delete for local removes the local directory so long as it is beneath /tmp/*.
-// THIS IS FOR TESTING AND LOCAL DEVELOPMENT ONLY!  This message should scare you away from using
-// this deleter for anything other than development and testing.
-func (r *localDeleter) Delete() error {
-	regexp := regexp.MustCompile("/tmp/.+")
-	if !regexp.MatchString(r.GetPath()) {
-		return fmt.Errorf("host_path deleter only supports /tmp/.+ but received provided %s", r.GetPath())
-	}
-	return os.RemoveAll(r.GetPath())
 }
 
 func getVolumeSource(

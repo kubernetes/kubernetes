@@ -10,3 +10,4 @@ spec:
       storage: 10Gi
   volumeType: "" # For some reason I must have this field even though it's optional
   storageClassName: "local-fast"
+  volumeType: SemiPersistentLocalStorage

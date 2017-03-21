@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
       - name: discovery
-        image: "gcr.io/msau-k8s-dev/local-discovery:v1.3"
+        image: "gcr.io/msau-gke-dev/local-discovery:v1.3"
         imagePullPolicy: Always
         volumeMounts:
         - name: discovery-vol
@@ -21,7 +21,7 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
       - name: kubectl
-        image: "gcr.io/msau-k8s-dev/kubectl:v1.7.0-alpha.0.1080"
+        image: "gcr.io/msau-gke-dev/kubectl:v1.7.0-alpha.0.1080"
         imagePullPolicy: Always
         args:
         - proxy

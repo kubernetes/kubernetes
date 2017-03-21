@@ -21,7 +21,7 @@
 GOARCH?=$(shell go env GOARCH)
 GOOS?=$(shell go env GOOS)
 TAG="v1.3"
-PROJECT="msau-k8s-dev"
+PROJECT="msau-gke-dev"
 
 local-discovery:
 	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' local-discovery.go
