@@ -171,8 +171,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 		AfterEach(func() {
 			// Delete all ingresses.
-			nsName := f.FederationNamespace.Name
-			deleteAllIngressesOrFail(f.FederationClientset, nsName)
+			deleteAllIngressesOrFail(f.FederationClientset, ns)
 			if secret != nil {
 				By("Deleting secret")
 				orphanDependents := false
@@ -202,24 +201,21 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			nsName := f.FederationNamespace.Name
 			orphanDependents := false
-			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, &orphanDependents, ns)
 			By(fmt.Sprintf("Verified that ingresses were deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			nsName := f.FederationNamespace.Name
 			orphanDependents := true
-			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, &orphanDependents, ns)
 			By(fmt.Sprintf("Verified that ingresses were not deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			nsName := f.FederationNamespace.Name
-			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, nil, nsName)
+			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, nil, ns)
 			By(fmt.Sprintf("Verified that ingresses were not deleted from underlying clusters"))
 		})
 
@@ -240,10 +236,8 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				deleteBackendPodsOrFail(clusters, ns)
 				if jig.ing != nil {
 					By(fmt.Sprintf("Deleting ingress %v on all clusters", jig.ing.Name))
-					deleteIngressOrFail(f.FederationClientset, ns, jig.ing.Name, nil)
-					for clusterName, cluster := range clusters {
-						deleteClusterIngressOrFail(clusterName, cluster.Clientset, ns, jig.ing.Name)
-					}
+					orphanDependents := false
+					deleteIngressOrFail(f.FederationClientset, ns, jig.ing.Name, &orphanDependents)
 					jig.ing = nil
 				} else {
 					By("No ingress to delete. Ingress is nil")
