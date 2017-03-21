@@ -62,7 +62,7 @@ func (s sortedPods) Less(i, j int) bool {
 func CreateValidPod(name, namespace string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			UID:       types.UID(name), // for the purpose of testing, this is unique enough
+			UID:       types.UID(name + namespace), // for the purpose of testing, this is unique enough
 			Name:      name,
 			Namespace: namespace,
 		},
@@ -248,7 +248,7 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.UPDATE, TestSource, pod))
 
-	podUpdate = CreatePodUpdate(kubetypes.REMOVE, TestSource, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "new"}})
+	podUpdate = CreatePodUpdate(kubetypes.REMOVE, TestSource, CreateValidPod("foo", "new"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.REMOVE, TestSource, pod))
 }
