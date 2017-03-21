@@ -16,10 +16,12 @@ go_library(
         "set_image.go",
         "set_resources.go",
         "set_selector.go",
+        "set_subject.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/apis/rbac:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
@@ -32,6 +34,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
     ],
@@ -42,6 +45,7 @@ go_test(
     srcs = [
         "set_image_test.go",
         "set_selector_test.go",
+        "set_subject_test.go",
         "set_test.go",
     ],
     data = [
@@ -53,6 +57,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/rbac:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
