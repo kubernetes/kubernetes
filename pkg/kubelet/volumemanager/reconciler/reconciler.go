@@ -566,7 +566,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 		}
 	}
 
-	// Get the list of volumes from desired state and update OuterVolumeSpecName if the information is avaiable
+	// Get the list of volumes from desired state and update OuterVolumeSpecName if the information is available
 	volumesToMount := rc.desiredStateOfWorld.GetVolumesToMount()
 	for _, volumeToMount := range volumesToMount {
 		if volume, exists := volumesNeedUpdate[volumeToMount.VolumeName]; exists {
@@ -591,7 +591,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 			volume.volumeName,
 			volume.mounter,
 			volume.outerVolumeSpecName,
-			volume.devicePath)
+			volume.volumeGidValue)
 		if err != nil {
 			glog.Errorf("Could not add pod to volume information to actual state of world: %v", err)
 			continue
