@@ -1282,6 +1282,7 @@ func TestValidateDeploymentStatus(t *testing.T) {
 			observedGeneration: 1,
 			expectedErr:        true,
 		},
+		/* TODO: Enable when we stop supporting updates from 1.5.
 		{
 			name:               "availableReplicas greater than readyReplicas",
 			replicas:           3,
@@ -1289,7 +1290,7 @@ func TestValidateDeploymentStatus(t *testing.T) {
 			availableReplicas:  3,
 			observedGeneration: 1,
 			expectedErr:        true,
-		},
+		},*/
 	}
 
 	for _, test := range tests {

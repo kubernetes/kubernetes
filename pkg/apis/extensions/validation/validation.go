@@ -352,9 +352,10 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	if status.AvailableReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
 	}
-	if status.AvailableReplicas > status.ReadyReplicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
-	}
+	// TODO: Enable when we stop supporting updates from 1.5.
+	//if status.AvailableReplicas > status.ReadyReplicas {
+	//	allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
+	//}
 	return allErrs
 }
 
