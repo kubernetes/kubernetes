@@ -72,7 +72,7 @@ func NewCmdUnjoin(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.Admin
 
 	cmd := &cobra.Command{
 		Use:     "unjoin CLUSTER_NAME --host-cluster-context=HOST_CONTEXT",
-		Short:   "Unjoins a cluster from a federation",
+		Short:   "Unjoin a cluster from a federation",
 		Long:    unjoin_long,
 		Example: unjoin_example,
 		Run: func(cmd *cobra.Command, args []string) {

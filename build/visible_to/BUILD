@@ -58,6 +58,7 @@ package_group(
 package_group(
     name = "FEDERATION_BAD",
     packages = [
+        "//federation/cmd/genfeddocs",
         "//federation/cmd/kubefed/app",
         "//federation/pkg/kubefed",
         "//federation/pkg/kubefed/init",
