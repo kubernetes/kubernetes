@@ -73,6 +73,8 @@ type VSphere struct {
 	cfg *VSphereConfig
 	// InstanceID of the server where this VSphere object is instantiated.
 	localInstanceID string
+	// Cluster that VirtualMachine belongs to
+	clusterName string
 }
 
 type VSphereConfig struct {
@@ -148,19 +150,16 @@ func init() {
 	})
 }
 
-// Returns the name of the VM on which this code is running.
-// This is done by searching for the name of virtual machine by current IP.
-// Prerequisite: this code assumes VMWare vmtools or open-vm-tools to be installed in the VM.
-func readInstanceID(cfg *VSphereConfig) (string, error) {
+func readInstance(cfg *VSphereConfig) (string, string, error) {
 	cmd := exec.Command("bash", "-c", `dmidecode -t 1 | grep UUID | tr -d ' ' | cut -f 2 -d ':'`)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if out.Len() == 0 {
-		return "", fmt.Errorf("unable to retrieve Instance ID")
+		return "", "", fmt.Errorf("unable to retrieve Instance ID")
 	}
 
 	// Create context
@@ -170,7 +169,7 @@ func readInstanceID(cfg *VSphereConfig) (string, error) {
 	// Create vSphere client
 	c, err := vsphereLogin(cfg, ctx)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer c.Logout(ctx)
 
@@ -180,7 +179,7 @@ func readInstanceID(cfg *VSphereConfig) (string, error) {
 	// Fetch and set data center
 	dc, err := f.Datacenter(ctx, cfg.Global.Datacenter)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	f.SetDatacenter(dc)
 
@@ -189,15 +188,33 @@ func readInstanceID(cfg *VSphereConfig) (string, error) {
 	svm, err := s.FindByUuid(ctx, dc, strings.ToLower(strings.TrimSpace(out.String())), true, nil)
 
 	var vm mo.VirtualMachine
-	err = s.Properties(ctx, svm.Reference(), []string{"name"}, &vm)
+	err = s.Properties(ctx, svm.Reference(), []string{"name", "resourcePool"}, &vm)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return vm.Name, nil
+
+	var cluster string
+	if vm.ResourcePool != nil {
+		// Extract the Cluster Name if VM belongs to a ResourcePool
+		var rp mo.ResourcePool
+		err = s.Properties(ctx, *vm.ResourcePool, []string{"parent"}, &rp)
+		if err == nil {
+			var ccr mo.ClusterComputeResource
+			err = s.Properties(ctx, *rp.Parent, []string{"name"}, &ccr)
+			if err == nil {
+				cluster = ccr.Name
+			} else {
+				glog.Warningf("VM %s, does not belong to a vSphere Cluster, will not have FailureDomain label", vm.Name)
+			}
+		} else {
+			glog.Warningf("VM %s, does not belong to a vSphere Cluster, will not have FailureDomain label", vm.Name)
+		}
+	}
+	return vm.Name, cluster, nil
 }
 
 func newVSphere(cfg VSphereConfig) (*VSphere, error) {
-	id, err := readInstanceID(&cfg)
+	id, cluster, err := readInstance(&cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -214,6 +231,7 @@ func newVSphere(cfg VSphereConfig) (*VSphere, error) {
 	vs := VSphere{
 		cfg:             &cfg,
 		localInstanceID: id,
+		clusterName:     cluster,
 	}
 	return &vs, nil
 }
@@ -507,9 +525,14 @@ func (vs *VSphere) Zones() (cloudprovider.Zones, bool) {
 }
 
 func (vs *VSphere) GetZone() (cloudprovider.Zone, error) {
-	glog.V(4).Infof("Current zone is %v", vs.cfg.Global.Datacenter)
+	glog.V(4).Infof("Current datacenter is %v, cluster is %v", vs.cfg.Global.Datacenter, vs.clusterName)
 
-	return cloudprovider.Zone{Region: vs.cfg.Global.Datacenter}, nil
+	// The clusterName is determined from the VirtualMachine ManagedObjectReference during init
+	// If the VM is not created within a Cluster, this will return empty-string
+	return cloudprovider.Zone{
+		Region:        vs.cfg.Global.Datacenter,
+		FailureDomain: vs.clusterName,
+	}, nil
 }
 
 // Routes returns a false since the interface is not supported for vSphere.
