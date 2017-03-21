@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "doc.go",
         "horizontal.go",
+        "rate_limitters.go",
         "replica_calculator.go",
     ],
     tags = ["automanaged"],
@@ -27,8 +28,10 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/extensions/v1beta1:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/autoscaling/v1:go_default_library",
         "//pkg/client/listers/autoscaling/v1:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/controller/podautoscaler/metrics:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
@@ -36,10 +39,12 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/tools/record",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 
