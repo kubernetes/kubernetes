@@ -17,6 +17,8 @@ limitations under the License.
 package mergepatch
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -94,9 +96,11 @@ func HasConflicts(left, right interface{}) (bool, error) {
 			for key, leftValue := range typedLeft {
 				rightValue, ok := typedRight[key]
 				if !ok {
-					return false, nil
+					continue
 				}
-				return HasConflicts(leftValue, rightValue)
+				if conflict, err := HasConflicts(leftValue, rightValue); err != nil || conflict {
+					return conflict, err
+				}
 			}
 
 			return false, nil
@@ -111,15 +115,29 @@ func HasConflicts(left, right interface{}) (bool, error) {
 			}
 
 			for i := range typedLeft {
-				return HasConflicts(typedLeft[i], typedRight[i])
+				if conflict, err := HasConflicts(typedLeft[i], typedRight[i]); err != nil || conflict {
+					return conflict, err
+				}
 			}
 
 			return false, nil
 		default:
 			return true, nil
 		}
-	case string, float64, bool, int, int64, nil:
+	case string, bool, nil:
 		return !reflect.DeepEqual(left, right), nil
+	case float64, int, int64:
+		// If they marshal to the same JSON, they will have the same patch result.
+		// A patch setting int(0) should not conflict with another setting int64(0).
+		leftJSON, err := json.Marshal(left)
+		if err != nil {
+			return true, fmt.Errorf("can't marshal left-hand value: %v", err)
+		}
+		rightJSON, err := json.Marshal(right)
+		if err != nil {
+			return true, fmt.Errorf("can't marshal right-hand value: %v", err)
+		}
+		return !bytes.Equal(leftJSON, rightJSON), nil
 	default:
 		return true, fmt.Errorf("unknown type: %v", reflect.TypeOf(left))
 	}
