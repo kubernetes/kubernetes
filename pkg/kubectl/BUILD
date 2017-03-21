@@ -152,6 +152,7 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//vendor:github.com/spf13/cobra",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",

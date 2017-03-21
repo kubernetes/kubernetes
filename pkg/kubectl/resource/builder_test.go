@@ -556,7 +556,7 @@ func TestResourceByName(t *testing.T) {
 	if err != nil || !singleItemImplied || len(test.Infos) != 1 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
-	if !reflect.DeepEqual(&pods.Items[0], test.Objects()[0]) {
+	if !apiequality.Semantic.DeepEqual(&pods.Items[0], test.Objects()[0]) {
 		t.Errorf("unexpected object: %#v", test.Objects()[0])
 	}
 
@@ -621,10 +621,10 @@ func TestResourceNames(t *testing.T) {
 	if err != nil || len(test.Infos) != 2 {
 		t.Fatalf("unexpected response: %v %#v", err, test.Infos)
 	}
-	if !reflect.DeepEqual(&pods.Items[0], test.Objects()[0]) {
+	if !apiequality.Semantic.DeepEqual(&pods.Items[0], test.Objects()[0]) {
 		t.Errorf("unexpected object: \n%#v, expected: \n%#v", test.Objects()[0], &pods.Items[0])
 	}
-	if !reflect.DeepEqual(&svc.Items[0], test.Objects()[1]) {
+	if !apiequality.Semantic.DeepEqual(&svc.Items[0], test.Objects()[1]) {
 		t.Errorf("unexpected object: \n%#v, expected: \n%#v", test.Objects()[1], &svc.Items[0])
 	}
 }
@@ -698,7 +698,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 	if err != nil || !singleItemImplied || len(infos) != 1 {
 		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, infos)
 	}
-	if !reflect.DeepEqual(&pods.Items[0], infos[0].Object) {
+	if !apiequality.Semantic.DeepEqual(&pods.Items[0], infos[0].Object) {
 		t.Errorf("unexpected object: %#v", infos[0])
 	}
 
