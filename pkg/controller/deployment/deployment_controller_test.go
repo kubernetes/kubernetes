@@ -195,19 +195,21 @@ func (f *fixture) newController() (*DeploymentController, informers.SharedInform
 	return c, informers
 }
 
-func (f *fixture) runExpectError(deploymentName string) {
-	f.run_(deploymentName, true)
+func (f *fixture) runExpectError(deploymentName string, startInformers bool) {
+	f.run_(deploymentName, startInformers, true)
 }
 
 func (f *fixture) run(deploymentName string) {
-	f.run_(deploymentName, false)
+	f.run_(deploymentName, true, false)
 }
 
-func (f *fixture) run_(deploymentName string, expectError bool) {
+func (f *fixture) run_(deploymentName string, startInformers bool, expectError bool) {
 	c, informers := f.newController()
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
+	if startInformers {
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		informers.Start(stopCh)
+	}
 
 	err := c.syncDeployment(deploymentName)
 	if !expectError && err != nil {
@@ -329,7 +331,8 @@ func TestSyncDeploymentDeletionRace(t *testing.T) {
 	// Expect to only recheck DeletionTimestamp.
 	f.expectGetDeploymentAction(d)
 	// Sync should fail and requeue to let cache catch up.
-	f.runExpectError(getKey(d, t))
+	// Don't start informers, since we don't want cache to catch up for this test.
+	f.runExpectError(getKey(d, t), false)
 }
 
 // issue: https://github.com/kubernetes/kubernetes/issues/23218

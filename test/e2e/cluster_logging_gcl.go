@@ -26,8 +26,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-// TODO(crassirostris): Remove Flaky once test is stable
-var _ = framework.KubeDescribe("Cluster level logging using GCL [Flaky]", func() {
+var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
 	f := framework.NewDefaultFramework("gcl-logging")
 
 	BeforeEach(func() {
@@ -44,10 +43,10 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Flaky]", func()
 		framework.ExpectNoError(err, "GCL is not working")
 
 		By("Running synthetic logger")
-		pod := createLoggingPod(f, podName, 100, 1*time.Second)
+		pod := createLoggingPod(f, podName, 10*60, 10*time.Minute)
 		defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
-		err = framework.WaitForPodSuccessInNamespace(f.ClientSet, podName, f.Namespace.Name)
-		framework.ExpectNoError(err, fmt.Sprintf("Should've successfully waited for pod %s to succeed", podName))
+		err = framework.WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
+		framework.ExpectNoError(err, fmt.Sprintf("Should've successfully waited for pod %s to be running", podName))
 
 		By("Waiting for logs to ingest")
 		config := &loggingTestConfig{
@@ -57,7 +56,6 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Flaky]", func()
 			MaxAllowedLostFraction:    0,
 			MaxAllowedFluentdRestarts: 0,
 		}
-		err = waitForLogsIngestion(f, config)
-		framework.ExpectNoError(err, "Failed to ingest logs")
+		framework.ExpectNoError(waitForSomeLogs(f, config), "Failed to ingest logs")
 	})
 })
