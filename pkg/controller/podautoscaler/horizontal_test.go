@@ -490,7 +490,7 @@ func (tc *testCase) runTest(t *testing.T) {
 	)
 
 	eventClient := &clientfake.Clientset{}
-	eventClient.AddReactor("*", "events", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	eventClient.AddReactor("create", "events", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		tc.Lock()
 		defer tc.Unlock()
 

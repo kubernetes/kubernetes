@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
@@ -173,7 +174,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			t.Errorf("unexpected object: %v", got)
 			t.FailNow()
 		}
-		if !reflect.DeepEqual(got.Spec, expected.Spec) {
+		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
 			t.Errorf("object mismatch!\nexpected:\n\t%+v\ngot:\n\t%+v", got.Spec, expected.Spec)
 		}
 	}

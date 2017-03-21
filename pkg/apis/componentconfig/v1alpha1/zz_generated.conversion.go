@@ -458,9 +458,21 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := v1.Convert_bool_To_Pointer_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
 		return err
 	}
-	out.HostNetworkSources = *(*[]string)(unsafe.Pointer(&in.HostNetworkSources))
-	out.HostPIDSources = *(*[]string)(unsafe.Pointer(&in.HostPIDSources))
-	out.HostIPCSources = *(*[]string)(unsafe.Pointer(&in.HostIPCSources))
+	if in.HostNetworkSources == nil {
+		out.HostNetworkSources = make([]string, 0)
+	} else {
+		out.HostNetworkSources = *(*[]string)(unsafe.Pointer(&in.HostNetworkSources))
+	}
+	if in.HostPIDSources == nil {
+		out.HostPIDSources = make([]string, 0)
+	} else {
+		out.HostPIDSources = *(*[]string)(unsafe.Pointer(&in.HostPIDSources))
+	}
+	if in.HostIPCSources == nil {
+		out.HostIPCSources = make([]string, 0)
+	} else {
+		out.HostIPCSources = *(*[]string)(unsafe.Pointer(&in.HostIPCSources))
+	}
 	if err := v1.Convert_int32_To_Pointer_int32(&in.RegistryPullQPS, &out.RegistryPullQPS, s); err != nil {
 		return err
 	}
@@ -489,7 +501,11 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	}
 	out.ClusterDomain = in.ClusterDomain
 	out.MasterServiceNamespace = in.MasterServiceNamespace
-	out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
+	if in.ClusterDNS == nil {
+		out.ClusterDNS = make([]string, 0)
+	} else {
+		out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
+	}
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
@@ -546,7 +562,11 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := v1.Convert_bool_To_Pointer_bool(&in.RegisterSchedulable, &out.RegisterSchedulable, s); err != nil {
 		return err
 	}
-	out.RegisterWithTaints = *(*[]api_v1.Taint)(unsafe.Pointer(&in.RegisterWithTaints))
+	if in.RegisterWithTaints == nil {
+		out.RegisterWithTaints = make([]api_v1.Taint, 0)
+	} else {
+		out.RegisterWithTaints = *(*[]api_v1.Taint)(unsafe.Pointer(&in.RegisterWithTaints))
+	}
 	out.ContentType = in.ContentType
 	if err := v1.Convert_int32_To_Pointer_int32(&in.KubeAPIQPS, &out.KubeAPIQPS, s); err != nil {
 		return err

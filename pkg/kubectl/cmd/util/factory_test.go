@@ -25,12 +25,12 @@ import (
 	"os"
 	"os/user"
 	"path"
-	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -623,7 +623,7 @@ func TestGetFirstPod(t *testing.T) {
 			t.Errorf("%s: expected %d pods, got %d", test.name, test.expectedNum, numPods)
 			continue
 		}
-		if !reflect.DeepEqual(test.expected, pod) {
+		if !apiequality.Semantic.DeepEqual(test.expected, pod) {
 			t.Errorf("%s:\nexpected pod:\n%#v\ngot:\n%#v\n\n", test.name, test.expected, pod)
 		}
 	}

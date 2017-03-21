@@ -102,6 +102,7 @@ go_test(
         "//pkg/util/exec:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
