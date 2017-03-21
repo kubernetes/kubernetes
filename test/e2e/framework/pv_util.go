@@ -44,7 +44,7 @@ import (
 const (
 	PDRetryTimeout    = 5 * time.Minute
 	PDRetryPollTime   = 5 * time.Second
-	VolumeSelectorKey = "e2e-pv-pool" // TODO or just "Namespace" ?
+	VolumeSelectorKey = "e2e-pv-pool"
 )
 
 // Map of all PVs used in the multi pv-pvc tests. The key is the PV's name, which is
@@ -63,13 +63,15 @@ type PVMap map[string]pvval
 type pvcval struct{}
 type PVCMap map[types.NamespacedName]pvcval
 
-// Configuration for a persistent volume.  To create PVs for varying storage options (NFS, ceph, glusterFS, etc.)
-// define the pvSource as below.  prebind holds a pre-bound PVC if there is one.
-// pvSource: api.PersistentVolumeSource{
-// 	NFS: &api.NFSVolumeSource{
-// 		...
-// 	},
-// }
+// PersistentVolumeConfig is consumed by MakePersistentVolume() to generate a PV object
+// for varying storage options (NFS, ceph, glusterFS, etc.).
+// (+optional) prebind holds a pre-bound PVC
+// Example pvSource:
+//	pvSource: api.PersistentVolumeSource{
+//		NFS: &api.NFSVolumeSource{
+//	 		...
+//	 	},
+//	 }
 type PersistentVolumeConfig struct {
 	PVSource      v1.PersistentVolumeSource
 	Prebind       *v1.PersistentVolumeClaim
@@ -78,9 +80,12 @@ type PersistentVolumeConfig struct {
 	Labels        map[string]string
 }
 
-// TODO fancy comment
-// TODO add AccessModes
+// PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to generate a PVC object.
+// AccessModes defaults to all modes (RWO, RWX, ROX) if left empty
+// (+optional) Annotations defines the PVC's annotations
+
 type PersistentVolumeClaimConfig struct {
+	AccessModes []v1.PersistentVolumeAccessMode
 	Annotations map[string]string
 	Selector    metav1.LabelSelector
 }
@@ -227,7 +232,7 @@ func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 		pvConfig.Prebind = pvc
 	}
 	// make the pv spec
-	pv := makePersistentVolume(pvConfig)
+	pv := MakePersistentVolume(pvConfig)
 
 	By(fmt.Sprintf("Creating a PVC followed by a%s PV", preBindMsg))
 	// instantiate the pvc
@@ -258,7 +263,7 @@ func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 	Logf("Creating a PV followed by a%s PVC", preBindMsg)
 
 	// make the pv and pvc definitions
-	pv := makePersistentVolume(pvConfig)
+	pv := MakePersistentVolume(pvConfig)
 	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
 
 	// instantiate the pv
@@ -300,7 +305,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 
 	// create extra pvs or pvcs as needed
 	for i = 0; i < extraPVs; i++ {
-		pv = makePersistentVolume(pvConfig)
+		pv = MakePersistentVolume(pvConfig)
 		pv = createPV(c, pv)
 		pvMap[pv.Name] = pvval{}
 	}
@@ -461,8 +466,8 @@ func makePvcKey(ns, name string) types.NamespacedName {
 //   (instantiated) and thus the PV's ClaimRef cannot be completely filled-in in
 //   this func. Therefore, the ClaimRef's name is added later in
 //   createPVCPV.
-func makePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
-	// Specs are expected to match this test's PersistentVolumeClaim
+func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
+	// Specs are expected to match the test's PersistentVolumeClaim
 
 	//TODO Handle default values
 	Logf("DEBUG --- MakePVC Selector: %v", pvConfig.Labels)
@@ -470,6 +475,7 @@ func makePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 	var claimRef *v1.ObjectReference
 	// If the reclaimPolicy is not provided, assume Retain
 	if pvConfig.ReclaimPolicy == "" {
+		Logf("PV ReclaimPolicy unspecified, default: Retain")
 		pvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimRetain
 	}
 	if pvConfig.Prebind != nil {
@@ -511,6 +517,10 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 
 	// TODO handle default values
 	Logf("DEBUG --- MakePVC Selector: %v", cfg.Selector)
+	if len(cfg.AccessModes) == 0 {
+		Logf("AccessModes unspecified, default: all modes (RWO, RWX, ROX).")
+		cfg.AccessModes = append(cfg.AccessModes, v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadOnlyMany)
+	}
 
 	return &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -520,11 +530,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			Selector: &cfg.Selector,
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-				v1.ReadOnlyMany,
-				v1.ReadWriteMany,
-			},
+			AccessModes: cfg.AccessModes,
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),

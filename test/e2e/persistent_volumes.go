@@ -352,9 +352,6 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			if c != nil {
 				framework.DeletePodWithWait(f, c, clientPod)
 				framework.PVPVCCleanup(c, ns, pv, pvc)
-				clientPod = nil
-				pvc = nil
-				pv = nil
 			}
 			node, clientPod, pvc, pv = "", nil, nil, nil
 		})
