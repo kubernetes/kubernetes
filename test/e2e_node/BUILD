@@ -108,6 +108,8 @@ go_test(
         "//test/utils:go_default_library",
         "//vendor:github.com/coreos/go-systemd/util",
         "//vendor:github.com/davecgh/go-spew/spew",
+        "//vendor:github.com/docker/engine-api/client",
+        "//vendor:github.com/docker/engine-api/types",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/kardianos/osext",
         "//vendor:github.com/onsi/ginkgo",
