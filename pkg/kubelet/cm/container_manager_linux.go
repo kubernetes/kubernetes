@@ -67,7 +67,7 @@ const (
 
 var (
 	// The docker version in which containerd was introduced.
-	containerdVersion = utilversion.MustParseSemantic("1.11.0")
+	containerdVersion = utilversion.MustParseSemantic("1.23")
 )
 
 // A non-user container tracked by the Kubelet.
@@ -816,9 +816,9 @@ func getDockerVersion(cadvisor cadvisor.Interface) *utilversion.Version {
 		glog.Errorf("Error requesting cAdvisor VersionInfo: %v", err)
 		return utilversion.MustParseSemantic("0.0.0")
 	}
-	dockerVersion, err := utilversion.ParseSemantic(versions.DockerVersion)
+	dockerVersion, err := utilversion.ParseSemantic(versions.DockerAPIVersion)
 	if err != nil {
-		glog.Errorf("Error parsing docker version %q: %v", versions.DockerVersion, err)
+		glog.Errorf("Error parsing docker version %q: %v", versions.DockerAPIVersion, err)
 		return utilversion.MustParseSemantic("0.0.0")
 	}
 	return dockerVersion
