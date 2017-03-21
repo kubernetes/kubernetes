@@ -70,7 +70,7 @@ func autoConvert_apiserver_AdmissionConfiguration_To_v1alpha1_AdmissionConfigura
 			}
 		}
 	} else {
-		out.Plugins = nil
+		out.Plugins = make([]AdmissionPluginConfiguration, 0)
 	}
 	return nil
 }
