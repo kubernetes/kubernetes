@@ -49,7 +49,7 @@ const (
 
 var (
 	join_long = templates.LongDesc(`
-		Join a cluster to a federation.
+		Join adds a cluster to a federation.
 
         Current context is assumed to be a federation API
         server. Please use the --context flag otherwise.`)

@@ -47,7 +47,7 @@ var (
 		# Federation control plane's host cluster context name
 		# must be specified via the --host-cluster-context flag
 		# to properly cleanup the credentials.
-		kubectl unjoin foo --host-cluster-context=bar`)
+		kubefed unjoin foo --host-cluster-context=bar`)
 )
 
 type unjoinFederation struct {
@@ -61,7 +61,7 @@ func NewCmdUnjoin(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.Admin
 
 	cmd := &cobra.Command{
 		Use:     "unjoin CLUSTER_NAME --host-cluster-context=HOST_CONTEXT",
-		Short:   "Unjoins a cluster from a federation",
+		Short:   "Unjoin a cluster from a federation",
 		Long:    unjoin_long,
 		Example: unjoin_example,
 		Run: func(cmd *cobra.Command, args []string) {

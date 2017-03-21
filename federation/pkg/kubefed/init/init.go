@@ -96,7 +96,7 @@ const (
 
 var (
 	init_long = templates.LongDesc(`
-		Initialize a federation control plane.
+		Init initializes a federation control plane.
 
         Federation control plane is hosted inside a Kubernetes
         cluster. The host cluster must be specified using the
@@ -178,7 +178,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "init FEDERATION_NAME --host-cluster-context=HOST_CONTEXT",
-		Short:   "init initializes a federation control plane",
+		Short:   "Initialize a federation control plane",
 		Long:    init_long,
 		Example: init_example,
 		Run: func(cmd *cobra.Command, args []string) {
