@@ -330,7 +330,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	It("should be able to scale down when rescheduling a pod is required and pdb allows for it[Feature:ClusterSizeAutoscalingScaleDown]", func() {
-		runDrainTest(f, originalSizes, 1, func(increasedSize int) {
+		runDrainTest(f, originalSizes, 1, 1, func(increasedSize int) {
 			By("Some node should be removed")
 			framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 				func(size int) bool { return size < increasedSize }, scaleDownTimeout))
@@ -338,7 +338,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	It("shouldn't be able to scale down when rescheduling a pod is required, but pdb doesn't allow drain[Feature:ClusterSizeAutoscalingScaleDown]", func() {
-		runDrainTest(f, originalSizes, 0, func(increasedSize int) {
+		runDrainTest(f, originalSizes, 1, 0, func(increasedSize int) {
 			By("No nodes should be removed")
 			time.Sleep(scaleDownTimeout)
 			nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
@@ -346,9 +346,17 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		})
 	})
 
+	It("should be able to scale down by draining multiple pods one by one as dictated by pdb[Feature:ClusterSizeAutoscalingScaleDown]", func() {
+		runDrainTest(f, originalSizes, 2, 1, func(increasedSize int) {
+			By("Some node should be removed")
+			framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+				func(size int) bool { return size < increasedSize }, scaleDownTimeout))
+		})
+	})
+
 })
 
-func runDrainTest(f *framework.Framework, migSizes map[string]int, pdbSize int, verifyFunction func(int)) {
+func runDrainTest(f *framework.Framework, migSizes map[string]int, podsPerNode, pdbSize int, verifyFunction func(int)) {
 	increasedSize := manuallyIncreaseClusterSize(f, migSizes)
 
 	nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
@@ -356,10 +364,10 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, pdbSize int, 
 	}.AsSelector().String()})
 	framework.ExpectNoError(err)
 	namespace := f.Namespace.Name
-	numPods := len(nodes.Items)
+	numPods := len(nodes.Items) * podsPerNode
 	testId := string(uuid.NewUUID()) // So that we can label and find pods
 	labelMap := map[string]string{"test_id": testId}
-	framework.ExpectNoError(runReplicatedPodOnEachNode(f, nodes.Items, "reschedulable-pods", labelMap))
+	framework.ExpectNoError(runReplicatedPodOnEachNode(f, nodes.Items, podsPerNode, "reschedulable-pods", labelMap))
 
 	defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "reschedulable-pods")
 
@@ -705,16 +713,16 @@ func makeNodeSchedulable(c clientset.Interface, node *v1.Node) error {
 	return nil
 }
 
-// Creat an RC running a single pod on each node without adding any constraint forcing such
-// pod distribution. This is meant to create a bunch of underutilized (but not unused) nodes
+// Creat an RC running a given number of pods on each node without adding any constraint forcing
+// such pod distribution. This is meant to create a bunch of underutilized (but not unused) nodes
 // with pods that can be rescheduled on different nodes.
 // This is achieved using the following method:
 // 1. disable scheduling on each node
 // 2. create an empty RC
 // 3. for each node:
 // 3a. enable scheduling on that node
-// 3b. increase number of replicas in RC by 1
-func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, id string, labels map[string]string) error {
+// 3b. increase number of replicas in RC by podsPerNode
+func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, podsPerNode int, id string, labels map[string]string) error {
 	By("Run a pod on each node")
 	for _, node := range nodes {
 		err := makeNodeUnschedulable(f.ClientSet, &node)
@@ -754,7 +762,7 @@ func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, id stri
 		// Update replicas count, to create new pods that will be allocated on node
 		// (we retry 409 errors in case rc reference got out of sync)
 		for j := 0; j < 3; j++ {
-			*rc.Spec.Replicas = int32(i + 1)
+			*rc.Spec.Replicas = int32((i + 1) * podsPerNode)
 			rc, err = f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Update(rc)
 			if err == nil {
 				break
@@ -771,7 +779,7 @@ func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, id stri
 
 		err = wait.PollImmediate(5*time.Second, podTimeout, func() (bool, error) {
 			rc, err = f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Get(id, metav1.GetOptions{})
-			if err != nil || rc.Status.ReadyReplicas < int32(i+1) {
+			if err != nil || rc.Status.ReadyReplicas < int32((i+1)*podsPerNode) {
 				return false, nil
 			}
 			return true, nil
