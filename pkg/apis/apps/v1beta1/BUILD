@@ -65,6 +65,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
     ],
