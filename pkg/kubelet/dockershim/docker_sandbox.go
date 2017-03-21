@@ -106,7 +106,7 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 		}
 
 		if err := dockertools.RewriteResolvFile(containerInfo.ResolvConfPath, dnsConfig.Servers, dnsConfig.Searches, len(dnsConfig.Options) > 0); err != nil {
-			return createResp.ID, fmt.Errorf("rewrite resolf.conf faield for pod %q: %v", config.Metadata.Name, err)
+			return createResp.ID, fmt.Errorf("rewrite resolv.conf failed for pod %q: %v", config.Metadata.Name, err)
 		}
 	}
 
