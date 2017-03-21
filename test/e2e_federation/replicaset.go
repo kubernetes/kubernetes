@@ -388,7 +388,7 @@ func waitForReplicaSetOrFail(c *fedclientset.Clientset, namespace string, replic
 
 func waitForReplicaSet(c *fedclientset.Clientset, namespace string, replicaSetName string, clusters map[string]*cluster, expect map[string]int32) error {
 	framework.Logf("waitForReplicaSet: %s/%s; clusters: %v; expect: %v", namespace, replicaSetName, clusters, expect)
-	err := wait.Poll(10*time.Second, federatedReplicasetTimeout, func() (bool, error) {
+	err := wait.Poll(10*time.Second, federatedDefaultTestTimeout, func() (bool, error) {
 		frs, err := c.ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

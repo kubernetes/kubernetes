@@ -185,7 +185,7 @@ func waitForDeploymentOrFail(c *fedclientset.Clientset, namespace string, deploy
 }
 
 func waitForDeployment(c *fedclientset.Clientset, namespace string, deploymentName string, clusters map[string]*cluster) error {
-	err := wait.Poll(10*time.Second, federatedDeploymentTimeout, func() (bool, error) {
+	err := wait.Poll(10*time.Second, federatedDefaultTestTimeout, func() (bool, error) {
 		fdep, err := c.Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -259,7 +259,7 @@ func deleteDeploymentOrFail(clientset *fedclientset.Clientset, nsName string, de
 	}
 
 	// Wait for the deployment to be deleted.
-	err = wait.Poll(10*time.Second, federatedDeploymentTimeout, func() (bool, error) {
+	err = wait.Poll(10*time.Second, federatedDefaultTestTimeout, func() (bool, error) {
 		_, err := clientset.Extensions().Deployments(nsName).Get(deploymentName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil
