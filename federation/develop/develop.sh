@@ -148,7 +148,7 @@ function build_image() {
   cp "${bin_path}" "${docker_build_path}/${binary}"
   printf " FROM ubuntu:16.04 \n ADD ${binary} /${binary}\n" > ${docker_file_path}
 
-  local docker_image_tag="${KUBE_REGISTRY}:${kube_version}"
+  local docker_image_tag="${KUBE_REGISTRY}/hyperkube-amd64:${kube_version}"
 
   # Build the docker image on-the-fly.
   #
@@ -179,7 +179,16 @@ function package_test() {
   kube::build::build_image
   kube::build::run_build_command make WHAT="${targets}"
   kube::build::copy_output
-  kube::release::package_test_tarball
+  kube::release::init_release_dir
+  kube::release::package_src_tarball &
+  kube::release::package_client_tarballs &
+  kube::release::package_salt_tarball &
+  kube::release::package_kube_manifests_tarball &
+  kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
+
+  kube::release::package_final_tarball & # _final depends on some of the previous phases
+  kube::release::package_test_tarball & # _test doesn't depend on anything
+  kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
   build_image
 }

@@ -34,6 +34,8 @@
 #    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
 #  Set KUBERNETES_DOWNLOAD_TESTS to additionally download and extract the test
 #    binaries tarball.
+#  Set KUBERNETES_SKIP_DOWNLOAD_SERVER_TAR to skip downloading a server tarballs.
+
 
 set -o errexit
 set -o nounset
@@ -169,7 +171,7 @@ echo
 # TODO: remove this check and default to true when we stop shipping server
 # tarballs in kubernetes.tar.gz
 DOWNLOAD_SERVER_TAR=false
-if [[ ! -e "${KUBE_ROOT}/server/${SERVER_TAR}" ]]; then
+if [[ -z "${KUBERNETES_SKIP_DOWNLOAD_SERVER_TAR-}" ]] && [[ ! -e "${KUBE_ROOT}/server/${SERVER_TAR}" ]]; then
   DOWNLOAD_SERVER_TAR=true
   echo "Will download ${SERVER_TAR} from ${DOWNLOAD_URL_PREFIX}"
 fi
