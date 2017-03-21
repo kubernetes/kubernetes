@@ -561,7 +561,9 @@ func (nc *NodeController) Run() {
 						} else {
 							glog.V(4).Info("Made sure that Node %v has no %v Taint", value.Value, oppositeTaint)
 						}
-						return true, 0
+
+						// remove the node from the queue after the adding/removal of taint is successful
+						return nc.zoneNotReadyOrUnreachableTainer[utilnode.GetZoneKey(node)].Remove(node.Name), 0
 					})
 				}
 			}, nodeEvictionPeriod, wait.NeverStop)
@@ -685,7 +687,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Check eviction timeout against decisionTimestamp
 			if observedReadyCondition.Status == v1.ConditionFalse {
 				if nc.useTaintBasedEvictions {
-					if nc.markNodeForTainting(node) {
+					if nc.markNodeForTaintingNotReady(node) {
 						glog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
@@ -706,7 +708,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			}
 			if observedReadyCondition.Status == v1.ConditionUnknown {
 				if nc.useTaintBasedEvictions {
-					if nc.markNodeForTainting(node) {
+					if nc.markNodeForTaintingUnreachable(node) {
 						glog.V(2).Infof("Node %v is unresponsive as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
@@ -1115,10 +1117,26 @@ func (nc *NodeController) evictPods(node *v1.Node) bool {
 	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
 }
 
-func (nc *NodeController) markNodeForTainting(node *v1.Node) bool {
+func (nc *NodeController) markNodeForTaintingNotReady(node *v1.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	return nc.zoneNotReadyOrUnreachableTainer[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
+	if !v1.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
+		return nc.zoneNotReadyOrUnreachableTainer[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
+	}
+
+	// node is already tainted with NotReady
+	return false
+}
+
+func (nc *NodeController) markNodeForTaintingUnreachable(node *v1.Node) bool {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+	if !v1.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
+		return nc.zoneNotReadyOrUnreachableTainer[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
+	}
+
+	// node is already tainted with Unreachable
+	return false
 }
 
 func (nc *NodeController) markNodeAsHealthy(node *v1.Node) (bool, error) {
