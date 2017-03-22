@@ -365,6 +365,11 @@ func DeepCopy_api_CinderVolumeSource(in interface{}, out interface{}, c *convers
 		in := in.(*CinderVolumeSource)
 		out := out.(*CinderVolumeSource)
 		*out = *in
+		if in.SecretRef != nil {
+			in, out := &in.SecretRef, &out.SecretRef
+			*out = new(LocalObjectReference)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -2023,7 +2028,9 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		if in.Cinder != nil {
 			in, out := &in.Cinder, &out.Cinder
 			*out = new(CinderVolumeSource)
-			**out = **in
+			if err := DeepCopy_api_CinderVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		if in.CephFS != nil {
 			in, out := &in.CephFS, &out.CephFS
@@ -3425,7 +3432,9 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 		if in.Cinder != nil {
 			in, out := &in.Cinder, &out.Cinder
 			*out = new(CinderVolumeSource)
-			**out = **in
+			if err := DeepCopy_api_CinderVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		}
 		if in.CephFS != nil {
 			in, out := &in.CephFS, &out.CephFS

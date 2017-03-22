@@ -2112,6 +2112,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"secretRef": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Optional: Used to configure the Cinder credentials instead of using the Cloud Provider.",
+								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.LocalObjectReference"),
+							},
+						},
 						"readOnly": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
@@ -2120,10 +2126,11 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"volumeID"},
+					Required: []string{"volumeID", "secretRef"},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"k8s.io/kubernetes/pkg/api/v1.LocalObjectReference"},
 		},
 		"k8s.io/kubernetes/pkg/api/v1.ComponentCondition": {
 			Schema: spec.Schema{
