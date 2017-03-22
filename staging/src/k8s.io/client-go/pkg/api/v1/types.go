@@ -2095,14 +2095,15 @@ type WeightedPodAffinityTerm struct {
 // relative to the given namespace(s)) that this pod should be
 // co-located (affinity) or not co-located (anti-affinity) with,
 // where co-located is defined as running on a node whose value of
-// the label with key <topologyKey> tches that of any node on which
+// the label with key <topologyKey> matches that of any node on which
 // a pod of the set of pods is running
 type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
 	// namespaces specifies which namespaces the labelSelector applies to (matches against);
-	// null or empty list means "this pod's namespace"
+	// null or empty list means "this pod's namespace";
+	// a singleton list containing "*" means "all namespaces".
 	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,2,rep,name=namespaces"`
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node

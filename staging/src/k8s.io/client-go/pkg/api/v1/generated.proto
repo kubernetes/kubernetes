@@ -2271,7 +2271,7 @@ message PodAffinity {
 // relative to the given namespace(s)) that this pod should be
 // co-located (affinity) or not co-located (anti-affinity) with,
 // where co-located is defined as running on a node whose value of
-// the label with key <topologyKey> tches that of any node on which
+// the label with key <topologyKey> matches that of any node on which
 // a pod of the set of pods is running
 message PodAffinityTerm {
   // A label query over a set of resources, in this case pods.
@@ -2279,7 +2279,8 @@ message PodAffinityTerm {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
 
   // namespaces specifies which namespaces the labelSelector applies to (matches against);
-  // null or empty list means "this pod's namespace"
+  // null or empty list means "this pod's namespace";
+  // a singleton list containing "*" means "all namespaces".
   repeated string namespaces = 2;
 
   // This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
