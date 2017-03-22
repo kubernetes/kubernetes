@@ -62,8 +62,17 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 }
 
 func masterUpgradeGCE(rawV string) error {
+	env := os.Environ()
+	// TODO: Remove these variables when they're no longer needed for downgrades.
+	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
+		env = append(env,
+			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
+			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
+			"TEST_ETCD_IMAGE=3.0.17")
+	}
+
 	v := "v" + rawV
-	_, _, err := RunCmd(gceUpgradeScript(), "-M", v)
+	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-M", v)
 	return err
 }
 
