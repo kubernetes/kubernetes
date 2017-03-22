@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "apiserver.go",
         "authn.go",
+        "crud.go",
         "daemonset.go",
         "deployment.go",
         "event.go",
@@ -29,6 +30,7 @@ go_library(
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/core/v1:go_default_library",
+        "//federation/pkg/federatedtypes:go_default_library",
         "//federation/pkg/federation-controller/replicaset:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/api:go_default_library",
