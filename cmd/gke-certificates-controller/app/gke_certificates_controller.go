@@ -22,9 +22,11 @@ import (
 	"time"
 
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
@@ -63,13 +65,14 @@ func Run(s *GKECertificatesController) error {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "gke-certificates-controller"})
 
 	clientBuilder := controller.SimpleControllerClientBuilder{ClientConfig: kubeconfig}
 	client := clientBuilder.ClientOrDie("certificate-controller")
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Duration(12)*time.Hour)
 
-	signer, err := NewGKESigner(s.ClusterSigningGKEKubeconfig, s.ClusterSigningGKERetryBackoff.Duration)
+	signer, err := NewGKESigner(s.ClusterSigningGKEKubeconfig, s.ClusterSigningGKERetryBackoff.Duration, recorder)
 	if err != nil {
 		return err
 	}

@@ -31,6 +31,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apiserver/pkg/util/webhook",
         "//vendor:k8s.io/client-go/kubernetes/typed/core/v1",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
@@ -56,5 +57,8 @@ go_test(
     srcs = ["gke_signer_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/apis/certificates/v1beta1:go_default_library"],
+    deps = [
+        "//pkg/apis/certificates/v1beta1:go_default_library",
+        "//vendor:k8s.io/client-go/tools/record",
+    ],
 )
