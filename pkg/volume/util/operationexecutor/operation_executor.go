@@ -403,6 +403,10 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 
 	for node, nodeAttachedVolumes := range attachedVolumes {
 		for _, volumeAttached := range nodeAttachedVolumes {
+			if volumeAttached.VolumeSpec == nil {
+				glog.Errorf("VerifyVolumesAreAttached: nil spec for volume %s", volumeAttached.VolumeName)
+				continue
+			}
 			volumePlugin, err :=
 				oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
 
