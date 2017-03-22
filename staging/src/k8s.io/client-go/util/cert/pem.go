@@ -23,6 +23,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -119,22 +120,22 @@ func ParsePublicKeysPEM(keyData []byte) ([]interface{}, error) {
 			break
 		}
 
-		switch block.Type {
-		case ECPrivateKeyBlockType:
+		switch {
+		case block.Type == ECPrivateKeyBlockType:
 			// ECDSA Private Key in ASN.1 format
 			privateKey, err := x509.ParseECPrivateKey(block.Bytes)
 			if err != nil {
 				return keys, err
 			}
 			keys = append(keys, &privateKey.PublicKey)
-		case RSAPrivateKeyBlockType:
+		case block.Type == RSAPrivateKeyBlockType:
 			// RSA Private Key in PKCS#1 format
 			privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 			if err != nil {
 				return keys, err
 			}
 			keys = append(keys, &privateKey.PublicKey)
-		case PrivateKeyBlockType:
+		case block.Type == PrivateKeyBlockType:
 			// RSA or ECDSA Private Key in unencrypted PKCS#8 format
 			privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 			if err != nil {
@@ -149,14 +150,14 @@ func ParsePublicKeysPEM(keyData []byte) ([]interface{}, error) {
 			default:
 				return keys, err
 			}
-		case CertificateBlockType:
+		case block.Type == CertificateBlockType:
 			// x509 certificate in PEM encoded format
 			cert, err := x509.ParseCertificate(block.Bytes)
 			if err != nil {
 				return keys, err
 			}
 			keys = append(keys, &cert.PublicKey)
-		case PublicKeyBlockType:
+		case block.Type == PublicKeyBlockType, strings.HasSuffix(block.Type, PublicKeyBlockType):
 			// RSA or ECDSA public key in PEM encoded format
 			publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
 			if err != nil {
