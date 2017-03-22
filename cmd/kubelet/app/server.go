@@ -155,6 +155,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		DockerClient:       dockerClient,
 		KubeClient:         nil,
 		ExternalKubeClient: nil,
+		EventClient:        nil,
 		Mounter:            mounter,
 		NetworkPlugins:     ProbeNetworkPlugins(s.NetworkPluginDir, s.CNIConfDir, s.CNIBinDir),
 		OOMAdjuster:        oom.NewOOMAdjuster(),
@@ -415,9 +416,9 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps == nil {
-		var kubeClient clientset.Interface
-		var eventClient v1core.EventsGetter
-		var externalKubeClient clientgoclientset.Interface
+		var kubeClient *clientset.Clientset
+		var eventClient *clientgoclientset.Clientset
+		var externalKubeClient *clientgoclientset.Clientset
 		var cloud cloudprovider.Interface
 
 		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
@@ -476,9 +477,17 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 
 		kubeDeps.Cloud = cloud
-		kubeDeps.KubeClient = kubeClient
-		kubeDeps.ExternalKubeClient = externalKubeClient
-		kubeDeps.EventClient = eventClient
+		// we can not set struct pointer directly to interface when struct pointer is nil
+		// if we did that the expression (interface == nil) will never equal
+		if kubeClient != nil {
+			kubeDeps.KubeClient = kubeClient
+		}
+		if externalKubeClient != nil {
+			kubeDeps.ExternalKubeClient = externalKubeClient
+		}
+		if eventClient != nil {
+			kubeDeps.EventClient = eventClient
+		}
 	}
 
 	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
