@@ -666,14 +666,17 @@ run_pod_tests() {
   }
 }
 __EOF__
-  kubectl-with-retry replace "${kube_flags[@]}" -f <(echo '{
+  kubectl replace -f - "${kube_flags[@]}" << __EOF__
+{
   "kind": "Node",
   "apiVersion": "v1",
   "metadata": {
     "name": "node-v1-test",
-    "annotations": {"a":"b"}
+    "annotations": {"a":"b"},
+    "resourceVersion": "0"
   }
-}')
+}
+__EOF__
 
   # Post-condition: the node command succeeds
   kube::test::get_object_assert "node node-v1-test" "{{.metadata.annotations.a}}" 'b'

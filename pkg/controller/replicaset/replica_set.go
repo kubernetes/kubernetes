@@ -320,7 +320,9 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		// "closer" to kubelet (from the deployment to the replica set controller).
 		if !v1.IsPodReady(oldPod) && v1.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
 			glog.V(2).Infof("ReplicaSet %q will be enqueued after %ds for availability check", rs.Name, rs.Spec.MinReadySeconds)
-			rsc.enqueueReplicaSetAfter(rs, time.Duration(rs.Spec.MinReadySeconds)*time.Second)
+			// Add a second to avoid milliseconds skew in AddAfter.
+			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
+			rsc.enqueueReplicaSetAfter(rs, (time.Duration(rs.Spec.MinReadySeconds)*time.Second)+time.Second)
 		}
 		return
 	}

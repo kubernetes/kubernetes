@@ -1,91 +1,96 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [v1.6.0-beta.4](#v160-beta4)
-  - [Downloads for v1.6.0-beta.4](#downloads-for-v160-beta4)
+- [v1.5.5](#v155)
+  - [Downloads for v1.5.5](#downloads-for-v155)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
+  - [Changelog since v1.5.4](#changelog-since-v154)
+- [v1.6.0-beta.4](#v160-beta4)
+  - [Downloads for v1.6.0-beta.4](#downloads-for-v160-beta4)
+    - [Client Binaries](#client-binaries-1)
+    - [Server Binaries](#server-binaries-1)
   - [Changelog since v1.6.0-beta.3](#changelog-since-v160-beta3)
     - [Other notable changes](#other-notable-changes)
 - [v1.6.0-beta.3](#v160-beta3)
   - [Downloads for v1.6.0-beta.3](#downloads-for-v160-beta3)
-    - [Client Binaries](#client-binaries-1)
-    - [Server Binaries](#server-binaries-1)
+    - [Client Binaries](#client-binaries-2)
+    - [Server Binaries](#server-binaries-2)
   - [Changelog since v1.6.0-beta.2](#changelog-since-v160-beta2)
     - [Other notable changes](#other-notable-changes-1)
 - [v1.6.0-beta.2](#v160-beta2)
   - [Downloads for v1.6.0-beta.2](#downloads-for-v160-beta2)
-    - [Client Binaries](#client-binaries-2)
-    - [Server Binaries](#server-binaries-2)
+    - [Client Binaries](#client-binaries-3)
+    - [Server Binaries](#server-binaries-3)
   - [Changelog since v1.6.0-beta.1](#changelog-since-v160-beta1)
     - [Action Required](#action-required)
     - [Other notable changes](#other-notable-changes-2)
 - [v1.5.4](#v154)
   - [Downloads for v1.5.4](#downloads-for-v154)
-    - [Client Binaries](#client-binaries-3)
-    - [Server Binaries](#server-binaries-3)
+    - [Client Binaries](#client-binaries-4)
+    - [Server Binaries](#server-binaries-4)
   - [Changelog since v1.5.3](#changelog-since-v153)
     - [Other notable changes](#other-notable-changes-3)
 - [v1.6.0-beta.1](#v160-beta1)
   - [Downloads for v1.6.0-beta.1](#downloads-for-v160-beta1)
-    - [Client Binaries](#client-binaries-4)
-    - [Server Binaries](#server-binaries-4)
+    - [Client Binaries](#client-binaries-5)
+    - [Server Binaries](#server-binaries-5)
   - [Changelog since v1.6.0-alpha.3](#changelog-since-v160-alpha3)
     - [Action Required](#action-required-1)
     - [Other notable changes](#other-notable-changes-4)
 - [v1.6.0-alpha.3](#v160-alpha3)
   - [Downloads for v1.6.0-alpha.3](#downloads-for-v160-alpha3)
-    - [Client Binaries](#client-binaries-5)
-    - [Server Binaries](#server-binaries-5)
+    - [Client Binaries](#client-binaries-6)
+    - [Server Binaries](#server-binaries-6)
   - [Changelog since v1.6.0-alpha.2](#changelog-since-v160-alpha2)
     - [Other notable changes](#other-notable-changes-5)
 - [v1.4.9](#v149)
   - [Downloads for v1.4.9](#downloads-for-v149)
-    - [Client Binaries](#client-binaries-6)
-    - [Server Binaries](#server-binaries-6)
+    - [Client Binaries](#client-binaries-7)
+    - [Server Binaries](#server-binaries-7)
   - [Changelog since v1.4.8](#changelog-since-v148)
     - [Other notable changes](#other-notable-changes-6)
 - [v1.5.3](#v153)
   - [Downloads for v1.5.3](#downloads-for-v153)
-    - [Client Binaries](#client-binaries-7)
-    - [Server Binaries](#server-binaries-7)
+    - [Client Binaries](#client-binaries-8)
+    - [Server Binaries](#server-binaries-8)
     - [Node Binaries](#node-binaries)
   - [Changelog since v1.5.2](#changelog-since-v152)
     - [Other notable changes](#other-notable-changes-7)
 - [v1.6.0-alpha.2](#v160-alpha2)
   - [Downloads for v1.6.0-alpha.2](#downloads-for-v160-alpha2)
-    - [Client Binaries](#client-binaries-8)
-    - [Server Binaries](#server-binaries-8)
+    - [Client Binaries](#client-binaries-9)
+    - [Server Binaries](#server-binaries-9)
   - [Changelog since v1.6.0-alpha.1](#changelog-since-v160-alpha1)
     - [Other notable changes](#other-notable-changes-8)
 - [v1.6.0-alpha.1](#v160-alpha1)
   - [Downloads for v1.6.0-alpha.1](#downloads-for-v160-alpha1)
-    - [Client Binaries](#client-binaries-9)
-    - [Server Binaries](#server-binaries-9)
+    - [Client Binaries](#client-binaries-10)
+    - [Server Binaries](#server-binaries-10)
   - [Changelog since v1.5.0](#changelog-since-v150)
     - [Action Required](#action-required-2)
     - [Other notable changes](#other-notable-changes-9)
 - [v1.5.2](#v152)
   - [Downloads for v1.5.2](#downloads-for-v152)
-    - [Client Binaries](#client-binaries-10)
-    - [Server Binaries](#server-binaries-10)
+    - [Client Binaries](#client-binaries-11)
+    - [Server Binaries](#server-binaries-11)
   - [Changelog since v1.5.1](#changelog-since-v151)
     - [Other notable changes](#other-notable-changes-10)
 - [v1.4.8](#v148)
   - [Downloads for v1.4.8](#downloads-for-v148)
-    - [Client Binaries](#client-binaries-11)
-    - [Server Binaries](#server-binaries-11)
+    - [Client Binaries](#client-binaries-12)
+    - [Server Binaries](#server-binaries-12)
   - [Changelog since v1.4.7](#changelog-since-v147)
     - [Other notable changes](#other-notable-changes-11)
 - [v1.5.1](#v151)
   - [Downloads for v1.5.1](#downloads-for-v151)
-    - [Client Binaries](#client-binaries-12)
-    - [Server Binaries](#server-binaries-12)
+    - [Client Binaries](#client-binaries-13)
+    - [Server Binaries](#server-binaries-13)
   - [Changelog since v1.5.0](#changelog-since-v150-1)
     - [Other notable changes](#other-notable-changes-12)
   - [Known Issues for v1.5.1](#known-issues-for-v151)
 - [v1.5.0](#v150)
   - [Downloads for v1.5.0](#downloads-for-v150)
-    - [Client Binaries](#client-binaries-13)
-    - [Server Binaries](#server-binaries-13)
+    - [Client Binaries](#client-binaries-14)
+    - [Server Binaries](#server-binaries-14)
   - [Major Themes](#major-themes)
   - [Features](#features)
   - [Known Issues](#known-issues)
@@ -98,64 +103,64 @@
     - [Previous Releases Included in v1.5.0](#previous-releases-included-in-v150)
 - [v1.4.7](#v147)
   - [Downloads for v1.4.7](#downloads-for-v147)
-    - [Client Binaries](#client-binaries-14)
-    - [Server Binaries](#server-binaries-14)
+    - [Client Binaries](#client-binaries-15)
+    - [Server Binaries](#server-binaries-15)
   - [Changelog since v1.4.6](#changelog-since-v146)
     - [Other notable changes](#other-notable-changes-14)
 - [v1.5.0-beta.3](#v150-beta3)
   - [Downloads for v1.5.0-beta.3](#downloads-for-v150-beta3)
-    - [Client Binaries](#client-binaries-15)
-    - [Server Binaries](#server-binaries-15)
+    - [Client Binaries](#client-binaries-16)
+    - [Server Binaries](#server-binaries-16)
   - [Changelog since v1.5.0-beta.2](#changelog-since-v150-beta2)
     - [Other notable changes](#other-notable-changes-15)
 - [v1.5.0-beta.2](#v150-beta2)
   - [Downloads for v1.5.0-beta.2](#downloads-for-v150-beta2)
-    - [Client Binaries](#client-binaries-16)
-    - [Server Binaries](#server-binaries-16)
+    - [Client Binaries](#client-binaries-17)
+    - [Server Binaries](#server-binaries-17)
   - [Changelog since v1.5.0-beta.1](#changelog-since-v150-beta1)
     - [Other notable changes](#other-notable-changes-16)
 - [v1.5.0-beta.1](#v150-beta1)
   - [Downloads for v1.5.0-beta.1](#downloads-for-v150-beta1)
-    - [Client Binaries](#client-binaries-17)
-    - [Server Binaries](#server-binaries-17)
+    - [Client Binaries](#client-binaries-18)
+    - [Server Binaries](#server-binaries-18)
   - [Changelog since v1.5.0-alpha.2](#changelog-since-v150-alpha2)
     - [Action Required](#action-required-3)
     - [Other notable changes](#other-notable-changes-17)
 - [v1.4.6](#v146)
   - [Downloads for v1.4.6](#downloads-for-v146)
-    - [Client Binaries](#client-binaries-18)
-    - [Server Binaries](#server-binaries-18)
+    - [Client Binaries](#client-binaries-19)
+    - [Server Binaries](#server-binaries-19)
   - [Changelog since v1.4.5](#changelog-since-v145)
     - [Other notable changes](#other-notable-changes-18)
 - [v1.3.10](#v1310)
   - [Downloads for v1.3.10](#downloads-for-v1310)
-    - [Client Binaries](#client-binaries-19)
-    - [Server Binaries](#server-binaries-19)
+    - [Client Binaries](#client-binaries-20)
+    - [Server Binaries](#server-binaries-20)
   - [Changelog since v1.3.9](#changelog-since-v139)
     - [Other notable changes](#other-notable-changes-19)
 - [v1.4.5](#v145)
   - [Downloads for v1.4.5](#downloads-for-v145)
-    - [Client Binaries](#client-binaries-20)
-    - [Server Binaries](#server-binaries-20)
+    - [Client Binaries](#client-binaries-21)
+    - [Server Binaries](#server-binaries-21)
   - [Changelog since v1.4.4](#changelog-since-v144)
     - [Other notable changes](#other-notable-changes-20)
 - [v1.5.0-alpha.2](#v150-alpha2)
   - [Downloads for v1.5.0-alpha.2](#downloads-for-v150-alpha2)
-    - [Client Binaries](#client-binaries-21)
-    - [Server Binaries](#server-binaries-21)
+    - [Client Binaries](#client-binaries-22)
+    - [Server Binaries](#server-binaries-22)
   - [Changelog since v1.5.0-alpha.1](#changelog-since-v150-alpha1)
     - [Action Required](#action-required-4)
     - [Other notable changes](#other-notable-changes-21)
 - [v1.2.7](#v127)
   - [Downloads for v1.2.7](#downloads-for-v127)
-    - [Client Binaries](#client-binaries-22)
-    - [Server Binaries](#server-binaries-22)
+    - [Client Binaries](#client-binaries-23)
+    - [Server Binaries](#server-binaries-23)
   - [Changelog since v1.2.6](#changelog-since-v126)
     - [Other notable changes](#other-notable-changes-22)
 - [v1.4.4](#v144)
   - [Downloads for v1.4.4](#downloads-for-v144)
-    - [Client Binaries](#client-binaries-23)
-    - [Server Binaries](#server-binaries-23)
+    - [Client Binaries](#client-binaries-24)
+    - [Server Binaries](#server-binaries-24)
   - [Changelog since v1.4.3](#changelog-since-v143)
     - [Other notable changes](#other-notable-changes-23)
 - [v1.3.9](#v139)
@@ -379,6 +384,71 @@
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.5.5
+
+This release contains a fix for a PodSecurityPolicy vulnerability which allows users to make use of any existing PodSecurityPolicy object, even ones they are not authorized to use.
+
+Other then that, this release contains no other changes from 1.5.4.
+
+The vulnerability is tracked in http://issue.k8s.io/43459.
+
+**Who is affected?**
+
+Only Kubernetes 1.5.0-1.5.4 installations that do all of the following:
+* Enable the PodSecurityPolicy API (which is not enabled by default):
+  * `--runtime-config=extensions/v1beta1/podsecuritypolicy=true`
+* Enable the PodSecurityPolicy admission plugin (which is not enabled by default):
+  * `--admission-control=...,PodSecurityPolicy,...`
+* Use authorization to limit users' ability to use specific PodSecurityPolicy objects
+
+**What is the impact?**
+
+A user that is authorized to create pods can make use of any existing PodSecurityPolicy, even ones they are not authorized to use.
+
+**How can I mitigate this prior to installing 1.5.5?**
+
+1. Export existing PodSecurityPolicy objects:
+  * `kubectl get podsecuritypolicies -o yaml > psp.yaml`
+2. Review and delete any PodSecurityPolicy objects you do not want all pod-creating users to be able to use (NOTE: Privileged users that were making use of those policies will also lose access to those policies). For example:
+  * `kubectl delete podsecuritypolicies/my-privileged-policy`
+3. After upgrading to 1.5.5, re-create the exported PodSecurityPolicy objects:
+  * `kubectl create -f psp.yaml`
+
+## Downloads for v1.5.5
+
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes.tar.gz) | `ff171d53b6dba2aace899dbfa06044d3a54d798896f7b6dd483f20d2c05374ed`
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-src.tar.gz) | `25207344982bcf76172c7d156106357a7113b3909ac851e19b437dbba9402af6`
+
+### Client Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-client-darwin-386.tar.gz) | `92eb19b1464674078927263642205498a9b4e496909138626de721f8ff2eb3f1`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-client-darwin-amd64.tar.gz) | `dd2076d8a3062459b82481bf064d80a198df580f2c34efe7132a091c19d8084c`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-client-linux-386.tar.gz) | `8366a72910c987e4140db42244741752efac8e06f0e13f5d0cbc1cc9bec9733c`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-client-linux-amd64.tar.gz) | `73536e200fee9f4de19ebfd7d2e063a04f5ccb93073982032e79dc47ae92e89a`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-client-linux-arm64.tar.gz) | `8f679bd012ecbc58f0a916f393d3fc79de6dc2624320b04edc1b9249213a49f8`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-client-linux-arm.tar.gz) | `1998d6398aef02898babc5ff20484fe7c538f75f78c650631afea1a555aee8d1`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-client-windows-386.tar.gz) | `dff6fe02a6090feb949acc5753633891bcbdb7ecfb2bff3fa132d025713cbd55`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-client-windows-amd64.tar.gz) | `bd7c7c39122135b58da89a700580475a3cadbb31aa1b35175ff2f80067bedc0d`
+
+### Server Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-server-linux-amd64.tar.gz) | `578977b62af58639548d743991cd2f71b0fd58f9caa729131824f8dde85b5c6e`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-server-linux-arm64.tar.gz) | `01a1104d8c5a22c26b8b0a402bf0362d749b7d13a636b31c64fb51bb61ea3a01`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.5.5/kubernetes-server-linux-arm.tar.gz) | `06c5ca1f962f368219835ed6d075ef6e3a72685f2f0988823f44dd2e602e1980`
+
+## Changelog since v1.5.4
+
+**No notable changes for this release**
+
 
 
 # v1.6.0-beta.4
