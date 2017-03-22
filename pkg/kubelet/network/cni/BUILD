@@ -20,7 +20,6 @@ go_library(
         "//vendor:github.com/containernetworking/cni/libcni",
         "//vendor:github.com/containernetworking/cni/pkg/types",
         "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
