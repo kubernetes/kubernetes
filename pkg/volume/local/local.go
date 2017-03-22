@@ -129,8 +129,8 @@ type local struct {
 	volume.MetricsNil
 }
 
-func (hp *local) GetPath() string {
-	return hp.path
+func (l *local) GetPath() string {
+	return l.path
 }
 
 type localMounter struct {
@@ -140,9 +140,9 @@ type localMounter struct {
 
 var _ volume.Mounter = &localMounter{}
 
-func (b *localMounter) GetAttributes() volume.Attributes {
+func (m *localMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
+		ReadOnly:        m.readOnly,
 		Managed:         false,
 		SupportsSELinux: false,
 	}
@@ -151,22 +151,23 @@ func (b *localMounter) GetAttributes() volume.Attributes {
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
-func (b *localMounter) CanMount() error {
+func (m *localMounter) CanMount() error {
 	return nil
 }
 
 // SetUp does nothing.
-func (b *localMounter) SetUp(fsGroup *int64) error {
-	return nil
+func (m *localMounter) SetUp(fsGroup *int64) error {
+	return m.SetUpAt(m.GetPath(), fsGroup)
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
-func (b *localMounter) SetUpAt(dir string, fsGroup *int64) error {
-	return fmt.Errorf("SetUpAt() does not make sense for host paths")
+func (m *localMounter) SetUpAt(dir string, fsGroup *int64) error {
+	// TODO: how to prevent multiple mounts with conflicting fsGroup?
+	return volume.SetVolumeOwnership(m, fsGroup)
 }
 
-func (b *localMounter) GetPath() string {
-	return b.path
+func (m *localMounter) GetPath() string {
+	return m.path
 }
 
 type localUnmounter struct {
@@ -176,12 +177,12 @@ type localUnmounter struct {
 var _ volume.Unmounter = &localUnmounter{}
 
 // TearDown does nothing.
-func (c *localUnmounter) TearDown() error {
+func (u *localUnmounter) TearDown() error {
 	return nil
 }
 
 // TearDownAt does not make sense for host paths - probably programmer error.
-func (c *localUnmounter) TearDownAt(dir string) error {
+func (u *localUnmounter) TearDownAt(dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
 }
 

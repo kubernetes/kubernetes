@@ -17,10 +17,17 @@ spec:
         - "/bin/sh"
         args:
         - "-c"
-        - "date >> /usr/test-pod/test_file; echo \"Testing local-test pod\" >> /usr/test-pod/test_file; while [ 1 ]; do sleep 100; done"
+        - "count=0; count_file=\"/usr/test-pod/count\"; test_file=\"/usr/test-pod/test_file\"; if [ -e $count_file ]; then count=$(cat $count_file); fi; echo $((count+1)) > $count_file; while [ 1 ]; do date >> $test_file; echo \"This is $MY_POD_NAME, count=$(cat $count_file)\" >> $test_file; sleep 10; done"
         volumeMounts:
         - name: local-vol
           mountPath: /usr/test-pod
+        env:
+        - name: MY_POD_NAME
+          valueFrom: 
+            fieldRef:
+              fieldPath: metadata.name
+      securityContext:
+        fsGroup: 1234
   volumeClaimTemplates:
   - metadata:
       name: local-vol
@@ -30,4 +37,4 @@ spec:
       resources:
         requests:
           storage: 1Gi
-
+      volumeType: SemiPersistentLocalStorage
