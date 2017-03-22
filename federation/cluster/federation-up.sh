@@ -92,7 +92,9 @@ function init() {
       --image="${kube_registry}/hyperkube-amd64:${kube_version}" \
       --apiserver-arg-overrides="--storage-backend=etcd2" \
       --apiserver-enable-basic-auth=true \
-      --apiserver-enable-token-auth=true
+      --apiserver-enable-token-auth=true \
+      --apiserver-arg-overrides="--v=4" \
+      --controllermanager-arg-overrides="--v=4"
 }
 
 # join_clusters joins the clusters in the local kubeconfig to federation. The clusters
