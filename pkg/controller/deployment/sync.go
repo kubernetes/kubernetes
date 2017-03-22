@@ -111,11 +111,11 @@ func (dc *DeploymentController) checkPausedConditions(d *extensions.Deployment) 
 // This may lead to stale reads of replica sets, thus incorrect deployment status.
 func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(d *extensions.Deployment, rsList []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList, createIfNotExisted bool) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
 	// List the deployment's RSes & Pods and apply pod-template-hash info to deployment's adopted RSes/Pods
-	rsList, podList, err := dc.rsAndPodsWithHashKeySynced(d, rsList, podMap)
+	rsList, _, err := dc.rsAndPodsWithHashKeySynced(d, rsList, podMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error labeling replica sets and pods with pod-template-hash: %v", err)
 	}
-	_, allOldRSs, err := deploymentutil.FindOldReplicaSets(d, rsList, podList)
+	_, allOldRSs, err := deploymentutil.FindOldReplicaSets(d, rsList)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -630,7 +630,7 @@ func TestFindOldReplicaSets(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		old, _, err := FindOldReplicaSets(&test.deployment, test.rsList, test.podList)
+		old, _, err := FindOldReplicaSets(&test.deployment, test.rsList)
 		sort.Sort(controller.ReplicaSetsByCreationTimestamp(old))
 		sort.Sort(controller.ReplicaSetsByCreationTimestamp(test.expected))
 		if !reflect.DeepEqual(old, test.expected) || err != nil {
