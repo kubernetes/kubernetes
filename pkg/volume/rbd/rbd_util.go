@@ -83,20 +83,27 @@ func (util *RBDUtil) loadRBD(mounter *rbdMounter, mnt string) error {
 }
 
 type diskMapper interface {
+	IsSupported(disk rbdMounter) bool
 	MapDisk(disk rbdMounter) (string, error)
 	UnmapDisk(disk rbdMounter, mntPath string) error
 }
 
-func createDiskMapper(backendType string) (diskMapper, error) {
-	glog.V(1).Infof("rbd: creating diskMapper for backendType %s", backendType)
+func createDiskMapper(b rbdMounter) (diskMapper, error) {
+	glog.V(1).Infof("rbd: creating diskMapper for backendType %s", b.BackendType)
 
-	switch strings.ToLower(backendType) {
+	switch strings.ToLower(b.BackendType) {
 	case "krbd":
 		return &RBDKernel{}, nil
 	case "nbd":
-		return &RBDNbd{}, nil
+		nbdMapper := &RBDNbd{}
+		if nbdMapper.IsSupported(b) {
+			return nbdMapper, nil
+		} else {
+			glog.V(1).Infof("rbd: the rbd-nbd is not availble, fallbacking to krbd")
+			return &RBDKernel{}, nil
+		}
 	}
-	return nil, fmt.Errorf("unsupported backendType %s", backendType)
+	return nil, fmt.Errorf("unsupported backendType %s", b.BackendType)
 }
 
 func (util *RBDUtil) AttachDisk(b rbdMounter) error {
@@ -117,7 +124,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 	}
 
 	// map a block device
-	mapper, err := createDiskMapper(b.BackendType)
+	mapper, err := createDiskMapper(b)
 	if err != nil {
 		return fmt.Errorf("rbd: cannot create diskMapper: %v", err)
 	}
@@ -158,7 +165,7 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 			return fmt.Errorf("rbd detach disk: failed to load the persisted metadata\nError: %v", err)
 		}
 
-		mapper, err := createDiskMapper(c.rbdMounter.BackendType)
+		mapper, err := createDiskMapper(*c.rbdMounter)
 		if err != nil {
 			return fmt.Errorf("rbd: cannot create diskMapper: %v", err)
 		}

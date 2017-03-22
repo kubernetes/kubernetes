@@ -33,6 +33,15 @@ type RBDNbd struct {
 	RBDUtil
 }
 
+func (rk *RBDNbd) IsSupported(b rbdMounter) bool {
+	// rbd-nbd might not be installed in a system. In such situation we'll fallback
+	// to krbd. See createDiskMapper() in rbd_util.go
+	if _, err := b.plugin.execCommandStdOut("rbd-nbd", []string{"list-mapped"}); err != nil {
+		return false
+	}
+	return true
+}
+
 func (rk *RBDNbd) MapDisk(b rbdMounter) (string, error) {
 	var err error
 	var output []byte

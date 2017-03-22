@@ -41,6 +41,17 @@ const (
 	kubeLockMagic = "kubelet_lock_magic_"
 )
 
+func (rk *RBDKernel) IsSupported(b rbdMounter) bool {
+	// let's check whether we have the kernel plugin available
+	if _, err := b.plugin.execCommand("modprobe", []string{"rbd"}); err != nil {
+		return false
+	}
+	if _, err := os.Stat("/sys/bus/rbd/devices"); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
 // search /sys/bus for rbd device that matches given pool and image
 func getDevFromImageAndPool(pool, image string) (string, bool) {
 	// /sys/bus/rbd/devices/X/name and /sys/bus/rbd/devices/X/pool
