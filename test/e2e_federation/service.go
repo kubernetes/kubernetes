@@ -47,7 +47,7 @@ var FederatedServiceLabels = map[string]string{
 
 var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federated-service")
-	var clusters map[string]*cluster // All clusters, keyed by cluster name
+	var clusters fedframework.ClusterMap // All clusters, keyed by cluster name
 	var federationName string
 	var primaryClusterName string // The name of the "primary" cluster
 
@@ -84,7 +84,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				federationName = DefaultFederationName
 			}
 
-			clusters, primaryClusterName = getRegisteredClusters(UserAgentName, f)
+			clusters, primaryClusterName = f.GetRegisteredClusters()
 		})
 
 		Describe("Federated Service", func() {
@@ -287,7 +287,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 // verifyCascadingDeletionForService verifies that services are deleted from
 // underlying clusters when orphan dependents is false and they are not
 // deleted when orphan dependents is true.
-func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, clusters fedframework.ClusterMap, orphanDependents *bool, nsName string) {
 	service := createServiceOrFail(clientset, nsName, FederatedServiceName)
 	serviceName := service.Name
 	// Check subclusters if the service was created there.

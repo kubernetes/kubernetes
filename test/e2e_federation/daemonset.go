@@ -43,7 +43,7 @@ const (
 
 // Create/delete daemonset api objects
 var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", func() {
-	var clusters map[string]*cluster // All clusters, keyed by cluster name
+	var clusters map[string]*fedframework.Cluster // All clusters, keyed by cluster name
 
 	f := fedframework.NewDefaultFederatedFramework("federated-daemonset")
 
@@ -51,7 +51,7 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", fun
 
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			clusters, _ = getRegisteredClusters(UserAgentName, f)
+			clusters, _ = f.GetRegisteredClusters()
 		})
 
 		AfterEach(func() {
@@ -114,7 +114,7 @@ func deleteAllDaemonSetsOrFail(clientset *fedclientset.Clientset, nsName string)
 // verifyCascadingDeletionForDS verifies that daemonsets are deleted from
 // underlying clusters when orphan dependents is false and they are not
 // deleted when orphan dependents is true.
-func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+func verifyCascadingDeletionForDS(clientset *fedclientset.Clientset, clusters fedframework.ClusterMap, orphanDependents *bool, nsName string) {
 	daemonset := createDaemonSetOrFail(clientset, nsName)
 	daemonsetName := daemonset.Name
 	// Check subclusters if the daemonset was created there.
@@ -233,7 +233,7 @@ func updateDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) 
 	return newDaemonSet
 }
 
-func waitForDaemonSetShardsOrFail(namespace string, daemonset *v1beta1.DaemonSet, clusters map[string]*cluster) {
+func waitForDaemonSetShardsOrFail(namespace string, daemonset *v1beta1.DaemonSet, clusters fedframework.ClusterMap) {
 	framework.Logf("Waiting for daemonset %q in %d clusters", daemonset.Name, len(clusters))
 	for _, c := range clusters {
 		waitForDaemonSetOrFail(c.Clientset, namespace, daemonset, true, FederatedDaemonSetTimeout)
@@ -263,7 +263,7 @@ func waitForDaemonSetOrFail(clientset *kubeclientset.Clientset, namespace string
 	}
 }
 
-func waitForDaemonSetShardsUpdatedOrFail(namespace string, daemonset *v1beta1.DaemonSet, clusters map[string]*cluster) {
+func waitForDaemonSetShardsUpdatedOrFail(namespace string, daemonset *v1beta1.DaemonSet, clusters fedframework.ClusterMap) {
 	framework.Logf("Waiting for daemonset %q in %d clusters", daemonset.Name, len(clusters))
 	for _, c := range clusters {
 		waitForDaemonSetUpdateOrFail(c.Clientset, namespace, daemonset, FederatedDaemonSetTimeout)

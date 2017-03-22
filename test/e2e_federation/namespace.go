@@ -44,13 +44,13 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 	f := fedframework.NewDefaultFederatedFramework("federation-namespace")
 
 	Describe("Namespace objects", func() {
-		var clusters map[string]*cluster // All clusters, keyed by cluster name
+		var clusters fedframework.ClusterMap // All clusters, keyed by cluster name
 
 		var nsName string
 
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			clusters, _ = getRegisteredClusters(UserAgentName, f)
+			clusters, _ = f.GetRegisteredClusters()
 		})
 
 		AfterEach(func() {
@@ -188,7 +188,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 // verifyNsCascadingDeletion verifies that namespaces are deleted from
 // underlying clusters when orphan dependents is false and they are not
 // deleted when orphan dependents is true.
-func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface, clusters map[string]*cluster, orphanDependents *bool) string {
+func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface, clusters fedframework.ClusterMap, orphanDependents *bool) string {
 	nsName := createNamespace(nsClient)
 	// Check subclusters if the namespace was created there.
 	By(fmt.Sprintf("Waiting for namespace %s to be created in all underlying clusters", nsName))

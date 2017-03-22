@@ -142,7 +142,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 	// e2e cases for federation ingress controller
 	var _ = Describe("Federated Ingresses", func() {
 		var (
-			clusters                               map[string]*cluster // All clusters, keyed by cluster name
+			clusters                               fedframework.ClusterMap // All clusters, keyed by cluster name
 			primaryClusterName, federationName, ns string
 			jig                                    *federationTestJig
 			service                                *v1.Service
@@ -157,7 +157,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				federationName = DefaultFederationName
 			}
 			jig = newFederationTestJig(f.FederationClientset)
-			clusters, primaryClusterName = getRegisteredClusters(UserAgentName, f)
+			clusters, primaryClusterName = f.GetRegisteredClusters()
 			ns = f.FederationNamespace.Name
 			// create backend service
 			service = createServiceOrFail(f.FederationClientset, ns, FederatedIngressServiceName)
@@ -285,7 +285,7 @@ func equivalentIngress(federatedIngress, clusterIngress v1beta1.Ingress) bool {
 // verifyCascadingDeletionForIngress verifies that ingresses are deleted from
 // underlying clusters when orphan dependents is false and they are not deleted
 // when orphan dependents is true.
-func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset, clusters fedframework.ClusterMap, orphanDependents *bool, nsName string) {
 	ingress := createIngressOrFail(clientset, nsName, FederatedIngressServiceName, FederatedIngressTLSSecretName)
 	ingressName := ingress.Name
 	// Check subclusters if the ingress was created there.
@@ -338,7 +338,7 @@ func waitForIngressOrFail(clientset *kubeclientset.Clientset, namespace string, 
 }
 
 // waitForIngressShardsOrFail waits for the ingress to appear in all clusters
-func waitForIngressShardsOrFail(namespace string, ingress *v1beta1.Ingress, clusters map[string]*cluster) {
+func waitForIngressShardsOrFail(namespace string, ingress *v1beta1.Ingress, clusters fedframework.ClusterMap) {
 	framework.Logf("Waiting for ingress %q in %d clusters", ingress.Name, len(clusters))
 	for _, c := range clusters {
 		waitForIngressOrFail(c.Clientset, namespace, ingress, true, FederatedIngressTimeout)
@@ -346,7 +346,7 @@ func waitForIngressShardsOrFail(namespace string, ingress *v1beta1.Ingress, clus
 }
 
 // waitForIngressShardsUpdatedOrFail waits for the ingress to be updated in all clusters
-func waitForIngressShardsUpdatedOrFail(namespace string, ingress *v1beta1.Ingress, clusters map[string]*cluster) {
+func waitForIngressShardsUpdatedOrFail(namespace string, ingress *v1beta1.Ingress, clusters fedframework.ClusterMap) {
 	framework.Logf("Waiting for ingress %q in %d clusters", ingress.Name, len(clusters))
 	for _, c := range clusters {
 		waitForIngressUpdateOrFail(c.Clientset, namespace, ingress, FederatedIngressTimeout)
@@ -374,7 +374,7 @@ func waitForIngressUpdateOrFail(clientset *kubeclientset.Clientset, namespace st
 }
 
 // waitForIngressShardsGoneOrFail waits for the ingress to disappear in all clusters
-func waitForIngressShardsGoneOrFail(namespace string, ingress *v1beta1.Ingress, clusters map[string]*cluster) {
+func waitForIngressShardsGoneOrFail(namespace string, ingress *v1beta1.Ingress, clusters fedframework.ClusterMap) {
 	framework.Logf("Waiting for ingress %q in %d clusters", ingress.Name, len(clusters))
 	for _, c := range clusters {
 		waitForIngressOrFail(c.Clientset, namespace, ingress, false, FederatedIngressTimeout)

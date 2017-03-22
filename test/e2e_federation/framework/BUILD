@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cluster.go",
         "framework.go",
         "util.go",
     ],
@@ -31,6 +32,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )
 
