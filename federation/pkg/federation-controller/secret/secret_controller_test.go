@@ -77,7 +77,7 @@ func TestSecretController(t *testing.T) {
 			return nil, fmt.Errorf("Unknown cluster")
 		}
 	}
-	setClientFactory(secretController.secretFederatedInformer, informerClientFactory)
+	setClientFactory(secretController.informer, informerClientFactory)
 
 	secretController.minimizeLatency()
 
@@ -115,7 +115,7 @@ func TestSecretController(t *testing.T) {
 
 	// Wait for the secret to appear in the informer store
 	err := WaitForStoreUpdate(
-		secretController.secretFederatedInformer.GetTargetStore(),
+		secretController.informer.GetTargetStore(),
 		cluster1.Name, types.NamespacedName{Namespace: secret1.Namespace, Name: secret1.Name}.String(), wait.ForeverTestTimeout)
 	assert.Nil(t, err, "secret should have appeared in the informer store")
 
@@ -146,7 +146,7 @@ func TestSecretController(t *testing.T) {
 
 	// Wait for the secret to be updated in the informer store.
 	err = WaitForSecretStoreUpdate(
-		secretController.secretFederatedInformer.GetTargetStore(),
+		secretController.informer.GetTargetStore(),
 		cluster1.Name, types.NamespacedName{Namespace: secret1.Namespace, Name: secret1.Name}.String(),
 		&secret1, wait.ForeverTestTimeout)
 	assert.NoError(t, err, "secret should have been updated in the informer store")
