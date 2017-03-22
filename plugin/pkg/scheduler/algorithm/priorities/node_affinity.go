@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-// CalculateNodeAffinityPriority prioritizes nodes according to node affinity scheduling preferences
+// CalculateNodeAffinityPriorityMap prioritizes nodes according to node affinity scheduling preferences
 // indicated in PreferredDuringSchedulingIgnoredDuringExecution. Each time a node match a preferredSchedulingTerm,
 // it will a get an add of preferredSchedulingTerm.Weight. Thus, the more preferredSchedulingTerms
 // the node satisfies and the more the preferredSchedulingTerm that is satisfied weights, the higher

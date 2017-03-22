@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-// ImageLocalityPriority is a priority function that favors nodes that already have requested pod container's images.
+// ImageLocalityPriorityMap is a priority function that favors nodes that already have requested pod container's images.
 // It will detect whether the requested images are present on a node, and then calculate a score ranging from 0 to 10
 // based on the total size of those images.
 // - If none of the images are present, this node will be given the lowest priority.
