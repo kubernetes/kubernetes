@@ -555,6 +555,56 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		verifyResult(cs, 3, 1, ns)
 	})
 
+	// test the pod affinity successful matching scenario, matching affinity pod in different namespaces
+	It("validates that InterPodAffinity is respected if matching in different namespace", func() {
+		nodeName, _ := runAndKeepPodWithLabelAndGetNodeName(f)
+
+		By("Trying to apply a random label on the found node.")
+		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
+		v := "china-e2etest"
+		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+
+		By("Building a new namespace api object")
+		ns2, err := f.CreateNamespace(f.BaseName, map[string]string{
+			"e2e-framework": f.BaseName,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		f.Namespace = ns2
+		err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, ns2.Name)
+		Expect(err).NotTo(HaveOccurred())
+		By("Trying to launch the pod, now with podAffinity.")
+		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
+		_ = createPausePod(f, pausePodConfig{
+			Name: labelPodName,
+			Affinity: &v1.Affinity{
+				PodAffinity: &v1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "security",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S1", "value2"},
+									},
+								},
+							},
+							TopologyKey: k,
+							Namespaces:  []string{ns},
+						},
+					},
+				},
+			},
+		})
+
+		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns2.Name, labelPodName))
+		labelPod, err := cs.CoreV1().Pods(ns2.Name).Get(labelPodName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
+	})
+
 	// test the pod affinity successful matching scenario with multiple Label Operators.
 	It("validates that InterPodAffinity is respected if matching with multiple Affinities", func() {
 		nodeName, _ := runAndKeepPodWithLabelAndGetNodeName(f)
