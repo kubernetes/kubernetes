@@ -388,7 +388,33 @@
 
 # v1.5.5
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.5.4/examples)
+This release contains a fix for a PodSecurityPolicy vulnerability which allows users to make use of any existing PodSecurityPolicy object, even ones they are not authorized to use.
+
+Other then that, this release contains no other changes from 1.5.4.
+
+The vulnerability is tracked in http://issue.k8s.io/43459.
+
+**Who is affected?**
+
+Only Kubernetes 1.5.0-1.5.4 installations that do all of the following:
+* Enable the PodSecurityPolicy API (which is not enabled by default):
+  * `--runtime-config=extensions/v1beta1/podsecuritypolicy=true`
+* Enable the PodSecurityPolicy admission plugin (which is not enabled by default):
+  * `--admission-control=...,PodSecurityPolicy,...`
+* Use authorization to limit users' ability to use specific PodSecurityPolicy objects
+
+**What is the impact?**
+
+A user that is authorized to create pods can make use of any existing PodSecurityPolicy, even ones they are not authorized to use.
+
+**How can I mitigate this prior to installing 1.5.5?**
+
+1. Export existing PodSecurityPolicy objects:
+  * `kubectl get podsecuritypolicies -o yaml > psp.yaml`
+2. Review and delete any PodSecurityPolicy objects you do not want all pod-creating users to be able to use (NOTE: Privileged users that were making use of those policies will also lose access to those policies). For example:
+  * `kubectl delete podsecuritypolicies/my-privileged-policy`
+3. After upgrading to 1.5.5, re-create the exported PodSecurityPolicy objects:
+  * `kubectl create -f psp.yaml`
 
 ## Downloads for v1.5.5
 
