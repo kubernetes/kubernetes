@@ -241,6 +241,17 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 # Optional: install a default StorageClass
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 
+# Optional: Enable legacy ABAC policy that makes all service accounts superusers.
+if [[ "${E2E_UPGRADE_TEST:-}" == "true" ]]; then
+  # Enable (match the regular default) when running upgrade tests (E2E_UPGRADE_TEST=true is set by upgrade CI jobs).
+  # This ensures the combination of legacy ABAC and default RBAC policies work properly for upgrade scenarios.
+  ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-true}" # true, false
+else
+  # Disable by default when running regular e2e tests.
+  # This ensures default RBAC policies alone are sufficient for e2e tests from 1.6+
+  ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
+fi
+
 # TODO(dawn1107): Remove this once the flag is built into CVM image.
 # Kernel panic upon soft lockup issue
 SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-true}" # true, false
