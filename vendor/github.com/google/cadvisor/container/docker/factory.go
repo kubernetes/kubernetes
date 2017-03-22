@@ -57,6 +57,12 @@ var (
 	dockerRootDirFlag = flag.String("docker_root", "/var/lib/docker", "DEPRECATED: docker root is read from docker info (this is a fallback, default: /var/lib/docker)")
 
 	dockerRootDirOnce sync.Once
+
+	// flag that controls globally disabling thin_ls pending future enhancements.
+	// in production, it has been found that thin_ls makes excessive use of iops.
+	// in an iops restricted environment, usage of thin_ls must be controlled via blkio.
+	// pending that enhancement, disable its usage.
+	disableThinLs = true
 )
 
 func RootDir() string {
@@ -141,17 +147,21 @@ func ContainerNameToDockerId(name string) string {
 	return id
 }
 
+// isContainerName returns true if the cgroup with associated name
+// corresponds to a docker container.
 func isContainerName(name string) bool {
+	// always ignore .mount cgroup even if associated with docker and delegate to systemd
+	if strings.HasSuffix(name, ".mount") {
+		return false
+	}
 	return dockerCgroupRegexp.MatchString(path.Base(name))
 }
 
 // Docker handles all containers under /docker
 func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
-	// docker factory accepts all containers it can handle.
-	canAccept := true
-
+	// if the container is not associated with docker, we can't handle it or accept it.
 	if !isContainerName(name) {
-		return false, canAccept, fmt.Errorf("invalid container name")
+		return false, false, nil
 	}
 
 	// Check if the container is known to docker and it is active.
@@ -160,10 +170,10 @@ func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	// We assume that if Inspect fails then the container is not known to docker.
 	ctnr, err := self.client.ContainerInspect(context.Background(), id)
 	if err != nil || !ctnr.State.Running {
-		return false, canAccept, fmt.Errorf("error inspecting container: %v", err)
+		return false, true, fmt.Errorf("error inspecting container: %v", err)
 	}
 
-	return true, canAccept, nil
+	return true, true, nil
 }
 
 func (self *dockerFactory) DebugInfo() map[string][]string {
@@ -183,6 +193,10 @@ func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolW
 
 	if err := ensureThinLsKernelVersion(machine.KernelVersion()); err != nil {
 		return nil, err
+	}
+
+	if disableThinLs {
+		return nil, fmt.Errorf("usage of thin_ls is disabled to preserve iops")
 	}
 
 	dockerThinPoolName, err := dockerutil.DockerThinPoolName(*dockerInfo)
