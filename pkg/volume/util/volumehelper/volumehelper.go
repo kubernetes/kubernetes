@@ -20,6 +20,7 @@ package volumehelper
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -86,4 +87,19 @@ func GetUniqueVolumeNameFromSpec(
 			volumePlugin.GetPluginName(),
 			volumeName),
 		nil
+}
+
+// SplitUniqueName splits the unique name to plugin name and volume name strings. It expects the uniqueName to follow
+// the fromat plugin_name/volume_name and the plugin name must be namespaced as descibed by the plugin interface,
+// i.e. namespace/plugin containing exactly one '/'. This means the unique name will always be in the form of
+// plugin_namespace/plugin/volume_name, see k8s.io/kubernetes/pkg/volume/plugins.go VolumePlugin interface
+// description and pkg/volume/util/volumehelper/volumehelper.go GetUniqueVolumeNameFromSpec that constructs
+// the unique volume names.
+func SplitUniqueName(uniqueName v1.UniqueVolumeName) (string, string, error) {
+	components := strings.SplitN(string(uniqueName), "/", 3)
+	if len(components) != 3 {
+		return "", "", fmt.Errorf("Cannot split volume unique name %s to plugin/volume components", uniqueName)
+	}
+	pluginName := fmt.Sprintf("%s/%s", components[0], components[1])
+	return pluginName, components[2], nil
 }

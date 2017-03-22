@@ -56,7 +56,7 @@ type ActualStateOfWorld interface {
 	// added.
 	// If no node with the name nodeName exists in list of attached nodes for
 	// the specified volume, the node is added.
-	AddVolumeNode(volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) (v1.UniqueVolumeName, error)
+	AddVolumeNode(uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) (v1.UniqueVolumeName, error)
 
 	// SetVolumeMountedByNode sets the MountedByNode value for the given volume
 	// and node. When set to true this value indicates the volume is mounted by
@@ -65,7 +65,7 @@ type ActualStateOfWorld interface {
 	// returned.
 	// If no node with the name nodeName exists in list of attached nodes for
 	// the specified volume, an error is returned.
-	SetVolumeMountedByNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool) error
+	SetVolumeMountedByNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool, forceUnmount bool) error
 
 	// SetNodeStatusUpdateNeeded sets statusUpdateNeeded for the specified
 	// node to true indicating the AttachedVolume field in the Node's Status
@@ -230,8 +230,8 @@ type nodeToUpdateStatusFor struct {
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
-	_ v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error {
-	_, err := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
+	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error {
+	_, err := asw.AddVolumeNode(uniqueName, volumeSpec, nodeName, devicePath)
 	return err
 }
 
@@ -255,25 +255,34 @@ func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(
 }
 
 func (asw *actualStateOfWorld) AddVolumeNode(
-	volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) (v1.UniqueVolumeName, error) {
+	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) (v1.UniqueVolumeName, error) {
+	var volumeName v1.UniqueVolumeName
 	asw.Lock()
 	defer asw.Unlock()
 
-	attachableVolumePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
-	if err != nil || attachableVolumePlugin == nil {
-		return "", fmt.Errorf(
-			"failed to get AttachablePlugin from volumeSpec for volume %q err=%v",
-			volumeSpec.Name(),
-			err)
-	}
+	if volumeSpec != nil {
+		attachableVolumePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+		if err != nil || attachableVolumePlugin == nil {
+			return "", fmt.Errorf(
+				"failed to get AttachablePlugin from volumeSpec for volume %q err=%v",
+				volumeSpec.Name(),
+				err)
+		}
 
-	volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
-		attachableVolumePlugin, volumeSpec)
-	if err != nil {
-		return "", fmt.Errorf(
-			"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q err=%v",
-			volumeSpec.Name(),
-			err)
+		volumeName, err = volumehelper.GetUniqueVolumeNameFromSpec(
+			attachableVolumePlugin, volumeSpec)
+		if err != nil {
+			return "", fmt.Errorf(
+				"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q err=%v",
+				volumeSpec.Name(),
+				err)
+		}
+	} else {
+		// volumeSpec is nil
+		// This happens only on controller startup when reading the volumes from node
+		// status; if the pods using the volume have been removed and are unreachable
+		// the volumes should be detached immediately and the spec is not needed
+		volumeName = uniqueName
 	}
 
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
@@ -316,7 +325,7 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 }
 
 func (asw *actualStateOfWorld) SetVolumeMountedByNode(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool) error {
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool, forceUnmount bool) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -330,7 +339,7 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 		nodeObj.mountedByNodeSetCount = nodeObj.mountedByNodeSetCount + 1
 	} else {
 		// Do not allow value to be reset unless it has been set at least once
-		if nodeObj.mountedByNodeSetCount == 0 {
+		if nodeObj.mountedByNodeSetCount == 0 && !forceUnmount {
 			return nil
 		}
 	}

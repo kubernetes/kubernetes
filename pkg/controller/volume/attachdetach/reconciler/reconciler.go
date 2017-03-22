@@ -184,9 +184,8 @@ func (rc *reconciler) reconcile() {
 				// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
 				glog.Errorf(
-					"operationExecutor.DetachVolume failed to start for volume %q (spec.Name: %q) from node %q with err: %v",
+					"operationExecutor.DetachVolume failed to start for volume %q from node %q with err: %v",
 					attachedVolume.VolumeName,
-					attachedVolume.VolumeSpec.Name(),
 					attachedVolume.NodeName,
 					err)
 			}
