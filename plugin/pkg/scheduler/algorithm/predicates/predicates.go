@@ -56,7 +56,7 @@ type NodeInfo interface {
 }
 
 type PersistentVolumeInfo interface {
-	List(selector labels.Selector) (ret []*v1.PersistentVolume, err error)
+	ListVolumes(selector labels.Selector) (ret []*v1.PersistentVolume, err error)
 	GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error)
 }
 
@@ -69,7 +69,7 @@ func (c *CachedPersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.P
 	return c.Get(pvID)
 }
 
-func (c *CachedPersistentVolumeInfo) List(selector labels.Selector) (ret []*v1.PersistentVolume, err error) {
+func (c *CachedPersistentVolumeInfo) ListVolumes(selector labels.Selector) (ret []*v1.PersistentVolume, err error) {
 	return c.List(selector)
 }
 

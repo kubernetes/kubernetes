@@ -63,7 +63,7 @@ func NewVolumeNodePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolum
 }
 
 func (c *VolumeNodeChecker) getAllLocalVolumes(node *v1.Node) ([]*v1.PersistentVolume, error) {
-	volumes, err := c.pvInfo.List(labels.Everything())
+	volumes, err := c.pvInfo.ListVolumes(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("volume node predicate cannot get a list of persistent volumes: %v", err)
 	}

@@ -71,7 +71,7 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.Pe
 	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
 }
 
-func (pvs FakePersistentVolumeInfo) List(selector labels.Selector) (ret []*v1.PersistentVolume, err error) {
+func (pvs FakePersistentVolumeInfo) ListVolumes(selector labels.Selector) (ret []*v1.PersistentVolume, err error) {
 	return
 }
 
