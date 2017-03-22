@@ -18,6 +18,8 @@ package testing
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/volume"
 )
+
+const TestPluginName = "kubernetes.io/testPlugin"
 
 // GetTestVolumeSpec returns a test volume spec
 func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.Spec {
@@ -45,9 +49,12 @@ func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.
 	}
 }
 
+var extraPods *v1.PodList
+
 func CreateTestClient() *fake.Clientset {
 	fakeClient := &fake.Clientset{}
 
+	extraPods = &v1.PodList{}
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PodList{}
 		podNamePrefix := "mypod"
@@ -60,6 +67,7 @@ func CreateTestClient() *fake.Clientset {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
+					UID:       types.UID(podName),
 					Namespace: namespace,
 					Labels: map[string]string{
 						"name": podName,
@@ -91,9 +99,51 @@ func CreateTestClient() *fake.Clientset {
 							},
 						},
 					},
+					NodeName: "mynode",
 				},
 			}
 			obj.Items = append(obj.Items, pod)
+		}
+		for _, pod := range extraPods.Items {
+			obj.Items = append(obj.Items, pod)
+		}
+		return true, obj, nil
+	})
+	fakeClient.AddReactor("create", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		createAction := action.(core.CreateAction)
+		pod := createAction.GetObject().(*v1.Pod)
+		extraPods.Items = append(extraPods.Items, *pod)
+		return true, createAction.GetObject(), nil
+	})
+	fakeClient.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &v1.NodeList{}
+		nodeNamePrefix := "mynode"
+		for i := 0; i < 5; i++ {
+			var nodeName string
+			if i != 0 {
+				nodeName = fmt.Sprintf("%s-%d", nodeNamePrefix, i)
+			} else {
+				// We want also the "mynode" node since all the testing pods live there
+				nodeName = nodeNamePrefix
+			}
+			node := v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+					Labels: map[string]string{
+						"name": nodeName,
+					},
+				},
+				Status: v1.NodeStatus{
+					VolumesAttached: []v1.AttachedVolume{
+						{
+							Name:       TestPluginName + "/volumeName",
+							DevicePath: "fake/path",
+						},
+					},
+				},
+				Spec: v1.NodeSpec{ExternalID: string(nodeName)},
+			}
+			obj.Items = append(obj.Items, node)
 		}
 		return true, obj, nil
 	})
@@ -113,4 +163,229 @@ func NewPod(uid, name string) *v1.Pod {
 			Namespace: name,
 		},
 	}
+}
+
+// NewPod returns a test pod object
+func NewPodWithVolume(podName, volumeName, nodeName string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       types.UID(podName),
+			Name:      podName,
+			Namespace: "mynamespace",
+			Labels: map[string]string{
+				"name": podName,
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "containerName",
+					Image: "containerImage",
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "volumeMountName",
+							ReadOnly:  false,
+							MountPath: "/mnt",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: volumeName,
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:   "pdName",
+							FSType:   "ext4",
+							ReadOnly: false,
+						},
+					},
+				},
+			},
+			NodeName: nodeName,
+		},
+	}
+}
+
+type TestPlugin struct {
+	ErrorEncountered   bool
+	attachedVolumeMap  map[string][]string
+	detachedVolumeMap  map[string][]string
+	attachedVolumeLock *sync.RWMutex
+	detachedVolumeLock *sync.RWMutex
+}
+
+func (plugin *TestPlugin) Init(host volume.VolumeHost) error {
+	return nil
+}
+
+func (plugin *TestPlugin) GetPluginName() string {
+	return TestPluginName
+}
+
+func (plugin *TestPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	return spec.Name(), nil
+}
+
+func (plugin *TestPlugin) CanSupport(spec *volume.Spec) bool {
+	return true
+}
+
+func (plugin *TestPlugin) RequiresRemount() bool {
+	return false
+}
+
+func (plugin *TestPlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	return nil, nil
+}
+
+func (plugin *TestPlugin) NewUnmounter(name string, podUID types.UID) (volume.Unmounter, error) {
+	return nil, nil
+}
+
+func (plugin *TestPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	fakeVolume := &v1.Volume{
+		Name: volumeName,
+		VolumeSource: v1.VolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName:   "pdName",
+				FSType:   "ext4",
+				ReadOnly: false,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(fakeVolume), nil
+}
+
+func (plugin *TestPlugin) NewAttacher() (volume.Attacher, error) {
+	attacher := testPluginAttacher{
+		ErrorEncountered:  &plugin.ErrorEncountered,
+		attachedVolumeMap: plugin.attachedVolumeMap,
+		mapLock:           plugin.attachedVolumeLock,
+	}
+	return &attacher, nil
+}
+
+func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
+	detacher := testPluginDetacher{
+		detachedVolumeMap: plugin.detachedVolumeMap,
+		mapLock:           plugin.detachedVolumeLock,
+	}
+	return &detacher, nil
+}
+
+func (plugin *TestPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	return []string{}, nil
+}
+
+func (plugin *TestPlugin) SupportsMountOption() bool {
+	return false
+}
+
+func (plugin *TestPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
+func (plugin *TestPlugin) GetErrorEncountered() bool {
+	return plugin.ErrorEncountered
+}
+
+func (plugin *TestPlugin) GetAttachedVolumes() map[string][]string {
+	plugin.attachedVolumeLock.RLock()
+	defer plugin.attachedVolumeLock.RUnlock()
+	ret := make(map[string][]string)
+	for nodeName, volumeList := range plugin.attachedVolumeMap {
+		ret[nodeName] = make([]string, len(volumeList))
+		copy(ret[nodeName], volumeList)
+	}
+	return ret
+}
+
+func (plugin *TestPlugin) GetDetachedVolumes() map[string][]string {
+	plugin.detachedVolumeLock.RLock()
+	defer plugin.detachedVolumeLock.RUnlock()
+	ret := make(map[string][]string)
+	for nodeName, volumeList := range plugin.detachedVolumeMap {
+		ret[nodeName] = make([]string, len(volumeList))
+		copy(ret[nodeName], volumeList)
+	}
+	return ret
+}
+
+func CreateTestPlugin() []volume.VolumePlugin {
+	attachedVolumes := make(map[string][]string)
+	detachedVolumes := make(map[string][]string)
+	attachedLock := &sync.RWMutex{}
+	detachedLock := &sync.RWMutex{}
+	return []volume.VolumePlugin{&TestPlugin{
+		ErrorEncountered:   false,
+		attachedVolumeMap:  attachedVolumes,
+		detachedVolumeMap:  detachedVolumes,
+		attachedVolumeLock: attachedLock,
+		detachedVolumeLock: detachedLock,
+	}}
+}
+
+// Attacher
+type testPluginAttacher struct {
+	ErrorEncountered  *bool
+	attachedVolumeMap map[string][]string
+	mapLock           *sync.RWMutex
+}
+
+func (attacher *testPluginAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+	attacher.mapLock.Lock()
+	defer attacher.mapLock.Unlock()
+	if spec == nil {
+		*attacher.ErrorEncountered = true
+		return "", fmt.Errorf("Attach called with nil volume spec")
+	}
+	attacher.attachedVolumeMap[string(nodeName)] = append(attacher.attachedVolumeMap[string(nodeName)], spec.Name())
+	return spec.Name(), nil
+}
+
+func (attacher *testPluginAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+	return nil, nil
+}
+
+func (attacher *testPluginAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
+	if spec == nil {
+		*attacher.ErrorEncountered = true
+		return "", fmt.Errorf("WaitForAttach called with nil volume spec")
+	}
+	fakePath := fmt.Sprintf("%s/%s", devicePath, spec.Name())
+	return fakePath, nil
+}
+
+func (attacher *testPluginAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
+	if spec == nil {
+		*attacher.ErrorEncountered = true
+		return "", fmt.Errorf("GetDeviceMountPath called with nil volume spec")
+	}
+	return "", nil
+}
+
+func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	if spec == nil {
+		*attacher.ErrorEncountered = true
+		return fmt.Errorf("MountDevice called with nil volume spec")
+	}
+	return nil
+}
+
+// Detacher
+type testPluginDetacher struct {
+	detachedVolumeMap map[string][]string
+	mapLock           *sync.RWMutex
+}
+
+func (detacher *testPluginDetacher) Detach(volumeName string, nodeName types.NodeName) error {
+	detacher.mapLock.Lock()
+	defer detacher.mapLock.Unlock()
+	detacher.detachedVolumeMap[string(nodeName)] = append(detacher.detachedVolumeMap[string(nodeName)], volumeName)
+	return nil
+}
+
+func (detacher *testPluginDetacher) UnmountDevice(deviceMountPath string) error {
+	return nil
 }
