@@ -89,7 +89,7 @@ spec:
                 exit 1;
               fi;
       nodeSelector:
-        alpha.kubernetes.io/fluentd-ds-ready: "true"
+        beta.kubernetes.io/fluentd-ds-ready: "true"
       tolerations:
       - key: "node.alpha.kubernetes.io/ismaster"
         effect: "NoSchedule"
