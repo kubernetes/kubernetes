@@ -15022,7 +15022,10 @@ go_library(
 
 go_test(
     name = "k8s.io/client-go/util/cert_test",
-    srcs = ["k8s.io/client-go/util/cert/csr_test.go"],
+    srcs = [
+        "k8s.io/client-go/util/cert/csr_test.go",
+        "k8s.io/client-go/util/cert/pem_test.go",
+    ],
     library = ":k8s.io/client-go/util/cert",
     tags = ["automanaged"],
 )

@@ -23,7 +23,6 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/serviceaccount",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
-        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

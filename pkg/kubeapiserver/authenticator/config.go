@@ -218,7 +218,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 
 // IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file
 func IsValidServiceAccountKeyFile(file string) bool {
-	_, err := serviceaccount.ReadPublicKeys(file)
+	_, err := certutil.PublicKeysFromFile(file)
 	return err == nil
 }
 
@@ -262,7 +262,7 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Request, error) {
 	allPublicKeys := []interface{}{}
 	for _, keyfile := range keyfiles {
-		publicKeys, err := serviceaccount.ReadPublicKeys(keyfile)
+		publicKeys, err := certutil.PublicKeysFromFile(keyfile)
 		if err != nil {
 			return nil, err
 		}

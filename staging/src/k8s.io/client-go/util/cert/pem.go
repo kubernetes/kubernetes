@@ -17,6 +17,7 @@ limitations under the License.
 package cert
 
 import (
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -29,17 +30,17 @@ const (
 	ECPrivateKeyBlockType = "EC PRIVATE KEY"
 	// RSAPrivateKeyBlockType is a possible value for pem.Block.Type.
 	RSAPrivateKeyBlockType = "RSA PRIVATE KEY"
-	// CertificateBlockType is a possible value for pem.Block.Type.
-	CertificateBlockType = "CERTIFICATE"
-	// CertificateRequestBlockType is a possible value for pem.Block.Type.
-	CertificateRequestBlockType = "CERTIFICATE REQUEST"
 	// PrivateKeyBlockType is a possible value for pem.Block.Type.
 	PrivateKeyBlockType = "PRIVATE KEY"
 	// PublicKeyBlockType is a possible value for pem.Block.Type.
 	PublicKeyBlockType = "PUBLIC KEY"
+	// CertificateBlockType is a possible value for pem.Block.Type.
+	CertificateBlockType = "CERTIFICATE"
+	// CertificateRequestBlockType is a possible value for pem.Block.Type.
+	CertificateRequestBlockType = "CERTIFICATE REQUEST"
 )
 
-// EncodePublicKeyPEM returns PEM-endcode public data
+// EncodePublicKeyPEM returns PEM-encoded public data
 func EncodePublicKeyPEM(key *rsa.PublicKey) ([]byte, error) {
 	der, err := x509.MarshalPKIXPublicKey(key)
 	if err != nil {
@@ -106,6 +107,73 @@ func ParsePrivateKeyPEM(keyData []byte) (interface{}, error) {
 	return nil, fmt.Errorf("data does not contain a valid RSA or ECDSA private key")
 }
 
+// ParsePublicKeysPEM is a helper function for reading an array of rsa.PublicKey or ecdsa.PublicKey from a PEM-encoded byte array.
+// Reads public keys from both public keys, private keys, and certificate files.
+func ParsePublicKeysPEM(keyData []byte) ([]interface{}, error) {
+	ok := false
+	var keys []interface{}
+	for len(keyData) > 0 {
+		var block *pem.Block
+		block, keyData = pem.Decode(keyData)
+		if block == nil {
+			break
+		}
+
+		switch block.Type {
+		case ECPrivateKeyBlockType:
+			// ECDSA Private Key in ASN.1 format
+			privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+			if err != nil {
+				return keys, err
+			}
+			keys = append(keys, &privateKey.PublicKey)
+		case RSAPrivateKeyBlockType:
+			// RSA Private Key in PKCS#1 format
+			privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+			if err != nil {
+				return keys, err
+			}
+			keys = append(keys, &privateKey.PublicKey)
+		case PrivateKeyBlockType:
+			// RSA or ECDSA Private Key in unencrypted PKCS#8 format
+			privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+			if err != nil {
+				return keys, err
+			}
+			// determine if this is an RSA or ECDSA Private Key
+			switch privateKey.(type) {
+			case *ecdsa.PrivateKey:
+				keys = append(keys, privateKey.(*ecdsa.PrivateKey).PublicKey)
+			case *rsa.PrivateKey:
+				keys = append(keys, privateKey.(*rsa.PrivateKey).PublicKey)
+			default:
+				return keys, err
+			}
+		case CertificateBlockType:
+			// x509 certificate in PEM encoded format
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return keys, err
+			}
+			keys = append(keys, &cert.PublicKey)
+		case PublicKeyBlockType:
+			// RSA or ECDSA public key in PEM encoded format
+			publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+			if err != nil {
+				return keys, err
+			}
+			keys = append(keys, publicKey)
+		}
+
+		ok = true
+	}
+
+	if !ok {
+		return keys, errors.New("data does not contain any valid RSA or ECDSA public keys")
+	}
+	return keys, nil
+}
+
 // ParseCertsPEM returns the x509.Certificates contained in the given PEM-encoded byte array
 // Returns an error if a certificate could not be parsed, or if the data does not contain any certificates
 func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
@@ -132,7 +200,7 @@ func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 	}
 
 	if !ok {
-		return certs, errors.New("could not read any certificates")
+		return certs, errors.New("data does not contain any valid RSA or ECDSA certificates")
 	}
 	return certs, nil
 }
