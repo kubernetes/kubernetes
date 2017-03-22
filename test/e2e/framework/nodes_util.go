@@ -66,9 +66,9 @@ func masterUpgradeGCE(rawV string) error {
 	// TODO: Remove these variables when they're no longer needed for downgrades.
 	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
 		env = append(env,
-			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
+			"ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE=3.0.17")
+			"ETCD_IMAGE=3.0.17")
 	}
 
 	v := "v" + rawV
