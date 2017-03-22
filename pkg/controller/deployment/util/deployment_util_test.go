@@ -241,7 +241,7 @@ func generateDeployment(image string) extensions.Deployment {
 	}
 }
 
-func TestGetNewRC(t *testing.T) {
+func TestGetNewRS(t *testing.T) {
 	newDeployment := generateDeployment("nginx")
 	newRC := generateRS(newDeployment)
 
@@ -297,27 +297,23 @@ func TestGetNewRC(t *testing.T) {
 	}
 }
 
-func TestGetOldRCs(t *testing.T) {
+func TestGetOldRSs(t *testing.T) {
 	newDeployment := generateDeployment("nginx")
 	newRS := generateRS(newDeployment)
 	newRS.Status.FullyLabeledReplicas = *(newRS.Spec.Replicas)
-	newPod := generatePodFromRS(newRS)
 
 	// create 2 old deployments and related replica sets/pods, with the same labels but different template
 	oldDeployment := generateDeployment("nginx")
 	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
 	oldRS := generateRS(oldDeployment)
 	oldRS.Status.FullyLabeledReplicas = *(oldRS.Spec.Replicas)
-	oldPod := generatePodFromRS(oldRS)
 	oldDeployment2 := generateDeployment("nginx")
 	oldDeployment2.Spec.Template.Spec.Containers[0].Name = "nginx-old-2"
 	oldRS2 := generateRS(oldDeployment2)
 	oldRS2.Status.FullyLabeledReplicas = *(oldRS2.Spec.Replicas)
-	oldPod2 := generatePodFromRS(oldRS2)
 
 	// create 1 ReplicaSet that existed before the deployment,
 	// with the same labels as the deployment, but no ControllerRef.
-	existedPod := generatePod(newDeployment.Spec.Template.Labels, "foo")
 	existedRS := generateRSWithLabel(newDeployment.Spec.Template.Labels, "foo")
 	existedRS.Status.FullyLabeledReplicas = *(existedRS.Spec.Replicas)
 
@@ -329,13 +325,6 @@ func TestGetOldRCs(t *testing.T) {
 		{
 			"No old ReplicaSets",
 			[]runtime.Object{
-				&v1.PodList{
-					Items: []v1.Pod{
-						generatePod(newDeployment.Spec.Template.Labels, "foo"),
-						generatePod(newDeployment.Spec.Template.Labels, "bar"),
-						newPod,
-					},
-				},
 				&extensions.ReplicaSetList{
 					Items: []extensions.ReplicaSet{
 						generateRS(generateDeployment("foo")),
@@ -344,21 +333,11 @@ func TestGetOldRCs(t *testing.T) {
 					},
 				},
 			},
-			[]*extensions.ReplicaSet{},
+			nil,
 		},
 		{
 			"Has old ReplicaSet",
 			[]runtime.Object{
-				&v1.PodList{
-					Items: []v1.Pod{
-						oldPod,
-						oldPod2,
-						generatePod(map[string]string{"name": "bar"}, "bar"),
-						generatePod(map[string]string{"name": "xyz"}, "xyz"),
-						existedPod,
-						generatePod(newDeployment.Spec.Template.Labels, "abc"),
-					},
-				},
 				&extensions.ReplicaSetList{
 					Items: []extensions.ReplicaSet{
 						oldRS2,
@@ -376,12 +355,10 @@ func TestGetOldRCs(t *testing.T) {
 
 	for _, test := range tests {
 		fakeClient := &fake.Clientset{}
-		fakeClient = addListPodsReactor(fakeClient, test.objs[0])
-		fakeClient = addListRSReactor(fakeClient, test.objs[1])
-		fakeClient = addGetRSReactor(fakeClient, test.objs[1])
-		fakeClient = addUpdatePodsReactor(fakeClient)
+		fakeClient = addListRSReactor(fakeClient, test.objs[0])
+		fakeClient = addGetRSReactor(fakeClient, test.objs[0])
 		fakeClient = addUpdateRSReactor(fakeClient)
-		rss, _, err := GetOldReplicaSets(&newDeployment, fakeClient)
+		_, rss, err := GetOldReplicaSets(&newDeployment, fakeClient)
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
@@ -558,6 +535,7 @@ func TestFindOldReplicaSets(t *testing.T) {
 
 	deployment := generateDeployment("nginx")
 	newRS := generateRS(deployment)
+	*(newRS.Spec.Replicas) = 1
 	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "hash"
 	newRS.CreationTimestamp = later
 
@@ -571,70 +549,54 @@ func TestFindOldReplicaSets(t *testing.T) {
 	oldRS.Status.FullyLabeledReplicas = *(oldRS.Spec.Replicas)
 	oldRS.CreationTimestamp = before
 
-	newPod := generatePodFromRS(newRS)
-	oldPod := generatePodFromRS(oldRS)
-
 	tests := []struct {
-		test       string
-		deployment extensions.Deployment
-		rsList     []*extensions.ReplicaSet
-		podList    *v1.PodList
-		expected   []*extensions.ReplicaSet
+		test            string
+		deployment      extensions.Deployment
+		rsList          []*extensions.ReplicaSet
+		podList         *v1.PodList
+		expected        []*extensions.ReplicaSet
+		expectedRequire []*extensions.ReplicaSet
 	}{
 		{
-			test:       "Get old ReplicaSets",
-			deployment: deployment,
-			rsList:     []*extensions.ReplicaSet{&newRS, &oldRS},
-			podList: &v1.PodList{
-				Items: []v1.Pod{
-					newPod,
-					oldPod,
-				},
-			},
-			expected: []*extensions.ReplicaSet{&oldRS},
+			test:            "Get old ReplicaSets",
+			deployment:      deployment,
+			rsList:          []*extensions.ReplicaSet{&newRS, &oldRS},
+			expected:        []*extensions.ReplicaSet{&oldRS},
+			expectedRequire: nil,
 		},
 		{
-			test:       "Get old ReplicaSets with no new ReplicaSet",
-			deployment: deployment,
-			rsList:     []*extensions.ReplicaSet{&oldRS},
-			podList: &v1.PodList{
-				Items: []v1.Pod{
-					oldPod,
-				},
-			},
-			expected: []*extensions.ReplicaSet{&oldRS},
+			test:            "Get old ReplicaSets with no new ReplicaSet",
+			deployment:      deployment,
+			rsList:          []*extensions.ReplicaSet{&oldRS},
+			expected:        []*extensions.ReplicaSet{&oldRS},
+			expectedRequire: nil,
 		},
 		{
-			test:       "Get old ReplicaSets with two new ReplicaSets, only the oldest new ReplicaSet is seen as new ReplicaSet",
-			deployment: deployment,
-			rsList:     []*extensions.ReplicaSet{&oldRS, &newRS, &newRSDup},
-			podList: &v1.PodList{
-				Items: []v1.Pod{
-					newPod,
-					oldPod,
-				},
-			},
-			expected: []*extensions.ReplicaSet{&oldRS, &newRS},
+			test:            "Get old ReplicaSets with two new ReplicaSets, only the oldest new ReplicaSet is seen as new ReplicaSet",
+			deployment:      deployment,
+			rsList:          []*extensions.ReplicaSet{&oldRS, &newRS, &newRSDup},
+			expected:        []*extensions.ReplicaSet{&oldRS, &newRS},
+			expectedRequire: []*extensions.ReplicaSet{&newRS},
 		},
 		{
-			test:       "Get empty old ReplicaSets",
-			deployment: deployment,
-			rsList:     []*extensions.ReplicaSet{&newRS},
-			podList: &v1.PodList{
-				Items: []v1.Pod{
-					newPod,
-				},
-			},
-			expected: []*extensions.ReplicaSet{},
+			test:            "Get empty old ReplicaSets",
+			deployment:      deployment,
+			rsList:          []*extensions.ReplicaSet{&newRS},
+			expected:        nil,
+			expectedRequire: nil,
 		},
 	}
 
 	for _, test := range tests {
-		old, _, err := FindOldReplicaSets(&test.deployment, test.rsList, test.podList)
-		sort.Sort(controller.ReplicaSetsByCreationTimestamp(old))
+		requireRS, allRS, err := FindOldReplicaSets(&test.deployment, test.rsList)
+		sort.Sort(controller.ReplicaSetsByCreationTimestamp(allRS))
 		sort.Sort(controller.ReplicaSetsByCreationTimestamp(test.expected))
-		if !reflect.DeepEqual(old, test.expected) || err != nil {
-			t.Errorf("In test case %q, expected %#v, got %#v: %v", test.test, test.expected, old, err)
+		if !reflect.DeepEqual(allRS, test.expected) || err != nil {
+			t.Errorf("In test case %q, expected %#v, got %#v: %v", test.test, test.expected, allRS, err)
+		}
+		// RSs are getting filtered correctly by rs.spec.replicas
+		if !reflect.DeepEqual(requireRS, test.expectedRequire) || err != nil {
+			t.Errorf("In test case %q, expected %#v, got %#v: %v", test.test, test.expectedRequire, requireRS, err)
 		}
 	}
 }
