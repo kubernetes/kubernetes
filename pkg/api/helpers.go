@@ -18,6 +18,7 @@ package api
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -463,6 +464,11 @@ const (
 	// an object (e.g. secret, config map) before fetching it again from apiserver.
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
+
+	// AffinityAnnotationKey represents the key of affinity data (json serialized)
+	// in the Annotations of a Pod.
+	// TODO: remove when alpha support for affinity is removed
+	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
 )
 
 // AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
@@ -594,6 +600,21 @@ func PodAnnotationsFromSysctls(sysctls []Sysctl) string {
 		kvs[i] = fmt.Sprintf("%s=%s", sysctls[i].Name, sysctls[i].Value)
 	}
 	return strings.Join(kvs, ",")
+}
+
+// GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
+// and converts it to the Affinity type in api.
+// TODO: remove when alpha support for affinity is removed
+func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, error) {
+	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
+		var affinity Affinity
+		err := json.Unmarshal([]byte(annotations[AffinityAnnotationKey]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
 }
 
 // GetPersistentVolumeClass returns StorageClassName.
