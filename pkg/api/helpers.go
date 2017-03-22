@@ -434,6 +434,10 @@ const (
 	// in the Annotations of a Pod.
 	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
 
+	// TaintsAnnotationKey represents the key of taints data (json serialized)
+	// in the Annotations of a Node.
+	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
+
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
@@ -569,6 +573,19 @@ func (t *Taint) ToString() string {
 		return fmt.Sprintf("%v:%v", t.Key, t.Effect)
 	}
 	return fmt.Sprintf("%v=%v:%v", t.Key, t.Value, t.Effect)
+}
+
+// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
+// and converts it to the []Taint type in api.
+func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
+	var taints []Taint
+	if len(annotations) > 0 && annotations[TaintsAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[TaintsAnnotationKey]), &taints)
+		if err != nil {
+			return []Taint{}, err
+		}
+	}
+	return taints, nil
 }
 
 // SysctlsFromPodAnnotations parses the sysctl annotations into a slice of safe Sysctls
