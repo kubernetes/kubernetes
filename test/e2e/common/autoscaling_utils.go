@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -52,6 +53,8 @@ const (
 	rsIsNil                         = "ERROR: replicaset = nil"
 	invalidKind                     = "ERROR: invalid workload kind for resource consumer"
 	customMetricName                = "QPS"
+	serviceInitializationTimeout    = 2 * time.Minute
+	serviceInitializationInterval   = 15 * time.Second
 )
 
 const (
@@ -223,15 +226,23 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
-	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
-		Context(ctx).
-		Name(rc.controllerName).
-		Suffix("ConsumeCPU").
-		Param("millicores", strconv.Itoa(millicores)).
-		Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
-		Param("requestSizeMillicores", strconv.Itoa(rc.requestSizeInMillicores))
-	framework.Logf("URL: %v", *req.URL())
-	_, err = req.DoRaw()
+	err = wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
+		req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+			Context(ctx).
+			Name(rc.controllerName).
+			Suffix("ConsumeCPU").
+			Param("millicores", strconv.Itoa(millicores)).
+			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
+			Param("requestSizeMillicores", strconv.Itoa(rc.requestSizeInMillicores))
+		framework.Logf("ConsumeCPU URL: %v", *req.URL())
+		_, err := req.DoRaw()
+		if err != nil {
+			framework.Logf("ConsumeCPU failure: %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+
 	framework.ExpectNoError(err)
 }
 
@@ -243,15 +254,23 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
-	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
-		Context(ctx).
-		Name(rc.controllerName).
-		Suffix("ConsumeMem").
-		Param("megabytes", strconv.Itoa(megabytes)).
-		Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
-		Param("requestSizeMegabytes", strconv.Itoa(rc.requestSizeInMegabytes))
-	framework.Logf("URL: %v", *req.URL())
-	_, err = req.DoRaw()
+	err = wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
+		req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+			Context(ctx).
+			Name(rc.controllerName).
+			Suffix("ConsumeMem").
+			Param("megabytes", strconv.Itoa(megabytes)).
+			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
+			Param("requestSizeMegabytes", strconv.Itoa(rc.requestSizeInMegabytes))
+		framework.Logf("ConsumeMem URL: %v", *req.URL())
+		_, err := req.DoRaw()
+		if err != nil {
+			framework.Logf("ConsumeMem failure: %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+
 	framework.ExpectNoError(err)
 }
 
@@ -263,16 +282,23 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
-	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
-		Context(ctx).
-		Name(rc.controllerName).
-		Suffix("BumpMetric").
-		Param("metric", customMetricName).
-		Param("delta", strconv.Itoa(delta)).
-		Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
-		Param("requestSizeMetrics", strconv.Itoa(rc.requestSizeCustomMetric))
-	framework.Logf("URL: %v", *req.URL())
-	_, err = req.DoRaw()
+	err = wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
+		req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+			Context(ctx).
+			Name(rc.controllerName).
+			Suffix("BumpMetric").
+			Param("metric", customMetricName).
+			Param("delta", strconv.Itoa(delta)).
+			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
+			Param("requestSizeMetrics", strconv.Itoa(rc.requestSizeCustomMetric))
+		framework.Logf("ConsumeCustomMetric URL: %v", *req.URL())
+		_, err := req.DoRaw()
+		if err != nil {
+			framework.Logf("ConsumeCustomMetric failure: %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
 	framework.ExpectNoError(err)
 }
 
