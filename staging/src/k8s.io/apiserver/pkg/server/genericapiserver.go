@@ -388,10 +388,23 @@ func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
 		// sort to have a deterministic order
 		sortedGroups := []metav1.APIGroup{}
 		groupNames := make([]string, 0, len(s.apiGroupsForDiscovery))
+
+		// hack to move apps after extensions so that the Deployment resources is found by
+		// kubectl in 1.5
+		foundApps := false
 		for groupName := range s.apiGroupsForDiscovery {
-			groupNames = append(groupNames, groupName)
+			if groupName != "apps" {
+				groupNames = append(groupNames, groupName)
+			} else {
+				foundApps = true
+			}
 		}
 		sort.Strings(groupNames)
+		if foundApps {
+			// make sure apps comes after extensions to extensions.Deployments are used by
+			// kubectl in 1.5
+			groupNames = append(groupNames, "apps")
+		}
 		for _, groupName := range groupNames {
 			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
 		}
