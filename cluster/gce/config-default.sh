@@ -211,3 +211,7 @@ SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-false}" # true, false
 # Indicates if the values (eg. kube password) in metadata should be treated as
 # canonical, and therefore disk copies ought to be recreated/clobbered.
 METADATA_CLOBBERS_CONFIG=${METADATA_CLOBBERS_CONFIG:-false}
+
+# ENABLE_MASTER_NOSCHEDULE_TAINT enables master taint: node.alpha.kubernetes.io/ismaster=:NoSchedule
+# Note that this only works for gci and container-linux now.
+ENABLE_MASTER_NOSCHEDULE_TAINT="${KUBE_ENABLE_MASTER_NOSCHEDULE_TAINT:-false}"

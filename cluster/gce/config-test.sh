@@ -244,3 +244,7 @@ ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 # TODO(dawn1107): Remove this once the flag is built into CVM image.
 # Kernel panic upon soft lockup issue
 SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-true}" # true, false
+
+# ENABLE_MASTER_NOSCHEDULE_TAINT enables master taint: node.alpha.kubernetes.io/ismaster=:NoSchedule
+# Note that this only works for gci and container-linux now.
+ENABLE_MASTER_NOSCHEDULE_TAINT="${KUBE_ENABLE_MASTER_NOSCHEDULE_TAINT:-false}"
