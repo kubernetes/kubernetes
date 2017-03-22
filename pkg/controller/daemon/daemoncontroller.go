@@ -346,7 +346,9 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 		dsc.enqueueDaemonSet(ds)
 		// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
 		if changedToReady && ds.Spec.MinReadySeconds > 0 {
-			dsc.enqueueDaemonSetAfter(ds, time.Duration(ds.Spec.MinReadySeconds)*time.Second)
+			// Add a second to avoid milliseconds skew in AddAfter.
+			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
+			dsc.enqueueDaemonSetAfter(ds, (time.Duration(ds.Spec.MinReadySeconds)*time.Second)+time.Second)
 		}
 		return
 	}
