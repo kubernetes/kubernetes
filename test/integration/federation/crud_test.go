@@ -38,8 +38,9 @@ func TestFederationCRUD(t *testing.T) {
 			framework.SetUpControllerFixture(t, fedFixture.APIFixture, fixture)
 			defer fixture.TearDown(t)
 
-			crud := framework.NewCRUDHelper(t, fixture.Adapter(), fedFixture.ClusterClients)
-			obj := fixture.NewObject(uuid.New())
+			adapter := fixture.Adapter()
+			crud := framework.NewCRUDHelper(t, adapter, fedFixture.ClusterClients)
+			obj := adapter.NewTestObject(uuid.New())
 			crud.CheckLifecycle(obj)
 		})
 	}
@@ -57,8 +58,9 @@ func TestFederationCRUD(t *testing.T) {
 			framework.SetUpControllerFixture(t, fedFixture.APIFixture, fixture)
 			defer fixture.TearDown(t)
 
-			crud := framework.NewCRUDHelper(t, fixture.Adapter(), fedFixture.ClusterClients)
-			obj := fixture.NewObject(uuid.New())
+			adapter := fixture.Adapter()
+			crud := framework.NewCRUDHelper(t, adapter, fedFixture.ClusterClients)
+			obj := adapter.NewTestObject(uuid.New())
 			updatedObj := crud.CheckCreate(obj)
 			crud.CheckDelete(updatedObj, orphanDependents)
 		})

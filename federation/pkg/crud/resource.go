@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package crud
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 // ResourceAdapter defines operations for interacting with a federated
-// type.  Tests written to target this interface can then target any
+// type.  Code written to target this interface can then target any
 // type for which an implementation of this interface exists.
-//
-// TODO reuse resource adapters defined for use with a generic controller as per
-// https://github.com/kubernetes/kubernetes/pull/41050
 type ResourceAdapter interface {
+	SetClient(client federationclientset.Interface)
+
 	Kind() string
 	Equivalent(obj1, obj2 pkgruntime.Object) bool
 	ObjectMeta(obj pkgruntime.Object) *metav1.ObjectMeta
@@ -41,4 +41,6 @@ type ResourceAdapter interface {
 	FedDelete(namespacedName types.NamespacedName, options *metav1.DeleteOptions) error
 
 	Get(client clientset.Interface, namespacedName types.NamespacedName) (pkgruntime.Object, error)
+
+	NewTestObject(namespace string) pkgruntime.Object
 }

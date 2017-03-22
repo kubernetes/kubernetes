@@ -14,27 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
-
-import (
-	"testing"
-	"time"
-)
-
-const (
-	DefaultWaitInterval = 50 * time.Millisecond
-)
-
-// SetUp is likely to be fixture-specific, but TearDown needs to be
-// consistent to enable TearDownOnPanic.
-type TestFixture interface {
-	TearDown(t *testing.T)
-}
-
-// TearDownOnPanic can be used to ensure cleanup on setup failure.
-func TearDownOnPanic(t *testing.T, f TestFixture) {
-	if r := recover(); r != nil {
-		f.TearDown(t)
-		panic(r)
-	}
-}
+package crud

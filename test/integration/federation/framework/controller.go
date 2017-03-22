@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"testing"
 
-	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	"k8s.io/kubernetes/federation/pkg/crud"
 )
 
 // ControllerFixture defines operations for managing a federation
@@ -36,12 +36,7 @@ type ControllerFixture interface {
 
 	Kind() string
 
-	Adapter() ResourceAdapter
-
-	// NewObject creates a new object of the type the controller is intended to target
-	//
-	// TODO Will have to rethink this for controllers that target multiple types
-	NewObject(namespace string) pkgruntime.Object
+	Adapter() crud.ResourceAdapter
 }
 
 // SetUpControllerFixture configures the given resource fixture to target the provided api fixture
