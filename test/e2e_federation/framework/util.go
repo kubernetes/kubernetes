@@ -38,6 +38,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+const FederatedDefaultTestTimeout = 5 * time.Minute
+
 // Detects whether the federation namespace exists in the underlying cluster
 func SkipUnlessFederated(c clientset.Interface) {
 	federationNS := os.Getenv("FEDERATION_NAMESPACE")
