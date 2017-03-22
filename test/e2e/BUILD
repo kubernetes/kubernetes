@@ -166,7 +166,7 @@ go_library(
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/google/cadvisor/info/v1",
-        "//vendor:github.com/influxdata/influxdb/client",
+        "//vendor:github.com/influxdata/influxdb/client/v2",
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/ginkgo/config",
         "//vendor:github.com/onsi/ginkgo/reporters",
