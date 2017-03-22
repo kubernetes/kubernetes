@@ -272,7 +272,7 @@ function create-master-pki {
 
   # TODO(mikedanese): remove this when we don't support downgrading to versions
   # < 1.6.
-  ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.key
+  ln -sf "${APISERVER_SERVER_KEY_PATH}" /etc/srv/kubernetes/server.key
   ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.cert
 }
 
