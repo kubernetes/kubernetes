@@ -4052,11 +4052,10 @@ type Secret struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN
-	// or leading dot followed by valid DNS_SUBDOMAIN.
-	// The serialized form of the secret data is a base64 encoded string,
-	// representing the arbitrary (possibly non-string) data value here.
-	// Described in https://tools.ietf.org/html/rfc4648#section-4
+	// Data contains the secret data. Each key must consist of alphanumeric
+	// characters, '-', '_' or '.'. The serialized form of the secret data is a
+	// base64 encoded string, representing the arbitrary (possibly non-string)
+	// data value here. Described in https://tools.ietf.org/html/rfc4648#section-4
 	// +optional
 	Data map[string][]byte `json:"data,omitempty" protobuf:"bytes,2,rep,name=data"`
 
@@ -4180,7 +4179,7 @@ type ConfigMap struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Data contains the configuration data.
-	// Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
+	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
 	// +optional
 	Data map[string]string `json:"data,omitempty" protobuf:"bytes,2,rep,name=data"`
 }
