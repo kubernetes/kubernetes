@@ -381,7 +381,7 @@ func TestGetOldRCs(t *testing.T) {
 		fakeClient = addGetRSReactor(fakeClient, test.objs[1])
 		fakeClient = addUpdatePodsReactor(fakeClient)
 		fakeClient = addUpdateRSReactor(fakeClient)
-		rss, _, err := GetOldReplicaSets(&newDeployment, fakeClient)
+		_, rss, err := GetOldReplicaSets(&newDeployment, fakeClient)
 		if err != nil {
 			t.Errorf("In test case %s, got unexpected error %v", test.test, err)
 		}
@@ -571,9 +571,6 @@ func TestFindOldReplicaSets(t *testing.T) {
 	oldRS.Status.FullyLabeledReplicas = *(oldRS.Spec.Replicas)
 	oldRS.CreationTimestamp = before
 
-	newPod := generatePodFromRS(newRS)
-	oldPod := generatePodFromRS(oldRS)
-
 	tests := []struct {
 		test       string
 		deployment extensions.Deployment
@@ -585,52 +582,30 @@ func TestFindOldReplicaSets(t *testing.T) {
 			test:       "Get old ReplicaSets",
 			deployment: deployment,
 			rsList:     []*extensions.ReplicaSet{&newRS, &oldRS},
-			podList: &v1.PodList{
-				Items: []v1.Pod{
-					newPod,
-					oldPod,
-				},
-			},
-			expected: []*extensions.ReplicaSet{&oldRS},
+			expected:   []*extensions.ReplicaSet{&oldRS},
 		},
 		{
 			test:       "Get old ReplicaSets with no new ReplicaSet",
 			deployment: deployment,
 			rsList:     []*extensions.ReplicaSet{&oldRS},
-			podList: &v1.PodList{
-				Items: []v1.Pod{
-					oldPod,
-				},
-			},
-			expected: []*extensions.ReplicaSet{&oldRS},
+			expected:   []*extensions.ReplicaSet{&oldRS},
 		},
 		{
 			test:       "Get old ReplicaSets with two new ReplicaSets, only the oldest new ReplicaSet is seen as new ReplicaSet",
 			deployment: deployment,
 			rsList:     []*extensions.ReplicaSet{&oldRS, &newRS, &newRSDup},
-			podList: &v1.PodList{
-				Items: []v1.Pod{
-					newPod,
-					oldPod,
-				},
-			},
-			expected: []*extensions.ReplicaSet{&oldRS, &newRS},
+			expected:   []*extensions.ReplicaSet{&oldRS, &newRS},
 		},
 		{
 			test:       "Get empty old ReplicaSets",
 			deployment: deployment,
 			rsList:     []*extensions.ReplicaSet{&newRS},
-			podList: &v1.PodList{
-				Items: []v1.Pod{
-					newPod,
-				},
-			},
-			expected: []*extensions.ReplicaSet{},
+			expected:   []*extensions.ReplicaSet{},
 		},
 	}
 
 	for _, test := range tests {
-		old, _, err := FindOldReplicaSets(&test.deployment, test.rsList, test.podList)
+		_, old, err := FindOldReplicaSets(&test.deployment, test.rsList)
 		sort.Sort(controller.ReplicaSetsByCreationTimestamp(old))
 		sort.Sort(controller.ReplicaSetsByCreationTimestamp(test.expected))
 		if !reflect.DeepEqual(old, test.expected) || err != nil {
