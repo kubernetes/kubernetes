@@ -430,6 +430,10 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 }
 
 const (
+	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
+	// in the Annotations of a Pod.
+	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
+
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
@@ -470,6 +474,19 @@ const (
 	// TODO: remove when alpha support for affinity is removed
 	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
 )
+
+// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
+// and converts it to the []Toleration type in api.
+func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
+	var tolerations []Toleration
+	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)
+		if err != nil {
+			return tolerations, err
+		}
+	}
+	return tolerations, nil
+}
 
 // AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
 // Returns true if something was updated, false otherwise.
