@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -128,8 +127,10 @@ type GenericAPIServer struct {
 
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
+	// The slice preserves group name insertion order.
 	apiGroupsForDiscoveryLock sync.RWMutex
 	apiGroupsForDiscovery     map[string]metav1.APIGroup
+	apiGroupNamesForDiscovery []string
 
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	swaggerConfig *swagger.Config
@@ -334,12 +335,27 @@ func (s *GenericAPIServer) AddAPIGroupForDiscovery(apiGroup metav1.APIGroup) {
 	s.apiGroupsForDiscoveryLock.Lock()
 	defer s.apiGroupsForDiscoveryLock.Unlock()
 
+	// Insert the group into the ordered list if it is not already present
+	if _, exists := s.apiGroupsForDiscovery[apiGroup.Name]; !exists {
+		s.apiGroupNamesForDiscovery = append(s.apiGroupNamesForDiscovery, apiGroup.Name)
+	}
+
 	s.apiGroupsForDiscovery[apiGroup.Name] = apiGroup
 }
 
 func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
 	s.apiGroupsForDiscoveryLock.Lock()
 	defer s.apiGroupsForDiscoveryLock.Unlock()
+
+	// Remove the group from the ordered list
+	// https://github.com/golang/go/wiki/SliceTricks#filtering-without-allocating
+	newOrder := s.apiGroupNamesForDiscovery[:0]
+	for _, orderedGroupName := range s.apiGroupNamesForDiscovery {
+		if orderedGroupName != groupName {
+			newOrder = append(newOrder, orderedGroupName)
+		}
+	}
+	s.apiGroupNamesForDiscovery = newOrder
 
 	delete(s.apiGroupsForDiscovery, groupName)
 }
@@ -385,14 +401,10 @@ func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
 		s.apiGroupsForDiscoveryLock.RLock()
 		defer s.apiGroupsForDiscoveryLock.RUnlock()
 
-		// sort to have a deterministic order
 		sortedGroups := []metav1.APIGroup{}
-		groupNames := make([]string, 0, len(s.apiGroupsForDiscovery))
-		for groupName := range s.apiGroupsForDiscovery {
-			groupNames = append(groupNames, groupName)
-		}
-		sort.Strings(groupNames)
-		for _, groupName := range groupNames {
+
+		// ranging over apiGroupNamesForDiscovery preserves the registration order
+		for _, groupName := range s.apiGroupNamesForDiscovery {
 			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
 		}
 

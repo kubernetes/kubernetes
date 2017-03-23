@@ -529,6 +529,64 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	assert.Equal(0, len(groupList.Groups))
 }
 
+func TestDiscoveryOrdering(t *testing.T) {
+	master, etcdserver, _, assert := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	server := httptest.NewServer(master.InsecureHandler)
+	groupList, err := getGroupList(server)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assert.Equal(0, len(groupList.Groups))
+
+	// Register three groups
+	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "x"})
+	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "y"})
+	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "z"})
+	// Register three additional groups that come earlier alphabetically
+	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "a"})
+	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "b"})
+	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "c"})
+	// Make sure re-adding doesn't double-register or make a group lose its place
+	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "x"})
+
+	groupList, err = getGroupList(server)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assert.Equal(6, len(groupList.Groups))
+	assert.Equal("x", groupList.Groups[0].Name)
+	assert.Equal("y", groupList.Groups[1].Name)
+	assert.Equal("z", groupList.Groups[2].Name)
+	assert.Equal("a", groupList.Groups[3].Name)
+	assert.Equal("b", groupList.Groups[4].Name)
+	assert.Equal("c", groupList.Groups[5].Name)
+
+	// Remove a group.
+	master.RemoveAPIGroupForDiscovery("a")
+	groupList, err = getGroupList(server)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assert.Equal(5, len(groupList.Groups))
+
+	// Re-adding should move to the end.
+	master.AddAPIGroupForDiscovery(metav1.APIGroup{Name: "a"})
+	groupList, err = getGroupList(server)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assert.Equal(6, len(groupList.Groups))
+	assert.Equal("x", groupList.Groups[0].Name)
+	assert.Equal("y", groupList.Groups[1].Name)
+	assert.Equal("z", groupList.Groups[2].Name)
+	assert.Equal("b", groupList.Groups[3].Name)
+	assert.Equal("c", groupList.Groups[4].Name)
+	assert.Equal("a", groupList.Groups[5].Name)
+}
+
 func TestGetServerAddressByClientCIDRs(t *testing.T) {
 	publicAddressCIDRMap := []metav1.ServerAddressByClientCIDR{
 		{
