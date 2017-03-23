@@ -270,7 +270,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(ds.Spec.TemplateGeneration).To(Equal(int64(2)))
 
 		By("Check that daemon pods images aren't updated.")
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImage(c, ns, label, image))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImageAndAvailability(c, ns, label, image, 0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Make sure all daemon pods have correct template generation 1")
@@ -309,7 +309,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration + 1))
 
 		By("Check that daemon pods images are updated.")
-		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImage(c, ns, label, redisImage))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImageAndAvailability(c, ns, label, redisImage, 1))
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("Make sure all daemon pods have correct template generation %d", templateGeneration+1))
@@ -587,8 +587,9 @@ func checkDaemonStatus(f *framework.Framework, dsName string) error {
 	return nil
 }
 
-func checkDaemonPodsImage(c clientset.Interface, ns string, selector map[string]string, image string) func() (bool, error) {
+func checkDaemonPodsImageAndAvailability(c clientset.Interface, ns string, selector map[string]string, image string, maxUnavailable int) func() (bool, error) {
 	return func() (bool, error) {
+		var unavailablePods int
 		selector := labels.Set(selector).AsSelector()
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		podList, err := c.Core().Pods(ns).List(options)
@@ -597,12 +598,23 @@ func checkDaemonPodsImage(c clientset.Interface, ns string, selector map[string]
 		}
 		pods := podList.Items
 
+		allImagesUpdated := true
 		for _, pod := range pods {
 			podImage := pod.Spec.Containers[0].Image
-			if podImage != image || !v1.IsPodReady(&pod) {
-				framework.Logf("Wrong image for pod: %s. Expected: %s, got: %s. Pod Ready: %t", pod.Name, image, podImage, v1.IsPodReady(&pod))
-				return false, nil
+			if podImage != image {
+				allImagesUpdated = false
+				framework.Logf("Wrong image for pod: %s. Expected: %s, got: %s.", pod.Name, image, podImage)
 			}
+			if !v1.IsPodReady(&pod) {
+				framework.Logf("Pod %s is not ready", pod.Name)
+				unavailablePods++
+			}
+		}
+		if unavailablePods > maxUnavailable {
+			return false, fmt.Errorf("Error, number of unavailable pods: %d is greater than maxUnavailable: %d", unavailablePods, maxUnavailable)
+		}
+		if !allImagesUpdated {
+			return false, nil
 		}
 		return true, nil
 	}
