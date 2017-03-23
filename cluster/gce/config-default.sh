@@ -204,6 +204,9 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 # Optional: install a default StorageClass
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 
+# Optional: Enable legacy ABAC policy that makes all service accounts superusers.
+ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-true}" # true, false
+
 # TODO(dawn1107): Remove this once the flag is built into CVM image.
 # Kernel panic upon soft lockup issue
 SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-false}" # true, false
