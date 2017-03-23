@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
       - name: autoscaler
-        image: gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0
+        image: gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.1.0-r2
         resources:
             requests:
                 cpu: "20m"
@@ -40,7 +40,6 @@ spec:
           - /cluster-proportional-autoscaler
           - --namespace=kube-system
           - --configmap=kube-dns-autoscaler
-          - --mode=linear
           # Should keep target in sync with cluster/addons/dns/skydns-rc.yaml.base
           - --target=Deployment/kube-dns
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
