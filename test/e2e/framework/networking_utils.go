@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )
 
@@ -825,4 +826,36 @@ func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 			expectedHosts, hittedHosts, count, countToSucceed)
 	}
 	return nil
+}
+
+// Blocks outgoing network traffic on 'node'. Then runs testFunc and returns its status.
+// At the end (even in case of errors), the network traffic is brought back to normal.
+// This function executes commands on a node so it will work only for some
+// environments.
+func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1.Node, testFunc func()) {
+	host := GetNodeExternalIP(node)
+	master := GetMasterAddress(c)
+	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
+	defer func() {
+		// This code will execute even if setting the iptables rule failed.
+		// It is on purpose because we may have an error even if the new rule
+		// had been inserted. (yes, we could look at the error code and ssh error
+		// separately, but I prefer to stay on the safe side).
+		By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
+		UnblockNetwork(host, master)
+	}()
+
+	Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
+	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
+		Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+	}
+	BlockNetwork(host, master)
+
+	Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
+	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
+		Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
+	}
+
+	testFunc()
+	// network traffic is unblocked in a deferred function
 }
