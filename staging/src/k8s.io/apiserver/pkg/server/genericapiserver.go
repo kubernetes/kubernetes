@@ -331,6 +331,8 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	return nil
 }
 
+// AddAPIGroupForDiscovery adds the specified group to the list served to discovery queries.
+// Discovery lists groups in order of registration.
 func (s *GenericAPIServer) AddAPIGroupForDiscovery(apiGroup metav1.APIGroup) {
 	s.apiGroupsForDiscoveryLock.Lock()
 	defer s.apiGroupsForDiscoveryLock.Unlock()
