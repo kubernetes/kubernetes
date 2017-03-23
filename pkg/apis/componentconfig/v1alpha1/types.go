@@ -130,6 +130,15 @@ type KubeSchedulerConfiguration struct {
 	FailureDomains string `json:"failureDomains"`
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection LeaderElectionConfiguration `json:"leaderElection"`
+	// PolicyConfigMapName is the name of the ConfigMap object that specifies
+	// the scheduler's policy config. If UseLegacyPolicyConfig is true, scheduler
+	// uses PolicyConfigFile. If UseLegacyPolicyConfig is false and
+	// PolicyConfigMapName is not empty, the ConfigMap object with this name must
+	// exist before scheduler initialization.
+	PolicyConfigMapName string `json:"policyConfigMapName"`
+	// UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and
+	// to use PolicyConfigFile if available.
+	UseLegacyPolicyConfig bool `json:"useLegacyPolicyConfig"`
 }
 
 // HairpinMode denotes how the kubelet should configure networking to handle
