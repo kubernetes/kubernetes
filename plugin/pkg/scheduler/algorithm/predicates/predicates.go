@@ -508,11 +508,21 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				result.MilliCPU += rQuantity.MilliValue()
 			case v1.ResourceNvidiaGPU:
 				result.NvidiaGPU += rQuantity.Value()
+			case v1.ResourceStorageLogs:
+				result.StorageScratch += rQuantity.Value()
+			case v1.ResourceStorageOverlay:
+				result.StorageOverlay += rQuantity.Value()
 			default:
 				if v1.IsOpaqueIntResourceName(rName) {
 					result.AddOpaque(rName, rQuantity.Value())
 				}
 			}
+		}
+	}
+	// Account for storage requested by emptydir volumes.
+	for _, vol := range pod.Spec.Volumes {
+		if vol.EmptyDir != nil {
+			result.StorageScratch += vol.EmptyDir.SizeLimit.Value()
 		}
 	}
 	// take max_resource(sum_pod, any_init_container)
@@ -530,6 +540,14 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 			case v1.ResourceNvidiaGPU:
 				if gpu := rQuantity.Value(); gpu > result.NvidiaGPU {
 					result.NvidiaGPU = gpu
+				}
+			case v1.ResourceStorageLogs:
+				if scratch := rQuantity.Value(); scratch > result.StorageScratch {
+					result.StorageScratch = scratch
+				}
+			case v1.ResourceStorageOverlay:
+				if overlay := rQuantity.Value(); overlay > result.StorageOverlay {
+					result.StorageOverlay = overlay
 				}
 			default:
 				if v1.IsOpaqueIntResourceName(rName) {
@@ -580,6 +598,16 @@ func PodFitsResources(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 	}
 	if allocatable.NvidiaGPU < podRequest.NvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceNvidiaGPU, podRequest.NvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, allocatable.NvidiaGPU))
+	}
+	scratchSpace := podRequest.StorageScratch
+	if allocatable.StorageOverlay == 0 {
+		scratchSpace += podRequest.StorageOverlay
+	}
+	if allocatable.StorageScratch < scratchSpace+nodeInfo.RequestedResource().StorageScratch {
+		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceStorageScratch, scratchSpace, nodeInfo.RequestedResource().StorageScratch, allocatable.StorageScratch))
+	}
+	if allocatable.StorageOverlay > 0 && allocatable.StorageOverlay < podRequest.StorageOverlay+nodeInfo.RequestedResource().StorageOverlay {
+		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceStorageOverlay, podRequest.StorageOverlay, nodeInfo.RequestedResource().StorageOverlay, allocatable.StorageOverlay))
 	}
 	for rName, rQuant := range podRequest.OpaqueIntResources {
 		if allocatable.OpaqueIntResources[rName] < rQuant+nodeInfo.RequestedResource().OpaqueIntResources[rName] {

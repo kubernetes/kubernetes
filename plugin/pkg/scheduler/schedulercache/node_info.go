@@ -67,6 +67,8 @@ type Resource struct {
 	MilliCPU           int64
 	Memory             int64
 	NvidiaGPU          int64
+	StorageScratch     int64
+	StorageOverlay     int64
 	OpaqueIntResources map[v1.ResourceName]int64
 }
 
@@ -84,9 +86,11 @@ func (r *Resource) ResourceList() v1.ResourceList {
 
 func (r *Resource) Clone() *Resource {
 	res := &Resource{
-		MilliCPU:  r.MilliCPU,
-		Memory:    r.Memory,
-		NvidiaGPU: r.NvidiaGPU,
+		MilliCPU:       r.MilliCPU,
+		Memory:         r.Memory,
+		NvidiaGPU:      r.NvidiaGPU,
+		StorageOverlay: r.StorageOverlay,
+		StorageScratch: r.StorageScratch,
 	}
 	res.OpaqueIntResources = make(map[v1.ResourceName]int64)
 	for k, v := range r.OpaqueIntResources {
@@ -346,6 +350,10 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			n.allocatableResource.Memory = rQuant.Value()
 		case v1.ResourceNvidiaGPU:
 			n.allocatableResource.NvidiaGPU = rQuant.Value()
+		case v1.ResourceStorageScratch:
+			n.allocatableResource.StorageScratch = rQuant.Value()
+		case v1.ResourceStorageOverlay:
+			n.allocatableResource.StorageOverlay = rQuant.Value()
 		case v1.ResourcePods:
 			n.allowedPodNumber = int(rQuant.Value())
 		default:
