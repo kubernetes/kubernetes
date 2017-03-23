@@ -19,6 +19,7 @@ package vsphere_volume
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,6 +36,14 @@ const (
 	checkSleepDuration = time.Second
 	diskByIDPath       = "/dev/disk/by-id/"
 	diskSCSIPrefix     = "wwn-0x"
+	diskformat         = "diskformat"
+
+	Policy_HostFailuresToTolerate = "hostfailurestotolerate"
+	Policy_ForceProvisioning      = "forceprovisioning"
+	Policy_CacheReservation       = "cachereservation"
+	Policy_DiskStripes            = "diskstripes"
+	Policy_ObjectSpaceReservation = "objectspacereservation"
+	Policy_IopsLimit              = "iopslimit"
 )
 
 var ErrProbeVolume = errors.New("Error scanning attached volumes")
@@ -73,15 +82,56 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPa
 	// the values to the cloud provider.
 	for parameter, value := range v.options.Parameters {
 		switch strings.ToLower(parameter) {
-		case "diskformat":
+		case diskformat:
 			volumeOptions.DiskFormat = value
 		case "datastore":
 			volumeOptions.Datastore = value
+		case Policy_HostFailuresToTolerate:
+			if !validateVSANCapability(Policy_HostFailuresToTolerate, value) {
+				return "", 0, fmt.Errorf(`Invalid value for hostFailuresToTolerate in volume plugin %s. 
+				The default value is 1, minimum value is 0 and maximum value is 3.`, v.plugin.GetPluginName())
+			}
+			volumeOptions.StorageProfileData += " (\"hostFailuresToTolerate\" i" + value + ")"
+		case Policy_ForceProvisioning:
+			if !validateVSANCapability(Policy_ForceProvisioning, value) {
+				return "", 0, fmt.Errorf(`Invalid value for forceProvisioning in volume plugin %s. 
+				The value can be either 0 or 1.`, v.plugin.GetPluginName())
+			}
+			volumeOptions.StorageProfileData += " (\"forceProvisioning\" i" + value + ")"
+		case Policy_CacheReservation:
+			if !validateVSANCapability(Policy_CacheReservation, value) {
+				return "", 0, fmt.Errorf(`Invalid value for cacheReservation in volume plugin %s.
+				The minimum percentage is 0 and maximum percentage is 100.`, v.plugin.GetPluginName())
+			}
+			intVal, _ := strconv.Atoi(value)
+			volumeOptions.StorageProfileData += " (\"cacheReservation\" i" + strconv.Itoa(intVal*10000) + ")"
+		case Policy_DiskStripes:
+			if !validateVSANCapability(Policy_DiskStripes, value) {
+				return "", 0, fmt.Errorf(`Invalid value for diskStripes in volume plugin %s. 
+				The minimum value is 1 and maximum value is 12.`, v.plugin.GetPluginName())
+			}
+			volumeOptions.StorageProfileData += " (\"stripeWidth\" i" + value + ")"
+		case Policy_ObjectSpaceReservation:
+			if !validateVSANCapability(Policy_ObjectSpaceReservation, value) {
+				return "", 0, fmt.Errorf(`Invalid value for ObjectSpaceReservation in volume plugin %s. 
+				The minimum percentage is 0 and maximum percentage is 100.`, v.plugin.GetPluginName())
+			}
+			volumeOptions.StorageProfileData += " (\"proportionalCapacity\" i" + value + ")"
+		case Policy_IopsLimit:
+			if !validateVSANCapability(Policy_IopsLimit, value) {
+				return "", 0, fmt.Errorf(`Invalid value for iopsLimit in volume plugin %s. 
+				The value should be greater than 0.`, v.plugin.GetPluginName())
+			}
+			volumeOptions.StorageProfileData += " (\"iopsLimit\" i" + value + ")"
 		default:
 			return "", 0, fmt.Errorf("invalid option %q for volume plugin %s", parameter, v.plugin.GetPluginName())
 		}
 	}
 
+	if volumeOptions.StorageProfileData != "" {
+		volumeOptions.StorageProfileData = "(" + volumeOptions.StorageProfileData + ")"
+	}
+	glog.V(1).Infof("StorageProfileData in vsphere volume %q", volumeOptions.StorageProfileData)
 	// TODO: implement PVC.Selector parsing
 	if v.options.PVC.Spec.Selector != nil {
 		return "", 0, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on vSphere")
@@ -131,4 +181,51 @@ func getCloudProvider(cloud cloudprovider.Interface) (*vsphere.VSphere, error) {
 		return nil, errors.New("Invalid cloud provider: expected vSphere")
 	}
 	return vs, nil
+}
+
+// Validate the capability requirement for the user specified policy attributes.
+func validateVSANCapability(capabilityName string, capabilityValue string) bool {
+	switch strings.ToLower(capabilityName) {
+	case Policy_HostFailuresToTolerate:
+		capabilityIntVal, ok := verifyCapabilityValueIsInteger(capabilityValue)
+		if ok && (capabilityIntVal >= 0 && capabilityIntVal <= 3) {
+			return true
+		}
+	case Policy_ForceProvisioning:
+		capabilityIntVal, ok := verifyCapabilityValueIsInteger(capabilityValue)
+		if ok && (capabilityIntVal == 0 || capabilityIntVal == 1) {
+			return true
+		}
+	case Policy_CacheReservation:
+		capabilityIntVal, ok := verifyCapabilityValueIsInteger(capabilityValue)
+		if ok && (capabilityIntVal >= 0 && capabilityIntVal <= 100) {
+			return true
+		}
+	case Policy_DiskStripes:
+		capabilityIntVal, ok := verifyCapabilityValueIsInteger(capabilityValue)
+		if ok && (capabilityIntVal >= 1 && capabilityIntVal <= 12) {
+			return true
+		}
+	// Need to check
+	case Policy_ObjectSpaceReservation:
+		capabilityIntVal, ok := verifyCapabilityValueIsInteger(capabilityValue)
+		if ok && (capabilityIntVal >= 0 || capabilityIntVal <= 100) {
+			return true
+		}
+	case Policy_IopsLimit:
+		capabilityIntVal, ok := verifyCapabilityValueIsInteger(capabilityValue)
+		if ok && (capabilityIntVal >= 0) {
+			return true
+		}
+	}
+	return false
+}
+
+// Verify if the capability value is of type integer.
+func verifyCapabilityValueIsInteger(capabilityValue string) (int, bool) {
+	i, err := strconv.Atoi(capabilityValue)
+	if err != nil {
+		return -1, false
+	}
+	return i, true
 }
