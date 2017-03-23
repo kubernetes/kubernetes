@@ -42,6 +42,9 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
 		err = gclLogsProvider.EnsureWorking()
 		framework.ExpectNoError(err, "GCL is not working")
 
+		err = ensureSingleFluentdOnEachNode(f, gclLogsProvider.FluentdApplicationName())
+		framework.ExpectNoError(err, "Fluentd deployed incorrectly")
+
 		By("Running synthetic logger")
 		pod := createLoggingPod(f, podName, 10*60, 10*time.Minute)
 		defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})

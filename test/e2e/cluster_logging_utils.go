@@ -284,6 +284,31 @@ func getMissingLinesCount(logsProvider logsProvider, pod *loggingPod) (int, erro
 	return pod.ExpectedLinesNumber - len(pod.Occurrences), nil
 }
 
+func ensureSingleFluentdOnEachNode(f *framework.Framework, fluentdApplicationName string) error {
+	fluentdPodList, err := getFluentdPods(f, fluentdApplicationName)
+	if err != nil {
+		return err
+	}
+
+	fluentdPodsPerNode := make(map[string]int)
+	for _, fluentdPod := range fluentdPodList.Items {
+		fluentdPodsPerNode[fluentdPod.Spec.NodeName]++
+	}
+
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	for _, node := range nodeList.Items {
+		fluentdPodCount, ok := fluentdPodsPerNode[node.Name]
+
+		if !ok {
+			return fmt.Errorf("node %s doesn't have fluentd instance", node.Name)
+		} else if fluentdPodCount != 1 {
+			return fmt.Errorf("node %s contains %d fluentd instaces, expected exactly one", node.Name, fluentdPodCount)
+		}
+	}
+
+	return nil
+}
+
 func getFluentdPods(f *framework.Framework, fluentdApplicationName string) (*api_v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": fluentdApplicationName}))
 	options := meta_v1.ListOptions{LabelSelector: label.String()}
