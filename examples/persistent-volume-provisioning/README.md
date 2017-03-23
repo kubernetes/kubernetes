@@ -313,7 +313,6 @@ It is required that this value matches the name of a `StorageClass` configured b
   "apiVersion": "v1",
   "metadata": {
     "name": "claim1"
-    }
   },
   "spec": {
     "accessModes": [
