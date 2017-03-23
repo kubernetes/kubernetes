@@ -73,7 +73,7 @@ func Run(s *options.SchedulerServer) error {
 
 	informerFactory := informers.NewSharedInformerFactory(kubecli, 0)
 
-	sched, err := createScheduler(
+	sched, err := CreateScheduler(
 		s,
 		kubecli,
 		informerFactory.Core().V1().Nodes(),

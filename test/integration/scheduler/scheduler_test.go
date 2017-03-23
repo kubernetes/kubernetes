@@ -39,6 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -51,6 +53,162 @@ type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.Node
 type nodeStateManager struct {
 	makeSchedulable   nodeMutationFunc
 	makeUnSchedulable nodeMutationFunc
+}
+
+// TestSchedulerCreationFromConfigMap verifies that scheduler can be created
+// from configurations provided by a ConfigMap object.
+func TestSchedulerCreationFromConfigMap(t *testing.T) {
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("configmap", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+
+	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+
+	// Add a ConfigMap object.
+	configPolicyName := "scheduler-custom-policy-config"
+	policyConfigMap := v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
+		Data: map[string]string{
+			"scheduler-policy-config.json": `{
+			"kind" : "Policy",
+			"apiVersion" : "v1",
+			"predicates" : [
+				{"name" : "PodFitsHostPorts"},
+				{"name" : "PodFitsResources"},
+				{"name" : "NoDiskConflict"},
+				{"name" : "NoVolumeZoneConflict"},
+				{"name" : "MatchNodeSelector"},
+				{"name" : "HostName"}
+			],
+			"priorities" : [
+				{"name" : "LeastRequestedPriority", "weight" : 1},
+				{"name" : "BalancedResourceAllocation", "weight" : 1},
+				{"name" : "ServiceSpreadingPriority", "weight" : 1},
+				{"name" : "EqualPriority", "weight" : 1}
+			]
+			}`,
+		},
+	}
+	policyConfigMap.APIVersion = api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()
+	clientSet.Core().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+	ss := options.NewSchedulerServer()
+	ss.HardPodAffinitySymmetricWeight = v1.DefaultHardPodAffinitySymmetricWeight
+	ss.PolicyConfigMapName = configPolicyName
+	sched, err := app.CreateScheduler(ss, clientSet,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}),
+	)
+
+	if err != nil {
+		t.Fatalf("Error creating scheduler: %v", err)
+	}
+
+	stop := make(chan struct{})
+	informerFactory.Start(stop)
+
+	sched.Run()
+	defer close(stop)
+
+	DoTestUnschedulableNodes(t, clientSet, ns, informerFactory.Core().V1().Nodes().Lister())
+}
+
+// TestSchedulerCreationFromNonExistentConfigMap ensures that creation of the
+// scheduler from a non-existent ConfigMap fails.
+func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("configmap", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+
+	ss := options.NewSchedulerServer()
+	ss.PolicyConfigMapName = "non-existent-config"
+
+	_, err := app.CreateScheduler(ss, clientSet,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}),
+	)
+
+	if err == nil {
+		t.Fatalf("Creation of scheduler didn't fail while the policy ConfigMap didn't exist.")
+	}
+
+	stop := make(chan struct{})
+	informerFactory.Start(stop)
+
+	defer close(stop)
+}
+
+// TestSchedulerCreationInLegacyMode ensures that creation of the scheduler
+// works fine when legacy mode is enabled.
+func TestSchedulerCreationInLegacyMode(t *testing.T) {
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
+
+	ns := framework.CreateTestingNamespace("configmap", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+
+	ss := options.NewSchedulerServer()
+	ss.HardPodAffinitySymmetricWeight = v1.DefaultHardPodAffinitySymmetricWeight
+	ss.PolicyConfigMapName = "non-existent-configmap"
+	ss.UseLegacyPolicyConfig = true
+
+	sched, err := app.CreateScheduler(ss, clientSet,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}),
+	)
+
+	if err != nil {
+		t.Fatalf("Creation of scheduler in legacy mode failed: %v", err)
+	}
+
+	stop := make(chan struct{})
+	informerFactory.Start(stop)
+
+	sched.Run()
+	defer close(stop)
 }
 
 func TestUnschedulableNodes(t *testing.T) {
