@@ -40,7 +40,7 @@ func NewCmdApiVersions(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "api-versions",
 		// apiversions is deprecated.
 		Aliases: []string{"apiversions"},
-		Short:   "Print the supported API versions on the server, in the form of \"group/version\"",
+		Short:   "List the API versions that are available",
 		Long:    "Print the supported API versions on the server, in the form of \"group/version\"",
 		Example: apiversions_example,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -52,11 +52,11 @@ var (
 		` + valid_resources)
 
 	describe_example = templates.Examples(`
-		# Describe a node
-		kubectl describe nodes kubernetes-node-emt8.c.myproject.internal
+		# Display the details of the node with name <node-name>.
+		kubectl describe nodes <node-name>
 
-		# Describe a pod
-		kubectl describe pods/nginx
+		# Display the details of the pod with name <pod-name>.
+		kubectl describe pods/<pod-name>
 
 		# Describe a pod identified by type and name in "pod.json"
 		kubectl describe -f pod.json
@@ -67,9 +67,9 @@ var (
 		# Describe pods by label name=myLabel
 		kubectl describe po -l name=myLabel
 
-		# Describe all pods managed by the 'frontend' replication controller (rc-created pods
-		# get the name of the rc as a prefix in the pod the name).
-		kubectl describe pods frontend`)
+		# Display the details of all the pods that are managed by the replication controller named <rc-name>.
+		# Remember: Any pods that are created by the replication controller get prefixed with the name of the replication controller.
+		kubectl describe pods <rc-name>`)
 )
 
 func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
@@ -83,7 +83,7 @@ func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
-		Short:   i18n.T("Show details of a specific resource or group of resources"),
+		Short:   i18n.T("Display the detailed state of one or more resources"),
 		Long:    describe_long,
 		Example: describe_example,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -107,7 +107,7 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "edit (RESOURCE/NAME | -f FILENAME)",
-		Short:   i18n.T("Edit a resource on the server"),
+		Short:   i18n.T("Edit and update the definition of one or more resources on the server by using the default editor"),
 		Long:    editLong,
 		Example: fmt.Sprintf(editExample),
 		Run: func(cmd *cobra.Command, args []string) {

@@ -48,7 +48,7 @@ func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "cluster-info",
 		// clusterinfo is deprecated.
 		Aliases: []string{"clusterinfo"},
-		Short:   i18n.T("Display cluster info"),
+		Short:   i18n.T("Display endpoint information about the master and services in the cluster"),
 		Long:    longDescr,
 		Example: clusterinfo_example,
 		Run: func(cmd *cobra.Command, args []string) {

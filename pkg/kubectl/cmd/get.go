@@ -68,8 +68,8 @@ var (
 		# List all pods in ps output format with more information (such as node name).
 		kubectl get pods -o wide
 
-		# List a single replication controller with specified NAME in ps output format.
-		kubectl get replicationcontroller web
+		# List a single replication controller with specified NAME in ps output format. Tip: You can shorten and replace the 'replicationcontroller' resource type with the alias 'rc'.
+		kubectl get replicationcontroller <rc-name>
 
 		# List a single pod in JSON output format.
 		kubectl get -o json pod web-pod-13je7
@@ -108,7 +108,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:     "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
-		Short:   i18n.T("Display one or many resources"),
+		Short:   i18n.T("List one or more resources"),
 		Long:    get_long,
 		Example: get_example,
 		Run: func(cmd *cobra.Command, args []string) {

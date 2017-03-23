@@ -26,8 +26,8 @@ $ kubectl stop replicationcontroller foo
 # Stop pods and services with label name=myLabel.
 $ kubectl stop pods,services -l name=myLabel
 
-# Shut down the service defined in service.json
-$ kubectl stop -f service.json
+# Shut down the service defined in service.yaml
+$ kubectl stop -f service.yaml
 
 # Shut down all resources in the path/to/resources directory
 $ kubectl stop -f path/to/resources

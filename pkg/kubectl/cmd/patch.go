@@ -93,7 +93,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "patch (-f FILENAME | TYPE NAME) -p PATCH",
-		Short:   i18n.T("Update field(s) of a resource using strategic merge patch"),
+		Short:   i18n.T("Update one or more fields of a resource by using the strategic merge patch process"),
 		Long:    patch_long,
 		Example: patch_example,
 		Run: func(cmd *cobra.Command, args []string) {

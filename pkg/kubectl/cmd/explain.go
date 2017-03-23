@@ -48,7 +48,7 @@ var (
 func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "explain RESOURCE",
-		Short:   i18n.T("Documentation of resources"),
+		Short:   i18n.T("Get documentation of various resources. For instance pods, nodes, services, etc"),
 		Long:    explainLong,
 		Example: explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {

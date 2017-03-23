@@ -37,7 +37,7 @@ var (
 func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "version",
-		Short:   i18n.T("Print the client and server version information"),
+		Short:   i18n.T("Display the Kubernetes version running on the client and server"),
 		Long:    "Print the client and server version information for the current context",
 		Example: version_example,
 		Run: func(cmd *cobra.Command, args []string) {
