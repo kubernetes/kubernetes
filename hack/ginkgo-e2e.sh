@@ -30,6 +30,10 @@ e2e_test=$(kube::util::find-binary "e2e.test")
 
 GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
 
+# If 'y', Ginkgo's reporter will not print out in color when tests are run
+# in parallel
+GINKGO_NO_COLOR=${GINKGO_NO_COLOR:-n}
+
 # If 'y', will rerun failed tests once to give them a second chance.
 GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 
