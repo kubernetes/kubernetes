@@ -42,7 +42,7 @@ func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
 	faultMutex.Lock()
 	if faultDomain == nil {
 		var err error
-		faultDomain, err = fetchFaultDomain()
+		faultDomain, err = fetchFaultAndUpdateDomains()
 		if err != nil {
 			return cloudprovider.Zone{}, err
 		}
@@ -55,17 +55,18 @@ func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
 	return zone, nil
 }
 
-func fetchFaultDomain() (*string, error) {
+func fetchFaultAndUpdateDomains() (*string, error) {
 	resp, err := http.Get(instanceInfoURL)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return readFaultDomain(resp.Body)
+	return readFaultAndUpdateDomain(resp.Body)
 }
 
-func readFaultDomain(reader io.Reader) (*string, error) {
+func readFaultAndUpdateDomain(reader io.Reader) (*string, error) {
 	var instanceInfo instanceInfo
+	var faultAndUpdateDomains string
 	body, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return nil, err
@@ -74,5 +75,6 @@ func readFaultDomain(reader io.Reader) (*string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &instanceInfo.FaultDomain, nil
+	faultAndUpdateDomains = "FD" + instanceInfo.FaultDomain + "UP" + instanceInfo.UpdateDomain
+	return &faultAndUpdateDomains, nil
 }
