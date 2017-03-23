@@ -489,7 +489,6 @@ function update-addons() {
     reconcile-objects ${addon_path} Service "" &
     reconcile-objects ${addon_path} PersistentVolume "" &
     reconcile-objects ${addon_path} PersistentVolumeClaim "" &
-    reconcile-objects ${addon_path} ConfigMap "" &
 
     wait-for-jobs
     if [[ $? -eq 0 ]]; then
