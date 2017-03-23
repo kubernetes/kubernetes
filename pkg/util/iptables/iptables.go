@@ -122,14 +122,21 @@ const MinCheckVersion = "1.4.11"
 const MinWaitVersion = "1.4.20"
 const MinWait2Version = "1.4.22"
 
+type restoreWaitFlag uint
+
+const restoreWaitUnknown restoreWaitFlag = 0
+const noRestoreWait restoreWaitFlag = 1
+const haveRestoreWait restoreWaitFlag = 2
+
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
-	mu       sync.Mutex
-	exec     utilexec.Interface
-	dbus     utildbus.Interface
-	protocol Protocol
-	hasCheck bool
-	waitFlag []string
+	mu              sync.Mutex
+	exec            utilexec.Interface
+	dbus            utildbus.Interface
+	protocol        Protocol
+	hasCheck        bool
+	waitFlag        []string
+	restoreWaitFlag restoreWaitFlag
 
 	reloadFuncs []func()
 	signal      chan *godbus.Signal
@@ -143,11 +150,12 @@ func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) In
 		vstring = MinCheckVersion
 	}
 	runner := &runner{
-		exec:     exec,
-		dbus:     dbus,
-		protocol: protocol,
-		hasCheck: getIPTablesHasCheckCommand(vstring),
-		waitFlag: getIPTablesWaitFlag(vstring),
+		exec:            exec,
+		dbus:            dbus,
+		protocol:        protocol,
+		hasCheck:        getIPTablesHasCheckCommand(vstring),
+		waitFlag:        getIPTablesWaitFlag(vstring),
+		restoreWaitFlag: restoreWaitUnknown,
 	}
 	runner.connectToFirewallD()
 	return runner
@@ -334,6 +342,13 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 		args = append(args, "--counters")
 	}
 
+	if runner.restoreWaitFlag == restoreWaitUnknown {
+		runner.restoreWaitFlag = getIPTablesRestoreWaitFlag(runner.exec)
+	}
+	if runner.restoreWaitFlag == haveRestoreWait {
+		args = append(args, "-w2")
+	}
+
 	// run the command and return the output or an error including the output and error
 	glog.V(4).Infof("running iptables-restore %v", args)
 	cmd := runner.exec.Command(cmdIPTablesRestore, args...)
@@ -501,6 +516,18 @@ func getIPTablesWaitFlag(vstring string) []string {
 	} else {
 		return []string{"-w2"}
 	}
+}
+
+// Checks if iptables-restore has a "wait" flag
+func getIPTablesRestoreWaitFlag(exec utilexec.Interface) restoreWaitFlag {
+	glog.V(4).Infof("checking if iptables-restore can wait")
+	bytes, err := exec.Command(cmdIPTablesRestore, "--help").CombinedOutput()
+	if err != nil {
+		return restoreWaitUnknown
+	} else if strings.Contains(string(bytes), "[-w secs]") {
+		return haveRestoreWait
+	}
+	return noRestoreWait
 }
 
 // getIPTablesVersionString runs "iptables --version" to get the version string
