@@ -211,3 +211,6 @@ SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-false}" # true, false
 # Indicates if the values (eg. kube password) in metadata should be treated as
 # canonical, and therefore disk copies ought to be recreated/clobbered.
 METADATA_CLOBBERS_CONFIG=${METADATA_CLOBBERS_CONFIG:-false}
+
+# Optional: use a default, fairly open PodSecurityPolicy
+ENABLE_LENIENT_POD_SECURITY_POLICY="${ENABLE_LENIENT_POD_SECURITY_POLICY:-true}"

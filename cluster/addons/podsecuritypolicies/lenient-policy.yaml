@@ -1,0 +1,17 @@
+apiVersion: extensions/v1beta
+kind: PodSecurityPolicy
+metadata:
+  name: privileged
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+spec:
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  runAsUser:
+    rule: RunAsAny
+  fsGroup:
+    rule: RunAsAny
+  volumtes: '*'
+  privileged: true
