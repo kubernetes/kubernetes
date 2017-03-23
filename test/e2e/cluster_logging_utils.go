@@ -33,7 +33,7 @@ import (
 
 const (
 	// Duration of delay between any two attempts to check if all logs are ingested
-	ingestionRetryDelay = 10 * time.Second
+	ingestionRetryDelay = 100 * time.Second
 
 	// Amount of requested cores for logging container in millicores
 	loggingContainerCpuRequest = 10
