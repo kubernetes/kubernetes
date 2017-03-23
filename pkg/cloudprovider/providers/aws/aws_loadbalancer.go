@@ -377,6 +377,49 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 	return nil
 }
 
+// Makes sure that the health check for an ELB matches the configured health check node port
+func (c *Cloud) ensureHttpHealthCheck(loadBalancer *elb.LoadBalancerDescription, path string, port int32) error {
+	name := aws.StringValue(loadBalancer.LoadBalancerName)
+
+	actual := loadBalancer.HealthCheck
+
+	// Default AWS settings
+	expectedHealthyThreshold := int64(2)
+	expectedUnhealthyThreshold := int64(6)
+	expectedTimeout := int64(5)
+	expectedInterval := int64(10)
+
+	expectedTarget := "HTTP:" + strconv.FormatInt(int64(port), 10) + path
+
+	if expectedTarget == orEmpty(actual.Target) &&
+		expectedHealthyThreshold == orZero(actual.HealthyThreshold) &&
+		expectedUnhealthyThreshold == orZero(actual.UnhealthyThreshold) &&
+		expectedTimeout == orZero(actual.Timeout) &&
+		expectedInterval == orZero(actual.Interval) {
+		return nil
+	}
+
+	glog.V(2).Infof("Updating load-balancer health-check for %q", name)
+
+	healthCheck := &elb.HealthCheck{}
+	healthCheck.HealthyThreshold = &expectedHealthyThreshold
+	healthCheck.UnhealthyThreshold = &expectedUnhealthyThreshold
+	healthCheck.Timeout = &expectedTimeout
+	healthCheck.Interval = &expectedInterval
+	healthCheck.Target = &expectedTarget
+
+	request := &elb.ConfigureHealthCheckInput{}
+	request.HealthCheck = healthCheck
+	request.LoadBalancerName = loadBalancer.LoadBalancerName
+
+	_, err := c.elb.ConfigureHealthCheck(request)
+	if err != nil {
+		return fmt.Errorf("error configuring load-balancer health-check for %q: %v", name, err)
+	}
+
+	return nil
+}
+
 // Makes sure that exactly the specified hosts are registered as instances with the load balancer
 func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instances []*ec2.Instance) error {
 	expected := sets.NewString()

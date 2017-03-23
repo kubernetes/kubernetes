@@ -2737,9 +2737,18 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, err
 	}
 
-	err = c.ensureLoadBalancerHealthCheck(loadBalancer, listeners)
-	if err != nil {
-		return nil, err
+	if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+		glog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
+		err = c.ensureHttpHealthCheck(loadBalancer, path, healthCheckNodePort)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to ensure health check for localized service %v on node port %v: %v", loadBalancerName, healthCheckNodePort, err)
+		}
+	} else {
+		glog.V(4).Infof("service %v does not need health checks", apiService.Name)
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, listeners)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
