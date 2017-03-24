@@ -28,7 +28,7 @@ import (
 
 type useContextTest struct {
 	config         clientcmdapi.Config //initiate kubectl config
-	args           []string            //kubectl use-context args
+	args           []string            //kubectl config use-context args
 	expected       string              //expect out
 	expectedConfig clientcmdapi.Config //expect kubectl config
 }
@@ -85,7 +85,7 @@ func (test useContextTest) run(t *testing.T) {
 	cmd := NewCmdConfigUseContext(buf, pathOptions)
 	cmd.SetArgs(test.args)
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v,kubectl use-context args: %v", err, test.args)
+		t.Fatalf("unexpected error executing command: %v,kubectl config use-context args: %v", err, test.args)
 	}
 	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
 	if err != nil {
