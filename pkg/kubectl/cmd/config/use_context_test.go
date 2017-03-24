@@ -69,7 +69,7 @@ func TestUseContext(t *testing.T) {
 }
 
 func (test useContextTest) run(t *testing.T) {
-	fakeKubeFile, err := ioutil.TempFile("", "")
+	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
