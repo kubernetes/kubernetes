@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
@@ -31,8 +32,6 @@ import (
 type shortcutExpander struct {
 	RESTMapper meta.RESTMapper
 
-	All []schema.GroupResource
-
 	discoveryClient discovery.DiscoveryInterface
 }
 
@@ -42,33 +41,7 @@ func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInt
 	if client == nil {
 		return shortcutExpander{}, errors.New("Please provide discovery client to shortcut expander")
 	}
-	return shortcutExpander{All: UserResources, RESTMapper: delegate, discoveryClient: client}, nil
-}
-
-func (e shortcutExpander) getAll() []schema.GroupResource {
-	// Check if we have access to server resources
-	apiResources, err := e.discoveryClient.ServerResources()
-	if err != nil {
-		return e.All
-	}
-
-	availableResources, err := discovery.GroupVersionResources(apiResources)
-	if err != nil {
-		return e.All
-	}
-
-	availableAll := []schema.GroupResource{}
-	for _, requestedResource := range e.All {
-		for availableResource := range availableResources {
-			if requestedResource.Group == availableResource.Group &&
-				requestedResource.Resource == availableResource.Resource {
-				availableAll = append(availableAll, requestedResource)
-				break
-			}
-		}
-	}
-
-	return availableAll
+	return shortcutExpander{RESTMapper: delegate, discoveryClient: client}, nil
 }
 
 func (e shortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
@@ -97,38 +70,6 @@ func (e shortcutExpander) RESTMapping(gk schema.GroupKind, versions ...string) (
 
 func (e shortcutExpander) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
 	return e.RESTMapper.RESTMappings(gk, versions...)
-}
-
-// UserResources are the resource names that apply to the primary, user facing resources used by
-// client tools. They are in deletion-first order - dependent resources should be last.
-// Should remain exported in order to expose a current list of resources to downstream
-// composition that wants to build on the concept of 'all' for their CLIs.
-var UserResources = []schema.GroupResource{
-	{Group: "", Resource: "pods"},
-	{Group: "", Resource: "replicationcontrollers"},
-	{Group: "", Resource: "services"},
-	{Group: "apps", Resource: "statefulsets"},
-	{Group: "autoscaling", Resource: "horizontalpodautoscalers"},
-	{Group: "batch", Resource: "jobs"},
-	{Group: "extensions", Resource: "deployments"},
-	{Group: "extensions", Resource: "replicasets"},
-}
-
-// AliasesForResource returns whether a resource has an alias or not
-func (e shortcutExpander) AliasesForResource(resource string) ([]string, bool) {
-	if strings.ToLower(resource) == "all" {
-		var resources []schema.GroupResource
-		if resources = e.getAll(); len(resources) == 0 {
-			resources = UserResources
-		}
-		aliases := []string{}
-		for _, r := range resources {
-			aliases = append(aliases, r.Resource)
-		}
-		return aliases, true
-	}
-	expanded := e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource
-	return []string{expanded}, (expanded != resource)
 }
 
 // getShortcutMappings returns a set of tuples which holds short names for resources.
