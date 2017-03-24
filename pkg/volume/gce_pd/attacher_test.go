@@ -356,7 +356,7 @@ func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName types.No
 	return nil, errors.New("Not implemented")
 }
 
-func (testcase *testcase) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
+func (testcase *testcase) CreateDisk(name string, diskType string, zone string, sizeGb int64, imageID string, tags map[string]string) error {
 	return errors.New("Not implemented")
 }
 
