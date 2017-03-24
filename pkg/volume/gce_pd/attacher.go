@@ -97,34 +97,65 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName ty
 }
 
 func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
-	volumesAttachedCheck := make(map[*volume.Spec]bool)
-	volumePdNameMap := make(map[string]*volume.Spec)
-	pdNameList := []string{}
-	for _, spec := range specs {
-		volumeSource, _, err := getVolumeSource(spec)
-		// If error is occured, skip this volume and move to the next one
-		if err != nil {
-			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
-			continue
-		}
-		pdNameList = append(pdNameList, volumeSource.PDName)
-		volumesAttachedCheck[spec] = true
-		volumePdNameMap[volumeSource.PDName] = spec
+	glog.Warningf("Attacher.VolumesAreAttached called for node %q - Please use BulkVerifyVolumes for GCE", nodeName)
+	volumeNodeMap := map[types.NodeName][]*volume.Spec{
+		nodeName: specs,
 	}
-	attachedResult, err := attacher.gceDisks.DisksAreAttached(pdNameList, nodeName)
+	nodeVolumesResult := make(map[*volume.Spec]bool)
+
+	nodesVerificationMap, err := attacher.BulkVerifyVolumes(volumeNodeMap)
 	if err != nil {
-		// Log error and continue with attach
-		glog.Errorf(
-			"Error checking if PDs (%v) are already attached to current node (%q). err=%v",
-			pdNameList, nodeName, err)
+		glog.Errorf("Attacher.VolumesAreAttached - error checking volumes for node %q with %v", nodeName, err)
+		return nodeVolumesResult, err
+	}
+
+	if result, ok := nodesVerificationMap[nodeName]; ok {
+		return result, nil
+	}
+	return nodeVolumesResult, nil
+
+}
+
+// BulkverifyVolumes checks whether the volumes specified in the map are still attached or not. The function passes a map of volumes
+// sorted by their node name. If the status could be checked, the volume status is returned in the result map.
+func (attacher *gcePersistentDiskAttacher) BulkVerifyVolumes(volumesByNode map[types.NodeName][]*volume.Spec) (map[types.NodeName]map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[types.NodeName]map[*volume.Spec]bool)
+	diskNamesByNode := make(map[types.NodeName][]string)
+	volumeNameSpecMap := make(map[string]*volume.Spec)
+
+	for nodeName, volumeSpecs := range volumesByNode {
+		for _, volumeSpec := range volumeSpecs {
+			volumeSource, _, err := getVolumeSource(volumeSpec)
+			// If error is occured, skip this volume and move to the next one
+			if err != nil {
+				glog.Errorf("Error getting volume (%q) source : %v", volumeSpec.Name(), err)
+				continue
+			}
+			pdName := volumeSource.PDName
+			diskNamesByNode[nodeName] = append(diskNamesByNode[nodeName], pdName)
+
+			check, nodeExists := volumesAttachedCheck[nodeName]
+			if !nodeExists {
+				check = make(map[*volume.Spec]bool)
+			}
+			check[volumeSpec] = true
+			volumeNameSpecMap[pdName] = volumeSpec
+			volumesAttachedCheck[nodeName] = check
+		}
+	}
+
+	attachedResult, err := attacher.gceDisks.DisksAreAttached(diskNamesByNode)
+	if err != nil {
+		glog.Errorf("Error checking if PD volumes are attached to nodes, err=%v", err)
 		return volumesAttachedCheck, err
 	}
 
-	for pdName, attached := range attachedResult {
-		if !attached {
-			spec := volumePdNameMap[pdName]
-			volumesAttachedCheck[spec] = false
-			glog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", pdName, spec.Name())
+	for nodeName, check := range attachedResult {
+		for pdName, attached := range check {
+			if !attached {
+				spec := volumeNameSpecMap[pdName]
+				volumesAttachedCheck[nodeName][spec] = attached
+			}
 		}
 	}
 	return volumesAttachedCheck, nil
