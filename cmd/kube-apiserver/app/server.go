@@ -43,7 +43,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -95,12 +94,12 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(commandOptions *options.ServerRunOptions) error {
-	kubeAPIServerConfig, sharedInformers, err := CreateKubeAPIServerConfig(commandOptions)
+func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
+	kubeAPIServerConfig, sharedInformers, err := CreateKubeAPIServerConfig(runOptions)
 	if err != nil {
 		return err
 	}
-	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers, wait.NeverStop)
+	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers, stopCh)
 	if err != nil {
 		return err
 	}
@@ -108,21 +107,21 @@ func Run(commandOptions *options.ServerRunOptions) error {
 	// if we're starting up a hacked up version of this API server for a weird test case,
 	// just start the API server as is because clients don't get built correctly when you do this
 	if len(os.Getenv("KUBE_API_VERSIONS")) > 0 {
-		return kubeAPIServer.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
+		return kubeAPIServer.GenericAPIServer.PrepareRun().Run(stopCh)
 	}
 
 	// otherwise go down the normal path of standing the aggregator up in front of the API server
 	// this wires up openapi
 	kubeAPIServer.GenericAPIServer.PrepareRun()
-	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, commandOptions)
+	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, runOptions)
 	if err != nil {
 		return err
 	}
-	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, wait.NeverStop)
+	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, stopCh)
 	if err != nil {
 		return err
 	}
-	return aggregatorServer.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
+	return aggregatorServer.GenericAPIServer.PrepareRun().Run(stopCh)
 }
 
 // CreateKubeAPIServer creates and wires a workable kube-apiserver

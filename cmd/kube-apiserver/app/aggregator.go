@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ import (
 )
 
 func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, commandOptions *options.ServerRunOptions) (*aggregatorapiserver.Config, error) {
-	// make a shallow copy to let us tiddle a few things
+	// make a shallow copy to let us twiddle a few things
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the aggregator
 	genericConfig := kubeAPIServerConfig
 	genericConfig.FallThroughHandler = mux.NewPathRecorderMux()
@@ -104,7 +104,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		return nil, err
 	}
 	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(), apiRegistrationClient)
-	apiServices := registerAPIVersions(delegateAPIServer, autoRegistrationController)
+	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
 	tprRegistrationController := thirdparty.NewAutoRegistrationController(sharedInformers.Extensions().InternalVersion().ThirdPartyResources(), autoRegistrationController)
 
 	aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
@@ -113,7 +113,10 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		return nil
 	})
 	aggregatorServer.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("autoregister-completion", func(r *http.Request) error {
-		items, _ := aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices().Lister().List(labels.Everything())
+		items, err := aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices().Lister().List(labels.Everything())
+		if err != nil {
+			return err
+		}
 
 		missing := []apiregistration.APIService{}
 		for _, apiService := range apiServices {
@@ -150,7 +153,7 @@ func makeAPIService(gv schema.GroupVersion) *apiregistration.APIService {
 	}
 }
 
-func registerAPIVersions(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*apiregistration.APIService {
+func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*apiregistration.APIService {
 	apiServices := []*apiregistration.APIService{}
 
 	for _, curr := range delegateAPIServer.ListedPaths() {
@@ -164,6 +167,7 @@ func registerAPIVersions(delegateAPIServer genericapiserver.DelegationTarget, re
 		if !strings.HasPrefix(curr, "/apis/") {
 			continue
 		}
+		// this comes back in a list that looks like /apis/rbac.authorization.k8s.io/v1alpha1
 		tokens := strings.Split(curr, "/")
 		if len(tokens) != 4 {
 			continue

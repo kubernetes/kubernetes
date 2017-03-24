@@ -149,7 +149,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	return c.newFromExistingServer(genericServer, stopCh)
 }
 
-// NewFromExistingServer allows injection of already completed server.  This a very advanced use-case.  You
+// newFromExistingServer allows injection of already completed server.  This a very advanced use-case.  You
 // end up needing tight coupling and coordination on the config.  We may improve this moving foward
 func (c completedConfig) newFromExistingServer(genericServer *genericapiserver.GenericAPIServer, stopCh <-chan struct{}) (*APIAggregator, error) {
 	informerFactory := informers.NewSharedInformerFactory(

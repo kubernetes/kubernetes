@@ -205,8 +205,8 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"after we fix all the clients that send malformed updates.")
 
 	fs.StringVar(&s.ProxyClientCertFile, "proxy-client-cert-file", s.ProxyClientCertFile,
-		"client certificate used identify the kube-apiserver when it proxies requests to an aggregated API server")
+		"client certificate used to prove the identity of the aggragator or kube-apiserver when it proxies requests to a user api-server")
 	fs.StringVar(&s.ProxyClientKeyFile, "proxy-client-key-file", s.ProxyClientKeyFile,
-		"client certificate key used identify the kube-apiserver when it proxies requests to an aggregated API server")
+		"client certificate key used to prove the identity of the aggragator or kube-apiserver when it proxies requests to a user api-server")
 
 }
