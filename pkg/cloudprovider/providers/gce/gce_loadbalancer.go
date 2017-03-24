@@ -17,7 +17,9 @@ limitations under the License.
 package gce
 
 import (
+	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"sort"
 	"strconv"
@@ -34,6 +36,68 @@ import (
 	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
 )
+
+type cidrs struct {
+	ipn   netsets.IPNet
+	isSet bool
+}
+
+var l4SrcRngsFlag cidrs
+var l7SrcRngsFlag cidrs
+
+func init() {
+	var err error
+	// Set flag defaults to known cidrs
+	l4SrcRngsFlag.ipn, err = netsets.ParseIPNets([]string{"209.85.152.0/22", "209.85.204.0/22", "35.191.0.0/16"}...)
+	if err != nil {
+		panic("Incorrect default GCE L4 source ranges")
+	}
+	l7SrcRngsFlag.ipn, err = netsets.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16"}...)
+	if err != nil {
+		panic("Incorrect default GCE L7 source ranges")
+	}
+
+	flag.Var(&l4SrcRngsFlag, "cloud-provider-gce-l4-src-cidrs", "CIDRS opened in GCE firewall for L4 LB health checks")
+	flag.Var(&l7SrcRngsFlag, "cloud-provider-gce-l7-src-cidrs", "CIDRS opened in GCE firewall for L7 LB traffic proxy & health checks")
+}
+
+// String is the method to format the flag's value, part of the flag.Value interface.
+func (c *cidrs) String() string {
+	return strings.Join(c.ipn.StringSlice(), ",")
+}
+
+// Set supports a value of CSV or the flag repeated multiple times
+func (c *cidrs) Set(value string) error {
+	// On first Set(), clear the original defaults
+	if !c.isSet {
+		c.isSet = true
+		c.ipn = make(netsets.IPNet)
+	} else {
+		return fmt.Errorf("GCE LB CIDRS have already been set")
+	}
+
+	for _, cidr := range strings.Split(value, ",") {
+		_, ipnet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return err
+		}
+
+		c.ipn.Insert(ipnet)
+	}
+	return nil
+}
+
+// L7LoadBalancerSrcRanges contains the ranges of source ips used by the GCE L7 load balancer
+// for proxying client requests and performing health checks.
+func L7LoadBalancerSrcRanges() []string {
+	return l7SrcRngsFlag.ipn.StringSlice()
+}
+
+// L4LoadBalancerSrcRanges contains the ranges of source ips used by the GCE L4 load balancer
+// for performing health checks.
+func L4LoadBalancerSrcRanges() []string {
+	return l4SrcRngsFlag.ipn.StringSlice()
+}
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (gce *GCECloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
@@ -191,6 +255,11 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 		}
 	}
 
+	// Retrieve health check path and nodeport (if required by the service)
+	// This needs to be known early so we can add health cehck probe ranges to the firewall rules
+	path, healthCheckNodePort := apiservice.GetServiceHealthCheckPathPort(apiService)
+	needsHC := path != ""
+
 	// Deal with the firewall next. The reason we do this here rather than last
 	// is because the forwarding rule is used as the indicator that the load
 	// balancer is fully created - it's what getLoadBalancer checks for.
@@ -198,6 +267,19 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 	sourceRanges, err := apiservice.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
+	}
+
+	// If the user specified source ranges, verify all L4 health check source ranges exist
+	if needsHC && !apiservice.IsAllowAll(sourceRanges) {
+		healthCheckSrcRngs, err := netsets.ParseIPNets(L4LoadBalancerSrcRanges()...)
+		if err != nil {
+			return nil, err
+		}
+
+		// netsets is map based, so Insert will overwrite if IPNet already exists
+		for _, r := range healthCheckSrcRngs {
+			sourceRanges.Insert(r)
+		}
 	}
 
 	firewallExists, firewallNeedsUpdate, err := gce.firewallNeedsUpdate(loadBalancerName, serviceName.String(), gce.region, ipAddress, ports, sourceRanges)
@@ -241,7 +323,7 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 	if err != nil && !isHTTPErrorCode(err, http.StatusNotFound) {
 		return nil, fmt.Errorf("Error checking HTTP health check %s: %v", loadBalancerName, err)
 	}
-	if path, healthCheckNodePort := apiservice.GetServiceHealthCheckPathPort(apiService); path != "" {
+	if needsHC {
 		glog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
 		if err != nil {
 			// This logic exists to detect a transition for a pre-existing service and turn on
