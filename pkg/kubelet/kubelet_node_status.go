@@ -506,8 +506,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
 
-		glog.Infof("Jing machine info Filesystems %v", info.Filesystems)
-		glog.Infof("Jing machine info DiskMap %v", info.DiskMap)
 		for rName, rCap := range cadvisor.CapacityFromMachineInfo(info) {
 			node.Status.Capacity[rName] = rCap
 		}
