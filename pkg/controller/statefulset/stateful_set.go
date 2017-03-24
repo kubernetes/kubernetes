@@ -422,6 +422,6 @@ func (ssc *StatefulSetController) syncStatefulSet(set *apps.StatefulSet, pods []
 		glog.V(2).Infof("Error syncing StatefulSet %s/%s with %d pods : %s", set.Namespace, set.Name, err)
 		return err
 	}
-	glog.V(2).Infof("Succesfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
+	glog.V(2).Infof("Successfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
 	return nil
 }
