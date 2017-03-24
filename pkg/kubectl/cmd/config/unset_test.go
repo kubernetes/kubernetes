@@ -28,7 +28,7 @@ import (
 
 type unsetConfigTest struct {
 	config   clientcmdapi.Config //initiate kubectl config
-	args     []string            //kubectl args
+	args     []string            //kubectl config unset args
 	expected string              //expect out
 }
 
