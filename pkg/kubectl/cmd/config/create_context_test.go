@@ -101,7 +101,7 @@ func (test createContextTest) run(t *testing.T) {
 	}
 	if len(test.expected) != 0 {
 		if buf.String() != test.expected {
-			t.Fatalf("expected %v, but got %v", test.expected, buf.String())
+			t.Errorf("expected %v, but got %v", test.expected, buf.String())
 		}
 	}
 	if test.expectedConfig.Contexts != nil {
