@@ -985,8 +985,6 @@ function parse-master-env() {
   MASTER_KEY_BASE64=$(get-env-val "${master_env}" "MASTER_KEY")
   KUBELET_CERT_BASE64=$(get-env-val "${master_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${master_env}" "KUBELET_KEY")
-  MASTER_CERT_BASE64=$(get-env-val "${master_env}" "MASTER_CERT")
-  MASTER_KEY_BASE64=$(get-env-val "${master_env}" "MASTER_KEY")
 }
 
 # Check whether required client and server binaries exist, prompting to download

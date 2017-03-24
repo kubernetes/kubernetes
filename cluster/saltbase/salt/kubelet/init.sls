@@ -31,6 +31,7 @@
     - mode: 400
     - makedirs: true
 
+
 {% if pillar.get('is_systemd') %}
 
 {{ pillar.get('systemd_system_path') }}/kubelet.service:
@@ -51,6 +52,7 @@ fix-service-kubelet:
       - file: {{ pillar.get('systemd_system_path') }}/kubelet.service
       - file: {{ environment_file }}
       - file: /var/lib/kubelet/kubeconfig
+
 {% else %}
 
 /etc/init.d/kubelet:
