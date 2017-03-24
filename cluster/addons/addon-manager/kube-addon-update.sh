@@ -49,7 +49,6 @@ if [[ ! -x ${KUBECTL} ]]; then
     echo "ERROR: kubectl command (${KUBECTL}) not found or is not executable" 1>&2
     exit 1
 fi
-KUBECTL_OPTS=${KUBECTL_OPTS:-}
 
 # If an add-on definition is incorrect, or a definition has just disappeared
 # from the local directory, the script will still keep on retrying.
@@ -197,7 +196,7 @@ function run-until-success() {
 # returns a list of <namespace>/<name> pairs (nsnames)
 function get-addon-nsnames-from-server() {
     local -r obj_type=$1
-    "${KUBECTL}" "${KUBECTL_OPTS}" get "${obj_type}" --all-namespaces -o go-template="{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" -l kubernetes.io/cluster-service=true | sed 's/<no value>//g'
+    "${KUBECTL}" get "${obj_type}" --all-namespaces -o go-template="{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" -l kubernetes.io/cluster-service=true | sed 's/<no value>//g'
 }
 
 # returns the characters after the last separator (including)
@@ -243,7 +242,7 @@ function delete-object() {
     local -r obj_name=$3
     log INFO "Deleting ${obj_type} ${namespace}/${obj_name}"
 
-    run-until-success "${KUBECTL} ${KUBECTL_OPTS} delete --namespace=${namespace} ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    run-until-success "${KUBECTL} delete --namespace=${namespace} ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
 }
 
 function create-object() {
@@ -262,9 +261,9 @@ function create-object() {
     # this will keep on failing if the ${file_path} disappeared in the meantime.
     # Do not use too many retries.
     if [[ -n "${namespace}" ]]; then
-        run-until-success "${KUBECTL} ${KUBECTL_OPTS} create --namespace=${namespace} -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+        run-until-success "${KUBECTL} create --namespace=${namespace} -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
     else
-        run-until-success "${KUBECTL} ${KUBECTL_OPTS} create -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+        run-until-success "${KUBECTL} create -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
     fi
 }
 
@@ -490,7 +489,6 @@ function update-addons() {
     reconcile-objects ${addon_path} Service "" &
     reconcile-objects ${addon_path} PersistentVolume "" &
     reconcile-objects ${addon_path} PersistentVolumeClaim "" &
-    reconcile-objects ${addon_path} ConfigMap "" &
 
     wait-for-jobs
     if [[ $? -eq 0 ]]; then
