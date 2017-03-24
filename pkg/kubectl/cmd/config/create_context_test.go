@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -48,7 +47,7 @@ func TestCreateContext(t *testing.T) {
 		expected: `Context "shaker-context" set.` + "\n",
 		expectedConfig: clientcmdapi.Config{
 			Contexts: map[string]*clientcmdapi.Context{
-				"shaker-context": {AuthInfo: "cluster_nickname", Cluster: "user_nickname", Namespace: "namespace"}},
+				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"}},
 		},
 	}
 	test.run(t)
@@ -69,16 +68,19 @@ func TestModifyContext(t *testing.T) {
 		expected: `Context "shaker-context" set.` + "\n",
 		expectedConfig: clientcmdapi.Config{
 			Contexts: map[string]*clientcmdapi.Context{
-				"shaker-context": {AuthInfo: "cluster_nickname", Cluster: "user_nickname", Namespace: "namespace"},
+				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"},
 				"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}},
 	}
 	test.run(t)
 }
 
 func (test createContextTest) run(t *testing.T) {
-	fakeKubeFile, _ := ioutil.TempFile("", "")
+	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	defer os.Remove(fakeKubeFile.Name())
-	err := clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
+	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,7 +93,7 @@ func (test createContextTest) run(t *testing.T) {
 	cmd.SetArgs(test.args)
 	cmd.Flags().Parse(test.flags)
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v", err)
+		t.Fatalf("unexpected error executing command: %v,kubectl set-context args: %v,flags: %v", err, test.args, test.flags)
 	}
 	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
 	if err != nil {
@@ -99,11 +101,15 @@ func (test createContextTest) run(t *testing.T) {
 	}
 	if len(test.expected) != 0 {
 		if buf.String() != test.expected {
-			t.Errorf("expected %v, but got %v", test.expected, buf.String())
+			t.Fatalf("expected %v, but got %v", test.expected, buf.String())
 		}
-		return
 	}
-	if !reflect.DeepEqual(test.expectedConfig, &config) {
-		t.Errorf("expected clusters %v, but found %v in kubeconfig", test.expectedConfig, config)
+	if test.expectedConfig.Contexts != nil {
+		expectContext := test.expectedConfig.Contexts[test.args[0]]
+		actualContext := config.Contexts[test.args[0]]
+		if expectContext.AuthInfo != actualContext.AuthInfo || expectContext.Cluster != actualContext.Cluster ||
+			expectContext.Namespace != actualContext.Namespace {
+			t.Errorf("expected Context %v, but found %v in kubeconfig", expectContext, actualContext)
+		}
 	}
 }
