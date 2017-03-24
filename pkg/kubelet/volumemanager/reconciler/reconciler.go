@@ -111,7 +111,7 @@ func NewReconciler(
 		mounter:                       mounter,
 		volumePluginMgr:               volumePluginMgr,
 		kubeletPodsDir:                kubeletPodsDir,
-		timeOfLastSync:                time.Time{},
+		timeOfLastSync:                time.Now(),
 	}
 }
 
