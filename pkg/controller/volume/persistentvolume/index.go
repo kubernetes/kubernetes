@@ -141,12 +141,17 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 			// - volumes bound to another claim
 			// - volumes whose labels don't match the claim's selector, if specified
 			// - volumes in Class that is not requested
+			// - volumes whose phase is not available
 			if volume.Spec.ClaimRef != nil {
 				continue
 			} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 				continue
 			}
 			if v1.GetPersistentVolumeClass(volume) != requestedClass {
+				continue
+			}
+			if volume.Status.Phase != "" && volume.Status.Phase != v1.VolumeAvailable &&
+				volume.Status.Phase != v1.VolumePending {
 				continue
 			}
 
