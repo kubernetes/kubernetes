@@ -492,8 +492,6 @@ function start_apiserver {
         fi
     fi
 
-    # create the kube-public namespace for the aggregator
-    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create namespace kube-public
     ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
     ${CONTROLPLANE_SUDO} chown $(whoami) "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
     ${KUBECTL} config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-kube-aggregator.kubeconfig" --server="https://${API_HOST_IP}:31090"
