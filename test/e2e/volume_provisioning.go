@@ -201,13 +201,18 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			sc, err = c.StorageV1().StorageClasses().Create(sc)
 			defer Expect(c.StorageV1().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				Expect(c.StorageV1().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
+			}()
 
 			By("Creating a claim and expecting it to timeout")
 			pvc := newClaim(ns)
 			pvc.Spec.StorageClassName = &sc.Name
 			pvc, err = c.Core().PersistentVolumeClaims(ns).Create(pvc)
-			defer Expect(c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				Expect(c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)).To(Succeed())
+			}()
 
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionTimeout)
