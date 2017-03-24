@@ -57,7 +57,7 @@ type systemdInterface interface {
 	ListUnits() ([]dbus.UnitStatus, error)
 	// StopUnits stops the unit with the given name.
 	StopUnit(name string, mode string, ch chan<- string) (int, error)
-	// StopUnits restarts the unit with the given name.
+	// RestartUnit restarts the unit with the given name.
 	RestartUnit(name string, mode string, ch chan<- string) (int, error)
 	// ResetFailedUnit resets the "failed" state of a specific unit.
 	ResetFailedUnit(name string) error
