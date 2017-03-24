@@ -1,9 +1,12 @@
 /*
 Copyright 2017 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,7 +20,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -25,10 +27,10 @@ import (
 )
 
 type useContextTest struct {
-	config         clientcmdapi.Config
-	args           []string
-	expected       string
-	expectedConfig clientcmdapi.Config
+	config         clientcmdapi.Config //initiate kubectl config
+	args           []string            //kubectl use-context args
+	expected       string              //expect out
+	expectedConfig clientcmdapi.Config //expect kubectl config
 }
 
 func TestUseContext(t *testing.T) {
@@ -67,9 +69,12 @@ func TestUseContext(t *testing.T) {
 }
 
 func (test useContextTest) run(t *testing.T) {
-	fakeKubeFile, _ := ioutil.TempFile("", "")
+	fakeKubeFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	defer os.Remove(fakeKubeFile.Name())
-	err := clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
+	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,7 +85,7 @@ func (test useContextTest) run(t *testing.T) {
 	cmd := NewCmdConfigUseContext(buf, pathOptions)
 	cmd.SetArgs(test.args)
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v", err)
+		t.Fatalf("unexpected error executing command: %v,kubectl use-context args: %v", err, test.args)
 	}
 	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
 	if err != nil {
@@ -90,9 +95,8 @@ func (test useContextTest) run(t *testing.T) {
 		if buf.String() != test.expected {
 			t.Errorf("expected %v, but got %v", test.expected, buf.String())
 		}
-		return
 	}
-	if !reflect.DeepEqual(test.expectedConfig, &config) {
-		t.Errorf("expected clusters %v, but found %v in kubeconfig", test.expectedConfig, config)
+	if test.expectedConfig.CurrentContext != config.CurrentContext {
+		t.Errorf("expected config %v, but found %v in kubeconfig", test.expectedConfig, config)
 	}
 }
