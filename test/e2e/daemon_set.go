@@ -94,7 +94,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 	f = framework.NewDefaultFramework("daemonsets")
 
 	image := "gcr.io/google_containers/serve_hostname:v1.4"
-	redisImage := "gcr.io/google_containers/redis:e2e"
+	redisImage := "gcr.io/k8s-testimages/redis:e2e"
 	dsName := "daemon-set"
 
 	var ns string
