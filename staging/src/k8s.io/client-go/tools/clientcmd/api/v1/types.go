@@ -103,6 +103,12 @@ type AuthInfo struct {
 	// Impersonate is the username to imperonate.  The name matches the flag.
 	// +optional
 	Impersonate string `json:"as,omitempty"`
+	// ImpersonateGroups is the groups to imperonate.
+	// +optional
+	ImpersonateGroups []string `json:"as-groups,omitempty"`
+	// ImpersonateUserExtra contains additional information for impersonated user.
+	// +optional
+	ImpersonateUserExtra map[string][]string `json:"as-user-extra,omitempty"`
 	// Username is the username for basic authentication to the kubernetes cluster.
 	// +optional
 	Username string `json:"username,omitempty"`
