@@ -158,18 +158,28 @@ def setup_leader_authentication():
     api_opts.add('--token-auth-file', known_tokens)
     api_opts.add('--service-cluster-ip-range', service_cidr())
     hookenv.status_set('maintenance', 'Rendering authentication templates.')
-    if not os.path.isfile(basic_auth):
-        setup_basic_auth('admin', 'admin', 'admin')
-    if not os.path.isfile(known_tokens):
-        setup_tokens(None, 'admin', 'admin')
-        setup_tokens(None, 'kubelet', 'kubelet')
-        setup_tokens(None, 'kube_proxy', 'kube_proxy')
-    # Generate the default service account token key
-    os.makedirs('/etc/kubernetes', exist_ok=True)
 
-    cmd = ['openssl', 'genrsa', '-out', service_key,
-           '2048']
-    check_call(cmd)
+    # Try to fetch data from leadership broadcast.
+    contents = charms.leadership.leader_get(service_key)
+    if contents is not None:
+        # Since there was a leader in the past and we are bootstrapping
+        # the leader here, all masters were killed and a new one is
+        # added again.
+        keys = [service_key, basic_auth, known_tokens]
+        get_keys_from_leader(keys)
+    else:
+        if not os.path.isfile(basic_auth):
+            setup_basic_auth('admin', 'admin', 'admin')
+        if not os.path.isfile(known_tokens):
+            setup_tokens(None, 'admin', 'admin')
+            setup_tokens(None, 'kubelet', 'kubelet')
+            setup_tokens(None, 'kube_proxy', 'kube_proxy')
+        # Generate the default service account token key
+        os.makedirs('/etc/kubernetes', exist_ok=True)
+        cmd = ['openssl', 'genrsa', '-out', service_key,
+               '2048']
+        check_call(cmd)
+
     api_opts.add('--service-account-key-file', service_key)
     controller_opts.add('--service-account-private-key-file', service_key)
 
@@ -199,15 +209,27 @@ def setup_non_leader_authentication():
     basic_auth = '/srv/kubernetes/basic_auth.csv'
     known_tokens = '/srv/kubernetes/known_tokens.csv'
 
+    hookenv.status_set('maintenance', 'Rendering authentication templates.')
+
+    # Set an array for looping logic
+    keys = [service_key, basic_auth, known_tokens]
+    get_keys_from_leader(keys)
+
+    api_opts.add('--basic-auth-file', basic_auth)
+    api_opts.add('--token-auth-file', known_tokens)
+    api_opts.add('--service-cluster-ip-range', service_cidr())
+    api_opts.add('--service-account-key-file', service_key)
+    controller_opts.add('--service-account-private-key-file', service_key)
+
+    set_state('authentication.setup')
+
+
+def get_keys_from_leader(keys):
     # This races with other codepaths, and seems to require being created first
     # This block may be extracted later, but for now seems to work as intended
     os.makedirs('/etc/kubernetes', exist_ok=True)
     os.makedirs('/srv/kubernetes', exist_ok=True)
 
-    hookenv.status_set('maintenance', 'Rendering authentication templates.')
-
-    # Set an array for looping logic
-    keys = [service_key, basic_auth, known_tokens]
     for k in keys:
         # If the path does not exist, assume we need it
         if not os.path.exists(k):
@@ -222,14 +244,6 @@ def setup_non_leader_authentication():
             # Write out the file and move on to the next item
             with open(k, 'w+') as fp:
                 fp.write(contents)
-
-    api_opts.add('--basic-auth-file', basic_auth)
-    api_opts.add('--token-auth-file', known_tokens)
-    api_opts.add('--service-cluster-ip-range', service_cidr())
-    api_opts.add('--service-account-key-file', service_key)
-    controller_opts.add('--service-account-private-key-file', service_key)
-
-    set_state('authentication.setup')
 
 
 @when('kubernetes-master.components.installed')
@@ -760,8 +774,8 @@ def setup_tokens(token, username, user):
     if not token:
         alpha = string.ascii_letters + string.digits
         token = ''.join(random.SystemRandom().choice(alpha) for _ in range(32))
-    with open(known_tokens, 'w') as stream:
-        stream.write('{0},{1},{2}'.format(token, username, user))
+    with open(known_tokens, 'a') as stream:
+        stream.write('{0},{1},{2}\n'.format(token, username, user))
 
 
 def all_kube_system_pods_running():
