@@ -255,11 +255,6 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 		}
 	}
 
-	// Retrieve health check path and nodeport (if required by the service)
-	// This needs to be known early so we can add health cehck probe ranges to the firewall rules
-	path, healthCheckNodePort := apiservice.GetServiceHealthCheckPathPort(apiService)
-	needsHC := path != ""
-
 	// Deal with the firewall next. The reason we do this here rather than last
 	// is because the forwarding rule is used as the indicator that the load
 	// balancer is fully created - it's what getLoadBalancer checks for.
@@ -267,19 +262,6 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 	sourceRanges, err := apiservice.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
-	}
-
-	// If the user specified source ranges, verify all L4 health check source ranges exist
-	if needsHC && !apiservice.IsAllowAll(sourceRanges) {
-		healthCheckSrcRngs, err := netsets.ParseIPNets(L4LoadBalancerSrcRanges()...)
-		if err != nil {
-			return nil, err
-		}
-
-		// netsets is map based, so Insert will overwrite if IPNet already exists
-		for _, r := range healthCheckSrcRngs {
-			sourceRanges.Insert(r)
-		}
 	}
 
 	firewallExists, firewallNeedsUpdate, err := gce.firewallNeedsUpdate(loadBalancerName, serviceName.String(), gce.region, ipAddress, ports, sourceRanges)
@@ -323,7 +305,7 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 	if err != nil && !isHTTPErrorCode(err, http.StatusNotFound) {
 		return nil, fmt.Errorf("Error checking HTTP health check %s: %v", loadBalancerName, err)
 	}
-	if needsHC {
+	if path, healthCheckNodePort := apiservice.GetServiceHealthCheckPathPort(apiService); path != "" {
 		glog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
 		if err != nil {
 			// This logic exists to detect a transition for a pre-existing service and turn on
