@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -740,11 +741,25 @@ func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, id stri
 		if err != nil {
 			return err
 		}
-		*rc.Spec.Replicas = int32(i + 1)
-		rc, err = f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Update(rc)
-		if err != nil {
-			return err
+
+		// Update replicas count, to create new pods that will be allocated on node
+		// (we retry 409 errors in case rc reference got out of sync)
+		for j := 0; j < 3; j++ {
+			*rc.Spec.Replicas = int32(i + 1)
+			rc, err = f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Update(rc)
+			if err == nil {
+				break
+			}
+			if !errors.IsConflict(err) {
+				return err
+			}
+			glog.Warningf("Got 409 conflict when trying to scale RC, retries left: %v", 3-j)
+			rc, err = f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Get(id, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
 		}
+
 		err = wait.PollImmediate(5*time.Second, podTimeout, func() (bool, error) {
 			rc, err = f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Get(id, metav1.GetOptions{})
 			if err != nil || rc.Status.ReadyReplicas < int32(i+1) {
