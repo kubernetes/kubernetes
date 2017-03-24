@@ -1,9 +1,12 @@
 /*
 Copyright 2017 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,9 +27,9 @@ import (
 )
 
 type viewClusterTest struct {
-	config   clientcmdapi.Config
-	flags    []string
-	expected string
+	config   clientcmdapi.Config //initiate kubectl config
+	flags    []string            //kubectl config viw flags
+	expected string              //expect out
 }
 
 func TestViewCluster(t *testing.T) {
@@ -122,9 +125,12 @@ users:
 }
 
 func (test viewClusterTest) run(t *testing.T) {
-	fakeKubeFile, _ := ioutil.TempFile("", "")
+	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	defer os.Remove(fakeKubeFile.Name())
-	err := clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
+	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -136,12 +142,11 @@ func (test viewClusterTest) run(t *testing.T) {
 	cmd := NewCmdConfigView(buf, errBuf, pathOptions)
 	cmd.Flags().Parse(test.flags)
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v", err)
+		t.Fatalf("unexpected error executing command: %v,kubectl config view flags: %v", err, test.flags)
 	}
 	if len(test.expected) != 0 {
 		if buf.String() != test.expected {
 			t.Errorf("expected %v, but got %v", test.expected, buf.String())
 		}
-		return
 	}
 }
