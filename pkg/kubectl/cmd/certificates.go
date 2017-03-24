@@ -167,7 +167,7 @@ func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory,
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		FilenameParam(false, &options.FilenameOptions).
 		ResourceNames("certificatesigningrequest", options.csrNames...).

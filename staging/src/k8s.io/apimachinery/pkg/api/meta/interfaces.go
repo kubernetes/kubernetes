@@ -142,6 +142,5 @@ type RESTMapper interface {
 	// the provided version(s).
 	RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error)
 
-	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)
 }

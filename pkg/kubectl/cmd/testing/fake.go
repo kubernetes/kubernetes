@@ -277,6 +277,10 @@ func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper
 	return expander, typer, err
 }
 
+func (f *FakeFactory) CategoryExpander() resource.CategoryExpander {
+	return resource.LegacyCategoryExpander
+}
+
 func (f *FakeFactory) Decoder(bool) runtime.Decoder {
 	return f.Codec
 }
@@ -689,7 +693,7 @@ func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RES
 func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
 
-	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }
 
 func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {
