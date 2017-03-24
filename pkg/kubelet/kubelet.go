@@ -62,6 +62,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/containerdshim"
+	containerdremote "k8s.io/kubernetes/pkg/kubelet/containerdshim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -549,6 +551,35 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		klet.networkPlugin = nil
 
 		switch kubeCfg.ContainerRuntime {
+		case "containerd":
+			const (
+				// The unix socket for kubelet <-> containerdshim communication.
+				ep = "/var/run/containerdshim.sock"
+				// The unix socket for containerdshhim <-> containerd communication.
+				bindSocket = "/run/containerd/containerd.sock" // mikebrow get these from a config
+			)
+			kubeCfg.RemoteRuntimeEndpoint, kubeCfg.RemoteImageEndpoint = ep, ep
+
+			glog.V(2).Infof("Starting the GRPC client for containerd communication.")
+			// get the containerd client
+			conn, err := containerdshim.GetContainerdConnection()
+			if err != nil {
+				return nil, err
+			}
+			cs := containerdshim.NewContainerdService(conn)
+			if err := cs.Start(); err != nil {
+				return nil, err
+			}
+			// For now, the CRI shim redirects the streaming requests to the
+			// kubelet, which handles the requests using ContainerdService..
+			klet.criHandler = cs
+
+			glog.V(2).Infof("Starting the GRPC server for the containerd CRI shim.")
+			server := containerdremote.NewContainerdServer(ep, cs)
+			if err := server.Start(); err != nil {
+				return nil, err
+			}
+
 		case "docker":
 			// Create and start the CRI shim running as a grpc server.
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)

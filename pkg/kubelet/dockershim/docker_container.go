@@ -122,7 +122,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 		image = iSpec.Image
 	}
 	createConfig := dockertypes.ContainerCreateConfig{
-		Name: makeContainerName(sandboxConfig, config),
+		Name: MakeContainerName(sandboxConfig, config),
 		Config: &dockercontainer.Config{
 			// TODO: set User.
 			Entrypoint: dockerstrslice.StrSlice(config.Command),
@@ -410,7 +410,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		r.Name, r.Config.Labels = names[0], labels
 	}
 
-	metadata, err := parseContainerName(r.Name)
+	metadata, err := ParseContainerName(r.Name)
 	if err != nil {
 		return nil, err
 	}

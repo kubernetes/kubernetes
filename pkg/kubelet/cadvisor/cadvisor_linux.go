@@ -192,6 +192,7 @@ func (cc *cadvisorClient) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	var label string
 
 	switch cc.runtime {
+	case "containerd":
 	case "docker":
 		label = cadvisorfs.LabelDockerImages
 	case "rkt":
