@@ -267,6 +267,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 		}
 		if waitForDeletion {
 			if err := waitForObjectDeletion(info, timeout); err != nil {
+				fmt.Fprintf(out, "Failed to wait for deletion: ")
 				return cmdutil.AddSourceToErr("stopping", info.Source, err)
 			}
 		}
