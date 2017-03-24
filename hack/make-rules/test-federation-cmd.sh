@@ -36,12 +36,17 @@ function run_federation_apiserver() {
   # Admission Controllers to invoke prior to persisting objects in cluster
   ADMISSION_CONTROL="NamespaceLifecycle"
 
+  # secure port will be used to test authz/authn/impersonation features
+  TOKEN_AUTH_FILE=${KUBE_ROOT}/hack/make-rules/test-cmd-token-auth-file.csv
+
   "${KUBE_OUTPUT_HOSTBIN}/federation-apiserver" \
     --insecure-port="${API_PORT}" \
+    --secure-port="${SECURE_API_PORT}" \
     --admission-control="${ADMISSION_CONTROL}" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
     --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
-    --cert-dir="${TMPDIR:-/tmp/}" 1>&2 &
+    --cert-dir="${TMPDIR:-/tmp/}" \
+    --token-auth-file=${TOKEN_AUTH_FILE} 1>&2 &
   APISERVER_PID=$!
 
   kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
