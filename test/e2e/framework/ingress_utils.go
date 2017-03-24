@@ -27,7 +27,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
@@ -42,18 +41,16 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -824,14 +821,16 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 		Logf("creating secret")
 		RunKubectlOrDie("create", "-f", mkpath("secret.yaml"), fmt.Sprintf("--namespace=%v", ns))
 	}
-	j.Ingress = createIngressFromManifest(mkpath("ing.yaml"))
+	Logf("Parsing ingress from %v", mkpath("ing.yaml"))
+	var err error
+	j.Ingress, err = manifest.IngressFromManifest(mkpath("ing.yaml"))
+	ExpectNoError(err)
 	j.Ingress.Namespace = ns
 	j.Ingress.Annotations = map[string]string{ingressClass: j.Class}
 	for k, v := range ingAnnotations {
 		j.Ingress.Annotations[k] = v
 	}
 	Logf(fmt.Sprintf("creating" + j.Ingress.Name + " ingress"))
-	var err error
 	j.Ingress, err = j.Client.Extensions().Ingresses(ns).Create(j.Ingress)
 	ExpectNoError(err)
 }
@@ -988,20 +987,6 @@ func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressCo
 		},
 	}
 	return &fw
-}
-
-// createIngressFromManifest reads a .json/yaml file and returns the rc in it.
-func createIngressFromManifest(fileName string) *extensions.Ingress {
-	var ing extensions.Ingress
-	Logf("Parsing ingress from %v", fileName)
-	data, err := ioutil.ReadFile(fileName)
-	ExpectNoError(err)
-
-	json, err := utilyaml.ToJSON(data)
-	ExpectNoError(err)
-
-	ExpectNoError(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &ing))
-	return &ing
 }
 
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {

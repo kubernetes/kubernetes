@@ -29,16 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/test/e2e/generated"
+	"k8s.io/kubernetes/test/e2e/manifest"
 )
 
 const (
@@ -67,24 +64,6 @@ func CreateStatefulSetService(name string, labels map[string]string) *v1.Service
 	return headlessService
 }
 
-// StatefulSetFromManifest returns a StatefulSet from a manifest stored in fileName in the Namespace indicated by ns.
-func StatefulSetFromManifest(fileName, ns string) *apps.StatefulSet {
-	var ss apps.StatefulSet
-	Logf("Parsing statefulset from %v", fileName)
-	data := generated.ReadOrDie(fileName)
-	json, err := utilyaml.ToJSON(data)
-	Expect(err).NotTo(HaveOccurred())
-
-	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &ss)).NotTo(HaveOccurred())
-	ss.Namespace = ns
-	if ss.Spec.Selector == nil {
-		ss.Spec.Selector = &metav1.LabelSelector{
-			MatchLabels: ss.Spec.Template.Labels,
-		}
-	}
-	return &ss
-}
-
 // StatefulSetTester is a struct that contains utility methods for testing StatefulSet related functionality. It uses a
 // clientset.Interface to communicate with the API server.
 type StatefulSetTester struct {
@@ -101,15 +80,21 @@ func (s *StatefulSetTester) CreateStatefulSet(manifestPath, ns string) *apps.Sta
 	mkpath := func(file string) string {
 		return filepath.Join(manifestPath, file)
 	}
-	ss := StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
-	svcYaml := generated.ReadOrDie(mkpath("service.yaml"))
-	ssYaml := generated.ReadOrDie(mkpath("statefulset.yaml"))
+
+	Logf("Parsing statefulset from %v", mkpath("statefulset.yaml"))
+	ss, err := manifest.StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
+	Expect(err).NotTo(HaveOccurred())
+	Logf("Parsing service from %v", mkpath("service.yaml"))
+	svc, err := manifest.SvcFromManifest(mkpath("service.yaml"))
+	Expect(err).NotTo(HaveOccurred())
 
 	Logf(fmt.Sprintf("creating " + ss.Name + " service"))
-	RunKubectlOrDieInput(string(svcYaml[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+	_, err = s.c.CoreV1().Services(ns).Create(svc)
+	Expect(err).NotTo(HaveOccurred())
 
 	Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
-	RunKubectlOrDieInput(string(ssYaml[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+	_, err = s.c.AppsV1beta1().StatefulSets(ns).Create(ss)
+	Expect(err).NotTo(HaveOccurred())
 	s.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	return ss
 }
