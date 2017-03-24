@@ -145,7 +145,9 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeLister corelister
 				continue
 			}
 			volumeClone := clone.(*v1.PersistentVolume)
-			ctrl.storeVolumeUpdate(volumeClone)
+			if _, err = ctrl.storeVolumeUpdate(volumeClone); err != nil {
+				glog.Errorf("error updating volume cache: %v", err)
+			}
 		}
 	}
 
@@ -161,7 +163,9 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeLister corelister
 			continue
 		}
 		claimClone := clone.(*v1.PersistentVolumeClaim)
-		ctrl.storeClaimUpdate(claimClone)
+		if _, err = ctrl.storeClaimUpdate(claimClone); err != nil {
+			glog.Errorf("error updating claim cache: %v", err)
+		}
 	}
 	glog.V(4).Infof("controller initialized")
 }
