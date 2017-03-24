@@ -498,12 +498,16 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		// See if the test should be updated instead.
 		node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
 		node.Status.Capacity[v1.ResourceMemory] = resource.MustParse("0Gi")
+		//node.Status.Capacity[v1.ResourceStorageOverlay] = resource.MustParse("0Gi")
+		//node.Status.Capacity[v1.ResourceStorageScratch] = resource.MustParse("0Gi")
 		node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(int64(kl.maxPods), resource.DecimalSI)
 		glog.Errorf("Error getting machine info: %v", err)
 	} else {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
 
+		glog.Infof("Jing machine info Filesystems %v", info.Filesystems)
+		glog.Infof("Jing machine info DiskMap %v", info.DiskMap)
 		for rName, rCap := range cadvisor.CapacityFromMachineInfo(info) {
 			node.Status.Capacity[rName] = rCap
 		}
@@ -523,6 +527,24 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 				"Node %s has been rebooted, boot id: %s", kl.nodeName, info.BootID)
 		}
 		node.Status.NodeInfo.BootID = info.BootID
+	}
+
+	rootfs, err := kl.RootFsInfo()
+	if err != nil {
+		node.Status.Capacity[v1.ResourceStorageOverlay] = resource.MustParse("0Gi")
+	} else {
+		for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(rootfs) {
+			node.Status.Capacity[rName] = rCap
+		}
+	}
+
+	imagesfs, err := kl.ImagesFsInfo()
+	if err != nil {
+		node.Status.Capacity[v1.ResourceStorageOverlay] = resource.MustParse("0Gi")
+	} else {
+		for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(imagesfs) {
+			node.Status.Capacity[rName] = rCap
+		}
 	}
 
 	// Set Allocatable.
