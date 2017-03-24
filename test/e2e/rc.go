@@ -87,14 +87,6 @@ func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageNa
 	}
 }
 
-func newRCWithSelector(rcName string, replicas int32, rcPodLabels map[string]string, imageName string, image string, nameLabelSelector string) *v1.ReplicationController {
-	rcObj := newRC(rcName, replicas, rcPodLabels, imageName, image)
-
-	rcObj.Spec.Selector = map[string]string{"name": nameLabelSelector}
-
-	return rcObj
-}
-
 // A basic test to check the deployment of an image using
 // a replication controller. The image serves its hostname
 // which is checked for each replica.
@@ -274,20 +266,15 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 	})
 
 	By("When a replication controller with a matching selector is created")
-	replicas := int32(2)
-	rcSt := newRCWithSelector(name, replicas, map[string]string{"name": name}, name, nginxImageName, name)
+	replicas := int32(1)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, nginxImageName)
+	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())
-	// Cleanup the ReplicationController when we are done.
-	defer func() {
-		if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rc.Name); err != nil {
-			framework.Logf("Failed to cleanup ReplicationController %v: %v.", rc.Name, err)
-		}
-	}()
 
 	By("Then the orphan pod is adopted")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{ResourceVersion: ""})
 		Expect(err).NotTo(HaveOccurred())
 		for _, owner := range p2.OwnerReferences {
 			if *owner.Controller && owner.UID == rc.UID {
@@ -304,16 +291,11 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 func testRCReleaseControlledNotMatching(f *framework.Framework) {
 	name := "pod-release"
 	By("Given a ReplicationController is created")
-	replicas := int32(2)
-	rcSt := newRCWithSelector(name, replicas, map[string]string{"name": name}, name, nginxImageName, name)
+	replicas := int32(1)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, nginxImageName)
+	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())
-	// Cleanup the rc when we are done.
-	defer func() {
-		if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rc.Name); err != nil {
-			framework.Logf("Failed to cleanup ReplicationController %v: %v.", rc.Name, err)
-		}
-	}()
 
 	By("When the matched label of one of its pods change")
 	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rc.Name, replicas)
