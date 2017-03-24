@@ -241,6 +241,10 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 		validationErrors = append(validationErrors, fmt.Errorf("more than one authentication method found for %v; found %v, only one is allowed", authInfoName, methods))
 	}
 
+	// ImpersonateGroups should be requested with a user
+	if (len(authInfo.ImpersonateGroups) > 0) && (len(authInfo.Impersonate) == 0) {
+		validationErrors = append(validationErrors, fmt.Errorf("requesting groups %v for %v without impersonating a user", authInfo.ImpersonateGroups, authInfoName))
+	}
 	return validationErrors
 }
 
