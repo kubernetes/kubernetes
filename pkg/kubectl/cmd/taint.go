@@ -340,7 +340,23 @@ func (o TaintOptions) RunTaint() error {
 			return o.f.PrintObject(o.cmd, mapper, outputObj, o.out)
 		}
 
-		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, "tainted")
+		message := ""
+		if len(o.taintsToAdd) > 0 {
+			keys := []string{}
+			for _, taintAdd := range o.taintsToAdd {
+				keys = append(keys, taintAdd.Key)
+			}
+			message = message + fmt.Sprintf(" tainted: %v", keys)
+		}
+		if len(o.taintsToRemove) > 0 {
+			keys := []string{}
+			for _, taintRemove := range o.taintsToRemove {
+				keys = append(keys, taintRemove.Key)
+			}
+			message = message + fmt.Sprintf(" untainted: %v", keys)
+		}
+
+		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, message)
 		return nil
 	})
 }
