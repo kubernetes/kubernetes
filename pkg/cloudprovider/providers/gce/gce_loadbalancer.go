@@ -35,6 +35,18 @@ import (
 	compute "google.golang.org/api/compute/v1"
 )
 
+// L7LoadBalancerSrcRanges contains the ranges of source ips used by the GCE L7 load balancer
+// for proxying client requests and performing health checks.
+func L7LoadBalancerSrcRanges() []string {
+	return []string{"130.211.0.0/22", "35.191.0.0/16"}
+}
+
+// L4LoadBalancerSrcRanges contains the ranges of source ips used by the GCE L4 load balancer
+// for performing health checks.
+func L4LoadBalancerSrcRanges() []string {
+	return []string{"209.85.152.0/22", "209.85.204.0/22", "35.191.0.0/16"}
+}
+
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (gce *GCECloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
@@ -198,6 +210,19 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *v1.Servi
 	sourceRanges, err := apiservice.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
+	}
+
+	// If the user specified source ranges, verify all L4 health check source ranges exist
+	if !apiservice.IsAllowAll(sourceRanges) {
+		healhtCheckSrcs, err := netsets.ParseIPNets(L4LoadBalancerSrcRanges()...)
+		if err != nil {
+			return nil, err
+		}
+
+		// netsets is map based, so Insert will overwrite if IPNet already exists
+		for _, r := range healhtCheckSrcs {
+			sourceRanges.Insert(r)
+		}
 	}
 
 	firewallExists, firewallNeedsUpdate, err := gce.firewallNeedsUpdate(loadBalancerName, serviceName.String(), gce.region, ipAddress, ports, sourceRanges)
