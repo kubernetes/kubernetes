@@ -1,10 +1,10 @@
 language: go
 go:
-  - 1.2
   - 1.3
+  - 1.4
+  - 1.5
+  - 1.6
   - tip
 install:
-  - go get github.com/stretchr/testify
-  - go get github.com/stvp/go-udp-testing
-  - go get github.com/tobi/airbrake-go
-  - go get github.com/getsentry/raven-go
+  - go get -t ./...
+script: GOMAXPROCS=4 GORACE="halt_on_error=1" go test -race -v ./...

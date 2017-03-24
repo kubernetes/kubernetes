@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package containerd.v1;
+
+import "gogoproto/gogo.proto";
+import "github.com/docker/containerd/api/types/mount/mount.proto";
+import "github.com/docker/containerd/api/types/descriptor/descriptor.proto";
+
+service RootFS {
+	rpc Unpack(UnpackRequest) returns (UnpackResponse);
+	rpc Prepare(PrepareRequest) returns (MountResponse);
+	rpc Mounts(MountsRequest) returns (MountResponse);
+}
+
+message UnpackRequest {
+	repeated containerd.v1.types.Descriptor layers = 1;
+}
+
+message UnpackResponse {
+	string chainid = 1 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false, (gogoproto.customname) = "ChainID"];
+}
+
+message PrepareRequest {
+	string name = 1;
+	string chain_id = 2 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false, (gogoproto.customname) = "ChainID"];
+	bool readonly = 3;
+}
+
+message MountsRequest {
+	string name = 1;
+}
+
+message MountResponse {
+	repeated containerd.v1.types.Mount mounts = 1;
+}

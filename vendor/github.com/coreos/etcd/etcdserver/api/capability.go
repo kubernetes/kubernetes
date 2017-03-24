@@ -30,15 +30,14 @@ const (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/etcdserver", "api")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "etcdserver/api")
 
 	// capabilityMaps is a static map of version to capability map.
 	// the base capabilities is the set of capability 2.0 supports.
 	capabilityMaps = map[string]map[Capability]bool{
-		"2.1.0": {AuthCapability: true},
-		"2.2.0": {AuthCapability: true},
 		"2.3.0": {AuthCapability: true},
 		"3.0.0": {AuthCapability: true, V3rpcCapability: true},
+		"3.1.0": {AuthCapability: true, V3rpcCapability: true},
 	}
 
 	enableMapMu sync.RWMutex

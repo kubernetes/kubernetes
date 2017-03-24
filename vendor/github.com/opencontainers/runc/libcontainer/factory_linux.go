@@ -253,14 +253,13 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 		// send it back to the parent process in the form of an initError.
 		// If container's init successed, syscall.Exec will not return, hence
 		// this defer function will never be called.
-		if _, ok := i.(*linuxStandardInit); ok {
-			//  Synchronisation only necessary for standard init.
-			if werr := utils.WriteJSON(pipe, syncT{procError}); werr != nil {
-				panic(err)
-			}
+		if werr := utils.WriteJSON(pipe, syncT{procError}); werr != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
 		}
 		if werr := utils.WriteJSON(pipe, newSystemError(err)); werr != nil {
-			panic(err)
+			fmt.Fprintln(os.Stderr, err)
+			return
 		}
 		// ensure that this pipe is always closed
 		pipe.Close()

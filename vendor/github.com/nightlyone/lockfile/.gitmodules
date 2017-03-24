@@ -1,0 +1,3 @@
+[submodule "git-hooks"]
+	path = git-hooks
+	url = https://github.com/nightlyone/git-hooks

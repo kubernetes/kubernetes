@@ -1,0 +1,29 @@
+dist: trusty
+sudo: required
+
+language: go
+
+go:
+  - 1.7.x
+  - 1.8.x
+  - tip
+
+go_import_path: github.com/docker/containerd
+
+addons:
+  apt:
+    packages:
+      - btrfs-tools
+
+install:
+  - wget https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip -O /tmp/protoc-3.1.0-linux-x86_64.zip
+  - unzip -o -d /tmp/protobuf /tmp/protoc-3.1.0-linux-x86_64.zip
+  - export PATH=$PATH:/tmp/protobuf/bin/
+
+script:
+  - make binaries
+  - make coverage
+  - sudo PATH=$PATH GOPATH=$GOPATH make root-coverage
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

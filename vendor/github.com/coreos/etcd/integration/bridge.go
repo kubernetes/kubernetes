@@ -39,7 +39,8 @@ type bridge struct {
 
 func newBridge(addr string) (*bridge, error) {
 	b := &bridge{
-		inaddr:  addr + ".bridge",
+		// bridge "port" is ("%05d%05d0", port, pid) since go1.8 expects the port to be a number
+		inaddr:  addr + "0",
 		outaddr: addr,
 		conns:   make(map[*bridgeConn]struct{}),
 		stopc:   make(chan struct{}, 1),

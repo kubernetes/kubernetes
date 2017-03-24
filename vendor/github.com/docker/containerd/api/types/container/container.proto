@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+import "gogoproto/gogo.proto";
+
+enum Status {
+	UNKNOWN = 0;
+	CREATED = 1;
+	RUNNING = 2;
+	STOPPED = 3;
+	PAUSED = 4;
+}
+
+message Container {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	uint32 pid = 2;
+	Status status = 3;
+}
+
+message Process {
+	uint32 pid = 1;
+	repeated string args = 2;
+	repeated string env = 3;
+	User user = 4;
+	string cwd = 5;
+	bool terminal = 6;
+	uint32 exit_status = 7;
+	Status status = 8;
+}
+
+message User {
+	uint32 uid = 1;
+	uint32 gid = 2;
+	repeated uint32 additional_gids = 3;
+}
+
+message Event {
+	string id = 1 [(gogoproto.customname) = "ID"];
+
+	enum EventType {
+		EXIT = 0;
+		OOM = 1;
+		CREATE = 2;
+		START = 3;
+		EXEC_ADDED = 4;
+		PAUSED = 5;
+	}
+
+	EventType type = 2;
+	uint32 pid = 3;
+	uint32 exit_status = 4;
+}

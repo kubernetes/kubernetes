@@ -117,10 +117,17 @@ func (md MD) Len() int {
 
 // Copy returns a copy of md.
 func (md MD) Copy() MD {
+	return Join(md)
+}
+
+// Join joins any number of MDs into a single MD.
+// The order of values for each key is determined by the order in which
+// the MDs containing those values are presented to Join.
+func Join(mds ...MD) MD {
 	out := MD{}
-	for k, v := range md {
-		for _, i := range v {
-			out[k] = append(out[k], i)
+	for _, md := range mds {
+		for k, v := range md {
+			out[k] = append(out[k], v...)
 		}
 	}
 	return out
@@ -134,6 +141,8 @@ func NewContext(ctx context.Context, md MD) context.Context {
 }
 
 // FromContext returns the MD in ctx if it exists.
+// The returned md should be immutable, writing to it may cause races.
+// Modification should be made to the copies of the returned md.
 func FromContext(ctx context.Context) (md MD, ok bool) {
 	md, ok = ctx.Value(mdKey{}).(MD)
 	return

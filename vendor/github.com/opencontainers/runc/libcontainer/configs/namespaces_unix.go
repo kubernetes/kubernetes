@@ -22,8 +22,8 @@ var (
 	supportedNamespaces = make(map[NamespaceType]bool)
 )
 
-// nsToFile converts the namespace type to its filename
-func nsToFile(ns NamespaceType) string {
+// NsName converts the namespace type to its filename
+func NsName(ns NamespaceType) string {
 	switch ns {
 	case NEWNET:
 		return "net"
@@ -50,7 +50,7 @@ func IsNamespaceSupported(ns NamespaceType) bool {
 	if ok {
 		return supported
 	}
-	nsFile := nsToFile(ns)
+	nsFile := NsName(ns)
 	// if the namespace type is unknown, just return false
 	if nsFile == "" {
 		return false
@@ -84,7 +84,7 @@ func (n *Namespace) GetPath(pid int) string {
 	if n.Path != "" {
 		return n.Path
 	}
-	return fmt.Sprintf("/proc/%d/ns/%s", pid, nsToFile(n.Type))
+	return fmt.Sprintf("/proc/%d/ns/%s", pid, NsName(n.Type))
 }
 
 func (n *Namespaces) Remove(t NamespaceType) bool {

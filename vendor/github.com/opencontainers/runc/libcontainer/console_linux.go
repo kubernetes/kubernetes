@@ -3,18 +3,18 @@ package libcontainer
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"syscall"
 	"unsafe"
-
-	"github.com/opencontainers/runc/libcontainer/label"
 )
 
-// NewConsole returns an initalized console that can be used within a container by copying bytes
+// newConsole returns an initialized console that can be used within a container by copying bytes
 // from the master side to the slave that is attached as the tty for the container's init process.
-func NewConsole(uid, gid int) (Console, error) {
+func newConsole() (Console, error) {
 	master, err := os.OpenFile("/dev/ptmx", syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_CLOEXEC, 0)
 	if err != nil {
+		return nil, err
+	}
+	if err := saneTerminal(master); err != nil {
 		return nil, err
 	}
 	console, err := ptsname(master)
@@ -24,34 +24,20 @@ func NewConsole(uid, gid int) (Console, error) {
 	if err := unlockpt(master); err != nil {
 		return nil, err
 	}
-	if err := os.Chmod(console, 0600); err != nil {
-		return nil, err
-	}
-	if err := os.Chown(console, uid, gid); err != nil {
-		return nil, err
-	}
 	return &linuxConsole{
 		slavePath: console,
 		master:    master,
 	}, nil
 }
 
-// newConsoleFromPath is an internal function returning an initialized console for use inside
-// a container's MNT namespace.
-func newConsoleFromPath(slavePath string) *linuxConsole {
-	return &linuxConsole{
-		slavePath: slavePath,
-	}
-}
-
-// linuxConsole is a linux psuedo TTY for use within a container.
+// linuxConsole is a linux pseudo TTY for use within a container.
 type linuxConsole struct {
 	master    *os.File
 	slavePath string
 }
 
-func (c *linuxConsole) Fd() uintptr {
-	return c.master.Fd()
+func (c *linuxConsole) File() *os.File {
+	return c.master
 }
 
 func (c *linuxConsole) Path() string {
@@ -75,21 +61,17 @@ func (c *linuxConsole) Close() error {
 
 // mount initializes the console inside the rootfs mounting with the specified mount label
 // and applying the correct ownership of the console.
-func (c *linuxConsole) mount(rootfs, mountLabel string) error {
+func (c *linuxConsole) mount() error {
 	oldMask := syscall.Umask(0000)
 	defer syscall.Umask(oldMask)
-	if err := label.SetFileLabel(c.slavePath, mountLabel); err != nil {
-		return err
-	}
-	dest := filepath.Join(rootfs, "/dev/console")
-	f, err := os.Create(dest)
+	f, err := os.Create("/dev/console")
 	if err != nil && !os.IsExist(err) {
 		return err
 	}
 	if f != nil {
 		f.Close()
 	}
-	return syscall.Mount(c.slavePath, dest, "bind", syscall.MS_BIND, "")
+	return syscall.Mount(c.slavePath, "/dev/console", "bind", syscall.MS_BIND, "")
 }
 
 // dupStdio opens the slavePath for the console and dups the fds to the current
@@ -142,4 +124,27 @@ func ptsname(f *os.File) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("/dev/pts/%d", n), nil
+}
+
+// saneTerminal sets the necessary tty_ioctl(4)s to ensure that a pty pair
+// created by us acts normally. In particular, a not-very-well-known default of
+// Linux unix98 ptys is that they have +onlcr by default. While this isn't a
+// problem for terminal emulators, because we relay data from the terminal we
+// also relay that funky line discipline.
+func saneTerminal(terminal *os.File) error {
+	// Go doesn't have a wrapper for any of the termios ioctls.
+	var termios syscall.Termios
+
+	if err := ioctl(terminal.Fd(), syscall.TCGETS, uintptr(unsafe.Pointer(&termios))); err != nil {
+		return fmt.Errorf("ioctl(tty, tcgets): %s", err.Error())
+	}
+
+	// Set -onlcr so we don't have to deal with \r.
+	termios.Oflag &^= syscall.ONLCR
+
+	if err := ioctl(terminal.Fd(), syscall.TCSETS, uintptr(unsafe.Pointer(&termios))); err != nil {
+		return fmt.Errorf("ioctl(tty, tcsets): %s", err.Error())
+	}
+
+	return nil
 }

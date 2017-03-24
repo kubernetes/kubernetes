@@ -114,8 +114,8 @@ func (m *Manager) Apply(pid int) (err error) {
 		return err
 	}
 
+	m.Paths = make(map[string]string)
 	if c.Paths != nil {
-		paths := make(map[string]string)
 		for name, path := range c.Paths {
 			_, err := d.path(name)
 			if err != nil {
@@ -124,17 +124,12 @@ func (m *Manager) Apply(pid int) (err error) {
 				}
 				return err
 			}
-			paths[name] = path
+			m.Paths[name] = path
 		}
-		m.Paths = paths
 		return cgroups.EnterPid(m.Paths, pid)
 	}
 
-	paths := make(map[string]string)
 	for _, sys := range subsystems {
-		if err := sys.Apply(d); err != nil {
-			return err
-		}
 		// TODO: Apply should, ideally, be reentrant or be broken up into a separate
 		// create and join phase so that the cgroup hierarchy for a container can be
 		// created then join consists of writing the process pids to cgroup.procs
@@ -147,9 +142,12 @@ func (m *Manager) Apply(pid int) (err error) {
 			}
 			return err
 		}
-		paths[sys.Name()] = p
+		m.Paths[sys.Name()] = p
+
+		if err := sys.Apply(d); err != nil {
+			return err
+		}
 	}
-	m.Paths = paths
 	return nil
 }
 
@@ -295,7 +293,7 @@ func (raw *cgroupData) path(subsystem string) (string, error) {
 
 	// If the cgroup name/path is absolute do not look relative to the cgroup of the init process.
 	if filepath.IsAbs(raw.innerPath) {
-		// Sometimes subsystems can be mounted togethger as 'cpu,cpuacct'.
+		// Sometimes subsystems can be mounted together as 'cpu,cpuacct'.
 		return filepath.Join(raw.root, filepath.Base(mnt), raw.innerPath), nil
 	}
 
