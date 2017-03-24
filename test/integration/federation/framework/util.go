@@ -38,26 +38,3 @@ func TearDownOnPanic(t *testing.T, f TestFixture) {
 		panic(r)
 	}
 }
-
-// TestLogger defines operations common across integration and e2e testing
-type TestLogger interface {
-	Fatalf(format string, args ...interface{})
-	Fatal(msg string)
-	Logf(format string, args ...interface{})
-}
-
-type IntegrationLogger struct {
-	t *testing.T
-}
-
-func (tr *IntegrationLogger) Logf(format string, args ...interface{}) {
-	tr.t.Logf(format, args...)
-}
-
-func (tr *IntegrationLogger) Fatalf(format string, args ...interface{}) {
-	tr.t.Fatalf(format, args...)
-}
-
-func (tr *IntegrationLogger) Fatal(msg string) {
-	tr.t.Fatal(msg)
-}

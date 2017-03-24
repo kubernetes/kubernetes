@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package crudtester
 
 import (
-	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/federation/pkg/typeadapters"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -31,13 +31,20 @@ const (
 	AnnotationTestFederationCRUDUpdate string = "federation.kubernetes.io/test-federation-crud-update"
 )
 
-// CRUDHelper exercises Create/Read/Update/Delete operations for
+// TestLogger defines operations common across different types of testing
+type TestLogger interface {
+	Fatalf(format string, args ...interface{})
+	Fatal(msg string)
+	Logf(format string, args ...interface{})
+}
+
+// FederatedTypeCRUDTester exercises Create/Read/Update/Delete operations for
 // federated types via the Federation API and validates that the
 // results of those operations are propagated to clusters that are
 // members of a federation.
-type CRUDHelper struct {
+type FederatedTypeCRUDTester struct {
 	tl             TestLogger
-	adapter        ResourceAdapter
+	adapter        typeadapters.FederatedTypeAdapter
 	kind           string
 	clusterClients []clientset.Interface
 	waitInterval   time.Duration
@@ -47,8 +54,8 @@ type CRUDHelper struct {
 	clusterWaitTimeout time.Duration
 }
 
-func NewCRUDHelperWithTimeout(testLogger TestLogger, adapter ResourceAdapter, clusterClients []clientset.Interface, waitInterval, clusterWaitTimeout time.Duration) *CRUDHelper {
-	return &CRUDHelper{
+func NewFederatedTypeCRUDTester(testLogger TestLogger, adapter typeadapters.FederatedTypeAdapter, clusterClients []clientset.Interface, waitInterval, clusterWaitTimeout time.Duration) *FederatedTypeCRUDTester {
+	return &FederatedTypeCRUDTester{
 		tl:                 testLogger,
 		adapter:            adapter,
 		kind:               adapter.Kind(),
@@ -58,12 +65,7 @@ func NewCRUDHelperWithTimeout(testLogger TestLogger, adapter ResourceAdapter, cl
 	}
 }
 
-func NewCRUDHelper(t *testing.T, adapter ResourceAdapter, clusterClients []clientset.Interface) *CRUDHelper {
-	logger := &IntegrationLogger{t}
-	return NewCRUDHelperWithTimeout(logger, adapter, clusterClients, DefaultWaitInterval, wait.ForeverTestTimeout)
-}
-
-func (c *CRUDHelper) CheckLifecycle(obj pkgruntime.Object) {
+func (c *FederatedTypeCRUDTester) CheckLifecycle(obj pkgruntime.Object) {
 	updatedObj := c.CheckCreate(obj)
 	c.CheckUpdate(updatedObj)
 
@@ -72,7 +74,7 @@ func (c *CRUDHelper) CheckLifecycle(obj pkgruntime.Object) {
 	c.CheckDelete(updatedObj, &orphanDependents)
 }
 
-func (c *CRUDHelper) CheckCreate(obj pkgruntime.Object) pkgruntime.Object {
+func (c *FederatedTypeCRUDTester) CheckCreate(obj pkgruntime.Object) pkgruntime.Object {
 	namespacedName := c.adapter.NamespacedName(obj)
 
 	c.tl.Logf("Creating federated %s %q", c.kind, namespacedName)
@@ -82,12 +84,12 @@ func (c *CRUDHelper) CheckCreate(obj pkgruntime.Object) pkgruntime.Object {
 		c.tl.Fatalf("Error creating federated %s %q : %v", c.kind, namespacedName, err)
 	}
 
-	c.checkPropagation(obj)
+	c.CheckPropagation(obj)
 
 	return obj
 }
 
-func (c *CRUDHelper) CheckUpdate(obj pkgruntime.Object) {
+func (c *FederatedTypeCRUDTester) CheckUpdate(obj pkgruntime.Object) {
 	namespacedName := c.adapter.NamespacedName(obj)
 
 	var initialAnnotation string
@@ -109,10 +111,10 @@ func (c *CRUDHelper) CheckUpdate(obj pkgruntime.Object) {
 		c.tl.Fatalf("Federated %s %q not mutated", c.kind, namespacedName)
 	}
 
-	c.checkPropagation(updatedObj)
+	c.CheckPropagation(updatedObj)
 }
 
-func (c *CRUDHelper) CheckDelete(obj pkgruntime.Object, orphanDependents *bool) {
+func (c *FederatedTypeCRUDTester) CheckDelete(obj pkgruntime.Object, orphanDependents *bool) {
 	namespacedName := c.adapter.NamespacedName(obj)
 
 	c.tl.Logf("Deleting federated %s %q", c.kind, namespacedName)
@@ -159,7 +161,7 @@ func (c *CRUDHelper) CheckDelete(obj pkgruntime.Object, orphanDependents *bool) 
 	}
 }
 
-func (c *CRUDHelper) checkPropagation(obj pkgruntime.Object) {
+func (c *FederatedTypeCRUDTester) CheckPropagation(obj pkgruntime.Object) {
 	namespacedName := c.adapter.NamespacedName(obj)
 
 	c.tl.Logf("Waiting for %s %q in %d clusters", c.kind, namespacedName, len(c.clusterClients))
@@ -171,7 +173,7 @@ func (c *CRUDHelper) checkPropagation(obj pkgruntime.Object) {
 	}
 }
 
-func (c *CRUDHelper) waitForResource(client clientset.Interface, obj pkgruntime.Object) error {
+func (c *FederatedTypeCRUDTester) waitForResource(client clientset.Interface, obj pkgruntime.Object) error {
 	namespacedName := c.adapter.NamespacedName(obj)
 	err := wait.PollImmediate(c.waitInterval, c.clusterWaitTimeout, func() (bool, error) {
 		clusterObj, err := c.adapter.Get(client, namespacedName)
@@ -186,7 +188,7 @@ func (c *CRUDHelper) waitForResource(client clientset.Interface, obj pkgruntime.
 	return err
 }
 
-func (c *CRUDHelper) updateFedObject(obj pkgruntime.Object) (pkgruntime.Object, error) {
+func (c *FederatedTypeCRUDTester) updateFedObject(obj pkgruntime.Object) (pkgruntime.Object, error) {
 	err := wait.PollImmediate(c.waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		// Target the metadata for simplicity (it's type-agnostic)
 		meta := c.adapter.ObjectMeta(obj)

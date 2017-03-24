@@ -20,15 +20,14 @@ import (
 	"fmt"
 	"testing"
 
-	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	"k8s.io/kubernetes/federation/pkg/typeadapters"
 )
 
 // ControllerFixture defines operations for managing a federation
-// controller.  Tests written to target this interface can then target
-// any controller for which an implementation of this interface
-// exists.
+// controller.  Tests written to this interface can then target any
+// controller for which an implementation of this interface exists.
 type ControllerFixture interface {
 	TestFixture
 
@@ -36,12 +35,7 @@ type ControllerFixture interface {
 
 	Kind() string
 
-	Adapter() ResourceAdapter
-
-	// NewObject creates a new object of the type the controller is intended to target
-	//
-	// TODO Will have to rethink this for controllers that target multiple types
-	NewObject(namespace string) pkgruntime.Object
+	Adapter() typeadapters.FederatedTypeAdapter
 }
 
 // SetUpControllerFixture configures the given resource fixture to target the provided api fixture
