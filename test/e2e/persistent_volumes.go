@@ -97,7 +97,7 @@ func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
 	})
 }
 
-var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
+var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
 
 	// global vars for the Context()s and It()'s below
 	f := framework.NewDefaultFramework("pv")
@@ -106,7 +106,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 		ns        string
 		pvConfig  framework.PersistentVolumeConfig
 		pvcConfig framework.PersistentVolumeClaimConfig
-		volSelLab map[string]string
+		selector  map[string]string
 		pv        *v1.PersistentVolume
 		pvc       *v1.PersistentVolumeClaim
 	)
@@ -114,9 +114,9 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		/* -[DEBUG]- Volume Selector Label */
-		volSelLab = make(map[string]string)
-		volSelLab[framework.VolumeSelectorKey] = ns // Enforce PVCs and PVs binding only within test spec
+		// Enforce binding only within test space via selector labels
+		selector = make(map[string]string)
+		selector[framework.VolumeSelectorKey] = ns
 	})
 
 	///////////////////////////////////////////////////////////////////////
@@ -138,7 +138,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			framework.Logf("[BeforeEach] Configuring PersistentVolume")
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "nfs-",
-				Labels:     volSelLab, /* -[DEBUG]- Selector Label */
+				Labels:     selector,
 				PVSource: v1.PersistentVolumeSource{
 					NFS: &v1.NFSVolumeSource{
 						Server:   serverIP,
@@ -147,19 +147,20 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 					},
 				},
 			}
-			/* -[DEBUG]- PVC Config */
 			pvcConfig = framework.PersistentVolumeClaimConfig{
 				Annotations: map[string]string{
 					v1.BetaStorageClassAnnotation: "",
 				},
 				Selector: metav1.LabelSelector{
-					MatchLabels: volSelLab,
+					MatchLabels: selector,
 				},
 			}
 		})
 
 		AfterEach(func() {
 			framework.DeletePodWithWait(f, c, nfsServerPod)
+			pv, pvc = nil, nil
+			pvConfig, pvcConfig = framework.PersistentVolumeConfig{}, framework.PersistentVolumeClaimConfig{}
 		})
 
 		Context("with Single PV - PVC pairs", func() {
@@ -274,7 +275,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			// This It() tests a scenario where a PV is written to by a Pod, recycled, then the volume checked
 			// for files. If files are found, the checking Pod fails, failing the test.  Otherwise, the pod
 			// (and test) succeed.
-			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume][Serial][Flaky]", func() {
+			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume] [Flaky]", func() {
 				By("Writing to the volume.")
 				pod := framework.MakeWritePod(ns, pvc.Name)
 				pod, err := c.Core().Pods(ns).Create(pod)
@@ -322,38 +323,38 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			if diskName == "" {
 				diskName, err = framework.CreatePDWithRetry()
 				Expect(err).NotTo(HaveOccurred())
-				pvConfig = framework.PersistentVolumeConfig{
-					NamePrefix: "gce-",
-					Labels:     volSelLab, /* -[DEBUG]- Volume Selector Label */
-					PVSource: v1.PersistentVolumeSource{
-						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-							PDName:   diskName,
-							FSType:   "ext3",
-							ReadOnly: false,
-						},
-					},
-					Prebind: nil,
-				}
-				pvcConfig = framework.PersistentVolumeClaimConfig{ /* -[DEBUG]- PVC Config */
-					Annotations: map[string]string{
-						v1.BetaStorageClassAnnotation: "",
-					},
-					Selector: metav1.LabelSelector{
-						MatchLabels: volSelLab,
-					},
-				}
 			}
+			pvConfig = framework.PersistentVolumeConfig{
+				NamePrefix: "gce-",
+				Labels:     selector,
+				PVSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName:   diskName,
+						FSType:   "ext3",
+						ReadOnly: false,
+					},
+				},
+				Prebind: nil,
+			}
+			pvcConfig = framework.PersistentVolumeClaimConfig{
+				Annotations: map[string]string{
+					v1.BetaStorageClassAnnotation: "",
+				},
+				Selector: metav1.LabelSelector{
+					MatchLabels: selector,
+				},
+			}
+
 			clientPod, pv, pvc = initializeGCETestSpec(c, ns, pvConfig, pvcConfig, false)
 			node = types.NodeName(clientPod.Spec.NodeName)
 		})
 
 		AfterEach(func() {
 			framework.Logf("AfterEach: Cleaning up test resources")
-			if c != nil {
-				framework.DeletePodWithWait(f, c, clientPod)
-				framework.PVPVCCleanup(c, ns, pv, pvc)
-			}
+			framework.DeletePodWithWait(f, c, clientPod)
+			framework.PVPVCCleanup(c, ns, pv, pvc)
 			node, clientPod, pvc, pv = "", nil, nil, nil
+			pvConfig, pvcConfig = framework.PersistentVolumeConfig{}, framework.PersistentVolumeClaimConfig{}
 		})
 
 		AddCleanupAction(func() {

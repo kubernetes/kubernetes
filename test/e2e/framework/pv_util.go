@@ -201,7 +201,6 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, 
 func createPV(c clientset.Interface, pv *v1.PersistentVolume) *v1.PersistentVolume {
 
 	pv, err := c.Core().PersistentVolumes().Create(pv)
-	Logf("DEBUG --- createPV labels: %v", pv.Labels)
 	Expect(err).NotTo(HaveOccurred())
 	return pv
 }
@@ -210,7 +209,6 @@ func createPV(c clientset.Interface, pv *v1.PersistentVolume) *v1.PersistentVolu
 func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 
 	pvc, err := c.Core().PersistentVolumeClaims(ns).Create(pvc)
-	Logf("DEBUG --- createPVC Selector:  %v", pvc.Spec.Selector.MatchLabels)
 	Expect(err).NotTo(HaveOccurred())
 	return pvc
 }
@@ -469,9 +467,6 @@ func makePvcKey(ns, name string) types.NamespacedName {
 func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
 	// Specs are expected to match the test's PersistentVolumeClaim
 
-	//TODO Handle default values
-	Logf("DEBUG --- MakePVC Selector: %v", pvConfig.Labels)
-
 	var claimRef *v1.ObjectReference
 	// If the reclaimPolicy is not provided, assume Retain
 	if pvConfig.ReclaimPolicy == "" {
@@ -515,8 +510,6 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.PersistentVolumeClaim {
 	// Specs are expected to match this test's PersistentVolume
 
-	// TODO handle default values
-	Logf("DEBUG --- MakePVC Selector: %v", cfg.Selector)
 	if len(cfg.AccessModes) == 0 {
 		Logf("AccessModes unspecified, default: all modes (RWO, RWX, ROX).")
 		cfg.AccessModes = append(cfg.AccessModes, v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadOnlyMany)
@@ -529,7 +522,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 			Annotations:  cfg.Annotations,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Selector: &cfg.Selector,
+			Selector:    &cfg.Selector,
 			AccessModes: cfg.AccessModes,
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{

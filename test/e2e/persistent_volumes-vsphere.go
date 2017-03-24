@@ -32,18 +32,18 @@ import (
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
 var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 	var (
-		c           clientset.Interface
-		ns          string
-		volumePath  string
-		pv          *v1.PersistentVolume
-		pvc         *v1.PersistentVolumeClaim
-		clientPod   *v1.Pod
-		pvConfig    framework.PersistentVolumeConfig
-		pvcConfig   framework.PersistentVolumeClaimConfig
-		vsp         *vsphere.VSphere
-		err         error
-		node        types.NodeName
-		volSelLabel map[string]string
+		c          clientset.Interface
+		ns         string
+		volumePath string
+		pv         *v1.PersistentVolume
+		pvc        *v1.PersistentVolumeClaim
+		clientPod  *v1.Pod
+		pvConfig   framework.PersistentVolumeConfig
+		pvcConfig  framework.PersistentVolumeClaimConfig
+		vsp        *vsphere.VSphere
+		err        error
+		node       types.NodeName
+		selector   map[string]string
 	)
 
 	f := framework.NewDefaultFramework("pv")
@@ -64,8 +64,8 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		pvc = nil
 		pv = nil
 
-		volSelLabel = make(map[string]string)
-		volSelLabel[framework.VolumeSelectorKey] = ns
+		selector = make(map[string]string)
+		selector[framework.VolumeSelectorKey] = ns
 
 		if vsp == nil {
 			vsp, err = vsphere.GetVSphere()
@@ -76,7 +76,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 			Expect(err).NotTo(HaveOccurred())
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "vspherepv-",
-				Labels:     volSelLabel, /* -[DEBUG]- Volume Selector Label */
+				Labels:     selector,
 				PVSource: v1.PersistentVolumeSource{
 					VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
 						VolumePath: volumePath,
@@ -85,13 +85,12 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 				},
 				Prebind: nil,
 			}
-			/* -[DEBUG]- PVC CONFIG */
 			pvcConfig = framework.PersistentVolumeClaimConfig{
 				Annotations: map[string]string{
 					v1.BetaStorageClassAnnotation: "",
 				},
 				Selector: metav1.LabelSelector{
-					MatchLabels: volSelLabel,
+					MatchLabels: selector,
 				},
 			}
 		}
