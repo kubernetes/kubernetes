@@ -22,7 +22,7 @@ spec:
         - mountPath: /redis-master-data
           name: data
     - name: sentinel
-      image: kubernetes/redis:v1
+      image: gcr.io/google_containers/redis:v1
       env:
         - name: SENTINEL
           value: "true"
@@ -31,3 +31,17 @@ spec:
   volumes:
     - name: data
       emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: sentinel
+    role: service
+  name: redis-sentinel
+spec:
+  ports:
+    - port: 26379
+      targetPort: 26379
+  selector:
+    redis-sentinel: "true"
