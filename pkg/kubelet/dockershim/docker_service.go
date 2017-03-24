@@ -301,7 +301,7 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 	// Return empty portMappings if checkpoint is not found
 	if err != nil {
 		if err == errors.CheckpointNotFoundError {
-			glog.Warningf("Failed to retrieve checkpoint for sandbox %q: %v", err)
+			glog.Warningf("Failed to retrieve checkpoint for sandbox %q: %v", podSandboxID, err)
 			return nil, nil
 		} else {
 			return nil, err
