@@ -98,6 +98,7 @@ clientset-only
 clientset-path
 cloud-config
 cloud-provider
+cloud-provider-gce-lb-src-cidrs
 cluster-cidr
 cluster-context
 cluster-dns
