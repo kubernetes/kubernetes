@@ -60,26 +60,26 @@ func NewSelectorSpreadPriority(
 }
 
 // Returns selectors of services, RCs and RSs matching the given pod.
-func (s *SelectorSpread) getSelectors(pod *v1.Pod) []labels.Selector {
+func getSelectors(pod *v1.Pod, sl algorithm.ServiceLister, cl algorithm.ControllerLister, rsl algorithm.ReplicaSetLister, ssl algorithm.StatefulSetLister) []labels.Selector {
 	var selectors []labels.Selector
-	if services, err := s.serviceLister.GetPodServices(pod); err == nil {
+	if services, err := sl.GetPodServices(pod); err == nil {
 		for _, service := range services {
 			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
 		}
 	}
-	if rcs, err := s.controllerLister.GetPodControllers(pod); err == nil {
+	if rcs, err := cl.GetPodControllers(pod); err == nil {
 		for _, rc := range rcs {
 			selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
 		}
 	}
-	if rss, err := s.replicaSetLister.GetPodReplicaSets(pod); err == nil {
+	if rss, err := rsl.GetPodReplicaSets(pod); err == nil {
 		for _, rs := range rss {
 			if selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
 				selectors = append(selectors, selector)
 			}
 		}
 	}
-	if sss, err := s.statefulSetLister.GetPodStatefulSets(pod); err == nil {
+	if sss, err := ssl.GetPodStatefulSets(pod); err == nil {
 		for _, ss := range sss {
 			if selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector); err == nil {
 				selectors = append(selectors, selector)
@@ -87,6 +87,10 @@ func (s *SelectorSpread) getSelectors(pod *v1.Pod) []labels.Selector {
 		}
 	}
 	return selectors
+}
+
+func (s *SelectorSpread) getSelectors(pod *v1.Pod) []labels.Selector {
+	return getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister, s.statefulSetLister)
 }
 
 // CalculateSpreadPriority spreads pods across hosts and zones, considering pods belonging to the same service or replication controller.
@@ -203,7 +207,7 @@ func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister
 }
 
 // Classifies nodes into ones with labels and without labels.
-func(s *ServiceAntiAffinity) getNodeClassificationByLabels(nodes []*v1.Node) (map[string]string, []string){
+func (s *ServiceAntiAffinity) getNodeClassificationByLabels(nodes []*v1.Node) (map[string]string, []string) {
 	labeledNodes := map[string]string{}
 	nonLabeledNodes := []string{}
 	for _, node := range nodes {
@@ -215,19 +219,6 @@ func(s *ServiceAntiAffinity) getNodeClassificationByLabels(nodes []*v1.Node) (ma
 		}
 	}
 	return labeledNodes, nonLabeledNodes
-}
-
-// Finds all the pods in the given nodes with labels along with their counts
-func getPodsWithLabels(pods []*v1.Pod, labeledNodes map[string]string) map[string]int{
-	podsWithLabels := map[string]int{}
-	for _, pod := range pods {
-		label, exists := labeledNodes[pod.Spec.NodeName]
-		if !exists {
-			continue
-		}
-		podsWithLabels[label]++
-	}
-	return podsWithLabels
 }
 
 // CalculateAntiAffinityPriority spreads pods by minimizing the number of pods belonging to the same service
@@ -253,9 +244,14 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *v1.Pod, nodeNam
 
 	// separate out the nodes that have the label from the ones that don't
 	labeledNodes, nonLabeledNodes := s.getNodeClassificationByLabels(nodes)
-	// get pods with labels with their counts
-	podsWithLabels := getPodsWithLabels(nsServicePods, labeledNodes)
-
+	podCounts := map[string]int{}
+	for _, pod := range nsServicePods {
+		label, exists := labeledNodes[pod.Spec.NodeName]
+		if !exists {
+			continue
+		}
+		podCounts[label]++
+	}
 	numServicePods := len(nsServicePods)
 	result := []schedulerapi.HostPriority{}
 	//score int - scale of 0-maxPriority
@@ -264,7 +260,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *v1.Pod, nodeNam
 		// initializing to the default/max node score of maxPriority
 		fScore := float32(maxPriority)
 		if numServicePods > 0 {
-			fScore = maxPriority * (float32(numServicePods-podsWithLabels[labeledNodes[node]]) / float32(numServicePods))
+			fScore = maxPriority * (float32(numServicePods-podCounts[labeledNodes[node]]) / float32(numServicePods))
 		}
 		result = append(result, schedulerapi.HostPriority{Host: node, Score: int(fScore)})
 	}
