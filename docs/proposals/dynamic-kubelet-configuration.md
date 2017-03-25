@@ -80,38 +80,29 @@ Two really important questions:
 
 #### Cluster-level object
 - The Kubelet's configuration should be stored as a `JSON` or `YAML` blob under the `kubelet` key in a `ConfigMap` object. This allows the `ConfigMap`'s schema to be extended to other `Node`-level components, e.g. adding a key for `kube-proxy`.
-- On local disk, the Kubelet's configuration should be stored in a `.json` or `.yaml` file.
 - The Kubelet's configuration type should be organized in the cluster as a structured monolith. 
   + *Structured*, so that it is readable.
   + *Monolithic*, so that all Kubelet parameters roll out to a given `Node` in unison.
-- The `ConfigMap` containing the desired configuration should be specified via the `Node` object corresponding to the Kubelet. The `Node` will have a new field, `NodeConfig`, which contains an `ObjectRef` that refers to a `ConfigMap`.
+- The `ConfigMap` containing the desired configuration should be specified via the `Node` object corresponding to the Kubelet. The `Node` will have a new `spec` subfield, `config`, which is an `ObjectReference` intended to refer to a `ConfigMap`.
+- The name of the `ConfigMap` containing the desired configuration should be of the form `blah-blah-blah-{hash}`, where `{hash}` is a SHA-1 hash of the `data` field of the `ConfigMap`. The hash will be produced by serializing the `data` to a `JSON` string, and then taking the hash of this string. Depending on ordering guarantees, we may also need to ensure that keys are sorted in the serialization to ensure consistent hashing.
+  + The Kubelet will verify the downloaded `ConfigMap` by performing this same procedure and comparing the result to the hash in the name. This helps prevent the "shoot yourself in the foot" scenario detailed below in *Operational Considerations/Rollout workflow*.
 
 `ConfigMap` object containing just the Kubelet's configuration:
 ```
 kind: ConfigMap
 metadata:
-  name: node-config-{hash of `data` for verification}
+  name: node-config-{sha1 hash of ConfigMap, sans identifying information, for verification}
 data:
   kubelet: "{JSON blob}"
 ```
 
-With an additional `Node`-level component:
-```
-kind: ConfigMap
-metadata:
-  name: node-config-{hash of `data` for verification}
-data:
- kubelet: "{JSON blob}"
- kube-proxy: "YAML blob"
-```
-
 #### On-disk
 
-- The Kubelet should accept a `--config-dir` flag that specifies a directory (e.g. `config-dir`) for storing `ConfigMap` contents.
+- The Kubelet should accept a `--config-dir` flag that specifies a directory (e.g. `config-dir`).
 - The Kubelet will use this directory to checkpoint downloaded `ConfigMap`s.
-  + The name of each subdirectory of `config-dir` is the same as the name of the corresponding `ConfigMap`, e.g. `node-config-{hash}`.
-  + Each subdirectory of `config-dir` contains the `Data` of the corresponding `ConfigMap` as a set of files. Given the above `ConfigMap` examples, reading `config-dir/node-config-{hash}/kubelet` would return `{JSON blob}`, reading `config-dir/node-config-{hash}/kube-proxy` would return `YAML blob`.
-- The user can additionally pre-populate `config-dir/init` with an initial set of configuration files, to be used prior to the `Kubelet` being able to access the API server (including when running in standalone mode).
+  + When the Kubelet downloads a `ConfigMap`, it will save its contents to a directory named after the UID of that `ConfigMap`, in a subdirectory of `config-dir` called `configmaps`, e.g. `config-dir/configmaps/{uid}`.
+  + The directory `config-dir/configmaps/{uid}` contains the `Data` of the corresponding `ConfigMap` as a set of files. Given the most recent `ConfigMap` example above, reading `config-dir/configmaps/{uid-of-the-example}/kubelet` would return `{JSON blob}`.
+- The user can additionally pre-populate `config-dir/init` with an initial set of configuration files, to be used prior to the Kubelet being able to access the API server (including when running in standalone mode).
 
 ### Orchestration of configuration
 
@@ -130,11 +121,13 @@ Recovery involves:
 
 ##### Finding and checkpointing intended configuration
 
-The Kubelet finds its intended configuration by looking for the `ConfigMap` referenced via it's `Node`'s `NodeConfig` field. The Kubelet must have permission to read the namespace that contains the referenced `ConfigMap`.
+The Kubelet finds its intended configuration by looking for the `ConfigMap` referenced via it's `Node`'s `spec.config` field. This field is an `ObjectReference`. We consider this field to be "empty" if it lacks the information necessary to resolve to an object. The field must provide at least `name` or `uid`, to be considered "non-empty." If no `namespace` or `uid` is provided, the `default` namespace is assumed. 
+
+The Kubelet must have permission to read the namespace that contains the referenced `ConfigMap`. 
 
 If the field is empty, the Kubelet will use its `config-dir/init` configuration, or built-in defaults if `config-dir/init` is also absent.
 
-The mappings `node-config: ""` and `node-config: "init"` will be treated as intentions to use `config-dir/init`. If `config-dir/init` is not present, the Kubelet should fall back to its built-in defaults and report the absence of `config-dir/init` in the node status.
+If `config-dir/init` is not present, the Kubelet should fall back to its built-in defaults.
 
 If the referenced `ConfigMap` does not exist, the Kubelet will continue using its current configuration and report the non-existence via the node status.
 
@@ -146,32 +139,34 @@ To begin using a new configuration, the Kubelet simply sets `config-dir/_current
 
 The Kubelet detects new configuration by watching the `Node` object for changes to the `NodeConfig` field. When the Kubelet detects new configuration, it checkpoints it as necessary, sets `config-dir/_current`, and restarts to begin using it.
 
-##### Verifying Configuration Integrity
+##### Metrics for Bad Configuration
 
-The name of the `ConfigMap` in several of the above examples is `node-config-{hash}`. The `{hash}` portion is a hash of the `YAML` serialization of the `ConfigMap`'s `Data` field at creation time, and can be used to verify that its contents at Kubelet-download-time are the same as at user-creation-time. This helps protect against unintentional `ConfigMap` corruption (the `Data` fields of the `ConfigMap` may be accidentally mutated after its configuration). Today, the user would have to manually generate this hash when creating the `ConfigMap`.
-
-##### Possible Metrics for Bad Configuration
-
-These are possible metrics we can use to detect bad configuration. Some are perfect indicators (validation) and some are imperfect (`P(ThinkBad == ActuallyBad) < 1`).
+These are metrics we can use to detect bad configuration. Some are perfect indicators (validation) and some are imperfect (`P(ThinkBad == ActuallyBad) < 1`).
 
 Perfect Metrics:
 - `KubeletConfiguration` cannot be deserialized
 - `KubeletConfiguration` fails a validation step
 
 Imperfect Metrics:
-- Kubelet restarts occur above a frequency threshold when using a given configuration, before that configuration is out of "probation."
+- Kubelet restarts occur above a frequency threshold when using a given configuration, before that configuration is out of a "trial period."
 
-We should use the perfect metrics we have available. These immediately tell us when we have bad configuration. Adding a tweakable probationary period, within which crash loops can be attributed to the current configuration, adds some protection against more complex configuration mishaps.
+We should use the perfect metrics we have available. These immediately tell us when we have bad configuration. Adding a user-defined trial period, within which crash loops can be attributed to the current configuration, adds some protection against more complex configuration mishaps.  
 
 More advanced error detection probably requires an out-of-band component, like the Node Problem Detector. We shouldn't go overboard attempting to make the Kubelet too smart. 
 
 ##### Tracking LKG (last-known-good) configuration
 
-Any initial on-disk configuration (`config-dir/init`) will be automatically considered good. This should be ok, because operators should notice if a `Node` doesn't initially spin up in a healthy state.
+The Kubelet will track its LKG configuration by directing a symlink called `_lkg`, which lives at `config-dir/_lkg`, to point at the directory associated with the LKG `ConfigMap`. This symlink will not exist when the node is initially provisioned; the Kubelet will create it if it does not exist. If `config-dir/init` exists, the Kubelet will initially create the symlink such that it points to `config-dir/init`. Otherwise, the Kubelet will wait until a downloaded `ConfigMap` passes the trial period required to become the LKG. If the symlink does not exist and the current configuration is determined to be bad, the Kubelet will roll back to its built-in defaults.
 
-Any configuration retrieved from the API server must persist beyond a probationary period before it can be considered LKG. If `bad(config)` is the threshold for bad configuration, then `bad^-1(config) + (use_time > threshold)` is the point at which we adopt a new configuration as LKG.
+Any configuration retrieved from the API server must persist beyond a trial period before it can be considered LKG. This trial period will be called `ConfigTrialPeriod`, will be a `Duration` as defined by `k8s.io/apimachinery/pkg/apis/meta/v1/duration.go`, and will be a parameter of the `KubeletConfiguration`. The trial period on a given configuration is the trial period used for that configuration (as opposed to, say, using the trial period set on the previous configuration). This is useful if you have, for example, a configuration you want to roll out with a longer trial period for additional caution.
 
-The Kubelet will track its LKG configuration by directing a symlink called `_lkg`, which lives at `config-dir/_lkg`, to point at the directory associated with the LKG `ConfigMap`. This symlink will not exist when the node is initially provisioned; the Kubelet will create it if it does not exist. If `config-dir/init` exists, the Kubelet will initially create the symlink such that it points to `config-dir/init`. Otherwise, the Kubelet will wait until a downloaded `ConfigMap` passes the probationary period required to become the LKG. If the symlink does not exist, and the current configuration is considered "bad," the Kubelet will roll back to its built-in defaults.
+When the time since the `_current` symlink was set to point at the new configuration exceeds the trial period, `_lkg` will be set to point to the same configuration as `_current`.
+
+The init configuration (`config-dir/init`) will be automatically considered good. If a node is provisioned with an init configuration, it MUST be a valid configuration. The Kubelet will always attempt to deserialize the init configuration and validate it on startup, regardless of whether a remote configuration exists. If this fails, the Kubelet will submit an appropriate message to `Node.status.conditions` and enter a crash loop. We want invalid init configurations to be extremely obvious.
+
+This is very important, because the init configuration is the initial last-known-good configuration. If the init configuration turns out to be bad, there is nothing to fall back to. We presume a user provisions nodes with an init configuration when the Kubelet defaults are inappropriate for their use case. It would thus be inappropriate to fall back to the Kubelet defaults if the init configuration exists.
+
+As the init configuration and the built-in defaults are automatically considered good, intentionally setting `spec.config` on the `Node` to its empty default will reset the last-known-good symlink. If `config-dir/init` exists, the symlink will be updated to point there. If `config-dir/init` does not exist, the symlink will be deleted, meaning the built-in defaults become the last-known-good config.
 
 ##### Rolling back to the LKG config
 
@@ -182,12 +177,12 @@ When a configuration correlates too strongly with poor health, the Kubelet will 
 
 Regarding (1), the Kubelet will set `config-dir/_current` to point to the same location as `config-dir/_lkg`, and then call `os.Exit(0)`, as above.
 
-Regarding (2), when the Kubelet detects a bad configuration, it will add an entry to a file, `config-dir/bad-configs.json`, mapping the name of the `ConfigMap` to the time at which it was determined to be a bad config, and the reason. The Kubelet will not roll forward to any of these configurations again until their entries are removed from this file. For example, the contents of this file might look like:
+Regarding (2), when the Kubelet detects a bad configuration, it will add an entry to a file, `config-dir/bad-configs.json`, mapping the namespace and name of the `ConfigMap` to the time at which it was determined to be a bad config, and the reason. The Kubelet will not roll forward to any of these configurations again until their entries are removed from this file. For example, the contents of this file might look like (shown here with a `reason` matching what would be reported in the `Node`'s `status.conditions`):
 ```
 {
-  "node-config-{hash}": {
+  "{uid}": {
     "time": "YYYY-MM-DDThh:mm:ss.sTZD", 
-    "reason": "The configuration failed validation."
+    "reason": "failed deserialize: namespace/name.kubelet; search 'config deserialize' in Kubelet log for details"
   }
 }
 ```
@@ -210,66 +205,92 @@ Additionally, imagine that one configuration prevents the Kubelet from accessing
 
 If the problem is *really* bad - e.g. so bad that the Kubelet isn't serving endpoints, the user should set the new configuration via the API server and then reboot the affected `Node`. The Kubelet should always check for new configuration before loading the configuration referenced by `config-dir/_current`, in case `config-dir/_current` referenced a really-bad-configuration and the user had to swap this out.
 
-### Extension to additional components
+##### Reporting Configuration Status
 
-#### Plumbing configuration to components that run in pods
+Succinct messages related to the state of `Node` configuration should be reported in a `NodeCondition`, in `status.conditions`. These should inform users which `ConfigMap` the Kubelet is using, and if the Kubelet has detected any issues with the configuration. The Kubelet should report this condition during startup, after attempting to validate configuration but before actually using it, so that the chance of a bad configuration inhibiting status reporting is minimized.
 
-How do we plumb configuration that should be managed (e.g. rolled out) at the `Node` level to `Pod`s on the `Node`? These could be static pods, or daemonsets, etc. Here's one idea:
+All `NodeCondition`s contain the fields: `lastHeartbeatTime:Time`, `lastTransitionTime:Time`, `message:string`, `reason:string`, `status:string(True|False|Unknown)`, and `type:string`.
 
-Add a volume source that allows the `Node`'s configuration to be exposed in the filesystem of the `Pod`.
+These are some brief descriptions of how these fields should be interpreted for node-configuration related conditions:
+- `lastHeartbeatTime`: The last time the Kubelet updated the condition. The Kubelet will typically do this whenever it is restarted, because that is when configuration changes occur. The Kubelet will update this on restart regardless of whether the configuration, or the condition, has changed.
+- `lastTransitionTime`: The last time this condition changed. The Kubelet will not update this unless it intends to set a different condition than is currently set.
+- `message`: A report on the Think of this as the "effect" of the `reason`.
+- `reason`: Think of this as the "cause" of the `message`.
+- `status`: `True` if the currently set configuration is considered OK, `False` otherwise. `Unknown` should not be used in these condition messages. One *might* say that a config in its trial period has "unknown" goodness, but the `status` should still be `True` because the Kubelet is treating it as OK.
+- `type`: `ConfigOK` will always be used for these conditions.
 
-For example, plumbing configuration into the `kube-proxy`:
+The following list of example conditions, sans `type`, `lastHeartbeatTime`, and `lastTransitionTime`, can be used to get a feel for the relationship between `message`, `reason`, and `status`:
+
+Config still in trial period:
 ```
-kind: Pod
-  metadata:
-    name: kube-proxy
-  spec:
-    containers:
-      - name: kube-proxy
-        volumeMounts:
-          - mountPath: /etc/node-config
-            name: node-config
-            readOnly: true
-    volumes:
-      - nodeConfig:
-          name: node-config
+message: "using current: namespace/name"
+reason: "in trial period: namespace/name"
+status: "True"
 ```
 
-This volume will be backed by the `config-dir/_current` symlink. When the Kubelet downloads a new configuration and updates this symlink, the configuration update will become simultaneously visible to all `Pod`s using a `NodeConfig` volume. The `Pod`s could, for example, use `inotify` on the mounted directory to watch for changes to the configuration.
-
-This volume should always be mounted read-only. It would be ideal if the volume source could enforce this, regardless of what is set in the `Pod` spec.
-
-It may be advantageous to restrict the exposed configuration to only the necessary keys. For example, `kube-proxy` only sees the data for the `kube-proxy` configuration key in the `ConfigMap`:
-
+Config passed trial period:
 ```
-kind: Pod
-  metadata:
-    name: kube-proxy
-  spec:
-    containers:
-      - name: kube-proxy
-        volumeMounts:
-          - mountPath: /etc/node-config
-            name: node-config
-            readOnly: true
-    volumes:
-      - nodeConfig:
-          name: node-config
-          keys:
-            - kube-proxy
+message: "using current: namespace/name"
+reason: "passed trial period: namespace/name"
+status: "True"
 ```
 
-That said, per-key filtering may be considerably more difficult to implement.
+No remote config specified:
+```
+message: "using local init config"
+reason: "this Node's spec.config was empty"
+status: "True"
+```
 
-Users can manage permission to mount `NodeConfig` via [PodSecurityPolicy](https://kubernetes.io/docs/user-guide/pod-security-policy/) ([proposal](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/security-context-constraints.md)), which can restrict the types of volumes that a `Pod` is allowed to mount.
+If `Node.spec.config` refers to an object which is not a `ConfigMap`, we treat similarly to an empty `spec.config`, but report status `False`, as this is likely an error:
+```
+message: "using local init config"
+reason: "this Node's spec.config does not refer to a ConfigMap"
+status: "False"
+```
 
-The use of this pipeline is, of course, totally optional for any component but the Kubelet. It is useful for bundling configuration for `Node` components into a single rollout. But there are other ways to update daemon configurations. For example: have two `DaemonSet`s represent two configurations for the same component, and label `Nodes` with which `DaemonSet` to use. The similarity in rollout mechanism (progressively update `Node` objects) should be noted. This proposal does not dictate *how* that `Node` level information is updated; orchestration is open-ended.
+No remote config specified, no local `init` config provided:
+```
+message: "using defaults"
+reason: "this Node's spec.config was empty, and local init config does not exist"
+status: "True"
+```
+
+When reading or validation fails, the specific `ConfigMap` key(s) should be indicated. As `reason`s should be brief, the precise details of the error should be available in the Kubelet log. The `reason` should specify a short string to search for in the Kubelet log, to make finding the error easier.
+
+Deserialization error on one key:
+```
+message: "using last known good: namespace/name"
+reason: "failed deserialize: namespace/name.kubelet; search 'config deserialize' in Kubelet log for details"
+status: "False"
+```
+
+Validation errors on multiple keys:
+```
+message: "using last known good: namespace/name"
+reason: "failed validation: namespace/name.kubelet,kube-proxy; search 'config validation' in Kubelet log for details"
+status: "False"
+```
+
+Kubelet enters crash loop during a configuration trial period:
+```
+message: "using last known good: namespace/name"
+reason: "failed trial period due to crash loop: namespace/name"
+status: "False"
+```
+
+If the init config fails validation:
+```
+message: "local init config is bad, Kubelet will crash loop until this is fixed!"
+reason: "failed validation: local init config"
+status: "False"
+```
 
 ### Operational Considerations
 
 #### Rollout workflow
 
-Kubernetes does not have the concepts of immutable, or even undeleteable API objects. This makes it easy to shoot yourself in the foot by modifying or deleting a `ConfigMap`. This results in undefined behavior given the behaviors described in this document, because the assumption is that these `ConfigMaps` are not mutated once deployed. For example, this design includes no method for invalidating the Kubelet's local cache of configurations, so there is no concept of eventually consistent results from edits or deletes of a `ConfigMap`. You may, in such a scenario, end up with partially consistent results or no results at all.
+Kubernetes does not have the concepts of immutable, or even undeleteable API objects. This makes it easy to "shoot yourself in the foot" by modifying or deleting a `ConfigMap`. This results in undefined behavior given the behaviors described in this document, because the assumption is that these `ConfigMaps` are not mutated once deployed. For example, this design includes no method for invalidating the Kubelet's local cache of configurations, so there is no concept of eventually consistent results from edits or deletes of a `ConfigMap`. You may, in such a scenario, end up with partially consistent results or no results at all.
 
 Thus, we recommend that rollout workflow consist only of creating new `ConfigMap` objects and updating the `NodeConfig` field on each `Node` to point to that new object. This results in a controlled rollout with well-defined behavior.
 
@@ -279,8 +300,7 @@ There is discussion in [#10179](https://github.com/kubernetes/kubernetes/issues/
 
 ### Monitoring configuration status
 
-- A way to query/monitor the config in-use on a given node. Today this is possible via the configz endpoint, but there are a number of other potential solutions, e.g. exposing live config via Prometheus.
-- Once the Kubelet tracks restarts to detect bad configuration, it would be useful to report, e.g. via `NodeStatus`, that the Kubelet thinks it is in a bad configuration state.
+- A way to query/monitor the config in-use on a given node. Today this is possible via the configz endpoint, but this is just for debugging, not production use. There are a number of other potential solutions, e.g. exposing live config via Prometheus.
 
 ### Orchestration
 - A specific orchestration solution for rolling out kubelet configuration. There are several factors to think about, including these general rollout considerations:
