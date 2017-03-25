@@ -99,9 +99,7 @@ func Convert_apiregistration_APIServiceList_To_v1alpha1_APIServiceList(in *apire
 }
 
 func autoConvert_v1alpha1_APIServiceSpec_To_apiregistration_APIServiceSpec(in *APIServiceSpec, out *apiregistration.APIServiceSpec, s conversion.Scope) error {
-	if err := Convert_v1alpha1_ServiceReference_To_apiregistration_ServiceReference(&in.Service, &out.Service, s); err != nil {
-		return err
-	}
+	out.Service = (*apiregistration.ServiceReference)(unsafe.Pointer(in.Service))
 	out.Group = in.Group
 	out.Version = in.Version
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
@@ -115,9 +113,7 @@ func Convert_v1alpha1_APIServiceSpec_To_apiregistration_APIServiceSpec(in *APISe
 }
 
 func autoConvert_apiregistration_APIServiceSpec_To_v1alpha1_APIServiceSpec(in *apiregistration.APIServiceSpec, out *APIServiceSpec, s conversion.Scope) error {
-	if err := Convert_apiregistration_ServiceReference_To_v1alpha1_ServiceReference(&in.Service, &out.Service, s); err != nil {
-		return err
-	}
+	out.Service = (*ServiceReference)(unsafe.Pointer(in.Service))
 	out.Group = in.Group
 	out.Version = in.Version
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify

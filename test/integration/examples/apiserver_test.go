@@ -302,7 +302,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	_, err = aggregatorClient.ApiregistrationV1alpha1().APIServices().Create(&apiregistrationv1alpha1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.k8s.io"},
 		Spec: apiregistrationv1alpha1.APIServiceSpec{
-			Service: apiregistrationv1alpha1.ServiceReference{
+			Service: &apiregistrationv1alpha1.ServiceReference{
 				Namespace: "kube-wardle",
 				Name:      "api",
 			},
@@ -326,7 +326,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	_, err = aggregatorClient.ApiregistrationV1alpha1().APIServices().Create(&apiregistrationv1alpha1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1."},
 		Spec: apiregistrationv1alpha1.APIServiceSpec{
-			Service: apiregistrationv1alpha1.ServiceReference{
+			Service: &apiregistrationv1alpha1.ServiceReference{
 				Namespace: "default",
 				Name:      "kubernetes",
 			},

@@ -83,7 +83,9 @@ func TestProxyHandler(t *testing.T) {
 	targetServer := httptest.NewTLSServer(target)
 	defer targetServer.Close()
 
-	handler := &proxyHandler{}
+	handler := &proxyHandler{
+		localDelegate: http.NewServeMux(),
+	}
 
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -105,6 +107,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
+					Service: &apiregistration.ServiceReference{},
 					Group:   "foo",
 					Version: "v1",
 				},
@@ -121,6 +124,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
+					Service:               &apiregistration.ServiceReference{},
 					Group:                 "foo",
 					Version:               "v1",
 					InsecureSkipTLSVerify: true,
@@ -146,6 +150,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
+					Service: &apiregistration.ServiceReference{},
 					Group:   "foo",
 					Version: "v1",
 				},
@@ -160,7 +165,9 @@ func TestProxyHandler(t *testing.T) {
 		handler.removeAPIService()
 		if tc.apiService != nil {
 			handler.updateAPIService(tc.apiService)
-			handler.destinationHost = targetServer.Listener.Addr().String()
+			curr := handler.handlingInfo.Load().(proxyHandlingInfo)
+			curr.destinationHost = targetServer.Listener.Addr().String()
+			handler.handlingInfo.Store(curr)
 		}
 
 		resp, err := http.Get(server.URL + tc.path)
