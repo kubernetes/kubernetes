@@ -26,6 +26,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 func TestAdmission(t *testing.T) {
@@ -75,7 +76,7 @@ func TestAdmission(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		testAdmission(t, tc.pod, handler, tc.shouldAccept)
+		testAdmission(t, tc.pod, handler, handler, tc.shouldAccept)
 	}
 
 	// run with a permissive config and all cases should pass
@@ -84,7 +85,7 @@ func TestAdmission(t *testing.T) {
 	handler.hostIPC = false
 
 	for _, tc := range testCases {
-		testAdmission(t, tc.pod, handler, true)
+		testAdmission(t, tc.pod, handler, handler, true)
 	}
 
 	// run against an init container
@@ -98,7 +99,7 @@ func TestAdmission(t *testing.T) {
 	for _, tc := range testCases {
 		tc.pod.Spec.InitContainers = tc.pod.Spec.Containers
 		tc.pod.Spec.Containers = nil
-		testAdmission(t, tc.pod, handler, tc.shouldAccept)
+		testAdmission(t, tc.pod, handler, handler, tc.shouldAccept)
 	}
 
 	// run with a permissive config and all cases should pass
@@ -107,11 +108,11 @@ func TestAdmission(t *testing.T) {
 	handler.hostIPC = false
 
 	for _, tc := range testCases {
-		testAdmission(t, tc.pod, handler, true)
+		testAdmission(t, tc.pod, handler, handler, true)
 	}
 }
 
-func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept bool) {
+func testAdmission(t *testing.T, pod *api.Pod, clientReceiver kubeapiserveradmission.WantsInternalClientSet, handler admission.Interface, shouldAccept bool) {
 	mockClient := &fake.Clientset{}
 	mockClient.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		if action.(core.GetAction).GetName() == pod.Name {
@@ -121,7 +122,7 @@ func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept b
 		return true, nil, nil
 	})
 
-	handler.client = mockClient
+	clientReceiver.SetInternalClientSet(mockClient)
 
 	// pods/exec
 	{
@@ -195,14 +196,14 @@ func TestDenyExecOnPrivileged(t *testing.T) {
 		privileged: true,
 	}
 	for _, tc := range testCases {
-		testAdmission(t, tc.pod, handler, tc.shouldAccept)
+		testAdmission(t, tc.pod, handler, handler, tc.shouldAccept)
 	}
 
 	// test init containers
 	for _, tc := range testCases {
 		tc.pod.Spec.InitContainers = tc.pod.Spec.Containers
 		tc.pod.Spec.Containers = nil
-		testAdmission(t, tc.pod, handler, tc.shouldAccept)
+		testAdmission(t, tc.pod, handler, handler, tc.shouldAccept)
 	}
 }
 
