@@ -21,54 +21,77 @@ limitations under the License.
 package v1alpha1
 
 import (
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
-}
-
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_MetricValue, InType: reflect.TypeOf(&MetricValue{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_MetricValueList, InType: reflect.TypeOf(&MetricValueList{})},
-	)
-}
-
-func DeepCopy_v1alpha1_MetricValue(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*MetricValue)
-		out := out.(*MetricValue)
-		*out = *in
-		out.Timestamp = in.Timestamp.DeepCopy()
-		if in.WindowSeconds != nil {
-			in, out := &in.WindowSeconds, &out.WindowSeconds
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *MetricValue) DeepCopyInto(out *MetricValue) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.DescribedObject = in.DescribedObject
+	in.Timestamp.DeepCopyInto(&out.Timestamp)
+	if in.WindowSeconds != nil {
+		in, out := &in.WindowSeconds, &out.WindowSeconds
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int64)
 			**out = **in
 		}
-		out.Value = in.Value.DeepCopy()
+	}
+	out.Value = in.Value.DeepCopy()
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new MetricValue.
+func (x *MetricValue) DeepCopy() *MetricValue {
+	if x == nil {
+		return nil
+	}
+	out := new(MetricValue)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *MetricValue) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_MetricValueList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*MetricValueList)
-		out := out.(*MetricValueList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]MetricValue, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1alpha1_MetricValue(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *MetricValueList) DeepCopyInto(out *MetricValueList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]MetricValue, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new MetricValueList.
+func (x *MetricValueList) DeepCopy() *MetricValueList {
+	if x == nil {
+		return nil
+	}
+	out := new(MetricValueList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *MetricValueList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
