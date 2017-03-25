@@ -199,7 +199,6 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			// Set an unmanaged zone.
 			sc.Parameters = map[string]string{"zone": unmanagedZone}
 			sc, err = c.StorageV1().StorageClasses().Create(sc)
-			defer Expect(c.StorageV1().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
 			defer func() {
 				Expect(c.StorageV1().StorageClasses().Delete(sc.Name, nil)).To(Succeed())
