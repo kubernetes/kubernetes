@@ -63,7 +63,14 @@ type EndpointsConfigHandler interface {
 	// OnEndpointsUpdate gets called when endpoints configuration is changed for a given
 	// service on any of the configuration sources. An example is when a new
 	// service comes up, or when containers come up or down for an existing service.
-	OnEndpointsUpdate(endpoints []api.Endpoints)
+	//
+	// NOTE: For efficiency, endpoints are being passed by reference, thus,
+	// OnEndpointsUpdate should NOT modify pointers of a given slice.
+	// Those endpoints objects are shared with other layers of the system and
+	// are guaranteed to be immutable with the assumption that are also
+	// not mutated by those handlers. Make a deep copy if you need to modify
+	// them in your code.
+	OnEndpointsUpdate(endpoints []*api.Endpoints)
 }
 
 // EndpointsConfig tracks a set of endpoints configurations.
@@ -93,7 +100,7 @@ func NewEndpointsConfig() *EndpointsConfig {
 func (c *EndpointsConfig) RegisterHandler(handler EndpointsConfigHandler) {
 	c.bcaster.Add(config.ListenerFunc(func(instance interface{}) {
 		glog.V(3).Infof("Calling handler.OnEndpointsUpdate()")
-		handler.OnEndpointsUpdate(instance.([]api.Endpoints))
+		handler.OnEndpointsUpdate(instance.([]*api.Endpoints))
 	}))
 }
 
@@ -158,10 +165,10 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 func (s *endpointsStore) MergedState() interface{} {
 	s.endpointLock.RLock()
 	defer s.endpointLock.RUnlock()
-	endpoints := make([]api.Endpoints, 0)
+	endpoints := make([]*api.Endpoints, 0)
 	for _, sourceEndpoints := range s.endpoints {
 		for _, value := range sourceEndpoints {
-			endpoints = append(endpoints, *value)
+			endpoints = append(endpoints, value)
 		}
 	}
 	return endpoints

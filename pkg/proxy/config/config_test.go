@@ -83,7 +83,7 @@ func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []a
 	}
 }
 
-type sortedEndpoints []api.Endpoints
+type sortedEndpoints []*api.Endpoints
 
 func (s sortedEndpoints) Len() int {
 	return len(s)
@@ -96,24 +96,24 @@ func (s sortedEndpoints) Less(i, j int) bool {
 }
 
 type EndpointsHandlerMock struct {
-	updated chan []api.Endpoints
+	updated chan []*api.Endpoints
 	waits   int
 }
 
 func NewEndpointsHandlerMock() *EndpointsHandlerMock {
-	return &EndpointsHandlerMock{updated: make(chan []api.Endpoints, 5)}
+	return &EndpointsHandlerMock{updated: make(chan []*api.Endpoints, 5)}
 }
 
-func (h *EndpointsHandlerMock) OnEndpointsUpdate(endpoints []api.Endpoints) {
+func (h *EndpointsHandlerMock) OnEndpointsUpdate(endpoints []*api.Endpoints) {
 	sort.Sort(sortedEndpoints(endpoints))
 	h.updated <- endpoints
 }
 
-func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints []api.Endpoints) {
+func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints []*api.Endpoints) {
 	// We might get 1 or more updates for N endpoint updates, because we
 	// over write older snapshots of endpoints from the producer go-routine
 	// if the consumer falls behind. Unittests will hard timeout in 5m.
-	var endpoints []api.Endpoints
+	var endpoints []*api.Endpoints
 	for {
 		select {
 		case endpoints = <-h.updated:
@@ -254,7 +254,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 	channelOne <- endpointsUpdate1
 	channelTwo <- endpointsUpdate2
 
-	endpoints := []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints}
+	endpoints := []*api.Endpoints{endpointsUpdate2.Endpoints, endpointsUpdate1.Endpoints}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 }
@@ -285,7 +285,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	channelOne <- endpointsUpdate1
 	channelTwo <- endpointsUpdate2
 
-	endpoints := []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints}
+	endpoints := []*api.Endpoints{endpointsUpdate2.Endpoints, endpointsUpdate1.Endpoints}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 
@@ -298,7 +298,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 		}},
 	})
 	channelTwo <- endpointsUpdate3
-	endpoints = []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints, *endpointsUpdate3.Endpoints}
+	endpoints = []*api.Endpoints{endpointsUpdate2.Endpoints, endpointsUpdate1.Endpoints, endpointsUpdate3.Endpoints}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 
@@ -311,7 +311,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 		}},
 	})
 	channelOne <- endpointsUpdate1
-	endpoints = []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints, *endpointsUpdate3.Endpoints}
+	endpoints = []*api.Endpoints{endpointsUpdate2.Endpoints, endpointsUpdate1.Endpoints, endpointsUpdate3.Endpoints}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 
@@ -319,7 +319,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, &api.Endpoints{ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"}})
 	channelTwo <- endpointsUpdate2
 
-	endpoints = []api.Endpoints{*endpointsUpdate1.Endpoints, *endpointsUpdate3.Endpoints}
+	endpoints = []*api.Endpoints{endpointsUpdate1.Endpoints, endpointsUpdate3.Endpoints}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 }
