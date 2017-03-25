@@ -28,35 +28,30 @@ import (
 	//"k8s.io/apimachinery/pkg/runtime/schema"
 	"bytes"
 	"context"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	"k8s.io/kubernetes/cmd/kubebackup/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	apisrbac "k8s.io/kubernetes/pkg/apis/rbac"
-	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
+	apisextensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	apisrbac "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	apisstorage "k8s.io/kubernetes/pkg/apis/storage/v1"
 
 	"archive/zip"
+	"io/ioutil"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
 	config, _, err := BuildMasterConfig(s)
-	if err != nil {
-		return err
-	}
-
-	groupResource := api.Resource("registry")
-	storageConfig, err := config.StorageFactory.NewConfig(groupResource)
-	if err != nil {
-		return fmt.Errorf("error getting storage config for %v: %v", groupResource, err)
-	}
-	store, _, err := factory.Create(*storageConfig)
 	if err != nil {
 		return err
 	}
@@ -67,14 +62,31 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	dumper := &Dumper{
-		store:   store,
-		encoder: yaml.Serializer,
+		encoder:        yaml.Serializer,
+		storageFactory: config.StorageFactory,
+	}
+
+	if s.RestoreFromFile != "" {
+		glog.Infof("Reading from %s\n", s.RestoreFromFile)
+
+		reader, err := zip.OpenReader(s.RestoreFromFile)
+		if err != nil {
+			return fmt.Errorf("error opening RestoreFromFile %q: %v", s.RestoreFromFile, err)
+		}
+		defer reader.Close()
+
+		if err := dumper.Restore(reader); err != nil {
+			return err
+		}
+
+		// If we are restoring, we don't backup
+		return nil
 	}
 
 	if s.DestFile != "" {
 		f, err := os.Create(s.DestFile)
 		if err != nil {
-			return fmt.Errorf("error opening zipfile %q: %v", s.DestFile, err)
+			return fmt.Errorf("error opening DestFile %q: %v", s.DestFile, err)
 		}
 		defer f.Close()
 
@@ -109,22 +121,22 @@ func Run(s *options.ServerRunOptions) error {
 }
 
 type Dumper struct {
-	namespaces []string
-	store      storage.Interface
-	encoder    runtime.Encoder
-	zipfile    *zip.Writer
+	namespaces     []string
+	storageFactory serverstorage.StorageFactory
+	encoder        runtime.Encoder
+	zipfile        *zip.Writer
 }
 
 func (d *Dumper) Dump() error {
 	var namespaces []string
 	{
 		list := &v1.NamespaceList{}
-		if err := d.getAll("namespaces", list); err != nil {
+		if err := d.getAll("namespaces", "", list); err != nil {
 			return err
 		}
 		for i := range list.Items {
 			obj := &list.Items[i]
-			if err := d.write("namespaces/"+obj.Name, obj, v1.SchemeGroupVersion); err != nil {
+			if err := d.backupObject("namespaces", obj, v1.SchemeGroupVersion); err != nil {
 				return err
 			}
 			namespaces = append(namespaces, obj.Name)
@@ -133,15 +145,18 @@ func (d *Dumper) Dump() error {
 	d.namespaces = namespaces
 
 	// TODO: Any way to eliminate the copy pasta here?
+	// config.StorageFactory.ResourcePrefix seems to be the human string
+	// api.Scheme.AllKnownTypes() seems to get us everything
+	// Not sure how to identify lists or enumerate through Items
 
 	{
 		list := &apisstorage.StorageClassList{}
-		if err := d.getAll("storageclasses", list); err != nil {
+		if err := d.getAll("storageclasses", "", list); err != nil {
 			return err
 		}
 		for i := range list.Items {
 			obj := &list.Items[i]
-			if err := d.write("storageclasses/"+obj.Name, obj, apisstorage.SchemeGroupVersion); err != nil {
+			if err := d.backupObject("storageclasses", obj, apisstorage.SchemeGroupVersion); err != nil {
 				return err
 			}
 		}
@@ -149,12 +164,12 @@ func (d *Dumper) Dump() error {
 
 	{
 		list := &apisrbac.ClusterRoleList{}
-		if err := d.getAll("clusterroles", list); err != nil {
+		if err := d.getAll("clusterroles", "", list); err != nil {
 			return err
 		}
 		for i := range list.Items {
 			obj := &list.Items[i]
-			if err := d.write("clusterroles/"+obj.Name, obj, apisrbac.SchemeGroupVersion); err != nil {
+			if err := d.backupObject("clusterroles", obj, apisrbac.SchemeGroupVersion); err != nil {
 				return err
 			}
 		}
@@ -162,12 +177,12 @@ func (d *Dumper) Dump() error {
 
 	{
 		list := &v1.NodeList{}
-		if err := d.getAll("minions", list); err != nil {
+		if err := d.getAll("minions", "", list); err != nil {
 			return err
 		}
 		for i := range list.Items {
 			obj := &list.Items[i]
-			if err := d.write("minions/"+obj.Name, obj, v1.SchemeGroupVersion); err != nil {
+			if err := d.backupObject("minions", obj, v1.SchemeGroupVersion); err != nil {
 				return err
 			}
 		}
@@ -178,12 +193,12 @@ func (d *Dumper) Dump() error {
 	for _, namespace := range namespaces {
 		{
 			list := &v1.PodList{}
-			if err := d.getAll("pods/"+namespace, list); err != nil {
+			if err := d.getAll("pods", namespace, list); err != nil {
 				return err
 			}
 			for i := range list.Items {
 				obj := &list.Items[i]
-				if err := d.write("pods/"+namespace+"/"+obj.Name, obj, v1.SchemeGroupVersion); err != nil {
+				if err := d.backupObject("pods", obj, v1.SchemeGroupVersion); err != nil {
 					return err
 				}
 			}
@@ -191,12 +206,12 @@ func (d *Dumper) Dump() error {
 
 		{
 			list := &v1.ServiceList{}
-			if err := d.getAll("services/"+namespace, list); err != nil {
+			if err := d.getAll("services", namespace, list); err != nil {
 				return err
 			}
 			for i := range list.Items {
 				obj := &list.Items[i]
-				if err := d.write("services/"+namespace+"/"+obj.Name, obj, v1.SchemeGroupVersion); err != nil {
+				if err := d.backupObject("services", obj, v1.SchemeGroupVersion); err != nil {
 					return err
 				}
 			}
@@ -204,24 +219,12 @@ func (d *Dumper) Dump() error {
 
 		{
 			list := &v1.SecretList{}
-			if err := d.getAll("secrets/"+namespace, list); err != nil {
+			if err := d.getAll("secrets", namespace, list); err != nil {
 				return err
 			}
 			for i := range list.Items {
 				obj := &list.Items[i]
-				if err := d.write("secrets/"+namespace+"/"+obj.Name, obj, v1.SchemeGroupVersion); err != nil {
-					return err
-				}
-			}
-		}
-		{
-			list := &v1.PodList{}
-			if err := d.getAll("pods/"+namespace, list); err != nil {
-				return err
-			}
-			for i := range list.Items {
-				obj := &list.Items[i]
-				if err := d.write("pods/"+namespace+"/"+obj.Name, obj, v1.SchemeGroupVersion); err != nil {
+				if err := d.backupObject("secrets", obj, v1.SchemeGroupVersion); err != nil {
 					return err
 				}
 			}
@@ -229,25 +232,25 @@ func (d *Dumper) Dump() error {
 
 		{
 			list := &v1.LimitRangeList{}
-			if err := d.getAll("limitranges/"+namespace, list); err != nil {
+			if err := d.getAll("limitranges", namespace, list); err != nil {
 				return err
 			}
 			for i := range list.Items {
 				obj := &list.Items[i]
-				if err := d.write("limitranges/"+namespace+"/"+obj.Name, obj, v1.SchemeGroupVersion); err != nil {
+				if err := d.backupObject("limitranges", obj, v1.SchemeGroupVersion); err != nil {
 					return err
 				}
 			}
 		}
 
 		{
-			list := &extensions.DeploymentList{}
-			if err := d.getAll("deployments/"+namespace, list); err != nil {
+			list := &apisextensions.DeploymentList{}
+			if err := d.getAll("deployments", namespace, list); err != nil {
 				return err
 			}
 			for i := range list.Items {
 				obj := &list.Items[i]
-				if err := d.write("deployments/"+namespace+"/"+obj.Name, obj, extensions.SchemeGroupVersion); err != nil {
+				if err := d.backupObject("deployments", obj, apisextensions.SchemeGroupVersion); err != nil {
 					return err
 				}
 			}
@@ -255,12 +258,12 @@ func (d *Dumper) Dump() error {
 
 		{
 			list := &v1.ServiceAccountList{}
-			if err := d.getAll("serviceaccounts/"+namespace, list); err != nil {
+			if err := d.getAll("serviceaccounts", namespace, list); err != nil {
 				return err
 			}
 			for i := range list.Items {
 				obj := &list.Items[i]
-				if err := d.write("serviceaccounts/"+namespace+"/"+obj.Name, obj, v1.SchemeGroupVersion); err != nil {
+				if err := d.backupObject("serviceaccounts", obj, v1.SchemeGroupVersion); err != nil {
 					return err
 				}
 			}
@@ -268,12 +271,12 @@ func (d *Dumper) Dump() error {
 
 		{
 			list := &apisrbac.ClusterRoleBindingList{}
-			if err := d.getAll("clusterrolebindings/"+namespace, list); err != nil {
+			if err := d.getAll("clusterrolebindings", namespace, list); err != nil {
 				return err
 			}
 			for i := range list.Items {
 				obj := &list.Items[i]
-				if err := d.write("clusterrolebindings/"+namespace+"/"+obj.Name, obj, apisrbac.SchemeGroupVersion); err != nil {
+				if err := d.backupObject("clusterrolebindings", obj, apisrbac.SchemeGroupVersion); err != nil {
 					return err
 				}
 			}
@@ -281,25 +284,25 @@ func (d *Dumper) Dump() error {
 
 		{
 			list := &v1.ConfigMapList{}
-			if err := d.getAll("configmaps/"+namespace, list); err != nil {
+			if err := d.getAll("configmaps", namespace, list); err != nil {
 				return err
 			}
 			for i := range list.Items {
 				obj := &list.Items[i]
-				if err := d.write("configmaps/"+namespace+"/"+obj.Name, obj, v1.SchemeGroupVersion); err != nil {
+				if err := d.backupObject("configmaps", obj, v1.SchemeGroupVersion); err != nil {
 					return err
 				}
 			}
 		}
 
 		{
-			list := &extensions.ReplicaSetList{}
-			if err := d.getAll("replicasets/"+namespace, list); err != nil {
+			list := &apisextensions.ReplicaSetList{}
+			if err := d.getAll("replicasets", namespace, list); err != nil {
 				return err
 			}
 			for i := range list.Items {
 				obj := &list.Items[i]
-				if err := d.write("replicasets/"+namespace+"/"+obj.Name, obj, extensions.SchemeGroupVersion); err != nil {
+				if err := d.backupObject("replicasets", obj, apisextensions.SchemeGroupVersion); err != nil {
 					return err
 				}
 			}
@@ -311,21 +314,39 @@ func (d *Dumper) Dump() error {
 	return nil
 }
 
-func (d *Dumper) getAll(key string, list runtime.Object) error {
+func (d *Dumper) getAll(resource string, namespace string, list runtime.Object) error {
 	ctx := context.Background()
 	resourceVersion := ""
 	selectionPredicate := storage.Everything
 
-	glog.Infof("Listing all %q", key)
+	glog.Infof("Backing up all %q", resource)
 
-	if err := d.store.GetToList(ctx, key, resourceVersion, selectionPredicate, list); err != nil {
+	k := list.GetObjectKind()
+	gvk := k.GroupVersionKind()
+
+	groupResource := schema.GroupResource{
+		Group:    gvk.Group,
+		Resource: resource,
+	}
+
+	store, err := d.getStore(groupResource)
+	if err != nil {
+		return err
+	}
+
+	key, err := d.getListKey(groupResource, namespace)
+	if err != nil {
+		return err
+	}
+
+	if err := store.GetToList(ctx, key, resourceVersion, selectionPredicate, list); err != nil {
 		return fmt.Errorf("error getting objects of type %v: %v", key, err)
 	}
 
 	return nil
 }
 
-func (d *Dumper) write(path string, obj runtime.Object, gv runtime.GroupVersioner) error {
+func (d *Dumper) backupObject(resource string, obj runtime.Object, gv runtime.GroupVersioner) error {
 	encoder := api.Codecs.EncoderForVersion(d.encoder, gv)
 
 	var w bytes.Buffer
@@ -333,6 +354,20 @@ func (d *Dumper) write(path string, obj runtime.Object, gv runtime.GroupVersione
 	if err != nil {
 		return fmt.Errorf("error encoding %T: %v", obj, err)
 	}
+
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return fmt.Errorf("error getting accessor: %v", err)
+	}
+
+	namespace := accessor.GetNamespace()
+	name := accessor.GetName()
+
+	path := resource
+	if namespace != "" {
+		path += "/" + namespace
+	}
+	path += "/" + name
 
 	if d.zipfile != nil {
 		f, err := d.zipfile.Create(path)
@@ -345,6 +380,140 @@ func (d *Dumper) write(path string, obj runtime.Object, gv runtime.GroupVersione
 		}
 	} else {
 		fmt.Printf("#%s:\n%s\n---\n\n", path, w.String())
+	}
+
+	return nil
+}
+
+func (d *Dumper) Restore(z *zip.ReadCloser) error {
+	for _, f := range z.File {
+		glog.Infof("processing %s", f.Name)
+
+		r, err := f.Open()
+		if err != nil {
+			return fmt.Errorf("error opening %s: %v", f.Name, err)
+		}
+		data, err := ioutil.ReadAll(r)
+		r.Close()
+		if err != nil {
+			return fmt.Errorf("error reading %s: %v", f.Name, err)
+		}
+
+		if err := d.restoreObject(f.Name, data); err != nil {
+			return fmt.Errorf("error restoring %s: %v", f.Name, err)
+		}
+	}
+	return nil
+}
+
+func (d *Dumper) getStore(groupResource schema.GroupResource) (storage.Interface, error) {
+	// TODO: CACHE ... MUST CACHE!
+	storageConfig, err := d.storageFactory.NewConfig(groupResource)
+	if err != nil {
+		return nil, fmt.Errorf("error getting storage config for %v: %v", groupResource, err)
+	}
+	store, _, err := factory.Create(*storageConfig)
+	if err != nil {
+		return nil, err
+	}
+	return store, nil
+}
+
+func (d *Dumper) getObjectKey(resource string, obj runtime.Object) (string, error) {
+	k := obj.GetObjectKind()
+	gvk := k.GroupVersionKind()
+
+	groupResource := schema.GroupResource{
+		Group:    gvk.Group,
+		Resource: resource,
+	}
+
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return "", fmt.Errorf("error getting accessor for object: %v", err)
+	}
+
+	prefix := d.storageFactory.ResourcePrefix(groupResource)
+	namespace := accessor.GetNamespace()
+	name := accessor.GetName()
+
+	key := prefix + "/" + namespace + "/" + name
+	if namespace == "" {
+		key = prefix + "/" + name
+	}
+
+	return key, nil
+}
+
+func (d *Dumper) getListKey(groupResource schema.GroupResource, namespace string) (string, error) {
+	prefix := d.storageFactory.ResourcePrefix(groupResource)
+
+	key := prefix + "/" + namespace
+	if namespace == "" {
+		key = prefix
+	}
+
+	return key, nil
+}
+
+func (d *Dumper) restoreObject(zipPath string, data []byte) error {
+	decoder := api.Codecs.UniversalDeserializer()
+	obj, gvk, err := decoder.Decode(data, nil, nil)
+	if err != nil {
+		return fmt.Errorf("error decoding %s: %v", zipPath, err)
+	}
+	glog.V(8).Infof("GVK %v", gvk)
+
+	tokens := strings.Split(zipPath, "/")
+	resource := tokens[0]
+
+	groupResource := schema.GroupResource{
+		Group:    gvk.Group,
+		Resource: resource,
+	}
+	store, err := d.getStore(groupResource)
+	if err != nil {
+		return err
+	}
+
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return fmt.Errorf("error getting accessor for %v: %v", gvk, err)
+	}
+
+	key, err := d.getObjectKey(resource, obj)
+	if err != nil {
+		return err
+	}
+
+	accessor.SetResourceVersion("")
+
+	//typeAccessor, err := meta.TypeAccessor(obj)
+	////typeAccessor.SetAPIVersion()
+	//typeAccessor.SetKind(gvk.Kind)
+
+	ctx := context.Background()
+
+	glog.Infof("Restoring object %q", key)
+
+	//ttl := uint64(0) // forever
+	//err = d.store.Create(ctx, key, obj, obj, ttl)
+	//if err == nil {
+	//	return nil
+	//}
+	//if !storage.IsNodeExist(err) {
+	//	return fmt.Errorf("error creating objects %q: %v", key, err)
+	//}
+
+	//typeObj := accessor.
+	ignoreNotFound := true
+	err = store.GuaranteedUpdate(
+		ctx, key, obj, ignoreNotFound, nil,
+		func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			return obj, nil, nil
+		})
+	if err != nil {
+		return fmt.Errorf("error creating object %q: %v", key, err)
 	}
 
 	return nil

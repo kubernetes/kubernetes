@@ -24,7 +24,6 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -47,6 +46,8 @@ type ServerRunOptions struct {
 	APIEnablement           *kubeoptions.APIEnablementOptions
 
 	DestFile string
+
+	RestoreFromFile string
 
 	KubeletConfig kubeletclient.KubeletClientConfig
 }
@@ -95,41 +96,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.StorageSerialization.AddFlags(fs)
 	s.APIEnablement.AddFlags(fs)
 
-	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
-	// arrange these text blocks sensibly. Grrr.
-
 	fs.StringVar(&s.DestFile, "dest", s.DestFile,
 		"If set, dump to this zipfile.")
 
-	// Kubelet related flags:
-	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps,
-		"Use https for kubelet connections.")
-
-	fs.StringSliceVar(&s.KubeletConfig.PreferredAddressTypes, "kubelet-preferred-address-types", s.KubeletConfig.PreferredAddressTypes,
-		"List of the preferred NodeAddressTypes to use for kubelet connections.")
-
-	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port,
-		"DEPRECATED: kubelet port.")
-	fs.MarkDeprecated("kubelet-port", "kubelet-port is deprecated and will be removed.")
-
-	fs.UintVar(&s.KubeletConfig.ReadOnlyPort, "kubelet-read-only-port", s.KubeletConfig.ReadOnlyPort,
-		"DEPRECATED: kubelet port.")
-
-	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout,
-		"Timeout for kubelet operations.")
-
-	fs.StringVar(&s.KubeletConfig.CertFile, "kubelet-client-certificate", s.KubeletConfig.CertFile,
-		"Path to a client cert file for TLS.")
-
-	fs.StringVar(&s.KubeletConfig.KeyFile, "kubelet-client-key", s.KubeletConfig.KeyFile,
-		"Path to a client key file for TLS.")
-
-	fs.StringVar(&s.KubeletConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.CAFile,
-		"Path to a cert file for the certificate authority.")
-
-	// TODO: delete this flag as soon as we identify and fix all clients that send malformed updates, like #14126.
-	fs.BoolVar(&validation.RepairMalformedUpdates, "repair-malformed-updates", validation.RepairMalformedUpdates, ""+
-		"If true, server will do its best to fix the update request to pass the validation, "+
-		"e.g., setting empty UID in update request to its existing value. This flag can be turned off "+
-		"after we fix all the clients that send malformed updates.")
+	fs.StringVar(&s.RestoreFromFile, "restore-from", s.RestoreFromFile,
+		"If set, do a restore from this zipfile.")
 }
