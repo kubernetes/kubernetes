@@ -21,104 +21,111 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
-	reflect "reflect"
+	v1 "k8s.io/client-go/pkg/api/v1"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodPreset) DeepCopyInto(out *PodPreset) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodPreset, InType: reflect.TypeOf(&PodPreset{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodPresetList, InType: reflect.TypeOf(&PodPresetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodPresetSpec, InType: reflect.TypeOf(&PodPresetSpec{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new PodPreset.
+func (x *PodPreset) DeepCopy() *PodPreset {
+	if x == nil {
+		return nil
+	}
+	out := new(PodPreset)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1alpha1_PodPreset(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodPreset)
-		out := out.(*PodPreset)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_v1alpha1_PodPresetSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodPreset) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_PodPresetList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodPresetList)
-		out := out.(*PodPresetList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]PodPreset, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1alpha1_PodPreset(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodPresetList) DeepCopyInto(out *PodPresetList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]PodPreset, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodPresetList.
+func (x *PodPresetList) DeepCopy() *PodPresetList {
+	if x == nil {
+		return nil
+	}
+	out := new(PodPresetList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodPresetList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_PodPresetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodPresetSpec)
-		out := out.(*PodPresetSpec)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.Selector); err != nil {
-			return err
-		} else {
-			out.Selector = *newVal.(*v1.LabelSelector)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodPresetSpec) DeepCopyInto(out *PodPresetSpec) {
+	*out = *in
+	in.Selector.DeepCopyInto(&out.Selector)
+	if in.Env != nil {
+		in, out := &in.Env, &out.Env
+		*out = make([]v1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.Env != nil {
-			in, out := &in.Env, &out.Env
-			*out = make([]api_v1.EnvVar, len(*in))
-			for i := range *in {
-				if err := api_v1.DeepCopy_v1_EnvVar(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+	}
+	if in.EnvFrom != nil {
+		in, out := &in.EnvFrom, &out.EnvFrom
+		*out = make([]v1.EnvFromSource, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.EnvFrom != nil {
-			in, out := &in.EnvFrom, &out.EnvFrom
-			*out = make([]api_v1.EnvFromSource, len(*in))
-			for i := range *in {
-				if err := api_v1.DeepCopy_v1_EnvFromSource(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+	}
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]v1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.Volumes != nil {
-			in, out := &in.Volumes, &out.Volumes
-			*out = make([]api_v1.Volume, len(*in))
-			for i := range *in {
-				if err := api_v1.DeepCopy_v1_Volume(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		if in.VolumeMounts != nil {
-			in, out := &in.VolumeMounts, &out.VolumeMounts
-			*out = make([]api_v1.VolumeMount, len(*in))
-			copy(*out, *in)
-		}
+	}
+	if in.VolumeMounts != nil {
+		in, out := &in.VolumeMounts, &out.VolumeMounts
+		*out = make([]v1.VolumeMount, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodPresetSpec.
+func (x *PodPresetSpec) DeepCopy() *PodPresetSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(PodPresetSpec)
+	x.DeepCopyInto(out)
+	return out
 }

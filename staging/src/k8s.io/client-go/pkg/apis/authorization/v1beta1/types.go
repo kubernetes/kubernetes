@@ -25,6 +25,7 @@ import (
 // +genclient=true
 // +nonNamespaced=true
 // +noMethods=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SubjectAccessReview checks whether or not a user or group can perform an action.
 type SubjectAccessReview struct {
@@ -43,6 +44,7 @@ type SubjectAccessReview struct {
 // +genclient=true
 // +nonNamespaced=true
 // +noMethods=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a
 // spec.namespace means "in all namespaces".  Self is a special case, because users should always be able
@@ -62,6 +64,7 @@ type SelfSubjectAccessReview struct {
 
 // +genclient=true
 // +noMethods=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace.
 // Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions

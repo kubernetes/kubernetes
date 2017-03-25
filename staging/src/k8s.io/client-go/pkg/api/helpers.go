@@ -20,11 +20,8 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,20 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
-
-// Conversion error conveniently packages up errors in conversions.
-type ConversionError struct {
-	In, Out interface{}
-	Message string
-}
-
-// Return a helpful string about the error
-func (c *ConversionError) Error() string {
-	return spew.Sprintf(
-		"Conversion error: %s. (in: %v(%+v) out: %v)",
-		c.Message, reflect.TypeOf(c.In), c.In, reflect.TypeOf(c.Out),
-	)
-}
 
 const (
 	// annotation key prefix used to identify non-convertible json paths.
