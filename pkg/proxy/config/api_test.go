@@ -250,15 +250,15 @@ func (s *svcHandler) OnServiceUpdate(services []api.Service) {
 
 type epsHandler struct {
 	t        *testing.T
-	expected []api.Endpoints
+	expected []*api.Endpoints
 	done     func()
 }
 
-func newEpsHandler(t *testing.T, eps []api.Endpoints, done func()) *epsHandler {
+func newEpsHandler(t *testing.T, eps []*api.Endpoints, done func()) *epsHandler {
 	return &epsHandler{t: t, expected: eps, done: done}
 }
 
-func (e *epsHandler) OnEndpointsUpdate(endpoints []api.Endpoints) {
+func (e *epsHandler) OnEndpointsUpdate(endpoints []*api.Endpoints) {
 	defer e.done()
 	sort.Sort(sortedEndpoints(endpoints))
 	if !reflect.DeepEqual(e.expected, endpoints) {
@@ -290,7 +290,7 @@ func TestInitialSync(t *testing.T) {
 	epsConfig := NewEndpointsConfig()
 	svcHandler := newSvcHandler(t, []api.Service{*svc2, *svc1}, wg.Done)
 	svcConfig.RegisterHandler(svcHandler)
-	epsHandler := newEpsHandler(t, []api.Endpoints{*eps2, *eps1}, wg.Done)
+	epsHandler := newEpsHandler(t, []*api.Endpoints{eps2, eps1}, wg.Done)
 	epsConfig.RegisterHandler(epsHandler)
 
 	// Setup fake api client.
