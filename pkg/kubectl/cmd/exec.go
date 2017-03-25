@@ -47,7 +47,13 @@ var (
 
 		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
 		# and sends stdout/stderr from 'bash' back to the client
-		kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`))
+		kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il
+
+		# List directory contents /usr from pod 123456-7890 and sort by modification time
+		# please note that do not use quotes with remote command
+		kubectl exec -p 123456-7890 -i -t ls -t /usr
+		kubectl exec -p 123456-7890 -i -t 'ls -t /usr' (this may not work as intended)
+		`))
 )
 
 const (
