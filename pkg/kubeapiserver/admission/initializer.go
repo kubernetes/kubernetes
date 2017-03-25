@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -48,22 +49,29 @@ type WantsCloudConfig interface {
 	SetCloudConfig([]byte)
 }
 
+// WantsRESTMapper defines a function which sets RESTMapper for admission plugins that need it.
+type WantsRESTMapper interface {
+	SetRESTMapper(meta.RESTMapper)
+}
+
 type pluginInitializer struct {
 	internalClient internalclientset.Interface
 	informers      informers.SharedInformerFactory
 	authorizer     authorizer.Authorizer
 	cloudConfig    []byte
+	restMapper     meta.RESTMapper
 }
 
 var _ admission.PluginInitializer = pluginInitializer{}
 
 // NewPluginInitializer constructs new instance of PluginInitializer
-func NewPluginInitializer(internalClient internalclientset.Interface, sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer, cloudConfig []byte) admission.PluginInitializer {
+func NewPluginInitializer(internalClient internalclientset.Interface, sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer, cloudConfig []byte, restMapper meta.RESTMapper) admission.PluginInitializer {
 	return pluginInitializer{
 		internalClient: internalClient,
 		informers:      sharedInformers,
 		authorizer:     authz,
 		cloudConfig:    cloudConfig,
+		restMapper:     restMapper,
 	}
 }
 
@@ -84,5 +92,9 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsCloudConfig); ok {
 		wants.SetCloudConfig(i.cloudConfig)
+	}
+
+	if wants, ok := plugin.(WantsRESTMapper); ok {
+		wants.SetRESTMapper(i.restMapper)
 	}
 }
