@@ -198,7 +198,7 @@ type ObjectMappingFactory interface {
 	Describer(mapping *meta.RESTMapping) (printers.Describer, error)
 
 	// LogsForObject returns a request for the logs associated with the provided object
-	LogsForObject(object, options runtime.Object) (*restclient.Request, error)
+	LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
 	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
 	Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 	// Returns a Reaper for gracefully shutting down resources.
@@ -211,7 +211,7 @@ type ObjectMappingFactory interface {
 	StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
 
 	// AttachablePodForObject returns the pod to which to attach given an object.
-	AttachablePodForObject(object runtime.Object) (*api.Pod, error)
+	AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error)
 
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool, cacheDir string) (validation.Schema, error)
