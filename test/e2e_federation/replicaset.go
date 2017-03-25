@@ -170,7 +170,7 @@ var _ = framework.KubeDescribe("Federated ReplicaSet [Feature:Federation]", func
 			})
 
 			// test for rebalancing
-			It("should create replicasets and rebalance them", func() {
+			Pit("should create replicasets and rebalance them", func() {
 				nsName := f.FederationNamespace.Name
 				pref1, pref2, replicas, expect1, expect2 := generateFedRSPrefsForRebalancing(clusters)
 
