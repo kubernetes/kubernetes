@@ -29,6 +29,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/features"
 
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 // Runtime options for the federation-apiserver.
@@ -46,6 +47,48 @@ type ServerRunOptions struct {
 	APIEnablement           *kubeoptions.APIEnablementOptions
 
 	EventTTL time.Duration
+}
+
+func (s *ServerRunOptions) ComponentConfigz() componentconfig.APIServerConfiguration {
+	componentconfig := componentconfig.APIServerConfiguration{
+		AdmissionControl:            s.GenericServerRunOptions.AdmissionControl,
+		AdmissionControlConfigFile:  s.GenericServerRunOptions.AdmissionControlConfigFile,
+		AdvertiseAddress:            s.GenericServerRunOptions.AdvertiseAddress.String(),
+		CorsAllowedOriginList:       s.GenericServerRunOptions.CorsAllowedOriginList,
+		ExternalHost:                s.GenericServerRunOptions.ExternalHost,
+		MaxRequestsInFlight:         s.GenericServerRunOptions.MaxRequestsInFlight,
+		MaxMutatingRequestsInFlight: s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
+		MinRequestTimeout:           s.GenericServerRunOptions.MinRequestTimeout,
+		TargetRAMMB:                 s.GenericServerRunOptions.TargetRAMMB,
+		WatchCacheSizes:             s.GenericServerRunOptions.WatchCacheSizes,
+		EnableProfiling:             s.Features.EnableProfiling,
+		EnableContentionProfiling:   s.Features.EnableContentionProfiling,
+		EnableSwaggerUI:             s.Features.EnableSwaggerUI,
+		StorageConfig: componentconfig.APIServerEtcdConfiguration{
+			Type:       s.Etcd.StorageConfig.Type,
+			ServerSize: len(s.Etcd.StorageConfig.ServerList),
+			Quorum:     s.Etcd.StorageConfig.Quorum,
+			DeserializationCacheSize: s.Etcd.StorageConfig.DeserializationCacheSize,
+		},
+		DefaultStorageMediaType: s.Etcd.DefaultStorageMediaType,
+		DeleteCollectionWorkers: s.Etcd.DeleteCollectionWorkers,
+		EnableGarbageCollection: s.Etcd.EnableGarbageCollection,
+		EnableWatchCache:        s.Etcd.EnableWatchCache,
+		CloudConfigFile:         s.CloudProvider.CloudConfigFile,
+		CloudProvider:           s.CloudProvider.CloudProvider,
+		StorageSerialization: componentconfig.APIServerStorageSerializationOptions{
+			StorageVersions:        s.StorageSerialization.StorageVersions,
+			DefaultStorageVersions: s.StorageSerialization.DefaultStorageVersions,
+		},
+		AllowPrivileged:           nil,
+		KubernetesServiceNodePort: nil,
+		MasterCount:               nil,
+		MaxConnectionBytesPerSec:  nil,
+		ServiceClusterIPRange:     nil,
+		ServiceNodePortRange:      nil,
+	}
+
+	return componentconfig
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default values.

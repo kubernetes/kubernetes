@@ -25,6 +25,84 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+type APIServerConfiguration struct {
+	metav1.TypeMeta
+	//
+	// Generic Server Run Options
+	//
+	AdmissionControl           string
+	AdmissionControlConfigFile string
+	AdvertiseAddress           string
+
+	CorsAllowedOriginList []string
+
+	ExternalHost                string
+	MaxRequestsInFlight         int
+	MaxMutatingRequestsInFlight int
+	MinRequestTimeout           int
+	TargetRAMMB                 int
+	WatchCacheSizes             []string
+
+	//
+	// Server Run Options: Feature Options
+	//
+	EnableProfiling           bool
+	EnableContentionProfiling bool
+	EnableSwaggerUI           bool
+
+	//
+	// Server Run Options: Etcd
+	//
+	StorageConfig           APIServerEtcdConfiguration
+	DefaultStorageMediaType string
+	DeleteCollectionWorkers int
+	EnableGarbageCollection bool
+	EnableWatchCache        bool
+
+	//
+	// Server Run Options: Cloud Provider
+	//
+	CloudConfigFile string
+	CloudProvider   string
+
+	//
+	// Server Run Options: Storage Serialization
+	//
+	StorageSerialization APIServerStorageSerializationOptions
+
+	//
+	//Server Run Options
+	//
+	AllowPrivileged           *bool
+	EventTTL                  metav1.Duration
+	KubernetesServiceNodePort *int
+	MasterCount               *int
+	MaxConnectionBytesPerSec  *int64
+	ServiceClusterIPRange     *string
+	ServiceNodePortRange      *string
+}
+
+type APIServerEtcdConfiguration struct {
+	// Type defines the type of storage backend, e.g. "etcd2", etcd3". Default ("") is "etcd3".
+	Type string
+	// Number of nodes in etcd cluster.
+	ServerSize int
+	// Quorum indicates that whether read operations should be quorum-level consistent.
+	Quorum bool
+	// DeserializationCacheSize is the size of cache of deserialized objects.
+	// Currently this is only supported in etcd2.
+	// We will drop the cache once using protobuf.
+	DeserializationCacheSize int
+}
+
+type APIServerStorageSerializationOptions struct {
+	StorageVersions string
+	// The default values for StorageVersions. StorageVersions overrides
+	// these; you can change this if you want to change the defaults (e.g.,
+	// for testing). This is not actually exposed as a flag.
+	DefaultStorageVersions string
+}
+
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta
 

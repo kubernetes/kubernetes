@@ -40,6 +40,8 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/generated/openapi"
@@ -47,6 +49,7 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/routes"
+	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -223,6 +226,12 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		return err
 	}
 
+	if _, err := initConfigz(s.ComponentConfigz()); err != nil {
+		glog.Errorf("error initiating configz: %s", err)
+	} else {
+		m.HandlerContainer.NonSwaggerRoutes.HandleFunc("/configz", configz.Handle)
+	}
+
 	routes.UIRedirect{}.Install(m.HandlerContainer)
 	routes.Logs{}.Install(m.HandlerContainer)
 
@@ -239,6 +248,16 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		sharedInformers.Start(stopCh)
 	}
 	return err
+}
+
+func initConfigz(ac componentconfig.APIServerConfiguration) (*configz.Config, error) {
+	cz, err := configz.New("componentconfig")
+	if err == nil {
+		tmp := componentconfigv1alpha1.APIServerConfiguration{}
+		api.Scheme.Convert(&ac, &tmp, nil)
+		cz.Set(tmp)
+	}
+	return cz, err
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility

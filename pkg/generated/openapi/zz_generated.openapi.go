@@ -12589,6 +12589,277 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/kubernetes/pkg/apis/certificates/v1beta1.CertificateSigningRequestCondition"},
 		},
+		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerConfiguration": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"admissionControl": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Generic Server Run Options",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"admissionControlConfigFile": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"advertiseAddress": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"corsAllowedOriginList": {
+							SchemaProps: spec.SchemaProps{
+								Type: []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"externalHost": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"maxRequestsInFlight": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
+						"maxMutatingRequestsInFlight": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
+						"minRequestTimeout": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
+						"targetRAMMB": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
+						"watchCacheSizes": {
+							SchemaProps: spec.SchemaProps{
+								Type: []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"enableProfiling": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Server Run Options: Feature Options",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"enableContentionProfiling": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"boolean"},
+								Format: "",
+							},
+						},
+						"enableSwaggerUI": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"boolean"},
+								Format: "",
+							},
+						},
+						"storageConfig": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Server Run Options: Etcd",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerEtcdConfiguration"),
+							},
+						},
+						"defaultStorageMediaType": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"deleteCollectionWorkers": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
+						"enableGarbageCollection": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"boolean"},
+								Format: "",
+							},
+						},
+						"enableWatchCache": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"boolean"},
+								Format: "",
+							},
+						},
+						"cloudConfigFile": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Server Run Options: Cloud Provider",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"cloudProvider": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"storageSerialization": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Server Run Options: Storage Serialization",
+								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerStorageSerializationOptions"),
+							},
+						},
+						"allowPrivileged": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Server Run Options",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"eventTTL": {
+							SchemaProps: spec.SchemaProps{
+								Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+							},
+						},
+						"kubernetesServiceNodePort": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
+						"masterCount": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int32",
+							},
+						},
+						"maxConnectionBytesPerSec": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"integer"},
+								Format: "int64",
+							},
+						},
+						"serviceClusterIPRange": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"serviceNodePortRange": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+					},
+					Required: []string{"admissionControl", "admissionControlConfigFile", "advertiseAddress", "corsAllowedOriginList", "externalHost", "maxRequestsInFlight", "maxMutatingRequestsInFlight", "minRequestTimeout", "targetRAMMB", "watchCacheSizes", "enableProfiling", "enableContentionProfiling", "enableSwaggerUI", "storageConfig", "defaultStorageMediaType", "deleteCollectionWorkers", "enableGarbageCollection", "enableWatchCache", "cloudConfigFile", "cloudProvider", "storageSerialization", "eventTTL"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerEtcdConfiguration", "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerStorageSerializationOptions"},
+		},
+		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerEtcdConfiguration": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Type defines the type of storage backend, e.g. \"etcd2\", etcd3\". Default (\"\") is \"etcd3\".",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"serverSize": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Number of nodes in etcd cluster.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+						"quorum": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Quorum indicates that whether read operations should be quorum-level consistent.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"deserializationCacheSize": {
+							SchemaProps: spec.SchemaProps{
+								Description: "DeserializationCacheSize is the size of cache of deserialized objects. Currently this is only supported in etcd2. We will drop the cache once using protobuf.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
+					},
+					Required: []string{"type", "serverSize", "quorum", "deserializationCacheSize"},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.APIServerStorageSerializationOptions": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Properties: map[string]spec.Schema{
+						"storageVersions": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"defaultStorageVersions": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The default values for StorageVersions. StorageVersions overrides these; you can change this if you want to change the defaults (e.g., for testing). This is not actually exposed as a flag.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"storageVersions", "defaultStorageVersions"},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeProxyConfiguration": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
