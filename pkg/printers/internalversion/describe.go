@@ -632,6 +632,8 @@ func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
 			printPortworxVolumeSource(volume.VolumeSource.PortworxVolume, w)
 		case volume.VolumeSource.ScaleIO != nil:
 			printScaleIOVolumeSource(volume.VolumeSource.ScaleIO, w)
+		case volume.VolumeSource.ScaleIO != nil:
+			printLocalVolumeSource(volume.VolumeSource.LocalStorage, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -807,6 +809,13 @@ func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w *PrefixWriter) {
 		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, sio.FSType, sio.ReadOnly)
 }
 
+func printLocalVolumeSource(local *api.LocalStorageVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tLocalStorage (a persistent volume backed by a local storage volume)\n"+
+		"    Path:\t%v\n"+
+		"    Node:\t%v\n",
+		local.Path, local.NodeName)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -873,6 +882,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
 		case pv.Spec.ScaleIO != nil:
 			printScaleIOVolumeSource(pv.Spec.ScaleIO, w)
+		case pv.Spec.LocalStorage != nil:
+			printLocalVolumeSource(pv.Spec.LocalStorage, w)
 		}
 
 		if events != nil {

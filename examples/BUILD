@@ -74,6 +74,7 @@ filegroup(
         "//examples/https-nginx:all-srcs",
         "//examples/k8petstore/web-server/src:all-srcs",
         "//examples/sharing-clusters:all-srcs",
+        "//examples/volumes/local_storage/local-discovery-app:all-srcs",
     ],
     tags = ["automanaged"],
 )

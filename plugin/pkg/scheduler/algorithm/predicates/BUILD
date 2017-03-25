@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "error.go",
+        "local_pv_predicate.go",
         "metadata.go",
         "predicates.go",
         "utils.go",
@@ -19,6 +20,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
@@ -29,6 +31,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )

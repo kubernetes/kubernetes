@@ -70,6 +70,8 @@ func init() {
 	signalToNodeCondition = map[evictionapi.Signal]v1.NodeConditionType{}
 	signalToNodeCondition[evictionapi.SignalMemoryAvailable] = v1.NodeMemoryPressure
 	signalToNodeCondition[evictionapi.SignalAllocatableMemoryAvailable] = v1.NodeMemoryPressure
+	signalToNodeCondition[evictionapi.SignalAllocatableStorageOverlayAvailable] = v1.NodeDiskPressure
+	signalToNodeCondition[evictionapi.SignalAllocatableStorageScratchAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalImageFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalNodeFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalImageFsInodesFree] = v1.NodeDiskPressure
@@ -83,6 +85,8 @@ func init() {
 	signalToResource[evictionapi.SignalImageFsInodesFree] = resourceImageFsInodes
 	signalToResource[evictionapi.SignalNodeFsAvailable] = resourceNodeFs
 	signalToResource[evictionapi.SignalNodeFsInodesFree] = resourceNodeFsInodes
+	signalToResource[evictionapi.SignalAllocatableStorageScratchAvailable] = resourceImageFs
+	signalToResource[evictionapi.SignalAllocatableStorageOverlayAvailable] = resourceNodeFs
 	resourceToSignal = map[v1.ResourceName]evictionapi.Signal{}
 	for key, value := range signalToResource {
 		resourceToSignal[value] = key
@@ -226,6 +230,26 @@ func getAllocatableThreshold(allocatableConfig []string) []evictionapi.Threshold
 			return []evictionapi.Threshold{
 				{
 					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalAllocatableStorageOverlayAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalAllocatableStorageScratchAvailable,
 					Operator: evictionapi.OpLessThan,
 					Value: evictionapi.ThresholdValue{
 						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),

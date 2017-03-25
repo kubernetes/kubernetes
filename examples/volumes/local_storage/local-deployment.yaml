@@ -1,0 +1,28 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: local-test
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: local-test
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: test-container
+        image: gcr.io/google_containers/busybox:1.24
+        command: 
+        - "/bin/sh"
+        args:
+        - "-c"
+        - "date >> /usr/test-pod/test_file; echo \"Testing local-test pod\" >> /usr/test-pod/test_file; while [ 1 ]; do sleep 100; done"
+        volumeMounts:
+        - name: local-vol
+          mountPath: /usr/test-pod
+      volumes:
+      - name: local-vol
+        persistentVolumeClaim: 
+          claimName: "local-pvc"
+
