@@ -386,7 +386,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 	}
 
 	// Needs to create a new sandbox when network namespace changed.
-	if sandboxStatus.Linux != nil && sandboxStatus.Linux.Namespaces.Options != nil &&
+	if sandboxStatus.Linux != nil && sandboxStatus.Linux.Namespaces != nil && sandboxStatus.Linux.Namespaces.Options != nil &&
 		sandboxStatus.Linux.Namespaces.Options.HostNetwork != kubecontainer.IsHostNetworkPod(pod) {
 		glog.V(2).Infof("Sandbox for pod %q has changed. Need to start a new one", format.Pod(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, ""
