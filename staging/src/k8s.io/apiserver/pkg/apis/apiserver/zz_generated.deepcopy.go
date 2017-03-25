@@ -21,57 +21,59 @@ limitations under the License.
 package apiserver
 
 import (
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
-}
-
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiserver_AdmissionConfiguration, InType: reflect.TypeOf(&AdmissionConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiserver_AdmissionPluginConfiguration, InType: reflect.TypeOf(&AdmissionPluginConfiguration{})},
-	)
-}
-
-func DeepCopy_apiserver_AdmissionConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*AdmissionConfiguration)
-		out := out.(*AdmissionConfiguration)
-		*out = *in
-		if in.Plugins != nil {
-			in, out := &in.Plugins, &out.Plugins
-			*out = make([]AdmissionPluginConfiguration, len(*in))
-			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
-					(*out)[i] = *newVal.(*AdmissionPluginConfiguration)
-				}
-			}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *AdmissionConfiguration) DeepCopyInto(out *AdmissionConfiguration) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.Plugins != nil {
+		in, out := &in.Plugins, &out.Plugins
+		*out = make([]AdmissionPluginConfiguration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new AdmissionConfiguration.
+func (x *AdmissionConfiguration) DeepCopy() *AdmissionConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(AdmissionConfiguration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *AdmissionConfiguration) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_apiserver_AdmissionPluginConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*AdmissionPluginConfiguration)
-		out := out.(*AdmissionPluginConfiguration)
-		*out = *in
-		// in.Configuration is kind 'Interface'
-		if in.Configuration != nil {
-			if newVal, err := c.DeepCopy(&in.Configuration); err != nil {
-				return err
-			} else {
-				out.Configuration = *newVal.(*runtime.Object)
-			}
-		}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *AdmissionPluginConfiguration) DeepCopyInto(out *AdmissionPluginConfiguration) {
+	*out = *in
+	if in.Configuration == nil {
+		out.Configuration = nil
+	} else {
+		out.Configuration = in.Configuration.DeepCopyObject()
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new AdmissionPluginConfiguration.
+func (x *AdmissionPluginConfiguration) DeepCopy() *AdmissionPluginConfiguration {
+	if x == nil {
 		return nil
 	}
+	out := new(AdmissionPluginConfiguration)
+	x.DeepCopyInto(out)
+	return out
 }

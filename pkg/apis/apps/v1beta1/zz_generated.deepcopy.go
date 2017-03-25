@@ -22,334 +22,481 @@ package v1beta1
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Deployment) DeepCopyInto(out *Deployment) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Deployment, InType: reflect.TypeOf(&Deployment{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentCondition, InType: reflect.TypeOf(&DeploymentCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentList, InType: reflect.TypeOf(&DeploymentList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentRollback, InType: reflect.TypeOf(&DeploymentRollback{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentSpec, InType: reflect.TypeOf(&DeploymentSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentStatus, InType: reflect.TypeOf(&DeploymentStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentStrategy, InType: reflect.TypeOf(&DeploymentStrategy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_RollbackConfig, InType: reflect.TypeOf(&RollbackConfig{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_RollingUpdateDeployment, InType: reflect.TypeOf(&RollingUpdateDeployment{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Scale, InType: reflect.TypeOf(&Scale{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ScaleSpec, InType: reflect.TypeOf(&ScaleSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ScaleStatus, InType: reflect.TypeOf(&ScaleStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StatefulSet, InType: reflect.TypeOf(&StatefulSet{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StatefulSetList, InType: reflect.TypeOf(&StatefulSetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StatefulSetSpec, InType: reflect.TypeOf(&StatefulSetSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StatefulSetStatus, InType: reflect.TypeOf(&StatefulSetStatus{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new Deployment.
+func (x *Deployment) DeepCopy() *Deployment {
+	if x == nil {
+		return nil
+	}
+	out := new(Deployment)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1beta1_Deployment(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Deployment)
-		out := out.(*Deployment)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Deployment) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *DeploymentCondition) DeepCopyInto(out *DeploymentCondition) {
+	*out = *in
+	in.LastUpdateTime.DeepCopyInto(&out.LastUpdateTime)
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new DeploymentCondition.
+func (x *DeploymentCondition) DeepCopy() *DeploymentCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(DeploymentCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *DeploymentList) DeepCopyInto(out *DeploymentList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Deployment, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new DeploymentList.
+func (x *DeploymentList) DeepCopy() *DeploymentList {
+	if x == nil {
+		return nil
+	}
+	out := new(DeploymentList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *DeploymentList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *DeploymentRollback) DeepCopyInto(out *DeploymentRollback) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.UpdatedAnnotations != nil {
+		in, out := &in.UpdatedAnnotations, &out.UpdatedAnnotations
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	out.RollbackTo = in.RollbackTo
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new DeploymentRollback.
+func (x *DeploymentRollback) DeepCopy() *DeploymentRollback {
+	if x == nil {
+		return nil
+	}
+	out := new(DeploymentRollback)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *DeploymentRollback) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *DeploymentSpec) DeepCopyInto(out *DeploymentSpec) {
+	*out = *in
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		if *in == nil {
+			*out = nil
 		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_v1beta1_DeploymentSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_DeploymentStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1beta1_DeploymentCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentCondition)
-		out := out.(*DeploymentCondition)
-		*out = *in
-		out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		return nil
-	}
-}
-
-func DeepCopy_v1beta1_DeploymentList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentList)
-		out := out.(*DeploymentList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Deployment, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_Deployment(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1beta1_DeploymentRollback(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentRollback)
-		out := out.(*DeploymentRollback)
-		*out = *in
-		if in.UpdatedAnnotations != nil {
-			in, out := &in.UpdatedAnnotations, &out.UpdatedAnnotations
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1beta1_DeploymentSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentSpec)
-		out := out.(*DeploymentSpec)
-		*out = *in
-		if in.Replicas != nil {
-			in, out := &in.Replicas, &out.Replicas
 			*out = new(int32)
 			**out = **in
 		}
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
-				*out = newVal.(*v1.LabelSelector)
-			}
+	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
 		}
-		if err := api_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, c); err != nil {
-			return err
-		}
-		if in.RevisionHistoryLimit != nil {
-			in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
+	}
+	in.Template.DeepCopyInto(&out.Template)
+	in.Strategy.DeepCopyInto(&out.Strategy)
+	if in.RevisionHistoryLimit != nil {
+		in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
-		if in.RollbackTo != nil {
-			in, out := &in.RollbackTo, &out.RollbackTo
+	}
+	if in.RollbackTo != nil {
+		in, out := &in.RollbackTo, &out.RollbackTo
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(RollbackConfig)
 			**out = **in
 		}
-		if in.ProgressDeadlineSeconds != nil {
-			in, out := &in.ProgressDeadlineSeconds, &out.ProgressDeadlineSeconds
+	}
+	if in.ProgressDeadlineSeconds != nil {
+		in, out := &in.ProgressDeadlineSeconds, &out.ProgressDeadlineSeconds
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
-		return nil
 	}
+	return
 }
 
-func DeepCopy_v1beta1_DeploymentStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentStatus)
-		out := out.(*DeploymentStatus)
-		*out = *in
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]DeploymentCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_DeploymentCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+// DeepCopy will perform a deep copy of the receiver, creating a new DeploymentSpec.
+func (x *DeploymentSpec) DeepCopy() *DeploymentSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(DeploymentSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *DeploymentStatus) DeepCopyInto(out *DeploymentStatus) {
+	*out = *in
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]DeploymentCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		return nil
 	}
+	return
 }
 
-func DeepCopy_v1beta1_DeploymentStrategy(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentStrategy)
-		out := out.(*DeploymentStrategy)
-		*out = *in
-		if in.RollingUpdate != nil {
-			in, out := &in.RollingUpdate, &out.RollingUpdate
+// DeepCopy will perform a deep copy of the receiver, creating a new DeploymentStatus.
+func (x *DeploymentStatus) DeepCopy() *DeploymentStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(DeploymentStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *DeploymentStrategy) DeepCopyInto(out *DeploymentStrategy) {
+	*out = *in
+	if in.RollingUpdate != nil {
+		in, out := &in.RollingUpdate, &out.RollingUpdate
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(RollingUpdateDeployment)
-			if err := DeepCopy_v1beta1_RollingUpdateDeployment(*in, *out, c); err != nil {
-				return err
-			}
+			(*in).DeepCopyInto(*out)
 		}
-		return nil
 	}
+	return
 }
 
-func DeepCopy_v1beta1_RollbackConfig(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RollbackConfig)
-		out := out.(*RollbackConfig)
-		*out = *in
+// DeepCopy will perform a deep copy of the receiver, creating a new DeploymentStrategy.
+func (x *DeploymentStrategy) DeepCopy() *DeploymentStrategy {
+	if x == nil {
 		return nil
 	}
+	out := new(DeploymentStrategy)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1beta1_RollingUpdateDeployment(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RollingUpdateDeployment)
-		out := out.(*RollingUpdateDeployment)
-		*out = *in
-		if in.MaxUnavailable != nil {
-			in, out := &in.MaxUnavailable, &out.MaxUnavailable
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *RollbackConfig) DeepCopyInto(out *RollbackConfig) {
+	*out = *in
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new RollbackConfig.
+func (x *RollbackConfig) DeepCopy() *RollbackConfig {
+	if x == nil {
+		return nil
+	}
+	out := new(RollbackConfig)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *RollingUpdateDeployment) DeepCopyInto(out *RollingUpdateDeployment) {
+	*out = *in
+	if in.MaxUnavailable != nil {
+		in, out := &in.MaxUnavailable, &out.MaxUnavailable
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(intstr.IntOrString)
 			**out = **in
 		}
-		if in.MaxSurge != nil {
-			in, out := &in.MaxSurge, &out.MaxSurge
+	}
+	if in.MaxSurge != nil {
+		in, out := &in.MaxSurge, &out.MaxSurge
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(intstr.IntOrString)
 			**out = **in
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new RollingUpdateDeployment.
+func (x *RollingUpdateDeployment) DeepCopy() *RollingUpdateDeployment {
+	if x == nil {
+		return nil
+	}
+	out := new(RollingUpdateDeployment)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Scale) DeepCopyInto(out *Scale) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = in.Spec
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Scale.
+func (x *Scale) DeepCopy() *Scale {
+	if x == nil {
+		return nil
+	}
+	out := new(Scale)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Scale) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1beta1_Scale(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Scale)
-		out := out.(*Scale)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ScaleSpec) DeepCopyInto(out *ScaleSpec) {
+	*out = *in
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ScaleSpec.
+func (x *ScaleSpec) DeepCopy() *ScaleSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(ScaleSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ScaleStatus) DeepCopyInto(out *ScaleStatus) {
+	*out = *in
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ScaleStatus.
+func (x *ScaleStatus) DeepCopy() *ScaleStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(ScaleStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StatefulSet) DeepCopyInto(out *StatefulSet) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new StatefulSet.
+func (x *StatefulSet) DeepCopy() *StatefulSet {
+	if x == nil {
+		return nil
+	}
+	out := new(StatefulSet)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *StatefulSet) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StatefulSetList) DeepCopyInto(out *StatefulSetList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]StatefulSet, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new StatefulSetList.
+func (x *StatefulSetList) DeepCopy() *StatefulSetList {
+	if x == nil {
+		return nil
+	}
+	out := new(StatefulSetList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *StatefulSetList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StatefulSetSpec) DeepCopyInto(out *StatefulSetSpec) {
+	*out = *in
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		if *in == nil {
+			*out = nil
 		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_v1beta1_ScaleStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1beta1_ScaleSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ScaleSpec)
-		out := out.(*ScaleSpec)
-		*out = *in
-		return nil
-	}
-}
-
-func DeepCopy_v1beta1_ScaleStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ScaleStatus)
-		out := out.(*ScaleStatus)
-		*out = *in
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1beta1_StatefulSet(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StatefulSet)
-		out := out.(*StatefulSet)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_v1beta1_StatefulSetSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_StatefulSetStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1beta1_StatefulSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StatefulSetList)
-		out := out.(*StatefulSetList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]StatefulSet, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_StatefulSet(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1beta1_StatefulSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StatefulSetSpec)
-		out := out.(*StatefulSetSpec)
-		*out = *in
-		if in.Replicas != nil {
-			in, out := &in.Replicas, &out.Replicas
 			*out = new(int32)
 			**out = **in
 		}
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
-				*out = newVal.(*v1.LabelSelector)
-			}
-		}
-		if err := api_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
-			return err
-		}
-		if in.VolumeClaimTemplates != nil {
-			in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
-			*out = make([]api_v1.PersistentVolumeClaim, len(*in))
-			for i := range *in {
-				if err := api_v1.DeepCopy_v1_PersistentVolumeClaim(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
 	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
+	}
+	in.Template.DeepCopyInto(&out.Template)
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]api_v1.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
 }
 
-func DeepCopy_v1beta1_StatefulSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StatefulSetStatus)
-		out := out.(*StatefulSetStatus)
-		*out = *in
-		if in.ObservedGeneration != nil {
-			in, out := &in.ObservedGeneration, &out.ObservedGeneration
+// DeepCopy will perform a deep copy of the receiver, creating a new StatefulSetSpec.
+func (x *StatefulSetSpec) DeepCopy() *StatefulSetSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(StatefulSetSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StatefulSetStatus) DeepCopyInto(out *StatefulSetStatus) {
+	*out = *in
+	if in.ObservedGeneration != nil {
+		in, out := &in.ObservedGeneration, &out.ObservedGeneration
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int64)
 			**out = **in
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new StatefulSetStatus.
+func (x *StatefulSetStatus) DeepCopy() *StatefulSetStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(StatefulSetStatus)
+	x.DeepCopyInto(out)
+	return out
 }
