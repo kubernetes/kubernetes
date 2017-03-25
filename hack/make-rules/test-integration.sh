@@ -84,11 +84,6 @@ checkEtcdOnPath
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
 
-# If a test case is specified, just run once with v1 API version and exit
-if [[ -n "${KUBE_TEST_ARGS}" ]]; then
-  runTests v1
-fi
-
 # Pass arguments that begin with "-" and move them to goflags.
 what_flags=()
 for arg in "$@"; do
@@ -100,9 +95,15 @@ if [[ "${#what_flags[@]}" -eq 0 ]]; then
   what_flags=''
 fi
 
+apiVersions=()
+# If a test case is specified, just run once with v1 API version and exit
+if [[ -n "${KUBE_TEST_ARGS}" ]]; then
+  apiVersions+=("v1")
+else
+  # Convert the CSV to an array of API versions to test
+  IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
+fi
 
-# Convert the CSV to an array of API versions to test
-IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 for apiVersion in "${apiVersions[@]}"; do
   runTests "${apiVersion}" "${1-}" "${what_flags[@]}"
 done
