@@ -29,8 +29,8 @@ import (
 type Index struct{}
 
 // Install adds the Index webservice to the given mux.
-func (i Index) Install(c *mux.APIContainer) {
-	c.UnlistedRoutes.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+func (i Index) Install(c *mux.APIContainer, mux *mux.PathRecorderMux) {
+	mux.UnlistedHandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
 			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler api.Registry.
@@ -43,7 +43,7 @@ func (i Index) Install(c *mux.APIContainer) {
 			handledPaths = append(handledPaths, ws.RootPath())
 		}
 		// Extract the paths handled using mux handler.
-		handledPaths = append(handledPaths, c.NonSwaggerRoutes.HandledPaths()...)
+		handledPaths = append(handledPaths, mux.HandledPaths()...)
 		sort.Strings(handledPaths)
 		responsewriters.WriteRawJSON(status, metav1.RootPaths{Paths: handledPaths}, w)
 	})

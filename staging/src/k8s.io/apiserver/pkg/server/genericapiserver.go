@@ -43,6 +43,7 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/mux"
 	genericmux "k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	restclient "k8s.io/client-go/rest"
@@ -124,6 +125,9 @@ type GenericAPIServer struct {
 	// "Outputs"
 	Handler         http.Handler
 	InsecureHandler http.Handler
+	// FallThroughHandler is the final HTTP handler in the chain.
+	// It comes after all filters and the API handling
+	FallThroughHandler *mux.PathRecorderMux
 
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
@@ -180,7 +184,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.openAPIConfig != nil {
 		routes.OpenAPI{
 			Config: s.openAPIConfig,
-		}.Install(s.HandlerContainer)
+		}.Install(s.HandlerContainer, s.FallThroughHandler)
 	}
 
 	s.installHealthz()

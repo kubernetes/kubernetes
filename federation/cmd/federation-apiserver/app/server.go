@@ -223,7 +223,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	routes.UIRedirect{}.Install(m.HandlerContainer)
+	routes.UIRedirect{}.Install(m.FallThroughHandler)
 	routes.Logs{}.Install(m.HandlerContainer)
 
 	installFederationAPIs(m, genericConfig.RESTOptionsGetter)
