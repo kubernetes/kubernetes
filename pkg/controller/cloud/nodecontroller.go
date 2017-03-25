@@ -62,7 +62,7 @@ func NewCloudNodeController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
-	nodeMonitorPeriod time.Duration) (*CloudNodeController, error) {
+	nodeMonitorPeriod time.Duration) *CloudNodeController {
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "cloudcontrollermanager"})
@@ -81,7 +81,7 @@ func NewCloudNodeController(
 		cloud:             cloud,
 		nodeMonitorPeriod: nodeMonitorPeriod,
 	}
-	return cnc, nil
+	return cnc
 }
 
 // This controller deletes a node if kubelet is not reporting
