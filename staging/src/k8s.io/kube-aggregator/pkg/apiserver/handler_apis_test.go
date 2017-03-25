@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/pkg/api"
 	corev1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -49,6 +48,7 @@ func TestAPIsDelegation(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	delegate := &delegationHTTPHandler{}
 	handler := &apisHandler{
+		codecs:   Codecs,
 		lister:   listers.NewAPIServiceLister(indexer),
 		delegate: delegate,
 	}
@@ -271,6 +271,7 @@ func TestAPIs(t *testing.T) {
 		endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		delegate := &delegationHTTPHandler{}
 		handler := &apisHandler{
+			codecs:          Codecs,
 			serviceLister:   v1listers.NewServiceLister(serviceIndexer),
 			endpointsLister: v1listers.NewEndpointsLister(endpointsIndexer),
 			lister:          listers.NewAPIServiceLister(indexer),
@@ -303,7 +304,7 @@ func TestAPIs(t *testing.T) {
 		}
 
 		actual := &metav1.APIGroupList{}
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), bytes, actual); err != nil {
+		if err := runtime.DecodeInto(Codecs.UniversalDecoder(), bytes, actual); err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
 		}
@@ -317,6 +318,7 @@ func TestAPIs(t *testing.T) {
 func TestAPIGroupMissing(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	handler := &apiGroupHandler{
+		codecs:    Codecs,
 		lister:    listers.NewAPIServiceLister(indexer),
 		groupName: "foo",
 	}
@@ -428,6 +430,7 @@ func TestAPIGroup(t *testing.T) {
 		serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		handler := &apiGroupHandler{
+			codecs:          Codecs,
 			lister:          listers.NewAPIServiceLister(indexer),
 			serviceLister:   v1listers.NewServiceLister(serviceIndexer),
 			endpointsLister: v1listers.NewEndpointsLister(endpointsIndexer),
@@ -465,7 +468,7 @@ func TestAPIGroup(t *testing.T) {
 		}
 
 		actual := &metav1.APIGroup{}
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), bytes, actual); err != nil {
+		if err := runtime.DecodeInto(Codecs.UniversalDecoder(), bytes, actual); err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
 		}
