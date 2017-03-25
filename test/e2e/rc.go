@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -274,7 +275,10 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 
 	By("Then the orphan pod is adopted")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{ResourceVersion: ""})
+		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
 		Expect(err).NotTo(HaveOccurred())
 		for _, owner := range p2.OwnerReferences {
 			if *owner.Controller && owner.UID == rc.UID {
