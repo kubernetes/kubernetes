@@ -21,100 +21,130 @@ limitations under the License.
 package apiregistration
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *APIService) DeepCopyInto(out *APIService) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiregistration_APIService, InType: reflect.TypeOf(&APIService{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiregistration_APIServiceList, InType: reflect.TypeOf(&APIServiceList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiregistration_APIServiceSpec, InType: reflect.TypeOf(&APIServiceSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiregistration_APIServiceStatus, InType: reflect.TypeOf(&APIServiceStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apiregistration_ServiceReference, InType: reflect.TypeOf(&ServiceReference{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new APIService.
+func (x *APIService) DeepCopy() *APIService {
+	if x == nil {
+		return nil
+	}
+	out := new(APIService)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_apiregistration_APIService(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIService)
-		out := out.(*APIService)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if newVal, err := c.DeepCopy(&in.Spec); err != nil {
-			return err
-		} else {
-			out.Spec = *newVal.(*APIServiceSpec)
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *APIService) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_apiregistration_APIServiceList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIServiceList)
-		out := out.(*APIServiceList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]APIService, len(*in))
-			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
-					(*out)[i] = *newVal.(*APIService)
-				}
-			}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *APIServiceList) DeepCopyInto(out *APIServiceList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]APIService, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new APIServiceList.
+func (x *APIServiceList) DeepCopy() *APIServiceList {
+	if x == nil {
+		return nil
+	}
+	out := new(APIServiceList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *APIServiceList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_apiregistration_APIServiceSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIServiceSpec)
-		out := out.(*APIServiceSpec)
-		*out = *in
-		if in.Service != nil {
-			in, out := &in.Service, &out.Service
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *APIServiceSpec) DeepCopyInto(out *APIServiceSpec) {
+	*out = *in
+	if in.Service != nil {
+		in, out := &in.Service, &out.Service
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(ServiceReference)
 			**out = **in
 		}
-		if in.CABundle != nil {
-			in, out := &in.CABundle, &out.CABundle
-			*out = make([]byte, len(*in))
-			copy(*out, *in)
-		}
-		return nil
 	}
+	if in.CABundle != nil {
+		in, out := &in.CABundle, &out.CABundle
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	}
+	return
 }
 
-func DeepCopy_apiregistration_APIServiceStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIServiceStatus)
-		out := out.(*APIServiceStatus)
-		*out = *in
+// DeepCopy will perform a deep copy of the receiver, creating a new APIServiceSpec.
+func (x *APIServiceSpec) DeepCopy() *APIServiceSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(APIServiceSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_apiregistration_ServiceReference(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ServiceReference)
-		out := out.(*ServiceReference)
-		*out = *in
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *APIServiceStatus) DeepCopyInto(out *APIServiceStatus) {
+	*out = *in
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new APIServiceStatus.
+func (x *APIServiceStatus) DeepCopy() *APIServiceStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(APIServiceStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ServiceReference) DeepCopyInto(out *ServiceReference) {
+	*out = *in
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ServiceReference.
+func (x *ServiceReference) DeepCopy() *ServiceReference {
+	if x == nil {
+		return nil
+	}
+	out := new(ServiceReference)
+	x.DeepCopyInto(out)
+	return out
 }

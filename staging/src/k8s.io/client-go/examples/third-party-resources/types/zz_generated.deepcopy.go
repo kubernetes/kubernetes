@@ -20,10 +20,6 @@ limitations under the License.
 
 package types
 
-import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
-)
-
 // DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
 func (in *Example) DeepCopyInto(out *Example) {
 	*out = *in
@@ -41,15 +37,6 @@ func (x *Example) DeepCopy() *Example {
 	out := new(Example)
 	x.DeepCopyInto(out)
 	return out
-}
-
-// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
-func (x *Example) DeepCopyObject() runtime.Object {
-	if c := x.DeepCopy(); c != nil {
-		return c
-	} else {
-		return nil
-	}
 }
 
 // DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
@@ -75,15 +62,6 @@ func (x *ExampleList) DeepCopy() *ExampleList {
 	out := new(ExampleList)
 	x.DeepCopyInto(out)
 	return out
-}
-
-// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
-func (x *ExampleList) DeepCopyObject() runtime.Object {
-	if c := x.DeepCopy(); c != nil {
-		return c
-	} else {
-		return nil
-	}
 }
 
 // DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.

@@ -21,38 +21,48 @@ limitations under the License.
 package v1beta1
 
 import (
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Policy) DeepCopyInto(out *Policy) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.Spec = in.Spec
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Policy, InType: reflect.TypeOf(&Policy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PolicySpec, InType: reflect.TypeOf(&PolicySpec{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new Policy.
+func (x *Policy) DeepCopy() *Policy {
+	if x == nil {
+		return nil
+	}
+	out := new(Policy)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1beta1_Policy(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Policy)
-		out := out.(*Policy)
-		*out = *in
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Policy) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1beta1_PolicySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PolicySpec)
-		out := out.(*PolicySpec)
-		*out = *in
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PolicySpec) DeepCopyInto(out *PolicySpec) {
+	*out = *in
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PolicySpec.
+func (x *PolicySpec) DeepCopy() *PolicySpec {
+	if x == nil {
 		return nil
 	}
+	out := new(PolicySpec)
+	x.DeepCopyInto(out)
+	return out
 }
