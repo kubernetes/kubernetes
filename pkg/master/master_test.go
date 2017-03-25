@@ -60,7 +60,7 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
 
 	config := &Config{
@@ -101,16 +101,11 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 		TLSClientConfig: &tls.Config{},
 	})
 
-	master, err := config.Complete().New()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return master, server, *config, assert.New(t)
+	return server, *config, assert.New(t)
 }
 
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	_, etcdserver, config, assert := setUp(t)
+	etcdserver, config, assert := setUp(t)
 
 	master, err := config.Complete().New()
 	if err != nil {
@@ -136,7 +131,7 @@ func limitedAPIResourceConfigSource() *serverstorage.ResourceConfig {
 
 // newLimitedMaster only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	_, etcdserver, config, assert := setUp(t)
+	etcdserver, config, assert := setUp(t)
 	config.APIResourceConfigSource = limitedAPIResourceConfigSource()
 	master, err := config.Complete().New()
 	if err != nil {
