@@ -104,6 +104,10 @@ elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("--nodes=25")
 fi
 
+if [[ "${GINKGO_UNTIL_IT_FAILS:-}" == true ]]; then
+ginkgo_args+=("--untilItFails=true")
+fi
+
 FLAKE_ATTEMPTS=1
 if [[ "${GINKGO_TOLERATE_FLAKES}" == "y" ]]; then
   FLAKE_ATTEMPTS=2
