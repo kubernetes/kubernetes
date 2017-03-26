@@ -158,11 +158,20 @@ readonly KUBE_TEST_PORTABLE=(
 # need to target server platforms.
 # These binaries will be distributed in the kubernetes-test tarball.
 # If you update this list, please also update build/release-tars/BUILD.
-readonly KUBE_TEST_SERVER_TARGETS=(
-  cmd/kubemark
-  vendor/github.com/onsi/ginkgo/ginkgo
-  test/e2e_node/e2e_node.test
-)
+kube::golang::server_test_targets() {
+  local targets=(
+    cmd/kubemark
+    vendor/github.com/onsi/ginkgo/ginkgo
+  )
+
+  if [[ "${OSTYPE:-}" == "linux"* ]]; then
+    targets+=( test/e2e_node/e2e_node.test )
+  fi
+
+  echo "${targets[@]}"
+}
+
+readonly KUBE_TEST_SERVER_TARGETS=($(kube::golang::server_test_targets))
 readonly KUBE_TEST_SERVER_BINARIES=("${KUBE_TEST_SERVER_TARGETS[@]##*/}")
 readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
 
@@ -487,7 +496,6 @@ kube::golang::build_binaries_for_platform() {
   V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-} GO=${GO}"
 
   for binary in "${binaries[@]}"; do
-
     if [[ "${binary}" =~ ".test"$ ]]; then
       tests+=($binary)
     elif kube::golang::is_statically_linked_library "${binary}"; then
