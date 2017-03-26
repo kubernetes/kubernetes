@@ -190,6 +190,20 @@ function mount-master-pd {
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
+# replace_prefixed_line ensures:
+# 1. the specified file exists
+# 2. existing lines with the specified ${prefix} are removed
+# 3. a new line with the specified ${prefix}${suffix} is appended
+function replace_prefixed_line {
+  local -r file="${1:-}"
+  local -r prefix="${2:-}"
+  local -r suffix="${3:-}"
+
+  touch "${file}"
+  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
+  echo "${prefix}${suffix}" >> "${file}"
+}
+
 function create-node-pki {
   echo "Creating node pki files"
 
@@ -261,10 +275,14 @@ function create-master-auth {
     echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${basic_auth_csv}"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
-  if [[ ! -e "${known_tokens_csv}" ]]; then
-    echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
-    echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${known_tokens_csv}"
-    echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${known_tokens_csv}"
+  if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN}," "admin,admin"
+  fi
+  if [[ -n "${KUBELET_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"     "kubelet,kubelet"
+  fi
+  if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"  "kube_proxy,kube_proxy"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
