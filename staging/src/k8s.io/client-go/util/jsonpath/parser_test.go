@@ -61,6 +61,12 @@ var parserTests = []parserTest{
 		newList(), newIdentifier("end"),
 	}, false},
 	{"malformat input", `{\\\}`, []Node{}, true},
+	{"paired parentheses in quotes", `{[?(@.price == "Debian GNU/Linux 7 (wheezy)")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("price"), newList(), newText("Debian GNU/Linux 7 (wheezy)")}, false},
+	{"paired parentheses in quotes and with quotes escape", `{[?(@.price == "Debian GNU/Linux 7 \"test\" (wheezy)")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("price"), newList(), newText("Debian GNU/Linux 7 \"test\" (wheezy)")}, false},
+	{"unregular parentheses in quotes", `{[?(@.price == "())(")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("price"), newList(), newText("())(")}, false},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {

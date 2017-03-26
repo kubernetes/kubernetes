@@ -334,13 +334,23 @@ Loop:
 func (p *Parser) parseFilter(cur *ListNode) error {
 	p.pos += len("[?(")
 	p.consumeText()
+	quotes := 0
 Loop:
 	for {
 		switch p.next() {
 		case eof, '\n':
 			return fmt.Errorf("unterminated filter")
+		case '"':
+			//if it's not esapce qutoes like  \"
+			if p.input[p.pos-2] != '\\' {
+				quotes = quotes + 1
+			}
 		case ')':
-			break Loop
+			//in rightParser below qutoes only apper zero or once
+			//and must be paired at the beginning and end
+			if quotes == 0 || quotes == 2 {
+				break Loop
+			}
 		}
 	}
 	if p.next() != ']' {
@@ -378,7 +388,10 @@ Loop:
 		case eof, '\n':
 			return fmt.Errorf("unterminated quoted string")
 		case '"':
-			break Loop
+			//if it's not escapce break the Loop
+			if p.input[p.pos-2] != '\\' {
+				break Loop
+			}
 		}
 	}
 	value := p.consumeText()
