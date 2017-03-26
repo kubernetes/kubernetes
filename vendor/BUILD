@@ -15160,13 +15160,11 @@ go_test(
         "k8s.io/client-go/util/workqueue/default_rate_limiters_test.go",
         "k8s.io/client-go/util/workqueue/delaying_queue_test.go",
         "k8s.io/client-go/util/workqueue/rate_limitting_queue_test.go",
-        "k8s.io/client-go/util/workqueue/timed_queue_test.go",
     ],
     library = ":k8s.io/client-go/util/workqueue",
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/util/clock",
     ],
 )
@@ -15181,7 +15179,6 @@ go_library(
         "k8s.io/client-go/util/workqueue/parallelizer.go",
         "k8s.io/client-go/util/workqueue/queue.go",
         "k8s.io/client-go/util/workqueue/rate_limitting_queue.go",
-        "k8s.io/client-go/util/workqueue/timed_queue.go",
     ],
     tags = ["automanaged"],
     deps = [
