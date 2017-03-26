@@ -163,35 +163,19 @@ func TestGroupJobsByParent(t *testing.T) {
 
 	{
 		// Case 1: There are no jobs and scheduledJobs
-		sjs := []batchv2alpha1.CronJob{}
 		js := []batchv1.Job{}
-		jobsBySj := groupJobsByParent(sjs, js)
+		jobsBySj := groupJobsByParent(js)
 		if len(jobsBySj) != 0 {
 			t.Errorf("Wrong number of items in map")
 		}
 	}
 
 	{
-		// Case 2: there is one controller with no job.
-		sjs := []batchv2alpha1.CronJob{
-			{ObjectMeta: metav1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
-		}
-		js := []batchv1.Job{}
-		jobsBySj := groupJobsByParent(sjs, js)
-		if len(jobsBySj) != 0 {
-			t.Errorf("Wrong number of items in map")
-		}
-	}
-
-	{
-		// Case 3: there is one controller with one job it created.
-		sjs := []batchv2alpha1.CronJob{
-			{ObjectMeta: metav1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
-		}
+		// Case 2: there is one controller with one job it created.
 		js := []batchv1.Job{
 			{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "x", Annotations: createdBy1}},
 		}
-		jobsBySj := groupJobsByParent(sjs, js)
+		jobsBySj := groupJobsByParent(js)
 
 		if len(jobsBySj) != 1 {
 			t.Errorf("Wrong number of items in map")
@@ -206,7 +190,7 @@ func TestGroupJobsByParent(t *testing.T) {
 	}
 
 	{
-		// Case 4: Two namespaces, one has two jobs from one controller, other has 3 jobs from two controllers.
+		// Case 3: Two namespaces, one has two jobs from one controller, other has 3 jobs from two controllers.
 		// There are also two jobs with no created-by annotation.
 		js := []batchv1.Job{
 			{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "x", Annotations: createdBy1}},
@@ -217,13 +201,8 @@ func TestGroupJobsByParent(t *testing.T) {
 			{ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "y", Annotations: createdBy3}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "d", Namespace: "y", Annotations: noCreatedBy}},
 		}
-		sjs := []batchv2alpha1.CronJob{
-			{ObjectMeta: metav1.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "f", Namespace: "x", UID: uid2}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "g", Namespace: "y", UID: uid3}},
-		}
 
-		jobsBySj := groupJobsByParent(sjs, js)
+		jobsBySj := groupJobsByParent(js)
 
 		if len(jobsBySj) != 3 {
 			t.Errorf("Wrong number of items in map")
