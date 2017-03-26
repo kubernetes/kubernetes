@@ -59,7 +59,6 @@ go_library(
         "limit_range.go",
         "load.go",
         "logging_soak.go",
-        "mesos.go",
         "monitoring.go",
         "namespace.go",
         "network_partition.go",
