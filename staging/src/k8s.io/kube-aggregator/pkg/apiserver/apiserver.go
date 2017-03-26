@@ -183,7 +183,7 @@ func (c completedConfig) New(stopCh <-chan struct{}) (*APIAggregator, error) {
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), s)
 
-	s.GenericAPIServer.AddPostStartHook("start-informers", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHook("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
 		informerFactory.Start(stopCh)
 		kubeInformers.Start(stopCh)
 		return nil
