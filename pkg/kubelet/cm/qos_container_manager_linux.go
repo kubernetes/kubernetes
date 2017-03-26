@@ -139,7 +139,12 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 }
 
 func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
-	pods := m.activePods()
+	var pods []*v1.Pod
+	if m.activePods != nil {
+		pods = m.activePods()
+	} else {
+		glog.Warning("ActivePodsFunc is nil")
+	}
 	burstablePodCPURequest := int64(0)
 	for i := range pods {
 		pod := pods[i]
