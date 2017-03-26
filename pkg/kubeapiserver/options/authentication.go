@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"io/ioutil"
 	"strings"
 	"time"
 
@@ -261,7 +262,7 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.AuthenticatorConfig {
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (authenticator.AuthenticatorConfig, error) {
 	ret := authenticator.AuthenticatorConfig{}
 
 	if s.Anonymous != nil {
@@ -277,7 +278,16 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 	}
 
 	if s.ClientCert != nil {
-		ret.ClientCAFile = s.ClientCert.ClientCA
+		if len(s.ClientCert.ClientCAFile) > 0 {
+			var err error
+			ret.ClientCAData, err = ioutil.ReadFile(s.ClientCert.ClientCAFile)
+			if err != nil {
+				return authenticator.AuthenticatorConfig{}, nil
+			}
+
+		} else {
+			ret.ClientCAData = s.ClientCert.ClientCAData
+		}
 	}
 
 	if s.Keystone != nil {
@@ -315,7 +325,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.WebhookTokenAuthnCacheTTL = s.WebHook.CacheTTL
 	}
 
-	return ret
+	return ret, nil
 }
 
 func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
@@ -325,13 +335,17 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error
 
 	var err error
 	if o.ClientCert != nil {
-		c, err = c.ApplyClientCert(o.ClientCert.ClientCA)
+		if len(o.ClientCert.ClientCAFile) > 0 {
+			c, err = c.ApplyClientCertFile(o.ClientCert.ClientCAFile)
+		} else {
+			c, err = c.ApplyClientCert(o.ClientCert.ClientCAData)
+		}
 		if err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
 	if o.RequestHeader != nil {
-		c, err = c.ApplyClientCert(o.RequestHeader.ClientCAFile)
+		c, err = c.ApplyClientCertFile(o.RequestHeader.ClientCAFile)
 		if err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}

@@ -62,7 +62,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.Config) error {
 	if err := o.SecureServing.ApplyTo(config); err != nil {
 		return err
 	}
-	if err := o.Authentication.ApplyTo(config); err != nil {
+	if err := o.Authentication.ApplyTo(config, o.SecureServing.ServerCert.CertDirectory); err != nil {
 		return err
 	}
 	if err := o.Authorization.ApplyTo(config); err != nil {

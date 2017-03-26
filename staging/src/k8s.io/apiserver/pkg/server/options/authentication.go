@@ -79,12 +79,14 @@ func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig
 }
 
 type ClientCertAuthenticationOptions struct {
-	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
-	ClientCA string
+	// ClientCAFile is the certificate bundle for all the signers that you'll recognize for incoming client certificates
+	ClientCAFile string
+	// ClientCAData binary equivalent of ClientCAFile. ClientCAFile overrides ClientCAData.
+	ClientCAData []byte
 }
 
 func (s *ClientCertAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&s.ClientCA, "client-ca-file", s.ClientCA, ""+
+	fs.StringVar(&s.ClientCAFile, "client-ca-file", s.ClientCAFile, ""+
 		"If set, any request presenting a client certificate signed by one of "+
 		"the authorities in the client-ca-file is authenticated with an identity "+
 		"corresponding to the CommonName of the client certificate.")
@@ -142,12 +144,17 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 }
 
-func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.Config) error {
+func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.Config, certDir string) error {
 	clientCA, err := s.getClientCA()
 	if err != nil {
 		return err
 	}
-	c, err = c.ApplyClientCert(clientCA.ClientCA)
+
+	if len(clientCA.ClientCAFile) > 0 {
+		c, err = c.ApplyClientCertFile(clientCA.ClientCAFile)
+	} else {
+		c, err = c.ApplyClientCert(clientCA.ClientCAData)
+	}
 	if err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
@@ -156,7 +163,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.Config) error {
 	if err != nil {
 		return err
 	}
-	c, err = c.ApplyClientCert(requestHeader.ClientCAFile)
+	c, err = c.ApplyClientCertFile(requestHeader.ClientCAFile)
 	if err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
@@ -198,7 +205,7 @@ func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig() (authenticato
 		Anonymous:               true,
 		TokenAccessReviewClient: tokenClient,
 		CacheTTL:                s.CacheTTL,
-		ClientCAFile:            clientCA.ClientCA,
+		ClientCAFile:            clientCA.ClientCAFile,
 		RequestHeaderConfig:     requestHeader.ToAuthenticationRequestHeaderConfig(),
 	}
 	return ret, nil
@@ -211,7 +218,7 @@ const (
 )
 
 func (s *DelegatingAuthenticationOptions) getClientCA() (*ClientCertAuthenticationOptions, error) {
-	if len(s.ClientCert.ClientCA) > 0 || s.SkipInClusterLookup {
+	if len(s.ClientCert.ClientCAFile) > 0 || s.SkipInClusterLookup {
 		return &s.ClientCert, nil
 	}
 
@@ -266,14 +273,7 @@ func (s *DelegatingAuthenticationOptions) lookupInClusterClientCA() (*ClientCert
 		return nil, nil
 	}
 
-	f, err := ioutil.TempFile("", "client-ca-file")
-	if err != nil {
-		return nil, err
-	}
-	if err := ioutil.WriteFile(f.Name(), []byte(clientCA), 0600); err != nil {
-		return nil, err
-	}
-	return &ClientCertAuthenticationOptions{ClientCA: f.Name()}, nil
+	return &ClientCertAuthenticationOptions{ClientCAData: []byte(clientCA)}, nil
 }
 
 func (s *DelegatingAuthenticationOptions) lookupInClusterRequestHeader() (*RequestHeaderAuthenticationOptions, error) {
