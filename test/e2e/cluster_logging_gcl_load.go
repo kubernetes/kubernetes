@@ -17,7 +17,7 @@ limitations under the License.
 package e2e
 
 import (
-	"strconv"
+	"fmt"
 	"time"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +40,8 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		gclLogsProvider, err := newGclLogsProvider(f)
 		framework.ExpectNoError(err, "Failed to create GCL logs provider")
 
-		nodeCount := len(framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items
+		nodeCount := len(nodes)
 		podCount := 30 * nodeCount
 		loggingDuration := 10 * time.Minute
 		linesPerSecond := 1000 * nodeCount
@@ -50,8 +51,9 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		By("Running logs generator pods")
 		pods := []*loggingPod{}
 		for podIdx := 0; podIdx < podCount; podIdx++ {
-			podName := f.Namespace.Name + "-logs-generator-" + strconv.Itoa(linesPerPod) + "-" + strconv.Itoa(podIdx)
-			pods = append(pods, createLoggingPod(f, podName, linesPerPod, loggingDuration))
+			node := nodes[podIdx%len(nodes)]
+			podName := fmt.Sprintf("logs-generator-%d-%d", linesPerPod, podIdx)
+			pods = append(pods, createLoggingPod(f, podName, node.Name, linesPerPod, loggingDuration))
 
 			defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
 		}
@@ -79,8 +81,8 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		gclLogsProvider, err := newGclLogsProvider(f)
 		framework.ExpectNoError(err, "Failed to create GCL logs provider")
 
-		nodeCount := len(framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items)
-		maxPodCount := 10 * nodeCount
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items
+		maxPodCount := 10
 		jobDuration := 1 * time.Minute
 		linesPerPodPerSecond := 100
 		testDuration := 10 * time.Minute
@@ -92,13 +94,13 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 
 		By("Running short-living pods")
 		pods := []*loggingPod{}
-		for i := 0; i < podRunCount; i++ {
-			podName := f.Namespace.Name + "-job-logs-generator-" +
-				strconv.Itoa(maxPodCount) + "-" + strconv.Itoa(linesPerPod) + "-" + strconv.Itoa(i)
-			pods = append(pods, createLoggingPod(f, podName, linesPerPod, jobDuration))
+		for runIdx := 0; runIdx < podRunCount; runIdx++ {
+			for _, node := range nodes {
+				podName := fmt.Sprintf("job-logs-generator-%d-%d-%d", maxPodCount, linesPerPod, runIdx)
+				pods = append(pods, createLoggingPod(f, podName, node.Name, linesPerPod, jobDuration))
 
-			defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
-
+				defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
+			}
 			time.Sleep(podRunDelay)
 		}
 
