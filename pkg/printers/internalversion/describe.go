@@ -1148,7 +1148,7 @@ func DescribeProbe(probe *api.Probe) string {
 		url.Path = probe.HTTPGet.Path
 		return fmt.Sprintf("http-get %s %s", url.String(), attrs)
 	case probe.TCPSocket != nil:
-		return fmt.Sprintf("tcp-socket :%s %s", probe.TCPSocket.Port.String(), attrs)
+		return fmt.Sprintf("tcp-socket %s:%s %s", probe.TCPSocket.Host, probe.TCPSocket.Port.String(), attrs)
 	}
 	return fmt.Sprintf("unknown %s", attrs)
 }
