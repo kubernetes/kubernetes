@@ -682,8 +682,12 @@ type GroupVersionForDiscovery struct {
 
 // APIResource specifies the name of a resource and whether it is namespaced.
 type APIResource struct {
-	// name is the name of the resource.
+	// name is the plural name of the resource.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
+	// The singularName is more correct for reporting status on a single item and both singular and plural are allowed
+	// from the kubectl CLI interface.
+	SingularName string `json:"singularName" protobuf:"bytes,6,opt,name=singularName"`
 	// namespaced indicates if a resource is namespaced or not.
 	Namespaced bool `json:"namespaced" protobuf:"varint,2,opt,name=namespaced"`
 	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
