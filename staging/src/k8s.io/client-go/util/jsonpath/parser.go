@@ -332,6 +332,7 @@ Loop:
 
 // parseFilter scans filter inside array selection
 func (p *Parser) parseFilter(cur *ListNode) error {
+	closure := 0
 	p.pos += len("[?(")
 	p.consumeText()
 Loop:
@@ -339,8 +340,14 @@ Loop:
 		switch p.next() {
 		case eof, '\n':
 			return fmt.Errorf("unterminated filter")
+		case '(':
+			closure = closure + 1
 		case ')':
-			break Loop
+			if closure == 0 {
+				break Loop
+			} else {
+				closure = closure - 1
+			}
 		}
 	}
 	if p.next() != ']' {
