@@ -259,23 +259,12 @@ func BuildMasterConfig(s *options.ServerRunOptions) (*master.Config, informers.S
 	// keep Deployments in extensions for backwards compatibility, we'll have to migrate at some point, eventually
 	storageFactory.AddCohabitatingResources(extensions.Resource("deployments"), apps.Resource("deployments"))
 	for _, override := range s.Etcd.EtcdServersOverrides {
-		tokens := strings.Split(override, "#")
-		if len(tokens) != 2 {
-			glog.Errorf("invalid value of etcd server overrides: %s", override)
+		groupResource, servers, err := parseEtcdOverride(override)
+		if err != nil {
+			glog.Errorf("fail to parse EtcdOverride (%s): %v", override, err)
 			continue
 		}
-
-		apiresource := strings.Split(tokens[0], "/")
-		if len(apiresource) != 2 {
-			glog.Errorf("invalid resource definition: %s", tokens[0])
-			continue
-		}
-		group := apiresource[0]
-		resource := apiresource[1]
-		groupResource := schema.GroupResource{Group: group, Resource: resource}
-
-		servers := strings.Split(tokens[1], ";")
-		storageFactory.SetEtcdLocation(groupResource, servers)
+		storageFactory.SetEtcdLocation(*groupResource, servers)
 	}
 
 	// Default to the private server key for service account token signing
@@ -738,4 +727,23 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		}
 	}
 	return s, nil
+}
+
+func parseEtcdOverride(override string) (*schema.GroupResource, []string, error) {
+	tokens := strings.Split(override, "#")
+	if len(tokens) != 2 {
+		return nil, nil, fmt.Errorf("invalid value of etcd server overrides: %s", override)
+	}
+
+	apiresource := strings.Split(tokens[0], "/")
+	if len(apiresource) != 2 {
+		return nil, nil, fmt.Errorf("invalid resource definition: %s", tokens[0])
+	}
+
+	group := apiresource[0]
+	resource := apiresource[1]
+	groupResource := &schema.GroupResource{Group: group, Resource: resource}
+	servers := strings.Split(tokens[1], ";")
+
+	return groupResource, servers, nil
 }
