@@ -2958,7 +2958,7 @@ runTests() {
   output_message=$(kubectl get --raw=/api/v1)
 
   ## test if a short name is exported during discovery
-  kube::test::if_has_string "${output_message}" '{"name":"configmaps","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
+  kube::test::if_has_string "${output_message}" '{"name":"configmaps","singularName":"","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
 
   ###########################
   # POD creation / deletion #
