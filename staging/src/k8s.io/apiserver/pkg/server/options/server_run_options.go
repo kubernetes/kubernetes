@@ -46,7 +46,7 @@ type ServerRunOptions struct {
 	TargetRAMMB                 int
 	WatchCacheSizes             []string
 
-	admissionPlugins *admission.Plugins
+	AdmissionPlugins *admission.Plugins
 }
 
 func NewServerRunOptions(admissionPlugins *admission.Plugins) *ServerRunOptions {
@@ -57,7 +57,7 @@ func NewServerRunOptions(admissionPlugins *admission.Plugins) *ServerRunOptions 
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
-		admissionPlugins:            admissionPlugins,
+		AdmissionPlugins:            admissionPlugins,
 	}
 }
 
@@ -108,7 +108,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.AdmissionControl, "admission-control", s.AdmissionControl, ""+
 		"Ordered list of plug-ins to do admission control of resources into cluster. "+
-		"Comma-delimited list of: "+strings.Join(s.admissionPlugins.Registered(), ", ")+".")
+		"Comma-delimited list of: "+strings.Join(s.AdmissionPlugins.Registered(), ", ")+".")
 
 	fs.StringVar(&s.AdmissionControlConfigFile, "admission-control-config-file", s.AdmissionControlConfigFile,
 		"File with admission control configuration.")

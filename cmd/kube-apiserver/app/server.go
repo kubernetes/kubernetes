@@ -321,7 +321,12 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 		return nil, nil, fmt.Errorf("invalid authorization config: %v", err)
 	}
 
-	genericConfig.AdmissionControl, err = BuildAdmission(s, client, sharedInformers, genericConfig.Authorizer)
+	genericConfig.AdmissionControl, err = BuildAdmission(s,
+		s.GenericServerRunOptions.AdmissionPlugins,
+		client,
+		sharedInformers,
+		genericConfig.Authorizer,
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
 	}
@@ -330,7 +335,7 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 }
 
 // BuildAdmission constructs the admission chain
-func BuildAdmission(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, apiAuthorizer authorizer.Authorizer) (admission.Interface, error) {
+func BuildAdmission(s *options.ServerRunOptions, plugins *admission.Plugins, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, apiAuthorizer authorizer.Authorizer) (admission.Interface, error) {
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
 	var cloudConfig []byte
 	var err error
@@ -346,7 +351,7 @@ func BuildAdmission(s *options.ServerRunOptions, client internalclientset.Interf
 	if err != nil {
 		return nil, fmt.Errorf("failed to read plugin config: %v", err)
 	}
-	return kubeapiserveradmission.Plugins.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
+	return plugins.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
 }
 
 // BuildAuthenticator constructs the authenticator
