@@ -28,7 +28,6 @@ grains:
   cbr-cidr: $MASTER_IP_RANGE
   cloud: vsphere
   master_extra_sans: $MASTER_EXTRA_SANS
-  kube_user: $KUBE_USER
 EOF
 
 # Auto accept all keys from minions that try to join
