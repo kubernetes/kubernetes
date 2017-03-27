@@ -95,8 +95,8 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		By("Running short-living pods")
 		pods := []*loggingPod{}
 		for runIdx := 0; runIdx < podRunCount; runIdx++ {
-			for _, node := range nodes {
-				podName := fmt.Sprintf("job-logs-generator-%d-%d-%d", maxPodCount, linesPerPod, runIdx)
+			for nodeIdx, node := range nodes {
+				podName := fmt.Sprintf("job-logs-generator-%d-%d-%d-%d", maxPodCount, linesPerPod, runIdx, nodeIdx)
 				pods = append(pods, createLoggingPod(f, podName, node.Name, linesPerPod, jobDuration))
 
 				defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
