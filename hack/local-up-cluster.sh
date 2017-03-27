@@ -72,6 +72,9 @@ ENABLE_RBAC=${ENABLE_RBAC:-false}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
 
+# Install a default storage class (enabled by default)
+DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
+
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
@@ -709,6 +712,21 @@ function create_psp_policy {
     ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/bindings.yaml
 }
 
+function create_storage_class {
+    if [ -z "$CLOUD_PROVIDER" ]; then
+        # No cloud provider -> no default storage class
+        return
+    fi
+
+    CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/${CLOUD_PROVIDER}/default.yaml
+    if [ -e $CLASS_FILE ]; then
+        echo "Create default storage class for $CLOUD_PROVIDER"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f $CLASS_FILE
+    else
+        echo "No storage class available for $CLOUD_PROVIDER."
+    fi
+}
+
 function print_success {
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   cat <<EOF
@@ -816,6 +834,10 @@ fi
 
 if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
   create_psp_policy
+fi
+
+if [[ "$DEFAULT_STORAGE_CLASS" = "true" ]]; then
+  create_storage_class
 fi
 
 print_success
