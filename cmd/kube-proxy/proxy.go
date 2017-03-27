@@ -46,6 +46,8 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
+	logs.PrintDeamonStartupFlags()
+
 	s, err := app.NewProxyServerDefault(config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)

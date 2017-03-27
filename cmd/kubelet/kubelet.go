@@ -45,6 +45,8 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
+	logs.PrintDeamonStartupFlags()
+
 	if err := app.Run(s, nil); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
