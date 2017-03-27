@@ -562,6 +562,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 	if err := checkPermissions(); err != nil {
 		glog.Error(err)
+		return err
 	}
 
 	utilruntime.ReallyCrash = s.ReallyCrashForTesting
