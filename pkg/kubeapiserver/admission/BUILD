@@ -21,7 +21,10 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["initializer.go"],
+    srcs = [
+        "initializer.go",
+        "registry.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
