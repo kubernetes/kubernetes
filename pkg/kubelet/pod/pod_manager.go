@@ -43,9 +43,9 @@ import (
 type Manager interface {
 	// GetPods returns the regular pods bound to the kubelet and their spec.
 	GetPods() []*v1.Pod
-	// GetPodByName returns the (non-mirror) pod that matches full name, as well as
-	// whether the pod was found.
-	GetPodByFullName(podFullName string) (*v1.Pod, bool)
+	// GetPodByFullName returns the (non-mirror) pod that matches full name, as well as
+    // whether the pod was found.
+    GetPodByFullName(podFullName string) (*v1.Pod, bool)
 	// GetPodByName provides the (non-mirror) pod that matches namespace and
 	// name, as well as whether the pod was found.
 	GetPodByName(namespace, name string) (*v1.Pod, bool)
@@ -60,9 +60,6 @@ type Manager interface {
 	GetMirrorPodByPod(*v1.Pod) (*v1.Pod, bool)
 	// GetPodsAndMirrorPods returns the both regular and mirror pods.
 	GetPodsAndMirrorPods() ([]*v1.Pod, []*v1.Pod)
-	// SetPods replaces the internal pods with the new pods.
-	// It is currently only used for testing.
-	SetPods(pods []*v1.Pod)
 	// AddPod adds the given pod to the manager.
 	AddPod(pod *v1.Pod)
 	// UpdatePod updates the given pod in the manager.
@@ -73,7 +70,7 @@ type Manager interface {
 	DeletePod(pod *v1.Pod)
 	// DeleteOrphanedMirrorPods deletes all mirror pods which do not have
 	// associated static pods. This method sends deletion requests to the API
-	// server, but does NOT modify the internal pod storage in basicManager.
+	// server, but does NOT modify the internal pod storage in BasicManager.
 	DeleteOrphanedMirrorPods()
 	// TranslatePodUID returns the actual UID of a pod. If the UID belongs to
 	// a mirror pod, returns the UID of its static pod. Otherwise, returns the
@@ -93,11 +90,11 @@ type Manager interface {
 	MirrorClient
 }
 
-// basicManager is a functional Manger.
+// BasicManager is a functional Manger.
 //
-// All fields in basicManager are read-only and are updated calling SetPods,
+// All fields in BasicManager are read-only and are updated calling SetPods,
 // AddPod, UpdatePod, or DeletePod.
-type basicManager struct {
+type BasicManager struct {
 	// Protects all internal maps.
 	lock sync.RWMutex
 
@@ -113,7 +110,7 @@ type basicManager struct {
 	// Mirror pod UID to pod UID map.
 	translationByUID map[types.UID]types.UID
 
-	// basicManager is keeping secretManager up-to-date.
+	// BasicManager is keeping secretManager up-to-date.
 	secretManager secret.Manager
 
 	// A mirror pod client to create/delete mirror pods.
@@ -121,8 +118,8 @@ type basicManager struct {
 }
 
 // NewBasicPodManager returns a functional Manager.
-func NewBasicPodManager(client MirrorClient, secretManager secret.Manager) Manager {
-	pm := &basicManager{}
+func NewBasicPodManager(client MirrorClient, secretManager secret.Manager) *BasicManager {
+	pm := &BasicManager{}
 	pm.secretManager = secretManager
 	pm.MirrorClient = client
 	pm.SetPods(nil)
@@ -130,7 +127,7 @@ func NewBasicPodManager(client MirrorClient, secretManager secret.Manager) Manag
 }
 
 // Set the internal pods based on the new pods.
-func (pm *basicManager) SetPods(newPods []*v1.Pod) {
+func (pm *BasicManager) SetPods(newPods []*v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 
@@ -143,11 +140,11 @@ func (pm *basicManager) SetPods(newPods []*v1.Pod) {
 	pm.updatePodsInternal(newPods...)
 }
 
-func (pm *basicManager) AddPod(pod *v1.Pod) {
+func (pm *BasicManager) AddPod(pod *v1.Pod) {
 	pm.UpdatePod(pod)
 }
 
-func (pm *basicManager) UpdatePod(pod *v1.Pod) {
+func (pm *BasicManager) UpdatePod(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.updatePodsInternal(pod)
@@ -156,7 +153,7 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 // updatePodsInternal replaces the given pods in the current state of the
 // manager, updating the various indices.  The caller is assumed to hold the
 // lock.
-func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
+func (pm *BasicManager) updatePodsInternal(pods ...*v1.Pod) {
 	for _, pod := range pods {
 		if pm.secretManager != nil {
 			// TODO: Consider detecting only status update and in such case do
@@ -180,7 +177,7 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 	}
 }
 
-func (pm *basicManager) DeletePod(pod *v1.Pod) {
+func (pm *BasicManager) DeletePod(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	if pm.secretManager != nil {
@@ -197,13 +194,13 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	}
 }
 
-func (pm *basicManager) GetPods() []*v1.Pod {
+func (pm *BasicManager) GetPods() []*v1.Pod {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	return podsMapToPods(pm.podByUID)
 }
 
-func (pm *basicManager) GetPodsAndMirrorPods() ([]*v1.Pod, []*v1.Pod) {
+func (pm *BasicManager) GetPodsAndMirrorPods() ([]*v1.Pod, []*v1.Pod) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	pods := podsMapToPods(pm.podByUID)
@@ -211,26 +208,26 @@ func (pm *basicManager) GetPodsAndMirrorPods() ([]*v1.Pod, []*v1.Pod) {
 	return pods, mirrorPods
 }
 
-func (pm *basicManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
+func (pm *BasicManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	pod, ok := pm.podByUID[uid]
 	return pod, ok
 }
 
-func (pm *basicManager) GetPodByName(namespace, name string) (*v1.Pod, bool) {
+func (pm *BasicManager) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	podFullName := kubecontainer.BuildPodFullName(name, namespace)
 	return pm.GetPodByFullName(podFullName)
 }
 
-func (pm *basicManager) GetPodByFullName(podFullName string) (*v1.Pod, bool) {
+func (pm *BasicManager) GetPodByFullName(podFullName string) (*v1.Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	pod, ok := pm.podByFullName[podFullName]
 	return pod, ok
 }
 
-func (pm *basicManager) TranslatePodUID(uid types.UID) types.UID {
+func (pm *BasicManager) TranslatePodUID(uid types.UID) types.UID {
 	if uid == "" {
 		return uid
 	}
@@ -243,7 +240,7 @@ func (pm *basicManager) TranslatePodUID(uid types.UID) types.UID {
 	return uid
 }
 
-func (pm *basicManager) GetUIDTranslations() (podToMirror, mirrorToPod map[types.UID]types.UID) {
+func (pm *BasicManager) GetUIDTranslations() (podToMirror, mirrorToPod map[types.UID]types.UID) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 
@@ -267,7 +264,7 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror, mirrorToPod map[types
 	return podToMirror, mirrorToPod
 }
 
-func (pm *basicManager) getOrphanedMirrorPodNames() []string {
+func (pm *BasicManager) getOrphanedMirrorPodNames() []string {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	var podFullNames []string
@@ -279,14 +276,14 @@ func (pm *basicManager) getOrphanedMirrorPodNames() []string {
 	return podFullNames
 }
 
-func (pm *basicManager) DeleteOrphanedMirrorPods() {
+func (pm *BasicManager) DeleteOrphanedMirrorPods() {
 	podFullNames := pm.getOrphanedMirrorPodNames()
 	for _, podFullName := range podFullNames {
 		pm.MirrorClient.DeleteMirrorPod(podFullName)
 	}
 }
 
-func (pm *basicManager) IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool {
+func (pm *BasicManager) IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool {
 	// Check name and namespace first.
 	if pod.Name != mirrorPod.Name || pod.Namespace != mirrorPod.Namespace {
 		return false
@@ -306,14 +303,14 @@ func podsMapToPods(UIDMap map[types.UID]*v1.Pod) []*v1.Pod {
 	return pods
 }
 
-func (pm *basicManager) GetMirrorPodByPod(pod *v1.Pod) (*v1.Pod, bool) {
+func (pm *BasicManager) GetMirrorPodByPod(pod *v1.Pod) (*v1.Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	mirrorPod, ok := pm.mirrorPodByFullName[kubecontainer.GetPodFullName(pod)]
 	return mirrorPod, ok
 }
 
-func (pm *basicManager) GetPodByMirrorPod(mirrorPod *v1.Pod) (*v1.Pod, bool) {
+func (pm *BasicManager) GetPodByMirrorPod(mirrorPod *v1.Pod) (*v1.Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	pod, ok := pm.podByFullName[kubecontainer.GetPodFullName(mirrorPod)]
