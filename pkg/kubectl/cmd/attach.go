@@ -146,7 +146,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 	}
 
 	mapper, typer := f.Object()
-	builder := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	builder := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(namespace).DefaultNamespace()
 
 	switch len(argsIn) {

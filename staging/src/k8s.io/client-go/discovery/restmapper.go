@@ -277,20 +277,6 @@ func (d *DeferredDiscoveryRESTMapper) RESTMappings(gk schema.GroupKind, versions
 	return
 }
 
-// AliasesForResource returns whether a resource has an alias or not.
-func (d *DeferredDiscoveryRESTMapper) AliasesForResource(resource string) (as []string, ok bool) {
-	del, err := d.getDelegate()
-	if err != nil {
-		return nil, false
-	}
-	as, ok = del.AliasesForResource(resource)
-	if len(as) == 0 && !d.cl.Fresh() {
-		d.Reset()
-		as, ok = d.AliasesForResource(resource)
-	}
-	return
-}
-
 // ResourceSingularizer converts a resource name from plural to
 // singular (e.g., from pods to pod).
 func (d *DeferredDiscoveryRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {

@@ -105,6 +105,20 @@ func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectType
 	return expander, typer, err
 }
 
+func (f *ring1Factory) CategoryExpander() resource.CategoryExpander {
+	var categoryExpander resource.CategoryExpander
+	categoryExpander = resource.LegacyCategoryExpander
+	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
+	if err == nil {
+		// wrap with discovery based filtering
+		categoryExpander, err = resource.NewDiscoveryFilteredExpander(categoryExpander, discoveryClient)
+		// you only have an error on missing discoveryClient, so this shouldn't fail.  Check anyway.
+		CheckErr(err)
+	}
+
+	return categoryExpander
+}
+
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	cfg, err := f.clientAccessFactory.ClientConfig()
 	if err != nil {

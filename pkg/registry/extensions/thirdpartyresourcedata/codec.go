@@ -171,10 +171,6 @@ func (t *thirdPartyResourceDataMapper) RESTMappings(gk schema.GroupKind, version
 	return mappings, nil
 }
 
-func (t *thirdPartyResourceDataMapper) AliasesForResource(resource string) ([]string, bool) {
-	return t.mapper.AliasesForResource(resource)
-}
-
 func (t *thirdPartyResourceDataMapper) ResourceSingularizer(resource string) (singular string, err error) {
 	return t.mapper.ResourceSingularizer(resource)
 }
