@@ -449,7 +449,7 @@ func (ctrl *PersistentVolumeController) upgradeVolumeFrom1_2(volume *v1.Persiste
 // setClaimProvisioner saves
 // claim.Annotations[annStorageProvisioner] = class.Provisioner
 func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.PersistentVolumeClaim, class *storage.StorageClass) (*v1.PersistentVolumeClaim, error) {
-	if val, ok := claim.Annotations[annDynamicallyProvisioned]; ok && val == class.Provisioner {
+	if val, ok := claim.Annotations[annStorageProvisioner]; ok && val == class.Provisioner {
 		// annotation is already set, nothing to do
 		return claim, nil
 	}
