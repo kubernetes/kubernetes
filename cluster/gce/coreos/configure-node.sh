@@ -240,6 +240,20 @@ function convert-bytes-gce-kube() {
   echo "${storage_space}" | sed -e 's/^\([0-9]\+\)\([A-Z]\)\?i\?B$/\1\2/g' -e 's/\([A-Z]\)$/\1i/'
 }
 
+# replace_prefixed_line ensures:
+# 1. the specified file exists
+# 2. existing lines with the specified ${prefix} are removed
+# 3. a new line with the specified ${prefix}${suffix} is appended
+function replace_prefixed_line {
+  local -r file="${1:-}"
+  local -r prefix="${2:-}"
+  local -r suffix="${3:-}"
+
+  touch "${file}"
+  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
+  echo "${prefix}${suffix}" >> "${file}"
+}
+
 # TODO(yifan): Use create-salt-master-auth() in configure-vm.sh
 function create-salt-master-auth() {
   if [[ ! -e /srv/kubernetes/ca.crt ]]; then
@@ -261,6 +275,7 @@ function create-salt-master-auth() {
     (umask 077;
       echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${BASIC_AUTH_FILE}")
   fi
+
   if [ ! -e "${KNOWN_TOKENS_FILE}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
@@ -278,6 +293,19 @@ function create-salt-master-auth() {
       token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
       echo "${token},${account},${account}" >> "${KNOWN_TOKENS_FILE}"
     done
+  else
+    # If $KNOWN_TOKENS_FILE already exists, ensure it contains the control plane tokens, and that they identify the expected users
+    (umask 077;
+      if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
+        replace_prefixed_line "${KNOWN_TOKENS_FILE}" "${KUBE_BEARER_TOKEN}," "admin,admin"
+      fi;
+      if [[ -n "${KUBELET_TOKEN:-}" ]]; then
+        replace_prefixed_line "${KNOWN_TOKENS_FILE}" "${KUBELET_TOKEN},"     "kubelet,kubelet"
+      fi;
+      if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
+        replace_prefixed_line "${KNOWN_TOKENS_FILE}" "${KUBE_PROXY_TOKEN},"  "kube_proxy,kube_proxy"
+      fi;
+    )
   fi
 }
 
