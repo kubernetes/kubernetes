@@ -189,6 +189,30 @@ func (s *GenericAPIServer) ListedPaths() []string {
 	return s.listedPathProvider.ListedPaths()
 }
 
+var EmptyDelegate = emptyDelegate{
+	requestContextMapper: apirequest.NewRequestContextMapper(),
+}
+
+type emptyDelegate struct {
+	requestContextMapper apirequest.RequestContextMapper
+}
+
+func (s emptyDelegate) UnprotectedHandler() http.Handler {
+	return http.NotFoundHandler()
+}
+func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
+	return map[string]postStartHookEntry{}
+}
+func (s emptyDelegate) HealthzChecks() []healthz.HealthzChecker {
+	return []healthz.HealthzChecker{}
+}
+func (s emptyDelegate) ListedPaths() []string {
+	return []string{}
+}
+func (s emptyDelegate) RequestContextMapper() apirequest.RequestContextMapper {
+	return s.requestContextMapper
+}
+
 func init() {
 	// Send correct mime type for .svg files.
 	// TODO: remove when https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33

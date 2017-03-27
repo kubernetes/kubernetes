@@ -159,7 +159,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	server, err := config.Complete().New(stopCh)
+	server, err := config.Complete().NewWithDelegate(genericapiserver.EmptyDelegate, stopCh)
 	if err != nil {
 		return err
 	}
