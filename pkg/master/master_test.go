@@ -64,7 +64,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
 
 	config := &Config{
-		GenericConfig:           genericapiserver.NewConfig().WithSerializer(api.Codecs),
+		GenericConfig:           genericapiserver.NewConfig(api.Codecs),
 		APIResourceConfigSource: DefaultAPIResourceConfigSource(),
 		APIServerServicePort:    443,
 		MasterCount:             1,

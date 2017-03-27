@@ -114,8 +114,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig().
-		WithSerializer(apiserver.Codecs)
+	serverConfig := genericapiserver.NewConfig(apiserver.Codecs)
 
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return err

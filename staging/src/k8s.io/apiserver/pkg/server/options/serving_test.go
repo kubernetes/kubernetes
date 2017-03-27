@@ -46,7 +46,7 @@ func setUp(t *testing.T) Config {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 
-	config := NewConfig().WithSerializer(codecs)
+	config := NewConfig(codecs)
 	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 
 	return *config
