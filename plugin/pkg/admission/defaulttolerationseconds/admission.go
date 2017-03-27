@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 var (
@@ -39,7 +40,7 @@ var (
 )
 
 func init() {
-	admission.RegisterPlugin("DefaultTolerationSeconds", func(config io.Reader) (admission.Interface, error) {
+	kubeapiserveradmission.Plugins.Register("DefaultTolerationSeconds", func(config io.Reader) (admission.Interface, error) {
 		return NewDefaultTolerationSeconds(), nil
 	})
 }
