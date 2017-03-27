@@ -376,12 +376,23 @@ func (c *Config) SkipComplete() completedConfig {
 //   auth, then the caller should create a handler for those endpoints, which delegates the
 //   any unhandled paths to "Handler".
 func (c completedConfig) New() (*GenericAPIServer, error) {
+	s, err := c.constructServer()
+	if err != nil {
+		return nil, err
+	}
+
+	return c.buildHandlers(s, nil)
+}
+
+func (c completedConfig) constructServer() (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
 	if c.LoopbackClientConfig == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.LoopbackClientConfig == nil")
 	}
+
+	handlerContainer := mux.NewAPIContainer(http.NewServeMux(), c.Serializer, c.FallThroughHandler)
 
 	s := &GenericAPIServer{
 		discoveryAddresses:     c.DiscoveryAddresses,
@@ -399,7 +410,10 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 
 		apiGroupsForDiscovery: map[string]metav1.APIGroup{},
 
+		HandlerContainer:   handlerContainer,
 		FallThroughHandler: c.FallThroughHandler,
+
+		listedPathProvider: routes.ListedPathProviders{handlerContainer, c.FallThroughHandler},
 
 		swaggerConfig: c.SwaggerConfig,
 		openAPIConfig: c.OpenAPIConfig,
@@ -408,8 +422,48 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		healthzChecks:  c.HealthzChecks,
 	}
 
-	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer, s.FallThroughHandler)
+	return s, nil
+}
 
+// NewWithDelegate creates a new server which logically combines the handling chain with the passed server.
+func (c completedConfig) NewWithDelegate(delegationTarget DelegationTarget) (*GenericAPIServer, error) {
+	// some pieces of the delegationTarget take precendence.  Callers should already have ensured that these
+	// were wired correctly.  Documenting them here.
+	// c.RequestContextMapper = delegationTarget.RequestContextMapper()
+
+	s, err := c.constructServer()
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range delegationTarget.PostStartHooks() {
+		s.postStartHooks[k] = v
+	}
+
+	for _, delegateCheck := range delegationTarget.HealthzChecks() {
+		skip := false
+		for _, existingCheck := range c.HealthzChecks {
+			if existingCheck.Name() == delegateCheck.Name() {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+
+		s.healthzChecks = append(s.healthzChecks, delegateCheck)
+	}
+
+	s.listedPathProvider = routes.ListedPathProviders{s.listedPathProvider, delegationTarget}
+
+	// use the UnprotectedHandler from the delegation target to ensure that we don't attempt to double authenticator, authorize,
+	// or some other part of the filter chain in delegation cases.
+	return c.buildHandlers(s, delegationTarget.UnprotectedHandler())
+}
+
+// buildHandlers builds our handling chain
+func (c completedConfig) buildHandlers(s *GenericAPIServer, delegate http.Handler) (*GenericAPIServer, error) {
 	if s.openAPIConfig != nil {
 		if s.openAPIConfig.Info == nil {
 			s.openAPIConfig.Info = &spec.Info{}
@@ -423,7 +477,7 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		}
 	}
 
-	s.installAPI(c.Config)
+	installAPI(s, c.Config, delegate)
 
 	s.Handler, s.InsecureHandler = c.BuildHandlerChainsFunc(s.HandlerContainer.ServeMux, c.Config)
 
@@ -454,9 +508,15 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insec
 	return generic(protect(apiHandler)), generic(audit(apiHandler))
 }
 
-func (s *GenericAPIServer) installAPI(c *Config) {
-	if c.EnableIndex {
-		routes.Index{}.Install(s.HandlerContainer, s.FallThroughHandler)
+func installAPI(s *GenericAPIServer, c *Config, delegate http.Handler) {
+	switch {
+	case c.EnableIndex:
+		routes.Index{}.Install(s.listedPathProvider, c.FallThroughHandler, delegate)
+
+	case delegate != nil:
+		// if we have a delegate, allow it to handle everything that's unmatched even if
+		// the index is disabled.
+		s.FallThroughHandler.UnlistedHandleFunc("/", delegate.ServeHTTP)
 	}
 	if c.SwaggerConfig != nil && c.EnableSwaggerUI {
 		routes.SwaggerUI{}.Install(s.FallThroughHandler)
