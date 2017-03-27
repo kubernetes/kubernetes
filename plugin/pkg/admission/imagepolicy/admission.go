@@ -49,7 +49,7 @@ var (
 )
 
 func init() {
-	admission.RegisterPlugin("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
+	api.AdmissionPlugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
 		newImagePolicyWebhook, err := NewImagePolicyWebhook(config)
 		if err != nil {
 			return nil, err

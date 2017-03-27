@@ -38,7 +38,7 @@ var (
 )
 
 func init() {
-	admission.RegisterPlugin("DefaultTolerationSeconds", func(config io.Reader) (admission.Interface, error) {
+	api.AdmissionPlugins.Register("DefaultTolerationSeconds", func(config io.Reader) (admission.Interface, error) {
 		return NewDefaultTolerationSeconds(), nil
 	})
 }

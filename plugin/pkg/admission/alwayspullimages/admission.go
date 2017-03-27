@@ -33,7 +33,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("AlwaysPullImages", func(config io.Reader) (admission.Interface, error) {
+	api.AdmissionPlugins.Register("AlwaysPullImages", func(config io.Reader) (admission.Interface, error) {
 		return NewAlwaysPullImages(), nil
 	})
 }

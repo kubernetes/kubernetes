@@ -195,14 +195,14 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 }
 
 var ignoredResources = map[schema.GroupVersionResource]struct{}{
-	schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:              {},
-	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                                           {},
-	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                                  {},
-	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                             {},
-	schema.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:             {},
-	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
-	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
-	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
+	{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:              {},
+	{Group: "", Version: "v1", Resource: "bindings"}:                                           {},
+	{Group: "", Version: "v1", Resource: "componentstatuses"}:                                  {},
+	{Group: "", Version: "v1", Resource: "events"}:                                             {},
+	{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:             {},
+	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
+	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
+	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
 }
 
 func (gb *GraphBuilder) enqueueChanges(e *event) {

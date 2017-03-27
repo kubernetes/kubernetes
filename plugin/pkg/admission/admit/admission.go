@@ -20,10 +20,11 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func init() {
-	admission.RegisterPlugin("AlwaysAdmit", func(config io.Reader) (admission.Interface, error) {
+	api.AdmissionPlugins.Register("AlwaysAdmit", func(config io.Reader) (admission.Interface, error) {
 		return NewAlwaysAdmit(), nil
 	})
 }

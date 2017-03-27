@@ -27,7 +27,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("LimitPodHardAntiAffinityTopology", func(config io.Reader) (admission.Interface, error) {
+	api.AdmissionPlugins.Register("LimitPodHardAntiAffinityTopology", func(config io.Reader) (admission.Interface, error) {
 		return NewInterPodAntiAffinity(), nil
 	})
 }

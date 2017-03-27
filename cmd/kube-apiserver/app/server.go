@@ -346,7 +346,7 @@ func BuildAdmission(s *options.ServerRunOptions, client internalclientset.Interf
 	if err != nil {
 		return nil, fmt.Errorf("failed to read plugin config: %v", err)
 	}
-	return admission.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
+	return api.AdmissionPlugins.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
 }
 
 // BuildAuthenticator constructs the authenticator
