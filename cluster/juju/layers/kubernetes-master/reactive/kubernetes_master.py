@@ -159,15 +159,9 @@ def setup_leader_authentication():
     api_opts.add('--service-cluster-ip-range', service_cidr())
     hookenv.status_set('maintenance', 'Rendering authentication templates.')
 
-    # Try to fetch data from leadership broadcast.
-    contents = charms.leadership.leader_get(service_key)
-    if contents is not None:
-        # Since there was a leader in the past and we are bootstrapping
-        # the leader here, all masters were killed and a new one is
-        # added again.
-        keys = [service_key, basic_auth, known_tokens]
-        get_keys_from_leader(keys)
-    else:
+    # Try first to fetch data from an old leadership broadcast.
+    keys = [service_key, basic_auth, known_tokens]
+    if not get_keys_from_leader(keys):
         if not os.path.isfile(basic_auth):
             setup_basic_auth('admin', 'admin', 'admin')
         if not os.path.isfile(known_tokens):
@@ -211,9 +205,10 @@ def setup_non_leader_authentication():
 
     hookenv.status_set('maintenance', 'Rendering authentication templates.')
 
-    # Set an array for looping logic
     keys = [service_key, basic_auth, known_tokens]
-    get_keys_from_leader(keys)
+    if not get_keys_from_leader(keys):
+        # the keys were not retrieved. Non-leaders have to retry.
+        return
 
     api_opts.add('--basic-auth-file', basic_auth)
     api_opts.add('--token-auth-file', known_tokens)
@@ -225,6 +220,16 @@ def setup_non_leader_authentication():
 
 
 def get_keys_from_leader(keys):
+    """
+    Gets the broadcasted keys from the leader and stores them in
+    the corresponding files.
+
+    Args:
+        keys: list of keys. Keys are actually files on the FS.
+
+    Returns: True if all key were fetched, False if not.
+
+    """
     # This races with other codepaths, and seems to require being created first
     # This block may be extracted later, but for now seems to work as intended
     os.makedirs('/etc/kubernetes', exist_ok=True)
@@ -240,10 +245,11 @@ def get_keys_from_leader(keys):
                 msg = "Waiting on leaders crypto keys."
                 hookenv.status_set('waiting', msg)
                 hookenv.log('Missing content for file {}'.format(k))
-                return
+                return False
             # Write out the file and move on to the next item
             with open(k, 'w+') as fp:
                 fp.write(contents)
+    return True
 
 
 @when('kubernetes-master.components.installed')
