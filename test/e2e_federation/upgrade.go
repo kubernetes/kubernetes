@@ -25,9 +25,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var upgradeTests = []upgrades.Test{
-	upgrades.SecretUpgradeTest(),
-}
+var upgradeTests = upgrades.GenericUpgradeTests()
 
 var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federation-upgrade")

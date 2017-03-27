@@ -30,26 +30,27 @@ import (
 // GenericUpgradeTest validates that a federated resource remains
 // propagated before and after a control plane upgrade
 type GenericUpgradeTest struct {
-	adapter    typeadapters.FederatedTypeAdapter
-	crudtester *crudtester.FederatedTypeCRUDTester
-	obj        pkgruntime.Object
+	kind           string
+	adapterFactory typeadapters.FederatedTypeAdapterFactory
+	crudtester     *crudtester.FederatedTypeCRUDTester
+	obj            pkgruntime.Object
 }
 
 // Setup creates a resource and validates its propagation to member clusters
 func (t *GenericUpgradeTest) Setup(f *fedframework.Framework) {
-	t.adapter.SetClient(f.FederationClientset)
+	adapter := t.adapterFactory(f.FederationClientset)
 	clients := f.GetClusterClients()
-	t.crudtester = fedframework.NewFederatedTypeCRUDTester(t.adapter, clients)
+	t.crudtester = fedframework.NewFederatedTypeCRUDTester(adapter, clients)
 
-	By(fmt.Sprintf("Creating a resource of kind %q and validating propagation to member clusters", t.adapter.Kind()))
-	obj := t.adapter.NewTestObject(f.Namespace.Name)
+	By(fmt.Sprintf("Creating a resource of kind %q and validating propagation to member clusters", t.kind))
+	obj := adapter.NewTestObject(f.Namespace.Name)
 	t.obj = t.crudtester.CheckCreate(obj)
 }
 
 // Test validates that a resource remains propagated post-upgrade
 func (t *GenericUpgradeTest) Test(f *fedframework.Framework, done <-chan struct{}, upgrade FederationUpgradeType) {
 	<-done
-	By(fmt.Sprintf("Validating that a resource of kind %q remains propagated to member clusters after upgrade", t.adapter.Kind()))
+	By(fmt.Sprintf("Validating that a resource of kind %q remains propagated to member clusters after upgrade", t.kind))
 	t.crudtester.CheckPropagation(t.obj)
 }
 
@@ -58,8 +59,13 @@ func (t *GenericUpgradeTest) Teardown(f *fedframework.Framework) {
 	// Rely on the namespace deletion to clean up everything
 }
 
-// SecretUpgradeTest validates that a secret remains propagated before
-// and after a controlplane upgrade
-func SecretUpgradeTest() Test {
-	return &GenericUpgradeTest{adapter: &typeadapters.SecretAdapter{}}
+func GenericUpgradeTests() []Test {
+	tests := []Test{}
+	for kind, adapterFactory := range typeadapters.AdapterFactories() {
+		tests = append(tests, &GenericUpgradeTest{
+			kind:           kind,
+			adapterFactory: adapterFactory,
+		})
+	}
+	return tests
 }
