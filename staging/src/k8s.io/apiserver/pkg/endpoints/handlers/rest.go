@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/net/httpheader"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
@@ -492,7 +493,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 
 		// TODO: handle this in negotiation
-		contentType := req.HeaderParameter("Content-Type")
+		contentType := req.HeaderParameter(httpheader.ContentType)
 		// Remove "; charset=" if included in header.
 		if idx := strings.Index(contentType, ";"); idx > 0 {
 			contentType = contentType[:idx]

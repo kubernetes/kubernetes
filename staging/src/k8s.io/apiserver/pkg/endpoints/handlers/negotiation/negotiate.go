@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/net/httpheader"
 )
 
 // MediaTypesForSerializer returns a list of media and stream media types for the server.
@@ -41,7 +42,7 @@ func MediaTypesForSerializer(ns runtime.NegotiatedSerializer) (mediaTypes, strea
 }
 
 func NegotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
-	mediaType, ok := negotiateMediaTypeOptions(req.Header.Get("Accept"), acceptedMediaTypesForEndpoint(ns), defaultEndpointRestrictions)
+	mediaType, ok := negotiateMediaTypeOptions(req.Header.Get(httpheader.Accept), acceptedMediaTypesForEndpoint(ns), defaultEndpointRestrictions)
 	if !ok {
 		supported, _ := MediaTypesForSerializer(ns)
 		return runtime.SerializerInfo{}, errNotAcceptable{supported}
@@ -55,7 +56,7 @@ func NegotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerialize
 }
 
 func NegotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
-	mediaType, ok := negotiateMediaTypeOptions(req.Header.Get("Accept"), acceptedMediaTypesForEndpoint(ns), defaultEndpointRestrictions)
+	mediaType, ok := negotiateMediaTypeOptions(req.Header.Get(httpheader.Accept), acceptedMediaTypesForEndpoint(ns), defaultEndpointRestrictions)
 	if !ok || mediaType.accepted.Serializer.StreamSerializer == nil {
 		_, supported := MediaTypesForSerializer(ns)
 		return runtime.SerializerInfo{}, errNotAcceptable{supported}
@@ -65,7 +66,7 @@ func NegotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSer
 
 func NegotiateInputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	mediaTypes := ns.SupportedMediaTypes()
-	mediaType := req.Header.Get("Content-Type")
+	mediaType := req.Header.Get(httpheader.ContentType)
 	if len(mediaType) == 0 {
 		mediaType = mediaTypes[0].MediaType
 	}

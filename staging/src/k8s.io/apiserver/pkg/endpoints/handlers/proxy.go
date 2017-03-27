@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/net/httpheader"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -61,7 +62,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer func() {
 		metrics.Monitor(&verb, &apiResource,
 			net.GetHTTPClient(req),
-			w.Header().Get("Content-Type"),
+			w.Header().Get(httpheader.ContentType),
 			httpCode, reqStart)
 	}()
 
