@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	apiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
@@ -55,7 +56,7 @@ func (a *APIServer) Start() error {
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
-		err := apiserver.Run(config)
+		err := apiserver.Run(config, wait.NeverStop)
 		if err != nil {
 			errCh <- fmt.Errorf("run apiserver error: %v", err)
 		}
