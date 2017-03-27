@@ -5,6 +5,7 @@ metadata:
 spec:
   group: mygroup.example.com
   version: v1alpha1
+  scope: Namespaced
   names:
     name: noxus
     singular: noxu

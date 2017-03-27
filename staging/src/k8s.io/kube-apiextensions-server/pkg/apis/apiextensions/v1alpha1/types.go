@@ -33,7 +33,7 @@ type CustomResourceSpec struct {
 
 // CustomResourceNames indicates the names to serve this CustomResource
 type CustomResourceNames struct {
-	// Plural is the plural name of the resource to serve.  It must match the name of the TPR-registration
+	// Plural is the plural name of the resource to serve.  It must match the name of the CustomResource-registration
 	// too: plural.group and it must be all lowercase.
 	Plural string `json:"plural" protobuf:"bytes,1,opt,name=plural"`
 	// Singular is the singular name of the resource.  It must be all lowercase  Defaults to lowercased <kind>
