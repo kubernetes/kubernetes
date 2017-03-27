@@ -26,7 +26,7 @@ import (
 )
 
 type SecretFixture struct {
-	adapter  *typeadapters.SecretAdapter
+	adapter  typeadapters.FederatedTypeAdapter
 	stopChan chan struct{}
 }
 

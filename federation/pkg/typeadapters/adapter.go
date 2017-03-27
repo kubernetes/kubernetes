@@ -17,6 +17,8 @@ limitations under the License.
 package typeadapters
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,8 +30,6 @@ import (
 // federated type.  Code written to this interface can then target any
 // type for which an implementation of this interface exists.
 type FederatedTypeAdapter interface {
-	SetClient(client federationclientset.Interface)
-
 	Kind() string
 	Equivalent(obj1, obj2 pkgruntime.Object) bool
 	ObjectMeta(obj pkgruntime.Object) *metav1.ObjectMeta
@@ -45,4 +45,35 @@ type FederatedTypeAdapter interface {
 	ClusterGet(client clientset.Interface, namespacedName types.NamespacedName) (pkgruntime.Object, error)
 
 	NewTestObject(namespace string) pkgruntime.Object
+}
+
+// FederatedTypeAdapterFactory defines the function signature for
+// factory methods that create FederatedTypeAdapters.  Such methods
+// should be registered with RegisterAdapterFactory to ensure the type
+// adapter is discoverable.
+type FederatedTypeAdapterFactory func(client federationclientset.Interface) FederatedTypeAdapter
+
+var typeAdapterRegistry = make(map[string]FederatedTypeAdapterFactory)
+
+// RegisterAdapterFactory ensures that the given kind and adapter
+// factory will be returned in the results of the AdapterFactories method.
+func RegisterAdapterFactory(kind string, factory FederatedTypeAdapterFactory) {
+	_, ok := typeAdapterRegistry[kind]
+	if ok {
+		// TODO Is panicking ok given that this is part of a type-registration mechanism
+		panic(fmt.Sprintf("An adapter has already been registered for federated type %q", kind))
+	}
+	typeAdapterRegistry[kind] = factory
+}
+
+// AdapterFactories returns a mapping of known federated type
+// (e.g. "secret") to the factory method that will create an adapter
+// for that type.
+func AdapterFactories() map[string]FederatedTypeAdapterFactory {
+	// Return a copy to avoid accidental mutation
+	result := make(map[string]FederatedTypeAdapterFactory)
+	for key, value := range typeAdapterRegistry {
+		result[key] = value
+	}
+	return result
 }
