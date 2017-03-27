@@ -296,7 +296,7 @@ func (s *ServingOptions) ApplyTo(c *server.Config) error {
 	return nil
 }
 
-func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress string, alternateIPs ...net.IP) error {
+func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress string, alternateDNS []string, alternateIPs []net.IP) error {
 	if s == nil {
 		return nil
 	}
@@ -313,11 +313,6 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 		return err
 	}
 	if !canReadCertAndKey {
-		// TODO: It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
-		// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
-		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
-
 		// add either the bind address or localhost to the valid alternates
 		bindIP := s.ServingOptions.BindAddress.String()
 		if bindIP == "0.0.0.0" {
