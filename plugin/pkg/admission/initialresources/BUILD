@@ -20,6 +20,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
         "//vendor:cloud.google.com/go/compute/metadata",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/hawkular/hawkular-client-go/metrics",
