@@ -490,19 +490,23 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	}
 
 	if ctx.IsControllerEnabled(serviceControllerName) {
-		serviceController, err := servicecontroller.New(
-			cloud,
-			clientBuilder.ClientOrDie("service-controller"),
-			sharedInformers.Core().V1().Services(),
-			sharedInformers.Core().V1().Nodes(),
-			s.ClusterName,
-		)
-		if err != nil {
-			glog.Errorf("Failed to start service controller: %v", err)
+		if cloud == nil {
+			glog.Errorf("Failed to start service controller: no cloud provider specified.")
 		} else {
-			go serviceController.Run(stop, int(s.ConcurrentServiceSyncs))
+			serviceController, err := servicecontroller.New(
+				cloud,
+				clientBuilder.ClientOrDie("service-controller"),
+				sharedInformers.Core().V1().Services(),
+				sharedInformers.Core().V1().Nodes(),
+				s.ClusterName,
+			)
+			if err != nil {
+				glog.Errorf("Failed to start service controller: %v", err)
+			} else {
+				go serviceController.Run(stop, int(s.ConcurrentServiceSyncs))
+			}
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
-		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	} else {
 		glog.Warningf("%q is disabled", serviceControllerName)
 	}
