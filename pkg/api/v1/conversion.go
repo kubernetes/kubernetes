@@ -191,7 +191,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.serviceAccountName",
 				"status.phase",
 				"status.podIP",
-				"status.hostIP":
+				"status.hostIP",
+				"status.podIP":
 				return label, value, nil
 				// This is for backwards compatibility with old v1 clients which send spec.host
 			case "spec.host":

@@ -605,6 +605,18 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	return result, nil
 }
 
+// getStatusHostIP returns the Kubelet IPAddress
+func getStatusHostIP(kl *Kubelet) (string, error) {
+	hostIP, err := kl.GetHostIP()
+	if err != nil {
+		return "", err
+	}
+	if len(hostIP) != 0 {
+		return hostIP.String(), nil
+	}
+	return "", fmt.Errorf("status.hostIP == <nil>")
+}
+
 // podFieldSelectorRuntimeValue returns the runtime value of the given
 // selector for a pod.
 func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod *v1.Pod, podIP string) (string, error) {
@@ -617,6 +629,8 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod 
 		return pod.Spec.NodeName, nil
 	case "spec.serviceAccountName":
 		return pod.Spec.ServiceAccountName, nil
+	case "status.hostIP":
+		return getStatusHostIP(kl)
 	case "status.podIP":
 		return podIP, nil
 	case "status.hostIP":
