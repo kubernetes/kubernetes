@@ -29,10 +29,10 @@ import (
 )
 
 // Stub out mirror client for testing purpose.
-func newTestManager() (*basicManager, *podtest.FakeMirrorClient) {
+func newTestManager() (*BasicManager, *podtest.FakeMirrorClient) {
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
 	secretManager := secret.NewFakeManager()
-	manager := NewBasicPodManager(fakeMirrorClient, secretManager).(*basicManager)
+	manager := NewBasicPodManager(fakeMirrorClient, secretManager)
 	return manager, fakeMirrorClient
 }
 

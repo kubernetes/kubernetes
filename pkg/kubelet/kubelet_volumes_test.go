@@ -61,7 +61,7 @@ func TestListVolumesForPod(t *testing.T) {
 		close(stopCh)
 	}()
 
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	assert.NoError(t, err)
 
@@ -145,7 +145,7 @@ func TestPodVolumesExist(t *testing.T) {
 		close(stopCh)
 	}()
 
-	kubelet.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 	for _, pod := range pods {
 		err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 		assert.NoError(t, err)
@@ -180,7 +180,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 		close(stopCh)
 	}()
 
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	assert.NoError(t, err)
 
@@ -227,7 +227,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	}()
 
 	// Add pod
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
 
 	// Verify volumes attached
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
@@ -253,7 +253,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 
 	// Remove pod
-	kubelet.podManager.SetPods([]*v1.Pod{})
+	testKubelet.basicManager.SetPods([]*v1.Pod{})
 
 	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))
 
@@ -315,7 +315,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		close(stopCh)
 	}()
 
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
@@ -385,7 +385,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	}()
 
 	// Add pod
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
@@ -415,7 +415,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 
 	// Remove pod
-	kubelet.podManager.SetPods([]*v1.Pod{})
+	testKubelet.basicManager.SetPods([]*v1.Pod{})
 
 	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))
 

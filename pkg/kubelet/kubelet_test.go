@@ -103,6 +103,7 @@ func (f *fakeImageGCManager) GetImageList() ([]kubecontainer.Image, error) {
 
 type TestKubelet struct {
 	kubelet          *Kubelet
+	basicManager     *kubepod.BasicManager
 	fakeRuntime      *containertest.FakeRuntime
 	fakeCadvisor     *cadvisortest.Mock
 	fakeKubeClient   *fake.Clientset
@@ -204,7 +205,8 @@ func newTestKubeletWithImageList(
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
 	secretManager := secret.NewSimpleSecretManager(kubelet.kubeClient)
 	kubelet.secretManager = secretManager
-	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager)
+	basicPodManager := kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager)
+	kubelet.podManager = basicPodManager
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
@@ -299,7 +301,7 @@ func newTestKubeletWithImageList(
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
 	kubelet.gpuManager = gpu.NewGPUManagerStub()
-	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
+	return &TestKubelet{kubelet, basicPodManager, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
 }
 
 func newTestPods(count int) []*v1.Pod {
@@ -383,7 +385,7 @@ func TestSyncPodsStartPod(t *testing.T) {
 			},
 		}),
 	}
-	kubelet.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 	kubelet.HandlePodSyncs(pods)
 	fakeRuntime.AssertStartedPods([]string{string(pods[0].UID)})
 }
@@ -666,7 +668,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 		t.Fatalf("expected to have status cached for pod2")
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
-	kl.podManager.SetPods([]*v1.Pod{})
+	testKubelet.basicManager.SetPods([]*v1.Pod{})
 	kl.HandlePodCleanups()
 	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); found {
 		t.Fatalf("expected to not have status cached for pod2")
@@ -814,7 +816,7 @@ func TestCreateMirrorPod(t *testing.T) {
 		pod := podWithUidNameNs("12345678", "bar", "foo")
 		pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 		pods := []*v1.Pod{pod}
-		kl.podManager.SetPods(pods)
+		testKubelet.basicManager.SetPods(pods)
 		err := kl.syncPod(syncPodOptions{
 			pod:        pod,
 			podStatus:  &kubecontainer.PodStatus{},
@@ -855,7 +857,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 	mirrorPod.Annotations[kubetypes.ConfigMirrorAnnotationKey] = "mirror"
 
 	pods := []*v1.Pod{pod, mirrorPod}
-	kl.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 	err := kl.syncPod(syncPodOptions{
 		pod:        pod,
 		mirrorPod:  mirrorPod,
@@ -905,7 +907,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 		},
 	}
 
-	kl.podManager.SetPods(orphanPods)
+	testKubelet.basicManager.SetPods(orphanPods)
 	// Sync with an empty pod list to delete all mirror pods.
 	kl.HandlePodCleanups()
 	assert.Len(t, manager.GetPods(), 0, "Expected 0 mirror pods")
@@ -985,7 +987,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 		}},
 	}
 
-	kubelet.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 	// Use the mirror pod UID to retrieve the stats.
 	stats, err := kubelet.GetContainerInfo("qux_ns", "5678", "foo", cadvisorReq)
 	assert.NoError(t, err)
@@ -1017,7 +1019,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 	})
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
 	err := kubelet.syncPod(syncPodOptions{
 		pod:        pod,
 		podStatus:  &kubecontainer.PodStatus{},
@@ -1079,7 +1081,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 		},
 	})
 
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
 	err := kubelet.syncPod(syncPodOptions{
 		pod:        pod,
 		podStatus:  &kubecontainer.PodStatus{},
@@ -1139,7 +1141,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 		},
 	})
 
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
 	err := kubelet.syncPod(syncPodOptions{
 		pod:        pod,
 		podStatus:  &kubecontainer.PodStatus{},
@@ -1168,7 +1170,7 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	pods[3].Status.Phase = v1.PodPending
 
 	expected := []*v1.Pod{pods[2], pods[3], pods[4]}
-	kubelet.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 	actual := kubelet.filterOutTerminatedPods(pods)
 	assert.Equal(t, expected, actual)
 }
@@ -1267,7 +1269,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 		}},
 	}
 
-	kubelet.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 	kubelet.HandlePodUpdates(pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
@@ -1305,7 +1307,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 		podWithUidNameNs("12345679", "pod2", "ns"),
 	}
 
-	kl.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 	// Sync to create pod directories.
 	kl.HandlePodSyncs(kl.podManager.GetPods())
 	for i := range pods {
@@ -1313,7 +1315,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 	}
 
 	// Pod 1 has been deleted and no longer exists.
-	kl.podManager.SetPods([]*v1.Pod{pods[0]})
+	testKubelet.basicManager.SetPods([]*v1.Pod{pods[0]})
 	kl.HandlePodCleanups()
 	assert.True(t, dirExists(kl.getPodDir(pods[0].UID)), "Expected directory to exist for pod 0")
 	assert.False(t, dirExists(kl.getPodDir(pods[1].UID)), "Expected directory to be deleted for pod 1")
@@ -1322,7 +1324,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod, podsToCheck []*v1.Pod, shouldExist bool) {
 	kl := testKubelet.kubelet
 
-	kl.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 	kl.HandlePodSyncs(pods)
 	kl.HandlePodCleanups()
 	for i, pod := range podsToCheck {
@@ -1404,7 +1406,7 @@ func TestGetPodsToSync(t *testing.T) {
 	pods[2].Status.StartTime = &startTime
 	pods[2].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
 
-	kubelet.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 	kubelet.workQueue.Enqueue(pods[2].UID, 0)
 	kubelet.workQueue.Enqueue(pods[3].UID, 30*time.Second)
 	kubelet.workQueue.Enqueue(pods[4].UID, 2*time.Minute)
@@ -1925,7 +1927,7 @@ func TestGetPodsToSyncInvokesPodSyncLoopHandlers(t *testing.T) {
 	pods := newTestPods(5)
 	expected := []*v1.Pod{pods[0]}
 	kubelet.AddPodSyncLoopHandler(&testPodSyncLoopHandler{expected})
-	kubelet.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 
 	podsToSync := kubelet.getPodsToSync()
 	sort.Sort(podsByUID(expected))
@@ -1984,7 +1986,7 @@ func TestSyncPodKillPod(t *testing.T) {
 		},
 	}
 	pods := []*v1.Pod{pod}
-	kl.podManager.SetPods(pods)
+	testKubelet.basicManager.SetPods(pods)
 	gracePeriodOverride := int64(0)
 	err := kl.syncPod(syncPodOptions{
 		pod:        pod,
