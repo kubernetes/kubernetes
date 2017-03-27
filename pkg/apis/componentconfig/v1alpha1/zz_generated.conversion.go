@@ -137,6 +137,8 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 	if err := Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
+	out.LockObjectNamespace = in.LockObjectNamespace
+	out.LockObjectName = in.LockObjectName
 	return nil
 }
 
@@ -162,6 +164,8 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 	if err := Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
+	out.LockObjectNamespace = in.LockObjectNamespace
+	out.LockObjectName = in.LockObjectName
 	return nil
 }
 
