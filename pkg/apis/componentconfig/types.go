@@ -595,6 +595,10 @@ type KubeSchedulerConfiguration struct {
 	FailureDomains string
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection LeaderElectionConfiguration
+	// LockObjectNamespace defines the namespace of the lock object
+	LockObjectNamespace string
+	// LockObjectName defines the lock object name
+	LockObjectName string
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election
@@ -904,3 +908,11 @@ func (m *ConfigurationMap) Set(value string) error {
 func (*ConfigurationMap) Type() string {
 	return "mapStringString"
 }
+
+const (
+	// "kube-system" is the default scheduler lock object namespace
+	SchedulerDefaultLockObjectNamespace string = "kube-system"
+
+	// "kube-scheduler" is the default scheduler lock object name
+	SchedulerDefaultLockObjectName = "kube-scheduler"
+)
