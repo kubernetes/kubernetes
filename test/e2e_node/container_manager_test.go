@@ -112,13 +112,23 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					var pausePids []int
 					By("checking infra container's oom-score-adj")
 					Eventually(func() error {
+						output, err := exec.Command("ps", "-C", "pause").CombinedOutput()
+						if err != nil {
+							return fmt.Errorf("failed to list all pause processes: %v", err)
+						}
 						pausePids, err = getPidsForProcess("pause", "")
 						if err != nil {
 							return fmt.Errorf("failed to get list of pause pids: %v", err)
 						}
+						var errMsg string
 						for _, pid := range pausePids {
+							oomScore, err := getOOMScoreForPid(pid)
+							if err != nil {
+								return fmt.Errorf("failed to get oom_score_adj for %d: %v", pid, err)
+							}
+							errMsg += fmt.Sprintf("pid: %d, oomScore: %d\n", pid, oomScore)
 							if err := validateOOMScoreAdjSetting(pid, -998); err != nil {
-								return err
+								return fmt.Errorf("error: %v\nps:\n%s\ncurrent status:\n%s\n", err, output, errMsg)
 							}
 						}
 						return nil
@@ -141,9 +151,9 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 				AfterEach(func() {
 					if CurrentGinkgoTestDescription().Failed {
 						By("Dump all running docker containers")
-						output, err := exec.Command("docker", "ps").CombinedOutput()
+						output, err := exec.Command("sh", "-c", `docker ps | grep "\/pause" | cut -d " " -f1 | xargs docker inspect`).CombinedOutput()
 						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("Running docker containers:\n%s", string(output))
+						framework.Logf("Inspect running docker containers:\n%s", string(output))
 					}
 				})
 			})
