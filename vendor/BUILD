@@ -2142,7 +2142,10 @@ go_library(
 
 go_library(
     name = "github.com/coreos/go-systemd/daemon",
-    srcs = ["github.com/coreos/go-systemd/daemon/sdnotify.go"],
+    srcs = [
+        "github.com/coreos/go-systemd/daemon/sdnotify.go",
+        "github.com/coreos/go-systemd/daemon/watchdog.go",
+    ],
     tags = ["automanaged"],
 )
 
@@ -2179,7 +2182,7 @@ go_library(
 
 cgo_genrule(
     name = "github.com/coreos/go-systemd/util_cgo",
-    srcs = ["github.com/coreos/go-systemd/util/util.go"],
+    srcs = ["github.com/coreos/go-systemd/util/util_cgo.go"],
     clinkopts = [
         "-lz",
         "-lm",
@@ -2191,7 +2194,7 @@ cgo_genrule(
 
 go_library(
     name = "github.com/coreos/go-systemd/util",
-    srcs = [],
+    srcs = ["github.com/coreos/go-systemd/util/util.go"],
     library = ":github.com/coreos/go-systemd/util_cgo",
     tags = ["automanaged"],
     deps = ["//vendor:github.com/coreos/pkg/dlopen"],
