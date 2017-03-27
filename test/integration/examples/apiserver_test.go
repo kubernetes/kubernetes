@@ -112,13 +112,18 @@ func TestAggregatedAPIServer(t *testing.T) {
 			kubeAPIServerOptions.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
 			kubeAPIServerOptions.Authorization.Mode = "RBAC"
 
-			config, sharedInformers, err := app.BuildMasterConfig(kubeAPIServerOptions)
+			kubeAPIServerConfig, sharedInformers, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions)
 			if err != nil {
 				t.Fatal(err)
 			}
-			kubeClientConfigValue.Store(config.GenericConfig.LoopbackClientConfig)
+			kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
 
-			if err := app.RunServer(config, sharedInformers, stopCh); err != nil {
+			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers, wait.NeverStop)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(wait.NeverStop); err != nil {
 				t.Log(err)
 			}
 			time.Sleep(100 * time.Millisecond)
