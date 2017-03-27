@@ -119,7 +119,18 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	// When a client updates the internal load balancer annotation,
 	// the service may be switched from an internal LB to a public one, or vise versa.
 	// Here we'll firstly ensure service do not lie in the opposite LB.
-	az.ensureLoadBalancerDeleted(clusterName, service, !isInternal)
+	err := az.cleanupLoadBalancer(clusterName, service, !isInternal)
+	if err != nil {
+		return nil, err
+	}
+
+	// Also clean up public ip resource, since service might be switched from public load balancer type.
+	if isInternal {
+		err = az.cleanupPublicIP(clusterName, service)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	serviceName := getServiceName(service)
 	glog.V(2).Infof("ensure(%s): START clusterName=%q lbName=%q", serviceName, clusterName, lbName)
@@ -272,7 +283,17 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 
 	glog.V(2).Infof("delete(%s): START clusterName=%q lbName=%q", serviceName, clusterName, lbName)
 
-	az.ensureLoadBalancerDeleted(clusterName, service, isInternal)
+	err := az.cleanupLoadBalancer(clusterName, service, isInternal)
+	if err != nil {
+		return err
+	}
+
+	if !isInternal {
+		err = az.cleanupPublicIP(clusterName, service)
+		if err != nil {
+			return err
+		}
+	}
 
 	sg, existsSg, err := az.getSecurityGroup()
 	if err != nil {
@@ -300,7 +321,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 	return nil
 }
 
-func (az *Cloud) ensureLoadBalancerDeleted(clusterName string, service *v1.Service, isInternalLb bool) error {
+func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, isInternalLb bool) error {
 	lbName := getLoadBalancerName(clusterName, isInternalLb)
 	serviceName := getServiceName(service)
 
@@ -333,8 +354,14 @@ func (az *Cloud) ensureLoadBalancerDeleted(clusterName string, service *v1.Servi
 		}
 	}
 
+	return nil
+}
+
+func (az *Cloud) cleanupPublicIP(clusterName string, service *v1.Service) error {
+	serviceName := getServiceName(service)
+
 	// Only delete an IP address if we created it.
-	if !isInternalLb && service.Spec.LoadBalancerIP == "" {
+	if service.Spec.LoadBalancerIP == "" {
 		pipName, err := az.getPublicIPName(clusterName, service)
 		if err != nil {
 			return err
