@@ -536,7 +536,7 @@ func MakePod(ns string, pvcName string, isPrivileged bool, command string) *v1.P
 			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "client-",
+			GenerateName: "pvc-tester-",
 			Namespace:    ns,
 		},
 		Spec: v1.PodSpec{
