@@ -19,6 +19,8 @@ package main
 import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"fmt"
+	"os"
 )
 
 // NewKubeAPIServer creates a new hyperkube Server object that includes the
@@ -32,7 +34,13 @@ func NewKubeAPIServer() *Server {
 		SimpleUsage:     "apiserver",
 		Long:            "The main API entrypoint and interface to the storage system.  The API server is also the focal point for all authorization decisions.",
 		Run: func(_ *Server, args []string) error {
-			return app.Run(s)
+			err := app.Run(s)
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+			}
+
+			return err
 		},
 	}
 	s.AddFlags(hks.Flags())
