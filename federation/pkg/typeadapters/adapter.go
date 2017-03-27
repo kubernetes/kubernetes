@@ -17,6 +17,8 @@ limitations under the License.
 package typeadapters
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,8 +31,6 @@ import (
 // federated type.  Code written to this interface can then target any
 // type for which an implementation of this interface exists.
 type FederatedTypeAdapter interface {
-	SetClient(client federationclientset.Interface)
-
 	Kind() string
 	ObjectType() pkgruntime.Object
 	IsExpectedType(obj interface{}) bool
@@ -56,4 +56,36 @@ type FederatedTypeAdapter interface {
 	ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error)
 
 	NewTestObject(namespace string) pkgruntime.Object
+}
+
+// AdapterFactory defines the function signature for factory methods
+// that create FederatedTypeAdapters.  Such methods should be
+// registered with RegisterAdapterFactory to ensure the type adapter
+// is discoverable.
+type AdapterFactory func(client federationclientset.Interface) FederatedTypeAdapter
+
+var typeAdapterRegistry = make(map[string]AdapterFactory)
+
+// RegisterAdapterFactory ensures that the given kind and adapter
+// factory will be returned in the results of the AdapterFactories
+// method.
+func RegisterAdapterFactory(kind string, factory AdapterFactory) {
+	_, ok := typeAdapterRegistry[kind]
+	if ok {
+		// TODO Is panicking ok given that this is part of a type-registration mechanism
+		panic(fmt.Sprintf("An adapter has already been registered for federated type %q", kind))
+	}
+	typeAdapterRegistry[kind] = factory
+}
+
+// AdapterFactories returns a mapping of federated kind
+// (e.g. "secret") to the factory method that will create an adapter
+// for that type.
+func AdapterFactories() map[string]AdapterFactory {
+	// Return a copy to avoid accidental mutation
+	result := make(map[string]AdapterFactory)
+	for key, value := range typeAdapterRegistry {
+		result[key] = value
+	}
+	return result
 }
