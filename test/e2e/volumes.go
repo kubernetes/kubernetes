@@ -933,7 +933,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// vSphere
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("vsphere", func() {
+	framework.KubeDescribe("vsphere [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			var (
