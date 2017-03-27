@@ -90,7 +90,11 @@ func Convert_v1alpha1_APIServiceList_To_apiregistration_APIServiceList(in *APISe
 
 func autoConvert_apiregistration_APIServiceList_To_v1alpha1_APIServiceList(in *apiregistration.APIServiceList, out *APIServiceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]APIService)(unsafe.Pointer(&in.Items))
+	if in.Items == nil {
+		out.Items = make([]APIService, 0)
+	} else {
+		out.Items = *(*[]APIService)(unsafe.Pointer(&in.Items))
+	}
 	return nil
 }
 
@@ -117,7 +121,11 @@ func autoConvert_apiregistration_APIServiceSpec_To_v1alpha1_APIServiceSpec(in *a
 	out.Group = in.Group
 	out.Version = in.Version
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
-	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
+	if in.CABundle == nil {
+		out.CABundle = make([]byte, 0)
+	} else {
+		out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
+	}
 	out.Priority = in.Priority
 	return nil
 }
