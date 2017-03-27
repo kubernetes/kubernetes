@@ -16,5 +16,9 @@ FROM alpine
 
 RUN apk add --no-cache redis
 
+RUN mkdir /data
+COPY redis.conf /etc/redis.conf
+
 EXPOSE 6379
-CMD ["redis-server"]
+
+CMD ["redis-server", "/etc/redis.conf"]
