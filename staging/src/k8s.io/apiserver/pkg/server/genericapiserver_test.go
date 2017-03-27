@@ -86,7 +86,7 @@ func testGetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
 
-	config := NewConfig().WithSerializer(codecs)
+	config := NewConfig(codecs)
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")

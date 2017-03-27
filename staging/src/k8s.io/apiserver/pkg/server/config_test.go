@@ -33,7 +33,7 @@ import (
 )
 
 func TestNewWithDelegate(t *testing.T) {
-	delegateConfig := NewConfig().WithSerializer(codecs)
+	delegateConfig := NewConfig(codecs)
 	delegateConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	delegateConfig.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
@@ -63,7 +63,7 @@ func TestNewWithDelegate(t *testing.T) {
 	// this wires up swagger
 	delegateServer.PrepareRun()
 
-	wrappingConfig := NewConfig().WithSerializer(codecs)
+	wrappingConfig := NewConfig(codecs)
 	wrappingConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	wrappingConfig.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
