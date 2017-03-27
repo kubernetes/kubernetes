@@ -447,6 +447,27 @@ if [[ "${master_upgrade}" == "false" ]] && [[ "${node_upgrade}" == "false" ]]; t
   exit 1
 fi
 
+# prompt if etcd storage media type isn't set
+if [[ -z "${STORAGE_MEDIA_TYPE:-}" ]]; then
+  if [ -t 1 ]; then
+    echo "The default etcd storage media type in 1.6 has changed from application/json to application/vnd.kubernetes.protobuf."
+    echo ""
+    echo "ETCD2 DOES NOT SUPPORT PROTOBUF: If you wish to have to ability to downgrade to etcd2 later application/json must be used."
+    echo ""
+    echo "To enable using json, before running this script set:"
+    echo "export STORAGE_MEDIA_TYPE=application/json"
+    echo ""
+    echo "It's HIGHLY recommended that etcd be backed up before this step!!"
+    read -p "Would you like to continue? [y/N] " confirm
+    if [[ "${confirm}" != "y" ]]; then
+      exit 1
+    fi
+  else
+    echo "STORAGE_MEDIA_TYPE must be specified when run non-interactively." >&2
+    exit 1
+  fi
+fi
+
 print-node-version-info "Pre-Upgrade"
 
 if [[ "${local_binaries}" == "false" ]]; then
