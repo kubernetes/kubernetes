@@ -29,7 +29,7 @@ all: build
 build:
 	mkdir -p $(OUTPUT_DIR)
 
-	docker run -it -v $(OUTPUT_DIR):/output golang:$(GOLANG_VERSION) /bin/bash -c "\
+	docker run -it -v $(OUTPUT_DIR):/output:Z golang:$(GOLANG_VERSION) /bin/bash -c "\
 	git clone https://github.com/containernetworking/cni\
 	&& cd cni \
 	&& git checkout $(CNI_RELEASE) \
