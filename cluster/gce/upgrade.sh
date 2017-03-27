@@ -74,6 +74,13 @@ function print-node-version-info() {
 }
 
 function upgrade-master() {
+  local num_masters
+  num_masters=$(get-master-replicas-count)
+  if [[ "${num_masters}" -gt 1 ]]; then
+    echo "Upgrade of master not supported if more than one master replica present. The current number of master replicas: ${num_masters}"
+    exit 1
+  fi
+
   echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
 
   # Tries to figure out KUBE_USER/KUBE_PASSWORD by first looking under
