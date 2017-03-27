@@ -142,7 +142,7 @@ spec:
     spec:
       containers:
       - name: master
-        image: gcr.io/k8s-gubernator/redis:e2e  # or just image: redis
+        image: gcr.io/google_containers/redis:e2e  # or just image: redis
         resources:
           requests:
             cpu: 100m
@@ -297,7 +297,7 @@ Controllers:	ReplicaSet/redis-master-2353460263
 Containers:
   master:
     Container ID:	docker://76cf8115485966131587958ea3cbe363e2e1dcce129e2e624883f393ce256f6c
-    Image:		gcr.io/k8s-gubernator/redis:e2e
+    Image:		gcr.io/google_containers/redis:e2e
     Image ID:		docker://e5f6c5a2b5646828f51e8e0d30a2987df7e8183ab2c3ed0ca19eaa03cc5db08c
     Port:		6379/TCP
 ...
