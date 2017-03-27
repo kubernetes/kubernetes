@@ -33,7 +33,7 @@ import (
 )
 
 func init() {
-	admission.RegisterPlugin("PersistentVolumeLabel", func(config io.Reader) (admission.Interface, error) {
+	kubeapiserveradmission.AdmissionPlugins.Register("PersistentVolumeLabel", func(config io.Reader) (admission.Interface, error) {
 		persistentVolumeLabelAdmission := NewPersistentVolumeLabel()
 		return persistentVolumeLabelAdmission, nil
 	})

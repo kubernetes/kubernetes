@@ -41,7 +41,7 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin(pluginName, func(config io.Reader) (admission.Interface, error) {
+	kubeapiserveradmission.AdmissionPlugins.Register(pluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewPlugin(), nil
 	})
 }

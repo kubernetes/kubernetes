@@ -64,7 +64,7 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/tunneler"
@@ -341,12 +341,12 @@ func BuildAdmission(s *options.ServerRunOptions, client internalclientset.Interf
 			glog.Fatalf("Error reading from cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
 		}
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig)
 	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read plugin config: %v", err)
 	}
-	return admission.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
+	return kubeapiserveradmission.AdmissionPlugins.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
 }
 
 // BuildAuthenticator constructs the authenticator

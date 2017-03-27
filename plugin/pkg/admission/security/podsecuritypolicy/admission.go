@@ -45,7 +45,7 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin(PluginName, func(config io.Reader) (admission.Interface, error) {
+	kubeapiserveradmission.AdmissionPlugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		plugin := NewPlugin(psp.NewSimpleStrategyFactory(), getMatchingPolicies, true)
 		return plugin, nil
 	})
