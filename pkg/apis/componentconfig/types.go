@@ -596,6 +596,10 @@ type KubeSchedulerConfiguration struct {
 	FailureDomains string
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection LeaderElectionConfiguration
+	// LockObjectNamespace defines the namespace of the lock object
+	LockObjectNamespace string
+	// LockObjectName defines the lock object name
+	LockObjectName string
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election
