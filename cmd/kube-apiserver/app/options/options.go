@@ -63,6 +63,9 @@ type ServerRunOptions struct {
 	ServiceNodePortRange      utilnet.PortRange
 	SSHKeyfile                string
 	SSHUser                   string
+
+	ProxyClientCertFile string
+	ProxyClientKeyFile  string
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
@@ -200,4 +203,10 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"If true, server will do its best to fix the update request to pass the validation, "+
 		"e.g., setting empty UID in update request to its existing value. This flag can be turned off "+
 		"after we fix all the clients that send malformed updates.")
+
+	fs.StringVar(&s.ProxyClientCertFile, "proxy-client-cert-file", s.ProxyClientCertFile,
+		"client certificate used to prove the identity of the aggragator or kube-apiserver when it proxies requests to a user api-server")
+	fs.StringVar(&s.ProxyClientKeyFile, "proxy-client-key-file", s.ProxyClientKeyFile,
+		"client certificate key used to prove the identity of the aggragator or kube-apiserver when it proxies requests to a user api-server")
+
 }
