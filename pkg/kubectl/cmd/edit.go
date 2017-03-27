@@ -385,7 +385,7 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 		return nil, nil, nil, "", err
 	}
 
-	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
+	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
 	if editMode == NormalEditMode {
 		// if in normal mode, also read from args, and fetch latest from the server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
@@ -403,7 +403,7 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 
 	updatedResultGetter := func(data []byte) *resource.Result {
 		// resource builder to read objects from edited data
-		return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+		return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 			Stream(bytes.NewReader(data), "edited-file").
 			ContinueOnError().
 			Flatten().
