@@ -18,9 +18,9 @@ PREFIX ?= gcr.io/google-containers
 all: push
 
 image:
-	docker build --pull -t $(PREFIX)/redis .
+	docker build --pull -t $(PREFIX)/redis:$(TAG) .
 
 push: image
-	gcloud docker -- push $(PREFIX)/redis
+	gcloud docker -- push $(PREFIX)/redis:$(TAG)
 
 clean:
