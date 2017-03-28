@@ -283,7 +283,8 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 	// Avoid changing behaviour when not managing multiple zones
 	for _, zone := range gce.managedZones {
 		name = canonicalizeInstanceName(name)
-		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Do()
+		dc := contextWithNamespace(name, "gce_instance_list")
+		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Context(dc).Do()
 		if err != nil {
 			glog.Errorf("getInstanceByName: failed to get instance %s; err: %v", name, err)
 
