@@ -226,6 +226,13 @@ func (c *MesosCloud) InstanceID(nodeName types.NodeName) (string, error) {
 	return "", nil
 }
 
+// InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (c *MesosCloud) InstanceTypeByProviderID(providerID string) (string, error) {
+	return "", errors.New("unimplemented")
+}
+
 // InstanceType returns the type of the instance with the specified nodeName.
 func (c *MesosCloud) InstanceType(nodeName types.NodeName) (string, error) {
 	return "", nil
@@ -295,4 +302,11 @@ func (c *MesosCloud) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, e
 		{Type: v1.NodeInternalIP, Address: ip.String()},
 		{Type: v1.NodeExternalIP, Address: ip.String()},
 	}, nil
+}
+
+// NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (c *MesosCloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	return []v1.NodeAddress{}, errors.New("unimplemented")
 }
