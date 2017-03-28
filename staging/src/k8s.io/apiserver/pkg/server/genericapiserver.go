@@ -105,11 +105,10 @@ type GenericAPIServer struct {
 	// The registered APIs
 	HandlerContainer *genericmux.APIContainer
 
-	SecureServingInfo   *SecureServingInfo
-	InsecureServingInfo *ServingInfo
+	SecureServingInfo *SecureServingInfo
 
 	// numerical ports, set after listening
-	effectiveSecurePort, effectiveInsecurePort int
+	effectiveSecurePort int
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
@@ -123,8 +122,7 @@ type GenericAPIServer struct {
 	Serializer runtime.NegotiatedSerializer
 
 	// "Outputs"
-	Handler         http.Handler
-	InsecureHandler http.Handler
+	Handler http.Handler
 	// FallThroughHandler is the final HTTP handler in the chain.
 	// It comes after all filters and the API handling
 	FallThroughHandler *mux.PathRecorderMux
@@ -272,13 +270,6 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		if err := s.serveSecurely(internalStopCh); err != nil {
-			close(internalStopCh)
-			return err
-		}
-	}
-
-	if s.InsecureServingInfo != nil && s.InsecureHandler != nil {
-		if err := s.serveInsecurely(internalStopCh); err != nil {
 			close(internalStopCh)
 			return err
 		}

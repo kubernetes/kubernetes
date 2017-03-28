@@ -459,10 +459,8 @@ NextTest:
 
 			config.EnableIndex = true
 			secureOptions := &SecureServingOptions{
-				ServingOptions: ServingOptions{
-					BindAddress: net.ParseIP("127.0.0.1"),
-					BindPort:    6443,
-				},
+				BindAddress: net.ParseIP("127.0.0.1"),
+				BindPort:    6443,
 				ServerCert: GeneratableKeyCert{
 					CertKey: CertKey{
 						CertFile: serverCertBundleFile,
@@ -476,7 +474,6 @@ NextTest:
 				t.Errorf("%q - failed applying the SecureServingOptions: %v", title, err)
 				return
 			}
-			config.InsecureServingInfo = nil
 
 			s, err := config.Complete().New()
 			if err != nil {
