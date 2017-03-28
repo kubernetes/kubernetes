@@ -15,20 +15,19 @@ The example assumes that you have already set up a GlusterFS server cluster and 
 The first step is to create the GlusterFS endpoints definition in Kubernetes. Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json):
 
 ```
-      "addresses": [
-        {
-          "IP": "10.240.106.152"
-        }
-      ],
-      "ports": [
-        {
-          "port": 1
-        }
-      ]
-
+  "subsets": [
+    {
+      "addresses": [{ "ip": "10.240.106.152" }],
+      "ports": [{ "port": 1 }]
+    },
+    {
+      "addresses": [{ "ip": "10.240.79.157" }],
+      "ports": [{ "port": 1 }]
+    }
+  ]
 ```
 
-The `IP` field should be filled with the addresses of the nodes in the GlusterFS server cluster. It is fine to provide any valid value (from 1 to 65535) in the `port` field.
+The `subsets` field should be populated with the addresses of the nodes in the GlusterFS cluster. It is fine to provide any valid value (from 1 to 65535) in the `port` field.
 
 Create the endpoints:
 
@@ -44,7 +43,7 @@ NAME                ENDPOINTS
 glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
 ```
 
-We also need to create a service for these endpoints, so that they will be persisted. We will add this service without a selector to tell Kubernetes we want to add its endpoints manually. You can see [glusterfs-service.json](glusterfs-service.json) for details.
+We also need to create a service for these endpoints, so that they will persist. We will add this service without a selector to tell Kubernetes we want to add its endpoints manually. You can see [glusterfs-service.json](glusterfs-service.json) for details.
 
 Use this command to create the service:
 
@@ -90,11 +89,11 @@ NAME             READY     STATUS    RESTARTS   AGE
 glusterfs        1/1       Running   0          3m
 ```
 
-You may run the command `df -h` to see if the GlusterFS volume is mounted correctly:
+You may run the command `mount` to see if the GlusterFS volume is mounted correctly:
 
 ```sh
-$ kubectl exec glusterfs -- df -h
-```
+$ kubectl exec glusterfs -- mount | grep gluster
+10.240.106.152:kube_vol on /mnt/glusterfs type fuse.glusterfs (rw,relatime,user_id=0,group_id=0,default_permissions,allow_other,max_read=131072)```
 
 You may also run `docker ps` on the host to see the actual container.
 
