@@ -288,16 +288,22 @@ def start_worker(kube_api, kube_control, cni):
     # the correct DNS even though the server isn't ready yet.
 
     dns = kube_control.get_dns()
+    cluster_cidr = cni.get_config()['cidr']
+
+    if cluster_cidr is None:
+        hookenv.log('Waiting for cluster cidr.')
+        return
 
     if (is_state('kubernetes-worker.restart-needed') or
             data_changed('kube-api-servers', servers) or
-            data_changed('kube-dns', dns)):
+            data_changed('kube-dns', dns) or
+            data_changed('cluster-cidr', cluster_cidr)):
 
         # set --allow-privileged flag for kubelet
         set_privileged()
 
         create_config(servers[0])
-        configure_worker_services(servers, dns)
+        configure_worker_services(servers, dns, cluster_cidr)
         set_state('kubernetes-worker.config.created')
         restart_unit_services()
         update_kubelet_status()
@@ -424,7 +430,7 @@ def create_config(server):
                       user='kubelet')
 
 
-def configure_worker_services(api_servers, dns):
+def configure_worker_services(api_servers, dns, cluster_cidr):
     ''' Add remaining flags for the worker services and configure snaps to use
     them '''
     layer_options = layer.options('tls-client')
@@ -448,6 +454,7 @@ def configure_worker_services(api_servers, dns):
     kubelet_opts.add('tls-private-key-file', server_key_path)
 
     kube_proxy_opts = FlagManager('kube-proxy')
+    kube_proxy_opts.add('cluster-cidr', cluster_cidr)
     kube_proxy_opts.add('kubeconfig', kubeconfig_path)
     kube_proxy_opts.add('logtostderr', 'true')
     kube_proxy_opts.add('v', '0')
