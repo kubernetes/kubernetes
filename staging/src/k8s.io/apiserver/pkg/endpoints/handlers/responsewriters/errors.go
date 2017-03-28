@@ -48,8 +48,10 @@ func Forbidden(attributes authorizer.Attributes, w http.ResponseWriter, req *htt
 
 func forbiddenMessage(attributes authorizer.Attributes) string {
 	username := ""
+	groups := []string{}
 	if user := attributes.GetUser(); user != nil {
 		username = user.GetName()
+		groups = user.GetGroups()
 	}
 
 	resource := attributes.GetResource()
@@ -61,10 +63,10 @@ func forbiddenMessage(attributes authorizer.Attributes) string {
 	}
 
 	if ns := attributes.GetNamespace(); len(ns) > 0 {
-		return fmt.Sprintf("User %q cannot %s %s in the namespace %q.", username, attributes.GetVerb(), resource, ns)
+		return fmt.Sprintf("User %q groups %v cannot %s %s in the namespace %q.", username, groups, attributes.GetVerb(), resource, ns)
 	}
 
-	return fmt.Sprintf("User %q cannot %s %s at the cluster scope.", username, attributes.GetVerb(), resource)
+	return fmt.Sprintf("User %q groups %v cannot %s %s at the cluster scope.", username, groups, attributes.GetVerb(), resource)
 }
 
 // InternalError renders a simple internal error
