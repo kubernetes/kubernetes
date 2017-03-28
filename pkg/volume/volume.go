@@ -18,10 +18,8 @@ package volume
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
-	filepath "path/filepath"
-	"runtime"
+	"path/filepath"
 	"time"
 
 	"github.com/golang/glog"
@@ -235,28 +233,35 @@ func (err deletedVolumeInUseError) Error() string {
 	return string(err)
 }
 
-func RenameDirectory(oldPath, newName string) (string, error) {
-	newPath, err := ioutil.TempDir(filepath.Dir(oldPath), newName)
-	if err != nil {
-		return "", err
-	}
+// RenameDirectory renames oldPath into newPath. If newPath exists before renaming,
+// it can be optionally fully replaced by oldPath.
+func RenameDirectory(oldPath, newName string, replaceExisting bool) (string, error) {
+	newPath := filepath.Join(filepath.Dir(oldPath), newName)
 
-	// os.Rename call fails on windows (https://github.com/golang/go/issues/14527)
-	// Replacing with copyFolder to the newPath and deleting the oldPath directory
-	if runtime.GOOS == "windows" {
-		err = copyFolder(oldPath, newPath)
-		if err != nil {
-			glog.Errorf("Error copying folder from: %s to: %s with error: %v", oldPath, newPath, err)
-			return "", err
-		}
-		os.RemoveAll(oldPath)
+	err := os.Rename(oldPath, newPath)
+	if err == nil {
 		return newPath, nil
 	}
 
-	err = os.Rename(oldPath, newPath)
-	if err != nil {
+	// Since Go 1.8, os.Rename call fails when the destination exists even under Linux
+	// So if the caller doesn't want to replace the existing directory, this function
+	// should return error code on such condition.
+	if !replaceExisting || !os.IsExist(err) {
 		return "", err
 	}
+
+	// For the force-overwriting case, since the destination is meant to be replaced,
+	// it is safe to remove the destination here.
+	if err := os.RemoveAll(newPath); err != nil {
+		glog.Errorf("Error removing existing directory %s. %v", newPath, err)
+		return "", err
+	}
+
+	// Then try calling rename again and returns any error if occured
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return "", err
+	}
+
 	return newPath, nil
 }
 
