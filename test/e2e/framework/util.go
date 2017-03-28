@@ -4982,11 +4982,21 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 	return
 }
 
-// CheckConnectivityToHost launches a pod running wget on the
-// specified node to test connectivity to the specified host.  An
-// error will be returned if the host is not reachable from the pod.
+// CheckConnectivityToHost launches a pod to test connectivity to the specified
+// host. An error will be returned if the host is not reachable from the pod.
+//
+// An empty nodeName will use the schedule to choose where the pod is executed.
 func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeout int) error {
 	contName := fmt.Sprintf("%s-container", podName)
+
+	command := []string{
+		"ping",
+		"-c", "3", // send 3 pings
+		"-W", "2", // wait at most 2 seconds for a reply
+		"-w", strconv.Itoa(timeout),
+		host,
+	}
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
@@ -4996,7 +5006,7 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeo
 				{
 					Name:    contName,
 					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"wget", fmt.Sprintf("--timeout=%d", timeout), "-s", host},
+					Command: command,
 				},
 			},
 			NodeName:      nodeName,
@@ -5015,7 +5025,7 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeo
 		if logErr != nil {
 			Logf("Warning: Failed to get logs from pod %q: %v", pod.Name, logErr)
 		} else {
-			Logf("pod %s/%s \"wget\" logs:\n%s", f.Namespace.Name, pod.Name, logs)
+			Logf("pod %s/%s logs:\n%s", f.Namespace.Name, pod.Name, logs)
 		}
 	}
 
