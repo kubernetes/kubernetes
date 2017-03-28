@@ -24,7 +24,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -155,14 +154,19 @@ func (m *manager) shouldRotate() bool {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
 	notAfter := m.cert.Leaf.NotAfter
-	total := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
-	remaining := float64(notAfter.Sub(time.Now()))
-	// Add some jitter (+/-10%) to the rotation threshold so that if a number
-	// of nodes are added to a cluster at approximately the same time (such as
-	// cluster creation time), they won't all try to rotate certificates at the
-	// same time for the rest of the life of the cluster.
-	jitter := (rand.Float64() * 20) - 10
-	return remaining < 0 || (remaining/total*100) < (shouldRotatePercent+jitter)
+	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
+
+	// Use some jitter to set the rotation threshold so each node will rotate
+	// at approximately 70-90% of the total lifetime of the certificate.  With
+	// jitter, if a number of nodes are added to a cluster at approximately the
+	// same time (such as cluster creation time), they won't all try to rotate
+	// certificates at the same time for the rest of the life of the cluster.
+	//
+	// For the parameters of the Jitter function:
+	//    [total*0.7, total+total*0.7*0.28] ~ [total*0.7, total*0.9]
+	jitteryDuration := wait.Jitter(time.Duration(totalDuration*0.7), 0.28)
+	rotationThreshold := m.cert.Leaf.NotBefore.Add(jitteryDuration)
+	return time.Now().After(rotationThreshold)
 }
 
 func (m *manager) rotateCerts() error {
