@@ -1,0 +1,2432 @@
+{
+  "swaggerVersion": "1.2",
+  "apiVersion": "settings.k8s.io/v1alpha1",
+  "basePath": "https://10.10.10.10:6443",
+  "resourcePath": "/apis/settings.k8s.io/v1alpha1",
+  "info": {
+   "title": "",
+   "description": ""
+  },
+  "apis": [
+   {
+    "path": "/apis/settings.k8s.io/v1alpha1/namespaces/{namespace}/podpresets",
+    "description": "API at /apis/settings.k8s.io/v1alpha1",
+    "operations": [
+     {
+      "type": "v1alpha1.PodPresetList",
+      "method": "GET",
+      "summary": "list or watch objects of kind PodPreset",
+      "nickname": "listNamespacedPodPreset",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.PodPresetList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1alpha1.PodPreset",
+      "method": "POST",
+      "summary": "create a PodPreset",
+      "nickname": "createNamespacedPodPreset",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1alpha1.PodPreset",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.PodPreset"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Status",
+      "method": "DELETE",
+      "summary": "delete collection of PodPreset",
+      "nickname": "deletecollectionNamespacedPodPreset",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/settings.k8s.io/v1alpha1/watch/namespaces/{namespace}/podpresets",
+    "description": "API at /apis/settings.k8s.io/v1alpha1",
+    "operations": [
+     {
+      "type": "v1.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of PodPreset",
+      "nickname": "watchNamespacedPodPresetList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/settings.k8s.io/v1alpha1/namespaces/{namespace}/podpresets/{name}",
+    "description": "API at /apis/settings.k8s.io/v1alpha1",
+    "operations": [
+     {
+      "type": "v1alpha1.PodPreset",
+      "method": "GET",
+      "summary": "read the specified PodPreset",
+      "nickname": "readNamespacedPodPreset",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "exact",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodPreset",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.PodPreset"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1alpha1.PodPreset",
+      "method": "PUT",
+      "summary": "replace the specified PodPreset",
+      "nickname": "replaceNamespacedPodPreset",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1alpha1.PodPreset",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodPreset",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.PodPreset"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1alpha1.PodPreset",
+      "method": "PATCH",
+      "summary": "partially update the specified PodPreset",
+      "nickname": "patchNamespacedPodPreset",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodPreset",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.PodPreset"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "v1.Status",
+      "method": "DELETE",
+      "summary": "delete a PodPreset",
+      "nickname": "deleteNamespacedPodPreset",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "propagationPolicy",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodPreset",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/settings.k8s.io/v1alpha1/watch/namespaces/{namespace}/podpresets/{name}",
+    "description": "API at /apis/settings.k8s.io/v1alpha1",
+    "operations": [
+     {
+      "type": "v1.WatchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind PodPreset",
+      "nickname": "watchNamespacedPodPreset",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodPreset",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/settings.k8s.io/v1alpha1/podpresets",
+    "description": "API at /apis/settings.k8s.io/v1alpha1",
+    "operations": [
+     {
+      "type": "v1alpha1.PodPresetList",
+      "method": "GET",
+      "summary": "list or watch objects of kind PodPreset",
+      "nickname": "listPodPresetForAllNamespaces",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.PodPresetList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/settings.k8s.io/v1alpha1/watch/podpresets",
+    "description": "API at /apis/settings.k8s.io/v1alpha1",
+    "operations": [
+     {
+      "type": "v1.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of PodPreset",
+      "nickname": "watchPodPresetListForAllNamespaces",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/settings.k8s.io/v1alpha1",
+    "description": "API at /apis/settings.k8s.io/v1alpha1",
+    "operations": [
+     {
+      "type": "v1.APIResourceList",
+      "method": "GET",
+      "summary": "get available resources",
+      "nickname": "getAPIResources",
+      "parameters": [],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ]
+     }
+    ]
+   }
+  ],
+  "models": {
+   "v1alpha1.PodPresetList": {
+    "id": "v1alpha1.PodPresetList",
+    "description": "PodPresetList is a list of PodPreset objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1alpha1.PodPreset"
+      },
+      "description": "Items is a list of schema objects."
+     }
+    }
+   },
+   "v1.ListMeta": {
+    "id": "v1.ListMeta",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "properties": {
+     "selfLink": {
+      "type": "string",
+      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     }
+    }
+   },
+   "v1alpha1.PodPreset": {
+    "id": "v1alpha1.PodPreset",
+    "description": "PodPreset is a policy resource that defines additional runtime requirements for a Pod.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "v1alpha1.PodPresetSpec"
+     }
+    }
+   },
+   "v1.ObjectMeta": {
+    "id": "v1.ObjectMeta",
+    "description": "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "GenerateName is an optional prefix, used by the server, to generate a unique name ONLY IF the Name field has not been provided. If this field is used, the name returned to the client will be different than the name passed. This value will also be combined with a unique suffix. The provided value has the same validation rules as the Name field, and may be truncated by the length of the suffix required to make the value unique on the server.\n\nIf this field is specified and the generated name exists, the server will NOT return a 409 - instead, it will either return 201 Created or 500 with Reason ServerTimeout indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).\n\nApplied only if Name is not specified. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#idempotency"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "Namespace defines the space within each name must be unique. An empty namespace is equivalent to the \"default\" namespace, but \"default\" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.\n\nMust be a DNS_LABEL. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/namespaces"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID is the unique in time and space value for this object. It is typically generated by the server on successful creation of a resource and is not allowed to change on PUT operations.\n\nPopulated by the system. Read-only. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "An opaque value that represents the internal version of this object that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a resource or set of resources. Clients must treat these values as opaque and passed unmodified back to the server. They may only be valid for a particular resource or set of resources.\n\nPopulated by the system. Read-only. Value must be treated as opaque by clients and . More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "generation": {
+      "type": "integer",
+      "format": "int64",
+      "description": "A sequence number representing a specific generation of the desired state. Populated by the system. Read-only."
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "deletionGracePeriodSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Number of seconds allowed for this object to gracefully terminate before it will be removed from the system. Only set when deletionTimestamp is also set. May only be shortened. Read-only."
+     },
+     "labels": {
+      "type": "object",
+      "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels"
+     },
+     "annotations": {
+      "type": "object",
+      "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations"
+     },
+     "ownerReferences": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.OwnerReference"
+      },
+      "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
+     },
+     "finalizers": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed."
+     },
+     "clusterName": {
+      "type": "string",
+      "description": "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request."
+     }
+    }
+   },
+   "v1.OwnerReference": {
+    "id": "v1.OwnerReference",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "required": [
+     "apiVersion",
+     "kind",
+     "name",
+     "uid"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent."
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
+     "controller": {
+      "type": "boolean",
+      "description": "If true, this reference points to the managing controller."
+     },
+     "blockOwnerDeletion": {
+      "type": "boolean",
+      "description": "If true, AND if the owner has the \"foregroundDeletion\" finalizer, then the owner cannot be deleted from the key-value store until this reference is removed. Defaults to false. To set this field, a user needs \"delete\" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned."
+     }
+    }
+   },
+   "v1alpha1.PodPresetSpec": {
+    "id": "v1alpha1.PodPresetSpec",
+    "description": "PodPresetSpec is a description of a pod injection policy.",
+    "properties": {
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "Selector is a label query over a set of resources, in this case pods. Required."
+     },
+     "env": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.EnvVar"
+      },
+      "description": "Env defines the collection of EnvVar to inject into containers."
+     },
+     "envFrom": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.EnvFromSource"
+      },
+      "description": "EnvFrom defines the collection of EnvFromSource to inject into containers."
+     },
+     "volumes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Volume"
+      },
+      "description": "Volumes defines the collection of Volume to inject into the pod."
+     },
+     "volumeMounts": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.VolumeMount"
+      },
+      "description": "VolumeMounts defines the collection of VolumeMount to inject into containers."
+     }
+    }
+   },
+   "v1.LabelSelector": {
+    "id": "v1.LabelSelector",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchLabels": {
+      "type": "object",
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
+     },
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.LabelSelectorRequirement"
+      },
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "v1.LabelSelectorRequirement": {
+    "id": "v1.LabelSelectorRequirement",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "key is the label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
+     }
+    }
+   },
+   "v1.EnvVar": {
+    "id": "v1.EnvVar",
+    "description": "EnvVar represents an environment variable present in a Container.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the environment variable. Must be a C_IDENTIFIER."
+     },
+     "value": {
+      "type": "string",
+      "description": "Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to \"\"."
+     },
+     "valueFrom": {
+      "$ref": "v1.EnvVarSource",
+      "description": "Source for the environment variable's value. Cannot be used if value is not empty."
+     }
+    }
+   },
+   "v1.EnvVarSource": {
+    "id": "v1.EnvVarSource",
+    "description": "EnvVarSource represents a source for the value of an EnvVar.",
+    "properties": {
+     "fieldRef": {
+      "$ref": "v1.ObjectFieldSelector",
+      "description": "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.podIP."
+     },
+     "resourceFieldRef": {
+      "$ref": "v1.ResourceFieldSelector",
+      "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
+     },
+     "configMapKeyRef": {
+      "$ref": "v1.ConfigMapKeySelector",
+      "description": "Selects a key of a ConfigMap."
+     },
+     "secretKeyRef": {
+      "$ref": "v1.SecretKeySelector",
+      "description": "Selects a key of a secret in the pod's namespace"
+     }
+    }
+   },
+   "v1.ObjectFieldSelector": {
+    "id": "v1.ObjectFieldSelector",
+    "description": "ObjectFieldSelector selects an APIVersioned field of an object.",
+    "required": [
+     "fieldPath"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "Version of the schema the FieldPath is written in terms of, defaults to \"v1\"."
+     },
+     "fieldPath": {
+      "type": "string",
+      "description": "Path of the field to select in the specified API version."
+     }
+    }
+   },
+   "v1.ResourceFieldSelector": {
+    "id": "v1.ResourceFieldSelector",
+    "description": "ResourceFieldSelector represents container resources (cpu, memory) and their output format",
+    "required": [
+     "resource"
+    ],
+    "properties": {
+     "containerName": {
+      "type": "string",
+      "description": "Container name: required for volumes, optional for env vars"
+     },
+     "resource": {
+      "type": "string",
+      "description": "Required: resource to select"
+     },
+     "divisor": {
+      "type": "string",
+      "description": "Specifies the output format of the exposed resources, defaults to \"1\""
+     }
+    }
+   },
+   "v1.ConfigMapKeySelector": {
+    "id": "v1.ConfigMapKeySelector",
+    "description": "Selects a key from a ConfigMap.",
+    "required": [
+     "key"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "key": {
+      "type": "string",
+      "description": "The key to select."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap or it's key must be defined"
+     }
+    }
+   },
+   "v1.SecretKeySelector": {
+    "id": "v1.SecretKeySelector",
+    "description": "SecretKeySelector selects a key of a Secret.",
+    "required": [
+     "key"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "key": {
+      "type": "string",
+      "description": "The key of the secret to select from.  Must be a valid secret key."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the Secret or it's key must be defined"
+     }
+    }
+   },
+   "v1.EnvFromSource": {
+    "id": "v1.EnvFromSource",
+    "description": "EnvFromSource represents the source of a set of ConfigMaps",
+    "properties": {
+     "prefix": {
+      "type": "string",
+      "description": "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER."
+     },
+     "configMapRef": {
+      "$ref": "v1.ConfigMapEnvSource",
+      "description": "The ConfigMap to select from"
+     },
+     "secretRef": {
+      "$ref": "v1.SecretEnvSource",
+      "description": "The Secret to select from"
+     }
+    }
+   },
+   "v1.ConfigMapEnvSource": {
+    "id": "v1.ConfigMapEnvSource",
+    "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap must be defined"
+     }
+    }
+   },
+   "v1.SecretEnvSource": {
+    "id": "v1.SecretEnvSource",
+    "description": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the Secret must be defined"
+     }
+    }
+   },
+   "v1.Volume": {
+    "id": "v1.Volume",
+    "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "hostPath": {
+      "$ref": "v1.HostPathVolumeSource",
+      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath"
+     },
+     "emptyDir": {
+      "$ref": "v1.EmptyDirVolumeSource",
+      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir"
+     },
+     "gcePersistentDisk": {
+      "$ref": "v1.GCEPersistentDiskVolumeSource",
+      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
+     },
+     "awsElasticBlockStore": {
+      "$ref": "v1.AWSElasticBlockStoreVolumeSource",
+      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
+     },
+     "gitRepo": {
+      "$ref": "v1.GitRepoVolumeSource",
+      "description": "GitRepo represents a git repository at a particular revision."
+     },
+     "secret": {
+      "$ref": "v1.SecretVolumeSource",
+      "description": "Secret represents a secret that should populate this volume. More info: http://kubernetes.io/docs/user-guide/volumes#secrets"
+     },
+     "nfs": {
+      "$ref": "v1.NFSVolumeSource",
+      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
+     },
+     "iscsi": {
+      "$ref": "v1.ISCSIVolumeSource",
+      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md"
+     },
+     "glusterfs": {
+      "$ref": "v1.GlusterfsVolumeSource",
+      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md"
+     },
+     "persistentVolumeClaim": {
+      "$ref": "v1.PersistentVolumeClaimVolumeSource",
+      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims"
+     },
+     "rbd": {
+      "$ref": "v1.RBDVolumeSource",
+      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md"
+     },
+     "flexVolume": {
+      "$ref": "v1.FlexVolumeSource",
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future."
+     },
+     "cinder": {
+      "$ref": "v1.CinderVolumeSource",
+      "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "cephfs": {
+      "$ref": "v1.CephFSVolumeSource",
+      "description": "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime"
+     },
+     "flocker": {
+      "$ref": "v1.FlockerVolumeSource",
+      "description": "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running"
+     },
+     "downwardAPI": {
+      "$ref": "v1.DownwardAPIVolumeSource",
+      "description": "DownwardAPI represents downward API about the pod that should populate this volume"
+     },
+     "fc": {
+      "$ref": "v1.FCVolumeSource",
+      "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod."
+     },
+     "azureFile": {
+      "$ref": "v1.AzureFileVolumeSource",
+      "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod."
+     },
+     "configMap": {
+      "$ref": "v1.ConfigMapVolumeSource",
+      "description": "ConfigMap represents a configMap that should populate this volume"
+     },
+     "vsphereVolume": {
+      "$ref": "v1.VsphereVirtualDiskVolumeSource",
+      "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
+     },
+     "quobyte": {
+      "$ref": "v1.QuobyteVolumeSource",
+      "description": "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime"
+     },
+     "azureDisk": {
+      "$ref": "v1.AzureDiskVolumeSource",
+      "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
+     },
+     "photonPersistentDisk": {
+      "$ref": "v1.PhotonPersistentDiskVolumeSource",
+      "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine"
+     },
+     "projected": {
+      "$ref": "v1.ProjectedVolumeSource",
+      "description": "Items for all in one resources secrets, configmaps, and downward API"
+     },
+     "portworxVolume": {
+      "$ref": "v1.PortworxVolumeSource",
+      "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine"
+     },
+     "scaleIO": {
+      "$ref": "v1.ScaleIOVolumeSource",
+      "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
+     }
+    }
+   },
+   "v1.HostPathVolumeSource": {
+    "id": "v1.HostPathVolumeSource",
+    "description": "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Path of the directory on the host. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath"
+     }
+    }
+   },
+   "v1.EmptyDirVolumeSource": {
+    "id": "v1.EmptyDirVolumeSource",
+    "description": "Represents an empty directory for a pod. Empty directory volumes support ownership management and SELinux relabeling.",
+    "properties": {
+     "medium": {
+      "type": "string",
+      "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir"
+     }
+    }
+   },
+   "v1.GCEPersistentDiskVolumeSource": {
+    "id": "v1.GCEPersistentDiskVolumeSource",
+    "description": "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.",
+    "required": [
+     "pdName"
+    ],
+    "properties": {
+     "pdName": {
+      "type": "string",
+      "description": "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk"
+     }
+    }
+   },
+   "v1.AWSElasticBlockStoreVolumeSource": {
+    "id": "v1.AWSElasticBlockStoreVolumeSource",
+    "description": "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string",
+      "description": "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty)."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore"
+     }
+    }
+   },
+   "v1.GitRepoVolumeSource": {
+    "id": "v1.GitRepoVolumeSource",
+    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.",
+    "required": [
+     "repository"
+    ],
+    "properties": {
+     "repository": {
+      "type": "string",
+      "description": "Repository URL"
+     },
+     "revision": {
+      "type": "string",
+      "description": "Commit hash for the specified revision."
+     },
+     "directory": {
+      "type": "string",
+      "description": "Target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name."
+     }
+    }
+   },
+   "v1.SecretVolumeSource": {
+    "id": "v1.SecretVolumeSource",
+    "description": "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
+    "properties": {
+     "secretName": {
+      "type": "string",
+      "description": "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.KeyToPath"
+      },
+      "description": "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'."
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the Secret or it's keys must be defined"
+     }
+    }
+   },
+   "v1.KeyToPath": {
+    "id": "v1.KeyToPath",
+    "description": "Maps a string key to a path within a volume.",
+    "required": [
+     "key",
+     "path"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "The key to project."
+     },
+     "path": {
+      "type": "string",
+      "description": "The relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'."
+     },
+     "mode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     }
+    }
+   },
+   "v1.NFSVolumeSource": {
+    "id": "v1.NFSVolumeSource",
+    "description": "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "server",
+     "path"
+    ],
+    "properties": {
+     "server": {
+      "type": "string",
+      "description": "Server is the hostname or IP address of the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
+     },
+     "path": {
+      "type": "string",
+      "description": "Path that is exported by the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: http://kubernetes.io/docs/user-guide/volumes#nfs"
+     }
+    }
+   },
+   "v1.ISCSIVolumeSource": {
+    "id": "v1.ISCSIVolumeSource",
+    "description": "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "targetPortal",
+     "iqn",
+     "lun"
+    ],
+    "properties": {
+     "targetPortal": {
+      "type": "string",
+      "description": "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260)."
+     },
+     "iqn": {
+      "type": "string",
+      "description": "Target iSCSI Qualified Name."
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32",
+      "description": "iSCSI target lun number."
+     },
+     "iscsiInterface": {
+      "type": "string",
+      "description": "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false."
+     },
+     "portals": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260)."
+     }
+    }
+   },
+   "v1.GlusterfsVolumeSource": {
+    "id": "v1.GlusterfsVolumeSource",
+    "description": "Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "endpoints",
+     "path"
+    ],
+    "properties": {
+     "endpoints": {
+      "type": "string",
+      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
+     },
+     "path": {
+      "type": "string",
+      "description": "Path is the Glusterfs volume path. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
+     }
+    }
+   },
+   "v1.PersistentVolumeClaimVolumeSource": {
+    "id": "v1.PersistentVolumeClaimVolumeSource",
+    "description": "PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).",
+    "required": [
+     "claimName"
+    ],
+    "properties": {
+     "claimName": {
+      "type": "string",
+      "description": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Will force the ReadOnly setting in VolumeMounts. Default false."
+     }
+    }
+   },
+   "v1.RBDVolumeSource": {
+    "id": "v1.RBDVolumeSource",
+    "description": "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "monitors",
+     "image"
+    ],
+    "properties": {
+     "monitors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "A collection of Ceph monitors. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "image": {
+      "type": "string",
+      "description": "The rados image name. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#rbd"
+     },
+     "pool": {
+      "type": "string",
+      "description": "The rados pool name. Default is rbd. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it."
+     },
+     "user": {
+      "type": "string",
+      "description": "The rados user name. Default is admin. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "keyring": {
+      "type": "string",
+      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     }
+    }
+   },
+   "v1.LocalObjectReference": {
+    "id": "v1.LocalObjectReference",
+    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     }
+    }
+   },
+   "v1.FlexVolumeSource": {
+    "id": "v1.FlexVolumeSource",
+    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "driver": {
+      "type": "string",
+      "description": "Driver is the name of the driver to use for this volume."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script."
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     },
+     "options": {
+      "type": "object",
+      "description": "Optional: Extra command options if any."
+     }
+    }
+   },
+   "v1.CinderVolumeSource": {
+    "id": "v1.CinderVolumeSource",
+    "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string",
+      "description": "volume id used to identify the volume in cinder More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     }
+    }
+   },
+   "v1.CephFSVolumeSource": {
+    "id": "v1.CephFSVolumeSource",
+    "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "monitors"
+    ],
+    "properties": {
+     "monitors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+     },
+     "path": {
+      "type": "string",
+      "description": "Optional: Used as the mounted root, rather than the full Ceph tree, default is /"
+     },
+     "user": {
+      "type": "string",
+      "description": "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+     },
+     "secretFile": {
+      "type": "string",
+      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+     }
+    }
+   },
+   "v1.FlockerVolumeSource": {
+    "id": "v1.FlockerVolumeSource",
+    "description": "Represents a Flocker volume mounted by the Flocker agent. One and only one of datasetName and datasetUUID should be set. Flocker volumes do not support ownership management or SELinux relabeling.",
+    "properties": {
+     "datasetName": {
+      "type": "string",
+      "description": "Name of the dataset stored as metadata -\u003e name on the dataset for Flocker should be considered as deprecated"
+     },
+     "datasetUUID": {
+      "type": "string",
+      "description": "UUID of the dataset. This is unique identifier of a Flocker dataset"
+     }
+    }
+   },
+   "v1.DownwardAPIVolumeSource": {
+    "id": "v1.DownwardAPIVolumeSource",
+    "description": "DownwardAPIVolumeSource represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.",
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.DownwardAPIVolumeFile"
+      },
+      "description": "Items is a list of downward API volume file"
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     }
+    }
+   },
+   "v1.DownwardAPIVolumeFile": {
+    "id": "v1.DownwardAPIVolumeFile",
+    "description": "DownwardAPIVolumeFile represents information to create the file containing the pod field",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'"
+     },
+     "fieldRef": {
+      "$ref": "v1.ObjectFieldSelector",
+      "description": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
+     },
+     "resourceFieldRef": {
+      "$ref": "v1.ResourceFieldSelector",
+      "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
+     },
+     "mode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     }
+    }
+   },
+   "v1.FCVolumeSource": {
+    "id": "v1.FCVolumeSource",
+    "description": "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "targetWWNs",
+     "lun"
+    ],
+    "properties": {
+     "targetWWNs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Required: FC target worldwide names (WWNs)"
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Required: FC target lun number"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.AzureFileVolumeSource": {
+    "id": "v1.AzureFileVolumeSource",
+    "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+    "required": [
+     "secretName",
+     "shareName"
+    ],
+    "properties": {
+     "secretName": {
+      "type": "string",
+      "description": "the name of secret that contains Azure Storage Account Name and Key"
+     },
+     "shareName": {
+      "type": "string",
+      "description": "Share Name"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.ConfigMapVolumeSource": {
+    "id": "v1.ConfigMapVolumeSource",
+    "description": "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.KeyToPath"
+      },
+      "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'."
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap or it's keys must be defined"
+     }
+    }
+   },
+   "v1.VsphereVirtualDiskVolumeSource": {
+    "id": "v1.VsphereVirtualDiskVolumeSource",
+    "description": "Represents a vSphere volume resource.",
+    "required": [
+     "volumePath"
+    ],
+    "properties": {
+     "volumePath": {
+      "type": "string",
+      "description": "Path that identifies vSphere volume vmdk"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
+   "v1.QuobyteVolumeSource": {
+    "id": "v1.QuobyteVolumeSource",
+    "description": "Represents a Quobyte mount that lasts the lifetime of a pod. Quobyte volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "registry",
+     "volume"
+    ],
+    "properties": {
+     "registry": {
+      "type": "string",
+      "description": "Registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes"
+     },
+     "volume": {
+      "type": "string",
+      "description": "Volume is a string that references an already created Quobyte volume by name."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false."
+     },
+     "user": {
+      "type": "string",
+      "description": "User to map volume access to Defaults to serivceaccount user"
+     },
+     "group": {
+      "type": "string",
+      "description": "Group to map volume access to Default is no group"
+     }
+    }
+   },
+   "v1.AzureDiskVolumeSource": {
+    "id": "v1.AzureDiskVolumeSource",
+    "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+    "required": [
+     "diskName",
+     "diskURI"
+    ],
+    "properties": {
+     "diskName": {
+      "type": "string",
+      "description": "The Name of the data disk in the blob storage"
+     },
+     "diskURI": {
+      "type": "string",
+      "description": "The URI the data disk in the blob storage"
+     },
+     "cachingMode": {
+      "$ref": "v1.AzureDataDiskCachingMode",
+      "description": "Host Caching mode: None, Read Only, Read Write."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.AzureDataDiskCachingMode": {
+    "id": "v1.AzureDataDiskCachingMode",
+    "properties": {}
+   },
+   "v1.PhotonPersistentDiskVolumeSource": {
+    "id": "v1.PhotonPersistentDiskVolumeSource",
+    "description": "Represents a Photon Controller persistent disk resource.",
+    "required": [
+     "pdID"
+    ],
+    "properties": {
+     "pdID": {
+      "type": "string",
+      "description": "ID that identifies Photon Controller persistent disk"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
+   "v1.ProjectedVolumeSource": {
+    "id": "v1.ProjectedVolumeSource",
+    "description": "Represents a projected volume source",
+    "required": [
+     "sources"
+    ],
+    "properties": {
+     "sources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.VolumeProjection"
+      },
+      "description": "list of volume projections"
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Mode bits to use on created files by default. Must be a value between 0 and 0777. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     }
+    }
+   },
+   "v1.VolumeProjection": {
+    "id": "v1.VolumeProjection",
+    "description": "Projection that may be projected along with other supported volume types",
+    "properties": {
+     "secret": {
+      "$ref": "v1.SecretProjection",
+      "description": "information about the secret data to project"
+     },
+     "downwardAPI": {
+      "$ref": "v1.DownwardAPIProjection",
+      "description": "information about the downwardAPI data to project"
+     },
+     "configMap": {
+      "$ref": "v1.ConfigMapProjection",
+      "description": "information about the configMap data to project"
+     }
+    }
+   },
+   "v1.SecretProjection": {
+    "id": "v1.SecretProjection",
+    "description": "Adapts a secret into a projected volume.\n\nThe contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.KeyToPath"
+      },
+      "description": "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the Secret or its key must be defined"
+     }
+    }
+   },
+   "v1.DownwardAPIProjection": {
+    "id": "v1.DownwardAPIProjection",
+    "description": "Represents downward API info for projecting into a projected volume. Note that this is identical to a downwardAPI volume source without the default mode.",
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.DownwardAPIVolumeFile"
+      },
+      "description": "Items is a list of DownwardAPIVolume file"
+     }
+    }
+   },
+   "v1.ConfigMapProjection": {
+    "id": "v1.ConfigMapProjection",
+    "description": "Adapts a ConfigMap into a projected volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a projected volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. Note that this is identical to a configmap volume source without the default mode.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.KeyToPath"
+      },
+      "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap or it's keys must be defined"
+     }
+    }
+   },
+   "v1.PortworxVolumeSource": {
+    "id": "v1.PortworxVolumeSource",
+    "description": "PortworxVolumeSource represents a Portworx volume resource.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string",
+      "description": "VolumeID uniquely identifies a Portworx volume"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "FSType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.ScaleIOVolumeSource": {
+    "id": "v1.ScaleIOVolumeSource",
+    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+    "required": [
+     "gateway",
+     "system",
+     "secretRef"
+    ],
+    "properties": {
+     "gateway": {
+      "type": "string",
+      "description": "The host address of the ScaleIO API Gateway."
+     },
+     "system": {
+      "type": "string",
+      "description": "The name of the storage system as configured in ScaleIO."
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail."
+     },
+     "sslEnabled": {
+      "type": "boolean",
+      "description": "Flag to enable/disable SSL communication with Gateway, default false"
+     },
+     "protectionDomain": {
+      "type": "string",
+      "description": "The name of the Protection Domain for the configured storage (defaults to \"default\")."
+     },
+     "storagePool": {
+      "type": "string",
+      "description": "The Storage Pool associated with the protection domain (defaults to \"default\")."
+     },
+     "storageMode": {
+      "type": "string",
+      "description": "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\")."
+     },
+     "volumeName": {
+      "type": "string",
+      "description": "The name of a volume already created in the ScaleIO system that is associated with this volume source."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
+   "v1.VolumeMount": {
+    "id": "v1.VolumeMount",
+    "description": "VolumeMount describes a mounting of a Volume within a container.",
+    "required": [
+     "name",
+     "mountPath"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "This must match the Name of a Volume."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false."
+     },
+     "mountPath": {
+      "type": "string",
+      "description": "Path within the container at which the volume should be mounted.  Must not contain ':'."
+     },
+     "subPath": {
+      "type": "string",
+      "description": "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root)."
+     }
+    }
+   },
+   "v1.Status": {
+    "id": "v1.Status",
+    "description": "Status is a return value for calls that don't return other objects.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the status of this operation."
+     },
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
+     },
+     "details": {
+      "$ref": "v1.StatusDetails",
+      "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
+     },
+     "code": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Suggested HTTP return code for this status, 0 if not set."
+     }
+    }
+   },
+   "v1.StatusDetails": {
+    "id": "v1.StatusDetails",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)."
+     },
+     "group": {
+      "type": "string",
+      "description": "The group attribute of the resource associated with the status StatusReason."
+     },
+     "kind": {
+      "type": "string",
+      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "causes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.StatusCause"
+      },
+      "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
+     },
+     "retryAfterSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "If specified, the time in seconds before the operation should be retried."
+     }
+    }
+   },
+   "v1.StatusCause": {
+    "id": "v1.StatusCause",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of the cause of the error. If this value is empty there is no information available."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the cause of the error.  This field may be presented as-is to a reader."
+     },
+     "field": {
+      "type": "string",
+      "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "v1.WatchEvent": {
+    "id": "v1.WatchEvent",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
+   },
+   "v1.Patch": {
+    "id": "v1.Patch",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "properties": {}
+   },
+   "v1.DeleteOptions": {
+    "id": "v1.DeleteOptions",
+    "description": "DeleteOptions may be provided when deleting an API object.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "gracePeriodSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately."
+     },
+     "preconditions": {
+      "$ref": "v1.Preconditions",
+      "description": "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned."
+     },
+     "orphanDependents": {
+      "type": "boolean",
+      "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both."
+     },
+     "propagationPolicy": {
+      "$ref": "v1.DeletionPropagation",
+      "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy."
+     }
+    }
+   },
+   "v1.Preconditions": {
+    "id": "v1.Preconditions",
+    "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
+    "properties": {
+     "uid": {
+      "$ref": "types.UID",
+      "description": "Specifies the target UID."
+     }
+    }
+   },
+   "types.UID": {
+    "id": "types.UID",
+    "properties": {}
+   },
+   "v1.DeletionPropagation": {
+    "id": "v1.DeletionPropagation",
+    "properties": {}
+   },
+   "v1.APIResourceList": {
+    "id": "v1.APIResourceList",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "required": [
+     "groupVersion",
+     "resources"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "groupVersion": {
+      "type": "string",
+      "description": "groupVersion is the group and version this APIResourceList is for."
+     },
+     "resources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.APIResource"
+      },
+      "description": "resources contains the name of the resources and if they are namespaced."
+     }
+    }
+   },
+   "v1.APIResource": {
+    "id": "v1.APIResource",
+    "description": "APIResource specifies the name of a resource and whether it is namespaced.",
+    "required": [
+     "name",
+     "singularName",
+     "namespaced",
+     "kind",
+     "verbs"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name is the plural name of the resource."
+     },
+     "singularName": {
+      "type": "string",
+      "description": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface."
+     },
+     "namespaced": {
+      "type": "boolean",
+      "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')"
+     },
+     "verbs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     },
+     "shortNames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "shortNames is a list of suggested short names of the resource."
+     }
+    }
+   }
+  }
+ }

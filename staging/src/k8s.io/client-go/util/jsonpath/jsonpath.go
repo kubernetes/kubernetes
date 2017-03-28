@@ -148,6 +148,8 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 		return j.evalFilter(value, node)
 	case *IntNode:
 		return j.evalInt(value, node)
+	case *BoolNode:
+		return j.evalBool(value, node)
 	case *FloatNode:
 		return j.evalFloat(value, node)
 	case *WildcardNode:
@@ -174,6 +176,15 @@ func (j *JSONPath) evalInt(input []reflect.Value, node *IntNode) ([]reflect.Valu
 
 // evalFloat evaluates FloatNode
 func (j *JSONPath) evalFloat(input []reflect.Value, node *FloatNode) ([]reflect.Value, error) {
+	result := make([]reflect.Value, len(input))
+	for i := range input {
+		result[i] = reflect.ValueOf(node.Value)
+	}
+	return result, nil
+}
+
+// evalBool evaluates BoolNode
+func (j *JSONPath) evalBool(input []reflect.Value, node *BoolNode) ([]reflect.Value, error) {
 	result := make([]reflect.Value, len(input))
 	for i := range input {
 		result[i] = reflect.ValueOf(node.Value)

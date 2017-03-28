@@ -34,14 +34,10 @@ class MatchHandler(object):
         self.regex = re.compile(regex)
         self.replace_fn = replace_fn
 
-# global holding all strings discovered
-STRINGS = []
-
 def short_replace(match, file, line_number):
     """Replace a Short: ... cobra command description with an internationalization
     """
     sys.stdout.write('{}i18n.T({}),\n'.format(match.group(1), match.group(2)))
-    STRINGS.append((match.group(2), file, line_number))
 
 SHORT_MATCH = MatchHandler(r'(\s+Short:\s+)("[^"]+"),', short_replace)
 
@@ -53,6 +49,14 @@ def import_replace(match, file, line_number):
     sys.stdout.write('{}\n"k8s.io/kubernetes/pkg/util/i18n"\n'.format(match.group(1)))
 
 IMPORT_MATCH = MatchHandler('(.*"k8s.io/kubernetes/pkg/kubectl/cmd/util")', import_replace)
+
+
+def string_flag_replace(match, file, line_number):
+    """Replace a cmd.Flags().String("...", "", "...") with an internationalization
+    """
+    sys.stdout.write('{}i18n.T("{})"))\n'.format(match.group(1), match.group(2)))
+
+STRING_FLAG_MATCH = MatchHandler('(\s+cmd\.Flags\(\).String\("[^"]*", "[^"]*", )"([^"]*)"\)', string_flag_replace)
 
 def replace(filename, matchers):
     """Given a file and a set of matchers, run those matchers
@@ -75,22 +79,6 @@ def replace(filename, matchers):
 
     # gofmt the file again
     from subprocess import call
-    call(["gofmt", "-s", "-w", filename])
+    call(["goimports", "-w", filename])
 
-    # update the translation files
-    translation_files = [
-        "translations/kubectl/default/LC_MESSAGES/k8s.po",
-        "translations/kubectl/en_US/LC_MESSAGES/k8s.po",
-    ]
-
-    for translation_filename in translation_files:
-        with open(translation_filename, "a") as tfile:
-            for translation_string in STRINGS:
-                msg_string = translation_string[0]
-                tfile.write('\n')
-                tfile.write('# https://github.com/kubernetes/kubernetes/blob/master/{}#L{}\n'.format(translation_string[1], translation_string[2]))
-                tfile.write('msgctxt {}\n'.format(msg_string))
-                tfile.write('msgid {}\n'.format(msg_string))
-                tfile.write('msgstr {}\n'.format(msg_string))
-
-replace(sys.argv[1], [SHORT_MATCH, IMPORT_MATCH])
+replace(sys.argv[1], [SHORT_MATCH, IMPORT_MATCH, STRING_FLAG_MATCH])

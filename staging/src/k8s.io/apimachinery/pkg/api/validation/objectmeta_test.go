@@ -277,6 +277,28 @@ func TestValidateFinalizersUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateFinalizersPreventConflictingFinalizers(t *testing.T) {
+	testcases := map[string]struct {
+		ObjectMeta  metav1.ObjectMeta
+		ExpectedErr string
+	}{
+		"conflicting finalizers": {
+			ObjectMeta:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1", Finalizers: []string{metav1.FinalizerOrphanDependents, metav1.FinalizerDeleteDependents}},
+			ExpectedErr: "cannot be both set",
+		},
+	}
+	for name, tc := range testcases {
+		errs := ValidateObjectMeta(&tc.ObjectMeta, false, NameIsDNSSubdomain, field.NewPath("field"))
+		if len(errs) == 0 {
+			if len(tc.ExpectedErr) != 0 {
+				t.Errorf("case: %q, expected error to contain %q", name, tc.ExpectedErr)
+			}
+		} else if e, a := tc.ExpectedErr, errs.ToAggregate().Error(); !strings.Contains(a, e) {
+			t.Errorf("case: %q, expected error to contain %q, got error %q", name, e, a)
+		}
+	}
+}
+
 func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
 	now := metav1.NewTime(time.Unix(1000, 0).UTC())
 	later := metav1.NewTime(time.Unix(2000, 0).UTC())

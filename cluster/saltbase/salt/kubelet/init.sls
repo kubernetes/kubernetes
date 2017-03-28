@@ -31,6 +31,7 @@
     - mode: 400
     - makedirs: true
 
+{% if grains.cloud != 'gce' %}
 /var/lib/kubelet/ca.crt:
   file.managed:
     - source: salt://kubelet/ca.crt
@@ -38,6 +39,7 @@
     - group: root
     - mode: 400
     - makedirs: true
+{% endif %}
 
 {% if pillar.get('is_systemd') %}
 
@@ -59,7 +61,9 @@ fix-service-kubelet:
       - file: {{ pillar.get('systemd_system_path') }}/kubelet.service
       - file: {{ environment_file }}
       - file: /var/lib/kubelet/kubeconfig
+{% if grains.cloud != 'gce' %}
       - file: /var/lib/kubelet/ca.crt
+{% endif %}
 
 {% else %}
 
@@ -87,7 +91,9 @@ kubelet:
 {% endif %}
       - file: {{ environment_file }}
       - file: /var/lib/kubelet/kubeconfig
+{% if grains.cloud != 'gce' %}
       - file: /var/lib/kubelet/ca.crt
+{% endif %}
 {% if pillar.get('is_systemd') %}
     - provider:
       - service: systemd

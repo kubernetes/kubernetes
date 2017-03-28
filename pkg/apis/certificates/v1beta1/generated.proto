@@ -70,7 +70,7 @@ message CertificateSigningRequestList {
 }
 
 // This information is immutable after the request is created. Only the Request
-// and ExtraInfo fields can be set on creation, other fields are derived by
+// and Usages fields can be set on creation, other fields are derived by
 // Kubernetes and cannot be modified by users.
 message CertificateSigningRequestSpec {
   // Base64-encoded PKCS#10 CSR data
@@ -82,16 +82,25 @@ message CertificateSigningRequestSpec {
   //      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
   repeated string keyUsage = 5;
 
-  // Information about the requesting user (if relevant)
-  // See user.Info interface for details
+  // Information about the requesting user.
+  // See user.Info interface for details.
   // +optional
   optional string username = 2;
 
+  // UID information about the requesting user.
+  // See user.Info interface for details.
   // +optional
   optional string uid = 3;
 
+  // Group information about the requesting user.
+  // See user.Info interface for details.
   // +optional
   repeated string groups = 4;
+
+  // Extra information about the requesting user.
+  // See user.Info interface for details.
+  // +optional
+  map<string, ExtraValue> extra = 6;
 }
 
 message CertificateSigningRequestStatus {
@@ -102,5 +111,14 @@ message CertificateSigningRequestStatus {
   // If request was approved, the controller will place the issued certificate here.
   // +optional
   optional bytes certificate = 2;
+}
+
+// ExtraValue masks the value so protobuf can generate
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+message ExtraValue {
+  // items, if empty, will result in an empty slice
+
+  repeated string items = 1;
 }
 

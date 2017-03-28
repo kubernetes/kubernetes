@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	TokenExpectedRegex = "^\\S{6}\\:\\S{16}\n$"
+	TokenExpectedRegex = "^\\S{6}\\.\\S{16}\n$"
 )
 
 var kubeadmPath = flag.String("kubeadm-path", filepath.Join(os.Getenv("KUBE_ROOT"), "cluster/kubeadm.sh"), "Location of kubeadm")
@@ -36,17 +36,17 @@ func TestCmdTokenGenerate(t *testing.T) {
 		t.Log("kubeadm cmd tests being skipped")
 		t.Skip()
 	}
-	stdout, _, err := RunCmd(*kubeadmPath, "ex", "token", "generate")
+	stdout, _, err := RunCmd(*kubeadmPath, "token", "generate")
 	if err != nil {
-		t.Fatalf("'kubeadm ex token generate' exited uncleanly: %v", err)
+		t.Fatalf("'kubeadm token generate' exited uncleanly: %v", err)
 	}
 
 	matched, err := regexp.MatchString(TokenExpectedRegex, stdout)
 	if err != nil {
-		t.Fatalf("encountered an error while trying to match 'kubeadm ex token generate' stdout: %v", err)
+		t.Fatalf("encountered an error while trying to match 'kubeadm token generate' stdout: %v", err)
 	}
 	if !matched {
-		t.Errorf("'kubeadm ex token generate' stdout did not match expected regex; wanted: [%q], got: [%s]", TokenExpectedRegex, stdout)
+		t.Errorf("'kubeadm token generate' stdout did not match expected regex; wanted: [%q], got: [%s]", TokenExpectedRegex, stdout)
 	}
 }
 
@@ -54,7 +54,7 @@ func TestCmdTokenGenerateTypoError(t *testing.T) {
 	/*
 		Since we expect users to do things like this:
 
-			$ TOKEN=$(kubeadm ex token generate)
+			$ TOKEN=$(kubeadm token generate)
 
 		we want to make sure that if they have a typo in their command, we exit
 		with a non-zero status code after showing the command's usage, so that
@@ -65,9 +65,9 @@ func TestCmdTokenGenerateTypoError(t *testing.T) {
 		t.Skip()
 	}
 
-	_, _, err := RunCmd(*kubeadmPath, "ex", "token", "genorate") // subtle typo
+	_, _, err := RunCmd(*kubeadmPath, "token", "genorate") // subtle typo
 	if err == nil {
-		t.Error("'kubeadm ex token genorate' (a deliberate typo) exited without an error when we expected non-zero exit status")
+		t.Error("'kubeadm token genorate' (a deliberate typo) exited without an error when we expected non-zero exit status")
 	}
 }
 func TestCmdTokenDelete(t *testing.T) {
@@ -85,10 +85,10 @@ func TestCmdTokenDelete(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		_, _, actual := RunCmd(*kubeadmPath, "ex", "token", "delete", rt.args)
+		_, _, actual := RunCmd(*kubeadmPath, "token", "delete", rt.args)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed CmdTokenDelete running 'kubeadm ex token %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+				"failed CmdTokenDelete running 'kubeadm token %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
 				rt.args,
 				actual,
 				rt.expected,

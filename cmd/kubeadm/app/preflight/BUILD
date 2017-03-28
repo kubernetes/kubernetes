@@ -15,12 +15,13 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//pkg/api/validation:go_default_library",
+        "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/node:go_default_library",
         "//test/e2e_node/system:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:github.com/PuerkitoBio/purell",
+        "//vendor:github.com/blang/semver",
     ],
 )
 
@@ -29,7 +30,10 @@ go_test(
     srcs = ["checks_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//cmd/kubeadm/app/apis/kubeadm:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//vendor:github.com/renstrom/dedent",
+    ],
 )
 
 filegroup(

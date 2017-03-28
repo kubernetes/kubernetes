@@ -46,32 +46,3 @@ func TestCmdJoinConfig(t *testing.T) {
 		kubeadmReset()
 	}
 }
-
-func TestCmdJoinDiscovery(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
-	var initTest = []struct {
-		args     string
-		expected bool
-	}{
-		{"--discovery=foobar", false},
-		{"--dicovery=magic", false},
-	}
-
-	for _, rt := range initTest {
-		_, _, actual := RunCmd(*kubeadmPath, "join", rt.args, "--skip-preflight-checks")
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed CmdJoinDiscovery running 'kubeadm join %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
-				rt.args,
-				actual,
-				rt.expected,
-				(actual == nil),
-			)
-		}
-		kubeadmReset()
-	}
-}

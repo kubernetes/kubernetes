@@ -3,11 +3,8 @@ package pflag
 import (
 	"bytes"
 	"encoding/csv"
-	"fmt"
 	"strings"
 )
-
-var _ = fmt.Fprint
 
 // -- stringSlice Value
 type stringSliceValue struct {
@@ -39,7 +36,7 @@ func writeAsCSV(vals []string) (string, error) {
 		return "", err
 	}
 	w.Flush()
-	return strings.TrimSuffix(b.String(), fmt.Sprintln()), nil
+	return strings.TrimSuffix(b.String(), "\n"), nil
 }
 
 func (s *stringSliceValue) Set(val string) error {

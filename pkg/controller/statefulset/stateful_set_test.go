@@ -17,23 +17,25 @@ limitations under the License.
 package statefulset
 
 import (
+	"reflect"
 	"sort"
 	"testing"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
-
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
+func alwaysReady() bool { return true }
+
 func TestStatefulSetControllerCreates(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
+	ssc, spc := newFakeStatefulSetController(set)
 	if err := scaleUpStatefulSetController(set, ssc, spc); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -48,8 +50,8 @@ func TestStatefulSetControllerCreates(t *testing.T) {
 }
 
 func TestStatefulSetControllerDeletes(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
+	ssc, spc := newFakeStatefulSetController(set)
 	if err := scaleUpStatefulSetController(set, ssc, spc); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -76,8 +78,8 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 }
 
 func TestStatefulSetControllerRespectsTermination(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
+	ssc, spc := newFakeStatefulSetController(set)
 	if err := scaleUpStatefulSetController(set, ssc, spc); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -127,8 +129,8 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 }
 
 func TestStatefulSetControllerBlocksScaling(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
+	ssc, spc := newFakeStatefulSetController(set)
 	if err := scaleUpStatefulSetController(set, ssc, spc); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -173,23 +175,117 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 	}
 }
 
-func TestStateSetControllerAddPod(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
+func TestStatefulSetControllerDeletionTimestamp(t *testing.T) {
 	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
+	set.DeletionTimestamp = new(metav1.Time)
+	ssc, spc := newFakeStatefulSetController(set)
+
 	spc.setsIndexer.Add(set)
-	ssc.addPod(pod)
-	key, done := ssc.queue.Get()
-	if key == nil || done {
-		t.Error("Failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("Key is not a string")
-	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
-		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
+
+	// Force a sync. It should not try to create any Pods.
+	ssc.enqueueStatefulSet(set)
+	fakeWorker(ssc)
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(pods), 0; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
 	}
 }
 
-func TestStateSetControllerAddPodNoSet(t *testing.T) {
+func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
+	set := newStatefulSet(3)
+	// The bare client says it IS deleted.
+	set.DeletionTimestamp = new(metav1.Time)
+	ssc, spc := newFakeStatefulSetController(set)
+
+	// The lister (cache) says it's NOT deleted.
+	set2 := *set
+	set2.DeletionTimestamp = nil
+	spc.setsIndexer.Add(&set2)
+
+	// The recheck occurs in the presence of a matching orphan.
+	pod := newStatefulSetPod(set, 1)
+	pod.OwnerReferences = nil
+	spc.podsIndexer.Add(pod)
+
+	// Force a sync. It should not try to create any Pods.
+	ssc.enqueueStatefulSet(set)
+	fakeWorker(ssc)
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(pods), 1; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+}
+
+func TestStatefulSetControllerAddPod(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set1 := newStatefulSet(3)
+	set2 := newStatefulSet(3)
+	pod1 := newStatefulSetPod(set1, 0)
+	pod2 := newStatefulSetPod(set2, 0)
+	spc.setsIndexer.Add(set1)
+	spc.setsIndexer.Add(set2)
+
+	ssc.addPod(pod1)
+	key, done := ssc.queue.Get()
+	if key == nil || done {
+		t.Error("failed to enqueue StatefulSet")
+	} else if key, ok := key.(string); !ok {
+		t.Error("key is not a string")
+	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
+		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+	}
+	ssc.queue.Done(key)
+
+	ssc.addPod(pod2)
+	key, done = ssc.queue.Get()
+	if key == nil || done {
+		t.Error("failed to enqueue StatefulSet")
+	} else if key, ok := key.(string); !ok {
+		t.Error("key is not a string")
+	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
+		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+	}
+	ssc.queue.Done(key)
+}
+
+func TestStatefulSetControllerAddPodOrphan(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set1 := newStatefulSet(3)
+	set2 := newStatefulSet(3)
+	set2.Name = "foo2"
+	set3 := newStatefulSet(3)
+	set3.Name = "foo3"
+	set3.Spec.Selector.MatchLabels = map[string]string{"foo3": "bar"}
+	pod := newStatefulSetPod(set1, 0)
+	spc.setsIndexer.Add(set1)
+	spc.setsIndexer.Add(set2)
+	spc.setsIndexer.Add(set3)
+
+	// Make pod an orphan. Expect matching sets to be queued.
+	pod.OwnerReferences = nil
+	ssc.addPod(pod)
+	if got, want := ssc.queue.Len(), 2; got != want {
+		t.Errorf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestStatefulSetControllerAddPodNoSet(t *testing.T) {
 	ssc, _ := newFakeStatefulSetController()
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -203,19 +299,36 @@ func TestStateSetControllerAddPodNoSet(t *testing.T) {
 
 func TestStatefulSetControllerUpdatePod(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	spc.setsIndexer.Add(set)
-	prev := *pod
-	fakeResourceVersion(pod)
-	ssc.updatePod(&prev, pod)
+	set1 := newStatefulSet(3)
+	set2 := newStatefulSet(3)
+	set2.Name = "foo2"
+	pod1 := newStatefulSetPod(set1, 0)
+	pod2 := newStatefulSetPod(set2, 0)
+	spc.setsIndexer.Add(set1)
+	spc.setsIndexer.Add(set2)
+
+	prev := *pod1
+	fakeResourceVersion(pod1)
+	ssc.updatePod(&prev, pod1)
 	key, done := ssc.queue.Get()
 	if key == nil || done {
-		t.Error("Failed to enqueue StatefulSet")
+		t.Error("failed to enqueue StatefulSet")
 	} else if key, ok := key.(string); !ok {
-		t.Error("Key is not a string")
-	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
-		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
+		t.Error("key is not a string")
+	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
+		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+	}
+
+	prev = *pod2
+	fakeResourceVersion(pod2)
+	ssc.updatePod(&prev, pod2)
+	key, done = ssc.queue.Get()
+	if key == nil || done {
+		t.Error("failed to enqueue StatefulSet")
+	} else if key, ok := key.(string); !ok {
+		t.Error("key is not a string")
+	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
+		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
 }
 
@@ -246,53 +359,106 @@ func TestStatefulSetControllerUpdatePodWithSameVersion(t *testing.T) {
 	}
 }
 
-func TestStatefulSetControllerUpdatePodWithNewLabels(t *testing.T) {
+func TestStatefulSetControllerUpdatePodOrphanWithNewLabels(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
+	pod.OwnerReferences = nil
 	set2 := newStatefulSet(3)
 	set2.Name = "foo2"
-	set2.Spec.Selector.MatchLabels = map[string]string{"foo2": "bar2"}
-	set2.Spec.Template.Labels = map[string]string{"foo2": "bar2"}
 	spc.setsIndexer.Add(set)
 	spc.setsIndexer.Add(set2)
 	clone := *pod
 	clone.Labels = map[string]string{"foo2": "bar2"}
 	fakeResourceVersion(&clone)
-	ssc.updatePod(pod, &clone)
-	key, done := ssc.queue.Get()
-	if key == nil || done {
-		t.Error("Failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("Key is not a string")
-	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
-		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
+	ssc.updatePod(&clone, pod)
+	if got, want := ssc.queue.Len(), 2; got != want {
+		t.Errorf("queue.Len() = %v, want %v", got, want)
 	}
-	key, done = ssc.queue.Get()
-	if key == nil || done {
-		t.Error("Failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("Key is not a string")
-	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
-		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
+}
+
+func TestStatefulSetControllerUpdatePodChangeControllerRef(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set := newStatefulSet(3)
+	set2 := newStatefulSet(3)
+	set2.Name = "foo2"
+	pod := newStatefulSetPod(set, 0)
+	pod2 := newStatefulSetPod(set2, 0)
+	spc.setsIndexer.Add(set)
+	spc.setsIndexer.Add(set2)
+	clone := *pod
+	clone.OwnerReferences = pod2.OwnerReferences
+	fakeResourceVersion(&clone)
+	ssc.updatePod(&clone, pod)
+	if got, want := ssc.queue.Len(), 2; got != want {
+		t.Errorf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
+func TestStatefulSetControllerUpdatePodRelease(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set := newStatefulSet(3)
+	set2 := newStatefulSet(3)
+	set2.Name = "foo2"
+	pod := newStatefulSetPod(set, 0)
+	spc.setsIndexer.Add(set)
+	spc.setsIndexer.Add(set2)
+	clone := *pod
+	clone.OwnerReferences = nil
+	fakeResourceVersion(&clone)
+	ssc.updatePod(pod, &clone)
+	if got, want := ssc.queue.Len(), 2; got != want {
+		t.Errorf("queue.Len() = %v, want %v", got, want)
 	}
 }
 
 func TestStatefulSetControllerDeletePod(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	spc.setsIndexer.Add(set)
-	ssc.deletePod(pod)
+	set1 := newStatefulSet(3)
+	set2 := newStatefulSet(3)
+	set2.Name = "foo2"
+	pod1 := newStatefulSetPod(set1, 0)
+	pod2 := newStatefulSetPod(set2, 0)
+	spc.setsIndexer.Add(set1)
+	spc.setsIndexer.Add(set2)
+
+	ssc.deletePod(pod1)
 	key, done := ssc.queue.Get()
 	if key == nil || done {
-		t.Error("Failed to enqueue StatefulSet")
+		t.Error("failed to enqueue StatefulSet")
 	} else if key, ok := key.(string); !ok {
-		t.Error("Key is not a string")
-	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
-		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
+		t.Error("key is not a string")
+	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
+		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+	}
+
+	ssc.deletePod(pod2)
+	key, done = ssc.queue.Get()
+	if key == nil || done {
+		t.Error("failed to enqueue StatefulSet")
+	} else if key, ok := key.(string); !ok {
+		t.Error("key is not a string")
+	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
+		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
 }
+
+func TestStatefulSetControllerDeletePodOrphan(t *testing.T) {
+	ssc, spc := newFakeStatefulSetController()
+	set1 := newStatefulSet(3)
+	set2 := newStatefulSet(3)
+	set2.Name = "foo2"
+	pod1 := newStatefulSetPod(set1, 0)
+	spc.setsIndexer.Add(set1)
+	spc.setsIndexer.Add(set2)
+
+	pod1.OwnerReferences = nil
+	ssc.deletePod(pod1)
+	if got, want := ssc.queue.Len(), 0; got != want {
+		t.Errorf("queue.Len() = %v, want %v", got, want)
+	}
+}
+
 func TestStatefulSetControllerDeletePodTombstone(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
@@ -303,55 +469,125 @@ func TestStatefulSetControllerDeletePodTombstone(t *testing.T) {
 	ssc.deletePod(tombstone)
 	key, done := ssc.queue.Get()
 	if key == nil || done {
-		t.Error("Failed to enqueue StatefulSet")
+		t.Error("failed to enqueue StatefulSet")
 	} else if key, ok := key.(string); !ok {
-		t.Error("Key is not a string")
+		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
-		t.Errorf("Expected StatefulSet key %s found %s", expectedKey, key)
+		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
 }
 
-func TestStatefulSetControllerGetStatefulSetForPod(t *testing.T) {
+func TestStatefulSetControllerGetStatefulSetsForPod(t *testing.T) {
 	ssc, spc := newFakeStatefulSetController()
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	spc.setsIndexer.Add(set)
-	spc.podsIndexer.Add(pod)
-	if set := ssc.getStatefulSetForPod(pod); set == nil {
-		t.Error("Failed to get StatefulSet for Pod ")
-	}
-}
-
-func TestStatefulSetControllerGetStatefulSetForPodOverlapping(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
+	set1 := newStatefulSet(3)
 	set2 := newStatefulSet(3)
 	set2.Name = "foo2"
-	set3 := newStatefulSet(3)
-	set3.Name = "foo3"
-	set3.CreationTimestamp.Add(1 * time.Second)
-	spc.setsIndexer.Add(set3)
+	pod := newStatefulSetPod(set1, 0)
+	spc.setsIndexer.Add(set1)
 	spc.setsIndexer.Add(set2)
-	spc.setsIndexer.Add(set)
 	spc.podsIndexer.Add(pod)
-	if found := ssc.getStatefulSetForPod(pod); found == nil {
-		t.Error("Failed to get StatefulSet for Pod")
-	} else if found.Name != set.Name {
-		t.Errorf("Returned wrong StatefulSet %s for Pod", set.Name)
+	sets := ssc.getStatefulSetsForPod(pod)
+	if got, want := len(sets), 2; got != want {
+		t.Errorf("len(sets) = %v, want %v", got, want)
 	}
 }
 
-func newFakeStatefulSetController() (*StatefulSetController, *fakeStatefulPodControl) {
-	fpc := newFakeStatefulPodControl()
-	ssc := &StatefulSetController{
-		kubeClient:     nil,
-		podStoreSynced: func() bool { return true },
-		setStore:       fpc.setsLister,
-		podStore:       fpc.podsLister,
-		control:        NewDefaultStatefulSetControl(fpc),
-		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
+func TestGetPodsForStatefulSetAdopt(t *testing.T) {
+	set := newStatefulSet(5)
+	ssc, spc := newFakeStatefulSetController(set)
+	pod1 := newStatefulSetPod(set, 1)
+	// pod2 is an orphan with matching labels and name.
+	pod2 := newStatefulSetPod(set, 2)
+	pod2.OwnerReferences = nil
+	// pod3 has wrong labels.
+	pod3 := newStatefulSetPod(set, 3)
+	pod3.OwnerReferences = nil
+	pod3.Labels = nil
+	// pod4 has wrong name.
+	pod4 := newStatefulSetPod(set, 4)
+	pod4.OwnerReferences = nil
+	pod4.Name = "x" + pod4.Name
+
+	spc.podsIndexer.Add(pod1)
+	spc.podsIndexer.Add(pod2)
+	spc.podsIndexer.Add(pod3)
+	spc.podsIndexer.Add(pod4)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
 	}
+	pods, err := ssc.getPodsForStatefulSet(set, selector)
+	if err != nil {
+		t.Fatalf("getPodsForStatefulSet() error: %v", err)
+	}
+	var got []string
+	for _, pod := range pods {
+		got = append(got, pod.Name)
+	}
+
+	// pod2 should be claimed, pod3 and pod4 ignored
+	want := []string{pod1.Name, pod2.Name}
+	sort.Strings(got)
+	sort.Strings(want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("getPodsForStatefulSet() = %v, want %v", got, want)
+	}
+}
+
+func TestGetPodsForStatefulSetRelease(t *testing.T) {
+	set := newStatefulSet(3)
+	ssc, spc := newFakeStatefulSetController(set)
+	pod1 := newStatefulSetPod(set, 1)
+	// pod2 is owned but has wrong name.
+	pod2 := newStatefulSetPod(set, 2)
+	pod2.Name = "x" + pod2.Name
+	// pod3 is owned but has wrong labels.
+	pod3 := newStatefulSetPod(set, 3)
+	pod3.Labels = nil
+	// pod4 is an orphan that doesn't match.
+	pod4 := newStatefulSetPod(set, 4)
+	pod4.OwnerReferences = nil
+	pod4.Labels = nil
+
+	spc.podsIndexer.Add(pod1)
+	spc.podsIndexer.Add(pod2)
+	spc.podsIndexer.Add(pod3)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods, err := ssc.getPodsForStatefulSet(set, selector)
+	if err != nil {
+		t.Fatalf("getPodsForStatefulSet() error: %v", err)
+	}
+	var got []string
+	for _, pod := range pods {
+		got = append(got, pod.Name)
+	}
+
+	// Expect only pod1 (pod2 and pod3 should be released, pod4 ignored).
+	want := []string{pod1.Name}
+	sort.Strings(got)
+	sort.Strings(want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("getPodsForStatefulSet() = %v, want %v", got, want)
+	}
+}
+
+func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSetController, *fakeStatefulPodControl) {
+	client := fake.NewSimpleClientset(initialObjects...)
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
+	ssc := NewStatefulSetController(
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		client,
+	)
+	ssc.podListerSynced = alwaysReady
+	ssc.setListerSynced = alwaysReady
+	ssc.control = NewDefaultStatefulSetControl(fpc)
+
 	return ssc, fpc
 }
 

@@ -128,7 +128,7 @@ func MakeEllipticPrivateKeyPEM() ([]byte, error) {
 	}
 
 	privateKeyPemBlock := &pem.Block{
-		Type:  "EC PRIVATE KEY",
+		Type:  ECPrivateKeyBlockType,
 		Bytes: derBytes,
 	}
 	return pem.EncodeToMemory(privateKeyPemBlock), nil
@@ -173,13 +173,13 @@ func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 
 	// Generate cert
 	certBuffer := bytes.Buffer{}
-	if err := pem.Encode(&certBuffer, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
+	if err := pem.Encode(&certBuffer, &pem.Block{Type: CertificateBlockType, Bytes: derBytes}); err != nil {
 		return nil, nil, err
 	}
 
 	// Generate key
 	keyBuffer := bytes.Buffer{}
-	if err := pem.Encode(&keyBuffer, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
+	if err := pem.Encode(&keyBuffer, &pem.Block{Type: RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
 		return nil, nil, err
 	}
 

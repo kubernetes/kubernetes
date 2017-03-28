@@ -34,18 +34,22 @@ import (
 )
 
 type fakeAdminConfig struct {
-	pathOptions *clientcmd.PathOptions
-	hostFactory cmdutil.Factory
+	pathOptions          *clientcmd.PathOptions
+	hostFactory          cmdutil.Factory
+	targetClusterFactory cmdutil.Factory
+	targetClusterContext string
 }
 
-func NewFakeAdminConfig(f cmdutil.Factory, kubeconfigGlobal string) (util.AdminConfig, error) {
+func NewFakeAdminConfig(hostFactory cmdutil.Factory, targetFactory cmdutil.Factory, targetClusterContext, kubeconfigGlobal string) (util.AdminConfig, error) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = kubeconfigGlobal
 	pathOptions.EnvVar = ""
 
 	return &fakeAdminConfig{
-		pathOptions: pathOptions,
-		hostFactory: f,
+		pathOptions:          pathOptions,
+		hostFactory:          hostFactory,
+		targetClusterFactory: targetFactory,
+		targetClusterContext: targetClusterContext,
 	}, nil
 }
 
@@ -65,7 +69,10 @@ func (f *fakeAdminConfig) FederationClientset(context, kubeconfigPath string) (*
 	return fedclient.New(fakeRestClient), nil
 }
 
-func (f *fakeAdminConfig) HostFactory(host, kubeconfigPath string) cmdutil.Factory {
+func (f *fakeAdminConfig) ClusterFactory(context, kubeconfigPath string) cmdutil.Factory {
+	if f.targetClusterContext != "" && f.targetClusterContext == context {
+		return f.targetClusterFactory
+	}
 	return f.hostFactory
 }
 

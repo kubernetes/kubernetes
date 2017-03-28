@@ -19,18 +19,19 @@ package cmd
 import (
 	"bytes"
 	"net/http"
+	"strings"
 	"testing"
 
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestPatchObject(t *testing.T) {
 	_, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
@@ -53,8 +54,8 @@ func TestPatchObject(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"services/frontend"})
 
-	// uses the name from the file, not the response
-	if buf.String() != "service/frontend\n" {
+	// uses the name from the response
+	if buf.String() != "service/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -63,7 +64,6 @@ func TestPatchObjectFromFile(t *testing.T) {
 	_, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
@@ -87,8 +87,110 @@ func TestPatchObjectFromFile(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Run(cmd, []string{})
 
-	// uses the name from the file, not the response
-	if buf.String() != "service/frontend\n" {
+	// uses the name from the response
+	if buf.String() != "service/baz\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestPatchNoop(t *testing.T) {
+	_, svc, _ := testData()
+	getObject := &svc.Items[0]
+	patchObject := &svc.Items[0]
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/services/frontend" && m == "PATCH":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, patchObject)}, nil
+			case p == "/namespaces/test/services/frontend" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, getObject)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+
+	// No-op
+	{
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdPatch(f, buf)
+		cmd.Flags().Set("namespace", "test")
+		cmd.Flags().Set("patch", `{}`)
+		cmd.Run(cmd, []string{"services", "frontend"})
+		if buf.String() != "service \"baz\" not patched\n" {
+			t.Errorf("unexpected output: %s", buf.String())
+		}
+	}
+
+	// Patched
+	{
+		copied, _ := api.Scheme.DeepCopy(patchObject)
+		patchObject = copied.(*api.Service)
+		if patchObject.Annotations == nil {
+			patchObject.Annotations = map[string]string{}
+		}
+		patchObject.Annotations["foo"] = "bar"
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdPatch(f, buf)
+		cmd.Flags().Set("namespace", "test")
+		cmd.Flags().Set("patch", `{"metadata":{"annotations":{"foo":"bar"}}}`)
+		cmd.Run(cmd, []string{"services", "frontend"})
+		if buf.String() != "service \"baz\" patched\n" {
+			t.Errorf("unexpected output: %s", buf.String())
+		}
+	}
+}
+
+func TestPatchObjectFromFileOutput(t *testing.T) {
+	_, svc, _ := testData()
+
+	svcCopyObj, err := api.Scheme.DeepCopy(&svc.Items[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	svcCopy := svcCopyObj.(*api.Service)
+	if svcCopy.Labels == nil {
+		svcCopy.Labels = map[string]string{}
+	}
+	svcCopy.Labels["post-patch"] = "post-patch-value"
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.CommandPrinter = &printers.YAMLPrinter{}
+	tf.GenericPrinter = true
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/services/frontend" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
+			case p == "/namespaces/test/services/frontend" && m == "PATCH":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svcCopy)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdPatch(f, buf)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
+	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
+	cmd.Run(cmd, []string{})
+
+	t.Log(buf.String())
+	// make sure the value returned by the server is used
+	if !strings.Contains(buf.String(), "post-patch: post-patch-value") {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -406,7 +407,9 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 	// Set up admission plugin to auto-assign serviceaccounts to pods
 	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount()
-	serviceAccountAdmission.SetInternalClientSet(internalRootClientset)
+	serviceAccountAdmission.SetInternalKubeClientSet(internalRootClientset)
+	internalInformers := internalinformers.NewSharedInformerFactory(internalRootClientset, controller.NoResyncPeriodFunc())
+	serviceAccountAdmission.SetInternalKubeInformerFactory(internalInformers)
 
 	masterConfig := framework.NewMasterConfig()
 	masterConfig.GenericConfig.EnableIndex = true
@@ -428,13 +431,11 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	)
 	informers.Start(stopCh)
+	internalInformers.Start(stopCh)
 	go serviceAccountController.Run(5, stopCh)
-	// Start the admission plugin reflectors
-	serviceAccountAdmission.Run()
 
 	stop := func() {
 		close(stopCh)
-		serviceAccountAdmission.Stop()
 		apiServer.Close()
 	}
 

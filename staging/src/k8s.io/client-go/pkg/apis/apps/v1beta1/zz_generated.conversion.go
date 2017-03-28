@@ -110,7 +110,7 @@ func autoConvert_apps_StatefulSetList_To_v1beta1_StatefulSetList(in *apps.Statef
 			}
 		}
 	} else {
-		out.Items = nil
+		out.Items = make([]StatefulSet, 0)
 	}
 	return nil
 }
@@ -120,7 +120,7 @@ func Convert_apps_StatefulSetList_To_v1beta1_StatefulSetList(in *apps.StatefulSe
 }
 
 func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
-	if err := api.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
 	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
@@ -133,7 +133,7 @@ func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *StatefulSet
 }
 
 func autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSetSpec, out *StatefulSetSpec, s conversion.Scope) error {
-	if err := api.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
 	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))

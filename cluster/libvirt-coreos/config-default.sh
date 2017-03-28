@@ -67,6 +67,8 @@ ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false
 #Generate dns files
 sed -f "${KUBE_ROOT}/cluster/addons/dns/transforms2sed.sed" < "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.base" | sed -f "${KUBE_ROOT}/cluster/libvirt-coreos/forShellEval.sed"  > "${KUBE_ROOT}/cluster/libvirt-coreos/kubedns-controller.yaml"
 sed -f "${KUBE_ROOT}/cluster/addons/dns/transforms2sed.sed" < "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.base" | sed -f "${KUBE_ROOT}/cluster/libvirt-coreos/forShellEval.sed"  > "${KUBE_ROOT}/cluster/libvirt-coreos/kubedns-svc.yaml"
+cp "${KUBE_ROOT}/cluster/addons/dns/kubedns-sa.yaml" "${KUBE_ROOT}/cluster/libvirt-coreos/kubedns-sa.yaml"
+cp "${KUBE_ROOT}/cluster/addons/dns/kubedns-cm.yaml" "${KUBE_ROOT}/cluster/libvirt-coreos/kubedns-cm.yaml"
 
 
 #Generate registry files

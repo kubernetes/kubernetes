@@ -29,9 +29,14 @@ import (
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&MasterConfiguration{}, func(obj interface{}) { SetObjectDefaults_MasterConfiguration(obj.(*MasterConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&NodeConfiguration{}, func(obj interface{}) { SetObjectDefaults_NodeConfiguration(obj.(*NodeConfiguration)) })
 	return nil
 }
 
 func SetObjectDefaults_MasterConfiguration(in *MasterConfiguration) {
 	SetDefaults_MasterConfiguration(in)
+}
+
+func SetObjectDefaults_NodeConfiguration(in *NodeConfiguration) {
+	SetDefaults_NodeConfiguration(in)
 }

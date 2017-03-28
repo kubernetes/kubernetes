@@ -31,6 +31,9 @@ retry() {
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
+# Set artifacts directory
+export ARTIFACTS_DIR=${WORKSPACE}/artifacts
+
 retry go get github.com/tools/godep && godep version
 
 export LOG_LEVEL=4
@@ -39,7 +42,7 @@ cd /go/src/k8s.io/kubernetes
 
 # hack/verify-client-go.sh requires all dependencies exist in the GOPATH.
 # the retry helps avoid flakes while keeping total time bounded.
-godep restore || godep restore
+./hack/godep-restore.sh || ./hack/godep-restore.sh
 
 ./hack/install-etcd.sh
 make verify

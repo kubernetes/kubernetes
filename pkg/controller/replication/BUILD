@@ -29,8 +29,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/util/trace",
@@ -68,6 +66,7 @@ go_test(
         "//vendor:k8s.io/client-go/testing",
         "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/util/testing",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

@@ -111,6 +111,17 @@ func DeepCopy_v1beta1_CertificateSigningRequestSpec(in interface{}, out interfac
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
+		if in.Extra != nil {
+			in, out := &in.Extra, &out.Extra
+			*out = make(map[string]ExtraValue)
+			for key, val := range *in {
+				if newVal, err := c.DeepCopy(&val); err != nil {
+					return err
+				} else {
+					(*out)[key] = *newVal.(*ExtraValue)
+				}
+			}
+		}
 		return nil
 	}
 }

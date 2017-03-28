@@ -239,6 +239,7 @@ func (aggregator *Aggregator) registerSuiteEnding(suite *types.SuiteSummary) (fi
 		aggregatedSuiteSummary.NumberOfFailedSpecs += suiteSummary.NumberOfFailedSpecs
 		aggregatedSuiteSummary.NumberOfPendingSpecs += suiteSummary.NumberOfPendingSpecs
 		aggregatedSuiteSummary.NumberOfSkippedSpecs += suiteSummary.NumberOfSkippedSpecs
+		aggregatedSuiteSummary.NumberOfFlakedSpecs += suiteSummary.NumberOfFlakedSpecs
 	}
 
 	aggregatedSuiteSummary.RunTime = time.Since(aggregator.startTime)

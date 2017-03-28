@@ -31,7 +31,7 @@ import (
 )
 
 // The maximum priority value to give to a node
-// Prioritiy values range from 0-maxPriority
+// Priority values range from 0-maxPriority
 const maxPriority float32 = 10
 
 // When zone information is present, give 2/3 of the weighting to zone spreading, 1/3 to node spreading
@@ -39,25 +39,28 @@ const maxPriority float32 = 10
 const zoneWeighting = 2.0 / 3.0
 
 type SelectorSpread struct {
-	serviceLister    algorithm.ServiceLister
-	controllerLister algorithm.ControllerLister
-	replicaSetLister algorithm.ReplicaSetLister
+	serviceLister     algorithm.ServiceLister
+	controllerLister  algorithm.ControllerLister
+	replicaSetLister  algorithm.ReplicaSetLister
+	statefulSetLister algorithm.StatefulSetLister
 }
 
 func NewSelectorSpreadPriority(
 	serviceLister algorithm.ServiceLister,
 	controllerLister algorithm.ControllerLister,
-	replicaSetLister algorithm.ReplicaSetLister) algorithm.PriorityFunction {
+	replicaSetLister algorithm.ReplicaSetLister,
+	statefulSetLister algorithm.StatefulSetLister) algorithm.PriorityFunction {
 	selectorSpread := &SelectorSpread{
-		serviceLister:    serviceLister,
-		controllerLister: controllerLister,
-		replicaSetLister: replicaSetLister,
+		serviceLister:     serviceLister,
+		controllerLister:  controllerLister,
+		replicaSetLister:  replicaSetLister,
+		statefulSetLister: statefulSetLister,
 	}
 	return selectorSpread.CalculateSpreadPriority
 }
 
 // Returns selectors of services, RCs and RSs matching the given pod.
-func getSelectors(pod *v1.Pod, sl algorithm.ServiceLister, cl algorithm.ControllerLister, rsl algorithm.ReplicaSetLister) []labels.Selector {
+func getSelectors(pod *v1.Pod, sl algorithm.ServiceLister, cl algorithm.ControllerLister, rsl algorithm.ReplicaSetLister, ssl algorithm.StatefulSetLister) []labels.Selector {
 	selectors := make([]labels.Selector, 0, 3)
 	if services, err := sl.GetPodServices(pod); err == nil {
 		for _, service := range services {
@@ -76,11 +79,18 @@ func getSelectors(pod *v1.Pod, sl algorithm.ServiceLister, cl algorithm.Controll
 			}
 		}
 	}
+	if sss, err := ssl.GetPodStatefulSets(pod); err == nil {
+		for _, ss := range sss {
+			if selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector); err == nil {
+				selectors = append(selectors, selector)
+			}
+		}
+	}
 	return selectors
 }
 
 func (s *SelectorSpread) getSelectors(pod *v1.Pod) []labels.Selector {
-	return getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister)
+	return getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister, s.statefulSetLister)
 }
 
 // CalculateSpreadPriority spreads pods across hosts and zones, considering pods belonging to the same service or replication controller.

@@ -21,10 +21,10 @@ import (
 )
 
 type (
-	ConditionStatus string
+	ConditionStatus  string
 	PodConditionType string
-	PodPhase string
-	RestartPolicy string
+	PodPhase         string
+	RestartPolicy    string
 )
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).

@@ -28,6 +28,7 @@ import (
 // (kubecontainer) types.
 const (
 	statusRunningPrefix = "Up"
+	statusCreatedPrefix = "Created"
 	statusExitedPrefix  = "Exited"
 )
 

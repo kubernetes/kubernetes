@@ -86,15 +86,9 @@ func getCurrentKubeletConfig() (*componentconfig.KubeletConfiguration, error) {
 	return kubeCfg, nil
 }
 
-// Convenience method to set the evictionHard threshold during the current context.
-func tempSetEvictionHard(f *framework.Framework, evictionHard string) {
-	tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
-		initialConfig.EvictionHard = evictionHard
-	})
-}
-
 // Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
 // The change is reverted in the AfterEach of the context.
+// Returns true on success.
 func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *componentconfig.KubeletConfiguration)) {
 	var oldCfg *componentconfig.KubeletConfiguration
 	BeforeEach(func() {
@@ -291,4 +285,10 @@ func logNodeEvents(f *framework.Framework) {
 	framework.Logf("Summary of node events during the test:")
 	err := framework.ListNamespaceEvents(f.ClientSet, "")
 	framework.ExpectNoError(err)
+}
+
+func getLocalNode(f *framework.Framework) *v1.Node {
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	Expect(len(nodeList.Items)).To(Equal(1), "Unexpected number of node objects for node e2e. Expects only one node.")
+	return &nodeList.Items[0]
 }

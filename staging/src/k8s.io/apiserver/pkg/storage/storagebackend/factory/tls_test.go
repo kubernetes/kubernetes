@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/etcd/testing/testingcert"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
 var scheme = runtime.NewScheme()

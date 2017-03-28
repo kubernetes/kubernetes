@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -52,6 +53,9 @@ type MetricsProvider interface {
 
 // Metrics represents the used and available bytes of the Volume.
 type Metrics struct {
+	// The time at which these stats were updated.
+	Time metav1.Time
+
 	// Used represents the total bytes used by the Volume.
 	// Note: For block devices this maybe more than the total size of the files.
 	Used *resource.Quantity
@@ -71,15 +75,15 @@ type Metrics struct {
 	// InodesUsed represents the total inodes used by the Volume.
 	InodesUsed *resource.Quantity
 
-	// Inodes represents the total number of inodes availible in the volume.
+	// Inodes represents the total number of inodes available in the volume.
 	// For volumes that share a filesystem with the host (e.g. emptydir, hostpath),
 	// this is the inodes available in the underlying storage,
 	// and will not equal InodesUsed + InodesFree as the fs is shared.
 	Inodes *resource.Quantity
 
-	// InodesFree represent the inodes available for the volume.  For Volues that share
+	// InodesFree represent the inodes available for the volume.  For Volumes that share
 	// a filesystem with the host (e.g. emptydir, hostpath), this is the free inodes
-	// on the underlying sporage, and is shared with host processes and other volumes
+	// on the underlying storage, and is shared with host processes and other volumes
 	InodesFree *resource.Quantity
 }
 
@@ -134,15 +138,6 @@ type Unmounter interface {
 	TearDownAt(dir string) error
 }
 
-// Recycler provides methods to reclaim the volume resource.
-type Recycler interface {
-	Volume
-	// Recycle reclaims the resource. Calls to this method should block until
-	// the recycling task is complete. Any error returned indicates the volume
-	// has failed to be reclaimed. A nil return indicates success.
-	Recycle() error
-}
-
 // Provisioner is an interface that creates templates for PersistentVolumes
 // and can create the volume as a new resource in the infrastructure provider.
 type Provisioner interface {
@@ -163,7 +158,7 @@ type Deleter interface {
 	// as error and it will be sent as "Info" event to the PV being deleted. The
 	// volume controller will retry deleting the volume in the next periodic
 	// sync. This can be used to postpone deletion of a volume that is being
-	// dettached from a node. Deletion of such volume would fail anyway and such
+	// detached from a node. Deletion of such volume would fail anyway and such
 	// error would confuse users.
 	Delete() error
 }
@@ -176,8 +171,8 @@ type Attacher interface {
 	Attach(spec *Spec, nodeName types.NodeName) (string, error)
 
 	// VolumesAreAttached checks whether the list of volumes still attached to the specified
-	// the node. It returns a map which maps from the volume spec to the checking result.
-	// If an error is occured during checking, the error will be returned
+	// node. It returns a map which maps from the volume spec to the checking result.
+	// If an error is occurred during checking, the error will be returned
 	VolumesAreAttached(specs []*Spec, nodeName types.NodeName) (map[*Spec]bool, error)
 
 	// WaitForAttach blocks until the device is attached to this
@@ -194,6 +189,14 @@ type Attacher interface {
 	// MountDevice mounts the disk to a global path which
 	// individual pods can then bind mount
 	MountDevice(spec *Spec, devicePath string, deviceMountPath string) error
+}
+
+type BulkVolumeVerifier interface {
+	// BulkVerifyVolumes checks whether the list of volumes still attached to the
+	// the clusters in the node. It returns a map which maps from the volume spec to the checking result.
+	// If an error occurs during check - error should be returned and volume on nodes
+	// should be assumed as still attached.
+	BulkVerifyVolumes(volumesByNode map[types.NodeName][]*Spec) (map[types.NodeName]map[*Spec]bool, error)
 }
 
 // Detacher can detach a volume from a node.
@@ -280,16 +283,16 @@ func copyFolder(source string, dest string) (err error) {
 			continue
 		}
 
-		sourcefilepointer := source + "\\" + obj.Name()
-		destinationfilepointer := dest + "\\" + obj.Name()
+		sourceFilePointer := source + "\\" + obj.Name()
+		destinationFilePointer := dest + "\\" + obj.Name()
 
 		if obj.IsDir() {
-			err = copyFolder(sourcefilepointer, destinationfilepointer)
+			err = copyFolder(sourceFilePointer, destinationFilePointer)
 			if err != nil {
 				return err
 			}
 		} else {
-			err = copyFile(sourcefilepointer, destinationfilepointer)
+			err = copyFile(sourceFilePointer, destinationFilePointer)
 			if err != nil {
 				return err
 			}
@@ -300,25 +303,25 @@ func copyFolder(source string, dest string) (err error) {
 }
 
 func copyFile(source string, dest string) (err error) {
-	sourcefile, err := os.Open(source)
+	sourceFile, err := os.Open(source)
 	if err != nil {
 		return err
 	}
 
-	defer sourcefile.Close()
+	defer sourceFile.Close()
 
-	destfile, err := os.Create(dest)
+	destFile, err := os.Create(dest)
 	if err != nil {
 		return err
 	}
 
-	defer destfile.Close()
+	defer destFile.Close()
 
-	_, err = io.Copy(destfile, sourcefile)
+	_, err = io.Copy(destFile, sourceFile)
 	if err == nil {
-		sourceinfo, err := os.Stat(source)
+		sourceInfo, err := os.Stat(source)
 		if err != nil {
-			err = os.Chmod(dest, sourceinfo.Mode())
+			err = os.Chmod(dest, sourceInfo.Mode())
 		}
 
 	}

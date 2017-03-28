@@ -175,7 +175,7 @@ func (m *ThirdPartyResourceServer) removeAllThirdPartyResources(registry *thirdp
 	}
 	for ix := range list.Items {
 		item := &list.Items[ix]
-		if _, err := registry.Delete(ctx, item.Name, nil); err != nil {
+		if _, _, err := registry.Delete(ctx, item.Name, nil); err != nil {
 			return err
 		}
 	}
@@ -318,6 +318,7 @@ func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralRes
 		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
 		Convertor: api.Scheme,
 		Copier:    api.Scheme,
+		Defaulter: api.Scheme,
 		Typer:     api.Scheme,
 
 		Mapper:                 thirdpartyresourcedata.NewMapper(api.Registry.GroupOrDie(extensions.GroupName).RESTMapper, kind, version, group),

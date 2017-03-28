@@ -32,11 +32,10 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	go daemon.NewDaemonSetsController(
-		ctx.NewInformerFactory.Extensions().V1beta1().DaemonSets(),
-		ctx.NewInformerFactory.Core().V1().Pods(),
-		ctx.NewInformerFactory.Core().V1().Nodes(),
+		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
-		int(ctx.Options.LookupCacheSizeForDaemonSet),
 	).Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
 	return true, nil
 }
@@ -46,9 +45,9 @@ func startDeploymentController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	go deployment.NewDeploymentController(
-		ctx.NewInformerFactory.Extensions().V1beta1().Deployments(),
-		ctx.NewInformerFactory.Extensions().V1beta1().ReplicaSets(),
-		ctx.NewInformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Extensions().V1beta1().Deployments(),
+		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
+		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("deployment-controller"),
 	).Run(int(ctx.Options.ConcurrentDeploymentSyncs), ctx.Stop)
 	return true, nil
@@ -59,12 +58,10 @@ func startReplicaSetController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	go replicaset.NewReplicaSetController(
-		ctx.NewInformerFactory.Extensions().V1beta1().ReplicaSets(),
-		ctx.NewInformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
+		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
-		int(ctx.Options.LookupCacheSizeForRS),
-		ctx.Options.EnableGarbageCollector,
 	).Run(int(ctx.Options.ConcurrentRSSyncs), ctx.Stop)
 	return true, nil
 }

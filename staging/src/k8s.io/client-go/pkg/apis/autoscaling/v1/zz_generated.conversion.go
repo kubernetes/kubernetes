@@ -149,7 +149,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerList_To_v1_HorizontalPodAuto
 			}
 		}
 	} else {
-		out.Items = nil
+		out.Items = make([]HorizontalPodAutoscaler, 0)
 	}
 	return nil
 }

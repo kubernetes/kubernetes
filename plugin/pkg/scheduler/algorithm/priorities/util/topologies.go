@@ -19,18 +19,19 @@ package util
 import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // GetNamespacesFromPodAffinityTerm returns a set of names
 // according to the namespaces indicated in podAffinityTerm.
-// 1. If the namespaces is nil considers the given pod's namespace
-// 2. If the namespaces is empty list then considers all the namespaces
+// If namespaces is empty it considers the given pod's namespace.
 func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
 	names := sets.String{}
-	if podAffinityTerm.Namespaces == nil {
+	if len(podAffinityTerm.Namespaces) == 0 {
 		names.Insert(pod.Namespace)
-	} else if len(podAffinityTerm.Namespaces) != 0 {
+	} else {
 		names.Insert(podAffinityTerm.Namespaces...)
 	}
 	return names
@@ -39,7 +40,7 @@ func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffini
 // PodMatchesTermsNamespaceAndSelector returns true if the given <pod>
 // matches the namespace and selector defined by <affinityPod>`s <term>.
 func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, selector labels.Selector) bool {
-	if len(namespaces) != 0 && !namespaces.Has(pod.Namespace) {
+	if !namespaces.Has(pod.Namespace) {
 		return false
 	}
 
@@ -65,7 +66,7 @@ type Topologies struct {
 // NodesHaveSameTopologyKey checks if nodeA and nodeB have same label value with given topologyKey as label key.
 // If the topologyKey is empty, check if the two nodes have any of the default topologyKeys, and have same corresponding label value.
 func (tps *Topologies) NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyKey string) bool {
-	if len(topologyKey) == 0 {
+	if utilfeature.DefaultFeatureGate.Enabled(features.AffinityInAnnotations) && len(topologyKey) == 0 {
 		// assumes this is allowed only for PreferredDuringScheduling pod anti-affinity (ensured by api/validation)
 		for _, defaultKey := range tps.DefaultKeys {
 			if NodesHaveSameTopologyKey(nodeA, nodeB, defaultKey) {

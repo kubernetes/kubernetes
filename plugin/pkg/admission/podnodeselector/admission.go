@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -51,13 +51,14 @@ func init() {
 // podNodeSelector is an implementation of admission.Interface.
 type podNodeSelector struct {
 	*admission.Handler
-	client            internalclientset.Interface
-	namespaceInformer cache.SharedIndexInformer
+	client          internalclientset.Interface
+	namespaceLister corelisters.NamespaceLister
 	// global default node selector and namespace whitelists in a cluster.
 	clusterNodeSelectors map[string]string
 }
 
-var _ = kubeapiserveradmission.WantsInternalClientSet(&podNodeSelector{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&podNodeSelector{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&podNodeSelector{})
 
 type pluginConfig struct {
 	PodNodeSelectorPluginConfig map[string]string
@@ -114,18 +115,8 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	nsName := a.GetNamespace()
 	var namespace *api.Namespace
 
-	namespaceObj, exists, err := p.namespaceInformer.GetStore().Get(&api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      nsName,
-			Namespace: "",
-		},
-	})
-	if err != nil {
-		return errors.NewInternalError(err)
-	}
-	if exists {
-		namespace = namespaceObj.(*api.Namespace)
-	} else {
+	namespace, err := p.namespaceLister.Get(nsName)
+	if errors.IsNotFound(err) {
 		namespace, err = p.defaultGetNamespace(nsName)
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -133,7 +124,10 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 			}
 			return errors.NewInternalError(err)
 		}
+	} else if err != nil {
+		return errors.NewInternalError(err)
 	}
+
 	namespaceNodeSelector, err := p.getNodeSelectorMap(namespace)
 	if err != nil {
 		return err
@@ -168,18 +162,19 @@ func NewPodNodeSelector(clusterNodeSelectors map[string]string) *podNodeSelector
 	}
 }
 
-func (a *podNodeSelector) SetInternalClientSet(client internalclientset.Interface) {
+func (a *podNodeSelector) SetInternalKubeClientSet(client internalclientset.Interface) {
 	a.client = client
 }
 
-func (p *podNodeSelector) SetInformerFactory(f informers.SharedInformerFactory) {
-	p.namespaceInformer = f.InternalNamespaces().Informer()
-	p.SetReadyFunc(p.namespaceInformer.HasSynced)
+func (p *podNodeSelector) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	namespaceInformer := f.Core().InternalVersion().Namespaces()
+	p.namespaceLister = namespaceInformer.Lister()
+	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
 func (p *podNodeSelector) Validate() error {
-	if p.namespaceInformer == nil {
-		return fmt.Errorf("missing namespaceInformer")
+	if p.namespaceLister == nil {
+		return fmt.Errorf("missing namespaceLister")
 	}
 	if p.client == nil {
 		return fmt.Errorf("missing client")

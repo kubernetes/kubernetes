@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
@@ -47,7 +48,9 @@ type TokenCleanerOptions struct {
 // DefaultTokenCleanerOptions returns a set of default options for creating a
 // TokenCleaner
 func DefaultTokenCleanerOptions() TokenCleanerOptions {
-	return TokenCleanerOptions{}
+	return TokenCleanerOptions{
+		TokenSecretNamespace: api.NamespaceSystem,
+	}
 }
 
 // TokenCleaner is a controller that deletes expired tokens
@@ -97,7 +100,14 @@ func NewTokenCleaner(cl clientset.Interface, options TokenCleanerOptions) *Token
 // Run runs controller loops and returns when they are done
 func (tc *TokenCleaner) Run(stopCh <-chan struct{}) {
 	go tc.secretsController.Run(stopCh)
+	go wait.Until(tc.evalSecrets, 10*time.Second, stopCh)
 	<-stopCh
+}
+
+func (tc *TokenCleaner) evalSecrets() {
+	for _, obj := range tc.secrets.List() {
+		tc.evalSecret(obj)
+	}
 }
 
 func (tc *TokenCleaner) evalSecret(o interface{}) {

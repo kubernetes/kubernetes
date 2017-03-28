@@ -43,7 +43,7 @@ func ParseTaint(st string) (v1.Taint, error) {
 		return taint, fmt.Errorf("invalid taint spec: %v, %s", st, strings.Join(errs, "; "))
 	}
 
-	if effect != v1.TaintEffectNoSchedule && effect != v1.TaintEffectPreferNoSchedule {
+	if effect != v1.TaintEffectNoSchedule && effect != v1.TaintEffectPreferNoSchedule && effect != v1.TaintEffectNoExecute {
 		return taint, fmt.Errorf("invalid taint spec: %v, unsupported taint effect", st)
 	}
 

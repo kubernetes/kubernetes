@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/apimachinery/pkg/util/json"
 	"github.com/evanphx/json-patch"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 )
 

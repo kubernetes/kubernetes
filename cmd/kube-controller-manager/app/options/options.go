@@ -94,17 +94,18 @@ func NewCMServer() *CMServer {
 				},
 				FlexVolumePluginDir: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 			},
-			ContentType:              "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:               20.0,
-			KubeAPIBurst:             30,
-			LeaderElection:           leaderelection.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval:  metav1.Duration{Duration: 0 * time.Second},
-			EnableGarbageCollector:   true,
-			ConcurrentGCSyncs:        20,
-			ClusterSigningCertFile:   "/etc/kubernetes/ca/ca.pem",
-			ClusterSigningKeyFile:    "/etc/kubernetes/ca/ca.key",
-			ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 60 * time.Second},
-			EnableTaintManager:       true,
+			ContentType:                           "application/vnd.kubernetes.protobuf",
+			KubeAPIQPS:                            20.0,
+			KubeAPIBurst:                          30,
+			LeaderElection:                        leaderelection.DefaultLeaderElectionConfiguration(),
+			ControllerStartInterval:               metav1.Duration{Duration: 0 * time.Second},
+			EnableGarbageCollector:                true,
+			ConcurrentGCSyncs:                     20,
+			ClusterSigningCertFile:                "/etc/kubernetes/ca/ca.pem",
+			ClusterSigningKeyFile:                 "/etc/kubernetes/ca/ca.key",
+			ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 60 * time.Second},
+			EnableTaintManager:                    true,
+			HorizontalPodAutoscalerUseRESTClients: false,
 		},
 	}
 	s.LeaderElection.LeaderElect = true
@@ -130,9 +131,15 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.Int32Var(&s.ConcurrentDeploymentSyncs, "concurrent-deployment-syncs", s.ConcurrentDeploymentSyncs, "The number of deployment objects that are allowed to sync concurrently. Larger number = more responsive deployments, but more CPU (and network) load")
 	fs.Int32Var(&s.ConcurrentNamespaceSyncs, "concurrent-namespace-syncs", s.ConcurrentNamespaceSyncs, "The number of namespace objects that are allowed to sync concurrently. Larger number = more responsive namespace termination, but more CPU (and network) load")
 	fs.Int32Var(&s.ConcurrentSATokenSyncs, "concurrent-serviceaccount-token-syncs", s.ConcurrentSATokenSyncs, "The number of service account token objects that are allowed to sync concurrently. Larger number = more responsive token generation, but more CPU (and network) load")
-	fs.Int32Var(&s.LookupCacheSizeForRC, "replication-controller-lookup-cache-size", s.LookupCacheSizeForRC, "The the size of lookup cache for replication controllers. Larger number = more responsive replica management, but more MEM load.")
-	fs.Int32Var(&s.LookupCacheSizeForRS, "replicaset-lookup-cache-size", s.LookupCacheSizeForRS, "The the size of lookup cache for replicatsets. Larger number = more responsive replica management, but more MEM load.")
-	fs.Int32Var(&s.LookupCacheSizeForDaemonSet, "daemonset-lookup-cache-size", s.LookupCacheSizeForDaemonSet, "The the size of lookup cache for daemonsets. Larger number = more responsive daemonsets, but more MEM load.")
+	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
+	fs.Int32Var(&s.LookupCacheSizeForRC, "replication-controller-lookup-cache-size", s.LookupCacheSizeForRC, "This flag is deprecated and will be removed in future releases. ReplicationController no longer requires a lookup cache.")
+	fs.MarkDeprecated("replication-controller-lookup-cache-size", "This flag is deprecated and will be removed in future releases. ReplicationController no longer requires a lookup cache.")
+	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
+	fs.Int32Var(&s.LookupCacheSizeForRS, "replicaset-lookup-cache-size", s.LookupCacheSizeForRS, "This flag is deprecated and will be removed in future releases. ReplicaSet no longer requires a lookup cache.")
+	fs.MarkDeprecated("replicaset-lookup-cache-size", "This flag is deprecated and will be removed in future releases. ReplicaSet no longer requires a lookup cache.")
+	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
+	fs.Int32Var(&s.LookupCacheSizeForDaemonSet, "daemonset-lookup-cache-size", s.LookupCacheSizeForDaemonSet, "This flag is deprecated and will be removed in future releases. DaemonSet no longer requires a lookup cache.")
+	fs.MarkDeprecated("daemonset-lookup-cache-size", "This flag is deprecated and will be removed in future releases. DaemonSet no longer requires a lookup cache.")
 	fs.DurationVar(&s.ServiceSyncPeriod.Duration, "service-sync-period", s.ServiceSyncPeriod.Duration, "The period for syncing services with their external load balancers")
 	fs.DurationVar(&s.NodeSyncPeriod.Duration, "node-sync-period", 0, ""+
 		"This flag is deprecated and will be removed in future releases. See node-monitor-period for Node health checking or "+
@@ -176,6 +183,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.StringVar(&s.ClusterSigningKeyFile, "cluster-signing-key-file", s.ClusterSigningKeyFile, "Filename containing a PEM-encoded RSA or ECDSA private key used to sign cluster-scoped certificates")
 	fs.StringVar(&s.ApproveAllKubeletCSRsForGroup, "insecure-experimental-approve-all-kubelet-csrs-for-group", s.ApproveAllKubeletCSRsForGroup, "The group for which the controller-manager will auto approve all CSRs for kubelet client certificates.")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.BoolVar(&s.EnableContentionProfiling, "contention-profiling", false, "Enable lock contention profiling, if profiling is enabled")
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.StringVar(&s.ClusterCIDR, "cluster-cidr", s.ClusterCIDR, "CIDR Range for Pods in cluster.")
 	fs.StringVar(&s.ServiceCIDR, "service-cluster-ip-range", s.ServiceCIDR, "CIDR Range for Services in cluster.")
@@ -198,6 +206,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.BoolVar(&s.DisableAttachDetachReconcilerSync, "disable-attach-detach-reconcile-sync", false, "Disable volume attach detach reconciler sync. Disabling this may cause volumes to be mismatched with pods. Use wisely.")
 	fs.DurationVar(&s.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", s.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
 	fs.BoolVar(&s.EnableTaintManager, "enable-taint-manager", s.EnableTaintManager, "WARNING: Beta feature. If set to true enables NoExecute Taints and will evict all not-tolerating Pod running on Nodes tainted with this kind of Taints.")
+	fs.BoolVar(&s.HorizontalPodAutoscalerUseRESTClients, "horizontal-pod-autoscaler-use-rest-clients", s.HorizontalPodAutoscalerUseRESTClients, "WARNING: alpha feature.  If set to true, causes the horizontal pod autoscaler controller to use REST clients through the kube-aggregator, instead of using the legacy metrics client through the API server proxy.  This is required for custom metrics support in the horizonal pod autoscaler.")
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 

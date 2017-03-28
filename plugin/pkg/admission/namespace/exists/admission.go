@@ -23,10 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -41,14 +41,14 @@ func init() {
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
 type exists struct {
 	*admission.Handler
-	client            internalclientset.Interface
-	namespaceInformer cache.SharedIndexInformer
+	client          internalclientset.Interface
+	namespaceLister corelisters.NamespaceLister
 }
 
-var _ = kubeapiserveradmission.WantsInformerFactory(&exists{})
-var _ = kubeapiserveradmission.WantsInternalClientSet(&exists{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&exists{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&exists{})
 
-func (e *exists) Admit(a admission.Attributes) (err error) {
+func (e *exists) Admit(a admission.Attributes) error {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
@@ -60,19 +60,12 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	if !e.WaitForReady() {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
-	namespace := &api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      a.GetNamespace(),
-			Namespace: "",
-		},
-		Status: api.NamespaceStatus{},
-	}
-	_, exists, err := e.namespaceInformer.GetStore().Get(namespace)
-	if err != nil {
-		return errors.NewInternalError(err)
-	}
-	if exists {
+	_, err := e.namespaceLister.Get(a.GetNamespace())
+	if err == nil {
 		return nil
+	}
+	if !errors.IsNotFound(err) {
+		return errors.NewInternalError(err)
 	}
 
 	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
@@ -94,18 +87,19 @@ func NewExists() admission.Interface {
 	}
 }
 
-func (e *exists) SetInternalClientSet(client internalclientset.Interface) {
+func (e *exists) SetInternalKubeClientSet(client internalclientset.Interface) {
 	e.client = client
 }
 
-func (e *exists) SetInformerFactory(f informers.SharedInformerFactory) {
-	e.namespaceInformer = f.InternalNamespaces().Informer()
-	e.SetReadyFunc(e.namespaceInformer.HasSynced)
+func (e *exists) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	namespaceInformer := f.Core().InternalVersion().Namespaces()
+	e.namespaceLister = namespaceInformer.Lister()
+	e.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
 func (e *exists) Validate() error {
-	if e.namespaceInformer == nil {
-		return fmt.Errorf("missing namespaceInformer")
+	if e.namespaceLister == nil {
+		return fmt.Errorf("missing namespaceLister")
 	}
 	if e.client == nil {
 		return fmt.Errorf("missing client")

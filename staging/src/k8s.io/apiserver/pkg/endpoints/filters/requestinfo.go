@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // WithRequestInfo attaches a RequestInfo to the context.

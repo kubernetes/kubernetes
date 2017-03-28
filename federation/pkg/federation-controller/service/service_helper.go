@@ -17,7 +17,6 @@ limitations under the License.
 package service
 
 import (
-	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -85,31 +84,26 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 		// if serviceCache does not exists, that means the service is not created by federation, we should skip it
 		return nil
 	}
-	serviceInterface, exists, err := clusterCache.serviceStore.Indexer.GetByKey(key)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		glog.Errorf("Did not successfully get %v from store: %v, will retry later", key, err)
 		clusterCache.serviceQueue.Add(key)
 		return err
 	}
 	var needUpdate, isDeletion bool
-	if exists {
-		service, ok := serviceInterface.(*v1.Service)
-		if ok {
-			glog.V(4).Infof("Found service for federation service %s/%s from cluster %s", service.Namespace, service.Name, clusterName)
-			needUpdate = cc.processServiceUpdate(cachedService, service, clusterName)
-		} else {
-			_, ok := serviceInterface.(cache.DeletedFinalStateUnknown)
-			if !ok {
-				return fmt.Errorf("Object contained wasn't a service or a deleted key: %+v", serviceInterface)
-			}
-			glog.Infof("Found tombstone for %v", key)
-			needUpdate = cc.processServiceDeletion(cachedService, clusterName)
-			isDeletion = true
-		}
-	} else {
+	service, err := clusterCache.serviceStore.Services(namespace).Get(name)
+	switch {
+	case errors.IsNotFound(err):
 		glog.Infof("Can not get service %v for cluster %s from serviceStore", key, clusterName)
 		needUpdate = cc.processServiceDeletion(cachedService, clusterName)
 		isDeletion = true
+	case err != nil:
+		glog.Errorf("Did not successfully get %v from store: %v, will retry later", key, err)
+		clusterCache.serviceQueue.Add(key)
+		return err
+	default:
+		glog.V(4).Infof("Found service for federation service %s/%s from cluster %s", service.Namespace, service.Name, clusterName)
+		needUpdate = cc.processServiceUpdate(cachedService, service, clusterName)
 	}
 
 	if needUpdate {
@@ -137,9 +131,13 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 	if isDeletion {
 		// cachedService is not reliable here as
 		// deleting cache is the last step of federation service deletion
-		_, err := fedClient.Core().Services(cachedService.lastState.Namespace).Get(cachedService.lastState.Name, metav1.GetOptions{})
+		service, err := fedClient.Core().Services(cachedService.lastState.Namespace).Get(cachedService.lastState.Name, metav1.GetOptions{})
 		// rebuild service if federation service still exists
 		if err == nil || !errors.IsNotFound(err) {
+			if err == nil && service.DeletionTimestamp != nil {
+				glog.V(4).Infof("Skipping sync of service %v in underlying clusters as it has already been marked for deletion", name)
+				return nil
+			}
 			return sc.ensureClusterService(cachedService, clusterName, cachedService.appliedState, clusterCache.clientset)
 		}
 	}

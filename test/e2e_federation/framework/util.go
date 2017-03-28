@@ -19,7 +19,9 @@ package framework
 import (
 	"fmt"
 	"os"
+	"path"
 	"regexp"
+	"strings"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -38,10 +39,7 @@ import (
 
 // Detects whether the federation namespace exists in the underlying cluster
 func SkipUnlessFederated(c clientset.Interface) {
-	federationNS := os.Getenv("FEDERATION_NAMESPACE")
-	if federationNS == "" {
-		federationNS = federationapi.FederationNamespaceSystem
-	}
+	federationNS := framework.FederationSystemNamespace()
 
 	_, err := c.Core().Namespaces().Get(federationNS, metav1.GetOptions{})
 	if err != nil {
@@ -109,4 +107,47 @@ func GetValidDNSSubdomainName(name string) (string, error) {
 		return "", fmt.Errorf("errors in converting name to a valid DNS subdomain %s", errors)
 	}
 	return name, nil
+}
+
+func FederationControlPlaneUpgrade(version string) error {
+	version = "v" + version
+	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "federation/cluster/upgrade.sh"), version)
+	return err
+}
+
+func CheckFederationVersion(c federation_clientset.Interface, want string) error {
+	framework.Logf("Checking federation version")
+	v, err := c.Discovery().ServerVersion()
+	if err != nil {
+		return fmt.Errorf("CheckFederationVersion() couldn't get the master version: %v", err)
+	}
+	// We do prefix trimming and then matching because:
+	// want looks like:  0.19.3-815-g50e67d4
+	// got  looks like: v0.19.3-815-g50e67d4034e858-dirty
+	got := strings.TrimPrefix(v.GitVersion, "v")
+	if !strings.HasPrefix(got, want) {
+		return fmt.Errorf("federation had apiserver version %s which does not start with %s",
+			got, want)
+	}
+	framework.Logf("Federation is at version %s", want)
+	return nil
+}
+
+func MasterUpgrade(context, version string) error {
+	switch framework.TestContext.Provider {
+	case "gce":
+		return masterUpgradeGCE(context, version)
+	default:
+		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
+	}
+}
+
+func masterUpgradeGCE(context, rawVersion string) error {
+	version := "v" + rawVersion
+	// TODO: this breaks if we want to upgrade 2 clusters in same zone. use alternate methods in future to get zone of a cluster
+	zone := strings.TrimPrefix(context, "federation-e2e-"+framework.TestContext.Provider+"-")
+
+	env := append(os.Environ(), "KUBE_CONTEXT="+context, "ZONE="+zone)
+	_, _, err := framework.RunCmdEnv(env, path.Join(framework.TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-M", version)
+	return err
 }

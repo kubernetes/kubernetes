@@ -34,6 +34,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",

@@ -117,6 +117,12 @@ var viewEscalatingNamespaceResources = []rbac.PolicyRule{
 	rbac.NewRule(bootstrappolicy.Read...).Groups("").Resources("services/proxy").RuleOrDie(),
 }
 
+// ungettableResources is the list of rules that don't allow to view (GET) them
+// this is purposefully separate list to distinguish from escalating privs
+var ungettableResources = []rbac.PolicyRule{
+	rbac.NewRule(bootstrappolicy.Read...).Groups("apps", "extensions").Resources("deployments/rollback").RuleOrDie(),
+}
+
 func TestEditViewRelationship(t *testing.T) {
 	readVerbs := sets.NewString(bootstrappolicy.Read...)
 	semanticRoles := getSemanticRoles(bootstrappolicy.ClusterRoles())
@@ -142,6 +148,14 @@ func TestEditViewRelationship(t *testing.T) {
 	}
 	semanticRoles.view.Rules = append(semanticRoles.view.Rules, viewEscalatingNamespaceResources...)
 
+	// confirm that the view role doesn't have ungettable resources
+	for _, rule := range ungettableResources {
+		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbac.PolicyRule{rule}); covers {
+			t.Errorf("view has ungettable resource: %#v", rule)
+		}
+	}
+	semanticRoles.view.Rules = append(semanticRoles.view.Rules, ungettableResources...)
+
 	// at this point, we should have a two way covers relationship
 	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.view.Rules); !covers {
 		t.Errorf("edit has lost rules for: %#v", miss)
@@ -149,6 +163,50 @@ func TestEditViewRelationship(t *testing.T) {
 	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.view.Rules, semanticRoles.edit.Rules); !covers {
 		t.Errorf("view is missing rules for: %#v\nIf these are escalating powers, add them to the list.  Otherwise, add them to the view role.", miss)
 	}
+}
+
+func TestBootstrapNamespaceRoles(t *testing.T) {
+	list := &api.List{}
+	names := sets.NewString()
+	roles := map[string]runtime.Object{}
+
+	namespaceRoles := bootstrappolicy.NamespaceRoles()
+	for _, namespace := range sets.StringKeySet(namespaceRoles).List() {
+		bootstrapRoles := namespaceRoles[namespace]
+		for i := range bootstrapRoles {
+			role := bootstrapRoles[i]
+			names.Insert(role.Name)
+			roles[role.Name] = &role
+		}
+
+		for _, name := range names.List() {
+			list.Items = append(list.Items, roles[name])
+		}
+	}
+
+	testObjects(t, list, "namespace-roles.yaml")
+}
+
+func TestBootstrapNamespaceRoleBindings(t *testing.T) {
+	list := &api.List{}
+	names := sets.NewString()
+	roleBindings := map[string]runtime.Object{}
+
+	namespaceRoleBindings := bootstrappolicy.NamespaceRoleBindings()
+	for _, namespace := range sets.StringKeySet(namespaceRoleBindings).List() {
+		bootstrapRoleBindings := namespaceRoleBindings[namespace]
+		for i := range bootstrapRoleBindings {
+			roleBinding := bootstrapRoleBindings[i]
+			names.Insert(roleBinding.Name)
+			roleBindings[roleBinding.Name] = &roleBinding
+		}
+
+		for _, name := range names.List() {
+			list.Items = append(list.Items, roleBindings[name])
+		}
+	}
+
+	testObjects(t, list, "namespace-role-bindings.yaml")
 }
 
 func TestBootstrapClusterRoles(t *testing.T) {

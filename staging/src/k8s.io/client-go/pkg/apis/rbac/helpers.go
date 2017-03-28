@@ -218,14 +218,14 @@ func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 
 func (r *ClusterRoleBindingBuilder) Groups(groups ...string) *ClusterRoleBindingBuilder {
 	for _, group := range groups {
-		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, Subject{Kind: GroupKind, Name: group})
+		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, Subject{Kind: GroupKind, APIGroup: GroupName, Name: group})
 	}
 	return r
 }
 
 func (r *ClusterRoleBindingBuilder) Users(users ...string) *ClusterRoleBindingBuilder {
 	for _, user := range users {
-		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, Subject{Kind: UserKind, Name: user})
+		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, Subject{Kind: UserKind, APIGroup: GroupName, Name: user})
 	}
 	return r
 }
@@ -273,6 +273,22 @@ func NewRoleBinding(roleName, namespace string) *RoleBindingBuilder {
 			RoleRef: RoleRef{
 				APIGroup: GroupName,
 				Kind:     "Role",
+				Name:     roleName,
+			},
+		},
+	}
+}
+
+func NewRoleBindingForClusterRole(roleName, namespace string) *RoleBindingBuilder {
+	return &RoleBindingBuilder{
+		RoleBinding: RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      roleName,
+				Namespace: namespace,
+			},
+			RoleRef: RoleRef{
+				APIGroup: GroupName,
+				Kind:     "ClusterRole",
 				Name:     roleName,
 			},
 		},

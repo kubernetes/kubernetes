@@ -74,16 +74,19 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		Annotations: newPodAnnotations(pod),
 	}
 
+	dnsServers, dnsSearches, useClusterFirstPolicy, err := m.runtimeHelper.GetClusterDNS(pod)
+	if err != nil {
+		return nil, err
+	}
+	podSandboxConfig.DnsConfig = &runtimeapi.DNSConfig{
+		Servers:  dnsServers,
+		Searches: dnsSearches,
+	}
+	if useClusterFirstPolicy {
+		podSandboxConfig.DnsConfig.Options = defaultDNSOptions
+	}
+
 	if !kubecontainer.IsHostNetworkPod(pod) {
-		dnsServers, dnsSearches, err := m.runtimeHelper.GetClusterDNS(pod)
-		if err != nil {
-			return nil, err
-		}
-		podSandboxConfig.DnsConfig = &runtimeapi.DNSConfig{
-			Servers:  dnsServers,
-			Searches: dnsSearches,
-			Options:  defaultDNSOptions,
-		}
 		// TODO: Add domain support in new runtime interface
 		hostname, _, err := m.runtimeHelper.GeneratePodHostNameAndDomain(pod)
 		if err != nil {
@@ -95,17 +98,12 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	logDir := buildPodLogsDirectory(pod.UID)
 	podSandboxConfig.LogDirectory = logDir
 
-	cgroupParent := ""
 	portMappings := []*runtimeapi.PortMapping{}
 	for _, c := range pod.Spec.Containers {
-		// TODO: use a separate interface to only generate portmappings
-		opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, &c, "")
-		if err != nil {
-			return nil, err
-		}
+		containerPortMappings := kubecontainer.MakePortMappings(&c)
 
-		for idx := range opts.PortMappings {
-			port := opts.PortMappings[idx]
+		for idx := range containerPortMappings {
+			port := containerPortMappings[idx]
 			hostPort := int32(port.HostPort)
 			containerPort := int32(port.ContainerPort)
 			protocol := toRuntimeProtocol(port.Protocol)
@@ -117,9 +115,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 			})
 		}
 
-		// TODO: refactor kubelet to get cgroup parent for pod instead of containers
-		cgroupParent = opts.CgroupParent
 	}
+
+	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
 	podSandboxConfig.Linux = m.generatePodSandboxLinuxConfig(pod, cgroupParent)
 	if len(portMappings) > 0 {
 		podSandboxConfig.PortMappings = portMappings

@@ -225,7 +225,7 @@ func (m *kubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
 		return nil, err
 	}
 
-	return newRuntimeVersion(typedVersion.Version)
+	return newRuntimeVersion(typedVersion.RuntimeVersion)
 }
 
 // APIVersion returns the cached API version information of the container
@@ -386,7 +386,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 	}
 
 	// Needs to create a new sandbox when network namespace changed.
-	if sandboxStatus.Linux != nil && sandboxStatus.Linux.Namespaces.Options != nil &&
+	if sandboxStatus.Linux != nil && sandboxStatus.Linux.Namespaces != nil && sandboxStatus.Linux.Namespaces.Options != nil &&
 		sandboxStatus.Linux.Namespaces.Options.HostNetwork != kubecontainer.IsHostNetworkPod(pod) {
 		glog.V(2).Infof("Sandbox for pod %q has changed. Need to start a new one", format.Pod(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, ""
@@ -555,9 +555,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		if podContainerChanges.SandboxID != "" {
 			m.recorder.Eventf(ref, v1.EventTypeNormal, "SandboxChanged", "Pod sandbox changed, it will be killed and re-created.")
 		} else {
-			m.recorder.Eventf(ref, v1.EventTypeNormal, "SandboxReceived", "Pod sandbox received, it will be created.")
+			glog.V(4).Infof("SyncPod received new pod %q, will create a new sandbox for it", format.Pod(pod))
 		}
-
 	}
 
 	// Step 2: Kill the pod if the sandbox has changed.
@@ -620,6 +619,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 			glog.Errorf("createPodSandbox for pod %q failed: %v", format.Pod(pod), err)
 			return
 		}
+		glog.V(4).Infof("Created PodSandbox %q for pod %q", podSandboxID, format.Pod(pod))
 
 		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
 		if err != nil {
@@ -628,9 +628,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 			return
 		}
 
-		// Overwrite the podIP passed in the pod status, since we just started the pod sandbox.
-		podIP = m.determinePodSandboxIP(pod.Namespace, pod.Name, podSandboxStatus)
-		glog.V(4).Infof("Determined the ip %q for pod %q after sandbox changed", podIP, format.Pod(pod))
+		// If we ever allow updating a pod from non-host-network to
+		// host-network, we may use a stale IP.
+		if !kubecontainer.IsHostNetworkPod(pod) {
+			// Overwrite the podIP passed in the pod status, since we just started the pod sandbox.
+			podIP = m.determinePodSandboxIP(pod.Namespace, pod.Name, podSandboxStatus)
+			glog.V(4).Infof("Determined the ip %q for pod %q after sandbox changed", podIP, format.Pod(pod))
+		}
 	}
 
 	// Get podSandboxConfig for containers to start.

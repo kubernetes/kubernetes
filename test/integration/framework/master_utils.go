@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	goruntime "runtime"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -124,7 +125,7 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}, QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
 	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	controllerManager := replicationcontroller.NewReplicationManager(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().ReplicationControllers(), clientset, c.Burst, 4096, false)
+	controllerManager := replicationcontroller.NewReplicationManager(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().ReplicationControllers(), clientset, c.Burst)
 
 	// TODO: Support events once we can cleanly shutdown an event recorder.
 	controllerManager.SetEventRecorder(&record.FakeRecorder{})
@@ -357,7 +358,7 @@ func NewMasterConfig() *master.Config {
 		"",
 		ns)
 
-	genericConfig := genericapiserver.NewConfig().WithSerializer(api.Codecs)
+	genericConfig := genericapiserver.NewConfig(api.Codecs)
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
@@ -508,4 +509,26 @@ func RunParallel(task Task, numTasks, numWorkers int) {
 	}
 	wg.Wait()
 	close(semCh)
+}
+
+// FindFreeLocalPort returns the number of an available port number on
+// the loopback interface.  Useful for determining the port to launch
+// a server on.  Error handling required - there is a non-zero chance
+// that the returned port number will be bound by another process
+// after this function returns.
+func FindFreeLocalPort() (int, error) {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	_, portStr, err := net.SplitHostPort(l.Addr().String())
+	if err != nil {
+		return 0, err
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return 0, err
+	}
+	return port, nil
 }

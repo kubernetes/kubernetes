@@ -122,7 +122,11 @@ func Convert_v1beta1_ClusterList_To_federation_ClusterList(in *ClusterList, out 
 
 func autoConvert_federation_ClusterList_To_v1beta1_ClusterList(in *federation.ClusterList, out *ClusterList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]Cluster)(unsafe.Pointer(&in.Items))
+	if in.Items == nil {
+		out.Items = make([]Cluster, 0)
+	} else {
+		out.Items = *(*[]Cluster)(unsafe.Pointer(&in.Items))
+	}
 	return nil
 }
 
@@ -141,7 +145,11 @@ func Convert_v1beta1_ClusterSpec_To_federation_ClusterSpec(in *ClusterSpec, out 
 }
 
 func autoConvert_federation_ClusterSpec_To_v1beta1_ClusterSpec(in *federation.ClusterSpec, out *ClusterSpec, s conversion.Scope) error {
-	out.ServerAddressByClientCIDRs = *(*[]ServerAddressByClientCIDR)(unsafe.Pointer(&in.ServerAddressByClientCIDRs))
+	if in.ServerAddressByClientCIDRs == nil {
+		out.ServerAddressByClientCIDRs = make([]ServerAddressByClientCIDR, 0)
+	} else {
+		out.ServerAddressByClientCIDRs = *(*[]ServerAddressByClientCIDR)(unsafe.Pointer(&in.ServerAddressByClientCIDRs))
+	}
 	out.SecretRef = (*v1.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	return nil
 }

@@ -58,8 +58,8 @@ func (CustomMetricTarget) SwaggerDoc() map[string]string {
 var map_DaemonSet = map[string]string{
 	"":         "DaemonSet represents the configuration of a daemon set.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"spec":     "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-	"status":   "Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"spec":     "The desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+	"status":   "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 }
 
 func (DaemonSet) SwaggerDoc() map[string]string {
@@ -69,7 +69,7 @@ func (DaemonSet) SwaggerDoc() map[string]string {
 var map_DaemonSetList = map[string]string{
 	"":         "DaemonSetList is a collection of daemon sets.",
 	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"items":    "Items is a list of daemon sets.",
+	"items":    "A list of daemon sets.",
 }
 
 func (DaemonSetList) SwaggerDoc() map[string]string {
@@ -77,9 +77,12 @@ func (DaemonSetList) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetSpec = map[string]string{
-	"":         "DaemonSetSpec is the specification of a daemon set.",
-	"selector": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-	"template": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
+	"":                   "DaemonSetSpec is the specification of a daemon set.",
+	"selector":           "A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+	"template":           "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
+	"updateStrategy":     "An update strategy to replace existing DaemonSet pods with new pods.",
+	"minReadySeconds":    "The minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+	"templateGeneration": "A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
 }
 
 func (DaemonSetSpec) SwaggerDoc() map[string]string {
@@ -88,15 +91,27 @@ func (DaemonSetSpec) SwaggerDoc() map[string]string {
 
 var map_DaemonSetStatus = map[string]string{
 	"": "DaemonSetStatus represents the current status of a daemon set.",
-	"currentNumberScheduled": "CurrentNumberScheduled is the number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
-	"numberMisscheduled":     "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
-	"desiredNumberScheduled": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
-	"numberReady":            "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
-	"observedGeneration":     "ObservedGeneration is the most recent generation observed by the daemon set controller.",
+	"currentNumberScheduled": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+	"numberMisscheduled":     "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+	"desiredNumberScheduled": "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+	"numberReady":            "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
+	"observedGeneration":     "The most recent generation observed by the daemon set controller.",
+	"updatedNumberScheduled": "The total number of nodes that are running updated daemon pod",
+	"numberAvailable":        "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least spec.minReadySeconds)",
+	"numberUnavailable":      "The number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least spec.minReadySeconds)",
 }
 
 func (DaemonSetStatus) SwaggerDoc() map[string]string {
 	return map_DaemonSetStatus
+}
+
+var map_DaemonSetUpdateStrategy = map[string]string{
+	"type":          "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+	"rollingUpdate": "Rolling update config params. Present only if type = \"RollingUpdate\".",
+}
+
+func (DaemonSetUpdateStrategy) SwaggerDoc() map[string]string {
+	return map_DaemonSetUpdateStrategy
 }
 
 var map_Deployment = map[string]string{
@@ -486,6 +501,15 @@ var map_RollbackConfig = map[string]string{
 
 func (RollbackConfig) SwaggerDoc() map[string]string {
 	return map_RollbackConfig
+}
+
+var map_RollingUpdateDaemonSet = map[string]string{
+	"":               "Spec to control the desired behavior of daemon set rolling update.",
+	"maxUnavailable": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+}
+
+func (RollingUpdateDaemonSet) SwaggerDoc() map[string]string {
+	return map_RollingUpdateDaemonSet
 }
 
 var map_RollingUpdateDeployment = map[string]string{

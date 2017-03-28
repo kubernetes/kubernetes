@@ -17,11 +17,11 @@ limitations under the License.
 package mo
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 // Ancestors returns the entire ancestry tree of a specified managed object.
@@ -39,13 +39,28 @@ func Ancestors(ctx context.Context, rt soap.RoundTripper, pc, obj types.ManagedO
 					&types.SelectionSpec{Name: "traverseParent"},
 				},
 			},
+			&types.TraversalSpec{
+				SelectionSpec: types.SelectionSpec{},
+				Type:          "VirtualMachine",
+				Path:          "parentVApp",
+				Skip:          types.NewBool(false),
+				SelectSet: []types.BaseSelectionSpec{
+					&types.SelectionSpec{Name: "traverseParent"},
+				},
+			},
 		},
 		Skip: types.NewBool(false),
 	}
 
-	pspec := types.PropertySpec{
-		Type:    "ManagedEntity",
-		PathSet: []string{"name", "parent"},
+	pspec := []types.PropertySpec{
+		{
+			Type:    "ManagedEntity",
+			PathSet: []string{"name", "parent"},
+		},
+		{
+			Type:    "VirtualMachine",
+			PathSet: []string{"parentVApp"},
+		},
 	}
 
 	req := types.RetrieveProperties{
@@ -53,13 +68,12 @@ func Ancestors(ctx context.Context, rt soap.RoundTripper, pc, obj types.ManagedO
 		SpecSet: []types.PropertyFilterSpec{
 			{
 				ObjectSet: []types.ObjectSpec{ospec},
-				PropSet:   []types.PropertySpec{pspec},
+				PropSet:   pspec,
 			},
 		},
 	}
 
 	var ifaces []interface{}
-
 	err := RetrievePropertiesForRequest(ctx, rt, req, &ifaces)
 	if err != nil {
 		return nil, err
@@ -93,6 +107,15 @@ func Ancestors(ctx context.Context, rt soap.RoundTripper, pc, obj types.ManagedO
 				default:
 					// ManagedEntity always has a Name, if we hit this point we missed a case above.
 					panic(fmt.Sprintf("%#v Name is empty", me.Reference()))
+				}
+			}
+
+			if me.Parent == nil {
+				// Special case for VirtualMachine within VirtualApp,
+				// unlikely to hit this other than via Finder.Element()
+				switch x := iface.(type) {
+				case VirtualMachine:
+					me.Parent = x.ParentVApp
 				}
 			}
 

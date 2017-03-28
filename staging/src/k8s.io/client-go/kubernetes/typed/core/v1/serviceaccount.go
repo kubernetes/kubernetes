@@ -20,7 +20,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/client-go/pkg/api"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	rest "k8s.io/client-go/rest"
 )
@@ -99,7 +99,7 @@ func (c *serviceAccounts) DeleteCollection(options *meta_v1.DeleteOptions, listO
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +112,7 @@ func (c *serviceAccounts) Get(name string, options meta_v1.GetOptions) (result *
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,7 +124,7 @@ func (c *serviceAccounts) List(opts meta_v1.ListOptions) (result *v1.ServiceAcco
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -132,11 +132,11 @@ func (c *serviceAccounts) List(opts meta_v1.ListOptions) (result *v1.ServiceAcco
 
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
 func (c *serviceAccounts) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("serviceaccounts").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

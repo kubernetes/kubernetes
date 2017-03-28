@@ -17,10 +17,11 @@ limitations under the License.
 package object
 
 import (
+	"context"
+
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type DiagnosticManager struct {
@@ -33,6 +34,14 @@ func NewDiagnosticManager(c *vim25.Client) *DiagnosticManager {
 	}
 
 	return &m
+}
+
+func (m DiagnosticManager) Log(ctx context.Context, host *HostSystem, key string) *DiagnosticLog {
+	return &DiagnosticLog{
+		m:    m,
+		Key:  key,
+		Host: host,
+	}
 }
 
 func (m DiagnosticManager) BrowseLog(ctx context.Context, host *HostSystem, key string, start, lines int32) (*types.DiagnosticManagerLogHeader, error) {

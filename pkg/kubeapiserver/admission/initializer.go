@@ -20,20 +20,20 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 )
 
 // TODO add a `WantsToRun` which takes a stopCh.  Might make it generic.
 
-// WantsInformerFactory defines a function which sets InformerFactory for admission plugins that need it
-type WantsInternalClientSet interface {
-	SetInternalClientSet(internalclientset.Interface)
+// WantsInternalKubeClientSet defines a function which sets ClientSet for admission plugins that need it
+type WantsInternalKubeClientSet interface {
+	SetInternalKubeClientSet(internalclientset.Interface)
 	admission.Validator
 }
 
-// WantsInformerFactory defines a function which sets InformerFactory for admission plugins that need it
-type WantsInformerFactory interface {
-	SetInformerFactory(informers.SharedInformerFactory)
+// WantsInternalKubeInformerFactory defines a function which sets InformerFactory for admission plugins that need it
+type WantsInternalKubeInformerFactory interface {
+	SetInternalKubeInformerFactory(informers.SharedInformerFactory)
 	admission.Validator
 }
 
@@ -43,35 +43,46 @@ type WantsAuthorizer interface {
 	admission.Validator
 }
 
+// WantsCloudConfig defines a function which sets CloudConfig for admission plugins that need it.
+type WantsCloudConfig interface {
+	SetCloudConfig([]byte)
+}
+
 type pluginInitializer struct {
 	internalClient internalclientset.Interface
 	informers      informers.SharedInformerFactory
 	authorizer     authorizer.Authorizer
+	cloudConfig    []byte
 }
 
 var _ admission.PluginInitializer = pluginInitializer{}
 
 // NewPluginInitializer constructs new instance of PluginInitializer
-func NewPluginInitializer(internalClient internalclientset.Interface, sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer) admission.PluginInitializer {
+func NewPluginInitializer(internalClient internalclientset.Interface, sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer, cloudConfig []byte) admission.PluginInitializer {
 	return pluginInitializer{
 		internalClient: internalClient,
 		informers:      sharedInformers,
 		authorizer:     authz,
+		cloudConfig:    cloudConfig,
 	}
 }
 
 // Initialize checks the initialization interfaces implemented by each plugin
 // and provide the appropriate initialization data
 func (i pluginInitializer) Initialize(plugin admission.Interface) {
-	if wants, ok := plugin.(WantsInternalClientSet); ok {
-		wants.SetInternalClientSet(i.internalClient)
+	if wants, ok := plugin.(WantsInternalKubeClientSet); ok {
+		wants.SetInternalKubeClientSet(i.internalClient)
 	}
 
-	if wants, ok := plugin.(WantsInformerFactory); ok {
-		wants.SetInformerFactory(i.informers)
+	if wants, ok := plugin.(WantsInternalKubeInformerFactory); ok {
+		wants.SetInternalKubeInformerFactory(i.informers)
 	}
 
 	if wants, ok := plugin.(WantsAuthorizer); ok {
 		wants.SetAuthorizer(i.authorizer)
+	}
+
+	if wants, ok := plugin.(WantsCloudConfig); ok {
+		wants.SetCloudConfig(i.cloudConfig)
 	}
 }

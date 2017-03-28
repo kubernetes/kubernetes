@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
       - name: cassandra
-        image: gcr.io/google-samples/cassandra:v11
+        image: gcr.io/google-samples/cassandra:v12
         imagePullPolicy: Always
         ports:
         - containerPort: 7000
@@ -57,6 +57,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: status.podIP
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
         readinessProbe:
           exec:
             command:
@@ -78,9 +82,17 @@ spec:
   - metadata:
       name: cassandra-data
       annotations:
-        volume.alpha.kubernetes.io/storage-class: anything
+        volume.beta.kubernetes.io/storage-class: fast
     spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
           storage: 1Gi
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: fast
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd

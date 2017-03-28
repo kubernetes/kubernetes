@@ -23,6 +23,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -209,7 +210,10 @@ func schedulePods(config *testConfig) int32 {
 	// Bake in time for the first pod scheduling event.
 	for {
 		time.Sleep(50 * time.Millisecond)
-		scheduled := config.schedulerSupportFunctions.GetScheduledPodListerIndexer().List()
+		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
+		if err != nil {
+			glog.Fatalf("%v", err)
+		}
 		// 30,000 pods -> wait till @ least 300 are scheduled to start measuring.
 		// TODO Find out why sometimes there may be scheduling blips in the beggining.
 		if len(scheduled) > config.numPods/100 {
@@ -224,7 +228,10 @@ func schedulePods(config *testConfig) int32 {
 		// This can potentially affect performance of scheduler, since List() is done under mutex.
 		// Listing 10000 pods is an expensive operation, so running it frequently may impact scheduler.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled := config.schedulerSupportFunctions.GetScheduledPodListerIndexer().List()
+		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
+		if err != nil {
+			glog.Fatalf("%v", err)
+		}
 
 		// We will be completed when all pods are done being scheduled.
 		// return the worst-case-scenario interval that was seen during this time.

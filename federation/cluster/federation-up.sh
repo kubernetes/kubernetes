@@ -29,13 +29,14 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # For `kube::log::status` function since it already sources
 # "${KUBE_ROOT}/cluster/lib/logging.sh" and DEFAULT_KUBECONFIG
 source "${KUBE_ROOT}/cluster/common.sh"
-# For $FEDERATION_PUSH_REPO_BASE and $FEDERATION_NAMESPACE.
+# For $FEDERATION_NAME, $FEDERATION_NAMESPACE, $FEDERATION_KUBE_CONTEXT,
+# $HOST_CLUSTER_CONTEXT, $KUBEDNS_CONFIGMAP_NAME,
+# $KUBEDNS_CONFIGMAP_NAMESPACE and $KUBEDNS_FEDERATION_FLAG.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
-FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
-FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-e2e-federation}"
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
-HOST_CLUSTER_CONTEXT="${FEDERATION_HOST_CLUSTER_CONTEXT:-${1}}"
+DNS_PROVIDER="${FEDERATION_DNS_PROVIDER:-google-clouddns}"
+FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
 
 # get_version returns the version in KUBERNETES_RELEASE or defaults to the
 # value in the federation `versions` file.
@@ -78,33 +79,37 @@ function init() {
   local -r kube_registry="${KUBE_REGISTRY:-gcr.io/${project}}"
   local -r kube_version="$(get_version)"
 
-  "${KUBE_ROOT}/federation/develop/kubefed.sh" init \
+  kube::log::status "DNS_ZONE_NAME: \"${DNS_ZONE_NAME}\", DNS_PROVIDER: \"${DNS_PROVIDER}\""
+  kube::log::status "Image: \"${kube_registry}/hyperkube-amd64:${kube_version}\""
+
+  # Send INT after 20m and KILL 1m after that if process is still alive.
+  timeout --signal=INT --kill-after=1m 20m \
+      "${KUBE_ROOT}/federation/develop/kubefed.sh" init \
       "${FEDERATION_NAME}" \
+      --federation-system-namespace=${FEDERATION_NAMESPACE} \
       --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
       --dns-zone-name="${DNS_ZONE_NAME}" \
-      --image="${kube_registry}/hyperkube-amd64:${kube_version}"
+      --dns-provider="${DNS_PROVIDER}" \
+      --image="${kube_registry}/hyperkube-amd64:${kube_version}" \
+      --apiserver-arg-overrides="--storage-backend=etcd2" \
+      --apiserver-enable-basic-auth=true \
+      --apiserver-enable-token-auth=true \
+      --apiserver-arg-overrides="--v=4" \
+      --controllermanager-arg-overrides="--v=4"
 }
 
-# join_cluster_to_federation joins the clusters in the local kubeconfig to federation. The clusters
+# join_clusters joins the clusters in the local kubeconfig to federation. The clusters
 # and their kubeconfig entries in the local kubeconfig are created while deploying clusters, i.e. when kube-up is run.
-function join_cluster_to_federation() {
-  for cluster in $("${KUBE_ROOT}/cluster/kubectl.sh" config get-clusters |sed -n '1!p'); do
-    # Skip federation context
-    if [[ "${cluster}" == "${FEDERATION_NAME}" ]]; then
-      continue
-    fi
-    # Skip contexts not beginning with "federation"
-    if [[ "${cluster}" != federation* ]]; then
-      continue
-    fi
+function join_clusters() {
+  for context in $(federation_cluster_contexts); do
+    kube::log::status "Joining cluster with name '${context}' to federation with name '${FEDERATION_NAME}'"
 
-  kube::log::status "Joining cluster with name '${cluster}' to federation with name '${FEDERATION_NAME}'"
-
-  "${KUBE_ROOT}/federation/develop/kubefed.sh" join \
-      "${cluster}" \
-      --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
-      --context="${FEDERATION_NAME}" \
-      --secret-name="${cluster//_/-}"    # Replace "_" by "-"
+    "${KUBE_ROOT}/federation/develop/kubefed.sh" join \
+        "${context}" \
+        --federation-system-namespace=${FEDERATION_NAMESPACE} \
+        --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
+        --context="${FEDERATION_NAME}" \
+        --secret-name="${context//_/-}"    # Replace "_" by "-"
   done
 }
 
@@ -112,8 +117,7 @@ USE_KUBEFED="${USE_KUBEFED:-}"
 
 if [[ "${USE_KUBEFED}" == "true" ]]; then
   init
-
-  join_cluster_to_federation
+  join_clusters
 else
   export FEDERATION_IMAGE_TAG="$(get_version)"
   create-federation-api-objects

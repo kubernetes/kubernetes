@@ -21,12 +21,10 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -147,13 +145,9 @@ func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentcon
 	if err != nil {
 		return err
 	}
-
 	plugin.host = host
 
-	// sync network config from pluginDir periodically to detect network config updates
-	go wait.Forever(func() {
-		plugin.syncNetworkConfig()
-	}, 10*time.Second)
+	plugin.syncNetworkConfig()
 	return nil
 }
 
@@ -189,7 +183,15 @@ func (plugin *cniNetworkPlugin) Name() string {
 	return CNIPluginName
 }
 
-func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *cniNetworkPlugin) Status() error {
+	// sync network config from pluginDir periodically to detect network config updates
+	plugin.syncNetworkConfig()
+
+	// Can't set up pods if we don't have any CNI network configs yet
+	return plugin.checkInitialized()
+}
+
+func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
 	if err := plugin.checkInitialized(); err != nil {
 		return err
 	}

@@ -81,6 +81,14 @@ func (plugin *gitRepoPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *gitRepoPlugin) SupportsMountOption() bool {
+	return false
+}
+
+func (plugin *gitRepoPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &gitRepoVolumeMounter{
 		gitRepoVolume: &gitRepoVolume{

@@ -60,16 +60,16 @@ const (
 	kConfigPrefix = "CONFIG_"
 )
 
-func (k *KernelValidator) Validate(spec SysSpec) error {
+func (k *KernelValidator) Validate(spec SysSpec) (error, error) {
 	release, err := exec.Command("uname", "-r").CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to get kernel release: %v", err)
+		return nil, fmt.Errorf("failed to get kernel release: %v", err)
 	}
 	k.kernelRelease = strings.TrimSpace(string(release))
 	var errs []error
 	errs = append(errs, k.validateKernelVersion(spec.KernelSpec))
 	errs = append(errs, k.validateKernelConfig(spec.KernelSpec))
-	return errors.NewAggregate(errs)
+	return nil, errors.NewAggregate(errs)
 }
 
 // validateKernelVersion validates the kernel version.

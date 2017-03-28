@@ -61,6 +61,11 @@
 {% set etcd_servers = "--etcd-servers=http://127.0.0.1:2379" -%}
 {% set etcd_servers_overrides = "--etcd-servers-overrides=/events#http://127.0.0.1:4002" -%}
 
+{% set storage_media_type = "" -%}
+{% if pillar['storage_media_type'] is defined -%}
+  {% set storage_media_type = "--storage-media-type=" + pillar['storage_media_type'] -%}
+{% endif -%}
+
 {% set max_requests_inflight = "" -%}
 {% set target_ram_mb = "" -%}
 {% if pillar['num_nodes'] is defined -%}
@@ -175,13 +180,15 @@
   {% set audit_log = "--audit-log-path=/var/log/kube-apiserver-audit.log --audit-log-maxage=0 --audit-log-maxbackup=0 --audit-log-maxsize=2000000000" -%}
 {% endif -%}
 
-{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read + " " + audit_log -%}
+{% set params = address + " " + storage_backend + " " + storage_media_type + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read + " " + audit_log -%}
 {% set params = params + " " + cert_file + " " + key_file + " " + kubelet_cert_file + " " + kubelet_key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file + webhook_authentication_config + webhook_authorization_config + image_review_config -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['apiserver_test_args'] is defined -%}
   {% set params = params + " " + pillar['apiserver_test_args'] -%}
 {% endif -%}
+
+{% set container_env = "" -%}
 
 {
 "apiVersion": "v1",
@@ -210,6 +217,7 @@
                  "-c",
                  "/usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
                ],
+    {{container_env}}
     "livenessProbe": {
       "httpGet": {
         "host": "127.0.0.1",
@@ -256,7 +264,7 @@
         "mountPath": "/etc/openssl",
         "readOnly": true},
         { "name": "etcpki",
-        "mountPath": "/etc/pki",
+        "mountPath": "/etc/srv/pki",
         "readOnly": true},
         { "name": "srvsshproxy",
         "mountPath": "{{srv_sshproxy_path}}",
@@ -301,7 +309,7 @@
   },
   { "name": "etcpki",
     "hostPath": {
-        "path": "/etc/pki"}
+        "path": "/etc/srv/pki"}
   },
   { "name": "srvsshproxy",
     "hostPath": {

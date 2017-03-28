@@ -585,7 +585,7 @@ func TestGetPodStatus(t *testing.T) {
 	fs := newFakeSystemd()
 	fnp := nettest.NewMockNetworkPlugin(ctrl)
 	fos := &containertesting.FakeOS{}
-	frh := &fakeRuntimeHelper{}
+	frh := &containertesting.FakeRuntimeHelper{}
 	r := &Runtime{
 		apisvc:        fr,
 		systemd:       fs,
@@ -1391,7 +1391,12 @@ func TestGenerateRunCommand(t *testing.T) {
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
 		rkt.network = network.NewPluginManager(tt.networkPlugin)
-		rkt.runtimeHelper = &fakeRuntimeHelper{tt.dnsServers, tt.dnsSearches, tt.hostName, "", tt.err}
+		rkt.runtimeHelper = &containertesting.FakeRuntimeHelper{
+			DNSServers:  tt.dnsServers,
+			DNSSearches: tt.dnsSearches,
+			HostName:    tt.hostName,
+			Err:         tt.err,
+		}
 		rkt.execer = &utilexec.FakeExec{CommandScript: []utilexec.FakeCommandAction{func(cmd string, args ...string) utilexec.Cmd {
 			return utilexec.InitFakeCmd(&utilexec.FakeCmd{}, cmd, args...)
 		}}}
@@ -1961,5 +1966,33 @@ func TestPreparePodArgs(t *testing.T) {
 		r.config.Stage1Image = testCase.stage1Config
 		cmd := r.preparePodArgs(&testCase.manifest, "file")
 		assert.Equal(t, testCase.cmd, cmd, fmt.Sprintf("Test case #%d", i))
+	}
+}
+
+func TestConstructSyslogIdentifier(t *testing.T) {
+	testCases := []struct {
+		podName         string
+		podGenerateName string
+		identifier      string
+	}{
+		{
+			"prometheus-node-exporter-rv90m",
+			"prometheus-node-exporter-",
+			"prometheus-node-exporter",
+		},
+		{
+			"simplepod",
+			"",
+			"simplepod",
+		},
+		{
+			"p",
+			"",
+			"p",
+		},
+	}
+	for i, testCase := range testCases {
+		identifier := constructSyslogIdentifier(testCase.podGenerateName, testCase.podName)
+		assert.Equal(t, testCase.identifier, identifier, fmt.Sprintf("Test case #%d", i))
 	}
 }

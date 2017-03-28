@@ -19,6 +19,8 @@ package kubelet
 import (
 	"fmt"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fieldpath"
@@ -41,7 +43,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *v1.Pod, container *v1.Con
 		return nil, nil, fmt.Errorf("failed to find node object, expected a node")
 	}
 	allocatable := node.Status.Allocatable
-
+	glog.Errorf("allocatable: %v", allocatable)
 	podCopy, err := api.Scheme.Copy(pod)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to perform a deep copy of pod object: %v", err)

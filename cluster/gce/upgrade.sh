@@ -74,6 +74,13 @@ function print-node-version-info() {
 }
 
 function upgrade-master() {
+  local num_masters
+  num_masters=$(get-master-replicas-count)
+  if [[ "${num_masters}" -gt 1 ]]; then
+    echo "Upgrade of master not supported if more than one master replica present. The current number of master replicas: ${num_masters}"
+    exit 1
+  fi
+
   echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
 
   # Tries to figure out KUBE_USER/KUBE_PASSWORD by first looking under
@@ -88,6 +95,9 @@ function upgrade-master() {
 
   detect-master
   parse-master-env
+  upgrade-master-env
+
+  backfile-kubeletauth-certs
 
   # Delete the master instance. Note that the master-pd is created
   # with auto-delete=no, so it should not be deleted.
@@ -99,6 +109,60 @@ function upgrade-master() {
 
   create-master-instance "${MASTER_NAME}-ip"
   wait-for-master
+}
+
+function upgrade-master-env() {
+  echo "== Upgrading master environment variables. =="
+  # Generate the node problem detector token if it isn't present on the original
+  # master.
+ if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
+    NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  fi
+}
+
+# TODO(mikedanese): delete when we don't support < 1.6
+function backfile-kubeletauth-certs() {
+  if [[ ! -z "${KUBEAPISERVER_CERT_BASE64:-}" && ! -z "${KUBEAPISERVER_CERT_BASE64:-}" ]]; then
+    return 0
+  fi
+
+  mkdir -p "${KUBE_TEMP}/pki"
+  echo "${CA_KEY_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.key"
+  echo "${CA_CERT_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.crt"
+  (cd "${KUBE_TEMP}/pki"
+    download-cfssl
+    cat <<EOF > ca-config.json
+{
+  "signing": {
+    "client": {
+      "expiry": "43800h",
+      "usages": [
+        "signing",
+        "key encipherment",
+        "client auth"
+      ]
+    }
+  }
+}
+EOF
+    # the name kube-apiserver is bound to the node proxy
+    # subpaths required for the apiserver to hit proxy
+    # endpoints on the kubelet's handler.
+    cat <<EOF \
+      | "${KUBE_TEMP}/cfssl/cfssl" gencert \
+        -ca=ca.crt \
+        -ca-key=ca.key \
+        -config=ca-config.json \
+        -profile=client \
+        - \
+      | "${KUBE_TEMP}/cfssl/cfssljson" -bare kube-apiserver
+{
+  "CN": "kube-apiserver"
+}
+EOF
+  )
+  KUBEAPISERVER_CERT_BASE64=$(cat "${KUBE_TEMP}/pki/kube-apiserver.pem" | base64 | tr -d '\r\n')
+  KUBEAPISERVER_KEY_BASE64=$(cat "${KUBE_TEMP}/pki/kube-apiserver-key.pem" | base64 | tr -d '\r\n')
 }
 
 function wait-for-master() {
@@ -172,6 +236,7 @@ function get-node-os() {
 # Vars set:
 #   KUBELET_TOKEN
 #   KUBE_PROXY_TOKEN
+#   NODE_PROBLEM_DETECTOR_TOKEN
 #   CA_CERT_BASE64
 #   EXTRA_DOCKER_OPTS
 #   KUBELET_CERT_BASE64
@@ -206,6 +271,7 @@ fi
 #   INSTANCE_GROUPS
 #   KUBELET_TOKEN
 #   KUBE_PROXY_TOKEN
+#   NODE_PROBLEM_DETECTOR_TOKEN
 #   CA_CERT_BASE64
 #   EXTRA_DOCKER_OPTS
 #   KUBELET_CERT_BASE64
@@ -228,10 +294,13 @@ function prepare-node-upgrade() {
   local node_env=$(get-node-env)
   KUBELET_TOKEN=$(get-env-val "${node_env}" "KUBELET_TOKEN")
   KUBE_PROXY_TOKEN=$(get-env-val "${node_env}" "KUBE_PROXY_TOKEN")
+  NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${node_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
   CA_CERT_BASE64=$(get-env-val "${node_env}" "CA_CERT")
   EXTRA_DOCKER_OPTS=$(get-env-val "${node_env}" "EXTRA_DOCKER_OPTS")
   KUBELET_CERT_BASE64=$(get-env-val "${node_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${node_env}" "KUBELET_KEY")
+
+  upgrade-node-env
 
   # TODO(zmerlynn): How do we ensure kube-env is written in a ${version}-
   #                 compatible way?
@@ -244,6 +313,17 @@ function prepare-node-upgrade() {
   # The following is echo'd so that callers can get the template name.
   echo "Instance template name: ${template_name}"
   echo "== Finished preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
+}
+
+function upgrade-node-env() {
+  echo "== Upgrading node environment variables. =="
+  # Get the node problem detector token from master if it isn't present on
+  # the original node.
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
+    detect-master
+    local master_env=$(get-master-env)
+    NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${master_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
+  fi
 }
 
 # Prereqs:
@@ -372,6 +452,32 @@ fi
 if [[ "${master_upgrade}" == "false" ]] && [[ "${node_upgrade}" == "false" ]]; then
   echo "Can't specify both -M and -N" >&2
   exit 1
+fi
+
+# prompt if etcd storage media type isn't set unless using etcd2 when doing master upgrade
+if [[ -z "${STORAGE_MEDIA_TYPE:-}" ]] && [[ "${STORAGE_BACKEND:-}" != "etcd2" ]] && [[ "${master_upgrade}" == "true" ]]; then
+  echo "The default etcd storage media type in 1.6 has changed from application/json to application/vnd.kubernetes.protobuf."
+  echo "Documentation about the change can be found at https://kubernetes.io/docs/admin/etcd_upgrade."
+  echo ""
+  echo "ETCD2 DOES NOT SUPPORT PROTOBUF: If you wish to have to ability to downgrade to etcd2 later application/json must be used."
+  echo ""
+  echo "It's HIGHLY recommended that etcd be backed up before this step!!"
+  echo ""
+  echo "To enable using json, before running this script set:"
+  echo "export STORAGE_MEDIA_TYPE=application/json"
+  echo ""
+  if [ -t 0 ] && [ -t 1 ]; then
+    read -p "Would you like to continue with the new default, and lose the ability to downgrade to etcd2? [y/N] " confirm
+    if [[ "${confirm}" != "y" ]]; then
+      exit 1
+    fi
+  else
+    echo "To enable using protobuf, before running this script set:"
+    echo "export STORAGE_MEDIA_TYPE=application/vnd.kubernetes.protobuf"
+    echo ""
+    echo "STORAGE_MEDIA_TYPE must be specified when run non-interactively." >&2
+    exit 1
+  fi
 fi
 
 print-node-version-info "Pre-Upgrade"

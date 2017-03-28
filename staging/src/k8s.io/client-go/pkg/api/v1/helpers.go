@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	"k8s.io/client-go/pkg/api"
 )
 
@@ -83,7 +84,7 @@ func IsServiceIPRequested(service *Service) bool {
 
 var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes),
-	metav1.FinalizerOrphan,
+	metav1.FinalizerOrphanDependents,
 )
 
 func IsStandardFinalizerName(str string) bool {
@@ -234,14 +235,6 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 }
 
 const (
-	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
-	// in the Annotations of a Pod.
-	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
-
-	// TaintsAnnotationKey represents the key of taints data (json serialized)
-	// in the Annotations of a Node.
-	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
-
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
@@ -276,40 +269,49 @@ const (
 	// an object (e.g. secret, config map) before fetching it again from apiserver.
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
+
+	// AffinityAnnotationKey represents the key of affinity data (json serialized)
+	// in the Annotations of a Pod.
+	// TODO: remove when alpha support for affinity is removed
+	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
 )
 
-// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
-// and converts it to the []Toleration type in api.
-func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
-	var tolerations []Toleration
-	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)
-		if err != nil {
-			return tolerations, err
+// Tries to add a toleration to annotations list. Returns true if something was updated
+// false otherwise.
+func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) (bool, error) {
+	podTolerations := pod.Spec.Tolerations
+
+	var newTolerations []Toleration
+	updated := false
+	for i := range podTolerations {
+		if toleration.MatchToleration(&podTolerations[i]) {
+			if api.Semantic.DeepEqual(toleration, podTolerations[i]) {
+				return false, nil
+			}
+			newTolerations = append(newTolerations, *toleration)
+			updated = true
+			continue
 		}
+
+		newTolerations = append(newTolerations, podTolerations[i])
 	}
-	return tolerations, nil
-}
 
-func GetPodTolerations(pod *Pod) ([]Toleration, error) {
-	return GetTolerationsFromPodAnnotations(pod.Annotations)
-}
-
-// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
-// and converts it to the []Taint type in api.
-func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
-	var taints []Taint
-	if len(annotations) > 0 && annotations[TaintsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TaintsAnnotationKey]), &taints)
-		if err != nil {
-			return []Taint{}, err
-		}
+	if !updated {
+		newTolerations = append(newTolerations, *toleration)
 	}
-	return taints, nil
+
+	pod.Spec.Tolerations = newTolerations
+	return true, nil
 }
 
-func GetNodeTaints(node *Node) ([]Taint, error) {
-	return GetTaintsFromNodeAnnotations(node.Annotations)
+// MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
+// if the two tolerations have same <key,effect,operator,value> combination, regard as they match.
+// TODO: uniqueness check for tolerations in api validations.
+func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
+	return t.Key == tolerationToMatch.Key &&
+		t.Effect == tolerationToMatch.Effect &&
+		t.Operator == tolerationToMatch.Operator &&
+		t.Value == tolerationToMatch.Value
 }
 
 // ToleratesTaint checks if the toleration tolerates the taint.
@@ -392,7 +394,7 @@ func DeleteTaint(taints []Taint, taintToDelete *Taint) ([]Taint, bool) {
 	newTaints := []Taint{}
 	deleted := false
 	for i := range taints {
-		if taintToDelete.MatchTaint(taints[i]) {
+		if taintToDelete.MatchTaint(&taints[i]) {
 			deleted = true
 			continue
 		}
@@ -403,6 +405,9 @@ func DeleteTaint(taints []Taint, taintToDelete *Taint) ([]Taint, bool) {
 
 // Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
 func GetMatchingTolerations(taints []Taint, tolerations []Toleration) (bool, []Toleration) {
+	if len(taints) == 0 {
+		return true, []Toleration{}
+	}
 	if len(tolerations) == 0 && len(taints) > 0 {
 		return false, []Toleration{}
 	}
@@ -425,7 +430,7 @@ func GetMatchingTolerations(taints []Taint, tolerations []Toleration) (bool, []T
 
 // MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,
 // if the two taints have same key:effect, regard as they match.
-func (t *Taint) MatchTaint(taintToMatch Taint) bool {
+func (t *Taint) MatchTaint(taintToMatch *Taint) bool {
 	return t.Key == taintToMatch.Key && t.Effect == taintToMatch.Effect
 }
 
@@ -506,4 +511,122 @@ type Sysctl struct {
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
+}
+
+// Tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
+// false otherwise.
+func AddOrUpdateTaint(node *Node, taint *Taint) (*Node, bool, error) {
+	objCopy, err := api.Scheme.DeepCopy(node)
+	if err != nil {
+		return nil, false, err
+	}
+	newNode := objCopy.(*Node)
+	nodeTaints := newNode.Spec.Taints
+
+	var newTaints []Taint
+	updated := false
+	for i := range nodeTaints {
+		if taint.MatchTaint(&nodeTaints[i]) {
+			if api.Semantic.DeepEqual(taint, nodeTaints[i]) {
+				return newNode, false, nil
+			}
+			newTaints = append(newTaints, *taint)
+			updated = true
+			continue
+		}
+
+		newTaints = append(newTaints, nodeTaints[i])
+	}
+
+	if !updated {
+		newTaints = append(newTaints, *taint)
+	}
+
+	newNode.Spec.Taints = newTaints
+	return newNode, true, nil
+}
+
+func TaintExists(taints []Taint, taintToFind *Taint) bool {
+	for _, taint := range taints {
+		if taint.MatchTaint(taintToFind) {
+			return true
+		}
+	}
+	return false
+}
+
+// Tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
+// false otherwise.
+func RemoveTaint(node *Node, taint *Taint) (*Node, bool, error) {
+	objCopy, err := api.Scheme.DeepCopy(node)
+	if err != nil {
+		return nil, false, err
+	}
+	newNode := objCopy.(*Node)
+	nodeTaints := newNode.Spec.Taints
+	if len(nodeTaints) == 0 {
+		return newNode, false, nil
+	}
+
+	if !TaintExists(nodeTaints, taint) {
+		return newNode, false, nil
+	}
+
+	newTaints, _ := DeleteTaint(nodeTaints, taint)
+	newNode.Spec.Taints = newTaints
+	return newNode, true, nil
+}
+
+// GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
+// and converts it to the Affinity type in api.
+// TODO: remove when alpha support for affinity is removed
+func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, error) {
+	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
+		var affinity Affinity
+		err := json.Unmarshal([]byte(annotations[AffinityAnnotationKey]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
+}
+
+// GetPersistentVolumeClass returns StorageClassName.
+func GetPersistentVolumeClass(volume *PersistentVolume) string {
+	// Use beta annotation first
+	if class, found := volume.Annotations[BetaStorageClassAnnotation]; found {
+		return class
+	}
+
+	return volume.Spec.StorageClassName
+}
+
+// GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
+// requested, it returns "".
+func GetPersistentVolumeClaimClass(claim *PersistentVolumeClaim) string {
+	// Use beta annotation first
+	if class, found := claim.Annotations[BetaStorageClassAnnotation]; found {
+		return class
+	}
+
+	if claim.Spec.StorageClassName != nil {
+		return *claim.Spec.StorageClassName
+	}
+
+	return ""
+}
+
+// PersistentVolumeClaimHasClass returns true if given claim has set StorageClassName field.
+func PersistentVolumeClaimHasClass(claim *PersistentVolumeClaim) bool {
+	// Use beta annotation first
+	if _, found := claim.Annotations[BetaStorageClassAnnotation]; found {
+		return true
+	}
+
+	if claim.Spec.StorageClassName != nil {
+		return true
+	}
+
+	return false
 }

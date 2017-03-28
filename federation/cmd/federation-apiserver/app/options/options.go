@@ -36,7 +36,7 @@ type ServerRunOptions struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptions
-	InsecureServing         *genericoptions.ServingOptions
+	InsecureServing         *kubeoptions.InsecureServingOptions
 	Audit                   *genericoptions.AuditLogOptions
 	Features                *genericoptions.FeatureOptions
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
@@ -53,8 +53,8 @@ func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
 		Etcd:                 genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, api.Scheme, nil)),
-		SecureServing:        genericoptions.NewSecureServingOptions(),
-		InsecureServing:      genericoptions.NewInsecureServingOptions(),
+		SecureServing:        kubeoptions.NewSecureServingOptions(),
+		InsecureServing:      kubeoptions.NewInsecureServingOptions(),
 		Audit:                genericoptions.NewAuditLogOptions(),
 		Features:             genericoptions.NewFeatureOptions(),
 		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),

@@ -43,5 +43,5 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	StreamingProxyRedirects:                     {Default: true, PreRelease: utilfeature.Beta},
+	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
 }

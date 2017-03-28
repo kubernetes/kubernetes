@@ -6,6 +6,7 @@ metadata:
   labels:
     k8s-app: fluentd-es
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
     version: v1.22
 spec:
   template:
@@ -19,7 +20,6 @@ spec:
       # Note that this does not guarantee admission on the nodes (#40573).
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key": "node.alpha.kubernetes.io/ismaster", "effect": "NoSchedule"}]'
     spec:
       containers:
       - name: fluentd-es
@@ -41,7 +41,10 @@ spec:
           mountPath: /var/lib/docker/containers
           readOnly: true
       nodeSelector:
-        alpha.kubernetes.io/fluentd-ds-ready: "true"
+        beta.kubernetes.io/fluentd-ds-ready: "true"
+      tolerations:
+      - key : "node.alpha.kubernetes.io/ismaster"
+        effect: "NoSchedule"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog

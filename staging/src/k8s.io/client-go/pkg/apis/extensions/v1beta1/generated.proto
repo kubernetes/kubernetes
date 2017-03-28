@@ -71,12 +71,12 @@ message DaemonSet {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the desired behavior of this daemon set.
+  // The desired behavior of this daemon set.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
   // +optional
   optional DaemonSetSpec spec = 2;
 
-  // Status is the current status of this daemon set. This data may be
+  // The current status of this daemon set. This data may be
   // out of date by some window of time.
   // Populated by the system.
   // Read-only.
@@ -92,51 +92,98 @@ message DaemonSetList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of daemon sets.
+  // A list of daemon sets.
   repeated DaemonSet items = 2;
 }
 
 // DaemonSetSpec is the specification of a daemon set.
 message DaemonSetSpec {
-  // Selector is a label query over pods that are managed by the daemon set.
+  // A label query over pods that are managed by the daemon set.
   // Must match in order to be controlled.
   // If empty, defaulted to labels on Pod template.
   // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 1;
 
-  // Template is the object that describes the pod that will be created.
+  // An object that describes the pod that will be created.
   // The DaemonSet will create exactly one copy of this pod on every node
   // that matches the template's node selector (or on every node if no node
   // selector is specified).
   // More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
   optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 2;
+
+  // An update strategy to replace existing DaemonSet pods with new pods.
+  // +optional
+  optional DaemonSetUpdateStrategy updateStrategy = 3;
+
+  // The minimum number of seconds for which a newly created DaemonSet pod should
+  // be ready without any of its container crashing, for it to be considered
+  // available. Defaults to 0 (pod will be considered available as soon as it
+  // is ready).
+  // +optional
+  optional int32 minReadySeconds = 4;
+
+  // A sequence number representing a specific generation of the template.
+  // Populated by the system. It can be set only during the creation.
+  // +optional
+  optional int64 templateGeneration = 5;
 }
 
 // DaemonSetStatus represents the current status of a daemon set.
 message DaemonSetStatus {
-  // CurrentNumberScheduled is the number of nodes that are running at least 1
+  // The number of nodes that are running at least 1
   // daemon pod and are supposed to run the daemon pod.
   // More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
   optional int32 currentNumberScheduled = 1;
 
-  // NumberMisscheduled is the number of nodes that are running the daemon pod, but are
+  // The number of nodes that are running the daemon pod, but are
   // not supposed to run the daemon pod.
   // More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
   optional int32 numberMisscheduled = 2;
 
-  // DesiredNumberScheduled is the total number of nodes that should be running the daemon
+  // The total number of nodes that should be running the daemon
   // pod (including nodes correctly running the daemon pod).
   // More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
   optional int32 desiredNumberScheduled = 3;
 
-  // NumberReady is the number of nodes that should be running the daemon pod and have one
+  // The number of nodes that should be running the daemon pod and have one
   // or more of the daemon pod running and ready.
   optional int32 numberReady = 4;
 
-  // ObservedGeneration is the most recent generation observed by the daemon set controller.
+  // The most recent generation observed by the daemon set controller.
   // +optional
   optional int64 observedGeneration = 5;
+
+  // The total number of nodes that are running updated daemon pod
+  // +optional
+  optional int32 updatedNumberScheduled = 6;
+
+  // The number of nodes that should be running the
+  // daemon pod and have one or more of the daemon pod running and
+  // available (ready for at least spec.minReadySeconds)
+  // +optional
+  optional int32 numberAvailable = 7;
+
+  // The number of nodes that should be running the
+  // daemon pod and have none of the daemon pod running and available
+  // (ready for at least spec.minReadySeconds)
+  // +optional
+  optional int32 numberUnavailable = 8;
+}
+
+message DaemonSetUpdateStrategy {
+  // Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
+  // Default is OnDelete.
+  // +optional
+  optional string type = 1;
+
+  // Rolling update config params. Present only if type = "RollingUpdate".
+  // ---
+  // TODO: Update this to follow our convention for oneOf, whatever we decide it
+  // to be. Same as DeploymentStrategy.RollingUpdate.
+  // See https://github.com/kubernetes/kubernetes/issues/35345
+  // +optional
+  optional RollingUpdateDaemonSet rollingUpdate = 2;
 }
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -782,6 +829,26 @@ message RollbackConfig {
   // The revision to rollback to. If set to 0, rollbck to the last revision.
   // +optional
   optional int64 revision = 1;
+}
+
+// Spec to control the desired behavior of daemon set rolling update.
+message RollingUpdateDaemonSet {
+  // The maximum number of DaemonSet pods that can be unavailable during the
+  // update. Value can be an absolute number (ex: 5) or a percentage of total
+  // number of DaemonSet pods at the start of the update (ex: 10%). Absolute
+  // number is calculated from percentage by rounding up.
+  // This cannot be 0.
+  // Default value is 1.
+  // Example: when this is set to 30%, at most 30% of the total number of nodes
+  // that should be running the daemon pod (i.e. status.desiredNumberScheduled)
+  // can have their pods stopped for an update at any given
+  // time. The update starts by stopping at most 30% of those DaemonSet pods
+  // and then brings up new DaemonSet pods in their place. Once the new pods
+  // are available, it then proceeds onto other DaemonSet pods, thus ensuring
+  // that at least 70% of original number of DaemonSet pods are available at
+  // all times during the update.
+  // +optional
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
 }
 
 // Spec to control the desired behavior of rolling update.

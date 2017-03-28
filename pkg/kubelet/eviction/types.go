@@ -23,22 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-)
-
-// Signal defines a signal that can trigger eviction of pods on a node.
-type Signal string
-
-const (
-	// SignalMemoryAvailable is memory available (i.e. capacity - workingSet), in bytes.
-	SignalMemoryAvailable Signal = "memory.available"
-	// SignalNodeFsAvailable is amount of storage available on filesystem that kubelet uses for volumes, daemon logs, etc.
-	SignalNodeFsAvailable Signal = "nodefs.available"
-	// SignalNodeFsInodesFree is amount of inodes available on filesystem that kubelet uses for volumes, daemon logs, etc.
-	SignalNodeFsInodesFree Signal = "nodefs.inodesFree"
-	// SignalImageFsAvailable is amount of storage available on filesystem that container runtime uses for storing images and container writable layers.
-	SignalImageFsAvailable Signal = "imagefs.available"
-	// SignalImageFsInodesFree is amount of inodes available on filesystem that container runtime uses for storing images and container writeable layers.
-	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
 // fsStatsType defines the types of filesystem stats to collect.
@@ -53,14 +38,6 @@ const (
 	fsStatsRoot fsStatsType = "root"
 )
 
-// ThresholdOperator is the operator used to express a Threshold.
-type ThresholdOperator string
-
-const (
-	// OpLessThan is the operator that expresses a less than operator.
-	OpLessThan ThresholdOperator = "LessThan"
-)
-
 // Config holds information about how eviction is configured.
 type Config struct {
 	// PressureTransitionPeriod is duration the kubelet has to wait before transititioning out of a pressure condition.
@@ -68,39 +45,15 @@ type Config struct {
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
 	MaxPodGracePeriodSeconds int64
 	// Thresholds define the set of conditions monitored to trigger eviction.
-	Thresholds []Threshold
+	Thresholds []evictionapi.Threshold
 	// KernelMemcgNotification if true will integrate with the kernel memcg notification to determine if memory thresholds are crossed.
 	KernelMemcgNotification bool
-}
-
-// ThresholdValue is a value holder that abstracts literal versus percentage based quantity
-type ThresholdValue struct {
-	// The following fields are exclusive. Only the topmost non-zero field is used.
-
-	// Quantity is a quantity associated with the signal that is evaluated against the specified operator.
-	Quantity *resource.Quantity
-	// Percentage represents the usage percentage over the total resource that is evaluated against the specified operator.
-	Percentage float32
-}
-
-// Threshold defines a metric for when eviction should occur.
-type Threshold struct {
-	// Signal defines the entity that was measured.
-	Signal Signal
-	// Operator represents a relationship of a signal to a value.
-	Operator ThresholdOperator
-	// Value is the threshold the resource is evaluated against.
-	Value ThresholdValue
-	// GracePeriod represents the amount of time that a threshold must be met before eviction is triggered.
-	GracePeriod time.Duration
-	// MinReclaim represents the minimum amount of resource to reclaim if the threshold is met.
-	MinReclaim *ThresholdValue
 }
 
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
 type Manager interface {
 	// Start starts the control loop to monitor eviction thresholds at specified interval.
-	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, monitoringInterval time.Duration)
+	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, nodeProvider NodeProvider, monitoringInterval time.Duration)
 
 	// IsUnderMemoryPressure returns true if the node is under memory pressure.
 	IsUnderMemoryPressure() bool
@@ -113,6 +66,12 @@ type Manager interface {
 type DiskInfoProvider interface {
 	// HasDedicatedImageFs returns true if the imagefs is on a separate device from the rootfs.
 	HasDedicatedImageFs() (bool, error)
+}
+
+// NodeProvider is responsible for providing the node api object describing this node
+type NodeProvider interface {
+	// GetNode returns the node info for this node
+	GetNode() (*v1.Node, error)
 }
 
 // ImageGC is responsible for performing garbage collection of unused images.
@@ -150,10 +109,10 @@ type signalObservation struct {
 }
 
 // signalObservations maps a signal to an observed quantity
-type signalObservations map[Signal]signalObservation
+type signalObservations map[evictionapi.Signal]signalObservation
 
 // thresholdsObservedAt maps a threshold to a time that it was observed
-type thresholdsObservedAt map[Threshold]time.Time
+type thresholdsObservedAt map[evictionapi.Threshold]time.Time
 
 // nodeConditionsObservedAt maps a node condition to a time that it was observed
 type nodeConditionsObservedAt map[v1.NodeConditionType]time.Time

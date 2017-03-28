@@ -81,14 +81,14 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:LabelSelector]", func
 			Expect(err).NotTo(HaveOccurred())
 
 			By("wait for the pvc_ssd to bind with pv_ssd")
-			waitOnPVandPVC(c, ns, pv_ssd, pvc_ssd)
+			framework.WaitOnPVandPVC(c, ns, pv_ssd, pvc_ssd)
 
 			By("Verify status of pvc_vvol is pending")
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimPending, c, ns, pvc_vvol.Name, 3*time.Second, 300*time.Second)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("delete pvc_ssd")
-			deletePersistentVolumeClaim(c, pvc_ssd.Name, ns)
+			framework.DeletePersistentVolumeClaim(c, pvc_ssd.Name, ns)
 
 			By("verify pv_ssd is deleted")
 			err = framework.WaitForPersistentVolumeDeleted(c, pv_ssd.Name, 3*time.Second, 300*time.Second)
@@ -96,7 +96,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:LabelSelector]", func
 			volumePath = ""
 
 			By("delete pvc_vvol")
-			deletePersistentVolumeClaim(c, pvc_vvol.Name, ns)
+			framework.DeletePersistentVolumeClaim(c, pvc_vvol.Name, ns)
 		})
 	})
 })
@@ -139,12 +139,12 @@ func testCleanupVSpherePVClabelselector(c clientset.Interface, ns string, volume
 		vsp.DeleteVolume(volumePath)
 	}
 	if pvc_ssd != nil {
-		deletePersistentVolumeClaim(c, pvc_ssd.Name, ns)
+		framework.DeletePersistentVolumeClaim(c, pvc_ssd.Name, ns)
 	}
 	if pvc_vvol != nil {
-		deletePersistentVolumeClaim(c, pvc_vvol.Name, ns)
+		framework.DeletePersistentVolumeClaim(c, pvc_vvol.Name, ns)
 	}
 	if pv_ssd != nil {
-		deletePersistentVolume(c, pv_ssd.Name)
+		framework.DeletePersistentVolume(c, pv_ssd.Name)
 	}
 }

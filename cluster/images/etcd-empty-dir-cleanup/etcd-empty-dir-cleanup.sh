@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -17,7 +17,7 @@
 echo "Removing empty directories from etcd..."
 
 cleanup_empty_dirs () {
-  if [[ $(${ETCDCTL} ls $1) ]]; then
+  if [ "$(${ETCDCTL} ls $1)" ]; then
     for SUBDIR in $(${ETCDCTL} ls -p $1 | grep "/$")
     do
       cleanup_empty_dirs ${SUBDIR}

@@ -31,6 +31,7 @@ go_library(
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/client/listers/extensions/v1beta1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/node:go_default_library",
@@ -70,7 +71,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",

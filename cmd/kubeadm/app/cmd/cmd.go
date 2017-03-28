@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -34,11 +35,11 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			kubeadm: easily bootstrap a secure Kubernetes cluster.
 
 			    ┌──────────────────────────────────────────────────────────┐
-			    │ KUBEADM IS ALPHA, DO NOT USE IT FOR PRODUCTION CLUSTERS! │
+			    │ KUBEADM IS BETA, DO NOT USE IT FOR PRODUCTION CLUSTERS!  │
 			    │                                                          │
 			    │ But, please try it out! Give us feedback at:             │
 			    │ https://github.com/kubernetes/kubeadm/issues             │
-			    │ and at-mention @kubernetes/sig-cluster-lifecycle         │
+			    │ and at-mention @kubernetes/sig-cluster-lifecycle-misc    │
 			    └──────────────────────────────────────────────────────────┘
 
 			Example usage:
@@ -55,7 +56,7 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			    ┌──────────────────────────────────────────────────────────┐
 			    │ On the second machine                                    │
 			    ├──────────────────────────────────────────────────────────┤
-			    │ node# kubeadm join --token=<token> <ip-of-master>        │
+			    │ node# kubeadm join --token=<token> <ip-of-master>:<port> │
 			    └──────────────────────────────────────────────────────────┘
 
 			    You can then repeat the second step on as many other machines as you like.
@@ -77,17 +78,19 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.ResetFlags()
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
+	cmds.AddCommand(NewCmdCompletion(out, ""))
 	cmds.AddCommand(NewCmdInit(out))
 	cmds.AddCommand(NewCmdJoin(out))
 	cmds.AddCommand(NewCmdReset(out))
 	cmds.AddCommand(NewCmdVersion(out))
+	cmds.AddCommand(NewCmdToken(out, err))
 
-	// Wrap not yet usable/supported commands in experimental sub-command:
+	// Wrap not yet fully supported commands in an alpha subcommand
 	experimentalCmd := &cobra.Command{
-		Use:   "ex",
+		Use:   "alpha",
 		Short: "Experimental sub-commands not yet fully functional.",
 	}
-	experimentalCmd.AddCommand(NewCmdToken(out, err))
+	experimentalCmd.AddCommand(phases.NewCmdPhase(out))
 	cmds.AddCommand(experimentalCmd)
 
 	return cmds

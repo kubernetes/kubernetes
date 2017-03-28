@@ -37,7 +37,7 @@ tar xzf kubernetes-salt.tar.gz
 
 if ! which salt-call >/dev/null 2>&1; then
   echo "+++ Install salt binaries from https://bootstrap.saltstack.com"
-  # Install salt binaries but do not start deamon after installation
+  # Install salt binaries but do not start daemon after installation
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- "-X"
 fi
 

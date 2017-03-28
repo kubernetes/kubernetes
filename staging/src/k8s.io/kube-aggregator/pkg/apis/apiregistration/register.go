@@ -17,12 +17,8 @@ limitations under the License.
 package apiregistration
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	// we register here until we separate our scheme, which requires updates to client gen
-	kapi "k8s.io/client-go/pkg/api"
 )
 
 const GroupName = "apiregistration.k8s.io"
@@ -50,11 +46,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&APIService{},
 		&APIServiceList{},
-
-		&kapi.ListOptions{},
-		&metav1.DeleteOptions{},
-		&metav1.GetOptions{},
 	)
-	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "fake_cache.go",
         "fake_runtime.go",
+        "fake_runtime_helper.go",
         "mockfileinfo.go",
         "os.go",
         "runtime_mock.go",

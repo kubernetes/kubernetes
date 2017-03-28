@@ -19,6 +19,7 @@ package daemonset
 import (
 	"testing"
 
+	"k8s.io/apiserver/pkg/registry/rest"
 	_ "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -32,4 +33,13 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 		DaemonSetToSelectableFields(&extensions.DaemonSet{}),
 		nil,
 	)
+}
+
+func TestDefaultGarbageCollectionPolicy(t *testing.T) {
+	// Make sure we correctly implement the interface.
+	// Otherwise a typo could silently change the default.
+	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
+	if got, want := gcds.DefaultGarbageCollectionPolicy(), rest.OrphanDependents; got != want {
+		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
+	}
 }

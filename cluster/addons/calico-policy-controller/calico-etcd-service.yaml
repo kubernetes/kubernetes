@@ -4,6 +4,7 @@ metadata:
   labels:
     k8s-app: calico-etcd
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
   name: calico-etcd
   namespace: kube-system
 spec:

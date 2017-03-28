@@ -1,5 +1,10 @@
+approvers:
+- caesarxuchao
+- kargakis
+- lavalamp
+- bprashanth
 reviewers:
 - caesarxuchao
-- kargakis 
+- kargakis
 - lavalamp
 - bprashanth

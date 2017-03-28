@@ -115,19 +115,34 @@ function split-commas {
 }
 
 function install-gci-mounter-tools {
-    local -r rkt_version="v1.18.0"
-    local -r gci_mounter_version="v2"
-    local -r rkt_binary_sha1="75fc8f29c79bc9e505f3e7f6e8fadf2425c21967"
-    local -r rkt_stage1_fly_sha1="474df5a1f934960ba669b360ab713d0a54283091"
-    local -r gci_mounter_sha1="851e841d8640d6a05e64e22c493f5ac3c4cba561"
-    download-or-bust "${rkt_binary_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/rkt"
-    download-or-bust "${rkt_stage1_fly_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/stage1-fly.aci"
-    download-or-bust "${gci_mounter_sha1}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/gci-mounter-${gci_mounter_version}.aci"
-    local -r rkt_dst="${KUBE_HOME}/bin/"
-    mv "${KUBE_HOME}/rkt" "${rkt_dst}/rkt"
-    mv "${KUBE_HOME}/stage1-fly.aci" "${rkt_dst}/stage1-fly.aci"
-    mv "${KUBE_HOME}/gci-mounter-${gci_mounter_version}.aci" "${rkt_dst}/gci-mounter-${gci_mounter_version}.aci"
-    chmod a+x "${rkt_dst}/rkt"
+  CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
+  mkdir -p "${CONTAINERIZED_MOUNTER_HOME}"
+  chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
+  mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
+  local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
+  download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
+  cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
+  chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
+  mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
+  tar xvf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
+  rm /tmp/mounter.tar
+  mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs/var/lib/kubelet"
+}
+
+# Install node problem detector binary.
+function install-node-problem-detector {
+  local -r npd_version="v0.3.0"
+  local -r npd_sha1="2e6423c5798e14464271d9c944e56a637ee5a4bc"
+  local -r npd_release_path="https://storage.googleapis.com/kubernetes-release"
+  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
+  download-or-bust "${npd_sha1}" "${npd_release_path}/node-problem-detector/${npd_tar}"
+  local -r npd_dir="${KUBE_HOME}/node-problem-detector"
+  mkdir -p "${npd_dir}"
+  tar xzf "${KUBE_HOME}/${npd_tar}" -C "${npd_dir}" --overwrite
+  mv "${npd_dir}/bin"/* "${KUBE_HOME}/bin"
+  chmod a+x "${KUBE_HOME}/bin/node-problem-detector"
+  rmdir "${npd_dir}/bin"
+  rm -f "${KUBE_HOME}/${npd_tar}"
 }
 
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
@@ -153,6 +168,9 @@ function install-kube-binary-config {
   cp "${src_dir}/"*.docker_tag "${dst_dir}"
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
     cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
+    if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+      install-node-problem-detector
+    fi
   else
     cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
     cp "${src_dir}/kube-controller-manager.tar" "${dst_dir}"
@@ -166,8 +184,8 @@ function install-kube-binary-config {
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
-    local -r cni_tar="cni-07a8a28637e97b22eb8dfe710eeae1344f69d16e.tar.gz"
-    local -r cni_sha1="19d49f7b2b99cd2493d5ae0ace896c64e289ccbb"
+    local -r cni_tar="cni-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz"
+    local -r cni_sha1="1d9788b0f5420e1a219aad2cb8681823fc515e7c"
     download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
     local -r cni_dir="${KUBE_HOME}/cni"
     mkdir -p "${cni_dir}"
@@ -203,7 +221,6 @@ function install-kube-binary-config {
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_HOME}/bin/configure-helper.sh"
-  cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${KUBE_HOME}/bin/mounter"
   cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_HOME}/bin/health-monitor.sh"
   chmod -R 755 "${kube_bin}"
 

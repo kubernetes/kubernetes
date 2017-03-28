@@ -38,6 +38,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy,
 		Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
 		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
+		Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet,
+		Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
 		Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec,
 		Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
 	)
@@ -214,6 +216,23 @@ func Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployme
 		return err
 	}
 	if err := s.Convert(in.MaxSurge, &out.MaxSurge, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *RollingUpdateDaemonSet, s conversion.Scope) error {
+	if out.MaxUnavailable == nil {
+		out.MaxUnavailable = &intstr.IntOrString{}
+	}
+	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
+	if err := s.Convert(in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
 		return err
 	}
 	return nil

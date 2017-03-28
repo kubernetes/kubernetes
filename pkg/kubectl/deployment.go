@@ -22,11 +22,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/v1"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
-// DeploymentGeneratorV1 supports stable generation of a deployment
+// DeploymentBasicGeneratorV1 supports stable generation of a deployment
 type DeploymentBasicGeneratorV1 struct {
 	Name   string
 	Images []string
@@ -65,7 +66,7 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 		return nil, err
 	}
 
-	podSpec := api.PodSpec{Containers: []api.Container{}}
+	podSpec := v1.PodSpec{Containers: []v1.Container{}}
 	for _, imageString := range s.Images {
 		// Retain just the image name
 		imageSplit := strings.Split(imageString, "/")
@@ -76,22 +77,23 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 		} else if strings.Contains(name, "@") {
 			name = strings.Split(name, "@")[0]
 		}
-		podSpec.Containers = append(podSpec.Containers, api.Container{Name: name, Image: imageString})
+		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
 	}
 
 	// setup default label and selector
 	labels := map[string]string{}
 	labels["app"] = s.Name
+	one := int32(1)
 	selector := metav1.LabelSelector{MatchLabels: labels}
-	deployment := extensions.Deployment{
+	deployment := extensionsv1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
 		},
-		Spec: extensions.DeploymentSpec{
-			Replicas: 1,
+		Spec: extensionsv1beta1.DeploymentSpec{
+			Replicas: &one,
 			Selector: &selector,
-			Template: api.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
@@ -104,6 +106,94 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 
 // validate validates required fields are set to support structured generation
 func (s *DeploymentBasicGeneratorV1) validate() error {
+	if len(s.Name) == 0 {
+		return fmt.Errorf("name must be specified")
+	}
+	if len(s.Images) == 0 {
+		return fmt.Errorf("at least one image must be specified")
+	}
+	return nil
+}
+
+// DeploymentBasicAppsGeneratorV1 supports stable generation of a deployment under apps/v1beta1 endpoint
+type DeploymentBasicAppsGeneratorV1 struct {
+	Name   string
+	Images []string
+}
+
+// Ensure it supports the generator pattern that uses parameters specified during construction
+var _ StructuredGenerator = &DeploymentBasicAppsGeneratorV1{}
+
+func (DeploymentBasicAppsGeneratorV1) ParamNames() []GeneratorParam {
+	return []GeneratorParam{
+		{"name", true},
+		{"image", true},
+	}
+}
+
+func (s DeploymentBasicAppsGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
+	err := ValidateParams(s.ParamNames(), params)
+	if err != nil {
+		return nil, err
+	}
+	name, isString := params["name"].(string)
+	if !isString {
+		return nil, fmt.Errorf("expected string, saw %v for 'name'", name)
+	}
+	imageStrings, isArray := params["image"].([]string)
+	if !isArray {
+		return nil, fmt.Errorf("expected []string, found :%v", imageStrings)
+	}
+	delegate := &DeploymentBasicAppsGeneratorV1{Name: name, Images: imageStrings}
+	return delegate.StructuredGenerate()
+}
+
+// StructuredGenerate outputs a deployment object using the configured fields
+func (s *DeploymentBasicAppsGeneratorV1) StructuredGenerate() (runtime.Object, error) {
+	if err := s.validate(); err != nil {
+		return nil, err
+	}
+
+	podSpec := v1.PodSpec{Containers: []v1.Container{}}
+	for _, imageString := range s.Images {
+		// Retain just the image name
+		imageSplit := strings.Split(imageString, "/")
+		name := imageSplit[len(imageSplit)-1]
+		// Remove any tag or hash
+		if strings.Contains(name, ":") {
+			name = strings.Split(name, ":")[0]
+		} else if strings.Contains(name, "@") {
+			name = strings.Split(name, "@")[0]
+		}
+		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
+	}
+
+	// setup default label and selector
+	labels := map[string]string{}
+	labels["app"] = s.Name
+	one := int32(1)
+	selector := metav1.LabelSelector{MatchLabels: labels}
+	deployment := appsv1beta1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   s.Name,
+			Labels: labels,
+		},
+		Spec: appsv1beta1.DeploymentSpec{
+			Replicas: &one,
+			Selector: &selector,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: podSpec,
+			},
+		},
+	}
+	return &deployment, nil
+}
+
+// validate validates required fields are set to support structured generation
+func (s *DeploymentBasicAppsGeneratorV1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}

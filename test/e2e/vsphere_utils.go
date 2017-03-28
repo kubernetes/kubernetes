@@ -21,10 +21,12 @@ import (
 	"time"
 
 	"fmt"
+
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
@@ -84,24 +86,24 @@ func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeNam
 // function to create vsphere volume spec with given VMDK volume path, Reclaim Policy and labels
 func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy, labels map[string]string) *v1.PersistentVolume {
 	var (
-		pvConfig persistentVolumeConfig
+		pvConfig framework.PersistentVolumeConfig
 		pv       *v1.PersistentVolume
 		claimRef *v1.ObjectReference
 	)
-	pvConfig = persistentVolumeConfig{
-		namePrefix: "vspherepv-",
-		pvSource: v1.PersistentVolumeSource{
+	pvConfig = framework.PersistentVolumeConfig{
+		NamePrefix: "vspherepv-",
+		PVSource: v1.PersistentVolumeSource{
 			VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
 				VolumePath: volumePath,
 				FSType:     "ext4",
 			},
 		},
-		prebind: nil,
+		Prebind: nil,
 	}
 
 	pv = &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: pvConfig.namePrefix,
+			GenerateName: pvConfig.NamePrefix,
 			Annotations: map[string]string{
 				volumehelper.VolumeGidAnnotationKey: "777",
 			},
@@ -111,7 +113,7 @@ func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPo
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
 			},
-			PersistentVolumeSource: pvConfig.pvSource,
+			PersistentVolumeSource: pvConfig.PVSource,
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
@@ -222,6 +224,7 @@ func getVSphereClaimSpecWithStorageClassAnnotation(ns string, storageclass *stor
 	return claim
 }
 
+// func to get pod spec with given volume claim, node selector labels and command
 func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]string, command string) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -264,4 +267,68 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 		pod.Spec.NodeSelector = nodeSelectorKV
 	}
 	return pod
+}
+
+// func to get pod spec with given volume paths, node selector lables and container commands
+func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[string]string, commands []string) *v1.Pod {
+	var volumeMounts []v1.VolumeMount
+	var volumes []v1.Volume
+
+	for index, volumePath := range volumePaths {
+		name := fmt.Sprintf("volume%v", index+1)
+		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: name, MountPath: "/mnt/" + name})
+		vsphereVolume := new(v1.VsphereVirtualDiskVolumeSource)
+		vsphereVolume.VolumePath = volumePath
+		vsphereVolume.FSType = "ext4"
+		volumes = append(volumes, v1.Volume{Name: name})
+		volumes[index].VolumeSource.VsphereVolume = vsphereVolume
+	}
+
+	if commands == nil || len(commands) == 0 {
+		commands = []string{
+			"/bin/sh",
+			"-c",
+			"while true; do sleep 2; done",
+		}
+	}
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "vsphere-e2e-",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:         "vsphere-e2e-container-" + string(uuid.NewUUID()),
+					Image:        "gcr.io/google_containers/busybox:1.24",
+					Command:      commands,
+					VolumeMounts: volumeMounts,
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes:       volumes,
+		},
+	}
+
+	if keyValuelabel != nil {
+		pod.Spec.NodeSelector = keyValuelabel
+	}
+	return pod
+}
+
+func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths []string) {
+	for _, filePath := range filePaths {
+		_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
+	}
+}
+
+func createEmptyFilesOnVSphereVolume(namespace string, podName string, filePaths []string) {
+	for _, filePath := range filePaths {
+		err := framework.CreateEmptyFileOnPod(namespace, podName, filePath)
+		Expect(err).NotTo(HaveOccurred())
+	}
 }

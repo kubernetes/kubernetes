@@ -70,6 +70,23 @@ func SetObjectDefaults_DaemonSet(in *DaemonSet) {
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
+		if a.VolumeSource.Projected != nil {
+			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			for j := range a.VolumeSource.Projected.Sources {
+				b := &a.VolumeSource.Projected.Sources[j]
+				if b.DownwardAPI != nil {
+					for k := range b.DownwardAPI.Items {
+						c := &b.DownwardAPI.Items[k]
+						if c.FieldRef != nil {
+							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+						}
+					}
+				}
+			}
+		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
@@ -193,6 +210,23 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 		}
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+		}
+		if a.VolumeSource.Projected != nil {
+			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			for j := range a.VolumeSource.Projected.Sources {
+				b := &a.VolumeSource.Projected.Sources[j]
+				if b.DownwardAPI != nil {
+					for k := range b.DownwardAPI.Items {
+						c := &b.DownwardAPI.Items[k]
+						if c.FieldRef != nil {
+							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+						}
+					}
+				}
+			}
+		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
@@ -328,6 +362,23 @@ func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
 		}
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+		}
+		if a.VolumeSource.Projected != nil {
+			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			for j := range a.VolumeSource.Projected.Sources {
+				b := &a.VolumeSource.Projected.Sources[j]
+				if b.DownwardAPI != nil {
+					for k := range b.DownwardAPI.Items {
+						c := &b.DownwardAPI.Items[k]
+						if c.FieldRef != nil {
+							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+						}
+					}
+				}
+			}
+		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {

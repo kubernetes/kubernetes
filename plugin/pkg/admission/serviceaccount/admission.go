@@ -25,16 +25,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -75,15 +75,12 @@ type serviceAccount struct {
 
 	client internalclientset.Interface
 
-	serviceAccounts cache.Indexer
-	secrets         cache.Indexer
-
-	stopChan                 chan struct{}
-	serviceAccountsReflector *cache.Reflector
-	secretsReflector         *cache.Reflector
+	serviceAccountLister corelisters.ServiceAccountLister
+	secretLister         corelisters.SecretLister
 }
 
-var _ = kubeapiserveradmission.WantsInternalClientSet(&serviceAccount{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&serviceAccount{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&serviceAccount{})
 
 // NewServiceAccount returns an admission.Interface implementation which limits admission of Pod CREATE requests based on the pod's ServiceAccount:
 // 1. If the pod does not specify a ServiceAccount, it sets the pod's ServiceAccount to "default"
@@ -103,40 +100,20 @@ func NewServiceAccount() *serviceAccount {
 	}
 }
 
-func (a *serviceAccount) SetInternalClientSet(cl internalclientset.Interface) {
+func (a *serviceAccount) SetInternalKubeClientSet(cl internalclientset.Interface) {
 	a.client = cl
-	a.serviceAccounts, a.serviceAccountsReflector = cache.NewNamespaceKeyedIndexerAndReflector(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return cl.Core().ServiceAccounts(metav1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return cl.Core().ServiceAccounts(metav1.NamespaceAll).Watch(options)
-			},
-		},
-		&api.ServiceAccount{},
-		0,
-	)
+}
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
-	a.secrets, a.secretsReflector = cache.NewNamespaceKeyedIndexerAndReflector(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				options.FieldSelector = tokenSelector.String()
-				return cl.Core().Secrets(metav1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				options.FieldSelector = tokenSelector.String()
-				return cl.Core().Secrets(metav1.NamespaceAll).Watch(options)
-			},
-		},
-		&api.Secret{},
-		0,
-	)
+func (a *serviceAccount) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	serviceAccountInformer := f.Core().InternalVersion().ServiceAccounts()
+	a.serviceAccountLister = serviceAccountInformer.Lister()
 
-	if cl != nil {
-		a.Run()
-	}
+	secretInformer := f.Core().InternalVersion().Secrets()
+	a.secretLister = secretInformer.Lister()
+
+	a.SetReadyFunc(func() bool {
+		return serviceAccountInformer.Informer().HasSynced() && secretInformer.Informer().HasSynced()
+	})
 }
 
 // Validate ensures an authorizer is set.
@@ -144,33 +121,13 @@ func (a *serviceAccount) Validate() error {
 	if a.client == nil {
 		return fmt.Errorf("missing client")
 	}
-	if a.secrets == nil {
-		return fmt.Errorf("missing secretsIndexer")
+	if a.secretLister == nil {
+		return fmt.Errorf("missing secretLister")
 	}
-	if a.secretsReflector == nil {
-		return fmt.Errorf("missing secretsReflector")
-	}
-	if a.serviceAccounts == nil {
-		return fmt.Errorf("missing serviceAccountsIndexer")
-	}
-	if a.serviceAccountsReflector == nil {
-		return fmt.Errorf("missing serviceAccountsReflector")
+	if a.serviceAccountLister == nil {
+		return fmt.Errorf("missing serviceAccountLister")
 	}
 	return nil
-}
-
-func (s *serviceAccount) Run() {
-	if s.stopChan == nil {
-		s.stopChan = make(chan struct{})
-		s.serviceAccountsReflector.RunUntil(s.stopChan)
-		s.secretsReflector.RunUntil(s.stopChan)
-	}
-}
-func (s *serviceAccount) Stop() {
-	if s.stopChan != nil {
-		close(s.stopChan)
-		s.stopChan = nil
-	}
 }
 
 func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
@@ -193,10 +150,13 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		if len(pod.Spec.ServiceAccountName) != 0 {
 			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference service accounts"))
 		}
-		for _, volume := range pod.Spec.Volumes {
-			if volume.VolumeSource.Secret != nil {
-				return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference secrets"))
-			}
+		hasSecrets := false
+		podutil.VisitPodSecretNames(pod, func(name string) bool {
+			hasSecrets = true
+			return false
+		})
+		if hasSecrets {
+			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference secrets"))
 		}
 		return nil
 	}
@@ -269,17 +229,12 @@ func (s *serviceAccount) enforceMountableSecrets(serviceAccount *api.ServiceAcco
 
 // getServiceAccount returns the ServiceAccount for the given namespace and name if it exists
 func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.ServiceAccount, error) {
-	key := &api.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: namespace}}
-	index, err := s.serviceAccounts.Index("namespace", key)
-	if err != nil {
-		return nil, err
+	serviceAccount, err := s.serviceAccountLister.ServiceAccounts(namespace).Get(name)
+	if err == nil {
+		return serviceAccount, nil
 	}
-
-	for _, obj := range index {
-		serviceAccount := obj.(*api.ServiceAccount)
-		if serviceAccount.Name == name {
-			return serviceAccount, nil
-		}
+	if !errors.IsNotFound(err) {
+		return nil, err
 	}
 
 	// Could not find in cache, attempt to look up directly
@@ -332,15 +287,15 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 
 // getServiceAccountTokens returns all ServiceAccountToken secrets for the given ServiceAccount
 func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAccount) ([]*api.Secret, error) {
-	key := &api.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: serviceAccount.Namespace}}
-	index, err := s.secrets.Index("namespace", key)
+	tokens, err := s.secretLister.Secrets(serviceAccount.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	tokens := []*api.Secret{}
-	for _, obj := range index {
-		token := obj.(*api.Secret)
+	for _, token := range tokens {
+		if token.Type != api.SecretTypeServiceAccountToken {
+			continue
+		}
 
 		if serviceaccount.InternalIsServiceAccountToken(token, serviceAccount) {
 			tokens = append(tokens, token)

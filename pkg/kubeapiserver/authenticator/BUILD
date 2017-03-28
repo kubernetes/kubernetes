@@ -23,7 +23,6 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authentication/request/union",
         "//vendor:k8s.io/apiserver/pkg/authentication/request/x509",
         "//vendor:k8s.io/apiserver/pkg/authentication/token/tokenfile",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/plugin/pkg/authenticator/password/keystone",
         "//vendor:k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile",
         "//vendor:k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth",

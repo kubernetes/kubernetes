@@ -86,6 +86,8 @@
 {% set params = params + " " + pillar['controller_manager_test_args'] -%}
 {% endif -%}
 
+{% set container_env = "" -%}
+
 {
 "apiVersion": "v1",
 "kind": "Pod",
@@ -113,6 +115,7 @@
                  "-c",
                  "/usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
                ],
+    {{container_env}}
     "livenessProbe": {
       "httpGet": {
         "host": "127.0.0.1",

@@ -30,7 +30,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/keystone"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
 	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
@@ -49,6 +48,7 @@ type AuthenticatorConfig struct {
 	Anonymous                   bool
 	AnyToken                    bool
 	BasicAuthFile               string
+	BootstrapToken              bool
 	ClientCAFile                string
 	TokenAuthFile               string
 	OIDCIssuerURL               string
@@ -66,7 +66,8 @@ type AuthenticatorConfig struct {
 	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 
 	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
-	ServiceAccountTokenGetter serviceaccount.ServiceAccountTokenGetter
+	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
+	BootstrapTokenAuthenticator authenticator.Token
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -136,6 +137,13 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		authenticators = append(authenticators, serviceAccountAuth)
 		hasTokenAuth = true
 	}
+	if config.BootstrapToken {
+		if config.BootstrapTokenAuthenticator != nil {
+			// TODO: This can sometimes be nil because of
+			authenticators = append(authenticators, bearertoken.New(config.BootstrapTokenAuthenticator))
+			hasTokenAuth = true
+		}
+	}
 	// NOTE(ericchiang): Keep the OpenID Connect after Service Accounts.
 	//
 	// Because both plugins verify JWTs whichever comes first in the union experiences
@@ -198,7 +206,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 
 	authenticator := union.New(authenticators...)
 
-	authenticator = group.NewGroupAdder(authenticator, []string{user.AllAuthenticated})
+	authenticator = group.NewAuthenticatedGroupAdder(authenticator)
 
 	if config.Anonymous {
 		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token anonymous).

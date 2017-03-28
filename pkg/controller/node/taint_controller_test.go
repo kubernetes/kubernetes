@@ -17,13 +17,11 @@ limitations under the License.
 package node
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
@@ -47,24 +45,10 @@ func addToleration(pod *v1.Pod, index int, duration int64) *v1.Pod {
 		pod.Annotations = map[string]string{}
 	}
 	if duration < 0 {
-		pod.Annotations["scheduler.alpha.kubernetes.io/tolerations"] = `
-  [
-    {
-      "key": "testTaint` + fmt.Sprintf("%v", index) + `",
-      "value": "test` + fmt.Sprintf("%v", index) + `",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `"
-    }
-  ]`
+		pod.Spec.Tolerations = []v1.Toleration{{Key: "testTaint" + fmt.Sprintf("%v", index), Value: "test" + fmt.Sprintf("%v", index), Effect: v1.TaintEffectNoExecute}}
+
 	} else {
-		pod.Annotations["scheduler.alpha.kubernetes.io/tolerations"] = `
-  [
-    {
-      "key": "testTaint` + fmt.Sprintf("%v", index) + `",
-      "value": "test` + fmt.Sprintf("%v", index) + `",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `",
-      "tolerationSeconds": ` + fmt.Sprintf("%v", duration) + `
-    }
-  ]`
+		pod.Spec.Tolerations = []v1.Toleration{{Key: "testTaint" + fmt.Sprintf("%v", index), Value: "test" + fmt.Sprintf("%v", index), Effect: v1.TaintEffectNoExecute, TolerationSeconds: &duration}}
 	}
 	return pod
 }
@@ -74,15 +58,7 @@ func addTaintsToNode(node *v1.Node, key, value string, indices []int) *v1.Node {
 	for _, index := range indices {
 		taints = append(taints, createNoExecuteTaint(index))
 	}
-	taintsData, err := json.Marshal(taints)
-	if err != nil {
-		panic(err)
-	}
-
-	if node.Annotations == nil {
-		node.Annotations = make(map[string]string)
-	}
-	node.Annotations[v1.TaintsAnnotationKey] = string(taintsData)
+	node.Spec.Taints = taints
 	return node
 }
 
@@ -113,99 +89,6 @@ func TestFilterNoExecuteTaints(t *testing.T) {
 	taints = getNoExecuteTaints(taints)
 	if len(taints) != 1 || taints[0].Key != "one" {
 		t.Errorf("Filtering doesn't work. Got %v", taints)
-	}
-}
-
-func TestComputeTaintDifference(t *testing.T) {
-	testCases := []struct {
-		lhs                []v1.Taint
-		rhs                []v1.Taint
-		expectedDifference []v1.Taint
-		description        string
-	}{
-		{
-			lhs: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-				{
-					Key:   "two",
-					Value: "two",
-				},
-			},
-			rhs: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-				{
-					Key:   "two",
-					Value: "two",
-				},
-			},
-			description: "Equal sets",
-		},
-		{
-			lhs: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-			},
-			expectedDifference: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-			},
-			description: "Right is empty",
-		},
-		{
-			rhs: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-			},
-			description: "Left is empty",
-		},
-		{
-			lhs: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-				{
-					Key:   "two",
-					Value: "two",
-				},
-			},
-			rhs: []v1.Taint{
-				{
-					Key:   "two",
-					Value: "two",
-				},
-				{
-					Key:   "three",
-					Value: "three",
-				},
-			},
-			expectedDifference: []v1.Taint{
-				{
-					Key:   "one",
-					Value: "one",
-				},
-			},
-			description: "Intersecting arrays",
-		},
-	}
-
-	for _, item := range testCases {
-		difference := computeTaintDifference(item.lhs, item.rhs)
-		if !api.Semantic.DeepEqual(difference, item.expectedDifference) {
-			t.Errorf("%v: difference in not what expected. Got %v, expected %v", item.description, difference, item.expectedDifference)
-		}
 	}
 }
 
@@ -509,27 +392,13 @@ func TestUpdateNode(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "pod1",
-						Annotations: map[string]string{
-							"scheduler.alpha.kubernetes.io/tolerations": `
-  [
-    {
-      "key": "testTaint1",
-      "value": "test1",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `",
-      "tolerationSeconds": ` + fmt.Sprintf("%v", 1) + `
-    },
-    {
-      "key": "testTaint2",
-      "value": "test2",
-      "effect": "` + string(v1.TaintEffectNoExecute) + `",
-      "tolerationSeconds": ` + fmt.Sprintf("%v", 100) + `
-    }
-  ]
-  `,
-						},
 					},
 					Spec: v1.PodSpec{
 						NodeName: "node1",
+						Tolerations: []v1.Toleration{
+							{Key: "testTaint1", Value: "test1", Effect: v1.TaintEffectNoExecute, TolerationSeconds: &[]int64{1}[0]},
+							{Key: "testTaint2", Value: "test2", Effect: v1.TaintEffectNoExecute, TolerationSeconds: &[]int64{100}[0]},
+						},
 					},
 					Status: v1.PodStatus{
 						Conditions: []v1.PodCondition{
@@ -678,5 +547,49 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 		}
 
 		close(stopCh)
+	}
+}
+
+func TestGetMinTolerationTime(t *testing.T) {
+	one := int64(1)
+	oneSec := 1 * time.Second
+
+	tests := []struct {
+		tolerations []v1.Toleration
+		expected    time.Duration
+	}{
+		{
+			tolerations: []v1.Toleration{},
+			expected:    0,
+		},
+		{
+			tolerations: []v1.Toleration{
+				{
+					TolerationSeconds: &one,
+				},
+				{
+					TolerationSeconds: nil,
+				},
+			},
+			expected: oneSec,
+		},
+		{
+			tolerations: []v1.Toleration{
+				{
+					TolerationSeconds: nil,
+				},
+				{
+					TolerationSeconds: &one,
+				},
+			},
+			expected: oneSec,
+		},
+	}
+
+	for _, test := range tests {
+		got := getMinTolerationTime(test.tolerations)
+		if got != test.expected {
+			t.Errorf("Incorrect min toleration time: got %v, expected %v", got, test.expected)
+		}
 	}
 }

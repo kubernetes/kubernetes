@@ -21,8 +21,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
+	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 // CronJobsGetter has a method to return a CronJobInterface.
@@ -116,7 +116,7 @@ func (c *cronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +129,7 @@ func (c *cronJobs) Get(name string, options v1.GetOptions) (result *batch.CronJo
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +141,7 @@ func (c *cronJobs) List(opts v1.ListOptions) (result *batch.CronJobList, err err
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -149,11 +149,11 @@ func (c *cronJobs) List(opts v1.ListOptions) (result *batch.CronJobList, err err
 
 // Watch returns a watch.Interface that watches the requested cronJobs.
 func (c *cronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

@@ -17,16 +17,16 @@ limitations under the License.
 package kubeadm
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type EnvParams struct {
 	KubernetesDir    string
-	HostPKIPath      string
 	HostEtcdPath     string
 	HyperkubeImage   string
 	RepositoryPrefix string
-	DiscoveryImage   string
 	EtcdImage        string
 }
 
@@ -34,32 +34,35 @@ type MasterConfiguration struct {
 	metav1.TypeMeta
 
 	API               API
-	Discovery         Discovery
 	Etcd              Etcd
 	Networking        Networking
 	KubernetesVersion string
 	CloudProvider     string
 	AuthorizationMode string
+
+	Token    string
+	TokenTTL time.Duration
+
+	// SelfHosted enables an alpha deployment type where the apiserver, scheduler, and
+	// controller manager are managed by Kubernetes itself. This option is likely to
+	// become the default in the future.
+	SelfHosted bool
+
+	APIServerExtraArgs         map[string]string
+	ControllerManagerExtraArgs map[string]string
+	SchedulerExtraArgs         map[string]string
+
+	// APIServerCertSANs sets extra Subject Alternative Names for the API Server signing cert
+	APIServerCertSANs []string
+	// CertificatesDir specifies where to store or look for all required certificates
+	CertificatesDir string
 }
 
 type API struct {
-	AdvertiseAddresses []string
-	ExternalDNSNames   []string
-	Port               int32
-}
-
-type Discovery struct {
-	HTTPS *HTTPSDiscovery
-	File  *FileDiscovery
-	Token *TokenDiscovery
-}
-
-type HTTPSDiscovery struct {
-	URL string
-}
-
-type FileDiscovery struct {
-	Path string
+	// AdvertiseAddress sets the address for the API server to advertise.
+	AdvertiseAddress string
+	// BindPort sets the secure port for the API Server to bind to
+	BindPort int32
 }
 
 type TokenDiscovery struct {
@@ -84,13 +87,11 @@ type Etcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta
 
-	Discovery Discovery
-}
-
-// ClusterInfo TODO add description
-type ClusterInfo struct {
-	metav1.TypeMeta
-	// TODO(phase1+) this may become simply `api.Config`
-	CertificateAuthorities []string
-	Endpoints              []string
+	CACertPath     string
+	DiscoveryFile  string
+	DiscoveryToken string
+	// Currently we only pay attention to one api server but hope to support >1 in the future
+	DiscoveryTokenAPIServers []string
+	TLSBootstrapToken        string
+	Token                    string
 }

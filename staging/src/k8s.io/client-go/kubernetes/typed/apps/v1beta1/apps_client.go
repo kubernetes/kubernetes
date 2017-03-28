@@ -17,21 +17,30 @@ limitations under the License.
 package v1beta1
 
 import (
-	fmt "fmt"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	api "k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
 
 type AppsV1beta1Interface interface {
 	RESTClient() rest.Interface
+	DeploymentsGetter
+	ScalesGetter
 	StatefulSetsGetter
 }
 
 // AppsV1beta1Client is used to interact with features provided by the apps group.
 type AppsV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AppsV1beta1Client) Deployments(namespace string) DeploymentInterface {
+	return newDeployments(c, namespace)
+}
+
+func (c *AppsV1beta1Client) Scales(namespace string) ScaleInterface {
+	return newScales(c, namespace)
 }
 
 func (c *AppsV1beta1Client) StatefulSets(namespace string) StatefulSetInterface {
@@ -67,22 +76,14 @@ func New(c rest.Interface) *AppsV1beta1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv, err := schema.ParseGroupVersion("apps/v1beta1")
-	if err != nil {
-		return err
-	}
-	// if apps/v1beta1 is not enabled, return an error
-	if !api.Registry.IsEnabledVersion(gv) {
-		return fmt.Errorf("apps/v1beta1 is not enabled")
-	}
+	gv := v1beta1.SchemeGroupVersion
+	config.GroupVersion = &gv
 	config.APIPath = "/apis"
+	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	copyGroupVersion := gv
-	config.GroupVersion = &copyGroupVersion
-
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
 	return nil
 }

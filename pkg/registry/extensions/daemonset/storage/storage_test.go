@@ -49,6 +49,9 @@ func newValidDaemonSet() *extensions.DaemonSet {
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
+			UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+				Type: extensions.OnDeleteDaemonSetStrategyType,
+			},
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

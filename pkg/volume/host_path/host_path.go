@@ -24,14 +24,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 // This is the primary entrypoint for volume plugins.
 // The volumeConfig arg provides the ability to configure volume behavior.  It is implemented as a pointer to allow nils.
-// The hostPathPlugin is used to store the volumeConfig and give it, when needed, to the func that creates HostPath Recyclers.
+// The hostPathPlugin is used to store the volumeConfig and give it, when needed, to the func that Recycles.
 // Tests that exercise recycling should not use this func but instead use ProbeRecyclablePlugins() to override default behavior.
 func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{
@@ -84,6 +83,14 @@ func (plugin *hostPathPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *hostPathPlugin) SupportsMountOption() bool {
+	return false
+}
+
+func (plugin *hostPathPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *hostPathPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -107,8 +114,24 @@ func (plugin *hostPathPlugin) NewUnmounter(volName string, podUID types.UID) (vo
 	}}, nil
 }
 
-func (plugin *hostPathPlugin) NewRecycler(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder) (volume.Recycler, error) {
-	return newRecycler(pvName, spec, eventRecorder, plugin.host, plugin.config)
+// Recycle recycles/scrubs clean a HostPath volume.
+// Recycle blocks until the pod has completed or any error occurs.
+// HostPath recycling only works in single node clusters and is meant for testing purposes only.
+func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder) error {
+	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
+		return fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
+	}
+
+	pod := plugin.config.RecyclerPodTemplate
+	timeout := volume.CalculateTimeoutForVolume(plugin.config.RecyclerMinimumTimeout, plugin.config.RecyclerTimeoutIncrement, spec.PersistentVolume)
+	// overrides
+	pod.Spec.ActiveDeadlineSeconds = &timeout
+	pod.Spec.Volumes[0].VolumeSource = v1.VolumeSource{
+		HostPath: &v1.HostPathVolumeSource{
+			Path: spec.PersistentVolume.Spec.HostPath.Path,
+		},
+	}
+	return volume.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
 }
 
 func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -132,22 +155,6 @@ func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) 
 		},
 	}
 	return volume.NewSpecFromVolume(hostPathVolume), nil
-}
-
-func newRecycler(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
-	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
-		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
-	}
-	path := spec.PersistentVolume.Spec.HostPath.Path
-	return &hostPathRecycler{
-		name:          spec.Name(),
-		path:          path,
-		host:          host,
-		config:        config,
-		timeout:       volume.CalculateTimeoutForVolume(config.RecyclerMinimumTimeout, config.RecyclerTimeoutIncrement, spec.PersistentVolume),
-		pvName:        pvName,
-		eventRecorder: eventRecorder,
-	}, nil
 }
 
 func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error) {
@@ -223,42 +230,6 @@ func (c *hostPathUnmounter) TearDown() error {
 // TearDownAt does not make sense for host paths - probably programmer error.
 func (c *hostPathUnmounter) TearDownAt(dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
-}
-
-// hostPathRecycler implements a Recycler for the HostPath plugin
-// This implementation is meant for testing only and only works in a single node cluster
-type hostPathRecycler struct {
-	name    string
-	path    string
-	host    volume.VolumeHost
-	config  volume.VolumeConfig
-	timeout int64
-	volume.MetricsNil
-	pvName        string
-	eventRecorder volume.RecycleEventRecorder
-}
-
-func (r *hostPathRecycler) GetPath() string {
-	return r.path
-}
-
-// Recycle recycles/scrubs clean a HostPath volume.
-// Recycle blocks until the pod has completed or any error occurs.
-// HostPath recycling only works in single node clusters and is meant for testing purposes only.
-func (r *hostPathRecycler) Recycle() error {
-	templateClone, err := api.Scheme.DeepCopy(r.config.RecyclerPodTemplate)
-	if err != nil {
-		return err
-	}
-	pod := templateClone.(*v1.Pod)
-	// overrides
-	pod.Spec.ActiveDeadlineSeconds = &r.timeout
-	pod.Spec.Volumes[0].VolumeSource = v1.VolumeSource{
-		HostPath: &v1.HostPathVolumeSource{
-			Path: r.path,
-		},
-	}
-	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient(), r.eventRecorder)
 }
 
 // hostPathProvisioner implements a Provisioner for the HostPath plugin

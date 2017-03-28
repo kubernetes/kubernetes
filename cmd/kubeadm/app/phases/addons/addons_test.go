@@ -16,7 +16,11 @@ limitations under the License.
 
 package addons
 
-import "testing"
+import (
+	"testing"
+
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+)
 
 func TestGetClusterCIDR(t *testing.T) {
 	emptyClusterCIDR := getClusterCIDR("")
@@ -27,5 +31,58 @@ func TestGetClusterCIDR(t *testing.T) {
 	clusterCIDR := getClusterCIDR("10.244.0.0/16")
 	if clusterCIDR != "- --cluster-cidr=10.244.0.0/16" {
 		t.Errorf("Invalid format: %s", clusterCIDR)
+	}
+}
+
+func TestCompileManifests(t *testing.T) {
+	var tests = []struct {
+		manifest string
+		data     interface{}
+		expected bool
+	}{
+		{
+			manifest: KubeProxyConfigMap,
+			data: struct{ MasterEndpoint string }{
+				MasterEndpoint: "foo",
+			},
+			expected: true,
+		},
+		{
+			manifest: KubeProxyDaemonSet,
+			data: struct{ Image, ClusterCIDR, MasterTaintKey string }{
+				Image:          "foo",
+				ClusterCIDR:    "foo",
+				MasterTaintKey: "foo",
+			},
+			expected: true,
+		},
+		{
+			manifest: KubeDNSDeployment,
+			data: struct{ ImageRepository, Arch, Version, DNSDomain, MasterTaintKey string }{
+				ImageRepository: "foo",
+				Arch:            "foo",
+				Version:         "foo",
+				DNSDomain:       "foo",
+				MasterTaintKey:  "foo",
+			},
+			expected: true,
+		},
+		{
+			manifest: KubeDNSService,
+			data: struct{ DNSIP string }{
+				DNSIP: "foo",
+			},
+			expected: true,
+		},
+	}
+	for _, rt := range tests {
+		_, actual := kubeadmutil.ParseTemplate(rt.manifest, rt.data)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed CompileManifests:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(actual == nil),
+			)
+		}
 	}
 }

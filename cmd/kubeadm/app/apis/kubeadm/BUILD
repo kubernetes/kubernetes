@@ -12,14 +12,11 @@ go_library(
     srcs = [
         "doc.go",
         "env.go",
-        "fuzzer.go",
         "register.go",
         "types.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/google/gofuzz",
-        "//vendor:k8s.io/apimachinery/pkg/api/testing",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
@@ -37,6 +34,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//cmd/kubeadm/app/apis/kubeadm/fuzzer:all-srcs",
         "//cmd/kubeadm/app/apis/kubeadm/install:all-srcs",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:all-srcs",
         "//cmd/kubeadm/app/apis/kubeadm/validation:all-srcs",

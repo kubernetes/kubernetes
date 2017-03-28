@@ -21,6 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	scheme "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/scheme"
 	api "k8s.io/kubernetes/pkg/api"
 )
 
@@ -115,7 +116,7 @@ func (c *services) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -128,7 +129,7 @@ func (c *services) Get(name string, options v1.GetOptions) (result *api.Service,
 		Namespace(c.ns).
 		Resource("services").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -140,7 +141,7 @@ func (c *services) List(opts v1.ListOptions) (result *api.ServiceList, err error
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -148,11 +149,11 @@ func (c *services) List(opts v1.ListOptions) (result *api.ServiceList, err error
 
 // Watch returns a watch.Interface that watches the requested services.
 func (c *services) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("services").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

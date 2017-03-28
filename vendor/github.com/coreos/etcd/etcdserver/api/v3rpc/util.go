@@ -38,6 +38,17 @@ func togRPCError(err error) error {
 	case etcdserver.ErrNoSpace:
 		return rpctypes.ErrGRPCNoSpace
 
+	case etcdserver.ErrNoLeader:
+		return rpctypes.ErrGRPCNoLeader
+	case etcdserver.ErrStopped:
+		return rpctypes.ErrGRPCStopped
+	case etcdserver.ErrTimeout:
+		return rpctypes.ErrGRPCTimeout
+	case etcdserver.ErrTimeoutDueToLeaderFail:
+		return rpctypes.ErrGRPCTimeoutDueToLeaderFail
+	case etcdserver.ErrTimeoutDueToConnectionLost:
+		return rpctypes.ErrGRPCTimeoutDueToConnectionLost
+
 	case auth.ErrRootUserNotExist:
 		return rpctypes.ErrGRPCRootUserNotExist
 	case auth.ErrRootRoleNotExist:

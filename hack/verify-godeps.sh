@@ -44,7 +44,6 @@ preload-dep() {
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-kube::golang::verify_godep_version
 
 readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
 if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
@@ -86,22 +85,12 @@ _kubetmp="${_kubetmp}/kubernetes"
 export GOPATH="${_tmpdir}"
 
 pushd "${_kubetmp}" 2>&1 > /dev/null
-  # Build the godep tool
-  go get -u github.com/tools/godep 2>/dev/null
-  export GODEP="${GOPATH}/bin/godep"
-  pin-godep() {
-    pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
-      git checkout "$1"
-      "${GODEP}" go install
-    popd > /dev/null
-  }
-  # Use to following if we ever need to pin godep to a specific version again
-  pin-godep 'v74'
-  "${GODEP}" version
+  kube::util::ensure_godep_version v79
 
+  export GOPATH="${GOPATH}:${_kubetmp}/staging"
   # Fill out that nice clean place with the kube godeps
   echo "Starting to download all kubernetes godeps. This takes a while"
-  "${GODEP}" restore
+  godep restore
   echo "Download finished"
 
   # Destroy deps in the copy of the kube tree
@@ -127,11 +116,16 @@ pushd "${KUBE_ROOT}" 2>&1 > /dev/null
     echo "If you're seeing this locally, run the below command to fix your Godeps.json:"
     echo "patch -p0 < godepdiff.patch"
     echo "(The above output can be saved as godepdiff.patch if you're not running this locally)"
+    echo "(The patch file should also be exported as a build artifact if run through CI)"
     KEEP_TMP=true
+    if [[ -f godepdiff.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
+      echo "Copying patch to artifacts.."
+      cp godepdiff.patch "${ARTIFACTS_DIR:-}/"
+    fi
     ret=1
   fi
 
-  if ! _out="$(diff -Naupr -x 'BUILD' vendor ${_kubetmp}/vendor)"; then
+  if ! _out="$(diff -Naupr -x "BUILD" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor ${_kubetmp}/vendor)"; then
     echo "Your vendored results are different:"
     echo "${_out}"
     echo "Godeps Verify failed."
@@ -139,7 +133,12 @@ pushd "${KUBE_ROOT}" 2>&1 > /dev/null
     echo "If you're seeing this locally, run the below command to fix your directories:"
     echo "patch -p0 < vendordiff.patch"
     echo "(The above output can be saved as godepdiff.patch if you're not running this locally)"
+    echo "(The patch file should also be exported as a build artifact if run through CI)"
     KEEP_TMP=true
+    if [[ -f vendordiff.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
+      echo "Copying patch to artifacts.."
+      cp vendordiff.patch "${ARTIFACTS_DIR:-}/"
+    fi
     ret=1
   fi
 popd 2>&1 > /dev/null

@@ -149,10 +149,10 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]stru
 		// Some of this port stuff is under-documented voodoo.
 		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
 		var protocol string
-		switch strings.ToUpper(string(port.Protocol)) {
-		case "UDP":
+		switch port.Protocol {
+		case runtimeapi.Protocol_UDP:
 			protocol = "/udp"
-		case "TCP":
+		case runtimeapi.Protocol_TCP:
 			protocol = "/tcp"
 		default:
 			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
@@ -319,4 +319,20 @@ func getSecurityOptSeparator(v *semver.Version) rune {
 	default:
 		return dockertools.SecurityOptSeparatorNew
 	}
+}
+
+// ensureSandboxImageExists pulls the sandbox image when it's not present.
+func ensureSandboxImageExists(client dockertools.DockerInterface, image string) error {
+	_, err := client.InspectImageByRef(image)
+	if err == nil {
+		return nil
+	}
+	if !dockertools.IsImageNotFoundError(err) {
+		return fmt.Errorf("failed to inspect sandbox image %q: %v", image, err)
+	}
+	err = client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to pull sandbox image %q: %v", image, err)
+	}
+	return nil
 }

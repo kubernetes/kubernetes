@@ -125,7 +125,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 
 		if iscsiTransport == "" {
 			glog.Errorf("iscsi: could not find transport name in iface %s", b.iface)
-			return errors.New(fmt.Sprintf("Could not parse iface file for %s", b.iface))
+			return fmt.Errorf("Could not parse iface file for %s", b.iface)
 		} else if iscsiTransport == "tcp" {
 			devicePath = strings.Join([]string{"/dev/disk/by-path/ip", tp, "iscsi", b.iqn, "lun", b.lun}, "-")
 		} else {

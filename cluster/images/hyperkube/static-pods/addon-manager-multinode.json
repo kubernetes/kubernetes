@@ -11,7 +11,7 @@
     "containers": [
       {
         "name": "kube-addon-manager",
-        "image": "REGISTRY/kube-addon-manager-ARCH:v6.4-alpha.1",
+        "image": "REGISTRY/kube-addon-manager-ARCH:v6.4-beta.1",
         "resources": {
           "requests": {
             "cpu": "5m",

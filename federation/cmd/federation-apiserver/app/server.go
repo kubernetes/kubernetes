@@ -21,6 +21,7 @@ package app
 
 import (
 	"fmt"
+	"io/ioutil"
 	"strings"
 	"time"
 
@@ -33,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
@@ -41,10 +41,12 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/version"
@@ -66,13 +68,28 @@ cluster's shared state through which all other components interact.`,
 	return cmd
 }
 
-// Run runs the specified APIServer.  This should never exit.
-func Run(s *options.ServerRunOptions) error {
-	// set defaults
-	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
+// Run runs the specified APIServer.  It only returns if stopCh is closed
+// or one of the ports cannot be listened on initially.
+func Run(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
+	err := NonBlockingRun(s, stopCh)
+	if err != nil {
 		return err
 	}
-	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String()); err != nil {
+	<-stopCh
+	return nil
+}
+
+// NonBlockingRun runs the specified APIServer and configures it to
+// stop with the given channel.
+func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
+	// set defaults
+	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
+		return err
+	}
+	if err := kubeoptions.DefaultAdvertiseAddress(s.GenericServerRunOptions, s.InsecureServing); err != nil {
+		return err
+	}
+	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), nil, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
@@ -86,13 +103,12 @@ func Run(s *options.ServerRunOptions) error {
 		return utilerrors.NewAggregate(errs)
 	}
 
-	genericConfig := genericapiserver.NewConfig().
-		WithSerializer(api.Codecs)
-
+	genericConfig := genericapiserver.NewConfig(api.Codecs)
 	if err := s.GenericServerRunOptions.ApplyTo(genericConfig); err != nil {
 		return err
 	}
-	if err := s.InsecureServing.ApplyTo(genericConfig); err != nil {
+	insecureServingOptions, err := s.InsecureServing.ApplyTo(genericConfig)
+	if err != nil {
 		return err
 	}
 	if err := s.SecureServing.ApplyTo(genericConfig); err != nil {
@@ -159,7 +175,7 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizationConfig.New()
@@ -168,7 +184,15 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
+	var cloudConfig []byte
+
+	if s.CloudProvider.CloudConfigFile != "" {
+		cloudConfig, err = ioutil.ReadFile(s.CloudProvider.CloudConfigFile)
+		if err != nil {
+			glog.Fatalf("Error reading from cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
+		}
+	}
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig)
 	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
@@ -203,18 +227,30 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
-	routes.UIRedirect{}.Install(m.HandlerContainer)
+	routes.UIRedirect{}.Install(m.FallThroughHandler)
 	routes.Logs{}.Install(m.HandlerContainer)
 
 	installFederationAPIs(m, genericConfig.RESTOptionsGetter)
 	installCoreAPIs(s, m, genericConfig.RESTOptionsGetter)
 	installExtensionsAPIs(m, genericConfig.RESTOptionsGetter)
-	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
-	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
+	// Disable half-baked APIs for 1.6.
+	// TODO: Uncomment this once 1.6 is released.
+	//	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
+	//	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
 
-	sharedInformers.Start(wait.NeverStop)
-	m.PrepareRun().Run(wait.NeverStop)
-	return nil
+	// run the insecure server now
+	if insecureServingOptions != nil {
+		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(m.HandlerContainer.ServeMux, genericConfig)
+		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, stopCh); err != nil {
+			return err
+		}
+	}
+
+	err = m.PrepareRun().NonBlockingRun(stopCh)
+	if err == nil {
+		sharedInformers.Start(stopCh)
+	}
+	return err
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility

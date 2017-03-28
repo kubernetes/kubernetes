@@ -480,7 +480,7 @@ type Deployment struct {
 	ImageDatastores         []string               `json:"imageDatastores"`
 	SelfLink                string                 `json:"selfLink"`
 	Migration               *MigrationStatus       `json:"migrationStatus,omitempty"`
-	ClusterConfigurations   []ClusterConfiguration `json:"clusterConfigurations,omitempty"`
+	ServiceConfigurations   []ServiceConfiguration `json:"serviceConfigurations,omitempty"`
 	LoadBalancerEnabled     bool                   `json:"loadBalancerEnabled"`
 	LoadBalancerAddress     string                 `json:"loadBalancerAddress"`
 }
@@ -514,7 +514,6 @@ type AuthInfo struct {
 	Tenant         string   `json:"tenant,omitempty"`
 	Port           int      `json:"port,omitempty"`
 	SecurityGroups []string `json:"securityGroups,omitempty"`
-	Enabled        bool     `json:"enabled,omitempty"`
 	Username       string   `json:"username,omitempty"`
 }
 
@@ -532,6 +531,8 @@ type NetworkConfigurationCreateSpec struct {
 	Password        string   `json:"networkManagerPassword,omitempty"`
 	NetworkZoneId   string   `json:"networkZoneId,omitempty"`
 	TopRouterId     string   `json:"networkTopRouterId,omitempty"`
+	EdgeIpPoolId    string   `json:"networkEdgeIpPoolId,omitempty"`
+	HostUplinkPnic  string   `json:"networkHostUplinkPnic,omitempty"`
 	IpRange         string   `json:"ipRange,omitempty"`
 	ExternalIpRange *IpRange `json:"externalIpRange,omitempty"`
 	DhcpServers     []string `json:"dhcpServers,omitempty"`
@@ -545,21 +546,23 @@ type NetworkConfiguration struct {
 	Password        string   `json:"networkManagerPassword,omitempty"`
 	NetworkZoneId   string   `json:"networkZoneId,omitempty"`
 	TopRouterId     string   `json:"networkTopRouterId,omitempty"`
+	EdgeIpPoolId    string   `json:"networkEdgeIpPoolId,omitempty"`
+	HostUplinkPnic  string   `json:"networkHostUplinkPnic,omitempty"`
 	IpRange         string   `json:"ipRange,omitempty"`
 	FloatingIpRange *IpRange `json:"floatingIpRange,omitempty"`
 	SnatIp          string   `json:"snatIp,omitempty"`
 	DhcpServers     []string `json:"dhcpServers,omitempty"`
 }
 
-// Creation spec for subnets.
-type SubnetCreateSpec struct {
+// Creation spec for networks.
+type NetworkCreateSpec struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
 	PortGroups  []string `json:"portGroups"`
 }
 
 // Represents a subnet
-type Subnet struct {
+type Network struct {
 	Kind        string   `json:"kind"`
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
@@ -572,8 +575,8 @@ type Subnet struct {
 }
 
 // Represents multiple subnets returned by the API
-type Subnets struct {
-	Items []Subnet `json:"items"`
+type Networks struct {
+	Items []Network `json:"items"`
 }
 
 // Create spec for virtual subnet
@@ -592,7 +595,7 @@ type VirtualSubnet struct {
 	Description    string   `json:"description,omitempty"`
 	State          string   `json:"state"`
 	RoutingType    string   `json:"routingType"`
-	IsDefault      string   `json:"isDefault"`
+	IsDefault      bool     `json:"isDefault"`
 	Cidr           string   `json:"cidr,omitempty"`
 	LowIpDynamic   string   `json:"lowIpDynamic,omitempty"`
 	HighIpDynamic  string   `json:"highIpDynamic,omitempty"`
@@ -607,33 +610,59 @@ type VirtualSubnets struct {
 	Items []VirtualSubnet `json:"items"`
 }
 
-// Creation spec for Cluster Configuration.
-type ClusterConfigurationSpec struct {
+// Represents a router
+type Router struct {
+	ID            string `json:"id"`
+	Kind          string `json:"kind"`
+	Name          string `json:"name"`
+	PrivateIpCidr string `json:"privateIpCidr"`
+}
+
+// Represents multiple routers returned by the API.
+type Routers struct {
+	Items []Router `json:"items"`
+}
+
+type RouterCreateSpec struct {
+	Name          string `json:"name"`
+	PrivateIpCidr string `json:"privateIpCidr"`
+}
+
+// Represents name that can be set for router
+type RouterUpdateSpec struct {
+	RouterName string `json:"name"`
+}
+
+// Creation spec for Service Configuration.
+type ServiceConfigurationSpec struct {
 	Type    string `json:"type"`
 	ImageID string `json:"imageId"`
 }
 
-// Represnts a Cluster configuration.
-type ClusterConfiguration struct {
+// Represnts a Service configuration.
+type ServiceConfiguration struct {
 	Kind    string `json:"kind"`
 	Type    string `json:"type"`
 	ImageID string `json:"imageId"`
 }
 
-// Creation spec for clusters.
-type ClusterCreateSpec struct {
+// Creation spec for services.
+type ServiceCreateSpec struct {
 	Name               string            `json:"name"`
 	Type               string            `json:"type"`
 	VMFlavor           string            `json:"vmFlavor,omitempty"`
+	MasterVmFlavor     string            `json:"masterVmFlavor,omitempty"`
+	WorkerVmFlavor     string            `json:"workerVmFlavor,omitempty"`
 	DiskFlavor         string            `json:"diskFlavor,omitempty"`
 	NetworkID          string            `json:"vmNetworkId,omitempty"`
+	ImageID            string            `json:"imageId,omitempty"`
 	WorkerCount        int               `json:"workerCount"`
 	BatchSizeWorker    int               `json:"workerBatchExpansionSize,omitempty"`
 	ExtendedProperties map[string]string `json:"extendedProperties"`
 }
 
-// Represents a cluster
-type Cluster struct {
+// Represents a service
+type Service struct {
 	Kind               string            `json:"kind"`
 	Name               string            `json:"name"`
 	State              string            `json:"state"`
@@ -646,14 +675,19 @@ type Cluster struct {
 	ExtendedProperties map[string]string `json:"extendedProperties"`
 }
 
-// Represents multiple clusters returned by the API
-type Clusters struct {
-	Items []Cluster `json:"items"`
+// Represents multiple services returned by the API
+type Services struct {
+	Items []Service `json:"items"`
 }
 
-// Represents cluster size that can be resized for cluster
-type ClusterResizeOperation struct {
+// Represents service size that can be resized for service
+type ServiceResizeOperation struct {
 	NewWorkerCount int `json:"newWorkerCount"`
+}
+
+// Represents service imageId that can be updated during change version
+type ServiceChangeVersionOperation struct {
+	NewImageID string `json:"newImageId"`
 }
 
 // Represents a security group
@@ -708,4 +742,61 @@ type Info struct {
 	FullVersion   string `json:"fullVersion"`
 	GitCommitHash string `json:"gitCommitHash"`
 	NetworkType   string `json:"networkType"`
+}
+
+// NSX configuration spec
+type NsxConfigurationSpec struct {
+	NsxAddress             string            `json:"nsxAddress"`
+	NsxUsername            string            `json:"nsxUsername"`
+	NsxPassword            string            `json:"nsxPassword"`
+	DhcpServerAddresses    map[string]string `json:"dhcpServerAddresses"`
+	PrivateIpRootCidr      string            `json:"privateIpRootCidr"`
+	FloatingIpRootRange    IpRange           `json:"floatingIpRootRange"`
+	T0RouterId             string            `json:"t0RouterId"`
+	EdgeClusterId          string            `json:"edgeClusterId"`
+	OverlayTransportZoneId string            `json:"overlayTransportZoneId"`
+	TunnelIpPoolId         string            `json:"tunnelIpPoolId"`
+	HostUplinkPnic         string            `json:"hostUplinkPnic"`
+	HostUplinkVlanId       int               `json:"hostUplinkVlanId"`
+}
+
+// Represents a subnet
+type Subnet struct {
+	ID            string            `json:"id"`
+	Kind          string            `json:"kind"`
+	Name          string            `json:"name"`
+	Description   string            `json:"description,omitempty"`
+	PrivateIpCidr string            `json:"privateIpCidr"`
+	ReservedIps   map[string]string `json:"reservedIps"`
+	State         string            `json:"state"`
+}
+
+// Represents multiple subnets returned by the API.
+type Subnets struct {
+	Items []Subnet `json:"items"`
+}
+
+// Creation spec for subnets.
+type SubnetCreateSpec struct {
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	PrivateIpCidr string `json:"privateIpCidr"`
+}
+
+// Represents name that can be set for subnet
+type SubnetUpdateSpec struct {
+	SubnetName string `json:"name"`
+}
+
+// Identity and Access Management (IAM)
+// IAM Policy entry
+type PolicyEntry struct {
+	Principal string   `json:"principal"`
+	Roles     []string `json:"roles"`
+}
+
+type PolicyDelta struct {
+	Principal string `json:"principal"`
+	Action    string `json:"action"`
+	Role      string `json:"role"`
 }

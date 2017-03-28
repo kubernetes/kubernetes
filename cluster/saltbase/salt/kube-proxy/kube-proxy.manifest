@@ -59,7 +59,7 @@ spec:
     command:
     - /bin/sh
     - -c
-    - kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
+    - echo -998 > /proc/$$$/oom_score_adj && kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
     securityContext:
       privileged: true
     volumeMounts:

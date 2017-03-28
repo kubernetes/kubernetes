@@ -27,7 +27,7 @@ source "$KUBE_ROOT/cluster/common.sh"
 
 export LIBVIRT_DEFAULT_URI=qemu:///system
 export SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
-export ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota}
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota}
 readonly POOL=kubernetes
 readonly POOL_PATH=/var/lib/libvirt/images/kubernetes
 
@@ -187,6 +187,8 @@ function initialize-pool {
       render-template "$ROOT/namespace.yaml" > "$POOL_PATH/kubernetes/addons/namespace.yaml"
       render-template "$ROOT/kubedns-svc.yaml" > "$POOL_PATH/kubernetes/addons/kubedns-svc.yaml"
       render-template "$ROOT/kubedns-controller.yaml"  > "$POOL_PATH/kubernetes/addons/kubedns-controller.yaml"
+      render-template "$ROOT/kubedns-sa.yaml"  > "$POOL_PATH/kubernetes/addons/kubedns-sa.yaml"
+      render-template "$ROOT/kubedns-cm.yaml"  > "$POOL_PATH/kubernetes/addons/kubedns-cm.yaml"
   fi
 
   virsh pool-refresh $POOL

@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -57,18 +58,40 @@ type FileStore struct {
 	path string
 }
 
+func NewFileStore(path string) (CheckpointStore, error) {
+	if err := ensurePath(path); err != nil {
+		return nil, err
+	}
+	return &FileStore{path: path}, nil
+}
+
+// writeFileAndSync is copied from ioutil.WriteFile, with the extra File.Sync
+// at the end to ensure file is written on the disk.
+func writeFileAndSync(filename string, data []byte, perm os.FileMode) error {
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	n, err := f.Write(data)
+	if err == nil && n < len(data) {
+		err = io.ErrShortWrite
+	}
+	f.Sync()
+	if err1 := f.Close(); err == nil {
+		err = err1
+	}
+	return err
+}
+
 func (fstore *FileStore) Write(key string, data []byte) error {
 	if err := validateKey(key); err != nil {
 		return err
 	}
-	if _, err := os.Stat(fstore.path); err != nil {
-		// if directory already exists, proceed
-		if err = os.MkdirAll(fstore.path, 0755); err != nil && !os.IsExist(err) {
-			return err
-		}
+	if err := ensurePath(fstore.path); err != nil {
+		return err
 	}
 	tmpfile := filepath.Join(fstore.path, fmt.Sprintf("%s%s%s", tmpPrefix, key, tmpSuffix))
-	if err := ioutil.WriteFile(tmpfile, data, 0644); err != nil {
+	if err := writeFileAndSync(tmpfile, data, 0644); err != nil {
 		return err
 	}
 	return os.Rename(tmpfile, fstore.getCheckpointPath(key))
@@ -111,6 +134,15 @@ func (fstore *FileStore) List() ([]string, error) {
 
 func (fstore *FileStore) getCheckpointPath(key string) string {
 	return filepath.Join(fstore.path, key)
+}
+
+// ensurePath creates input directory if it does not exist
+func ensurePath(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		// MkdirAll returns nil if directory already exists
+		return os.MkdirAll(path, 0755)
+	}
+	return nil
 }
 
 func validateKey(key string) error {

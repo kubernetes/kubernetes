@@ -233,18 +233,21 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		By("verifying pod deletion was observed")
 		deleted := false
-		timeout := false
 		var lastPod *v1.Pod
-		timer := time.After(30 * time.Second)
-		for !deleted && !timeout {
+		timer := time.After(framework.DefaultPodDeletionTimeout)
+		for !deleted {
 			select {
 			case event, _ := <-w.ResultChan():
-				if event.Type == watch.Deleted {
+				switch event.Type {
+				case watch.Deleted:
 					lastPod = event.Object.(*v1.Pod)
 					deleted = true
+				case watch.Error:
+					framework.Logf("received a watch error: %v", event.Object)
+					Fail("watch closed with error")
 				}
 			case <-timer:
-				timeout = true
+				Fail("timed out waiting for pod deletion")
 			}
 		}
 		if !deleted {

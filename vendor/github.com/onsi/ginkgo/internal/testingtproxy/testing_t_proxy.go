@@ -50,7 +50,7 @@ func (t *ginkgoTestingTProxy) Log(args ...interface{}) {
 }
 
 func (t *ginkgoTestingTProxy) Logf(format string, args ...interface{}) {
-	fmt.Fprintf(t.writer, format, args...)
+	t.Log(fmt.Sprintf(format, args...))
 }
 
 func (t *ginkgoTestingTProxy) Failed() bool {
@@ -65,7 +65,7 @@ func (t *ginkgoTestingTProxy) Skip(args ...interface{}) {
 }
 
 func (t *ginkgoTestingTProxy) Skipf(format string, args ...interface{}) {
-	fmt.Printf(format, args...)
+	t.Skip(fmt.Sprintf(format, args...))
 }
 
 func (t *ginkgoTestingTProxy) SkipNow() {

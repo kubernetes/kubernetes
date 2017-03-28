@@ -18,8 +18,8 @@ package factory
 
 import (
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/etcd3"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"

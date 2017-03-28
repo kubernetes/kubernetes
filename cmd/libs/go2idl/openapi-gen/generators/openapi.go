@@ -69,17 +69,26 @@ func hasOptionalTag(m *types.Member) bool {
 	return hasOptionalCommentTag || hasOptionalJsonTag
 }
 
+type identityNamer struct{}
+
+func (_ identityNamer) Name(t *types.Type) string {
+	return t.Name.String()
+}
+
+var _ namer.Namer = identityNamer{}
+
 // NameSystems returns the name system used by the generators in this package.
 func NameSystems() namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer("", nil),
+		"raw":           namer.NewRawNamer("", nil),
+		"sorting_namer": identityNamer{},
 	}
 }
 
 // DefaultNameSystem returns the default name system for ordering the types to be
 // processed by the generators in this package.
 func DefaultNameSystem() string {
-	return "raw"
+	return "sorting_namer"
 }
 
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {

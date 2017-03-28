@@ -43,7 +43,7 @@ spec:
           mountPath: /srv/kubernetes/
           readOnly: true
       - name: etcd
-        image: gcr.io/google_containers/etcd:3.0.14-alpha.1
+        image: gcr.io/google_containers/etcd:3.0.17
         command:
           - /usr/local/bin/etcd
           - --data-dir

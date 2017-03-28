@@ -86,6 +86,14 @@ func (plugin *rbdPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *rbdPlugin) SupportsMountOption() bool {
+	return true
+}
+
+func (plugin *rbdPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *rbdPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -136,11 +144,12 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 			mounter:  &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
 			plugin:   plugin,
 		},
-		Mon:     source.CephMonitors,
-		Id:      id,
-		Keyring: keyring,
-		Secret:  secret,
-		fsType:  source.FSType,
+		Mon:          source.CephMonitors,
+		Id:           id,
+		Keyring:      keyring,
+		Secret:       secret,
+		fsType:       source.FSType,
+		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -360,13 +369,14 @@ func (rbd *rbd) GetPath() string {
 type rbdMounter struct {
 	*rbd
 	// capitalized so they can be exported in persistRBD()
-	Mon         []string
-	Id          string
-	Keyring     string
-	Secret      string
-	fsType      string
-	adminSecret string
-	adminId     string
+	Mon          []string
+	Id           string
+	Keyring      string
+	Secret       string
+	fsType       string
+	adminSecret  string
+	adminId      string
+	mountOptions []string
 }
 
 var _ volume.Mounter = &rbdMounter{}

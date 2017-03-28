@@ -210,6 +210,8 @@ type KubeletConfiguration struct {
 	// enableDebuggingHandlers enables server endpoints for log collection
 	// and local running of containers and commands
 	EnableDebuggingHandlers bool
+	// enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true.
+	EnableContentionProfiling bool
 	// minimumGCAge is the minimum age for a finished container before it is
 	// garbage collected.
 	MinimumGCAge metav1.Duration
@@ -362,8 +364,6 @@ type KubeletConfiguration struct {
 	BabysitDaemons bool
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32
-	// nvidiaGPUs is the number of NVIDIA GPU devices on this node.
-	NvidiaGPUs int32
 	// dockerExecHandlerName is the handler to use when executing a command
 	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
 	// 'native'.
@@ -442,16 +442,10 @@ type KubeletConfiguration struct {
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
 	EnableControllerAttachDetach bool
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
-	// that describe resources reserved for non-kubernetes components.
-	// Currently only cpu and memory are supported. [default=none]
-	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	SystemReserved ConfigurationMap
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
-	// that describe resources reserved for kubernetes system components.
-	// Currently only cpu and memory are supported. [default=none]
-	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	KubeReserved ConfigurationMap
+	// A set of ResourceName=Percentage (e.g. memory=50%) pairs that describe
+	// how pod resource requests are reserved at the QoS level.
+	// Currently only memory is supported. [default=none]"
+	ExperimentalQOSReserved ConfigurationMap
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool
 	// If true, Kubelet ensures a set of iptables rules are present on host.
@@ -485,6 +479,32 @@ type KubeletConfiguration struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
+
+	/* following flags are meant for Node Allocatable */
+
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for non-kubernetes components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
+	SystemReserved ConfigurationMap
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for kubernetes system components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
+	KubeReserved ConfigurationMap
+	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	SystemReservedCgroup string
+	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `KubeReserved` compute resource reservation for Kubernetes node system daemons.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	KubeReservedCgroup string
+	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
+	// This flag accepts a list of options. Acceptible options are `pods`, `system-reserved` & `kube-reserved`.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	EnforceNodeAllocatable []string
+	// This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
 }
 
 type KubeletAuthorizationMode string
@@ -572,6 +592,7 @@ type KubeSchedulerConfiguration struct {
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
 	HardPodAffinitySymmetricWeight int
 	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
+	// DEPRECATED: This is no longer used.
 	FailureDomains string
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection LeaderElectionConfiguration
@@ -663,12 +684,18 @@ type KubeControllerManagerConfiguration struct {
 	ConcurrentSATokenSyncs int32
 	// lookupCacheSizeForRC is the size of lookup cache for replication controllers.
 	// Larger number = more responsive replica management, but more MEM load.
+	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
+	// DEPRECATED: This is no longer used.
 	LookupCacheSizeForRC int32
 	// lookupCacheSizeForRS is the size of lookup cache for replicatsets.
 	// Larger number = more responsive replica management, but more MEM load.
+	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
+	// DEPRECATED: This is no longer used.
 	LookupCacheSizeForRS int32
 	// lookupCacheSizeForDaemonSet is the size of lookup cache for daemonsets.
 	// Larger number = more responsive daemonset, but more MEM load.
+	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
+	// DEPRECATED: This is no longer used.
 	LookupCacheSizeForDaemonSet int32
 	// serviceSyncPeriod is the period for syncing services with their external
 	// load balancers.
@@ -738,6 +765,8 @@ type KubeControllerManagerConfiguration struct {
 	ApproveAllKubeletCSRsForGroup string
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling bool
+	// enableContentionProfiling enables lock contention profiling, if enableProfiling is true.
+	EnableContentionProfiling bool
 	// clusterName is the instance prefix for the cluster.
 	ClusterName string
 	// clusterCIDR is CIDR Range for Pods in cluster.
@@ -793,6 +822,10 @@ type KubeControllerManagerConfiguration struct {
 	// If set to true enables NoExecute Taints and will evict all not-tolerating
 	// Pod running on Nodes tainted with this kind of Taints.
 	EnableTaintManager bool
+	// HorizontalPodAutoscalerUseRESTClients causes the HPA controller to use REST clients
+	// through the kube-aggregator when enabled, instead of using the legacy metrics client
+	// through the API server proxy.
+	HorizontalPodAutoscalerUseRESTClients bool
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

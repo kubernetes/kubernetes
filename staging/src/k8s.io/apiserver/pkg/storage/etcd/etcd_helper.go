@@ -380,11 +380,12 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFun
 	}
 	for _, node := range nodes {
 		if node.Dir {
-			trace.Step("Decoding dir " + node.Key + " START")
+			// IMPORTANT: do not log each key as a discrete step in the trace log
+			// as it produces an immense amount of log spam when there is a large
+			// amount of content in the list.
 			if err := h.decodeNodeList(node.Nodes, filter, slicePtr); err != nil {
 				return err
 			}
-			trace.Step("Decoding dir " + node.Key + " END")
 			continue
 		}
 		if obj, found := h.getFromCache(node.ModifiedIndex, filter); found {

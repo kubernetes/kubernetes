@@ -54,13 +54,19 @@ var (
 		kubectl logs --tail=20 nginx
 
 		# Show all logs from pod nginx written in the last hour
-		kubectl logs --since=1h nginx`)
+		kubectl logs --since=1h nginx
+
+		# Return snapshot logs from first container of a job named hello
+		kubectl logs job/hello
+
+		# Return snapshot logs from container nginx-1 of a deployment named nginx
+		kubectl logs deployment/nginx -c nginx-1`)
 
 	selectorTail int64 = 10
 )
 
 const (
-	logsUsageStr = "expected 'logs POD_NAME [CONTAINER_NAME]'.\nPOD_NAME is a required argument for the logs command"
+	logsUsageStr = "expected 'logs (POD | TYPE/NAME) [CONTAINER_NAME]'.\nPOD or TYPE/NAME is a required argument for the logs command"
 )
 
 type LogsOptions struct {
@@ -74,7 +80,8 @@ type LogsOptions struct {
 	Decoder      runtime.Decoder
 
 	Object        runtime.Object
-	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
+	GetPodTimeout time.Duration
+	LogsForObject func(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
 
 	Out io.Writer
 }
@@ -83,9 +90,9 @@ type LogsOptions struct {
 func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
-		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
+		Use:     "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
 		Short:   i18n.T("Print the logs for a container in a pod"),
-		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
+		Long:    "Print the logs for a container in a pod or specified resource. If the pod has only one container, the container name is optional.",
 		Example: logs_example,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if len(os.Args) > 1 && os.Args[1] == "log" {
@@ -94,9 +101,7 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, out, cmd, args))
-			if err := o.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
-			}
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunLogs())
 		},
 		Aliases: []string{"log"},
@@ -106,13 +111,13 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int64("limit-bytes", 0, "Maximum bytes of logs to return. Defaults to no limit.")
 	cmd.Flags().BoolP("previous", "p", false, "If true, print the logs for the previous instance of the container in a pod if it exists.")
 	cmd.Flags().Int64("tail", -1, "Lines of recent log file to display. Defaults to -1 with no selector, showing all log lines otherwise 10, if a selector is provided.")
-	cmd.Flags().String("since-time", "", "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.")
+	cmd.Flags().String("since-time", "", i18n.T("Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."))
 	cmd.Flags().Duration("since", 0, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.")
 	cmd.Flags().StringP("container", "c", "", "Print the logs of this container")
-
 	cmd.Flags().Bool("interactive", false, "If true, prompt the user for input when required.")
 	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
 	return cmd
 }
@@ -169,6 +174,10 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		sec := int64(math.Ceil(float64(sinceSeconds) / float64(time.Second)))
 		logOptions.SinceSeconds = &sec
 	}
+	o.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
+	if err != nil {
+		return err
+	}
 	o.Options = logOptions
 	o.LogsForObject = f.LogsForObject
 	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
@@ -189,7 +198,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	mapper, typer := f.Object()
 	decoder := f.Decoder(true)
 	if o.Object == nil {
-		builder := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).
+		builder := resource.NewBuilder(mapper, f.CategoryExpander(), typer, o.ClientMapper, decoder).
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			SingleResourceType()
 		if o.ResourceArg != "" {
@@ -239,7 +248,7 @@ func (o LogsOptions) RunLogs() error {
 }
 
 func (o LogsOptions) getLogs(obj runtime.Object) error {
-	req, err := o.LogsForObject(obj, o.Options)
+	req, err := o.LogsForObject(obj, o.Options, o.GetPodTimeout)
 	if err != nil {
 		return err
 	}

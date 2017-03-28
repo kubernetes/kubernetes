@@ -36,10 +36,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -69,6 +71,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -81,12 +85,17 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
+const (
+	// Kubelet component name
+	componentKubelet = "kubelet"
+)
+
 // NewKubeletCommand creates a *cobra.Command object with default parameters
 func NewKubeletCommand() *cobra.Command {
 	s := options.NewKubeletServer()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
-		Use: "kubelet",
+		Use: componentKubelet,
 		Long: `The kubelet is the primary "node agent" that runs on each
 node. The kubelet works in terms of a PodSpec. A PodSpec is a YAML or JSON object
 that describes a pod. The kubelet takes a set of PodSpecs that are provided through
@@ -305,6 +314,44 @@ func initConfigz(kc *componentconfig.KubeletConfiguration) (*configz.Config, err
 	return cz, err
 }
 
+// validateConfig validates configuration of Kubelet and returns an error is the input configuration is invalid.
+func validateConfig(s *options.KubeletServer) error {
+	if !s.CgroupsPerQOS && len(s.EnforceNodeAllocatable) > 0 {
+		return fmt.Errorf("Node Allocatable enforcement is not supported unless Cgroups Per QOS feature is turned on")
+	}
+	if s.SystemCgroups != "" && s.CgroupRoot == "" {
+		return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
+	}
+	for _, val := range s.EnforceNodeAllocatable {
+		switch val {
+		case cm.NodeAllocatableEnforcementKey:
+		case cm.SystemReservedEnforcementKey:
+		case cm.KubeReservedEnforcementKey:
+			continue
+		default:
+			return fmt.Errorf("invalid option %q specified for EnforceNodeAllocatable setting. Valid options are %q, %q or %q", val, cm.NodeAllocatableEnforcementKey, cm.SystemReservedEnforcementKey, cm.KubeReservedEnforcementKey)
+		}
+	}
+	return nil
+}
+
+// makeEventRecorder sets up kubeDeps.Recorder if its nil. Its a no-op otherwise.
+func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, nodeName types.NodeName) {
+	if kubeDeps.Recorder != nil {
+		return
+	}
+	eventBroadcaster := record.NewBroadcaster()
+	kubeDeps.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: componentKubelet, Host: string(nodeName)})
+	eventBroadcaster.StartLogging(glog.V(3).Infof)
+	if kubeDeps.EventClient != nil {
+		glog.V(4).Infof("Sending events to api server.")
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
+	} else {
+		glog.Warning("No api server defined - no events will be sent to API server.")
+	}
+
+}
+
 func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	// TODO: this should be replaced by a --standalone flag
 	standaloneMode := (len(s.APIServerList) == 0 && !s.RequireKubeConfig)
@@ -362,13 +409,18 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 	}
 
+	// Validate configuration.
+	if err := validateConfig(s); err != nil {
+		return err
+	}
+
 	if kubeDeps == nil {
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
 		var externalKubeClient clientgoclientset.Interface
 		var cloud cloudprovider.Interface
 
-		if s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
+		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
 			cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 			if err != nil {
 				return err
@@ -380,11 +432,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			}
 		}
 
+		nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+		if err != nil {
+			return err
+		}
+
 		if s.BootstrapKubeconfig != "" {
-			nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
-			if err != nil {
-				return err
-			}
 			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 				return err
 			}
@@ -428,12 +481,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		kubeDeps.EventClient = eventClient
 	}
 
-	if kubeDeps.Auth == nil {
-		nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
-		if err != nil {
-			return err
-		}
+	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+	if err != nil {
+		return err
+	}
 
+	if kubeDeps.Auth == nil {
 		auth, err := buildAuth(nodeName, kubeDeps.ExternalKubeClient, s.KubeletConfiguration)
 		if err != nil {
 			return err
@@ -448,9 +501,33 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 	}
 
+	// Setup event recorder if required.
+	makeEventRecorder(&s.KubeletConfiguration, kubeDeps, nodeName)
+
 	if kubeDeps.ContainerManager == nil {
-		if s.SystemCgroups != "" && s.CgroupRoot == "" {
-			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
+		if s.CgroupsPerQOS && s.CgroupRoot == "" {
+			glog.Infof("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
+			s.CgroupRoot = "/"
+		}
+		kubeReserved, err := parseResourceList(s.KubeReserved)
+		if err != nil {
+			return err
+		}
+		systemReserved, err := parseResourceList(s.SystemReserved)
+		if err != nil {
+			return err
+		}
+		var hardEvictionThresholds []evictionapi.Threshold
+		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
+		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
+			hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, "", "", "")
+			if err != nil {
+				return err
+			}
+		}
+		experimentalQOSReserved, err := cm.ParseQOSReserved(s.ExperimentalQOSReserved)
+		if err != nil {
+			return err
 		}
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
@@ -465,8 +542,18 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				CgroupDriver:          s.CgroupDriver,
 				ProtectKernelDefaults: s.ProtectKernelDefaults,
 				EnableCRI:             s.EnableCRI,
+				NodeAllocatableConfig: cm.NodeAllocatableConfig{
+					KubeReservedCgroupName:   s.KubeReservedCgroup,
+					SystemReservedCgroupName: s.SystemReservedCgroup,
+					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
+					KubeReserved:             kubeReserved,
+					SystemReserved:           systemReserved,
+					HardEvictionThresholds:   hardEvictionThresholds,
+				},
+				ExperimentalQOSReserved: *experimentalQOSReserved,
 			},
-			s.ExperimentalFailSwapOn)
+			s.ExperimentalFailSwapOn,
+			kubeDeps.Recorder)
 
 		if err != nil {
 			return err
@@ -681,16 +768,8 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	if err != nil {
 		return err
 	}
-
-	eventBroadcaster := record.NewBroadcaster()
-	kubeDeps.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kubelet", Host: string(nodeName)})
-	eventBroadcaster.StartLogging(glog.V(3).Infof)
-	if kubeDeps.EventClient != nil {
-		glog.V(4).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
-	} else {
-		glog.Warning("No api server defined - no events will be sent to API server.")
-	}
+	// Setup event recorder if required.
+	makeEventRecorder(kubeCfg, kubeDeps, nodeName)
 
 	// TODO(mtaufen): I moved the validation of these fields here, from UnsecuredKubeletConfig,
 	//                so that I could remove the associated fields from KubeletConfig. I would
@@ -799,7 +878,7 @@ func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg 
 	// start the kubelet server
 	if kubeCfg.EnableServer {
 		go wait.Until(func() {
-			k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers)
+			k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
 		}, 0, wait.NeverStop)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
@@ -823,4 +902,30 @@ func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDep
 	k.StartGarbageCollection()
 
 	return k, nil
+}
+
+// parseResourceList parses the given configuration map into an API
+// ResourceList or returns an error.
+func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, error) {
+	if len(m) == 0 {
+		return nil, nil
+	}
+	rl := make(v1.ResourceList)
+	for k, v := range m {
+		switch v1.ResourceName(k) {
+		// Only CPU and memory resources are supported.
+		case v1.ResourceCPU, v1.ResourceMemory:
+			q, err := resource.ParseQuantity(v)
+			if err != nil {
+				return nil, err
+			}
+			if q.Sign() == -1 {
+				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
+			}
+			rl[v1.ResourceName(k)] = q
+		default:
+			return nil, fmt.Errorf("cannot reserve %q resource", k)
+		}
+	}
+	return rl, nil
 }

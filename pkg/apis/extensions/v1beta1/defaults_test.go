@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -74,6 +75,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 						MatchLabels: defaultLabels,
 					},
 					Template: defaultTemplate,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -99,6 +103,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 						MatchLabels: defaultLabels,
 					},
 					Template: defaultTemplate,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -107,6 +114,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
 					Template: templateNoLabel,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -117,6 +127,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
 					Template: templateNoLabel,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -127,6 +140,9 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
 					Template: templateNoLabel,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
@@ -141,7 +157,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			t.Errorf("(%d) unexpected object: %v", i, got)
 			t.FailNow()
 		}
-		if !reflect.DeepEqual(got.Spec, expected.Spec) {
+		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
 			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
 		}
 	}
@@ -280,7 +296,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			t.Errorf("unexpected object: %v", got)
 			t.FailNow()
 		}
-		if !reflect.DeepEqual(got.Spec, expected.Spec) {
+		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
 			t.Errorf("object mismatch!\nexpected:\n\t%+v\ngot:\n\t%+v", got.Spec, expected.Spec)
 		}
 	}
@@ -523,16 +539,4 @@ func newInt32(val int32) *int32 {
 	p := new(int32)
 	*p = val
 	return p
-}
-
-func newString(val string) *string {
-	p := new(string)
-	*p = val
-	return p
-}
-
-func newBool(val bool) *bool {
-	b := new(bool)
-	*b = val
-	return b
 }

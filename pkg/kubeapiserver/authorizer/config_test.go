@@ -17,6 +17,7 @@ limitations under the License.
 package authorizer
 
 import (
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"testing"
 )
 
@@ -39,19 +40,19 @@ func TestNew(t *testing.T) {
 		{
 			// ModeAlwaysAllow and ModeAlwaysDeny should return without authorizationPolicyFile
 			// but error if one is given
-			config: AuthorizationConfig{AuthorizationModes: []string{ModeAlwaysAllow, ModeAlwaysDeny}},
+			config: AuthorizationConfig{AuthorizationModes: []string{modes.ModeAlwaysAllow, modes.ModeAlwaysDeny}},
 			msg:    "returned an error for valid config",
 		},
 		{
 			// ModeABAC requires a policy file
-			config:  AuthorizationConfig{AuthorizationModes: []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC}},
+			config:  AuthorizationConfig{AuthorizationModes: []string{modes.ModeAlwaysAllow, modes.ModeAlwaysDeny, modes.ModeABAC}},
 			wantErr: true,
 			msg:     "specifying ABAC with no policy file should return an error",
 		},
 		{
 			// ModeABAC should not error if a valid policy path is provided
 			config: AuthorizationConfig{
-				AuthorizationModes: []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC},
+				AuthorizationModes: []string{modes.ModeAlwaysAllow, modes.ModeAlwaysDeny, modes.ModeABAC},
 				PolicyFile:         examplePolicyFile,
 			},
 			msg: "errored while using a valid policy file",
@@ -60,7 +61,7 @@ func TestNew(t *testing.T) {
 
 			// Authorization Policy file cannot be used without ModeABAC
 			config: AuthorizationConfig{
-				AuthorizationModes: []string{ModeAlwaysAllow, ModeAlwaysDeny},
+				AuthorizationModes: []string{modes.ModeAlwaysAllow, modes.ModeAlwaysDeny},
 				PolicyFile:         examplePolicyFile,
 			},
 			wantErr: true,
@@ -74,14 +75,14 @@ func TestNew(t *testing.T) {
 		},
 		{
 			// ModeWebhook requires at minimum a target.
-			config:  AuthorizationConfig{AuthorizationModes: []string{ModeWebhook}},
+			config:  AuthorizationConfig{AuthorizationModes: []string{modes.ModeWebhook}},
 			wantErr: true,
 			msg:     "should have errored when config was empty with ModeWebhook",
 		},
 		{
 			// Cannot provide webhook flags without ModeWebhook
 			config: AuthorizationConfig{
-				AuthorizationModes: []string{ModeAlwaysAllow},
+				AuthorizationModes: []string{modes.ModeAlwaysAllow},
 				WebhookConfigFile:  "authz_webhook_config.yml",
 			},
 			wantErr: true,

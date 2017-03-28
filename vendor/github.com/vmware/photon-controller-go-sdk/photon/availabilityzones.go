@@ -19,7 +19,7 @@ type AvailabilityZonesAPI struct {
 	client *Client
 }
 
-var availabilityzoneUrl string = "/availabilityzones"
+var availabilityzoneUrl string = rootUrl + "/availabilityzones"
 
 // Creates availability zone.
 func (api *AvailabilityZonesAPI) Create(availabilityzoneSpec *AvailabilityZoneCreateSpec) (task *Task, err error) {
@@ -31,7 +31,7 @@ func (api *AvailabilityZonesAPI) Create(availabilityzoneSpec *AvailabilityZoneCr
 		api.client.Endpoint+availabilityzoneUrl,
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -42,7 +42,7 @@ func (api *AvailabilityZonesAPI) Create(availabilityzoneSpec *AvailabilityZoneCr
 
 // Gets availability zone with the specified ID.
 func (api *AvailabilityZonesAPI) Get(id string) (availabilityzone *AvailabilityZone, err error) {
-	res, err := api.client.restClient.Get(api.getEntityUrl(id), api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.getEntityUrl(id), api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -59,7 +59,7 @@ func (api *AvailabilityZonesAPI) Get(id string) (availabilityzone *AvailabilityZ
 // Returns all availability zones on an photon instance.
 func (api *AvailabilityZonesAPI) GetAll() (result *AvailabilityZones, err error) {
 	uri := api.client.Endpoint + availabilityzoneUrl
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -71,7 +71,7 @@ func (api *AvailabilityZonesAPI) GetAll() (result *AvailabilityZones, err error)
 
 // Deletes the availability zone with specified ID.
 func (api *AvailabilityZonesAPI) Delete(id string) (task *Task, err error) {
-	res, err := api.client.restClient.Delete(api.client.Endpoint+availabilityzoneUrl+"/"+id, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Delete(api.client.Endpoint+availabilityzoneUrl+"/"+id, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -87,7 +87,7 @@ func (api *AvailabilityZonesAPI) GetTasks(id string, options *TaskGetOptions) (r
 	if options != nil {
 		uri += getQueryString(options)
 	}
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}

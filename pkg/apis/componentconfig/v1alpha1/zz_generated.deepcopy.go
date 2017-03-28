@@ -266,15 +266,8 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = new(bool)
 			**out = **in
 		}
-		if in.SystemReserved != nil {
-			in, out := &in.SystemReserved, &out.SystemReserved
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.KubeReserved != nil {
-			in, out := &in.KubeReserved, &out.KubeReserved
+		if in.ExperimentalQOSReserved != nil {
+			in, out := &in.ExperimentalQOSReserved, &out.ExperimentalQOSReserved
 			*out = make(map[string]string)
 			for key, val := range *in {
 				(*out)[key] = val
@@ -304,6 +297,25 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			in, out := &in.EnableCRI, &out.EnableCRI
 			*out = new(bool)
 			**out = **in
+		}
+		if in.SystemReserved != nil {
+			in, out := &in.SystemReserved, &out.SystemReserved
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
+		if in.KubeReserved != nil {
+			in, out := &in.KubeReserved, &out.KubeReserved
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
+		if in.EnforceNodeAllocatable != nil {
+			in, out := &in.EnforceNodeAllocatable, &out.EnforceNodeAllocatable
+			*out = make([]string, len(*in))
+			copy(*out, *in)
 		}
 		return nil
 	}

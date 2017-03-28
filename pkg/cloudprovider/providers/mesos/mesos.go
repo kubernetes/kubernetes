@@ -169,7 +169,7 @@ func (c *MesosCloud) Master(clusterName string) (string, error) {
 			return host, nil
 		}
 	}
-	return "", errors.New(fmt.Sprintf("The supplied cluster '%v' does not exist", clusterName))
+	return "", fmt.Errorf("The supplied cluster '%v' does not exist", clusterName)
 }
 
 // ipAddress returns an IP address of the specified instance.

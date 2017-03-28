@@ -49,7 +49,7 @@ function gcloud-compute-list() {
   while true; do
     if result=$(gcloud compute ${resource} list --project=${PROJECT} ${@:2}); then
       if [[ ! -z "${GREP_REGEX}" ]]; then
-        result=$(echo "${result}" | grep "${GREP_REGEX}")
+        result=$(echo "${result}" | grep "${GREP_REGEX}" || true)
       fi
       echo "${result}"
       return

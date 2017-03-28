@@ -22,7 +22,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	federation "k8s.io/kubernetes/federation/apis/federation"
-	api "k8s.io/kubernetes/pkg/api"
+	scheme "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/scheme"
 )
 
 // ClustersGetter has a method to return a ClusterInterface.
@@ -109,7 +109,7 @@ func (c *clusters) Delete(name string, options *v1.DeleteOptions) error {
 func (c *clusters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusters").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -121,7 +121,7 @@ func (c *clusters) Get(name string, options v1.GetOptions) (result *federation.C
 	err = c.client.Get().
 		Resource("clusters").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -132,7 +132,7 @@ func (c *clusters) List(opts v1.ListOptions) (result *federation.ClusterList, er
 	result = &federation.ClusterList{}
 	err = c.client.Get().
 		Resource("clusters").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -140,10 +140,10 @@ func (c *clusters) List(opts v1.ListOptions) (result *federation.ClusterList, er
 
 // Watch returns a watch.Interface that watches the requested clusters.
 func (c *clusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("clusters").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

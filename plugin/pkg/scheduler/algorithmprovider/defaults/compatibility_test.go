@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -138,6 +139,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
+			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
 		  ],"priorities": [
@@ -161,6 +163,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NoVolumeZoneConflict"},
 					{Name: "MaxEBSVolumeCount"},
 					{Name: "MaxGCEPDVolumeCount"},
+					{Name: "MaxAzureDiskVolumeCount"},
 					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
 					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
 				},
@@ -194,6 +197,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "CheckNodeMemoryPressure"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
+			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
 			{"name": "GeneralPredicates"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
@@ -221,6 +225,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "CheckNodeMemoryPressure"},
 					{Name: "MaxEBSVolumeCount"},
 					{Name: "MaxGCEPDVolumeCount"},
+					{Name: "MaxAzureDiskVolumeCount"},
 					{Name: "MatchInterPodAffinity"},
 					{Name: "GeneralPredicates"},
 					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
@@ -257,6 +262,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "CheckNodeDiskPressure"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
+			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
 			{"name": "GeneralPredicates"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
@@ -287,6 +293,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "CheckNodeDiskPressure"},
 					{Name: "MaxEBSVolumeCount"},
 					{Name: "MaxGCEPDVolumeCount"},
+					{Name: "MaxAzureDiskVolumeCount"},
 					{Name: "MatchInterPodAffinity"},
 					{Name: "GeneralPredicates"},
 					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
@@ -339,8 +346,20 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		defer server.Close()
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+		informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-		if _, err := factory.NewConfigFactory(client, "some-scheduler-name", v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains).CreateFromConfig(policy); err != nil {
+		if _, err := factory.NewConfigFactory(
+			"some-scheduler-name",
+			client,
+			informerFactory.Core().V1().Nodes(),
+			informerFactory.Core().V1().PersistentVolumes(),
+			informerFactory.Core().V1().PersistentVolumeClaims(),
+			informerFactory.Core().V1().ReplicationControllers(),
+			informerFactory.Extensions().V1beta1().ReplicaSets(),
+			informerFactory.Apps().V1beta1().StatefulSets(),
+			informerFactory.Core().V1().Services(),
+			v1.DefaultHardPodAffinitySymmetricWeight,
+		).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
 		}

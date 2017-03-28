@@ -21,8 +21,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 // ClusterRolesGetter has a method to return a ClusterRoleInterface.
@@ -93,7 +93,7 @@ func (c *clusterRoles) Delete(name string, options *v1.DeleteOptions) error {
 func (c *clusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -105,7 +105,7 @@ func (c *clusterRoles) Get(name string, options v1.GetOptions) (result *v1alpha1
 	err = c.client.Get().
 		Resource("clusterroles").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -116,7 +116,7 @@ func (c *clusterRoles) List(opts v1.ListOptions) (result *v1alpha1.ClusterRoleLi
 	result = &v1alpha1.ClusterRoleList{}
 	err = c.client.Get().
 		Resource("clusterroles").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,10 +124,10 @@ func (c *clusterRoles) List(opts v1.ListOptions) (result *v1alpha1.ClusterRoleLi
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
 func (c *clusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("clusterroles").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

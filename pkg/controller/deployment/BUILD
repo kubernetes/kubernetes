@@ -33,11 +33,10 @@ go_library(
         "//pkg/util/labels:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
@@ -54,6 +53,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "deployment_controller_test.go",
+        "progress_test.go",
         "recreate_test.go",
         "rolling_test.go",
         "sync_test.go",
@@ -75,6 +75,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/uuid",
         "//vendor:k8s.io/client-go/testing",
         "//vendor:k8s.io/client-go/tools/record",
+        "//vendor:k8s.io/client-go/util/workqueue",
     ],
 )
 

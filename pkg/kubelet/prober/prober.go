@@ -143,7 +143,8 @@ func (pb *prober) runProbe(p *v1.Probe, pod *v1.Pod, status v1.PodStatus, contai
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		glog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod, container, p.Exec.Command)
-		return pb.exec.Probe(pb.newExecInContainer(container, containerID, p.Exec.Command, timeout))
+		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
+		return pb.exec.Probe(pb.newExecInContainer(container, containerID, command, timeout))
 	}
 	if p.HTTPGet != nil {
 		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
@@ -167,8 +168,12 @@ func (pb *prober) runProbe(p *v1.Probe, pod *v1.Pod, status v1.PodStatus, contai
 		if err != nil {
 			return probe.Unknown, "", err
 		}
-		glog.V(4).Infof("TCP-Probe PodIP: %v, Port: %v, Timeout: %v", status.PodIP, port, timeout)
-		return pb.tcp.Probe(status.PodIP, port, timeout)
+		host := p.TCPSocket.Host
+		if host == "" {
+			host = status.PodIP
+		}
+		glog.V(4).Infof("TCP-Probe Host: %v, Port: %v, Timeout: %v", host, port, timeout)
+		return pb.tcp.Probe(host, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for container: %v", container)
 	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", format.Pod(pod), container.Name)
@@ -249,5 +254,9 @@ func (eic execInContainer) SetStdin(in io.Reader) {
 }
 
 func (eic execInContainer) SetStdout(out io.Writer) {
+	//unimplemented
+}
+
+func (eic execInContainer) Stop() {
 	//unimplemented
 }

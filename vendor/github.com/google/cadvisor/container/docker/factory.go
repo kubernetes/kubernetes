@@ -57,6 +57,12 @@ var (
 	dockerRootDirFlag = flag.String("docker_root", "/var/lib/docker", "DEPRECATED: docker root is read from docker info (this is a fallback, default: /var/lib/docker)")
 
 	dockerRootDirOnce sync.Once
+
+	// flag that controls globally disabling thin_ls pending future enhancements.
+	// in production, it has been found that thin_ls makes excessive use of iops.
+	// in an iops restricted environment, usage of thin_ls must be controlled via blkio.
+	// pending that enhancement, disable its usage.
+	disableThinLs = true
 )
 
 func RootDir() string {
@@ -187,6 +193,10 @@ func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolW
 
 	if err := ensureThinLsKernelVersion(machine.KernelVersion()); err != nil {
 		return nil, err
+	}
+
+	if disableThinLs {
+		return nil, fmt.Errorf("usage of thin_ls is disabled to preserve iops")
 	}
 
 	dockerThinPoolName, err := dockerutil.DockerThinPoolName(*dockerInfo)

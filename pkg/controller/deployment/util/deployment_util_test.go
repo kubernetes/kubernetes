@@ -18,7 +18,10 @@ package util
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
+	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -27,12 +30,14 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func addListRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
@@ -100,11 +105,23 @@ func newPod(now time.Time, ready bool, beforeSec int) v1.Pod {
 	}
 }
 
+func newRSControllerRef(rs *extensions.ReplicaSet) *metav1.OwnerReference {
+	isController := true
+	return &metav1.OwnerReference{
+		APIVersion: "extensions/v1beta1",
+		Kind:       "ReplicaSet",
+		Name:       rs.GetName(),
+		UID:        rs.GetUID(),
+		Controller: &isController,
+	}
+}
+
 // generatePodFromRS creates a pod, with the input ReplicaSet's selector and its template
 func generatePodFromRS(rs extensions.ReplicaSet) v1.Pod {
 	return v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: rs.Labels,
+			Labels:          rs.Labels,
+			OwnerReferences: []metav1.OwnerReference{*newRSControllerRef(&rs)},
 		},
 		Spec: rs.Spec.Template.Spec,
 	}
@@ -156,13 +173,26 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 	}
 }
 
+func newDControllerRef(d *extensions.Deployment) *metav1.OwnerReference {
+	isController := true
+	return &metav1.OwnerReference{
+		APIVersion: "extensions/v1beta1",
+		Kind:       "Deployment",
+		Name:       d.GetName(),
+		UID:        d.GetUID(),
+		Controller: &isController,
+	}
+}
+
 // generateRS creates a replica set, with the input deployment's template as its template
 func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 	template := GetNewReplicaSetTemplate(&deployment)
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   v1.SimpleNameGenerator.GenerateName("replicaset"),
-			Labels: template.Labels,
+			UID:             randomUID(),
+			Name:            v1.SimpleNameGenerator.GenerateName("replicaset"),
+			Labels:          template.Labels,
+			OwnerReferences: []metav1.OwnerReference{*newDControllerRef(&deployment)},
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: func() *int32 { i := int32(0); return &i }(),
@@ -170,6 +200,10 @@ func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 			Selector: &metav1.LabelSelector{MatchLabels: template.Labels},
 		},
 	}
+}
+
+func randomUID() types.UID {
+	return types.UID(strconv.FormatInt(rand.Int63(), 10))
 }
 
 // generateDeployment creates a deployment, with the input image as its template
@@ -281,7 +315,8 @@ func TestGetOldRCs(t *testing.T) {
 	oldRS2.Status.FullyLabeledReplicas = *(oldRS2.Spec.Replicas)
 	oldPod2 := generatePodFromRS(oldRS2)
 
-	// create 1 ReplicaSet that existed before the deployment, with the same labels as the deployment
+	// create 1 ReplicaSet that existed before the deployment,
+	// with the same labels as the deployment, but no ControllerRef.
 	existedPod := generatePod(newDeployment.Spec.Template.Labels, "foo")
 	existedRS := generateRSWithLabel(newDeployment.Spec.Template.Labels, "foo")
 	existedRS.Status.FullyLabeledReplicas = *(existedRS.Spec.Replicas)
@@ -335,7 +370,7 @@ func TestGetOldRCs(t *testing.T) {
 					},
 				},
 			},
-			[]*extensions.ReplicaSet{&oldRS, &oldRS2, &existedRS},
+			[]*extensions.ReplicaSet{&oldRS, &oldRS2},
 		},
 	}
 
@@ -466,9 +501,18 @@ func TestEqualIgnoreHash(t *testing.T) {
 }
 
 func TestFindNewReplicaSet(t *testing.T) {
+	now := metav1.Now()
+	later := metav1.Time{Time: now.Add(time.Minute)}
+
 	deployment := generateDeployment("nginx")
 	newRS := generateRS(deployment)
-	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "hash"
+	newRS.CreationTimestamp = later
+
+	newRSDup := generateRS(deployment)
+	newRSDup.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	newRSDup.CreationTimestamp = now
+
 	oldDeployment := generateDeployment("nginx")
 	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
 	oldRS := generateRS(oldDeployment)
@@ -481,10 +525,16 @@ func TestFindNewReplicaSet(t *testing.T) {
 		expected   *extensions.ReplicaSet
 	}{
 		{
-			test:       "Get new ReplicaSet with the same spec but different pod-template-hash value",
+			test:       "Get new ReplicaSet with the same template as Deployment spec but different pod-template-hash value",
 			deployment: deployment,
 			rsList:     []*extensions.ReplicaSet{&newRS, &oldRS},
 			expected:   &newRS,
+		},
+		{
+			test:       "Get the oldest new ReplicaSet when there are more than one ReplicaSet with the same template",
+			deployment: deployment,
+			rsList:     []*extensions.ReplicaSet{&newRS, &oldRS, &newRSDup},
+			expected:   &newRSDup,
 		},
 		{
 			test:       "Get nil new ReplicaSet",
@@ -502,13 +552,25 @@ func TestFindNewReplicaSet(t *testing.T) {
 }
 
 func TestFindOldReplicaSets(t *testing.T) {
+	now := metav1.Now()
+	later := metav1.Time{Time: now.Add(time.Minute)}
+	before := metav1.Time{Time: now.Add(-time.Minute)}
+
 	deployment := generateDeployment("nginx")
 	newRS := generateRS(deployment)
-	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	newRS.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "hash"
+	newRS.CreationTimestamp = later
+
+	newRSDup := generateRS(deployment)
+	newRSDup.Labels[extensions.DefaultDeploymentUniqueLabelKey] = "different-hash"
+	newRSDup.CreationTimestamp = now
+
 	oldDeployment := generateDeployment("nginx")
 	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
 	oldRS := generateRS(oldDeployment)
 	oldRS.Status.FullyLabeledReplicas = *(oldRS.Spec.Replicas)
+	oldRS.CreationTimestamp = before
+
 	newPod := generatePodFromRS(newRS)
 	oldPod := generatePodFromRS(oldRS)
 
@@ -543,6 +605,18 @@ func TestFindOldReplicaSets(t *testing.T) {
 			expected: []*extensions.ReplicaSet{&oldRS},
 		},
 		{
+			test:       "Get old ReplicaSets with two new ReplicaSets, only the oldest new ReplicaSet is seen as new ReplicaSet",
+			deployment: deployment,
+			rsList:     []*extensions.ReplicaSet{&oldRS, &newRS, &newRSDup},
+			podList: &v1.PodList{
+				Items: []v1.Pod{
+					newPod,
+					oldPod,
+				},
+			},
+			expected: []*extensions.ReplicaSet{&oldRS, &newRS},
+		},
+		{
 			test:       "Get empty old ReplicaSets",
 			deployment: deployment,
 			rsList:     []*extensions.ReplicaSet{&newRS},
@@ -556,7 +630,10 @@ func TestFindOldReplicaSets(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if old, _, err := FindOldReplicaSets(&test.deployment, test.rsList, test.podList); !reflect.DeepEqual(old, test.expected) || err != nil {
+		old, _, err := FindOldReplicaSets(&test.deployment, test.rsList, test.podList)
+		sort.Sort(controller.ReplicaSetsByCreationTimestamp(old))
+		sort.Sort(controller.ReplicaSetsByCreationTimestamp(test.expected))
+		if !reflect.DeepEqual(old, test.expected) || err != nil {
 			t.Errorf("In test case %q, expected %#v, got %#v: %v", test.test, test.expected, old, err)
 		}
 	}
@@ -1109,114 +1186,6 @@ func TestDeploymentTimedOut(t *testing.T) {
 		nowFn = test.nowFn
 		if got, exp := DeploymentTimedOut(&test.d, &test.d.Status), test.expected; got != exp {
 			t.Errorf("expected timeout: %t, got: %t", exp, got)
-		}
-	}
-}
-
-func TestSelectorUpdatedBefore(t *testing.T) {
-	now := metav1.Now()
-	later := metav1.Time{Time: now.Add(time.Minute)}
-	selectorUpdated := metav1.Time{Time: later.Add(time.Minute)}
-	selectorUpdatedLater := metav1.Time{Time: selectorUpdated.Add(time.Minute)}
-
-	tests := []struct {
-		name string
-
-		d1                 extensions.Deployment
-		creationTimestamp1 *metav1.Time
-		selectorUpdated1   *metav1.Time
-
-		d2                 extensions.Deployment
-		creationTimestamp2 *metav1.Time
-		selectorUpdated2   *metav1.Time
-
-		expected bool
-	}{
-		{
-			name: "d1 created before d2",
-
-			d1:                 generateDeployment("foo"),
-			creationTimestamp1: &now,
-
-			d2:                 generateDeployment("bar"),
-			creationTimestamp2: &later,
-
-			expected: true,
-		},
-		{
-			name: "d1 created after d2",
-
-			d1:                 generateDeployment("foo"),
-			creationTimestamp1: &later,
-
-			d2:                 generateDeployment("bar"),
-			creationTimestamp2: &now,
-
-			expected: false,
-		},
-		{
-			// Think of the following scenario:
-			// d1 is created first, d2 is created after and its selector overlaps
-			// with d1. d2 is marked as overlapping correctly. If d1's selector is
-			// updated and continues to overlap with the selector of d2 then d1 is
-			// now marked overlapping and d2 is cleaned up. Proved by the following
-			// test case. Callers of SelectorUpdatedBefore should first check for
-			// the existence of the overlapping annotation in any of the two deployments
-			// prior to comparing their timestamps and as a matter of fact this is
-			// now handled in `(dc *DeploymentController) handleOverlap`.
-			name: "d1 created before d2 but updated its selector afterwards",
-
-			d1:                 generateDeployment("foo"),
-			creationTimestamp1: &now,
-			selectorUpdated1:   &selectorUpdated,
-
-			d2:                 generateDeployment("bar"),
-			creationTimestamp2: &later,
-
-			expected: false,
-		},
-		{
-			name: "d1 selector is older than d2",
-
-			d1:               generateDeployment("foo"),
-			selectorUpdated1: &selectorUpdated,
-
-			d2:               generateDeployment("bar"),
-			selectorUpdated2: &selectorUpdatedLater,
-
-			expected: true,
-		},
-		{
-			name: "d1 selector is younger than d2",
-
-			d1:               generateDeployment("foo"),
-			selectorUpdated1: &selectorUpdatedLater,
-
-			d2:               generateDeployment("bar"),
-			selectorUpdated2: &selectorUpdated,
-
-			expected: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Logf("running scenario %q", test.name)
-
-		if test.creationTimestamp1 != nil {
-			test.d1.CreationTimestamp = *test.creationTimestamp1
-		}
-		if test.creationTimestamp2 != nil {
-			test.d2.CreationTimestamp = *test.creationTimestamp2
-		}
-		if test.selectorUpdated1 != nil {
-			test.d1.Annotations[SelectorUpdateAnnotation] = test.selectorUpdated1.Format(time.RFC3339)
-		}
-		if test.selectorUpdated2 != nil {
-			test.d2.Annotations[SelectorUpdateAnnotation] = test.selectorUpdated2.Format(time.RFC3339)
-		}
-
-		if got := SelectorUpdatedBefore(&test.d1, &test.d2); got != test.expected {
-			t.Errorf("expected d1 selector to be updated before d2: %t, got: %t", test.expected, got)
 		}
 	}
 }

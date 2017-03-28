@@ -30,9 +30,9 @@ import (
 	"github.com/pborman/uuid"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	authenticationapi "k8s.io/client-go/pkg/apis/authentication"
-	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 )
 
 var _ http.ResponseWriter = &auditResponseWriter{}

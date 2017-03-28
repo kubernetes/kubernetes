@@ -27,12 +27,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+const DefaultPodDeletionTimeout = 3 * time.Minute
 
 // ImageWhiteList is the images used in the current test suite. It should be initialized in test suite and
 // the images in the white list should be pre-pulled in the test suite.  Currently, this is only used by
@@ -72,14 +77,19 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 	return p
 }
 
-// CreateSync creates a new pod according to the framework specifications, and wait for it to start.
-func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
+// CreateSync creates a new pod according to the framework specifications in the given namespace, and waits for it to start.
+func (c *PodClient) CreateSyncInNamespace(pod *v1.Pod, namespace string) *v1.Pod {
 	p := c.Create(pod)
-	ExpectNoError(c.f.WaitForPodRunning(p.Name))
+	ExpectNoError(WaitForPodNameRunningInNamespace(c.f.ClientSet, p.Name, namespace))
 	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
 	p, err := c.Get(p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
 	return p
+}
+
+// CreateSync creates a new pod according to the framework specifications, and wait for it to start.
+func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
+	return c.CreateSyncInNamespace(pod, c.f.Namespace.Name)
 }
 
 // CreateBatch create a batch of pods. All pods are created before waiting.
@@ -124,11 +134,17 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
 func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeout time.Duration) {
+	c.DeleteSyncInNamespace(name, c.f.Namespace.Name, options, timeout)
+}
+
+// DeleteSyncInNamespace deletes the pod from the namespace and wait for the pod to disappear for `timeout`. If the pod doesn't
+// disappear before the timeout, it will fail the test.
+func (c *PodClient) DeleteSyncInNamespace(name string, namespace string, options *metav1.DeleteOptions, timeout time.Duration) {
 	err := c.Delete(name, options)
 	if err != nil && !errors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)
 	}
-	Expect(WaitForPodToDisappear(c.f.ClientSet, c.f.Namespace.Name, name, labels.Everything(),
+	Expect(WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),
 		2*time.Second, timeout)).To(Succeed(), "wait for pod %q to disappear", name)
 }
 
@@ -169,7 +185,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 }
 
 // TODO(random-liu): Move pod wait function into this file
-// WaitForSuccess waits for pod to success.
+// WaitForSuccess waits for pod to succeed.
 func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	f := c.f
 	Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
@@ -186,7 +202,31 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	)).To(Succeed(), "wait for pod %q to success", name)
 }
 
-// MatchContainerOutput gest output of a container and match expected regexp in the output.
+// WaitForSuccess waits for pod to succeed or an error event for that pod.
+func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
+	var ev *v1.Event
+	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
+		evnts, err := c.f.ClientSet.Core().Events(pod.Namespace).Search(api.Scheme, pod)
+		if err != nil {
+			return false, fmt.Errorf("error in listing events: %s", err)
+		}
+		for _, e := range evnts.Items {
+			switch e.Reason {
+			case events.KillingContainer, events.FailedToCreateContainer, sysctl.UnsupportedReason, sysctl.ForbiddenReason:
+				ev = &e
+				return true, nil
+			case events.StartedContainer:
+				return true, nil
+			default:
+				// ignore all other errors
+			}
+		}
+		return false, nil
+	})
+	return ev, err
+}
+
+// MatchContainerOutput gets output of a container and match expected regexp in the output.
 func (c *PodClient) MatchContainerOutput(name string, containerName string, expectedRegexp string) error {
 	f := c.f
 	output, err := GetPodLogs(f.ClientSet, f.Namespace.Name, name, containerName)

@@ -20,13 +20,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
 const (
-	givenTokenID     = "tokenID"
+	givenTokenID     = "abc123"
+	givenTokenID2    = "def456"
 	givenTokenSecret = "tokenSecret"
 )
 
@@ -81,7 +84,7 @@ func TestValidateSecretForSigning(t *testing.T) {
 		secret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:       metav1.NamespaceSystem,
-				Name:            "secretName",
+				Name:            bootstrapapi.BootstrapTokenSecretPrefix + givenTokenID,
 				ResourceVersion: "1",
 			},
 			Type: bootstrapapi.SecretTypeBootstrapToken,
@@ -113,7 +116,7 @@ func TestValidateSecret(t *testing.T) {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       metav1.NamespaceSystem,
-			Name:            "secretName",
+			Name:            bootstrapapi.BootstrapTokenSecretPrefix + givenTokenID,
 			ResourceVersion: "1",
 		},
 		Type: bootstrapapi.SecretTypeBootstrapToken,
@@ -134,4 +137,70 @@ func TestValidateSecret(t *testing.T) {
 	if tokenSecret != givenTokenSecret {
 		t.Errorf("Unexpected Token Secret. Expected %q, got %q", givenTokenSecret, tokenSecret)
 	}
+}
+
+func TestBadSecretName(t *testing.T) {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       metav1.NamespaceSystem,
+			Name:            givenTokenID,
+			ResourceVersion: "1",
+		},
+		Type: bootstrapapi.SecretTypeBootstrapToken,
+		Data: map[string][]byte{
+			bootstrapapi.BootstrapTokenIDKey:           []byte(givenTokenID),
+			bootstrapapi.BootstrapTokenSecretKey:       []byte(givenTokenSecret),
+			bootstrapapi.BootstrapTokenUsageSigningKey: []byte("true"),
+		},
+	}
+
+	_, _, ok := validateSecretForSigning(secret)
+	if ok {
+		t.Errorf("Token validation should fail with bad name")
+	}
+}
+
+func TestMismatchSecretName(t *testing.T) {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       metav1.NamespaceSystem,
+			Name:            bootstrapapi.BootstrapTokenSecretPrefix + givenTokenID2,
+			ResourceVersion: "1",
+		},
+		Type: bootstrapapi.SecretTypeBootstrapToken,
+		Data: map[string][]byte{
+			bootstrapapi.BootstrapTokenIDKey:           []byte(givenTokenID),
+			bootstrapapi.BootstrapTokenSecretKey:       []byte(givenTokenSecret),
+			bootstrapapi.BootstrapTokenUsageSigningKey: []byte("true"),
+		},
+	}
+
+	_, _, ok := validateSecretForSigning(secret)
+	if ok {
+		t.Errorf("Token validation should fail with mismatched name")
+	}
+}
+
+func TestParseSecretName(t *testing.T) {
+	tokenID, ok := parseSecretName("bootstrap-token-abc123")
+	assert.True(t, ok, "parseSecretName should accept valid name")
+	assert.Equal(t, "abc123", tokenID, "parseSecretName should return token ID")
+
+	_, ok = parseSecretName("")
+	assert.False(t, ok, "parseSecretName should reject blank name")
+
+	_, ok = parseSecretName("abc123")
+	assert.False(t, ok, "parseSecretName should reject with no prefix")
+
+	_, ok = parseSecretName("bootstrap-token-")
+	assert.False(t, ok, "parseSecretName should reject no token ID")
+
+	_, ok = parseSecretName("bootstrap-token-abc")
+	assert.False(t, ok, "parseSecretName should reject short token ID")
+
+	_, ok = parseSecretName("bootstrap-token-abc123ghi")
+	assert.False(t, ok, "parseSecretName should reject long token ID")
+
+	_, ok = parseSecretName("bootstrap-token-ABC123")
+	assert.False(t, ok, "parseSecretName should reject invalid token ID")
 }

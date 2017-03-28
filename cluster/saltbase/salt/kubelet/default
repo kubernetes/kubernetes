@@ -33,7 +33,7 @@
     # running on the master.
     {% if grains.kubelet_api_servers is defined -%}
       {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
-      {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false --register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule" -%}
+      {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false" -%}
     {% else -%}
       {% set api_servers_with_port = "" -%}
     {% endif -%}
@@ -188,7 +188,7 @@
   {% set eviction_hard="--eviction-hard=" + pillar['eviction_hard'] %}
 {% endif -%}
 
-{% set kubelet_auth = "--anonymous-auth=false --authorization-mode=Webhook --client-ca-file=/var/lib/kubelet/ca.crt" %}
+{% set kubelet_auth = "--anonymous-auth=false --authorization-mode=Webhook --client-ca-file=" + pillar.get('ca_cert_bundle_path', '/var/lib/kubelet/ca.crt') %}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{babysit_daemons}} {{eviction_hard}} {{kubelet_auth}} {{feature_gates}} {{test_args}}"

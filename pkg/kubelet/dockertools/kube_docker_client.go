@@ -187,7 +187,7 @@ func (d *kubeDockerClient) inspectImageRaw(ref string) (*dockertypes.ImageInspec
 	}
 	if err != nil {
 		if dockerapi.IsErrImageNotFound(err) {
-			err = imageNotFoundError{ID: ref}
+			err = ImageNotFoundError{ID: ref}
 		}
 		return nil, err
 	}
@@ -202,7 +202,7 @@ func (d *kubeDockerClient) InspectImageByID(imageID string) (*dockertypes.ImageI
 	}
 
 	if !matchImageIDOnly(*resp, imageID) {
-		return nil, imageNotFoundError{ID: imageID}
+		return nil, ImageNotFoundError{ID: imageID}
 	}
 	return resp, nil
 }
@@ -214,7 +214,7 @@ func (d *kubeDockerClient) InspectImageByRef(imageRef string) (*dockertypes.Imag
 	}
 
 	if !matchImageTagOrSHA(*resp, imageRef) {
-		return nil, imageNotFoundError{ID: imageRef}
+		return nil, ImageNotFoundError{ID: imageRef}
 	}
 	return resp, nil
 }
@@ -613,18 +613,19 @@ func IsContainerNotFoundError(err error) bool {
 	return containerNotFoundErrorRegx.MatchString(err.Error())
 }
 
-// imageNotFoundError is the error returned by InspectImage when image not found.
-type imageNotFoundError struct {
+// ImageNotFoundError is the error returned by InspectImage when image not found.
+// Expose this to inject error in dockershim for testing.
+type ImageNotFoundError struct {
 	ID string
 }
 
-func (e imageNotFoundError) Error() string {
+func (e ImageNotFoundError) Error() string {
 	return fmt.Sprintf("no such image: %q", e.ID)
 }
 
 // IsImageNotFoundError checks whether the error is image not found error. This is exposed
 // to share with dockershim.
 func IsImageNotFoundError(err error) bool {
-	_, ok := err.(imageNotFoundError)
+	_, ok := err.(ImageNotFoundError)
 	return ok
 }

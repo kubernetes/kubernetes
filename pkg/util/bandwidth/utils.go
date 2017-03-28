@@ -36,6 +36,9 @@ func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
 }
 
 func ExtractPodBandwidthResources(podAnnotations map[string]string) (ingress, egress *resource.Quantity, err error) {
+	if podAnnotations == nil {
+		return nil, nil, nil
+	}
 	str, found := podAnnotations["kubernetes.io/ingress-bandwidth"]
 	if found {
 		ingressValue, err := resource.ParseQuantity(str)

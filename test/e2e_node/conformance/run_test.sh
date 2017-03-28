@@ -84,7 +84,7 @@ start_kubelet() {
   fi
 }
 
-# wait_kubelet retris for 10 times for kubelet to be ready by checking http://127.0.0.1:10255/healthz.
+# wait_kubelet retries for 10 times for kubelet to be ready by checking http://127.0.0.1:10255/healthz.
 wait_kubelet() {
   echo "Health checking kubelet..."
   healthCheckURL=http://127.0.0.1:10255/healthz

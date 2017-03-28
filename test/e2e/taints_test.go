@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,16 +74,6 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 					Labels:    map[string]string{"name": podName},
 					DeletionGracePeriodSeconds: &grace,
 					// default - tolerate forever
-					Annotations: map[string]string{
-						"scheduler.alpha.kubernetes.io/tolerations": `
-					[
-						{
-							"key": "kubernetes.io/e2e-evict-taint-key",
-							"value": "evictTaintVal",
-							"effect": "` + string(v1.TaintEffectNoExecute) + `"
-						}
-					]`,
-					},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -93,27 +82,17 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 							Image: "kubernetes/pause",
 						},
 					},
+					Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute}},
 				},
 			}
 		} else {
+			ts := int64(tolerationSeconds)
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
 					Namespace: ns,
 					Labels:    map[string]string{"name": podName},
 					DeletionGracePeriodSeconds: &grace,
-					// default - tolerate forever
-					Annotations: map[string]string{
-						"scheduler.alpha.kubernetes.io/tolerations": `
-					[
-						{
-							"key": "kubernetes.io/e2e-evict-taint-key",
-							"value": "evictTaintVal",
-							"effect": "` + string(v1.TaintEffectNoExecute) + `",
-							"tolerationSeconds": ` + fmt.Sprintf("%v", tolerationSeconds) + `
-						}
-					]`,
-					},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -122,6 +101,8 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 							Image: "kubernetes/pause",
 						},
 					},
+					// default - tolerate forever
+					Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute, TolerationSeconds: &ts}},
 				},
 			}
 		}
@@ -152,6 +133,11 @@ func createTestController(cs clientset.Interface, observedDeletions chan struct{
 	framework.Logf("Starting informer...")
 	go controller.Run(stopCh)
 }
+
+const (
+	KubeletPodDeletionDelaySeconds = 60
+	AdditionalWaitPerDeleteSeconds = 5
+)
 
 // Tests the behavior of NoExecuteTaintManager. Following scenarios are included:
 // - eviction of non-tolerating pods from a tainted node,
@@ -198,7 +184,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 
 		// Wait a bit
 		By("Waiting for Pod to be deleted")
-		timeoutChannel := time.NewTimer(10 * time.Second).C
+		timeoutChannel := time.NewTimer(time.Duration(KubeletPodDeletionDelaySeconds+AdditionalWaitPerDeleteSeconds) * time.Second).C
 		select {
 		case <-timeoutChannel:
 			framework.Failf("Failed to evict Pod")
@@ -230,7 +216,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 
 		// Wait a bit
 		By("Waiting for Pod to be deleted")
-		timeoutChannel := time.NewTimer(10 * time.Second).C
+		timeoutChannel := time.NewTimer(time.Duration(KubeletPodDeletionDelaySeconds+AdditionalWaitPerDeleteSeconds) * time.Second).C
 		select {
 		case <-timeoutChannel:
 			framework.Logf("Pod wasn't evicted. Test successful")
@@ -245,7 +231,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 	// 4. See if pod will get evicted after toleration time runs out
 	It("eventually evict pod with finite tolerations from tainted nodes", func() {
 		podName := "taint-eviction-3"
-		pod := createPodForTaintsTest(true, 5, podName, ns)
+		pod := createPodForTaintsTest(true, KubeletPodDeletionDelaySeconds+2*AdditionalWaitPerDeleteSeconds, podName, ns)
 		observedDeletions := make(chan struct{}, 100)
 		stopCh := make(chan struct{})
 		createTestController(cs, observedDeletions, stopCh, podName, ns)
@@ -263,7 +249,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 
 		// Wait a bit
 		By("Waiting to see if a Pod won't be deleted")
-		timeoutChannel := time.NewTimer(2 * time.Second).C
+		timeoutChannel := time.NewTimer(time.Duration(KubeletPodDeletionDelaySeconds+AdditionalWaitPerDeleteSeconds) * time.Second).C
 		select {
 		case <-timeoutChannel:
 			framework.Logf("Pod wasn't evicted")
@@ -272,7 +258,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 			return
 		}
 		By("Waiting for Pod to be deleted")
-		timeoutChannel = time.NewTimer(10 * time.Second).C
+		timeoutChannel = time.NewTimer(time.Duration(KubeletPodDeletionDelaySeconds+AdditionalWaitPerDeleteSeconds) * time.Second).C
 		select {
 		case <-timeoutChannel:
 			framework.Failf("Pod wasn't evicted")
@@ -289,7 +275,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 	// 5. See if Pod won't be evicted.
 	It("removing taint cancels eviction", func() {
 		podName := "taint-eviction-4"
-		pod := createPodForTaintsTest(true, 5, podName, ns)
+		pod := createPodForTaintsTest(true, 2*AdditionalWaitPerDeleteSeconds, podName, ns)
 		observedDeletions := make(chan struct{}, 100)
 		stopCh := make(chan struct{})
 		createTestController(cs, observedDeletions, stopCh, podName, ns)
@@ -312,7 +298,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 
 		// Wait a bit
 		By("Waiting short time to make sure Pod is queued for deletion")
-		timeoutChannel := time.NewTimer(2 * time.Second).C
+		timeoutChannel := time.NewTimer(AdditionalWaitPerDeleteSeconds).C
 		select {
 		case <-timeoutChannel:
 			framework.Logf("Pod wasn't evicted. Proceeding")
@@ -324,7 +310,7 @@ var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
 		framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 		taintRemoved = true
 		By("Waiting some time to make sure that toleration time passed.")
-		timeoutChannel = time.NewTimer(10 * time.Second).C
+		timeoutChannel = time.NewTimer(time.Duration(KubeletPodDeletionDelaySeconds+3*AdditionalWaitPerDeleteSeconds) * time.Second).C
 		select {
 		case <-timeoutChannel:
 			framework.Logf("Pod wasn't evicted. Test successful")

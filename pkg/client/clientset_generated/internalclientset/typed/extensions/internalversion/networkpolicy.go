@@ -21,8 +21,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 // NetworkPoliciesGetter has a method to return a NetworkPolicyInterface.
@@ -99,7 +99,7 @@ func (c *networkPolicies) DeleteCollection(options *v1.DeleteOptions, listOption
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +112,7 @@ func (c *networkPolicies) Get(name string, options v1.GetOptions) (result *exten
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,7 +124,7 @@ func (c *networkPolicies) List(opts v1.ListOptions) (result *extensions.NetworkP
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -132,11 +132,11 @@ func (c *networkPolicies) List(opts v1.ListOptions) (result *extensions.NetworkP
 
 // Watch returns a watch.Interface that watches the requested networkPolicies.
 func (c *networkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

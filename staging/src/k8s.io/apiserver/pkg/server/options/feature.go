@@ -19,6 +19,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/server"
 )
 
@@ -29,7 +30,7 @@ type FeatureOptions struct {
 }
 
 func NewFeatureOptions() *FeatureOptions {
-	defaults := server.NewConfig()
+	defaults := server.NewConfig(serializer.CodecFactory{})
 
 	return &FeatureOptions{
 		EnableProfiling:           defaults.EnableProfiling,
@@ -42,7 +43,7 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.EnableProfiling, "profiling", o.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", o.EnableContentionProfiling,
-		"Enable contention profiling. Requires --profiling to be set to work.")
+		"Enable lock contention profiling, if profiling is enabled")
 	fs.BoolVar(&o.EnableSwaggerUI, "enable-swagger-ui", o.EnableSwaggerUI,
 		"Enables swagger ui on the apiserver at /swagger-ui")
 }

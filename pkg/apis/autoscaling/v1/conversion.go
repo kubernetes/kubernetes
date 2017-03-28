@@ -108,12 +108,17 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 			return err
 		}
 
-		out.Spec.Metrics = make([]autoscaling.MetricSpec, len(otherMetrics))
+		// the normal Spec conversion could have populated out.Spec.Metrics with a single element, so deal with that
+		outMetrics := make([]autoscaling.MetricSpec, len(otherMetrics)+len(out.Spec.Metrics))
 		for i, metric := range otherMetrics {
-			if err := Convert_v1_MetricSpec_To_autoscaling_MetricSpec(&metric, &out.Spec.Metrics[i], s); err != nil {
+			if err := Convert_v1_MetricSpec_To_autoscaling_MetricSpec(&metric, &outMetrics[i], s); err != nil {
 				return err
 			}
 		}
+		if out.Spec.Metrics != nil {
+			outMetrics[len(otherMetrics)] = out.Spec.Metrics[0]
+		}
+		out.Spec.Metrics = outMetrics
 		delete(out.Annotations, autoscaling.MetricSpecsAnnotation)
 	}
 

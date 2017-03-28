@@ -10,6 +10,7 @@ import (
 	"github.com/onsi/ginkgo/ginkgo/testrunner"
 	"github.com/onsi/ginkgo/ginkgo/testsuite"
 	"github.com/onsi/ginkgo/ginkgo/watch"
+	colorable "github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable"
 )
 
 func BuildWatchCommand() *Command {
@@ -57,7 +58,7 @@ func (w *SpecWatcher) runnersForSuites(suites []testsuite.TestSuite, additionalA
 	runners := []*testrunner.TestRunner{}
 
 	for _, suite := range suites {
-		runners = append(runners, testrunner.New(suite, w.commandFlags.NumCPU, w.commandFlags.ParallelStream, w.commandFlags.Race, w.commandFlags.Cover, w.commandFlags.CoverPkg, w.commandFlags.Tags, w.commandFlags.GCFlags, additionalArgs))
+		runners = append(runners, testrunner.New(suite, w.commandFlags.NumCPU, w.commandFlags.ParallelStream, w.commandFlags.GoOpts, additionalArgs))
 	}
 
 	return runners
@@ -96,29 +97,30 @@ func (w *SpecWatcher) WatchSuites(args []string, additionalArgs []string) {
 		case <-ticker.C:
 			suites, _ := findSuites(args, w.commandFlags.Recurse, w.commandFlags.SkipPackage, false)
 			delta, _ := deltaTracker.Delta(suites)
+			coloredStream := colorable.NewColorableStdout()
 
 			suitesToRun := []testsuite.TestSuite{}
 
 			if len(delta.NewSuites) > 0 {
-				fmt.Printf(greenColor+"Detected %d new %s:\n"+defaultStyle, len(delta.NewSuites), pluralizedWord("suite", "suites", len(delta.NewSuites)))
+				fmt.Fprintf(coloredStream, greenColor+"Detected %d new %s:\n"+defaultStyle, len(delta.NewSuites), pluralizedWord("suite", "suites", len(delta.NewSuites)))
 				for _, suite := range delta.NewSuites {
 					suitesToRun = append(suitesToRun, suite.Suite)
-					fmt.Println("  " + suite.Description())
+					fmt.Fprintln(coloredStream, "  "+suite.Description())
 				}
 			}
 
 			modifiedSuites := delta.ModifiedSuites()
 			if len(modifiedSuites) > 0 {
-				fmt.Println(greenColor + "\nDetected changes in:" + defaultStyle)
+				fmt.Fprintln(coloredStream, greenColor+"\nDetected changes in:"+defaultStyle)
 				for _, pkg := range delta.ModifiedPackages {
-					fmt.Println("  " + pkg)
+					fmt.Fprintln(coloredStream, "  "+pkg)
 				}
-				fmt.Printf(greenColor+"Will run %d %s:\n"+defaultStyle, len(modifiedSuites), pluralizedWord("suite", "suites", len(modifiedSuites)))
+				fmt.Fprintf(coloredStream, greenColor+"Will run %d %s:\n"+defaultStyle, len(modifiedSuites), pluralizedWord("suite", "suites", len(modifiedSuites)))
 				for _, suite := range modifiedSuites {
 					suitesToRun = append(suitesToRun, suite.Suite)
-					fmt.Println("  " + suite.Description())
+					fmt.Fprintln(coloredStream, "  "+suite.Description())
 				}
-				fmt.Println("")
+				fmt.Fprintln(coloredStream, "")
 			}
 
 			if len(suitesToRun) > 0 {
@@ -136,7 +138,7 @@ func (w *SpecWatcher) WatchSuites(args []string, additionalArgs []string) {
 					if result.Passed {
 						color = greenColor
 					}
-					fmt.Println(color + "\nDone.  Resuming watch..." + defaultStyle)
+					fmt.Fprintln(coloredStream, color+"\nDone.  Resuming watch..."+defaultStyle)
 				}
 			}
 

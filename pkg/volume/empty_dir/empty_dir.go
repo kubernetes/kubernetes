@@ -90,6 +90,14 @@ func (plugin *emptyDirPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *emptyDirPlugin) SupportsMountOption() bool {
+	return false
+}
+
+func (plugin *emptyDirPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts)
 }

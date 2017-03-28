@@ -46,6 +46,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -55,6 +58,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     1,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 		},
@@ -81,6 +87,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -95,6 +104,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: -3,
 					NumberReady:            -1,
 					ObservedGeneration:     -3,
+					UpdatedNumberScheduled: -1,
+					NumberAvailable:        -1,
+					NumberUnavailable:      -2,
 				},
 			},
 		},
@@ -111,6 +123,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -125,6 +140,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 		},
@@ -141,6 +159,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -155,6 +176,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 		},
@@ -171,6 +195,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -185,6 +212,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: -3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 		},
@@ -201,6 +231,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -215,6 +248,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            -1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 		},
@@ -231,6 +267,9 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -245,6 +284,117 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
 					ObservedGeneration:     -3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
+				},
+			},
+		},
+		"negative UpdatedNumberScheduled": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: -1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
+				},
+			},
+		},
+		"negative NumberAvailable": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        -1,
+					NumberUnavailable:      2,
+				},
+			},
+		},
+		"negative NumberUnavailable": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      2,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "abc",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+					UpdatedNumberScheduled: 1,
+					NumberAvailable:        1,
+					NumberUnavailable:      -2,
 				},
 			},
 		},
@@ -321,11 +471,12 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			Spec: api.PodSpec{
+				// no containers specified
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: invalidSelector,
+				Labels: validSelector,
 			},
 		},
 	}
@@ -339,64 +490,148 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 
 	type dsUpdateTest struct {
-		old    extensions.DaemonSet
-		update extensions.DaemonSet
+		old            extensions.DaemonSet
+		update         extensions.DaemonSet
+		expectedErrNum int
 	}
-	successCases := []dsUpdateTest{
-		{
+	successCases := map[string]dsUpdateTest{
+		"no change": {
 			old: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
-		{
+		"change template and selector": {
 			old: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 2,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector2},
-					Template: validPodTemplateAbc2.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
+					TemplateGeneration: 3,
+					Template:           validPodTemplateAbc2.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 		},
-		{
+		"change template": {
 			old: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 3,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateNodeSelector.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 4,
+					Template:           validPodTemplateNodeSelector.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+		},
+		"change container image name": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
+					TemplateGeneration: 2,
+					Template:           validPodTemplateDef.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+		},
+		"change update strategy": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 4,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 4,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &extensions.RollingUpdateDaemonSet{
+							MaxUnavailable: intstr.FromInt(1),
+						},
+					},
 				},
 			},
 		},
 	}
-	for _, successCase := range successCases {
+	for testName, successCase := range successCases {
+		// ResourceVersion is required for updates.
 		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "2"
+		// Check test setup
+		if successCase.expectedErrNum > 0 {
+			t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
+		}
+		if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
+			t.Errorf("%q has incorrect test setup with no resource version set", testName)
+		}
 		if errs := ValidateDaemonSetUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
+			t.Errorf("%q expected no error, but got: %v", testName, errs)
 		}
 	}
 	errorCases := map[string]dsUpdateTest{
@@ -404,102 +639,219 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			old: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
+			expectedErrNum: 1,
 		},
 		"invalid selector": {
 			old: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: invalidSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: invalidSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
+			expectedErrNum: 1,
 		},
 		"invalid pod": {
 			old: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: invalidPodTemplate.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 2,
+					Template:           invalidPodTemplate.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
+			expectedErrNum: 1,
 		},
-		"change container image": {
+		"invalid read-write volume": {
 			old: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateDef.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 2,
+					Template:           readWriteVolumePodTemplate.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
-		},
-		"read-write volume": {
-			old: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
-				},
-			},
-			update: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: readWriteVolumePodTemplate.Template,
-				},
-			},
+			expectedErrNum: 1,
 		},
 		"invalid update strategy": {
 			old: extensions.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
 				},
 			},
 			update: extensions.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: invalidSelector},
-					Template: validPodTemplateAbc.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: "Random",
+					},
 				},
 			},
+			expectedErrNum: 1,
+		},
+		"negative templateGeneration": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: -1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: -1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			expectedErrNum: 1,
+		},
+		"decreased templateGeneration": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					TemplateGeneration: 2,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					TemplateGeneration: 1,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			expectedErrNum: 1,
+		},
+		"unchanged templateGeneration upon template update": {
+			old: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					TemplateGeneration: 2,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DaemonSetSpec{
+					TemplateGeneration: 2,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
+					Template:           validPodTemplateAbc2.Template,
+					UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+						Type: extensions.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			expectedErrNum: 1,
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidateDaemonSetUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
-			t.Errorf("expected failure: %s", testName)
+		// ResourceVersion is required for updates.
+		errorCase.old.ObjectMeta.ResourceVersion = "1"
+		errorCase.update.ObjectMeta.ResourceVersion = "2"
+		// Check test setup
+		if errorCase.expectedErrNum <= 0 {
+			t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
+		}
+		if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
+			t.Errorf("%q has incorrect test setup with no resource version set", testName)
+		}
+		// Run the tests
+		if errs := ValidateDaemonSetUpdate(&errorCase.update, &errorCase.old); len(errs) != errorCase.expectedErrNum {
+			t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
+		} else {
+			t.Logf("(PASS) %q got errors %v", testName, errs)
 		}
 	}
 }
@@ -536,6 +888,9 @@ func TestValidateDaemonSet(t *testing.T) {
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
+				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+					Type: extensions.OnDeleteDaemonSetStrategyType,
+				},
 			},
 		},
 		{
@@ -543,6 +898,9 @@ func TestValidateDaemonSet(t *testing.T) {
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
+				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+					Type: extensions.OnDeleteDaemonSetStrategyType,
+				},
 			},
 		},
 	}
@@ -832,6 +1190,128 @@ func TestValidateDeployment(t *testing.T) {
 			t.Errorf("[%s] expected failure", k)
 		} else if !strings.Contains(errs[0].Error(), k) {
 			t.Errorf("unexpected error: %q, expected: %q", errs[0].Error(), k)
+		}
+	}
+}
+
+func TestValidateDeploymentStatus(t *testing.T) {
+	tests := []struct {
+		name string
+
+		replicas           int32
+		updatedReplicas    int32
+		readyReplicas      int32
+		availableReplicas  int32
+		observedGeneration int64
+
+		expectedErr bool
+	}{
+		{
+			name:               "valid status",
+			replicas:           3,
+			updatedReplicas:    3,
+			readyReplicas:      2,
+			availableReplicas:  1,
+			observedGeneration: 2,
+			expectedErr:        false,
+		},
+		{
+			name:               "invalid replicas",
+			replicas:           -1,
+			updatedReplicas:    2,
+			readyReplicas:      2,
+			availableReplicas:  1,
+			observedGeneration: 2,
+			expectedErr:        true,
+		},
+		{
+			name:               "invalid updatedReplicas",
+			replicas:           2,
+			updatedReplicas:    -1,
+			readyReplicas:      2,
+			availableReplicas:  1,
+			observedGeneration: 2,
+			expectedErr:        true,
+		},
+		{
+			name:               "invalid readyReplicas",
+			replicas:           3,
+			readyReplicas:      -1,
+			availableReplicas:  1,
+			observedGeneration: 2,
+			expectedErr:        true,
+		},
+		{
+			name:               "invalid availableReplicas",
+			replicas:           3,
+			readyReplicas:      3,
+			availableReplicas:  -1,
+			observedGeneration: 2,
+			expectedErr:        true,
+		},
+		{
+			name:               "invalid observedGeneration",
+			replicas:           3,
+			readyReplicas:      3,
+			availableReplicas:  3,
+			observedGeneration: -1,
+			expectedErr:        true,
+		},
+		{
+			name:               "updatedReplicas greater than replicas",
+			replicas:           3,
+			updatedReplicas:    4,
+			readyReplicas:      3,
+			availableReplicas:  3,
+			observedGeneration: 1,
+			expectedErr:        true,
+		},
+		{
+			name:               "readyReplicas greater than replicas",
+			replicas:           3,
+			readyReplicas:      4,
+			availableReplicas:  3,
+			observedGeneration: 1,
+			expectedErr:        true,
+		},
+		{
+			name:               "availableReplicas greater than replicas",
+			replicas:           3,
+			readyReplicas:      3,
+			availableReplicas:  4,
+			observedGeneration: 1,
+			expectedErr:        true,
+		},
+		{
+			name:               "availableReplicas greater than readyReplicas",
+			replicas:           3,
+			readyReplicas:      2,
+			availableReplicas:  3,
+			observedGeneration: 1,
+			expectedErr:        true,
+		},
+		// TODO: Remove the following test case once we stop supporting upgrades from 1.5.
+		{
+			name:               "don't validate readyReplicas when it's zero",
+			replicas:           3,
+			readyReplicas:      0,
+			availableReplicas:  3,
+			observedGeneration: 1,
+			expectedErr:        false,
+		},
+	}
+
+	for _, test := range tests {
+		status := extensions.DeploymentStatus{
+			Replicas:           test.replicas,
+			UpdatedReplicas:    test.updatedReplicas,
+			ReadyReplicas:      test.readyReplicas,
+			AvailableReplicas:  test.availableReplicas,
+			ObservedGeneration: test.observedGeneration,
+		}
+
+		if hasErr := len(ValidateDeploymentStatus(&status, field.NewPath("status"))) > 0; hasErr != test.expectedErr {
+			t.Errorf("%s: expected error: %t, got error: %t", test.name, test.expectedErr, hasErr)
 		}
 	}
 }
@@ -1204,6 +1684,125 @@ func TestValidateScale(t *testing.T) {
 			t.Errorf("expected failure for %s", c.msg)
 		} else if !strings.Contains(errs[0].Error(), c.msg) {
 			t.Errorf("unexpected error: %v, expected: %s", errs[0], c.msg)
+		}
+	}
+}
+
+func TestValidateReplicaSetStatus(t *testing.T) {
+	tests := []struct {
+		name string
+
+		replicas             int32
+		fullyLabeledReplicas int32
+		readyReplicas        int32
+		availableReplicas    int32
+		observedGeneration   int64
+
+		expectedErr bool
+	}{
+		{
+			name:                 "valid status",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        2,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          false,
+		},
+		{
+			name:                 "invalid replicas",
+			replicas:             -1,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        2,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid fullyLabeledReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: -1,
+			readyReplicas:        2,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid readyReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        -1,
+			availableReplicas:    1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid availableReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        3,
+			availableReplicas:    -1,
+			observedGeneration:   2,
+			expectedErr:          true,
+		},
+		{
+			name:                 "invalid observedGeneration",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        3,
+			availableReplicas:    3,
+			observedGeneration:   -1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "fullyLabeledReplicas greater than replicas",
+			replicas:             3,
+			fullyLabeledReplicas: 4,
+			readyReplicas:        3,
+			availableReplicas:    3,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "readyReplicas greater than replicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        4,
+			availableReplicas:    3,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "availableReplicas greater than replicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        3,
+			availableReplicas:    4,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+		{
+			name:                 "availableReplicas greater than readyReplicas",
+			replicas:             3,
+			fullyLabeledReplicas: 3,
+			readyReplicas:        2,
+			availableReplicas:    3,
+			observedGeneration:   1,
+			expectedErr:          true,
+		},
+	}
+
+	for _, test := range tests {
+		status := extensions.ReplicaSetStatus{
+			Replicas:             test.replicas,
+			FullyLabeledReplicas: test.fullyLabeledReplicas,
+			ReadyReplicas:        test.readyReplicas,
+			AvailableReplicas:    test.availableReplicas,
+			ObservedGeneration:   test.observedGeneration,
+		}
+
+		if hasErr := len(ValidateReplicaSetStatus(status, field.NewPath("status"))) > 0; hasErr != test.expectedErr {
+			t.Errorf("%s: expected error: %t, got error: %t", test.name, test.expectedErr, hasErr)
 		}
 	}
 }
@@ -2401,10 +3000,4 @@ func TestIsValidSysctlPattern(t *testing.T) {
 			t.Errorf("%q expected to be an invalid sysctl pattern", s)
 		}
 	}
-}
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
 }

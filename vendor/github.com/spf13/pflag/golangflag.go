@@ -6,12 +6,9 @@ package pflag
 
 import (
 	goflag "flag"
-	"fmt"
 	"reflect"
 	"strings"
 )
-
-var _ = fmt.Print
 
 // flagValueWrapper implements pflag.Value around a flag.Value.  The main
 // difference here is the addition of the Type method that returns a string

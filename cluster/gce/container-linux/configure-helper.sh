@@ -167,7 +167,7 @@ function create-master-auth {
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
   fi
   if [[ -n "${KUBELET_TOKEN:-}" ]]; then
-    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "system:node:node-name,uid:kubelet,system:nodes"
+    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "kubelet,uid:kubelet,system:nodes"
   fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
@@ -516,7 +516,6 @@ function start-kubelet {
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
       flags+=" --api-servers=https://${KUBELET_APISERVER}"
       flags+=" --register-schedulable=false"
-      flags+=" --register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule"
     else
       # Standalone mode (not widely used?)
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
@@ -807,6 +806,9 @@ function start-kube-apiserver {
   if [[ -n "${STORAGE_BACKEND:-}" ]]; then
     params+=" --storage-backend=${STORAGE_BACKEND}"
   fi
+  if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
+    params+=" --storage-media-type=${STORAGE_MEDIA_TYPE}"
+  fi
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
     params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
   fi
@@ -886,10 +888,27 @@ function start-kube-apiserver {
   fi
 
   local authorization_mode="RBAC"
-  if [[ -n "${ABAC_AUTHZ_FILE:-}" && -e "${ABAC_AUTHZ_FILE}" ]]; then
-    params+=" --authorization-policy-file=${ABAC_AUTHZ_FILE}"
+  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
+
+  # Enable ABAC mode unless the user explicitly opts out with ENABLE_LEGACY_ABAC=false
+  if [[ "${ENABLE_LEGACY_ABAC:-}" != "false" ]]; then  
+    echo "Warning: Enabling legacy ABAC policy. All service accounts will have superuser API access. Set ENABLE_LEGACY_ABAC=false to disable this."
+    # Create the ABAC file if it doesn't exist yet, or if we have a KUBE_USER set (to ensure the right user is given permissions)
+    if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
+      local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
+      remove-salt-config-comments "${abac_policy_json}"
+      if [[ -n "${KUBE_USER:-}" ]]; then
+        sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
+      else
+        sed -i -e "/{{kube_user}}/d" "${abac_policy_json}"
+      fi
+      cp "${abac_policy_json}" /etc/srv/kubernetes/
+    fi
+
+    params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
     authorization_mode+=",ABAC"
   fi
+
   local webhook_config_mount=""
   local webhook_config_volume=""
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
@@ -898,14 +917,19 @@ function start-kube-apiserver {
     webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
   fi
-  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   params+=" --authorization-mode=${authorization_mode}"
+
+  local container_env=""
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+  fi
 
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag=$(cat /opt/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{srv_sshproxy_path}}@/etc/srv/sshproxy@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
@@ -972,6 +996,10 @@ function start-kube-controller-manager {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   local -r kube_rc_docker_tag=$(cat /opt/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
+  local container_env=""
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+  fi
 
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
   remove-salt-config-comments "${src_file}"
@@ -980,6 +1008,7 @@ function start-kube-controller-manager {
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-controller-manager_docker_tag'\]}}@${kube_rc_docker_tag}@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
@@ -1084,6 +1113,7 @@ function start-kube-addons {
   # Set up manifests of other addons.
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "google" ]] || \
+     [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "standalone" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "googleinfluxdb" ]]; then
     local -r file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
@@ -1171,7 +1201,7 @@ function start-kube-addons {
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
   fi
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "true" ]]; then
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then

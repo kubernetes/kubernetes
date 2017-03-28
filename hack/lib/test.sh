@@ -42,30 +42,60 @@ kube::test::get_caller() {
 
 # Force exact match of a returned result for a object query.  Wrap this with || to support multiple
 # valid return types.
+# This runs `kubectl get` once and asserts that the result is as expected.
+## $1: Object on which get should be run
+# $2: The go-template to run on the result
+# $3: The expected output
+# $4: Additional args to be passed to kubectl
 kube::test::get_object_assert() {
-  local object=$1
-  local request=$2
-  local expected=$3
-  local args=${4:-}
+  kube::test::object_assert 1 "$@"
+}
 
-  res=$(eval kubectl get "${kube_flags[@]}" ${args} $object -o go-template=\"$request\")
+# Asserts that the output of a given get query is as expected.
+# Runs the query multiple times before failing it.
+# $1: Object on which get should be run
+# $2: The go-template to run on the result
+# $3: The expected output
+# $4: Additional args to be passed to kubectl
+kube::test::wait_object_assert() {
+  kube::test::object_assert 10 "$@"
+}
 
-  if [[ "$res" =~ ^$expected$ ]]; then
-      echo -n ${green}
-      echo "$(kube::test::get_caller): Successful get $object $request: $res"
-      echo -n ${reset}
-      return 0
-  else
-      echo ${bold}${red}
-      echo "$(kube::test::get_caller): FAIL!"
-      echo "Get $object $request"
-      echo "  Expected: $expected"
-      echo "  Got:      $res"
-      echo ${reset}${red}
-      caller
-      echo ${reset}
-      return 1
-  fi
+# Asserts that the output of a given get query is as expected.
+# Can run the query multiple times before failing it.
+# $1: Number of times the query should be run before failing it.
+# $2: Object on which get should be run
+# $3: The go-template to run on the result
+# $4: The expected output
+# $5: Additional args to be passed to kubectl
+kube::test::object_assert() {
+  local tries=$1
+  local object=$2
+  local request=$3
+  local expected=$4
+  local args=${5:-}
+
+  for j in $(seq 1 ${tries}); do
+    res=$(eval kubectl get -a "${kube_flags[@]}" ${args} $object -o go-template=\"$request\")
+    if [[ "$res" =~ ^$expected$ ]]; then
+        echo -n ${green}
+        echo "$(kube::test::get_caller 3): Successful get $object $request: $res"
+        echo -n ${reset}
+        return 0
+    fi
+    echo "Waiting for Get $object $request $args: expected: $expected, got: $res"
+    sleep $((${j}-1))
+  done
+
+  echo ${bold}${red}
+  echo "$(kube::test::get_caller 3): FAIL!"
+  echo "Get $object $request"
+  echo "  Expected: $expected"
+  echo "  Got:      $res"
+  echo ${reset}${red}
+  caller
+  echo ${reset}
+  return 1
 }
 
 kube::test::get_object_jsonpath_assert() {
@@ -73,7 +103,7 @@ kube::test::get_object_jsonpath_assert() {
   local request=$2
   local expected=$3
 
-  res=$(eval kubectl get "${kube_flags[@]}" $object -o jsonpath=\"$request\")
+  res=$(eval kubectl get -a "${kube_flags[@]}" $object -o jsonpath=\"$request\")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}

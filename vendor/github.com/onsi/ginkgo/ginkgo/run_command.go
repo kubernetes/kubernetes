@@ -71,7 +71,7 @@ func (r *SpecRunner) RunSpecs(args []string, additionalArgs []string) {
 
 	runners := []*testrunner.TestRunner{}
 	for _, suite := range suites {
-		runners = append(runners, testrunner.New(suite, r.commandFlags.NumCPU, r.commandFlags.ParallelStream, r.commandFlags.Race, r.commandFlags.Cover, r.commandFlags.CoverPkg, r.commandFlags.Tags, r.commandFlags.GCFlags, additionalArgs))
+		runners = append(runners, testrunner.New(suite, r.commandFlags.NumCPU, r.commandFlags.ParallelStream, r.commandFlags.GoOpts, additionalArgs))
 	}
 
 	numSuites := 0

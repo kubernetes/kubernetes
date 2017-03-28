@@ -17,13 +17,13 @@ limitations under the License.
 package object
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type DatacenterFolders struct {

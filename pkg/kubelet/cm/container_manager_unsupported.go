@@ -21,6 +21,7 @@ package cm
 import (
 	"fmt"
 
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -31,7 +32,7 @@ type unsupportedContainerManager struct {
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ *v1.Node) error {
+func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
@@ -51,14 +52,22 @@ func (unsupportedContainerManager) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
+func (unsupportedContainerManager) UpdateQOSCgroups() error {
+	return nil
+}
+
 func (cm *unsupportedContainerManager) Status() Status {
 	return Status{}
+}
+
+func (cm *unsupportedContainerManager) GetNodeAllocatableReservation() v1.ResourceList {
+	return nil
 }
 
 func (cm *unsupportedContainerManager) NewPodContainerManager() PodContainerManager {
 	return &unsupportedPodContainerManager{}
 }
 
-func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool) (ContainerManager, error) {
+func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

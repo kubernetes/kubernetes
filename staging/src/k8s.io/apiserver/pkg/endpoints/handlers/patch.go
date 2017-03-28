@@ -17,11 +17,12 @@ limitations under the License.
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	"github.com/evanphx/json-patch"
@@ -77,21 +78,17 @@ func patchObjectJSON(
 // <originalObject> and stores the result in <objToUpdate>.
 // It additionally returns the map[string]interface{} representation of the
 // <originalObject> and <patchJS>.
+// NOTE: Both <originalObject> and <objToUpdate> are supposed to be versioned.
 func strategicPatchObject(
 	codec runtime.Codec,
+	defaulter runtime.ObjectDefaulter,
 	originalObject runtime.Object,
 	patchJS []byte,
 	objToUpdate runtime.Object,
 	versionedObj runtime.Object,
 ) (originalObjMap map[string]interface{}, patchMap map[string]interface{}, retErr error) {
-	// TODO: This should be one-step conversion that doesn't require
-	// json marshaling and unmarshaling once #39017 is fixed.
-	data, err := runtime.Encode(codec, originalObject)
-	if err != nil {
-		return nil, nil, err
-	}
 	originalObjMap = make(map[string]interface{})
-	if err := json.Unmarshal(data, &originalObjMap); err != nil {
+	if err := unstructured.DefaultConverter.ToUnstructured(originalObject, &originalObjMap); err != nil {
 		return nil, nil, err
 	}
 
@@ -100,17 +97,18 @@ func strategicPatchObject(
 		return nil, nil, err
 	}
 
-	if err := applyPatchToObject(codec, originalObjMap, patchMap, objToUpdate, versionedObj); err != nil {
+	if err := applyPatchToObject(codec, defaulter, originalObjMap, patchMap, objToUpdate, versionedObj); err != nil {
 		return nil, nil, err
 	}
 	return
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to
-// <originalMap> and stores the result in <objToUpdate>, though it operates
-// on versioned map[string]interface{} representations.
+// <originalMap> and stores the result in <objToUpdate>.
+// NOTE: <objToUpdate> must be a versioned object.
 func applyPatchToObject(
 	codec runtime.Codec,
+	defaulter runtime.ObjectDefaulter,
 	originalMap map[string]interface{},
 	patchMap map[string]interface{},
 	objToUpdate runtime.Object,
@@ -121,11 +119,12 @@ func applyPatchToObject(
 		return err
 	}
 
-	// TODO: This should be one-step conversion that doesn't require
-	// json marshaling and unmarshaling once #39017 is fixed.
-	data, err := json.Marshal(patchedObjMap)
-	if err != nil {
+	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
+	if err := unstructured.DefaultConverter.FromUnstructured(patchedObjMap, objToUpdate); err != nil {
 		return err
 	}
-	return runtime.DecodeInto(codec, data, objToUpdate)
+	// Decoding from JSON to a versioned object would apply defaults, so we do the same here
+	defaulter.Default(objToUpdate)
+
+	return nil
 }

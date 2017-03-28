@@ -129,7 +129,7 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -151,7 +151,7 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		}
 
 		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
 				return cmdutil.AddSourceToErr("replacing", info.Source, err)
 			}
 		}
@@ -200,7 +200,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -249,7 +249,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		})
 	})
 
-	r = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r = resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -272,7 +272,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		}
 
 		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
 				return cmdutil.AddSourceToErr("replacing", info.Source, err)
 			}
 		}

@@ -33,7 +33,6 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	var InsecureFlag bool
 	var err error
 	cfg.Global.VCenterIP = os.Getenv("VSPHERE_VCENTER")
-	cfg.Global.VCenterPort = os.Getenv("VSPHERE_VCENTER_PORT")
 	cfg.Global.User = os.Getenv("VSPHERE_USER")
 	cfg.Global.Password = os.Getenv("VSPHERE_PASSWORD")
 	cfg.Global.Datacenter = os.Getenv("VSPHERE_DATACENTER")
@@ -79,10 +78,6 @@ vm-uuid = 1234
 
 	if cfg.Global.VCenterIP != "0.0.0.0" {
 		t.Errorf("incorrect vcenter ip: %s", cfg.Global.VCenterIP)
-	}
-
-	if cfg.Global.VCenterPort != "443" {
-		t.Errorf("incorrect vcenter port: %s", cfg.Global.VCenterPort)
 	}
 
 	if cfg.Global.Datacenter != "us-west" {

@@ -22,7 +22,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
-	api "k8s.io/kubernetes/pkg/api"
+	scheme "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/scheme"
 )
 
 // TestTypesGetter has a method to return a TestTypeInterface.
@@ -116,7 +116,7 @@ func (c *testTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("testtypes").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -129,7 +129,7 @@ func (c *testTypes) Get(name string, options v1.GetOptions) (result *testgroup.T
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -141,7 +141,7 @@ func (c *testTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, e
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("testtypes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -149,11 +149,11 @@ func (c *testTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, e
 
 // Watch returns a watch.Interface that watches the requested testTypes.
 func (c *testTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("testtypes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

@@ -29,28 +29,28 @@ import (
 
 // Definte a number of test types.
 type A struct {
-	A int `json:"aa,omitempty"`
+	A int    `json:"aa,omitempty"`
 	B string `json:"ab,omitempty"`
-	C bool `json:"ac,omitempty"`
+	C bool   `json:"ac,omitempty"`
 }
 
 type B struct {
-	A A `json:"ba"`
-	B string `json:"bb"`
+	A A                 `json:"ba"`
+	B string            `json:"bb"`
 	C map[string]string `json:"bc"`
-	D []string `json:"bd"`
+	D []string          `json:"bd"`
 }
 
 type C struct {
 	A []A `json:"ca"`
-	B B `json:",inline"`
-	C string `json:"cc"`
-	D *int64 `json:"cd"`
+	B `json:",inline"`
+	C string         `json:"cc"`
+	D *int64         `json:"cd"`
 	E map[string]int `json:"ce"`
-	F []bool `json:"cf"`
-	G []int `json"cg"`
-	H float32 `json:ch"`
-	I []interface{} `json:"ci"`
+	F []bool         `json:"cf"`
+	G []int          `json:"cg"`
+	H float32        `json:"ch"`
+	I []interface{}  `json:"ci"`
 }
 
 type D struct {
@@ -62,15 +62,15 @@ type E struct {
 }
 
 type F struct {
-	A string `json:"fa"`
+	A string            `json:"fa"`
 	B map[string]string `json:"fb"`
-	C []A `json:"fc"`
-	D int `json:"fd"`
-	E float32 `json:"fe"`
-	F []string `json:"ff"`
-	G []int `json:"fg"`
-	H []bool `json:"fh"`
-	I []float32 `json:"fi"`
+	C []A               `json:"fc"`
+	D int               `json:"fd"`
+	E float32           `json:"fe"`
+	F []string          `json:"ff"`
+	G []int             `json:"fg"`
+	H []bool            `json:"fh"`
+	I []float32         `json:"fi"`
 }
 
 // Implement runtime.Object to make types usable for tests.
@@ -122,14 +122,14 @@ func doRoundTrip(t *testing.T, item runtime.Object) {
 	}
 
 	newUnstr := make(map[string]interface{})
-	err = NewConverter().ToUnstructured(item, &newUnstr)
+	err = DefaultConverter.ToUnstructured(item, &newUnstr)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
 	}
 
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	err = NewConverter().FromUnstructured(newUnstr, newObj)
+	err = DefaultConverter.FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
 		return
@@ -142,7 +142,7 @@ func doRoundTrip(t *testing.T, item runtime.Object) {
 
 func TestRoundTrip(t *testing.T) {
 	intVal := int64(42)
-	testCases := []struct{
+	testCases := []struct {
 		obj runtime.Object
 	}{
 		{
@@ -239,7 +239,7 @@ func doUnrecognized(t *testing.T, jsonData string, item runtime.Object, expected
 		return
 	}
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	err = NewConverter().FromUnstructured(unstr, newObj)
+	err = DefaultConverter.FromUnstructured(unstr, newObj)
 	if (err != nil) != (expectedErr != nil) {
 		t.Errorf("Unexpected error in FromUnstructured: %v, expected: %v", err, expectedErr)
 	}
@@ -250,10 +250,10 @@ func doUnrecognized(t *testing.T, jsonData string, item runtime.Object, expected
 }
 
 func TestUnrecognized(t *testing.T) {
-	testCases := []struct{
+	testCases := []struct {
 		data string
 		obj  runtime.Object
-		err error
+		err  error
 	}{
 		{
 			data: "{\"da\":[3.0,\"3.0\",null]}",
@@ -265,15 +265,15 @@ func TestUnrecognized(t *testing.T) {
 		},
 		{
 			data: "{\"ea\":[null,null,null]}",
-			obj: &E{},
+			obj:  &E{},
 		},
 		{
 			data: "{\"ea\":[[],[null]]}",
-			obj: &E{},
+			obj:  &E{},
 		},
 		{
 			data: "{\"ea\":{\"a\":[],\"b\":null}}",
-			obj: &E{},
+			obj:  &E{},
 		},
 		{
 			data: "{\"fa\":\"fa\",\"fb\":{\"a\":\"a\"}}",
@@ -436,5 +436,27 @@ func TestUnrecognized(t *testing.T) {
 		if t.Failed() {
 			break
 		}
+	}
+}
+
+func TestFloatIntConversion(t *testing.T) {
+	unstr := map[string]interface{}{"fd": float64(3)}
+
+	var obj F
+	if err := DefaultConverter.FromUnstructured(unstr, &obj); err != nil {
+		t.Errorf("Unexpected error in FromUnstructured: %v", err)
+	}
+
+	data, err := json.Marshal(unstr)
+	if err != nil {
+		t.Fatalf("Error when marshaling unstructured: %v", err)
+	}
+	var unmarshalled F
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		t.Fatalf("Error when unmarshaling to object: %v", err)
+	}
+
+	if !reflect.DeepEqual(obj, unmarshalled) {
+		t.Errorf("Incorrect conversion, diff: %v", diff.ObjectReflectDiff(obj, unmarshalled))
 	}
 }

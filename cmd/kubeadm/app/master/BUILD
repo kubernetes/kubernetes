@@ -12,7 +12,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "apiclient.go",
-        "discovery.go",
         "manifests.go",
         "selfhosted.go",
         "templates.go",
@@ -23,6 +22,9 @@ go_library(
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
+        "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
+        "//pkg/bootstrap/api:go_default_library",
+        "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -35,8 +37,6 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
-        "//vendor:k8s.io/client-go/tools/clientcmd",
-        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 
@@ -48,6 +48,7 @@ go_test(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
         "//vendor:k8s.io/client-go/pkg/api/v1",
     ],
 )

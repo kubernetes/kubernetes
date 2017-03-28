@@ -15,6 +15,7 @@
 package mvcc
 
 import (
+	"bytes"
 	"errors"
 	"sync"
 
@@ -96,6 +97,12 @@ type watchStream struct {
 // Watch creates a new watcher in the stream and returns its WatchID.
 // TODO: return error if ws is closed?
 func (ws *watchStream) Watch(key, end []byte, startRev int64) WatchID {
+	// prevent wrong range where key >= end lexicographically
+	// watch request with 'WithFromKey' has empty-byte range end
+	if len(end) != 0 && bytes.Compare(key, end) != -1 {
+		return -1
+	}
+
 	ws.mu.Lock()
 	defer ws.mu.Unlock()
 	if ws.closed {

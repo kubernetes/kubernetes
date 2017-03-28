@@ -23,8 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	// Import solely to initialize client auth plugins.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 // MatchesServerVersion queries the server to compares the build version

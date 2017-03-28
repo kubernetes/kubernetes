@@ -77,6 +77,14 @@ func (plugin *testPlugins) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *testPlugins) SupportsMountOption() bool {
+	return false
+}
+
+func (plugin *testPlugins) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *testPlugins) NewMounter(spec *Spec, podRef *v1.Pod, opts VolumeOptions) (Mounter, error) {
 	return nil, nil
 }

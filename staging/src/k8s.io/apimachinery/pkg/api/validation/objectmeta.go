@@ -171,8 +171,26 @@ func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn 
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(meta.OwnerReferences, fldPath.Child("ownerReferences"))...)
-	for _, finalizer := range meta.Finalizers {
-		allErrs = append(allErrs, ValidateFinalizerName(finalizer, fldPath.Child("finalizers"))...)
+	allErrs = append(allErrs, ValidateFinalizers(meta.Finalizers, fldPath.Child("finalizers"))...)
+	return allErrs
+}
+
+// ValidateFinalizers tests if the finalizers name are valid, and if there are conflicting finalizers.
+func ValidateFinalizers(finalizers []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	hasFinalizerOrphanDependents := false
+	hasFinalizerDeleteDependents := false
+	for _, finalizer := range finalizers {
+		allErrs = append(allErrs, ValidateFinalizerName(finalizer, fldPath)...)
+		if finalizer == metav1.FinalizerOrphanDependents {
+			hasFinalizerOrphanDependents = true
+		}
+		if finalizer == metav1.FinalizerDeleteDependents {
+			hasFinalizerDeleteDependents = true
+		}
+	}
+	if hasFinalizerDeleteDependents && hasFinalizerOrphanDependents {
+		allErrs = append(allErrs, field.Invalid(fldPath, finalizers, fmt.Sprintf("finalizer %s and %s cannot be both set", metav1.FinalizerOrphanDependents, metav1.FinalizerDeleteDependents)))
 	}
 	return allErrs
 }

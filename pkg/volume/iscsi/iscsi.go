@@ -82,6 +82,14 @@ func (plugin *iscsiPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *iscsiPlugin) SupportsMountOption() bool {
+	return true
+}
+
+func (plugin *iscsiPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -121,10 +129,11 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 			iface:   iface,
 			manager: manager,
 			plugin:  plugin},
-		fsType:     iscsi.FSType,
-		readOnly:   readOnly,
-		mounter:    &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
-		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
+		fsType:       iscsi.FSType,
+		readOnly:     readOnly,
+		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+		deviceUtil:   ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
+		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -184,10 +193,11 @@ func (iscsi *iscsiDisk) GetPath() string {
 
 type iscsiDiskMounter struct {
 	*iscsiDisk
-	readOnly   bool
-	fsType     string
-	mounter    *mount.SafeFormatAndMount
-	deviceUtil ioutil.DeviceUtil
+	readOnly     bool
+	fsType       string
+	mounter      *mount.SafeFormatAndMount
+	deviceUtil   ioutil.DeviceUtil
+	mountOptions []string
 }
 
 var _ volume.Mounter = &iscsiDiskMounter{}

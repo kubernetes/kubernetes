@@ -236,7 +236,7 @@ func (t *Tester) delete(ctx genericapirequest.Context, obj runtime.Object) error
 	if !ok {
 		return fmt.Errorf("Expected deleting storage, got %v", t.storage)
 	}
-	_, err = deleter.Delete(ctx, objectMeta.Name, nil)
+	_, _, err = deleter.Delete(ctx, objectMeta.Name, nil)
 	return err
 }
 
@@ -765,9 +765,12 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 		t.Errorf("unexpected error: %v", err)
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
-	obj, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(10))
+	obj, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(10))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if !wasDeleted {
+		t.Errorf("unexpected, object %s should have been deleted immediately", objectMeta.Name)
 	}
 	if !t.returnDeletedObject {
 		if status, ok := obj.(*metav1.Status); !ok {
@@ -786,7 +789,7 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 func (t *Tester) testDeleteNonExist(obj runtime.Object) {
 	objectMeta := t.getObjectMetaOrFail(obj)
 
-	_, err := t.storage.(rest.GracefulDeleter).Delete(t.TestContext(), objectMeta.Name, nil)
+	_, _, err := t.storage.(rest.GracefulDeleter).Delete(t.TestContext(), objectMeta.Name, nil)
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -805,12 +808,12 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	obj, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewPreconditionDeleteOptions("UID1111"))
+	obj, _, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewPreconditionDeleteOptions("UID1111"))
 	if err == nil || !errors.IsConflict(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	obj, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewPreconditionDeleteOptions("UID0000"))
+	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewPreconditionDeleteOptions("UID0000"))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -842,9 +845,12 @@ func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, createFn Creat
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.Generation
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, &metav1.DeleteOptions{})
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.Name)
 	}
 	if _, err := getFn(ctx, foo); err != nil {
 		t.Fatalf("did not gracefully delete resource: %v", err)
@@ -873,9 +879,12 @@ func (t *Tester) testDeleteGracefulWithValue(obj runtime.Object, createFn Create
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.Generation
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace+2))
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace+2))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.Name)
 	}
 	if _, err := getFn(ctx, foo); err != nil {
 		t.Fatalf("did not gracefully delete resource: %v", err)
@@ -904,18 +913,24 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFun
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.Generation
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace))
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.Name)
 	}
 	if _, err := getFn(ctx, foo); err != nil {
 		t.Fatalf("did not gracefully delete resource: %v", err)
 	}
 
 	// second delete duration is ignored
-	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace+2))
+	_, wasDeleted, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace+2))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.Name)
 	}
 	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name, &metav1.GetOptions{})
 	if err != nil {
@@ -940,18 +955,24 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.Generation
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace))
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.Name)
 	}
 	if _, err := getFn(ctx, foo); err != nil {
 		t.Fatalf("did not gracefully delete resource: %v", err)
 	}
 
 	// second delete is immediate, resource is deleted
-	out, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(0))
+	out, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if wasDeleted != true {
+		t.Errorf("unexpected, object %s should have been deleted immediately", objectMeta.Name)
 	}
 	_, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name, &metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
@@ -976,9 +997,12 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn Cr
 		t.Errorf("unexpected error: %v", err)
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, nil)
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if !wasDeleted {
+		t.Errorf("unexpected, object %s should have been deleted immediately", objectMeta.Name)
 	}
 	if _, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 		t.Errorf("unexpected error, object should not exist: %v", err)
@@ -999,9 +1023,12 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 		bigGrace = 2 * expectedGrace
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
-	_, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(bigGrace))
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(bigGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.Name)
 	}
 	object, err := getFn(ctx, foo)
 	if err != nil {
@@ -1011,9 +1038,12 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 	deletionTimestamp := *objectMeta.DeletionTimestamp
 
 	// second delete duration is ignored
-	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace))
+	_, wasDeleted, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, metav1.NewDeleteOptions(expectedGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.Name)
 	}
 	object, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name, &metav1.GetOptions{})
 	if err != nil {

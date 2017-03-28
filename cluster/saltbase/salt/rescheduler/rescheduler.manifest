@@ -1,17 +1,17 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: rescheduler-v0.2.1
+  name: rescheduler-v0.3.0
   namespace: kube-system
   labels:
     k8s-app: rescheduler
-    version: v0.2.1
+    version: v0.3.0
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "Rescheduler"
 spec:
   hostNetwork: true
   containers:
-  - image: gcr.io/google_containers/rescheduler:v0.2.1
+  - image: gcr.io/google-containers/rescheduler:v0.3.0
     name: rescheduler
     volumeMounts:
     - mountPath: /var/log/rescheduler.log

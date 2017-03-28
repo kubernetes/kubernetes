@@ -48,7 +48,11 @@ const (
 	defaultIPTablesDropBit       = 15
 )
 
-var zeroDuration = metav1.Duration{}
+var (
+	zeroDuration = metav1.Duration{}
+	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	defaultNodeAllocatableEnforcement = []string{"pods"}
+)
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	RegisterDefaults(scheme)
@@ -203,9 +207,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.CertDirectory == "" {
 		obj.CertDirectory = "/var/run/kubernetes"
-	}
-	if obj.CgroupsPerQOS == nil {
-		obj.CgroupsPerQOS = boolVar(false)
 	}
 	if obj.ContainerRuntime == "" {
 		obj.ContainerRuntime = "docker"
@@ -383,6 +384,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.KubeReserved == nil {
 		obj.KubeReserved = make(map[string]string)
 	}
+	if obj.ExperimentalQOSReserved == nil {
+		obj.ExperimentalQOSReserved = make(map[string]string)
+	}
 	if obj.MakeIPTablesUtilChains == nil {
 		obj.MakeIPTablesUtilChains = boolVar(true)
 	}
@@ -395,21 +399,14 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.IPTablesDropBit = &temp
 	}
 	if obj.CgroupsPerQOS == nil {
-		temp := false
+		temp := true
 		obj.CgroupsPerQOS = &temp
 	}
 	if obj.CgroupDriver == "" {
 		obj.CgroupDriver = "cgroupfs"
 	}
-	// NOTE: this is for backwards compatibility with earlier releases where cgroup-root was optional.
-	// if cgroups per qos is not enabled, and cgroup-root is not specified, we need to default to the
-	// container runtime default and not default to the root cgroup.
-	if obj.CgroupsPerQOS != nil {
-		if *obj.CgroupsPerQOS {
-			if obj.CgroupRoot == "" {
-				obj.CgroupRoot = "/"
-			}
-		}
+	if obj.EnforceNodeAllocatable == nil {
+		obj.EnforceNodeAllocatable = defaultNodeAllocatableEnforcement
 	}
 	if obj.EnableCRI == nil {
 		obj.EnableCRI = boolVar(true)

@@ -26,6 +26,8 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 

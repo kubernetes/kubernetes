@@ -17,9 +17,13 @@ limitations under the License.
 package pod
 
 import (
+	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -189,4 +193,147 @@ func TestFindPort(t *testing.T) {
 			t.Errorf("wrong result for %s: expected %d, got %d", tc.name, tc.expected, port)
 		}
 	}
+}
+
+func TestPodSecrets(t *testing.T) {
+	// Stub containing all possible secret references in a pod.
+	// The names of the referenced secrets match struct paths detected by reflection.
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				EnvFrom: []v1.EnvFromSource{{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "Spec.Containers[*].EnvFrom[*].SecretRef"}}}},
+				Env: []v1.EnvVar{{
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef"}}}}}}},
+			ImagePullSecrets: []v1.LocalObjectReference{{
+				Name: "Spec.ImagePullSecrets"}},
+			InitContainers: []v1.Container{{
+				EnvFrom: []v1.EnvFromSource{{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "Spec.InitContainers[*].EnvFrom[*].SecretRef"}}}},
+				Env: []v1.EnvVar{{
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef"}}}}}}},
+			Volumes: []v1.Volume{{
+				VolumeSource: v1.VolumeSource{
+					AzureFile: &v1.AzureFileVolumeSource{
+						SecretName: "Spec.Volumes[*].VolumeSource.AzureFile.SecretName"}}}, {
+				VolumeSource: v1.VolumeSource{
+					CephFS: &v1.CephFSVolumeSource{
+						SecretRef: &v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.CephFS.SecretRef"}}}}, {
+				VolumeSource: v1.VolumeSource{
+					FlexVolume: &v1.FlexVolumeSource{
+						SecretRef: &v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.FlexVolume.SecretRef"}}}}, {
+				VolumeSource: v1.VolumeSource{
+					Projected: &v1.ProjectedVolumeSource{
+						Sources: []v1.VolumeProjection{{
+							Secret: &v1.SecretProjection{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: "Spec.Volumes[*].VolumeSource.Projected.Sources[*].Secret"}}}}}}}, {
+				VolumeSource: v1.VolumeSource{
+					RBD: &v1.RBDVolumeSource{
+						SecretRef: &v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.RBD.SecretRef"}}}}, {
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName: "Spec.Volumes[*].VolumeSource.Secret.SecretName"}}}, {
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName: "Spec.Volumes[*].VolumeSource.Secret"}}}, {
+				VolumeSource: v1.VolumeSource{
+					ScaleIO: &v1.ScaleIOVolumeSource{
+						SecretRef: &v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef"}}}}},
+		},
+	}
+	extractedNames := sets.NewString()
+	VisitPodSecretNames(pod, func(name string) bool {
+		extractedNames.Insert(name)
+		return true
+	})
+
+	// excludedSecretPaths holds struct paths to fields with "secret" in the name that are not actually references to secret API objects
+	excludedSecretPaths := sets.NewString(
+		"Spec.Volumes[*].VolumeSource.CephFS.SecretFile",
+	)
+	// expectedSecretPaths holds struct paths to fields with "secret" in the name that are references to secret API objects.
+	// every path here should be represented as an example in the Pod stub above, with the secret name set to the path.
+	expectedSecretPaths := sets.NewString(
+		"Spec.Containers[*].EnvFrom[*].SecretRef",
+		"Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef",
+		"Spec.ImagePullSecrets",
+		"Spec.InitContainers[*].EnvFrom[*].SecretRef",
+		"Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef",
+		"Spec.Volumes[*].VolumeSource.AzureFile.SecretName",
+		"Spec.Volumes[*].VolumeSource.CephFS.SecretRef",
+		"Spec.Volumes[*].VolumeSource.FlexVolume.SecretRef",
+		"Spec.Volumes[*].VolumeSource.Projected.Sources[*].Secret",
+		"Spec.Volumes[*].VolumeSource.RBD.SecretRef",
+		"Spec.Volumes[*].VolumeSource.Secret",
+		"Spec.Volumes[*].VolumeSource.Secret.SecretName",
+		"Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef",
+	)
+	secretPaths := collectSecretPaths(t, nil, "", reflect.TypeOf(&v1.Pod{}))
+	secretPaths = secretPaths.Difference(excludedSecretPaths)
+	if missingPaths := expectedSecretPaths.Difference(secretPaths); len(missingPaths) > 0 {
+		t.Logf("Missing expected secret paths:\n%s", strings.Join(missingPaths.List(), "\n"))
+		t.Error("Missing expected secret paths. Verify VisitPodSecretNames() is correctly finding the missing paths, then correct expectedSecretPaths")
+	}
+	if extraPaths := secretPaths.Difference(expectedSecretPaths); len(extraPaths) > 0 {
+		t.Logf("Extra secret paths:\n%s", strings.Join(extraPaths.List(), "\n"))
+		t.Error("Extra fields with 'secret' in the name found. Verify VisitPodSecretNames() is including these fields if appropriate, then correct expectedSecretPaths")
+	}
+
+	if missingNames := expectedSecretPaths.Difference(extractedNames); len(missingNames) > 0 {
+		t.Logf("Missing expected secret names:\n%s", strings.Join(missingNames.List(), "\n"))
+		t.Error("Missing expected secret names. Verify the pod stub above includes these references, then verify VisitPodSecretNames() is correctly finding the missing names")
+	}
+	if extraNames := extractedNames.Difference(expectedSecretPaths); len(extraNames) > 0 {
+		t.Logf("Extra secret names:\n%s", strings.Join(extraNames.List(), "\n"))
+		t.Error("Extra secret names extracted. Verify VisitPodSecretNames() is correctly extracting secret names")
+	}
+}
+
+// collectSecretPaths traverses the object, computing all the struct paths that lead to fields with "secret" in the name.
+func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.Type) sets.String {
+	secretPaths := sets.NewString()
+
+	if tp.Kind() == reflect.Ptr {
+		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
+		return secretPaths
+	}
+
+	if strings.Contains(strings.ToLower(name), "secret") {
+		secretPaths.Insert(path.String())
+	}
+
+	switch tp.Kind() {
+	case reflect.Ptr:
+		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
+	case reflect.Struct:
+		for i := 0; i < tp.NumField(); i++ {
+			field := tp.Field(i)
+			secretPaths.Insert(collectSecretPaths(t, path.Child(field.Name), field.Name, field.Type).List()...)
+		}
+	case reflect.Interface:
+		t.Errorf("cannot find secret fields in interface{} field %s", path.String())
+	case reflect.Map:
+		secretPaths.Insert(collectSecretPaths(t, path.Key("*"), "", tp.Elem()).List()...)
+	case reflect.Slice:
+		secretPaths.Insert(collectSecretPaths(t, path.Key("*"), "", tp.Elem()).List()...)
+	default:
+		// all primitive types
+	}
+
+	return secretPaths
 }

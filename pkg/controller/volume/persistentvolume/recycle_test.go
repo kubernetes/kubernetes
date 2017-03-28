@@ -33,8 +33,8 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// recycle volume bound by controller
 			"6-1 - successful recycle",
-			newVolumeArray("volume6-1", "1Gi", "uid6-1", "claim6-1", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, annBoundByController),
-			newVolumeArray("volume6-1", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle),
+			newVolumeArray("volume6-1", "1Gi", "uid6-1", "claim6-1", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, annBoundByController),
+			newVolumeArray("volume6-1", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			noclaims,
 			noclaims,
 			noevents, noerrors,
@@ -45,8 +45,8 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// recycle volume bound by user
 			"6-2 - successful recycle with prebound volume",
-			newVolumeArray("volume6-2", "1Gi", "uid6-2", "claim6-2", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle),
-			newVolumeArray("volume6-2", "1Gi", "", "claim6-2", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle),
+			newVolumeArray("volume6-2", "1Gi", "uid6-2", "claim6-2", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			newVolumeArray("volume6-2", "1Gi", "", "claim6-2", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			noclaims,
 			noclaims,
 			noevents, noerrors,
@@ -57,17 +57,17 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// recycle failure - plugin not found
 			"6-3 - plugin not found",
-			newVolumeArray("volume6-3", "1Gi", "uid6-3", "claim6-3", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle),
-			withMessage("No recycler plugin found for the volume!", newVolumeArray("volume6-3", "1Gi", "uid6-3", "claim6-3", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle)),
+			newVolumeArray("volume6-3", "1Gi", "uid6-3", "claim6-3", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			withMessage("No recycler plugin found for the volume!", newVolumeArray("volume6-3", "1Gi", "uid6-3", "claim6-3", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle, classEmpty)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors, testSyncVolume,
 		},
 		{
-			// recycle failure - newRecycler returns error
+			// recycle failure - Recycle returns error
 			"6-4 - newRecycler returns error",
-			newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle),
-			withMessage("Failed to create recycler: Mock plugin error: no recycleCalls configured", newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle)),
+			newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			withMessage("Recycle failed: Mock plugin error: no recycleCalls configured", newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle, classEmpty)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
@@ -76,8 +76,8 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// recycle failure - recycle returns error
 			"6-5 - recycle returns error",
-			newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle),
-			withMessage("Recycler failed: Mock recycle error", newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle)),
+			newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			withMessage("Recycle failed: Mock recycle error", newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle, classEmpty)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
@@ -86,7 +86,7 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// recycle success(?) - volume is deleted before doRecycle() starts
 			"6-6 - volume is deleted before recycling",
-			newVolumeArray("volume6-6", "1Gi", "uid6-6", "claim6-6", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle),
+			newVolumeArray("volume6-6", "1Gi", "uid6-6", "claim6-6", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			novolumes,
 			noclaims,
 			noclaims,
@@ -103,8 +103,8 @@ func TestRecycleSync(t *testing.T) {
 			// at the time new doRecycle() starts. This simulates "volume no
 			// longer needs recycling, skipping".
 			"6-7 - volume is deleted before recycling",
-			newVolumeArray("volume6-7", "1Gi", "uid6-7", "claim6-7", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, annBoundByController),
-			newVolumeArray("volume6-7", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle),
+			newVolumeArray("volume6-7", "1Gi", "uid6-7", "claim6-7", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, annBoundByController),
+			newVolumeArray("volume6-7", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			noclaims,
 			noclaims,
 			noevents, noerrors,
@@ -124,8 +124,8 @@ func TestRecycleSync(t *testing.T) {
 			// "volume no longer needs recycling, skipping" with volume bound by
 			// user.
 			"6-8 - prebound volume is deleted before recycling",
-			newVolumeArray("volume6-8", "1Gi", "uid6-8", "claim6-8", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle),
-			newVolumeArray("volume6-8", "1Gi", "", "claim6-8", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle),
+			newVolumeArray("volume6-8", "1Gi", "uid6-8", "claim6-8", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			newVolumeArray("volume6-8", "1Gi", "", "claim6-8", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			noclaims,
 			noclaims,
 			noevents, noerrors,
@@ -142,10 +142,10 @@ func TestRecycleSync(t *testing.T) {
 			// recycle success - volume bound by user is recycled, while a new
 			// claim is created with another UID.
 			"6-9 - prebound volume is recycled while the claim exists",
-			newVolumeArray("volume6-9", "1Gi", "uid6-9", "claim6-9", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle),
-			newVolumeArray("volume6-9", "1Gi", "", "claim6-9", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle),
-			newClaimArray("claim6-9", "uid6-9-x", "10Gi", "", v1.ClaimPending),
-			newClaimArray("claim6-9", "uid6-9-x", "10Gi", "", v1.ClaimPending),
+			newVolumeArray("volume6-9", "1Gi", "uid6-9", "claim6-9", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			newVolumeArray("volume6-9", "1Gi", "", "claim6-9", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			newClaimArray("claim6-9", "uid6-9-x", "10Gi", "", v1.ClaimPending, nil),
+			newClaimArray("claim6-9", "uid6-9-x", "10Gi", "", v1.ClaimPending, nil),
 			noevents, noerrors,
 			// Inject recycler into the controller and call syncVolume. The
 			// recycler simulates one recycle() call that succeeds.
@@ -154,8 +154,8 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// volume has unknown reclaim policy - failure expected
 			"6-10 - unknown reclaim policy",
-			newVolumeArray("volume6-10", "1Gi", "uid6-10", "claim6-10", v1.VolumeBound, "Unknown"),
-			withMessage("Volume has unrecognized PersistentVolumeReclaimPolicy", newVolumeArray("volume6-10", "1Gi", "uid6-10", "claim6-10", v1.VolumeFailed, "Unknown")),
+			newVolumeArray("volume6-10", "1Gi", "uid6-10", "claim6-10", v1.VolumeBound, "Unknown", classEmpty),
+			withMessage("Volume has unrecognized PersistentVolumeReclaimPolicy", newVolumeArray("volume6-10", "1Gi", "uid6-10", "claim6-10", v1.VolumeFailed, "Unknown", classEmpty)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeUnknownReclaimPolicy"}, noerrors, testSyncVolume,
@@ -184,8 +184,8 @@ func TestRecycleMultiSync(t *testing.T) {
 			// recycle failure - recycle returns error. The controller should
 			// try again.
 			"7-1 - recycle returns error",
-			newVolumeArray("volume7-1", "1Gi", "uid7-1", "claim7-1", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle),
-			newVolumeArray("volume7-1", "1Gi", "", "claim7-1", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle),
+			newVolumeArray("volume7-1", "1Gi", "uid7-1", "claim7-1", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			newVolumeArray("volume7-1", "1Gi", "", "claim7-1", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,

@@ -20,7 +20,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/client-go/pkg/api"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	rest "k8s.io/client-go/rest"
 )
@@ -99,7 +99,7 @@ func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -112,7 +112,7 @@ func (c *roleBindings) Get(name string, options v1.GetOptions) (result *v1alpha1
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,7 +124,7 @@ func (c *roleBindings) List(opts v1.ListOptions) (result *v1alpha1.RoleBindingLi
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("rolebindings").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -132,11 +132,11 @@ func (c *roleBindings) List(opts v1.ListOptions) (result *v1alpha1.RoleBindingLi
 
 // Watch returns a watch.Interface that watches the requested roleBindings.
 func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Namespace(c.ns).
 		Resource("rolebindings").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

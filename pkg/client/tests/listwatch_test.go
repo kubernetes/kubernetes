@@ -122,8 +122,8 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// Node
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePathWithPrefix("watch", "nodes", metav1.NamespaceAll, ""),
-				buildQueryValues(url.Values{})),
+				testapi.Default.ResourcePath("nodes", metav1.NamespaceAll, ""),
+				buildQueryValues(url.Values{"watch": []string{"true"}})),
 			rv:            "",
 			resource:      "nodes",
 			namespace:     metav1.NamespaceAll,
@@ -131,8 +131,8 @@ func TestListWatchesCanWatch(t *testing.T) {
 		},
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePathWithPrefix("watch", "nodes", metav1.NamespaceAll, ""),
-				buildQueryValues(url.Values{"resourceVersion": []string{"42"}})),
+				testapi.Default.ResourcePath("nodes", metav1.NamespaceAll, ""),
+				buildQueryValues(url.Values{"resourceVersion": []string{"42"}, "watch": []string{"true"}})),
 			rv:            "42",
 			resource:      "nodes",
 			namespace:     metav1.NamespaceAll,
@@ -141,8 +141,8 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// pod with "assigned" field selector.
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePathWithPrefix("watch", "pods", metav1.NamespaceAll, ""),
-				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}})),
+				testapi.Default.ResourcePath("pods", metav1.NamespaceAll, ""),
+				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}, "watch": []string{"true"}})),
 			rv:            "0",
 			resource:      "pods",
 			namespace:     metav1.NamespaceAll,
@@ -151,8 +151,8 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// pod with namespace foo and assigned field selector
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePathWithPrefix("watch", "pods", "foo", ""),
-				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}})),
+				testapi.Default.ResourcePath("pods", "foo", ""),
+				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}, "watch": []string{"true"}})),
 			rv:            "0",
 			resource:      "pods",
 			namespace:     "foo",

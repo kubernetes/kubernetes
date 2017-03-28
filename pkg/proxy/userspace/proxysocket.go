@@ -32,20 +32,20 @@ import (
 )
 
 // Abstraction over TCP/UDP sockets which are proxied.
-type proxySocket interface {
-	// Addr gets the net.Addr for a proxySocket.
+type ProxySocket interface {
+	// Addr gets the net.Addr for a ProxySocket.
 	Addr() net.Addr
-	// Close stops the proxySocket from accepting incoming connections.
+	// Close stops the ProxySocket from accepting incoming connections.
 	// Each implementation should comment on the impact of calling Close
 	// while sessions are active.
 	Close() error
 	// ProxyLoop proxies incoming connections for the specified service to the service endpoints.
-	ProxyLoop(service proxy.ServicePortName, info *serviceInfo, proxier *Proxier)
-	// ListenPort returns the host port that the proxySocket is listening on
+	ProxyLoop(service proxy.ServicePortName, info *ServiceInfo, loadBalancer LoadBalancer)
+	// ListenPort returns the host port that the ProxySocket is listening on
 	ListenPort() int
 }
 
-func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, error) {
+func newProxySocket(protocol api.Protocol, ip net.IP, port int) (ProxySocket, error) {
 	host := ""
 	if ip != nil {
 		host = ip.String()
@@ -73,9 +73,9 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 }
 
 // How long we wait for a connection to a backend in seconds
-var endpointDialTimeout = []time.Duration{250 * time.Millisecond, 500 * time.Millisecond, 1 * time.Second, 2 * time.Second}
+var EndpointDialTimeouts = []time.Duration{250 * time.Millisecond, 500 * time.Millisecond, 1 * time.Second, 2 * time.Second}
 
-// tcpProxySocket implements proxySocket.  Close() is implemented by net.Listener.  When Close() is called,
+// tcpProxySocket implements ProxySocket.  Close() is implemented by net.Listener.  When Close() is called,
 // no new connections are allowed but existing connections are left untouched.
 type tcpProxySocket struct {
 	net.Listener
@@ -86,10 +86,12 @@ func (tcp *tcpProxySocket) ListenPort() int {
 	return tcp.port
 }
 
-func tryConnect(service proxy.ServicePortName, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
+// TryConnectEndpoints attempts to connect to the next available endpoint for the given service, cycling
+// through until it is able to successully connect, or it has tried with all timeouts in EndpointDialTimeouts.
+func TryConnectEndpoints(service proxy.ServicePortName, srcAddr net.Addr, protocol string, loadBalancer LoadBalancer) (out net.Conn, err error) {
 	sessionAffinityReset := false
-	for _, dialTimeout := range endpointDialTimeout {
-		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr, sessionAffinityReset)
+	for _, dialTimeout := range EndpointDialTimeouts {
+		endpoint, err := loadBalancer.NextEndpoint(service, srcAddr, sessionAffinityReset)
 		if err != nil {
 			glog.Errorf("Couldn't find an endpoint for %s: %v", service, err)
 			return nil, err
@@ -111,9 +113,9 @@ func tryConnect(service proxy.ServicePortName, srcAddr net.Addr, protocol string
 	return nil, fmt.Errorf("failed to connect to an endpoint.")
 }
 
-func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
+func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *ServiceInfo, loadBalancer LoadBalancer) {
 	for {
-		if !myInfo.isAlive() {
+		if !myInfo.IsAlive() {
 			// The service port was closed or replaced.
 			return
 		}
@@ -127,7 +129,7 @@ func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 			if isClosedError(err) {
 				return
 			}
-			if !myInfo.isAlive() {
+			if !myInfo.IsAlive() {
 				// Then the service port was just closed so the accept failure is to be expected.
 				return
 			}
@@ -135,19 +137,19 @@ func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 			continue
 		}
 		glog.V(3).Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
-		outConn, err := tryConnect(service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", proxier)
+		outConn, err := TryConnectEndpoints(service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", loadBalancer)
 		if err != nil {
 			glog.Errorf("Failed to connect to balancer: %v", err)
 			inConn.Close()
 			continue
 		}
 		// Spin up an async copy loop.
-		go proxyTCP(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
+		go ProxyTCP(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
 	}
 }
 
-// proxyTCP proxies data bi-directionally between in and out.
-func proxyTCP(in, out *net.TCPConn) {
+// ProxyTCP proxies data bi-directionally between in and out.
+func ProxyTCP(in, out *net.TCPConn) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	glog.V(4).Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
@@ -171,7 +173,7 @@ func copyBytes(direction string, dest, src *net.TCPConn, wg *sync.WaitGroup) {
 	src.Close()
 }
 
-// udpProxySocket implements proxySocket.  Close() is implemented by net.UDPConn.  When Close() is called,
+// udpProxySocket implements ProxySocket.  Close() is implemented by net.UDPConn.  When Close() is called,
 // no new connections are allowed and existing connections are broken.
 // TODO: We could lame-duck this ourselves, if it becomes important.
 type udpProxySocket struct {
@@ -188,19 +190,19 @@ func (udp *udpProxySocket) Addr() net.Addr {
 }
 
 // Holds all the known UDP clients that have not timed out.
-type clientCache struct {
-	mu      sync.Mutex
-	clients map[string]net.Conn // addr string -> connection
+type ClientCache struct {
+	Mu      sync.Mutex
+	Clients map[string]net.Conn // addr string -> connection
 }
 
-func newClientCache() *clientCache {
-	return &clientCache{clients: map[string]net.Conn{}}
+func newClientCache() *ClientCache {
+	return &ClientCache{Clients: map[string]net.Conn{}}
 }
 
-func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
+func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *ServiceInfo, loadBalancer LoadBalancer) {
 	var buffer [4096]byte // 4KiB should be enough for most whole-packets
 	for {
-		if !myInfo.isAlive() {
+		if !myInfo.IsAlive() {
 			// The service port was closed or replaced.
 			break
 		}
@@ -219,7 +221,7 @@ func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 			break
 		}
 		// If this is a client we know already, reuse the connection and goroutine.
-		svrConn, err := udp.getBackendConn(myInfo.activeClients, cliAddr, proxier, service, myInfo.timeout)
+		svrConn, err := udp.getBackendConn(myInfo.ActiveClients, cliAddr, loadBalancer, service, myInfo.Timeout)
 		if err != nil {
 			continue
 		}
@@ -233,7 +235,7 @@ func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 			}
 			continue
 		}
-		err = svrConn.SetDeadline(time.Now().Add(myInfo.timeout))
+		err = svrConn.SetDeadline(time.Now().Add(myInfo.Timeout))
 		if err != nil {
 			glog.Errorf("SetDeadline failed: %v", err)
 			continue
@@ -241,17 +243,17 @@ func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 	}
 }
 
-func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr net.Addr, proxier *Proxier, service proxy.ServicePortName, timeout time.Duration) (net.Conn, error) {
-	activeClients.mu.Lock()
-	defer activeClients.mu.Unlock()
+func (udp *udpProxySocket) getBackendConn(activeClients *ClientCache, cliAddr net.Addr, loadBalancer LoadBalancer, service proxy.ServicePortName, timeout time.Duration) (net.Conn, error) {
+	activeClients.Mu.Lock()
+	defer activeClients.Mu.Unlock()
 
-	svrConn, found := activeClients.clients[cliAddr.String()]
+	svrConn, found := activeClients.Clients[cliAddr.String()]
 	if !found {
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
 		glog.V(3).Infof("New UDP connection from %s", cliAddr)
 		var err error
-		svrConn, err = tryConnect(service, cliAddr, "udp", proxier)
+		svrConn, err = TryConnectEndpoints(service, cliAddr, "udp", loadBalancer)
 		if err != nil {
 			return nil, err
 		}
@@ -259,8 +261,8 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr ne
 			glog.Errorf("SetDeadline failed: %v", err)
 			return nil, err
 		}
-		activeClients.clients[cliAddr.String()] = svrConn
-		go func(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
+		activeClients.Clients[cliAddr.String()] = svrConn
+		go func(cliAddr net.Addr, svrConn net.Conn, activeClients *ClientCache, timeout time.Duration) {
 			defer runtime.HandleCrash()
 			udp.proxyClient(cliAddr, svrConn, activeClients, timeout)
 		}(cliAddr, svrConn, activeClients, timeout)
@@ -270,7 +272,7 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr ne
 
 // This function is expected to be called as a goroutine.
 // TODO: Track and log bytes copied, like TCP
-func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
+func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activeClients *ClientCache, timeout time.Duration) {
 	defer svrConn.Close()
 	var buffer [4096]byte
 	for {
@@ -294,7 +296,7 @@ func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activ
 			break
 		}
 	}
-	activeClients.mu.Lock()
-	delete(activeClients.clients, cliAddr.String())
-	activeClients.mu.Unlock()
+	activeClients.Mu.Lock()
+	delete(activeClients.Clients, cliAddr.String())
+	activeClients.Mu.Unlock()
 }

@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/kubelet"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
@@ -32,13 +31,13 @@ func TestValueOfAllocatableResources(t *testing.T) {
 	}{
 		{
 			kubeReserved:   "cpu=200m,memory=-150G",
-			systemReserved: "cpu=200m,memory=150G",
+			systemReserved: "cpu=200m,memory=15Ki",
 			errorExpected:  true,
 			name:           "negative quantity value",
 		},
 		{
-			kubeReserved:   "cpu=200m,memory=150GG",
-			systemReserved: "cpu=200m,memory=150G",
+			kubeReserved:   "cpu=200m,memory=150Gi",
+			systemReserved: "cpu=200m,memory=15Ky",
 			errorExpected:  true,
 			name:           "invalid quantity unit",
 		},
@@ -57,17 +56,15 @@ func TestValueOfAllocatableResources(t *testing.T) {
 		kubeReservedCM.Set(test.kubeReserved)
 		systemReservedCM.Set(test.systemReserved)
 
-		_, err := kubelet.ParseReservation(kubeReservedCM, systemReservedCM)
-		if err != nil {
-			t.Logf("%s: error returned: %v", test.name, err)
-		}
+		_, err1 := parseResourceList(kubeReservedCM)
+		_, err2 := parseResourceList(systemReservedCM)
 		if test.errorExpected {
-			if err == nil {
+			if err1 == nil && err2 == nil {
 				t.Errorf("%s: error expected", test.name)
 			}
 		} else {
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", test.name, err)
+			if err1 != nil || err2 != nil {
+				t.Errorf("%s: unexpected error: %v, %v", test.name, err1, err2)
 			}
 		}
 	}

@@ -7,6 +7,7 @@ metadata:
     k8s-app: glbc
     kubernetes.io/name: "GLBC"
     kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 spec:
   replicas: 1
   selector:
@@ -23,7 +24,7 @@ spec:
         # Any image is permissible as long as:
         # 1. It serves a 404 page at /
         # 2. It serves 200 on a /healthz endpoint
-        image: gcr.io/google_containers/defaultbackend:1.0
+        image: gcr.io/google_containers/defaultbackend:1.3
         livenessProbe:
           httpGet:
             path: /healthz

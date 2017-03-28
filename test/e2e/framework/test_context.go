@@ -49,7 +49,10 @@ type TestContextType struct {
 	// Timeout for waiting for system pods to be running
 	SystemPodsStartupTimeout time.Duration
 	UpgradeTarget            string
+	EtcdUpgradeStorage       string
+	EtcdUpgradeVersion       string
 	UpgradeImage             string
+	GCEUpgradeScript         string
 	PrometheusPushGateway    string
 	ContainerRuntime         string
 	MasterOSDistro           string
@@ -75,6 +78,8 @@ type TestContextType struct {
 	CreateTestingNS CreateTestingNSFn
 	// If set to true test will dump data about the namespace in which test was running.
 	DumpLogsOnFailure bool
+	// Disables dumping cluster log from master and nodes after all tests.
+	DisableLogDump bool
 	// If the garbage collector is enabled in the kube-apiserver and kube-controller-manager.
 	GarbageCollectorEnabled bool
 	// FeatureGates is a set of key=value pairs that describe feature gates for alpha/experimental features.
@@ -83,6 +88,8 @@ type TestContextType struct {
 	NodeTestContextType
 	// Federation e2e context
 	FederatedKubeContext string
+	// Federation control plane version to upgrade to while doing upgrade tests
+	FederationUpgradeTarget string
 
 	// Viper-only parameters.  These will in time replace all flags.
 
@@ -148,6 +155,7 @@ func RegisterCommonFlags() {
 	flag.BoolVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after each test.")
 	flag.StringVar(&TestContext.OutputPrintType, "output-print-type", "hr", "Comma separated list: 'hr' for human readable summaries 'json' for JSON ones.")
 	flag.BoolVar(&TestContext.DumpLogsOnFailure, "dump-logs-on-failure", true, "If set to true test will dump data about the namespace in which test was running.")
+	flag.BoolVar(&TestContext.DisableLogDump, "disable-log-dump", false, "If set to true, logs from master and nodes won't be gathered after test run.")
 	flag.BoolVar(&TestContext.DeleteNamespace, "delete-namespace", true, "If true tests will delete namespace after completion. It is only designed to make debugging easier, DO NOT turn it off by default.")
 	flag.BoolVar(&TestContext.DeleteNamespaceOnFailure, "delete-namespace-on-failure", true, "If true, framework will delete test namespace on failure. Used only during test debugging.")
 	flag.IntVar(&TestContext.AllowedNotReadyNodes, "allowed-not-ready-nodes", 0, "If non-zero, framework will allow for that many non-ready nodes when checking for all ready nodes.")
@@ -192,7 +200,11 @@ func RegisterClusterFlags() {
 	flag.DurationVar(&TestContext.SystemPodsStartupTimeout, "system-pods-startup-timeout", 10*time.Minute, "Timeout for waiting for all system pods to be running before starting tests.")
 	flag.DurationVar(&TestContext.NodeSchedulableTimeout, "node-schedulable-timeout", 4*time.Hour, "Timeout for waiting for all nodes to be schedulable.")
 	flag.StringVar(&TestContext.UpgradeTarget, "upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
+	flag.StringVar(&TestContext.EtcdUpgradeStorage, "etcd-upgrade-storage", "", "The storage version to upgrade to (either 'etcdv2' or 'etcdv3') if doing an etcd upgrade test.")
+	flag.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
 	flag.StringVar(&TestContext.UpgradeImage, "upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
+	flag.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
+	flag.StringVar(&TestContext.FederationUpgradeTarget, "federation-upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an federation upgrade test.")
 	flag.StringVar(&TestContext.PrometheusPushGateway, "prom-push-gateway", "", "The URL to prometheus gateway, so that metrics can be pushed during e2es and scraped by prometheus. Typically something like 127.0.0.1:9091.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
 	flag.BoolVar(&TestContext.GarbageCollectorEnabled, "garbage-collector-enabled", true, "Set to true if the garbage collector is enabled in the kube-apiserver and kube-controller-manager, then some tests will rely on the garbage collector to delete dependent resources.")

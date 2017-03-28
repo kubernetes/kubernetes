@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -116,6 +115,14 @@ func (plugin *glusterfsPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *glusterfsPlugin) SupportsMountOption() bool {
+	return true
+}
+
+func (plugin *glusterfsPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -161,10 +168,12 @@ func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endp
 			pod:     pod,
 			plugin:  plugin,
 		},
-		hosts:    ep,
-		path:     source.Path,
-		readOnly: readOnly,
-		exe:      exe}, nil
+		hosts:        ep,
+		path:         source.Path,
+		readOnly:     readOnly,
+		exe:          exe,
+		mountOptions: volume.MountOptionFromSpec(spec),
+	}, nil
 }
 
 func (plugin *glusterfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -209,10 +218,11 @@ type glusterfs struct {
 
 type glusterfsMounter struct {
 	*glusterfs
-	hosts    *v1.Endpoints
-	path     string
-	readOnly bool
-	exe      exec.Interface
+	hosts        *v1.Endpoints
+	path         string
+	readOnly     bool
+	exe          exec.Interface
+	mountOptions []string
 }
 
 var _ volume.Mounter = &glusterfsMounter{}
@@ -322,7 +332,8 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 		// Avoid mount storm, pick a host randomly.
 		// Iterate all hosts until mount succeeds.
 		for _, ip := range addrlist {
-			errs = b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", options)
+			mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+			errs = b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", mountOptions)
 			if errs == nil {
 				glog.Infof("glusterfs: successfully mounted %s", dir)
 				return nil
@@ -463,7 +474,7 @@ func (p *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAllocato
 	}
 
 	for _, pv := range pvList.Items {
-		if storageutil.GetVolumeStorageClass(&pv) != className {
+		if v1.GetPersistentVolumeClass(&pv) != className {
 			continue
 		}
 
@@ -642,7 +653,7 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
 	}
 	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", r.options)
-	scName := storageutil.GetClaimStorageClass(r.options.PVC)
+	scName := v1.GetPersistentVolumeClaimClass(r.options.PVC)
 	cfg, err := parseClassParameters(r.options.Parameters, r.plugin.host.GetKubeClient())
 	if err != nil {
 		return nil, err
@@ -690,6 +701,33 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
+func (p *glusterfsVolumeProvisioner) GetClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string, err error) {
+	clusterinfo, err := cli.ClusterInfo(cluster)
+	if err != nil {
+		glog.Errorf("glusterfs: failed to get cluster details: %v", err)
+		return nil, fmt.Errorf("failed to get cluster details: %v", err)
+	}
+
+	// For the dynamically provisioned volume, we gather the list of node IPs
+	// of the cluster on which provisioned volume belongs to, as there can be multiple
+	// clusters.
+	for _, node := range clusterinfo.Nodes {
+		nodei, err := cli.NodeInfo(string(node))
+		if err != nil {
+			glog.Errorf("glusterfs: failed to get hostip: %v", err)
+			return nil, fmt.Errorf("failed to get hostip: %v", err)
+		}
+		ipaddr := dstrings.Join(nodei.NodeAddRequest.Hostnames.Storage, "")
+		dynamicHostIps = append(dynamicHostIps, ipaddr)
+	}
+	glog.V(3).Infof("glusterfs: hostlist :%v", dynamicHostIps)
+	if len(dynamicHostIps) == 0 {
+		glog.Errorf("glusterfs: no hosts found: %v", err)
+		return nil, fmt.Errorf("no hosts found: %v", err)
+	}
+	return dynamicHostIps, nil
+}
+
 func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, err error) {
 	var clusterIds []string
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -717,28 +755,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		return nil, 0, fmt.Errorf("error creating volume %v", err)
 	}
 	glog.V(1).Infof("glusterfs: volume with size: %d and name: %s created", volume.Size, volume.Name)
-	clusterinfo, err := cli.ClusterInfo(volume.Cluster)
+	dynamicHostIps, err := p.GetClusterNodes(cli, volume.Cluster)
 	if err != nil {
-		glog.Errorf("glusterfs: failed to get cluster details: %v", err)
-		return nil, 0, fmt.Errorf("failed to get cluster details: %v", err)
-	}
-	// For the above dynamically provisioned volume, we gather the list of node IPs
-	// of the cluster on which provisioned volume belongs to, as there can be multiple
-	// clusters.
-	var dynamicHostIps []string
-	for _, node := range clusterinfo.Nodes {
-		nodei, err := cli.NodeInfo(string(node))
-		if err != nil {
-			glog.Errorf("glusterfs: failed to get hostip: %v", err)
-			return nil, 0, fmt.Errorf("failed to get hostip: %v", err)
-		}
-		ipaddr := dstrings.Join(nodei.NodeAddRequest.Hostnames.Storage, "")
-		dynamicHostIps = append(dynamicHostIps, ipaddr)
-	}
-	glog.V(3).Infof("glusterfs: hostlist :%v", dynamicHostIps)
-	if len(dynamicHostIps) == 0 {
-		glog.Errorf("glusterfs: no hosts found: %v", err)
-		return nil, 0, fmt.Errorf("no hosts found: %v", err)
+		glog.Errorf("glusterfs: error [%v] when getting cluster nodes for volume %s", err, volume)
+		return nil, 0, fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
 	}
 
 	// The 'endpointname' is created in form of 'gluster-dynamic-<claimname>'.

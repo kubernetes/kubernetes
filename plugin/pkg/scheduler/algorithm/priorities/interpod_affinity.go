@@ -17,6 +17,7 @@ limitations under the License.
 package priorities
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -35,21 +36,18 @@ type InterPodAffinity struct {
 	nodeLister            algorithm.NodeLister
 	podLister             algorithm.PodLister
 	hardPodAffinityWeight int
-	failureDomains        priorityutil.Topologies
 }
 
 func NewInterPodAffinityPriority(
 	info predicates.NodeInfo,
 	nodeLister algorithm.NodeLister,
 	podLister algorithm.PodLister,
-	hardPodAffinityWeight int,
-	failureDomains []string) algorithm.PriorityFunction {
+	hardPodAffinityWeight int) algorithm.PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
 		info:                  info,
 		nodeLister:            nodeLister,
 		podLister:             podLister,
 		hardPodAffinityWeight: hardPodAffinityWeight,
-		failureDomains:        priorityutil.Topologies{DefaultKeys: failureDomains},
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority
 }
@@ -68,11 +66,11 @@ type podAffinityPriorityMap struct {
 	firstError error
 }
 
-func newPodAffinityPriorityMap(nodes []*v1.Node, failureDomains priorityutil.Topologies) *podAffinityPriorityMap {
+func newPodAffinityPriorityMap(nodes []*v1.Node) *podAffinityPriorityMap {
 	return &podAffinityPriorityMap{
 		nodes:          nodes,
 		counts:         make(map[string]float64, len(nodes)),
-		failureDomains: failureDomains,
+		failureDomains: priorityutil.Topologies{DefaultKeys: strings.Split(v1.DefaultFailureDomains, ",")},
 	}
 }
 
@@ -118,7 +116,7 @@ func (p *podAffinityPriorityMap) processTerms(terms []v1.WeightedPodAffinityTerm
 // Symmetry need to be considered for preferredDuringSchedulingIgnoredDuringExecution from podAffinity & podAntiAffinity,
 // symmetry need to be considered for hard requirements from podAffinity
 func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	affinity := pod.Spec.Affinity
+	affinity := schedulercache.ReconcileAffinity(pod)
 	hasAffinityConstraints := affinity != nil && affinity.PodAffinity != nil
 	hasAntiAffinityConstraints := affinity != nil && affinity.PodAntiAffinity != nil
 
@@ -132,14 +130,14 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	var minCount float64
 	// priorityMap stores the mapping from node name to so-far computed score of
 	// the node.
-	pm := newPodAffinityPriorityMap(nodes, ipa.failureDomains)
+	pm := newPodAffinityPriorityMap(nodes)
 
 	processPod := func(existingPod *v1.Pod) error {
 		existingPodNode, err := ipa.info.GetNodeInfo(existingPod.Spec.NodeName)
 		if err != nil {
 			return err
 		}
-		existingPodAffinity := existingPod.Spec.Affinity
+		existingPodAffinity := schedulercache.ReconcileAffinity(existingPod)
 		existingHasAffinityConstraints := existingPodAffinity != nil && existingPodAffinity.PodAffinity != nil
 		existingHasAntiAffinityConstraints := existingPodAffinity != nil && existingPodAffinity.PodAntiAffinity != nil
 

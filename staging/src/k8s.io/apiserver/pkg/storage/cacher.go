@@ -59,7 +59,7 @@ type CacherConfig struct {
 	Type           interface{}
 	ResourcePrefix string
 
-	// KeyFunc is used to get a key in the underyling storage for a given object.
+	// KeyFunc is used to get a key in the underlying storage for a given object.
 	KeyFunc func(runtime.Object) (string, error)
 
 	// GetAttrsFunc is used to get object labels and fields.

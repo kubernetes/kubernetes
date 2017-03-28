@@ -11,7 +11,7 @@ KUBE_API_ADDRESS="--insecure-bind-address=127.0.0.1"
 KUBE_API_PORT="--insecure-port=8080"
 
 # default admission control policies
-KUBE_ADMISSION_CONTROL="--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota"
+KUBE_ADMISSION_CONTROL="--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultTolerationSeconds,ResourceQuota"
 
 # Add your own!
 KUBE_API_ARGS="{{ kube_apiserver_flags }}"

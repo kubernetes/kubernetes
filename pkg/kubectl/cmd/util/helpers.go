@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -386,6 +387,14 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	return d
 }
 
+func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
+	timeout := GetFlagDuration(cmd, "pod-running-timeout")
+	if timeout <= 0 {
+		return timeout, fmt.Errorf("--pod-running-timeout must be higher than zero")
+	}
+	return timeout, nil
+}
+
 func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
 	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
@@ -402,8 +411,12 @@ func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 }
 
+func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {
+	cmd.Flags().Duration("pod-running-timeout", defaultTimeout, "The length of time (like 5s, 2m, or 3h, higher than zero) to wait until at least one pod is running")
+}
+
 func AddApplyAnnotationFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.")
+	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. Otherwise, the annotation will be unchanged. This flag is useful when you want to perform kubectl apply on this object in the future.")
 }
 
 // AddGeneratorFlags adds flags common to resource generation commands
@@ -672,7 +685,7 @@ func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *k
 
 // FilterResourceList receives a list of runtime objects.
 // If any objects are filtered, that number is returned along with a modified list.
-func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterOpts *kubectl.PrintOptions) (int, []runtime.Object, error) {
+func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterOpts *printers.PrintOptions) (int, []runtime.Object, error) {
 	items, err := meta.ExtractList(obj)
 	if err != nil {
 		return 0, []runtime.Object{obj}, utilerrors.NewAggregate([]error{err})
@@ -697,9 +710,26 @@ func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterO
 	return filterCount, list, nil
 }
 
-func PrintFilterCount(hiddenObjNum int, resource string, options *kubectl.PrintOptions) {
-	if !options.NoHeaders && !options.ShowAll && hiddenObjNum > 0 {
-		glog.V(2).Infof("  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", hiddenObjNum, resource)
+// PrintFilterCount displays informational messages based on the number of resources found, hidden, or
+// config flags shown.
+func PrintFilterCount(out io.Writer, found, hidden, errors int, resource string, options *printers.PrintOptions, ignoreNotFound bool) {
+	switch {
+	case errors > 0 || ignoreNotFound:
+		// print nothing
+	case found <= hidden:
+		if found == 0 {
+			fmt.Fprintln(out, "No resources found.")
+		} else {
+			fmt.Fprintln(out, "No resources found, use --show-all to see completed objects.")
+		}
+	case hidden > 0 && !options.ShowAll && !options.NoHeaders:
+		if glog.V(2) {
+			if hidden > 1 {
+				fmt.Fprintf(out, "info: %d objects not shown, use --show-all to see completed objects.\n", hidden)
+			} else {
+				fmt.Fprintf(out, "info: 1 object not shown, use --show-all to see completed objects.\n")
+			}
+		}
 	}
 }
 

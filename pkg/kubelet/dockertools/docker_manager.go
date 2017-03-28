@@ -78,11 +78,12 @@ import (
 )
 
 const (
-	DockerType = "docker"
+	DockerType                 = "docker"
+	dockerDefaultLoggingDriver = "json-file"
 
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker version should be at least 1.9.x
-	minimumDockerAPIVersion = "1.21"
+	// docker version should be at least 1.10.x
+	minimumDockerAPIVersion = "1.22"
 
 	// Remote API version for docker daemon versions
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
@@ -405,6 +406,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 
 	// default to the image ID, but try and inspect for the RepoDigests
 	imageID := DockerPrefix + iResult.Image
+	imageName := iResult.Config.Image
 	imgInspectResult, err := dm.client.InspectImageByID(iResult.Image)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", iResult.Image, containerName, err))
@@ -416,12 +418,12 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		if len(imgInspectResult.RepoDigests) > 0 {
 			imageID = DockerPullablePrefix + imgInspectResult.RepoDigests[0]
 		}
+
+		if len(imgInspectResult.RepoTags) > 0 {
+			imageName = imgInspectResult.RepoTags[0]
+		}
 	}
 
-	imageName := iResult.Config.Image
-	if len(imgInspectResult.RepoTags) > 0 {
-		imageName = imgInspectResult.RepoTags[0]
-	}
 	status := kubecontainer.ContainerStatus{
 		Name:         containerName,
 		RestartCount: containerInfo.RestartCount,
@@ -695,7 +697,7 @@ func (dm *DockerManager) runContainer(
 		// here we just add a unique container id to make the path unique for different instances
 		// of the same container.
 		containerLogPath := path.Join(opts.PodContainerDir, cid)
-		fs, err := os.Create(containerLogPath)
+		fs, err := dm.os.Create(containerLogPath)
 		if err != nil {
 			// TODO: Clean up the previously created dir? return the error?
 			utilruntime.HandleError(fmt.Errorf("error creating termination-log file %q: %v", containerLogPath, err))
@@ -706,7 +708,7 @@ func (dm *DockerManager) runContainer(
 			// open(2) to create the file, so the final mode used is "mode &
 			// ~umask". But we want to make sure the specified mode is used
 			// in the file no matter what the umask is.
-			if err := os.Chmod(containerLogPath, 0666); err != nil {
+			if err := dm.os.Chmod(containerLogPath, 0666); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %v", containerLogPath, err))
 			}
 
@@ -857,6 +859,8 @@ func (dm *DockerManager) runContainer(
 
 // setInfraContainerNetworkConfig sets the network configuration for the infra-container. We only set network configuration for infra-container, all
 // the user containers will share the same network namespace with infra-container.
+// NOTE: cluster dns settings aren't passed anymore to docker api in all cases, not only for pods with host network:
+// the resolver conf will be overwritten after infra-container creation to override docker's behaviour
 func setInfraContainerNetworkConfig(pod *v1.Pod, netMode string, opts *kubecontainer.RunContainerOptions, dockerOpts *dockertypes.ContainerCreateConfig) {
 	exposedPorts, portBindings := makePortsAndBindings(opts.PortMappings)
 	dockerOpts.Config.ExposedPorts = exposedPorts
@@ -864,12 +868,6 @@ func setInfraContainerNetworkConfig(pod *v1.Pod, netMode string, opts *kubeconta
 
 	if netMode != namespaceModeHost {
 		dockerOpts.Config.Hostname = opts.Hostname
-		if len(opts.DNS) > 0 {
-			dockerOpts.HostConfig.DNS = opts.DNS
-		}
-		if len(opts.DNSSearch) > 0 {
-			dockerOpts.HostConfig.DNSSearch = opts.DNSSearch
-		}
 	}
 }
 
@@ -1758,7 +1756,7 @@ func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container,
 		glog.V(5).Infof("Generating ref for container %s: %#v", container.Name, ref)
 	}
 
-	opts, err := dm.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
+	opts, useClusterFirstPolicy, err := dm.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
 	if err != nil {
 		return kubecontainer.ContainerID{}, fmt.Errorf("GenerateRunContainerOptions: %v", err)
 	}
@@ -1796,14 +1794,31 @@ func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container,
 		return kubecontainer.ContainerID{}, fmt.Errorf("InspectContainer: %v", err)
 	}
 
-	// Create a symbolic link to the Docker container log file using a name which captures the
-	// full pod name, the container name and the Docker container ID. Cluster level logging will
-	// capture these symbolic filenames which can be used for search terms in Elasticsearch or for
-	// labels for Cloud Logging.
 	containerLogFile := containerInfo.LogPath
-	symlinkFile := LogSymlink(dm.containerLogsDir, kubecontainer.GetPodFullName(pod), container.Name, id.ID)
-	if err = dm.os.Symlink(containerLogFile, symlinkFile); err != nil {
-		glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", format.Pod(pod), container.Name, err)
+	if containerLogFile != "" {
+		// Create a symbolic link to the Docker container log file using a name which captures the
+		// full pod name, the container name and the Docker container ID. Cluster level logging will
+		// capture these symbolic filenames which can be used for search terms in Elasticsearch or for
+		// labels for Cloud Logging.
+		symlinkFile := LogSymlink(dm.containerLogsDir, kubecontainer.GetPodFullName(pod), container.Name, id.ID)
+		if err = dm.os.Symlink(containerLogFile, symlinkFile); err != nil {
+			glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", format.Pod(pod), container.Name, err)
+		}
+	} else {
+		dockerLoggingDriver := ""
+		dockerInfo, err := dm.client.Info()
+		if err != nil {
+			glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
+		} else {
+			dockerLoggingDriver = dockerInfo.LoggingDriver
+			glog.V(10).Infof("Docker logging driver is %s", dockerLoggingDriver)
+		}
+
+		if dockerLoggingDriver == dockerDefaultLoggingDriver {
+			glog.Errorf("Cannot create symbolic link because container log file doesn't exist!")
+		} else {
+			glog.V(5).Infof("Unsupported logging driver: %s", dockerLoggingDriver)
+		}
 	}
 
 	// Check if current docker version is higher than 1.10. Otherwise, we have to apply OOMScoreAdj instead of using docker API.
@@ -1812,14 +1827,15 @@ func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container,
 		return kubecontainer.ContainerID{}, err
 	}
 
-	// The addNDotsOption call appends the ndots option to the resolv.conf file generated by docker.
+	// Re-write resolv.conf file generated by docker.
+	// NOTE: cluster dns settings aren't passed anymore to docker api in all cases, not only for pods with host network:
+	// the resolver conf will be overwritten after infra-container creation to override docker's behaviour
 	// This resolv.conf file is shared by all containers of the same pod, and needs to be modified only once per pod.
 	// we modify it when the pause container is created since it is the first container created in the pod since it holds
 	// the networking namespace.
-	if container.Name == PodInfraContainerName && utsMode != namespaceModeHost {
-		err = addNDotsOption(containerInfo.ResolvConfPath)
-		if err != nil {
-			return kubecontainer.ContainerID{}, fmt.Errorf("addNDotsOption: %v", err)
+	if container.Name == PodInfraContainerName {
+		if err := RewriteResolvFile(containerInfo.ResolvConfPath, opts.DNS, opts.DNSSearch, useClusterFirstPolicy); err != nil {
+			return kubecontainer.ContainerID{}, err
 		}
 	}
 
@@ -1884,7 +1900,9 @@ func (dm *DockerManager) checkDockerAPIVersion(expectedVersion string) (int, err
 	return result, nil
 }
 
-func addNDotsOption(resolvFilePath string) error {
+// RewriteResolvFile rewrites resolv.conf file generated by docker.
+// Exported for reusing in dockershim.
+func RewriteResolvFile(resolvFilePath string, dns []string, dnsSearch []string, useClusterFirstPolicy bool) error {
 	if len(resolvFilePath) == 0 {
 		glog.Errorf("ResolvConfPath is empty.")
 		return nil
@@ -1894,23 +1912,42 @@ func addNDotsOption(resolvFilePath string) error {
 		return fmt.Errorf("ResolvConfPath %q does not exist", resolvFilePath)
 	}
 
-	glog.V(4).Infof("DNS ResolvConfPath exists: %s. Will attempt to add ndots option: %s", resolvFilePath, ndotsDNSOption)
+	var resolvFileContent []string
 
-	if err := appendToFile(resolvFilePath, ndotsDNSOption); err != nil {
-		glog.Errorf("resolv.conf could not be updated: %v", err)
-		return err
+	for _, srv := range dns {
+		resolvFileContent = append(resolvFileContent, "nameserver "+srv)
 	}
+
+	if len(dnsSearch) > 0 {
+		resolvFileContent = append(resolvFileContent, "search "+strings.Join(dnsSearch, " "))
+	}
+
+	if len(resolvFileContent) > 0 {
+		if useClusterFirstPolicy {
+			resolvFileContent = append(resolvFileContent, ndotsDNSOption)
+		}
+
+		resolvFileContentStr := strings.Join(resolvFileContent, "\n")
+		resolvFileContentStr += "\n"
+
+		glog.V(4).Infof("Will attempt to re-write config file %s with: \n%s", resolvFilePath, resolvFileContent)
+		if err := rewriteFile(resolvFilePath, resolvFileContentStr); err != nil {
+			glog.Errorf("resolv.conf could not be updated: %v", err)
+			return err
+		}
+	}
+
 	return nil
 }
 
-func appendToFile(filePath, stringToAppend string) error {
-	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0644)
+func rewriteFile(filePath, stringToWrite string) error {
+	f, err := os.OpenFile(filePath, os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	_, err = f.WriteString(stringToAppend)
+	_, err = f.WriteString(stringToWrite)
 	return err
 }
 
@@ -2249,7 +2286,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		setupNetworkResult := kubecontainer.NewSyncResult(kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod))
 		result.AddSyncResult(setupNetworkResult)
 		if !kubecontainer.IsHostNetworkPod(pod) {
-			if err := dm.network.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID.ContainerID()); err != nil {
+			if err := dm.network.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID.ContainerID(), pod.Annotations); err != nil {
 				setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, err.Error())
 				glog.Error(err)
 

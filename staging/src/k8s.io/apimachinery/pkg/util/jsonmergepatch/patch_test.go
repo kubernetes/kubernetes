@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/evanphx/json-patch"
 	"github.com/ghodss/yaml"
-	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
@@ -32,9 +32,9 @@ type FilterNullTestCases struct {
 }
 
 type FilterNullTestCase struct {
-	Description string
-	OriginalObj        map[string]interface{}
-	ExpectedWithNull   map[string]interface{}
+	Description         string
+	OriginalObj         map[string]interface{}
+	ExpectedWithNull    map[string]interface{}
 	ExpectedWithoutNull map[string]interface{}
 }
 
@@ -170,7 +170,6 @@ func TestKeepOrDeleteNullInObj(t *testing.T) {
 		}
 	}
 }
-
 
 type JSONMergePatchTestCases struct {
 	TestCases []JSONMergePatchTestCase
@@ -622,10 +621,10 @@ func testPatchApplication(t *testing.T, original, patch, expected []byte, descri
 
 func threeWayTestCaseToJSONOrFail(t *testing.T, c JSONMergePatchTestCase) ([]byte, []byte, []byte, []byte, []byte) {
 	return testObjectToJSONOrFail(t, c.Original),
-			testObjectToJSONOrFail(t, c.Modified),
-			testObjectToJSONOrFail(t, c.Current),
-			testObjectToJSONOrFail(t, c.ThreeWay),
-			testObjectToJSONOrFail(t, c.Result)
+		testObjectToJSONOrFail(t, c.Modified),
+		testObjectToJSONOrFail(t, c.Current),
+		testObjectToJSONOrFail(t, c.ThreeWay),
+		testObjectToJSONOrFail(t, c.Result)
 }
 
 func testObjectToJSONOrFail(t *testing.T, o map[string]interface{}) []byte {

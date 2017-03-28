@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
@@ -48,10 +49,11 @@ func NewFederatedEventSink(clientset fedclientset.Interface) *FederatedEventSink
 var scheme = runtime.NewScheme()
 
 func init() {
-	scheme.AddKnownTypes(clientv1.SchemeGroupVersion,
-		&clientv1.Event{},
-		&kubev1.Event{},
-	)
+	// register client-go's and kube's Event type under two different GroupVersions
+	// TODO: switch to client-go client for events
+	scheme.AddKnownTypes(clientv1.SchemeGroupVersion, &clientv1.Event{})
+	scheme.AddKnownTypes(schema.GroupVersion{Group: "fake-kube-" + kubev1.SchemeGroupVersion.Group, Version: kubev1.SchemeGroupVersion.Version}, &kubev1.Event{})
+
 	if err := scheme.AddConversionFuncs(
 		metav1.Convert_unversioned_Time_To_unversioned_Time,
 	); err != nil {

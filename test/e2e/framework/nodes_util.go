@@ -30,6 +30,15 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
+func EtcdUpgrade(target_storage, target_version string) error {
+	switch TestContext.Provider {
+	case "gce":
+		return etcdUpgradeGCE(target_storage, target_version)
+	default:
+		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", TestContext.Provider)
+	}
+}
+
 func MasterUpgrade(v string) error {
 	switch TestContext.Provider {
 	case "gce":
@@ -41,9 +50,29 @@ func MasterUpgrade(v string) error {
 	}
 }
 
+func etcdUpgradeGCE(target_storage, target_version string) error {
+	env := append(
+		os.Environ(),
+		"TEST_ETCD_VERSION="+target_version,
+		"STORAGE_BACKEND="+target_storage,
+		"TEST_ETCD_IMAGE=3.0.17")
+
+	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
+	return err
+}
+
 func masterUpgradeGCE(rawV string) error {
+	env := os.Environ()
+	// TODO: Remove these variables when they're no longer needed for downgrades.
+	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
+		env = append(env,
+			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
+			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
+			"TEST_ETCD_IMAGE=3.0.17")
+	}
+
 	v := "v" + rawV
-	_, _, err := RunCmd(path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-M", v)
+	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-M", v)
 	return err
 }
 
@@ -91,10 +120,10 @@ func nodeUpgradeGCE(rawV, img string) error {
 	v := "v" + rawV
 	if img != "" {
 		env := append(os.Environ(), "KUBE_NODE_OS_DISTRIBUTION="+img)
-		_, _, err := RunCmdEnv(env, path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", "-o", v)
+		_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-N", "-o", v)
 		return err
 	}
-	_, _, err := RunCmd(path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", v)
+	_, _, err := RunCmd(gceUpgradeScript(), "-N", v)
 	return err
 }
 
@@ -233,4 +262,11 @@ func MigTemplate() (string, error) {
 		return "", fmt.Errorf("MigTemplate() failed with last error: %v", errLast)
 	}
 	return templ, nil
+}
+
+func gceUpgradeScript() string {
+	if len(TestContext.GCEUpgradeScript) == 0 {
+		return path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh")
+	}
+	return TestContext.GCEUpgradeScript
 }

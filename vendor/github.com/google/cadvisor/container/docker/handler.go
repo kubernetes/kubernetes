@@ -252,9 +252,11 @@ func newDockerContainerHandler(
 	// split env vars to get metadata map.
 	for _, exposedEnv := range metadataEnvs {
 		for _, envVar := range ctnr.Config.Env {
-			splits := strings.SplitN(envVar, "=", 2)
-			if splits[0] == exposedEnv {
-				handler.envs[strings.ToLower(exposedEnv)] = splits[1]
+			if envVar != "" {
+				splits := strings.SplitN(envVar, "=", 2)
+				if len(splits) == 2 && splits[0] == exposedEnv {
+					handler.envs[strings.ToLower(exposedEnv)] = splits[1]
+				}
 			}
 		}
 	}

@@ -92,7 +92,7 @@ func (p *serviceEvaluator) GroupKind() schema.GroupKind {
 	return api.Kind("Service")
 }
 
-// Handles returns true of the evalutor should handle the specified operation.
+// Handles returns true of the evaluator should handle the specified operation.
 func (p *serviceEvaluator) Handles(operation admission.Operation) bool {
 	// We handle create and update because a service type can change.
 	return admission.Create == operation || admission.Update == operation
@@ -142,7 +142,9 @@ func (p *serviceEvaluator) Usage(item runtime.Object) (api.ResourceList, error) 
 		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
 		result[api.ResourceServicesNodePorts] = *value
 	case api.ServiceTypeLoadBalancer:
-		// load balancer services need to count load balancers
+		// load balancer services need to count node ports and load balancers
+		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
+		result[api.ResourceServicesNodePorts] = *value
 		result[api.ResourceServicesLoadBalancers] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
 	return result, nil

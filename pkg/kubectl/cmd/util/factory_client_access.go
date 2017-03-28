@@ -49,6 +49,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 type ring0Factory struct {
@@ -166,11 +168,11 @@ func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, er
 	return f.discoveryFactory.DiscoveryClient()
 }
 
-func (f *ring0Factory) ClientSet() (*internalclientset.Clientset, error) {
+func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
 	return f.clientCache.ClientSetForVersion(nil)
 }
 
-func (f *ring0Factory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (*internalclientset.Clientset, error) {
+func (f *ring0Factory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
 	return f.clientCache.ClientSetForVersion(requiredVersion)
 }
 
@@ -330,14 +332,35 @@ func (f *ring0Factory) FlagSet() *pflag.FlagSet {
 	return f.flags
 }
 
-// TODO: We need to filter out stuff like secrets.
-func (f *ring0Factory) Command() string {
+// Set showSecrets false to filter out stuff like secrets.
+func (f *ring0Factory) Command(cmd *cobra.Command, showSecrets bool) string {
 	if len(os.Args) == 0 {
 		return ""
 	}
+
+	flags := ""
+	parseFunc := func(flag *pflag.Flag, value string) error {
+		flags = flags + " --" + flag.Name
+		if set, ok := flag.Annotations["classified"]; showSecrets || !ok || len(set) == 0 {
+			flags = flags + "=" + value
+		} else {
+			flags = flags + "=CLASSIFIED"
+		}
+		return nil
+	}
+	var err error
+	err = cmd.Flags().ParseAll(os.Args[1:], parseFunc)
+	if err != nil || !cmd.Flags().Parsed() {
+		return ""
+	}
+
+	args := ""
+	if arguments := cmd.Flags().Args(); len(arguments) > 0 {
+		args = " " + strings.Join(arguments, " ")
+	}
+
 	base := filepath.Base(os.Args[0])
-	args := append([]string{base}, os.Args[1:]...)
-	return strings.Join(args, " ")
+	return base + args + flags
 }
 
 func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
@@ -360,12 +383,12 @@ func (f *ring0Factory) BindExternalFlags(flags *pflag.FlagSet) {
 	flags.AddGoFlagSet(flag.CommandLine)
 }
 
-func (f *ring0Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions {
+func (f *ring0Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
 	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
 	if err != nil {
 		columnLabel = []string{}
 	}
-	opts := &kubectl.PrintOptions{
+	opts := &printers.PrintOptions{
 		NoHeaders:          GetFlagBool(cmd, "no-headers"),
 		WithNamespace:      withNamespace,
 		Wide:               GetWideFlag(cmd),
@@ -392,8 +415,10 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 	}
 }
 
-func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
-	return kubectl.NewHumanReadablePrinter(options), nil
+func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+	p := printers.NewHumanReadablePrinter(f.JSONEncoder(), f.Decoder(true), options)
+	printersinternal.AddHandlers(p)
+	return p, nil
 }
 
 func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
@@ -431,31 +456,33 @@ func (f *ring0Factory) DefaultNamespace() (string, bool, error) {
 }
 
 const (
-	RunV1GeneratorName                     = "run/v1"
-	RunPodV1GeneratorName                  = "run-pod/v1"
-	ServiceV1GeneratorName                 = "service/v1"
-	ServiceV2GeneratorName                 = "service/v2"
-	ServiceNodePortGeneratorV1Name         = "service-nodeport/v1"
-	ServiceClusterIPGeneratorV1Name        = "service-clusterip/v1"
-	ServiceLoadBalancerGeneratorV1Name     = "service-loadbalancer/v1"
-	ServiceExternalNameGeneratorV1Name     = "service-externalname/v1"
-	ServiceAccountV1GeneratorName          = "serviceaccount/v1"
-	HorizontalPodAutoscalerV1GeneratorName = "horizontalpodautoscaler/v1"
-	DeploymentV1Beta1GeneratorName         = "deployment/v1beta1"
-	DeploymentBasicV1Beta1GeneratorName    = "deployment-basic/v1beta1"
-	JobV1GeneratorName                     = "job/v1"
-	CronJobV2Alpha1GeneratorName           = "cronjob/v2alpha1"
-	ScheduledJobV2Alpha1GeneratorName      = "scheduledjob/v2alpha1"
-	NamespaceV1GeneratorName               = "namespace/v1"
-	ResourceQuotaV1GeneratorName           = "resourcequotas/v1"
-	SecretV1GeneratorName                  = "secret/v1"
-	SecretForDockerRegistryV1GeneratorName = "secret-for-docker-registry/v1"
-	SecretForTLSV1GeneratorName            = "secret-for-tls/v1"
-	ConfigMapV1GeneratorName               = "configmap/v1"
-	ClusterRoleBindingV1GeneratorName      = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
-	RoleBindingV1GeneratorName             = "rolebinding.rbac.authorization.k8s.io/v1alpha1"
-	ClusterV1Beta1GeneratorName            = "cluster/v1beta1"
-	PodDisruptionBudgetV1GeneratorName     = "poddisruptionbudget/v1beta1"
+	RunV1GeneratorName                      = "run/v1"
+	RunPodV1GeneratorName                   = "run-pod/v1"
+	ServiceV1GeneratorName                  = "service/v1"
+	ServiceV2GeneratorName                  = "service/v2"
+	ServiceNodePortGeneratorV1Name          = "service-nodeport/v1"
+	ServiceClusterIPGeneratorV1Name         = "service-clusterip/v1"
+	ServiceLoadBalancerGeneratorV1Name      = "service-loadbalancer/v1"
+	ServiceExternalNameGeneratorV1Name      = "service-externalname/v1"
+	ServiceAccountV1GeneratorName           = "serviceaccount/v1"
+	HorizontalPodAutoscalerV1GeneratorName  = "horizontalpodautoscaler/v1"
+	DeploymentV1Beta1GeneratorName          = "deployment/v1beta1"
+	DeploymentAppsV1Beta1GeneratorName      = "deployment/apps.v1beta1"
+	DeploymentBasicV1Beta1GeneratorName     = "deployment-basic/v1beta1"
+	DeploymentBasicAppsV1Beta1GeneratorName = "deployment-basic/apps.v1beta1"
+	JobV1GeneratorName                      = "job/v1"
+	CronJobV2Alpha1GeneratorName            = "cronjob/v2alpha1"
+	ScheduledJobV2Alpha1GeneratorName       = "scheduledjob/v2alpha1"
+	NamespaceV1GeneratorName                = "namespace/v1"
+	ResourceQuotaV1GeneratorName            = "resourcequotas/v1"
+	SecretV1GeneratorName                   = "secret/v1"
+	SecretForDockerRegistryV1GeneratorName  = "secret-for-docker-registry/v1"
+	SecretForTLSV1GeneratorName             = "secret-for-tls/v1"
+	ConfigMapV1GeneratorName                = "configmap/v1"
+	ClusterRoleBindingV1GeneratorName       = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
+	RoleBindingV1GeneratorName              = "rolebinding.rbac.authorization.k8s.io/v1alpha1"
+	ClusterV1Beta1GeneratorName             = "cluster/v1beta1"
+	PodDisruptionBudgetV1GeneratorName      = "poddisruptionbudget/v1beta1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
@@ -481,16 +508,18 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 		}
 	case "deployment":
 		generator = map[string]kubectl.Generator{
-			DeploymentBasicV1Beta1GeneratorName: kubectl.DeploymentBasicGeneratorV1{},
+			DeploymentBasicV1Beta1GeneratorName:     kubectl.DeploymentBasicGeneratorV1{},
+			DeploymentBasicAppsV1Beta1GeneratorName: kubectl.DeploymentBasicAppsGeneratorV1{},
 		}
 	case "run":
 		generator = map[string]kubectl.Generator{
-			RunV1GeneratorName:                kubectl.BasicReplicationController{},
-			RunPodV1GeneratorName:             kubectl.BasicPod{},
-			DeploymentV1Beta1GeneratorName:    kubectl.DeploymentV1Beta1{},
-			JobV1GeneratorName:                kubectl.JobV1{},
-			ScheduledJobV2Alpha1GeneratorName: kubectl.CronJobV2Alpha1{},
-			CronJobV2Alpha1GeneratorName:      kubectl.CronJobV2Alpha1{},
+			RunV1GeneratorName:                 kubectl.BasicReplicationController{},
+			RunPodV1GeneratorName:              kubectl.BasicPod{},
+			DeploymentV1Beta1GeneratorName:     kubectl.DeploymentV1Beta1{},
+			DeploymentAppsV1Beta1GeneratorName: kubectl.DeploymentAppsV1Beta1{},
+			JobV1GeneratorName:                 kubectl.JobV1{},
+			ScheduledJobV2Alpha1GeneratorName:  kubectl.CronJobV2Alpha1{},
+			CronJobV2Alpha1GeneratorName:       kubectl.CronJobV2Alpha1{},
 		}
 	case "autoscale":
 		generator = map[string]kubectl.Generator{
@@ -527,7 +556,8 @@ func (f *ring0Factory) Generators(cmdName string) map[string]kubectl.Generator {
 
 func (f *ring0Factory) CanBeExposed(kind schema.GroupKind) error {
 	switch kind {
-	case api.Kind("ReplicationController"), api.Kind("Service"), api.Kind("Pod"), extensions.Kind("Deployment"), extensions.Kind("ReplicaSet"):
+	case api.Kind("ReplicationController"), api.Kind("Service"), api.Kind("Pod"),
+		extensions.Kind("Deployment"), apps.Kind("Deployment"), extensions.Kind("ReplicaSet"):
 		// nothing to do here
 	default:
 		return fmt.Errorf("cannot expose a %s", kind)
@@ -537,7 +567,8 @@ func (f *ring0Factory) CanBeExposed(kind schema.GroupKind) error {
 
 func (f *ring0Factory) CanBeAutoscaled(kind schema.GroupKind) error {
 	switch kind {
-	case api.Kind("ReplicationController"), extensions.Kind("Deployment"), extensions.Kind("ReplicaSet"):
+	case api.Kind("ReplicationController"), extensions.Kind("ReplicaSet"),
+		extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		// nothing to do here
 	default:
 		return fmt.Errorf("cannot autoscale a %v", kind)

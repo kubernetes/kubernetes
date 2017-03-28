@@ -28,14 +28,14 @@ func TestTokenParse(t *testing.T) {
 		expected bool
 	}{
 		{token: "1234567890123456789012", expected: false},   // invalid parcel size
-		{token: "12345:1234567890123456", expected: false},   // invalid parcel size
+		{token: "12345.1234567890123456", expected: false},   // invalid parcel size
 		{token: ".1234567890123456", expected: false},        // invalid parcel size
 		{token: "123456:1234567890.123456", expected: false}, // invalid separation
-		{token: "abcdef.1234567890123456", expected: false},  // invalid separation
-		{token: "Abcdef:1234567890123456", expected: false},  // invalid token id
-		{token: "123456:AABBCCDDEEFFGGHH", expected: false},  // invalid token secret
-		{token: "abcdef:1234567890123456", expected: true},
-		{token: "123456:aabbccddeeffgghh", expected: true},
+		{token: "abcdef:1234567890123456", expected: false},  // invalid separation
+		{token: "Abcdef.1234567890123456", expected: false},  // invalid token id
+		{token: "123456.AABBCCDDEEFFGGHH", expected: false},  // invalid token secret
+		{token: "abcdef.1234567890123456", expected: true},
+		{token: "123456.aabbccddeeffgghh", expected: true},
 	}
 
 	for _, rt := range tests {
@@ -117,15 +117,19 @@ func TestValidateToken(t *testing.T) {
 }
 
 func TestGenerateToken(t *testing.T) {
-	td := &kubeadmapi.TokenDiscovery{}
-	if err := GenerateToken(td); err != nil {
+	token, err := GenerateToken()
+	if err != nil {
 		t.Fatalf("GenerateToken returned an unexpected error: %+v", err)
 	}
-	if len(td.ID) != 6 {
-		t.Errorf("failed GenerateToken first part length:\n\texpected: 6\n\t  actual: %d", len(td.ID))
+	tokenID, tokenSecret, err := ParseToken(token)
+	if err != nil {
+		t.Fatalf("GenerateToken returned an unexpected error: %+v", err)
 	}
-	if len(td.Secret) != 16 {
-		t.Errorf("failed GenerateToken second part length:\n\texpected: 16\n\t  actual: %d", len(td.Secret))
+	if len(tokenID) != 6 {
+		t.Errorf("failed GenerateToken first part length:\n\texpected: 6\n\t  actual: %d", len(tokenID))
+	}
+	if len(tokenSecret) != 16 {
+		t.Errorf("failed GenerateToken second part length:\n\texpected: 16\n\t  actual: %d", len(tokenSecret))
 	}
 }
 
@@ -154,7 +158,7 @@ func TestBearerToken(t *testing.T) {
 		token    *kubeadmapi.TokenDiscovery
 		expected string
 	}{
-		{token: &kubeadmapi.TokenDiscovery{ID: "foo", Secret: "bar"}, expected: "foo:bar"}, // should use default
+		{token: &kubeadmapi.TokenDiscovery{ID: "foo", Secret: "bar"}, expected: "foo.bar"}, // should use default
 	}
 	for _, rt := range tests {
 		actual := BearerToken(rt.token)

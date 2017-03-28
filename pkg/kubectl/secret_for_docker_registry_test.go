@@ -30,6 +30,10 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	secretDataNoEmail, err := handleDockercfgContent(username, password, "", server)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	tests := map[string]struct {
 		params    map[string]interface{}
@@ -50,6 +54,24 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 				},
 				Data: map[string][]byte{
 					api.DockerConfigKey: secretData,
+				},
+				Type: api.SecretTypeDockercfg,
+			},
+			expectErr: false,
+		},
+		"test-valid-use-no-email": {
+			params: map[string]interface{}{
+				"name":            "foo",
+				"docker-server":   server,
+				"docker-username": username,
+				"docker-password": password,
+			},
+			expected: &api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					api.DockerConfigKey: secretDataNoEmail,
 				},
 				Type: api.SecretTypeDockercfg,
 			},

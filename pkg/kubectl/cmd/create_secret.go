@@ -64,7 +64,10 @@ var (
 	  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub
 
 	  # Create a new secret named my-secret with key1=supersecret and key2=topsecret
-	  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret`)
+	  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret
+
+	  # Create a new secret named my-secret from an env file
+	  kubectl create secret generic my-secret --from-env-file=path/to/bar.env`)
 )
 
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
@@ -85,7 +88,8 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comma
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.SecretV1GeneratorName)
 	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 	cmd.Flags().StringArray("from-literal", []string{}, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
-	cmd.Flags().String("type", "", "The type of secret to create")
+	cmd.Flags().String("from-env-file", "", "Specify the path to a file to read lines of key=val pairs to create a secret (i.e. a Docker .env file).")
+	cmd.Flags().String("type", "", i18n.T("The type of secret to create"))
 	return cmd
 }
 
@@ -103,6 +107,7 @@ func CreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command
 			Type:           cmdutil.GetFlagString(cmd, "type"),
 			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
 			LiteralSources: cmdutil.GetFlagStringArray(cmd, "from-literal"),
+			EnvFileSource:  cmdutil.GetFlagString(cmd, "from-env-file"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
@@ -126,7 +131,7 @@ var (
 		    $ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.
 
     That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to
-		authenticate to the registry.
+		authenticate to the registry. The email address is optional.
 
 		When creating applications, you may have a Docker registry that requires authentication.  In order for the
 		nodes to pull images on your behalf, they have to have the credentials.  You can provide this information
@@ -153,13 +158,12 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobr
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.SecretForDockerRegistryV1GeneratorName)
-	cmd.Flags().String("docker-username", "", "Username for Docker registry authentication")
+	cmd.Flags().String("docker-username", "", i18n.T("Username for Docker registry authentication"))
 	cmd.MarkFlagRequired("docker-username")
-	cmd.Flags().String("docker-password", "", "Password for Docker registry authentication")
+	cmd.Flags().String("docker-password", "", i18n.T("Password for Docker registry authentication"))
 	cmd.MarkFlagRequired("docker-password")
-	cmd.Flags().String("docker-email", "", "Email for Docker registry")
-	cmd.MarkFlagRequired("docker-email")
-	cmd.Flags().String("docker-server", "https://index.docker.io/v1/", "Server location for Docker registry")
+	cmd.Flags().String("docker-email", "", i18n.T("Email for Docker registry"))
+	cmd.Flags().String("docker-server", "https://index.docker.io/v1/", i18n.T("Server location for Docker registry"))
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
@@ -224,8 +228,8 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.SecretForTLSV1GeneratorName)
-	cmd.Flags().String("cert", "", "Path to PEM encoded public key certificate.")
-	cmd.Flags().String("key", "", "Path to private key associated with given certificate.")
+	cmd.Flags().String("cert", "", i18n.T("Path to PEM encoded public key certificate."))
+	cmd.Flags().String("key", "", i18n.T("Path to private key associated with given certificate."))
 	return cmd
 }
 

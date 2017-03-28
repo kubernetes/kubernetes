@@ -1,18 +1,18 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: l7-lb-controller-v0.9.1
+  name: l7-lb-controller-v0.9.2
   namespace: kube-system
   labels:
     k8s-app: glbc
-    version: v0.9.1
+    version: v0.9.2
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "GLBC"
 spec:
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:
-  - image: gcr.io/google_containers/glbc:0.9.1
+  - image: gcr.io/google_containers/glbc:0.9.2
     livenessProbe:
       httpGet:
         path: /healthz

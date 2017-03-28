@@ -86,7 +86,8 @@ type TLSConfig struct {
 	CertFile string // Path of the PEM-encoded client certificate.
 	KeyFile  string // Path of the PEM-encoded client key.
 
-	Insecure bool // Server should be accessed without verifying the certificate. For testing only.
+	Insecure   bool   // Server should be accessed without verifying the certificate. For testing only.
+	ServerName string // Override for the server name passed to the server for SNI and used to verify certificates.
 
 	CAData   []byte // Bytes of the PEM-encoded server trusted root certificates. Supercedes CAFile.
 	CertData []byte // Bytes of the PEM-encoded client certificate. Supercedes CertFile.

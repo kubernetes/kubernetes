@@ -23,9 +23,7 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 const (
@@ -34,45 +32,6 @@ const (
 
 type NamespaceInfo struct {
 	Namespace string
-}
-
-func listOfImages(spec *api.PodSpec) []string {
-	images := make([]string, 0, len(spec.Containers))
-	for _, container := range spec.Containers {
-		images = append(images, container.Image)
-	}
-	return images
-}
-
-func makeImageList(spec *api.PodSpec) string {
-	return strings.Join(listOfImages(spec), ",")
-}
-
-// OutputVersionMapper is a RESTMapper that will prefer mappings that
-// correspond to a preferred output version (if feasible)
-type OutputVersionMapper struct {
-	meta.RESTMapper
-
-	// output versions takes a list of preferred GroupVersions. Only the first
-	// hit for a given group will have effect.  This allows different output versions
-	// depending upon the group of the kind being requested
-	OutputVersions []schema.GroupVersion
-}
-
-// RESTMapping implements meta.RESTMapper by prepending the output version to the preferred version list.
-func (m OutputVersionMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
-	for _, preferredVersion := range m.OutputVersions {
-		if gk.Group == preferredVersion.Group {
-			mapping, err := m.RESTMapper.RESTMapping(gk, preferredVersion.Version)
-			if err == nil {
-				return mapping, nil
-			}
-
-			break
-		}
-	}
-
-	return m.RESTMapper.RESTMapping(gk, versions...)
 }
 
 // ResourceShortcuts represents a structure that holds the information how to

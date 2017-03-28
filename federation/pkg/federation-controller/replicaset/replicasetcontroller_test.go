@@ -37,6 +37,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	pods        = "pods"
+	replicasets = "replicasets"
+	k8s1        = "k8s-1"
+	k8s2        = "k8s-2"
+)
+
 func TestParseFederationReplicaSetReference(t *testing.T) {
 	successPrefs := []string{
 		`{"rebalance": true,
@@ -82,27 +89,27 @@ func TestReplicaSetController(t *testing.T) {
 
 	fedclientset := fedclientfake.NewSimpleClientset()
 	fedrswatch := watch.NewFake()
-	fedclientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fedrswatch, nil))
+	fedclientset.PrependWatchReactor(replicasets, core.DefaultWatchReactor(fedrswatch, nil))
 
-	fedclientset.Federation().Clusters().Create(testutil.NewCluster("k8s-1", apiv1.ConditionTrue))
-	fedclientset.Federation().Clusters().Create(testutil.NewCluster("k8s-2", apiv1.ConditionTrue))
+	fedclientset.Federation().Clusters().Create(testutil.NewCluster(k8s1, apiv1.ConditionTrue))
+	fedclientset.Federation().Clusters().Create(testutil.NewCluster(k8s2, apiv1.ConditionTrue))
 
 	kube1clientset := kubeclientfake.NewSimpleClientset()
 	kube1rswatch := watch.NewFake()
-	kube1clientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(kube1rswatch, nil))
+	kube1clientset.PrependWatchReactor(replicasets, core.DefaultWatchReactor(kube1rswatch, nil))
 	kube1Podwatch := watch.NewFake()
-	kube1clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(kube1Podwatch, nil))
+	kube1clientset.PrependWatchReactor(pods, core.DefaultWatchReactor(kube1Podwatch, nil))
 	kube2clientset := kubeclientfake.NewSimpleClientset()
 	kube2rswatch := watch.NewFake()
-	kube2clientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(kube2rswatch, nil))
+	kube2clientset.PrependWatchReactor(replicasets, core.DefaultWatchReactor(kube2rswatch, nil))
 	kube2Podwatch := watch.NewFake()
-	kube2clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(kube2Podwatch, nil))
+	kube2clientset.PrependWatchReactor(pods, core.DefaultWatchReactor(kube2Podwatch, nil))
 
 	fedInformerClientFactory := func(cluster *fedv1.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
-		case "k8s-1":
+		case k8s1:
 			return kube1clientset, nil
-		case "k8s-2":
+		case k8s2:
 			return kube2clientset, nil
 		default:
 			return nil, fmt.Errorf("Unknown cluster: %v", cluster.Name)

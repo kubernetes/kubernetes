@@ -20,6 +20,8 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -75,29 +77,34 @@ func (m *Helper) List(namespace, apiVersion string, selector labels.Selector, ex
 
 func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector labels.Selector) (watch.Interface, error) {
 	return m.RESTClient.Get().
-		Prefix("watch").
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Param("resourceVersion", resourceVersion).
+		Param("watch", "true").
 		LabelsSelectorParam(labelSelector).
 		Watch()
 }
 
 func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Interface, error) {
 	return m.RESTClient.Get().
-		Prefix("watch").
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		Name(name).
 		Param("resourceVersion", resourceVersion).
+		Param("watch", "true").
+		FieldsSelectorParam(fields.OneTermEqualSelector("metadata.name", name)).
 		Watch()
 }
 
 func (m *Helper) Delete(namespace, name string) error {
+	return m.DeleteWithOptions(namespace, name, nil)
+}
+
+func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.DeleteOptions) error {
 	return m.RESTClient.Delete().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
+		Body(options).
 		Do().
 		Error()
 }

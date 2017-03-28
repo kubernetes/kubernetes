@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -45,6 +46,10 @@ import (
 const (
 	dockerRuntimeName = "docker"
 	kubeAPIVersion    = "0.1.0"
+
+	// https://docs.docker.com/engine/reference/api/docker_remote_api/
+	// docker version should be at least 1.10.x
+	minimumDockerAPIVersion = "1.22.0"
 
 	// String used to detect docker host mode for various namespaces (e.g.
 	// networking). Must match the value returned by docker inspect -f
@@ -147,6 +152,10 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
 	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
+	checkpointHandler, err := NewPersistentCheckpointHandler()
+	if err != nil {
+		return nil, err
+	}
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             c,
@@ -157,8 +166,15 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 			execHandler: execHandler,
 		},
 		containerManager:  cm.NewContainerManager(cgroupsName, client),
-		checkpointHandler: NewPersistentCheckpointHandler(),
+		checkpointHandler: checkpointHandler,
 	}
+
+	// check docker version compatibility.
+	if err = ds.checkVersionCompatibility(); err != nil {
+		return nil, err
+	}
+
+	// create streaming server if configured.
 	if streamingConfig != nil {
 		var err error
 		ds.streamingServer, err = streaming.NewServer(*streamingConfig, ds.streamingRuntime)
@@ -296,7 +312,7 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 	// Return empty portMappings if checkpoint is not found
 	if err != nil {
 		if err == errors.CheckpointNotFoundError {
-			glog.Warningf("Failed to retrieve checkpoint for sandbox %q: %v", err)
+			glog.Warningf("Failed to retrieve checkpoint for sandbox %q: %v", podSandboxID, err)
 			return nil, nil
 		} else {
 			return nil, err
@@ -374,6 +390,27 @@ func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (stri
 	return cgroupParent, nil
 }
 
+// checkVersionCompatibility verifies whether docker is in a compatible version.
+func (ds *dockerService) checkVersionCompatibility() error {
+	apiVersion, err := ds.getDockerAPIVersion()
+	if err != nil {
+		return err
+	}
+
+	minAPIVersion, err := semver.Parse(minimumDockerAPIVersion)
+	if err != nil {
+		return err
+	}
+
+	// Verify the docker version.
+	result := apiVersion.Compare(minAPIVersion)
+	if result < 0 {
+		return fmt.Errorf("docker API version is older than %s", minimumDockerAPIVersion)
+	}
+
+	return nil
+}
+
 // getDockerAPIVersion gets the semver-compatible docker api version.
 func (ds *dockerService) getDockerAPIVersion() (*semver.Version, error) {
 	var dv *dockertypes.Version
@@ -411,4 +448,47 @@ func toAPIProtocol(protocol Protocol) v1.Protocol {
 	}
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return v1.ProtocolTCP
+}
+
+// DockerLegacyService interface embeds some legacy methods for backward compatibility.
+type DockerLegacyService interface {
+	// GetContainerLogs gets logs for a specific container.
+	GetContainerLogs(*v1.Pod, kubecontainer.ContainerID, *v1.PodLogOptions, io.Writer, io.Writer) error
+}
+
+// dockerLegacyService implements the DockerLegacyService. We add this for non json-log driver
+// support. (See #41996)
+type dockerLegacyService struct {
+	client dockertools.DockerInterface
+}
+
+func NewDockerLegacyService(client dockertools.DockerInterface) DockerLegacyService {
+	return &dockerLegacyService{client: client}
+}
+
+// GetContainerLogs get container logs directly from docker daemon.
+func (d *dockerLegacyService) GetContainerLogs(pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
+	container, err := d.client.InspectContainer(containerID.ID)
+	if err != nil {
+		return err
+	}
+	return dockertools.GetContainerLogs(d.client, pod, containerID, logOptions, stdout, stderr, container.Config.Tty)
+}
+
+// criSupportedLogDrivers are log drivers supported by native CRI integration.
+var criSupportedLogDrivers = []string{"json-file"}
+
+// IsCRISupportedLogDriver checks whether the logging driver used by docker is
+// suppoted by native CRI integration.
+func IsCRISupportedLogDriver(client dockertools.DockerInterface) (bool, error) {
+	info, err := client.Info()
+	if err != nil {
+		return false, fmt.Errorf("failed to get docker info: %v", err)
+	}
+	for _, driver := range criSupportedLogDrivers {
+		if info.LoggingDriver == driver {
+			return true, nil
+		}
+	}
+	return false, nil
 }

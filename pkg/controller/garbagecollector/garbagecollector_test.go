@@ -19,6 +19,7 @@ package garbagecollector
 import (
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -27,15 +28,16 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/api/install"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -48,12 +50,16 @@ func TestNewGarbageCollector(t *testing.T) {
 	metaOnlyClientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	podResource := map[schema.GroupVersionResource]struct{}{schema.GroupVersionResource{Version: "v1", Resource: "pods"}: {}}
+	podResource := map[schema.GroupVersionResource]struct{}{
+		schema.GroupVersionResource{Version: "v1", Resource: "pods"}: {},
+		// no monitor will be constructed for non-core resource, the GC construction will not fail.
+		schema.GroupVersionResource{Group: "tpr.io", Version: "v1", Resource: "unknown"}: {},
+	}
 	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(gc.monitors))
+	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
 }
 
 // fakeAction records information about requests to aid in testing.
@@ -142,8 +148,8 @@ func serilizeOrDie(t *testing.T, object interface{}) []byte {
 	return data
 }
 
-// test the processItem function making the expected actions.
-func TestProcessItem(t *testing.T) {
+// test the attemptToDeleteItem function making the expected actions.
+func TestAttemptToDeleteItem(t *testing.T) {
 	pod := getPod("ToBeDeletedPod", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
@@ -177,10 +183,10 @@ func TestProcessItem(t *testing.T) {
 			},
 			Namespace: pod.Namespace,
 		},
-		// owners are intentionally left empty. The processItem routine should get the latest item from the server.
+		// owners are intentionally left empty. The attemptToDeleteItem routine should get the latest item from the server.
 		owners: nil,
 	}
-	err := gc.processItem(item)
+	err := gc.attemptToDeleteItem(item)
 	if err != nil {
 		t.Errorf("Unexpected Error: %v", err)
 	}
@@ -249,7 +255,7 @@ func TestProcessEvent(t *testing.T) {
 	var testScenarios = []struct {
 		name string
 		// a series of events that will be supplied to the
-		// Propagator.eventQueue.
+		// GraphBuilder.eventQueue.
 		events []event
 	}{
 		{
@@ -293,22 +299,19 @@ func TestProcessEvent(t *testing.T) {
 	}
 
 	for _, scenario := range testScenarios {
-		propagator := &Propagator{
-			eventQueue: workqueue.NewTimedWorkQueue(),
+		dependencyGraphBuilder := &GraphBuilder{
+			graphChanges: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 			uidToNode: &concurrentUIDToNode{
-				RWMutex:   &sync.RWMutex{},
-				uidToNode: make(map[types.UID]*node),
+				uidToNodeLock: sync.RWMutex{},
+				uidToNode:     make(map[types.UID]*node),
 			},
-			gc: &GarbageCollector{
-				dirtyQueue:       workqueue.NewTimedWorkQueue(),
-				clock:            clock.RealClock{},
-				absentOwnerCache: NewUIDCache(2),
-			},
+			attemptToDelete:  workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+			absentOwnerCache: NewUIDCache(2),
 		}
 		for i := 0; i < len(scenario.events); i++ {
-			propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: propagator.gc.clock.Now(), Object: &scenario.events[i]})
-			propagator.processEvent()
-			verifyGraphInvariants(scenario.name, propagator.uidToNode.uidToNode, t)
+			dependencyGraphBuilder.graphChanges.Add(&scenario.events[i])
+			dependencyGraphBuilder.processGraphChanges()
+			verifyGraphInvariants(scenario.name, dependencyGraphBuilder.uidToNode.uidToNode, t)
 		}
 	}
 }
@@ -321,18 +324,18 @@ func TestDependentsRace(t *testing.T) {
 	const updates = 100
 	owner := &node{dependents: make(map[*node]struct{})}
 	ownerUID := types.UID("owner")
-	gc.propagator.uidToNode.Write(owner)
+	gc.dependencyGraphBuilder.uidToNode.Write(owner)
 	go func() {
 		for i := 0; i < updates; i++ {
 			dependent := &node{}
-			gc.propagator.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
-			gc.propagator.removeDependentFromOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
+			gc.dependencyGraphBuilder.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
+			gc.dependencyGraphBuilder.removeDependentFromOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
 		}
 	}()
 	go func() {
-		gc.orphanQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: owner})
+		gc.attemptToOrphan.Add(owner)
 		for i := 0; i < updates; i++ {
-			gc.orphanFinalizer()
+			gc.attemptToOrphanWorker()
 		}
 	}()
 }
@@ -348,13 +351,17 @@ func TestGCListWatcher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lw := gcListWatcher(client, podResource)
-	lw.Watch(metav1.ListOptions{ResourceVersion: "1"})
-	lw.List(metav1.ListOptions{ResourceVersion: "1"})
+	lw := listWatcher(client, podResource)
+	if _, err := lw.Watch(metav1.ListOptions{ResourceVersion: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lw.List(metav1.ListOptions{ResourceVersion: "1"}); err != nil {
+		t.Fatal(err)
+	}
 	if e, a := 2, len(testHandler.actions); e != a {
 		t.Errorf("expect %d requests, got %d", e, a)
 	}
-	if e, a := "resourceVersion=1", testHandler.actions[0].query; e != a {
+	if e, a := "resourceVersion=1&watch=true", testHandler.actions[0].query; e != a {
 		t.Errorf("expect %s, got %s", e, a)
 	}
 	if e, a := "resourceVersion=1", testHandler.actions[1].query; e != a {
@@ -373,7 +380,7 @@ func podToGCNode(pod *v1.Pod) *node {
 			},
 			Namespace: pod.Namespace,
 		},
-		// owners are intentionally left empty. The processItem routine should get the latest item from the server.
+		// owners are intentionally left empty. The attemptToDeleteItem routine should get the latest item from the server.
 		owners: nil,
 	}
 }
@@ -447,12 +454,12 @@ func TestAbsentUIDCache(t *testing.T) {
 	defer srv.Close()
 	gc := setupGC(t, clientConfig)
 	gc.absentOwnerCache = NewUIDCache(2)
-	gc.processItem(podToGCNode(rc1Pod1))
-	gc.processItem(podToGCNode(rc2Pod1))
+	gc.attemptToDeleteItem(podToGCNode(rc1Pod1))
+	gc.attemptToDeleteItem(podToGCNode(rc2Pod1))
 	// rc1 should already be in the cache, no request should be sent. rc1 should be promoted in the UIDCache
-	gc.processItem(podToGCNode(rc1Pod2))
+	gc.attemptToDeleteItem(podToGCNode(rc1Pod2))
 	// after this call, rc2 should be evicted from the UIDCache
-	gc.processItem(podToGCNode(rc3Pod1))
+	gc.attemptToDeleteItem(podToGCNode(rc3Pod1))
 	// check cache
 	if !gc.absentOwnerCache.Has(types.UID("1")) {
 		t.Errorf("expected rc1 to be in the cache")
@@ -472,5 +479,91 @@ func TestAbsentUIDCache(t *testing.T) {
 	}
 	if count != 1 {
 		t.Errorf("expected only 1 GET rc1 request, got %d", count)
+	}
+}
+
+func TestDeleteOwnerRefPatch(t *testing.T) {
+	original := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "100",
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: "1"},
+				{UID: "2"},
+				{UID: "3"},
+			},
+		},
+	}
+	originalData := serilizeOrDie(t, original)
+	expected := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "100",
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: "1"},
+			},
+		},
+	}
+	patch := deleteOwnerRefPatch("100", "2", "3")
+	patched, err := strategicpatch.StrategicMergePatch(originalData, patch, v1.Pod{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got v1.Pod
+	if err := json.Unmarshal(patched, &got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %#v,\ngot: %#v", expected, got)
+	}
+}
+
+func TestUnblockOwnerReference(t *testing.T) {
+	trueVar := true
+	falseVar := false
+	original := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "100",
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: "1", BlockOwnerDeletion: &trueVar},
+				{UID: "2", BlockOwnerDeletion: &falseVar},
+				{UID: "3"},
+			},
+		},
+	}
+	originalData := serilizeOrDie(t, original)
+	expected := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "100",
+			OwnerReferences: []metav1.OwnerReference{
+				{UID: "1", BlockOwnerDeletion: &falseVar},
+				{UID: "2", BlockOwnerDeletion: &falseVar},
+				{UID: "3"},
+			},
+		},
+	}
+	accessor, err := meta.Accessor(&original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := node{
+		owners: accessor.GetOwnerReferences(),
+	}
+	patch, err := n.patchToUnblockOwnerReferences()
+	if err != nil {
+		t.Fatal(err)
+	}
+	patched, err := strategicpatch.StrategicMergePatch(originalData, patch, v1.Pod{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got v1.Pod
+	if err := json.Unmarshal(patched, &got); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %#v,\ngot: %#v", expected, got)
+		t.Errorf("expected: %#v,\ngot: %#v", expected.OwnerReferences, got.OwnerReferences)
+		for _, ref := range got.OwnerReferences {
+			t.Errorf("ref.UID=%s, ref.BlockOwnerDeletion=%v", ref.UID, *ref.BlockOwnerDeletion)
+		}
 	}
 }

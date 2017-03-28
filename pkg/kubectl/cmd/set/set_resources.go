@@ -131,7 +131,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.Encoder = f.JSONEncoder()
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.Record = cmdutil.GetRecordFlag(cmd)
-	o.ChangeCause = f.Command()
+	o.ChangeCause = f.Command(cmd, false)
 	o.PrintObject = f.PrintObject
 	o.Cmd = cmd
 
@@ -140,7 +140,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		return err
 	}
 
-	builder := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	builder := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		//FilenameParam(enforceNamespace, o.Filenames...).

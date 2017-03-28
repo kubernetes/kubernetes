@@ -376,6 +376,28 @@ func TestSetDefaultDownwardAPIVolumeSource(t *testing.T) {
 	}
 }
 
+func TestSetDefaultProjectedVolumeSource(t *testing.T) {
+	s := v1.PodSpec{}
+	s.Volumes = []v1.Volume{
+		{
+			VolumeSource: v1.VolumeSource{
+				Projected: &v1.ProjectedVolumeSource{},
+			},
+		},
+	}
+	pod := &v1.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*v1.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.Projected.DefaultMode
+	expectedMode := v1.ProjectedVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected ProjectedVolumeSource DefaultMode %v, got %v", expectedMode, defaultMode)
+	}
+}
+
 func TestSetDefaultSecret(t *testing.T) {
 	s := &v1.Secret{}
 	obj2 := roundTrip(t, runtime.Object(s))
@@ -514,6 +536,15 @@ func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 			},
 		},
 	}
+	s.InitContainers = []v1.Container{
+		{
+			Ports: []v1.ContainerPort{
+				{
+					ContainerPort: portNum,
+				},
+			},
+		},
+	}
 	pod := &v1.Pod{
 		Spec: s,
 	}
@@ -522,6 +553,11 @@ func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 	s2 := pod2.Spec
 
 	hostPortNum := s2.Containers[0].Ports[0].HostPort
+	if hostPortNum != portNum {
+		t.Errorf("Expected container port to be defaulted, was made %d instead of %d", hostPortNum, portNum)
+	}
+
+	hostPortNum = s2.InitContainers[0].Ports[0].HostPort
 	if hostPortNum != portNum {
 		t.Errorf("Expected container port to be defaulted, was made %d instead of %d", hostPortNum, portNum)
 	}
@@ -657,6 +693,18 @@ func TestSetMinimumScalePod(t *testing.T) {
 			},
 		},
 	}
+	s.InitContainers = []v1.Container{
+		{
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1n"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("2n"),
+				},
+			},
+		},
+	}
 	pod := &v1.Pod{
 		Spec: s,
 	}
@@ -665,12 +713,28 @@ func TestSetMinimumScalePod(t *testing.T) {
 	if expect := resource.MustParse("1m"); expect.Cmp(pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory]) != 0 {
 		t.Errorf("did not round resources: %#v", pod.Spec.Containers[0].Resources)
 	}
+	if expect := resource.MustParse("1m"); expect.Cmp(pod.Spec.InitContainers[0].Resources.Requests[v1.ResourceMemory]) != 0 {
+		t.Errorf("did not round resources: %#v", pod.Spec.InitContainers[0].Resources)
+	}
 }
 
 func TestSetDefaultRequestsPod(t *testing.T) {
 	// verify we default if limits are specified (and that request=0 is preserved)
 	s := v1.PodSpec{}
 	s.Containers = []v1.Container{
+		{
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("0"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+	s.InitContainers = []v1.Container{
 		{
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
@@ -695,16 +759,28 @@ func TestSetDefaultRequestsPod(t *testing.T) {
 	if requestValue := defaultRequest[v1.ResourceMemory]; requestValue.String() != "0" {
 		t.Errorf("Expected request memory: %s, got: %s", "0", requestValue.String())
 	}
+	defaultRequest = pod2.Spec.InitContainers[0].Resources.Requests
+	if requestValue := defaultRequest[v1.ResourceCPU]; requestValue.String() != "100m" {
+		t.Errorf("Expected request cpu: %s, got: %s", "100m", requestValue.String())
+	}
+	if requestValue := defaultRequest[v1.ResourceMemory]; requestValue.String() != "0" {
+		t.Errorf("Expected request memory: %s, got: %s", "0", requestValue.String())
+	}
 
 	// verify we do nothing if no limits are specified
 	s = v1.PodSpec{}
 	s.Containers = []v1.Container{{}}
+	s.InitContainers = []v1.Container{{}}
 	pod = &v1.Pod{
 		Spec: s,
 	}
 	output = roundTrip(t, runtime.Object(pod))
 	pod2 = output.(*v1.Pod)
 	defaultRequest = pod2.Spec.Containers[0].Resources.Requests
+	if requestValue := defaultRequest[v1.ResourceCPU]; requestValue.String() != "0" {
+		t.Errorf("Expected 0 request value, got: %s", requestValue.String())
+	}
+	defaultRequest = pod2.Spec.InitContainers[0].Resources.Requests
 	if requestValue := defaultRequest[v1.ResourceCPU]; requestValue.String() != "0" {
 		t.Errorf("Expected 0 request value, got: %s", requestValue.String())
 	}

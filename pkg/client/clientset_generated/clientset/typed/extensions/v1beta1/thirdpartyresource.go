@@ -21,8 +21,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 
 // ThirdPartyResourcesGetter has a method to return a ThirdPartyResourceInterface.
@@ -93,7 +93,7 @@ func (c *thirdPartyResources) Delete(name string, options *v1.DeleteOptions) err
 func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("thirdpartyresources").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -105,7 +105,7 @@ func (c *thirdPartyResources) Get(name string, options v1.GetOptions) (result *v
 	err = c.client.Get().
 		Resource("thirdpartyresources").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -116,7 +116,7 @@ func (c *thirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPa
 	result = &v1beta1.ThirdPartyResourceList{}
 	err = c.client.Get().
 		Resource("thirdpartyresources").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -124,10 +124,10 @@ func (c *thirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPa
 
 // Watch returns a watch.Interface that watches the requested thirdPartyResources.
 func (c *thirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("thirdpartyresources").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 

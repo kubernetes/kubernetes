@@ -96,7 +96,10 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	// Now only the old pod or the new pod run. Watch it until it finishes
 	// and send all events on the pod to the PV
 	for {
-		event := <-podCh
+		event, ok := <-podCh
+		if !ok {
+			return fmt.Errorf("recycler pod %q watch channel had been closed", pod.Name)
+		}
 		switch event.Object.(type) {
 		case *v1.Pod:
 			// POD changed
@@ -198,13 +201,14 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 		return nil, err
 	}
 
-	eventCh := make(chan watch.Event, 0)
+	eventCh := make(chan watch.Event, 30)
 
 	go func() {
 		defer eventWatch.Stop()
 		defer podWatch.Stop()
 		defer close(eventCh)
-
+		var podWatchChannelClosed bool
+		var eventWatchChannelClosed bool
 		for {
 			select {
 			case _ = <-stopChannel:
@@ -212,15 +216,19 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 
 			case podEvent, ok := <-podWatch.ResultChan():
 				if !ok {
-					return
+					podWatchChannelClosed = true
+				} else {
+					eventCh <- podEvent
 				}
-				eventCh <- podEvent
-
 			case eventEvent, ok := <-eventWatch.ResultChan():
 				if !ok {
-					return
+					eventWatchChannelClosed = true
+				} else {
+					eventCh <- eventEvent
 				}
-				eventCh <- eventEvent
+			}
+			if podWatchChannelClosed && eventWatchChannelClosed {
+				break
 			}
 		}
 	}()
@@ -300,16 +308,34 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 
 		// Heuristic to make sure that volumes in a StatefulSet are spread across zones
 		// StatefulSet PVCs are (currently) named ClaimName-StatefulSetName-Id,
-		// where Id is an integer index
+		// where Id is an integer index.
+		// Note though that if a StatefulSet pod has multiple claims, we need them to be
+		// in the same zone, because otherwise the pod will be unable to mount both volumes,
+		// and will be unschedulable.  So we hash _only_ the "StatefulSetName" portion when
+		// it looks like `ClaimName-StatefulSetName-Id`.
+		// We continue to round-robin volume names that look like `Name-Id` also; this is a useful
+		// feature for users that are creating statefulset-like functionality without using statefulsets.
 		lastDash := strings.LastIndexByte(pvcName, '-')
 		if lastDash != -1 {
-			petIDString := pvcName[lastDash+1:]
-			petID, err := strconv.ParseUint(petIDString, 10, 32)
+			statefulsetIDString := pvcName[lastDash+1:]
+			statefulsetID, err := strconv.ParseUint(statefulsetIDString, 10, 32)
 			if err == nil {
-				// Offset by the pet id, so we round-robin across zones
-				index = uint32(petID)
-				// We still hash the volume name, but only the base
+				// Offset by the statefulsetID, so we round-robin across zones
+				index = uint32(statefulsetID)
+				// We still hash the volume name, but only the prefix
 				hashString = pvcName[:lastDash]
+
+				// In the special case where it looks like `ClaimName-StatefulSetName-Id`,
+				// hash only the StatefulSetName, so that different claims on the same StatefulSet
+				// member end up in the same zone.
+				// Note that StatefulSetName (and ClaimName) might themselves both have dashes.
+				// We actually just take the portion after the final - of ClaimName-StatefulSetName.
+				// For our purposes it doesn't much matter (just suboptimal spreading).
+				lastDash := strings.LastIndexByte(hashString, '-')
+				if lastDash != -1 {
+					hashString = hashString[lastDash+1:]
+				}
+
 				glog.V(2).Infof("Detected StatefulSet-style volume name %q; index=%d", pvcName, index)
 			}
 		}
@@ -353,4 +379,34 @@ func UnmountViaEmptyDir(dir string, host VolumeHost, volName string, volSpec Spe
 		return err
 	}
 	return wrapped.TearDownAt(dir)
+}
+
+// MountOptionFromSpec extracts and joins mount options from volume spec with supplied options
+func MountOptionFromSpec(spec *Spec, options ...string) []string {
+	pv := spec.PersistentVolume
+
+	if pv != nil {
+		if mo, ok := pv.Annotations[MountOptionAnnotation]; ok {
+			moList := strings.Split(mo, ",")
+			return JoinMountOptions(moList, options)
+		}
+
+	}
+	return options
+}
+
+// JoinMountOptions joins mount options eliminating duplicates
+func JoinMountOptions(userOptions []string, systemOptions []string) []string {
+	allMountOptions := sets.NewString()
+
+	for _, mountOption := range userOptions {
+		if len(mountOption) > 0 {
+			allMountOptions.Insert(mountOption)
+		}
+	}
+
+	for _, mountOption := range systemOptions {
+		allMountOptions.Insert(mountOption)
+	}
+	return allMountOptions.UnsortedList()
 }

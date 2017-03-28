@@ -49,7 +49,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "metrics_nil_test.go",
-        "metrics_statfs_test.go",
         "plugins_test.go",
         "util_test.go",
     ],
@@ -58,18 +57,22 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/util/slice:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 
 go_test(
     name = "go_default_xtest",
-    srcs = ["metrics_du_test.go"],
+    srcs = [
+        "metrics_du_test.go",
+        "metrics_statfs_test.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/volume:go_default_library",
@@ -107,11 +110,15 @@ filegroup(
         "//pkg/volume/iscsi:all-srcs",
         "//pkg/volume/nfs:all-srcs",
         "//pkg/volume/photon_pd:all-srcs",
+        "//pkg/volume/portworx:all-srcs",
+        "//pkg/volume/projected:all-srcs",
         "//pkg/volume/quobyte:all-srcs",
         "//pkg/volume/rbd:all-srcs",
+        "//pkg/volume/scaleio:all-srcs",
         "//pkg/volume/secret:all-srcs",
         "//pkg/volume/testing:all-srcs",
         "//pkg/volume/util:all-srcs",
+        "//pkg/volume/validation:all-srcs",
         "//pkg/volume/vsphere_volume:all-srcs",
     ],
     tags = ["automanaged"],

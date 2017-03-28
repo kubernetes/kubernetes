@@ -21,6 +21,8 @@ import socket
 import string
 import json
 
+import charms.leadership
+
 from shlex import split
 from subprocess import call
 from subprocess import check_call
@@ -31,8 +33,7 @@ from charms import layer
 from charms.reactive import hook
 from charms.reactive import remove_state
 from charms.reactive import set_state
-from charms.reactive import when
-from charms.reactive import when_not
+from charms.reactive import when, when_any, when_not
 from charms.reactive.helpers import data_changed
 from charms.kubernetes.flagmanager import FlagManager
 
@@ -41,6 +42,7 @@ from charmhelpers.core import host
 from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
 from charmhelpers.fetch import apt_install
+from charmhelpers.contrib.charmsupport import nrpe
 
 
 dashboard_templates = [
@@ -140,34 +142,92 @@ def configure_cni(cni):
     cni.set_config(is_master=True, kubeconfig_path='')
 
 
+@when('leadership.is_leader')
 @when('kubernetes-master.components.installed')
 @when_not('authentication.setup')
-def setup_authentication():
+def setup_leader_authentication():
     '''Setup basic authentication and token access for the cluster.'''
     api_opts = FlagManager('kube-apiserver')
     controller_opts = FlagManager('kube-controller-manager')
 
-    api_opts.add('--basic-auth-file', '/srv/kubernetes/basic_auth.csv')
-    api_opts.add('--token-auth-file', '/srv/kubernetes/known_tokens.csv')
+    service_key = '/etc/kubernetes/serviceaccount.key'
+    basic_auth = '/srv/kubernetes/basic_auth.csv'
+    known_tokens = '/srv/kubernetes/known_tokens.csv'
+
+    api_opts.add('--basic-auth-file', basic_auth)
+    api_opts.add('--token-auth-file', known_tokens)
     api_opts.add('--service-cluster-ip-range', service_cidr())
     hookenv.status_set('maintenance', 'Rendering authentication templates.')
-    htaccess = '/srv/kubernetes/basic_auth.csv'
-    if not os.path.isfile(htaccess):
+    if not os.path.isfile(basic_auth):
         setup_basic_auth('admin', 'admin', 'admin')
-    known_tokens = '/srv/kubernetes/known_tokens.csv'
     if not os.path.isfile(known_tokens):
         setup_tokens(None, 'admin', 'admin')
         setup_tokens(None, 'kubelet', 'kubelet')
         setup_tokens(None, 'kube_proxy', 'kube_proxy')
     # Generate the default service account token key
     os.makedirs('/etc/kubernetes', exist_ok=True)
-    cmd = ['openssl', 'genrsa', '-out', '/etc/kubernetes/serviceaccount.key',
+
+    cmd = ['openssl', 'genrsa', '-out', service_key,
            '2048']
     check_call(cmd)
-    api_opts.add('--service-account-key-file',
-                 '/etc/kubernetes/serviceaccount.key')
-    controller_opts.add('--service-account-private-key-file',
-                        '/etc/kubernetes/serviceaccount.key')
+    api_opts.add('--service-account-key-file', service_key)
+    controller_opts.add('--service-account-private-key-file', service_key)
+
+    # read service account key for syndication
+    leader_data = {}
+    for f in [known_tokens, basic_auth, service_key]:
+        with open(f, 'r') as fp:
+            leader_data[f] = fp.read()
+
+    # this is slightly opaque, but we are sending file contents under its file
+    # path as a key.
+    # eg:
+    # {'/etc/kubernetes/serviceaccount.key': 'RSA:2471731...'}
+    charms.leadership.leader_set(leader_data)
+
+    set_state('authentication.setup')
+
+
+@when_not('leadership.is_leader')
+@when('kubernetes-master.components.installed')
+@when_not('authentication.setup')
+def setup_non_leader_authentication():
+    api_opts = FlagManager('kube-apiserver')
+    controller_opts = FlagManager('kube-controller-manager')
+
+    service_key = '/etc/kubernetes/serviceaccount.key'
+    basic_auth = '/srv/kubernetes/basic_auth.csv'
+    known_tokens = '/srv/kubernetes/known_tokens.csv'
+
+    # This races with other codepaths, and seems to require being created first
+    # This block may be extracted later, but for now seems to work as intended
+    os.makedirs('/etc/kubernetes', exist_ok=True)
+    os.makedirs('/srv/kubernetes', exist_ok=True)
+
+    hookenv.status_set('maintenance', 'Rendering authentication templates.')
+
+    # Set an array for looping logic
+    keys = [service_key, basic_auth, known_tokens]
+    for k in keys:
+        # If the path does not exist, assume we need it
+        if not os.path.exists(k):
+            # Fetch data from leadership broadcast
+            contents = charms.leadership.leader_get(k)
+            # Default to logging the warning and wait for leader data to be set
+            if contents is None:
+                msg = "Waiting on leaders crypto keys."
+                hookenv.status_set('waiting', msg)
+                hookenv.log('Missing content for file {}'.format(k))
+                return
+            # Write out the file and move on to the next item
+            with open(k, 'w+') as fp:
+                fp.write(contents)
+
+    api_opts.add('--basic-auth-file', basic_auth)
+    api_opts.add('--token-auth-file', known_tokens)
+    api_opts.add('--service-cluster-ip-range', service_cidr())
+    api_opts.add('--service-account-key-file', service_key)
+    controller_opts.add('--service-account-private-key-file', service_key)
 
     set_state('authentication.setup')
 
@@ -185,13 +245,14 @@ def idle_status():
     if not all_kube_system_pods_running():
         hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
     elif hookenv.config('service-cidr') != service_cidr():
-        hookenv.status_set('active', 'WARN: cannot change service-cidr, still using ' + service_cidr())
+        msg = 'WARN: cannot change service-cidr, still using ' + service_cidr()
+        hookenv.status_set('active', msg)
     else:
         hookenv.status_set('active', 'Kubernetes master running.')
 
 
 @when('etcd.available', 'kubernetes-master.components.installed',
-      'certificates.server.cert.available')
+      'certificates.server.cert.available', 'authentication.setup')
 @when_not('kubernetes-master.components.started')
 def start_master(etcd, tls):
     '''Run the Kubernetes master components.'''
@@ -302,7 +363,7 @@ def start_kube_dns():
 
     context = {
         'arch': arch(),
-        # The dictionary named 'pillar' is a construct of the k8s template files.
+        # The dictionary named 'pillar' is a construct of the k8s template file
         'pillar': {
             'dns_server': get_dns_ip(),
             'dns_replicas': 1,
@@ -311,6 +372,8 @@ def start_kube_dns():
     }
 
     try:
+        create_addon('kubedns-sa.yaml', context)
+        create_addon('kubedns-cm.yaml', context)
         create_addon('kubedns-controller.yaml', context)
         create_addon('kubedns-svc.yaml', context)
     except CalledProcessError:
@@ -426,6 +489,44 @@ def ceph_storage(ceph_admin):
     # have performed the necessary pre-req steps to interface with a ceph
     # deployment.
     set_state('ceph-storage.configured')
+
+
+@when('nrpe-external-master.available')
+@when_not('nrpe-external-master.initial-config')
+def initial_nrpe_config(nagios=None):
+    set_state('nrpe-external-master.initial-config')
+    update_nrpe_config(nagios)
+
+
+@when('kubernetes-master.components.started')
+@when('nrpe-external-master.available')
+@when_any('config.changed.nagios_context',
+          'config.changed.nagios_servicegroups')
+def update_nrpe_config(unused=None):
+    services = ('kube-apiserver', 'kube-controller-manager', 'kube-scheduler')
+
+    hostname = nrpe.get_nagios_hostname()
+    current_unit = nrpe.get_nagios_unit_name()
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+    nrpe.add_init_service_checks(nrpe_setup, services, current_unit)
+    nrpe_setup.write()
+
+
+@when_not('nrpe-external-master.available')
+@when('nrpe-external-master.initial-config')
+def remove_nrpe_config(nagios=None):
+    remove_state('nrpe-external-master.initial-config')
+
+    # List of systemd services for which the checks will be removed
+    services = ('kube-apiserver', 'kube-controller-manager', 'kube-scheduler')
+
+    # The current nrpe-external-master interface doesn't handle a lot of logic,
+    # use the charm-helpers code for now.
+    hostname = nrpe.get_nagios_hostname()
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+
+    for service in services:
+        nrpe_setup.remove_check(shortname=service)
 
 
 def create_addon(template, context):
@@ -586,6 +687,8 @@ def render_files():
     # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
+    client_cert_path = layer_options.get('client_certificate_path')
+    client_key_path = layer_options.get('client_key_path')
     server_cert_path = layer_options.get('server_certificate_path')
     server_key_path = layer_options.get('server_key_path')
 
@@ -595,6 +698,9 @@ def render_files():
     api_opts.add('--client-ca-file', ca_cert_path)
     api_opts.add('--tls-cert-file', server_cert_path)
     api_opts.add('--tls-private-key-file', server_key_path)
+    api_opts.add('--kubelet-certificate-authority', ca_cert_path)
+    api_opts.add('--kubelet-client-certificate', client_cert_path)
+    api_opts.add('--kubelet-client-key', client_key_path)
 
     scheduler_opts.add('--v', '2')
 

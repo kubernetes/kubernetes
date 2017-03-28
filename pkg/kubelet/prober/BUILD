@@ -58,6 +58,7 @@ go_test(
         "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/status/testing:go_default_library",
         "//pkg/probe:go_default_library",
+        "//pkg/probe/exec:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",

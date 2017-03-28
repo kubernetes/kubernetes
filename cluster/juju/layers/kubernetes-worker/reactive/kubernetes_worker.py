@@ -24,13 +24,14 @@ from socket import gethostname
 from charms import layer
 from charms.reactive import hook
 from charms.reactive import set_state, remove_state
-from charms.reactive import when, when_not
+from charms.reactive import when, when_any, when_not
 from charms.reactive.helpers import data_changed
 from charms.kubernetes.flagmanager import FlagManager
 from charms.templating.jinja2 import render
 
 from charmhelpers.core import hookenv
 from charmhelpers.core.host import service_stop
+from charmhelpers.contrib.charmsupport import nrpe
 
 
 kubeconfig_path = '/srv/kubernetes/config'
@@ -136,7 +137,7 @@ def charm_status(kube_dns):
 
 
 def update_kubelet_status():
-    ''' There are different states that the kubelt can be in, where we are
+    ''' There are different states that the kubelet can be in, where we are
     waiting for dns, waiting for cluster turnup, or ready to serve
     applications.'''
     if (_systemctl_is_active('kubelet')):
@@ -146,9 +147,31 @@ def update_kubelet_status():
         hookenv.status_set('waiting', 'Waiting for kubelet to start.')
 
 
+@when('certificates.available')
+def send_data(tls):
+    '''Send the data that is required to create a server certificate for
+    this server.'''
+    # Use the public ip of this unit as the Common Name for the certificate.
+    common_name = hookenv.unit_public_ip()
+
+    # Create SANs that the tls layer will add to the server cert.
+    sans = [
+        hookenv.unit_public_ip(),
+        hookenv.unit_private_ip(),
+        gethostname()
+    ]
+
+    # Create a path safe name by removing path characters from the unit name.
+    certificate_name = hookenv.local_unit().replace('/', '_')
+
+    # Request a server cert with this information.
+    tls.request_server_cert(common_name, sans, certificate_name)
+
+
 @when('kubernetes-worker.components.installed', 'kube-api-endpoint.available',
       'tls_client.ca.saved', 'tls_client.client.certificate.saved',
-      'tls_client.client.key.saved', 'kube-dns.available', 'cni.available')
+      'tls_client.client.key.saved', 'tls_client.server.certificate.saved',
+      'tls_client.server.key.saved', 'kube-dns.available', 'cni.available')
 def start_worker(kube_api, kube_dns, cni):
     ''' Start kubelet using the provided API and DNS info.'''
     servers = get_kube_api_servers(kube_api)
@@ -165,7 +188,7 @@ def start_worker(kube_api, kube_dns, cni):
         opts = FlagManager('kubelet')
         # Append the DNS flags + data to the FlagManager object.
 
-        opts.add('--cluster-dns', dns['sdn-ip']) # FIXME: sdn-ip needs a rename
+        opts.add('--cluster-dns', dns['sdn-ip'])  # FIXME sdn-ip needs a rename
         opts.add('--cluster-domain', dns['domain'])
 
         create_config(servers[0])
@@ -301,39 +324,37 @@ def render_init_scripts(api_servers):
     context = {}
     context.update(hookenv.config())
 
-    # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
-    context['ca_cert_path'] = layer_options.get('ca_certificate_path')
-    context['client_cert_path'] = layer_options.get('client_certificate_path')
-    context['client_key_path'] = layer_options.get('client_key_path')
+    ca_cert_path = layer_options.get('ca_certificate_path')
+    server_cert_path = layer_options.get('server_certificate_path')
+    server_key_path = layer_options.get('server_key_path')
 
     unit_name = os.getenv('JUJU_UNIT_NAME').replace('/', '-')
     context.update({'kube_api_endpoint': ','.join(api_servers),
                     'JUJU_UNIT_NAME': unit_name})
 
-    # Create a flag manager for kubelet to render kubelet_opts.
     kubelet_opts = FlagManager('kubelet')
-    # Declare to kubelet it needs to read from kubeconfig
     kubelet_opts.add('--require-kubeconfig', None)
     kubelet_opts.add('--kubeconfig', kubeconfig_path)
     kubelet_opts.add('--network-plugin', 'cni')
+    kubelet_opts.add('--anonymous-auth', 'false')
+    kubelet_opts.add('--client-ca-file', ca_cert_path)
+    kubelet_opts.add('--tls-cert-file', server_cert_path)
+    kubelet_opts.add('--tls-private-key-file', server_key_path)
     context['kubelet_opts'] = kubelet_opts.to_s()
-    # Create a flag manager for kube-proxy to render kube_proxy_opts.
+
     kube_proxy_opts = FlagManager('kube-proxy')
     kube_proxy_opts.add('--kubeconfig', kubeconfig_path)
     context['kube_proxy_opts'] = kube_proxy_opts.to_s()
 
     os.makedirs('/var/lib/kubelet', exist_ok=True)
-    # Set the user when rendering config
-    context['user'] = 'kubelet'
-    # Set the user when rendering config
-    context['user'] = 'kube-proxy'
+
     render('kube-default', '/etc/default/kube-default', context)
     render('kubelet.defaults', '/etc/default/kubelet', context)
+    render('kubelet.service', '/lib/systemd/system/kubelet.service', context)
     render('kube-proxy.defaults', '/etc/default/kube-proxy', context)
     render('kube-proxy.service', '/lib/systemd/system/kube-proxy.service',
            context)
-    render('kubelet.service', '/lib/systemd/system/kubelet.service', context)
 
 
 def create_kubeconfig(kubeconfig, server, ca, key, certificate, user='ubuntu',
@@ -445,6 +466,44 @@ def kubectl_manifest(operation, manifest):
         # Execute the requested command that did not match any of the special
         # cases above
         return kubectl_success(operation, '-f', manifest)
+
+
+@when('nrpe-external-master.available')
+@when_not('nrpe-external-master.initial-config')
+def initial_nrpe_config(nagios=None):
+    set_state('nrpe-external-master.initial-config')
+    update_nrpe_config(nagios)
+
+
+@when('kubernetes-worker.config.created')
+@when('nrpe-external-master.available')
+@when_any('config.changed.nagios_context',
+          'config.changed.nagios_servicegroups')
+def update_nrpe_config(unused=None):
+    services = ('kubelet', 'kube-proxy')
+
+    hostname = nrpe.get_nagios_hostname()
+    current_unit = nrpe.get_nagios_unit_name()
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+    nrpe.add_init_service_checks(nrpe_setup, services, current_unit)
+    nrpe_setup.write()
+
+
+@when_not('nrpe-external-master.available')
+@when('nrpe-external-master.initial-config')
+def remove_nrpe_config(nagios=None):
+    remove_state('nrpe-external-master.initial-config')
+
+    # List of systemd services for which the checks will be removed
+    services = ('kubelet', 'kube-proxy')
+
+    # The current nrpe-external-master interface doesn't handle a lot of logic,
+    # use the charm-helpers code for now.
+    hostname = nrpe.get_nagios_hostname()
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+
+    for service in services:
+        nrpe_setup.remove_check(shortname=service)
 
 
 def _systemctl_is_active(application):

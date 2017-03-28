@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Note: the example only works with the code within the same release/branch.
 package main
 
 import (
@@ -26,11 +27,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var (
-	kubeconfig = flag.String("kubeconfig", "./config", "absolute path to the kubeconfig file")
-)
-
 func main() {
+	kubeconfig := flag.String("kubeconfig", "./config", "absolute path to the kubeconfig file")
 	flag.Parse()
 	// uses the current context in kubeconfig
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)

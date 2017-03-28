@@ -43,6 +43,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/crlf"
 	"k8s.io/kubernetes/pkg/util/i18n"
 
@@ -64,9 +65,9 @@ var (
 
 		Editing is done with the API version used to fetch the resource.
 		To edit using a specific API version, fully-qualify the resource, version, and group.
-		
+
 		The default format is YAML. To edit in JSON, specify "-o json".
-		
+
 		The flag --windows-line-endings can be used to force Windows line endings,
 		otherwise the default for your operating system will be used.
 
@@ -84,7 +85,10 @@ var (
 		KUBE_EDITOR="nano" kubectl edit svc/docker-registry
 
 		# Edit the job 'myjob' in JSON using the v1 API format:
-		kubectl edit job.v1.batch/myjob -o json`)
+		kubectl edit job.v1.batch/myjob -o json
+
+		# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation:
+		kubectl edit deployment/mydeployment -o yaml --save-config`)
 )
 
 func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
@@ -92,7 +96,7 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, kubectl.PrintOptions{
+	p, err := f.Printer(nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 	})
 	cmdutil.CheckErr(err)
@@ -117,9 +121,6 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringP("output", "o", "yaml", "Output format. One of: yaml|json.")
-	cmd.Flags().String("output-version", "", "DEPRECATED: To edit using a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
-	cmd.Flags().MarkDeprecated("output-version", "editing is now done using the resource exactly as fetched from the API. To edit using a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
-	cmd.Flags().MarkHidden("output-version")
 
 	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
@@ -346,14 +347,14 @@ func getPrinter(cmd *cobra.Command) (*editPrinterOptions, error) {
 	switch format := cmdutil.GetFlagString(cmd, "output"); format {
 	case "json":
 		return &editPrinterOptions{
-			printer:   &kubectl.JSONPrinter{},
+			printer:   &printers.JSONPrinter{},
 			ext:       ".json",
 			addHeader: false,
 		}, nil
 	// If flag -o is not specified, use yaml as default
 	case "yaml", "":
 		return &editPrinterOptions{
-			printer:   &kubectl.YAMLPrinter{},
+			printer:   &printers.YAMLPrinter{},
 			ext:       ".yaml",
 			addHeader: true,
 		}, nil
@@ -384,7 +385,7 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 		return nil, nil, nil, "", err
 	}
 
-	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
+	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
 	if editMode == NormalEditMode {
 		// if in normal mode, also read from args, and fetch latest from the server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
@@ -402,7 +403,7 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 
 	updatedResultGetter := func(data []byte) *resource.Result {
 		// resource builder to read objects from edited data
-		return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+		return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 			Stream(bytes.NewReader(data), "edited-file").
 			ContinueOnError().
 			Flatten().
@@ -534,12 +535,14 @@ func visitToCreate(createVisitor resource.Visitor, mapper meta.RESTMapper, out, 
 func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, annotationVisitor resource.Visitor, encoder runtime.Encoder) error {
 	// iterate through all items to apply annotations
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
-		// put configuration annotation in "updates"
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, encoder); err != nil {
-			return err
+		// If the flag is true, create or update the annotation. Otherwise, NOP
+		if cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag) {
+			if err := kubectl.CreateOrUpdateAnnotation(true, info, encoder); err != nil {
+				return err
+			}
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
 				return err
 			}
 		}
@@ -592,7 +595,7 @@ func (h *editHeader) flush() {
 }
 
 type editPrinterOptions struct {
-	printer   kubectl.ResourcePrinter
+	printer   printers.ResourcePrinter
 	ext       string
 	addHeader bool
 }

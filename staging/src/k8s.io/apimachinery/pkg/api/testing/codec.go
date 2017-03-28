@@ -17,18 +17,18 @@ limitations under the License.
 package testing
 
 import (
-	"os"
-	"mime"
 	"fmt"
+	"mime"
+	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 )
 
 var (
-	testCodecMediaType string
+	testCodecMediaType        string
 	testStorageCodecMediaType string
 )
 
@@ -58,7 +58,7 @@ func TestStorageCodec(codecs runtimeserializer.CodecFactory, gvs ...schema.Group
 		// TODO: remove for etcd3 / make parameterizable
 		serializer := serializerInfo.Serializer
 		if !serializerInfo.EncodesAsText {
-			serializer = runtime.NewBase64Serializer(serializer)
+			serializer = runtime.NewBase64Serializer(serializer, serializer)
 		}
 
 		decoder := recognizer.NewDecoder(serializer, codecs.UniversalDeserializer())

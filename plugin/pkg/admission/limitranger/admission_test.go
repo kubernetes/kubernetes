@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -590,12 +590,12 @@ func newMockClientForTest(limitRanges []api.LimitRange) *fake.Clientset {
 
 // newHandlerForTest returns a handler configured for testing.
 func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
-	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
+	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler, err := NewLimitRanger(&DefaultLimitRangerActions{})
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.Validate(handler)
 	return handler, f, err

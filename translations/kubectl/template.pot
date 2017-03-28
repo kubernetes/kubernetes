@@ -1,0 +1,619 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: EMAIL\n"
+"POT-Creation-Date: 2017-02-23 18:52+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: pkg/kubectl/cmd/create_quota.go:62
+msgid ""
+"A comma-delimited set of quota scopes that must all match each object "
+"tracked by the quota."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_quota.go:61
+msgid ""
+"A comma-delimited set of resource=quantity pairs that define a hard limit."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_pdb.go:64
+msgid ""
+"A label selector to use for this budget. Only equality-based selector "
+"requirements are supported."
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:137
+msgid "A schedule in the Cron format the job should be run with."
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:109
+msgid ""
+"Additional external IP address (not managed by Kubernetes) to accept for the "
+"service. If this IP is routed to a node, the service can be accessed by this "
+"IP in addition to its generated service IP."
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:110 pkg/kubectl/cmd/run.go:120
+msgid ""
+"An inline JSON override for the generated object. If this is non-empty, it "
+"is used to override the generated object. Requires that the object supply a "
+"valid apiVersion field."
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:135
+msgid ""
+"An inline JSON override for the generated service object. If this is non-"
+"empty, it is used to override the generated object. Requires that the object "
+"supply a valid apiVersion field.  Only used if --expose is true."
+msgstr ""
+
+#: pkg/kubectl/cmd/apply.go:104
+msgid "Apply a configuration to a resource by filename or stdin"
+msgstr ""
+
+#: pkg/kubectl/cmd/certificates.go:72
+msgid "Approve a certificate signing request"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:82
+msgid ""
+"Assign your own ClusterIP or set to 'None' for a 'headless' service (no "
+"loadbalancing)."
+msgstr ""
+
+#: pkg/kubectl/cmd/attach.go:70
+msgid "Attach to a running container"
+msgstr ""
+
+#: pkg/kubectl/cmd/autoscale.go:56
+msgid "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:113
+msgid ""
+"ClusterIP to be assigned to the service. Leave empty to auto-allocate, or "
+"set to 'None' to create a headless service."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_clusterrolebinding.go:56
+msgid "ClusterRole this ClusterRoleBinding should reference"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_rolebinding.go:56
+msgid "ClusterRole this RoleBinding should reference"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollingupdate.go:102
+msgid ""
+"Container name which will have its image upgraded. Only relevant when --"
+"image is specified, ignored otherwise. Required when using --image on a "
+"multi-container pod"
+msgstr ""
+
+#: pkg/kubectl/cmd/convert.go:68
+msgid "Convert config files between different API versions"
+msgstr ""
+
+#: pkg/kubectl/cmd/cp.go:65
+msgid "Copy files and directories to and from containers."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_clusterrolebinding.go:44
+msgid "Create a ClusterRoleBinding for a particular ClusterRole"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:182
+msgid "Create a LoadBalancer service."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:125
+msgid "Create a NodePort service."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_rolebinding.go:44
+msgid "Create a RoleBinding for a particular Role or ClusterRole"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:215
+msgid "Create a TLS secret"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:69
+msgid "Create a clusterIP service."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_configmap.go:60
+msgid "Create a configmap from a local file, directory or literal value"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_deployment.go:45
+msgid "Create a deployment with the specified name."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_namespace.go:45
+msgid "Create a namespace with the specified name"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_pdb.go:50
+msgid "Create a pod disruption budget with the specified name."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_quota.go:48
+msgid "Create a quota with the specified name."
+msgstr ""
+
+#: pkg/kubectl/cmd/create.go:63
+msgid "Create a resource by filename or stdin"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:144
+msgid "Create a secret for use with a Docker registry"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:74
+msgid "Create a secret from a local file, directory or literal value"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:35
+msgid "Create a secret using specified subcommand"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_serviceaccount.go:45
+msgid "Create a service account with the specified name"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:37
+msgid "Create a service using specified subcommand."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:241
+msgid "Create an ExternalName service."
+msgstr ""
+
+#: pkg/kubectl/cmd/delete.go:131
+msgid ""
+"Delete resources by filenames, stdin, resources and names, or by resources "
+"and label selector"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/delete_cluster.go:39
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/delete_context.go:39
+msgid "Delete the specified context from the kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/certificates.go:122
+msgid "Deny a certificate signing request"
+msgstr ""
+
+#: pkg/kubectl/cmd/stop.go:59
+msgid "Deprecated: Gracefully shut down a resource by name or filename"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/get_contexts.go:63
+msgid "Describe one or many contexts"
+msgstr ""
+
+#: pkg/kubectl/cmd/top_node.go:78
+msgid "Display Resource (CPU/Memory/Storage) usage of nodes"
+msgstr ""
+
+#: pkg/kubectl/cmd/top_pod.go:80
+msgid "Display Resource (CPU/Memory/Storage) usage of pods"
+msgstr ""
+
+#: pkg/kubectl/cmd/top.go:44
+msgid "Display Resource (CPU/Memory/Storage) usage."
+msgstr ""
+
+#: pkg/kubectl/cmd/clusterinfo.go:51
+msgid "Display cluster info"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/get_clusters.go:41
+msgid "Display clusters defined in the kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/view.go:65
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr ""
+
+#: pkg/kubectl/cmd/get.go:109
+msgid "Display one or many resources"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/current_context.go:49
+msgid "Displays the current-context"
+msgstr ""
+
+#: pkg/kubectl/cmd/explain.go:51
+msgid "Documentation of resources"
+msgstr ""
+
+#: pkg/kubectl/cmd/drain.go:177
+msgid "Drain node in preparation for maintenance"
+msgstr ""
+
+#: pkg/kubectl/cmd/clusterinfo_dump.go:39
+msgid "Dump lots of relevant info for debugging and diagnosis"
+msgstr ""
+
+#: pkg/kubectl/cmd/edit.go:106
+msgid "Edit a resource on the server"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:160
+msgid "Email for Docker registry"
+msgstr ""
+
+#: pkg/kubectl/cmd/exec.go:69
+msgid "Execute a command in a container"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollingupdate.go:103
+msgid ""
+"Explicit policy for when to pull container images. Required when --image is "
+"same as existing image, ignored otherwise."
+msgstr ""
+
+#: pkg/kubectl/cmd/portforward.go:76
+msgid "Forward one or more local ports to a pod"
+msgstr ""
+
+#: pkg/kubectl/cmd/help.go:37
+msgid "Help about any command"
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:103
+msgid ""
+"IP to assign to the Load Balancer. If empty, an ephemeral IP will be created "
+"and used (cloud-provider specific)."
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:112
+msgid ""
+"If non-empty, set the session affinity for the service to this; legal "
+"values: 'None', 'ClientIP'"
+msgstr ""
+
+#: pkg/kubectl/cmd/annotate.go:135
+msgid ""
+"If non-empty, the annotation update will only succeed if this is the current "
+"resource-version for the object. Only valid when specifying a single "
+"resource."
+msgstr ""
+
+#: pkg/kubectl/cmd/label.go:133
+msgid ""
+"If non-empty, the labels update will only succeed if this is the current "
+"resource-version for the object. Only valid when specifying a single "
+"resource."
+msgstr ""
+
+#: pkg/kubectl/cmd/rollingupdate.go:99
+msgid ""
+"Image to use for upgrading the replication controller. Must be distinct from "
+"the existing image (either new image or new image tag).  Can not be used "
+"with --filename/-f"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout.go:47
+msgid "Manage a deployment rollout"
+msgstr ""
+
+#: pkg/kubectl/cmd/drain.go:128
+msgid "Mark node as schedulable"
+msgstr ""
+
+#: pkg/kubectl/cmd/drain.go:103
+msgid "Mark node as unschedulable"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout_pause.go:74
+msgid "Mark the provided resource as paused"
+msgstr ""
+
+#: pkg/kubectl/cmd/certificates.go:36
+msgid "Modify certificate resources."
+msgstr ""
+
+#: pkg/kubectl/cmd/config/config.go:40
+msgid "Modify kubeconfig files"
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:108
+msgid ""
+"Name or number for the port on the container that the service should direct "
+"traffic to. Optional."
+msgstr ""
+
+#: pkg/kubectl/cmd/logs.go:109
+msgid ""
+"Only return logs after a specific date (RFC3339). Defaults to all logs. Only "
+"one of since-time / since may be used."
+msgstr ""
+
+#: pkg/kubectl/cmd/completion.go:98
+msgid "Output shell completion code for the specified shell (bash or zsh)"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:158
+msgid "Password for Docker registry authentication"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:227
+msgid "Path to PEM encoded public key certificate."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:228
+msgid "Path to private key associated with given certificate."
+msgstr ""
+
+#: pkg/kubectl/cmd/rollingupdate.go:85
+msgid "Perform a rolling update of the given ReplicationController"
+msgstr ""
+
+#: pkg/kubectl/cmd/scale.go:83
+msgid ""
+"Precondition for resource version. Requires that the current resource "
+"version match this value in order to scale."
+msgstr ""
+
+#: pkg/kubectl/cmd/version.go:40
+msgid "Print the client and server version information"
+msgstr ""
+
+#: pkg/kubectl/cmd/options.go:38
+msgid "Print the list of flags inherited by all commands"
+msgstr ""
+
+#: pkg/kubectl/cmd/logs.go:87
+msgid "Print the logs for a container in a pod"
+msgstr ""
+
+#: pkg/kubectl/cmd/replace.go:71
+msgid "Replace a resource by filename or stdin"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout_resume.go:72
+msgid "Resume a paused resource"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_rolebinding.go:57
+msgid "Role this RoleBinding should reference"
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:95
+msgid "Run a particular image on the cluster"
+msgstr ""
+
+#: pkg/kubectl/cmd/proxy.go:69
+msgid "Run a proxy to the Kubernetes API server"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:162
+msgid "Server location for Docker registry"
+msgstr ""
+
+#: pkg/kubectl/cmd/scale.go:71
+msgid ""
+"Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
+msgstr ""
+
+#: pkg/kubectl/cmd/set/set.go:38
+msgid "Set specific features on objects"
+msgstr ""
+
+#: pkg/kubectl/cmd/set/set_selector.go:82
+msgid "Set the selector on a resource"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/create_cluster.go:68
+msgid "Sets a cluster entry in kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/create_context.go:58
+msgid "Sets a context entry in kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/create_authinfo.go:104
+msgid "Sets a user entry in kubeconfig"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/set.go:60
+msgid "Sets an individual value in a kubeconfig file"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/use_context.go:49
+msgid "Sets the current-context in a kubeconfig file"
+msgstr ""
+
+#: pkg/kubectl/cmd/describe.go:82
+msgid "Show details of a specific resource or group of resources"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout_status.go:58
+msgid "Show the status of the rollout"
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:106
+msgid "Synonym for --target-port"
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:88
+msgid ""
+"Take a replication controller, service, deployment or pod and expose it as a "
+"new Kubernetes Service"
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:115
+msgid "The image for the container to run."
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:117
+msgid ""
+"The image pull policy for the container. If left empty, this value will not "
+"be specified by the client and defaulted by the server"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollingupdate.go:101
+msgid ""
+"The key to use to differentiate between two different controllers, default "
+"'deployment'.  Only relevant when --image is specified, ignored otherwise"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_pdb.go:63
+msgid ""
+"The minimum number or percentage of available pods this budget requires."
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:111
+msgid "The name for the newly created object."
+msgstr ""
+
+#: pkg/kubectl/cmd/autoscale.go:72
+msgid ""
+"The name for the newly created object. If not specified, the name of the "
+"input resource will be used."
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:114
+msgid ""
+"The name of the API generator to use, see http://kubernetes.io/docs/user-"
+"guide/kubectl-conventions/#generators for a list."
+msgstr ""
+
+#: pkg/kubectl/cmd/autoscale.go:67
+msgid ""
+"The name of the API generator to use. Currently there is only 1 generator."
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:99
+msgid ""
+"The name of the API generator to use. There are 2 generators: 'service/v1' "
+"and 'service/v2'. The only difference between them is that service port in "
+"v1 is named 'default', while it is left unnamed in v2. Default is 'service/"
+"v2'."
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:134
+msgid ""
+"The name of the generator to use for creating a service.  Only used if --"
+"expose is true"
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:100
+msgid "The network protocol for the service to be created. Default is 'TCP'."
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:101
+msgid ""
+"The port that the service should serve on. Copied from the resource being "
+"exposed, if unspecified"
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:122
+msgid ""
+"The port that this container exposes.  If --expose is true, this is also the "
+"port used by the service that is created."
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:132
+msgid ""
+"The resource requirement limits for this container.  For example, 'cpu=200m,"
+"memory=512Mi'.  Note that server side components may assign limits depending "
+"on the server configuration, such as limit ranges."
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:131
+msgid ""
+"The resource requirement requests for this container.  For example, "
+"'cpu=100m,memory=256Mi'.  Note that server side components may assign "
+"requests depending on the server configuration, such as limit ranges."
+msgstr ""
+
+#: pkg/kubectl/cmd/run.go:129
+msgid ""
+"The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  "
+"If set to 'Always' a deployment is created, if set to 'OnFailure' a job is "
+"created, if set to 'Never', a regular pod is created. For the latter two --"
+"replicas must be 1.  Default 'Always', for CronJobs `Never`."
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:88
+msgid "The type of secret to create"
+msgstr ""
+
+#: pkg/kubectl/cmd/expose.go:102
+msgid ""
+"Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is "
+"'ClusterIP'."
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout_undo.go:72
+msgid "Undo a previous rollout"
+msgstr ""
+
+#: pkg/kubectl/cmd/config/unset.go:48
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr ""
+
+#: pkg/kubectl/cmd/patch.go:95
+msgid "Update field(s) of a resource using strategic merge patch"
+msgstr ""
+
+#: pkg/kubectl/cmd/set/set_image.go:95
+msgid "Update image of a pod template"
+msgstr ""
+
+#: pkg/kubectl/cmd/set/set_resources.go:102
+msgid "Update resource requests/limits on objects with pod templates"
+msgstr ""
+
+#: pkg/kubectl/cmd/annotate.go:115
+msgid "Update the annotations on a resource"
+msgstr ""
+
+#: pkg/kubectl/cmd/label.go:113
+msgid "Update the labels on a resource"
+msgstr ""
+
+#: pkg/kubectl/cmd/taint.go:87
+msgid "Update the taints on one or more nodes"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_secret.go:156
+msgid "Username for Docker registry authentication"
+msgstr ""
+
+#: pkg/kubectl/cmd/rollout/rollout_history.go:52
+msgid "View rollout history"
+msgstr ""
+
+#: pkg/kubectl/cmd/clusterinfo_dump.go:46
+msgid ""
+"Where to output the files.  If empty or '-' uses stdout, otherwise creates a "
+"directory hierarchy in that directory"
+msgstr ""
+
+#: pkg/kubectl/cmd/create_service.go:254
+msgid "external name of service"
+msgstr ""
+
+#: pkg/kubectl/cmd/cmd.go:217
+msgid "kubectl controls the Kubernetes cluster manager"
+msgstr ""

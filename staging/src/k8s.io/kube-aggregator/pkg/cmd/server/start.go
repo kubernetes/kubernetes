@@ -22,19 +22,17 @@ import (
 	"io/ioutil"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeclientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kube-aggregator/pkg/apiserver"
-
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+	"k8s.io/kube-aggregator/pkg/apiserver"
 )
 
 const defaultEtcdPathPrefix = "/registry/kube-aggregator.kubernetes.io/"
@@ -55,15 +53,9 @@ type AggregatorOptions struct {
 	StdErr io.Writer
 }
 
-// NewCommandStartMaster provides a CLI handler for 'start master' command
-func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
-	o := &AggregatorOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, api.Scheme, api.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
-
-		StdOut: out,
-		StdErr: err,
-	}
-	o.RecommendedOptions.SecureServing.ServingOptions.BindPort = 443
+// NewCommandStartAggregator provides a CLI handler for 'start master' command
+func NewCommandStartAggregator(out, err io.Writer, stopCh <-chan struct{}) *cobra.Command {
+	o := NewDefaultOptions(out, err)
 
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
@@ -75,21 +67,36 @@ func NewCommandStartAggregator(out, err io.Writer) *cobra.Command {
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunAggregator(); err != nil {
+			if err := o.RunAggregator(stopCh); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
 
-	flags := cmd.Flags()
-	o.RecommendedOptions.AddFlags(flags)
-	flags.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
-	flags.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
-	flags.StringVar(&o.CoreAPIKubeconfig, "core-kubeconfig", o.CoreAPIKubeconfig, ""+
+	o.AddFlags(cmd.Flags())
+	return cmd
+}
+
+// AddFlags is necessary because hyperkube doesn't work using cobra, so we have to have different registration and execution paths
+func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
+	o.RecommendedOptions.AddFlags(fs)
+	fs.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
+	fs.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
+	fs.StringVar(&o.CoreAPIKubeconfig, "core-kubeconfig", o.CoreAPIKubeconfig, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to get,list,watch "+
 		" services,endpoints.  If not set, the in-cluster config is used")
-	return cmd
+}
+
+// NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
+func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
+	o := &AggregatorOptions{
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+
+		StdOut: out,
+		StdErr: err,
+	}
+	return o
 }
 
 func (o AggregatorOptions) Validate(args []string) error {
@@ -100,14 +107,13 @@ func (o *AggregatorOptions) Complete() error {
 	return nil
 }
 
-func (o AggregatorOptions) RunAggregator() error {
+func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	// TODO have a "real" external address
-	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost"); err != nil {
+	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig().
-		WithSerializer(api.Codecs)
+	serverConfig := genericapiserver.NewConfig(apiserver.Codecs)
 
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return err
@@ -151,11 +157,9 @@ func (o AggregatorOptions) RunAggregator() error {
 		return err
 	}
 
-	server, err := config.Complete().New()
+	server, err := config.Complete().NewWithDelegate(genericapiserver.EmptyDelegate, stopCh)
 	if err != nil {
 		return err
 	}
-	server.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
-
-	return nil
+	return server.GenericAPIServer.PrepareRun().Run(stopCh)
 }

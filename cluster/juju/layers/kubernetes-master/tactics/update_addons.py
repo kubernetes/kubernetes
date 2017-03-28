@@ -45,31 +45,46 @@ def clean_addon_dir(addon_dir):
     os.makedirs(addon_dir)
 
 
+def run_with_logging(command):
+    """ Run a command with controlled logging """
+    log.debug("Running: %s" % command)
+    process = subprocess.Popen(command, stderr=subprocess.PIPE)
+    stderr = process.communicate()[1].rstrip()
+    process.wait()
+    if process.returncode != 0:
+        log.error(stderr)
+        raise Exception("%s: exit code %d" % (command, process.returncode))
+    log.debug(stderr)
+
+
 @contextmanager
 def kubernetes_repo():
-    """ Shallow clone kubernetes repo and clean up when we are done """
-    repo = "https://github.com/kubernetes/kubernetes.git"
-    path = tempfile.mkdtemp(prefix="kubernetes")
-    try:
-        log.info("Cloning " + repo)
-        cmd = ["git", "clone", "--depth", "1", repo, path]
-        process = subprocess.Popen(cmd, stderr=subprocess.PIPE)
-        stderr = process.communicate()[1].rstrip()
-        process.wait()
-        if process.returncode != 0:
-            log.error(stderr)
-            raise Exception("clone failed: exit code %d" % process.returncode)
-        log.debug(stderr)
-        yield path
-    finally:
-        shutil.rmtree(path)
+    """ Yield a kubernetes repo to copy addons from.
+
+    If KUBE_VERSION is set, this will clone the local repo and checkout the
+    corresponding branch. Otherwise, the local branch will be used. """
+    repo = os.path.abspath("../../../..")
+    if "KUBE_VERSION" in os.environ:
+        branch = os.environ["KUBE_VERSION"]
+        log.info("Cloning %s with branch %s" % (repo, branch))
+        path = tempfile.mkdtemp(prefix="kubernetes")
+        try:
+            cmd = ["git", "clone", repo, path, "-b", branch]
+            run_with_logging(cmd)
+            yield path
+        finally:
+            shutil.rmtree(path)
+    else:
+        log.info("Using local repo " + repo)
+        yield repo
 
 
-def add_addon(source, dest):
-    """ Add an addon manifest from the given source.
+def add_addon(repo, source, dest):
+    """ Add an addon manifest from the given repo and source.
 
     Any occurrences of 'amd64' are replaced with '{{ arch }}' so the charm can
     fill it in during deployment. """
+    source = os.path.join(repo, "cluster/addons", source)
     if os.path.isdir(dest):
         dest = os.path.join(dest, os.path.basename(source))
     log.debug("Copying: %s -> %s" % (source, dest))
@@ -86,20 +101,30 @@ def update_addons(dest):
     with kubernetes_repo() as repo:
         log.info("Copying addons to charm")
         clean_addon_dir(dest)
-        add_addon(repo + "/cluster/addons/dashboard/dashboard-controller.yaml",
-                  dest)
-        add_addon(repo + "/cluster/addons/dashboard/dashboard-service.yaml",
-                  dest)
-        add_addon(repo + "/cluster/addons/dns/kubedns-controller.yaml.in",
-                  dest + "/kubedns-controller.yaml")
-        add_addon(repo + "/cluster/addons/dns/kubedns-svc.yaml.in",
-                  dest + "/kubedns-svc.yaml")
-        influxdb = "/cluster/addons/cluster-monitoring/influxdb"
-        add_addon(repo + influxdb + "/grafana-service.yaml", dest)
-        add_addon(repo + influxdb + "/heapster-controller.yaml", dest)
-        add_addon(repo + influxdb + "/heapster-service.yaml", dest)
-        add_addon(repo + influxdb + "/influxdb-grafana-controller.yaml", dest)
-        add_addon(repo + influxdb + "/influxdb-service.yaml", dest)
+        add_addon(repo, "dashboard/dashboard-controller.yaml", dest)
+        add_addon(repo, "dashboard/dashboard-service.yaml", dest)
+        try:
+            add_addon(repo, "dns/kubedns-sa.yaml",
+                      dest + "/kubedns-sa.yaml")
+            add_addon(repo, "dns/kubedns-cm.yaml",
+                      dest + "/kubedns-cm.yaml")
+            add_addon(repo, "dns/kubedns-controller.yaml.in",
+                      dest + "/kubedns-controller.yaml")
+            add_addon(repo, "dns/kubedns-svc.yaml.in",
+                      dest + "/kubedns-svc.yaml")
+        except IOError as e:
+            # fall back to the older filenames
+            log.debug(e)
+            add_addon(repo, "dns/skydns-rc.yaml.in",
+                      dest + "/kubedns-controller.yaml")
+            add_addon(repo, "dns/skydns-svc.yaml.in",
+                      dest + "/kubedns-svc.yaml")
+        influxdb = "cluster-monitoring/influxdb"
+        add_addon(repo, influxdb + "/grafana-service.yaml", dest)
+        add_addon(repo, influxdb + "/heapster-controller.yaml", dest)
+        add_addon(repo, influxdb + "/heapster-service.yaml", dest)
+        add_addon(repo, influxdb + "/influxdb-grafana-controller.yaml", dest)
+        add_addon(repo, influxdb + "/influxdb-service.yaml", dest)
 
 # Entry points
 
@@ -151,8 +176,8 @@ def parse_args():
 def main():
     """ Update addons into the layer's templates/addons folder """
     parse_args()
-    dest = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                        "../templates/addons"))
+    os.chdir(os.path.join(os.path.dirname(__file__), ".."))
+    dest = "templates/addons"
     update_addons(dest)
 
 

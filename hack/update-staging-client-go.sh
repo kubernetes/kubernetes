@@ -19,4 +19,18 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-"${KUBE_ROOT}"/staging/copy.sh
+source "${KUBE_ROOT}/hack/lib/util.sh"
+
+kube::util::ensure_clean_working_dir
+kube::util::ensure_godep_version v79
+
+cd ${KUBE_ROOT}
+
+echo "Checking whether godeps are restored"
+if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
+  echo -e '\nRun 'godep restore' to download dependencies.' 1>&2
+  exit 1
+fi
+
+echo "Running staging/copy.sh"
+staging/copy.sh -u "$@" 2>&1 | sed 's/^/  /'

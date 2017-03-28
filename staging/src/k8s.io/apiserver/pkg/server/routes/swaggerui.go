@@ -21,20 +21,20 @@ import (
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 
-	"k8s.io/apiserver/pkg/server/routes/data/swagger"
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes/data/swagger"
 )
 
 // SwaggerUI exposes files in third_party/swagger-ui/ under /swagger-ui.
 type SwaggerUI struct{}
 
 // Install adds the SwaggerUI webservice to the given mux.
-func (l SwaggerUI) Install(c *mux.APIContainer) {
+func (l SwaggerUI) Install(c *mux.PathRecorderMux) {
 	fileServer := http.FileServer(&assetfs.AssetFS{
 		Asset:    swagger.Asset,
 		AssetDir: swagger.AssetDir,
 		Prefix:   "third_party/swagger-ui",
 	})
 	prefix := "/swagger-ui/"
-	c.NonSwaggerRoutes.Handle(prefix, http.StripPrefix(prefix, fileServer))
+	c.Handle(prefix, http.StripPrefix(prefix, fileServer))
 }

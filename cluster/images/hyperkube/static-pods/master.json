@@ -37,7 +37,7 @@
         "--service-cluster-ip-range=10.0.0.1/24",
         "--insecure-bind-address=127.0.0.1",
         "--etcd-servers=http://127.0.0.1:2379",
-        "--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota",
+        "--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
         "--client-ca-file=/srv/kubernetes/ca.crt",
         "--basic-auth-file=/srv/kubernetes/basic_auth.csv",
         "--min-request-timeout=300",

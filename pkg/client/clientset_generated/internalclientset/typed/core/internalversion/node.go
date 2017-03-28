@@ -22,6 +22,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
+	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
 // NodesGetter has a method to return a NodeInterface.
@@ -108,7 +109,7 @@ func (c *nodes) Delete(name string, options *v1.DeleteOptions) error {
 func (c *nodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("nodes").
-		VersionedParams(&listOptions, api.ParameterCodec).
+		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
@@ -120,7 +121,7 @@ func (c *nodes) Get(name string, options v1.GetOptions) (result *api.Node, err e
 	err = c.client.Get().
 		Resource("nodes").
 		Name(name).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -131,7 +132,7 @@ func (c *nodes) List(opts v1.ListOptions) (result *api.NodeList, err error) {
 	result = &api.NodeList{}
 	err = c.client.Get().
 		Resource("nodes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -139,10 +140,10 @@ func (c *nodes) List(opts v1.ListOptions) (result *api.NodeList, err error) {
 
 // Watch returns a watch.Interface that watches the requested nodes.
 func (c *nodes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.client.Get().
-		Prefix("watch").
 		Resource("nodes").
-		VersionedParams(&opts, api.ParameterCodec).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
 }
 
