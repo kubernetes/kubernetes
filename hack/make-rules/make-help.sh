@@ -18,8 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-red='\E[1;31m'
-reset='\E[0m'
+readonly red=$(tput setaf 1)
+readonly reset=$(tput sgr0)
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 ALL_TARGETS=$(make -C "${KUBE_ROOT}" PRINT_HELP=y -rpn | sed -n -e '/^$/ { n ; /^[^ .#][^ ]*:/ { s/:.*$// ; p ; } ; }' | sort)

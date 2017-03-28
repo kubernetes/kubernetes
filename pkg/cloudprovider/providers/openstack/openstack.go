@@ -46,7 +46,6 @@ const ProviderName = "openstack"
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
-var ErrAttrNotFound = errors.New("Expected attribute not found")
 
 const (
 	MiB = 1024 * 1024
@@ -314,8 +313,8 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 		return nil, err
 	}
 
-	for network, addrlist := range addresses {
-		for _, props := range addrlist {
+	for network, addrList := range addresses {
+		for _, props := range addrList {
 			var addressType v1.NodeAddressType
 			if props.IpType == "floating" || network == "public" {
 				addressType = v1.NodeExternalIP
@@ -390,8 +389,8 @@ func (os *OpenStack) ProviderName() string {
 }
 
 // ScrubDNS filters DNS settings for pods.
-func (os *OpenStack) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	return nameservers, searches
+func (os *OpenStack) ScrubDNS(nameServers, searches []string) ([]string, []string) {
+	return nameServers, searches
 }
 
 func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
@@ -414,8 +413,8 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 		return nil, false
 	}
 
-	lbversion := os.lbOpts.LBVersion
-	if lbversion == "" {
+	lbVersion := os.lbOpts.LBVersion
+	if lbVersion == "" {
 		// No version specified, try newest supported by server
 		netExts, err := networkExtensions(network)
 		if err != nil {
@@ -424,24 +423,24 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 		}
 
 		if netExts["lbaasv2"] {
-			lbversion = "v2"
+			lbVersion = "v2"
 		} else if netExts["lbaas"] {
-			lbversion = "v1"
+			lbVersion = "v1"
 		} else {
 			glog.Warningf("Failed to find neutron LBaaS extension (v1 or v2)")
 			return nil, false
 		}
-		glog.V(3).Infof("Using LBaaS extension %v", lbversion)
+		glog.V(3).Infof("Using LBaaS extension %v", lbVersion)
 	}
 
 	glog.V(1).Info("Claiming to support LoadBalancer")
 
-	if lbversion == "v2" {
+	if lbVersion == "v2" {
 		return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
-	} else if lbversion == "v1" {
+	} else if lbVersion == "v1" {
 		return &LbaasV1{LoadBalancer{network, compute, os.lbOpts}}, true
 	} else {
-		glog.Warningf("Config error: unrecognised lb-version \"%v\"", lbversion)
+		glog.Warningf("Config error: unrecognised lb-version \"%v\"", lbVersion)
 		return nil, false
 	}
 }

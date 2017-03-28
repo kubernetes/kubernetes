@@ -43,53 +43,45 @@ type DeviceAllocator interface {
 }
 
 type deviceAllocator struct {
-	firstDevice        mountDevice
-	lastAssignedDevice mountDevice
-	length             int
+	possibleDevices []mountDevice
+	lastIndex       int
 }
 
-// NewDeviceAllocator creates new DeviceAlllocator that allocates device names
-// of given length ("aaa" for length 3) and with given first device, so all
-// devices before the first device are left to the operating system.
-// With length 2 and firstDevice "ba", it will allocate device names
-// ba, bb, ..., bz, ca, ... cz, ..., da, ... zz, so a..z and aa..az can be used
-// by the operating system.
-func NewDeviceAllocator(length int, firstDevice mountDevice) DeviceAllocator {
-	lastDevice := make([]byte, length)
-	for i := 0; i < length; i++ {
-		lastDevice[i] = 'z'
+// Allocates device names according to scheme ba..bz, ca..cz
+// it moves along the ring and always picks next device until
+// device list is exhausted.
+func NewDeviceAllocator(lastIndex int) DeviceAllocator {
+	possibleDevices := []mountDevice{}
+	for _, firstChar := range []rune{'b', 'c'} {
+		for i := 'a'; i <= 'z'; i++ {
+			dev := mountDevice([]rune{firstChar, i})
+			possibleDevices = append(possibleDevices, dev)
+		}
 	}
 	return &deviceAllocator{
-		firstDevice:        firstDevice,
-		lastAssignedDevice: mountDevice(lastDevice),
-		length:             length,
+		possibleDevices: possibleDevices,
+		lastIndex:       lastIndex,
 	}
 }
 
 func (d *deviceAllocator) GetNext(existingDevices ExistingDevices) (mountDevice, error) {
-	candidate := d.lastAssignedDevice
-
+	var candidate mountDevice
+	foundIndex := d.lastIndex
 	for {
-		candidate = d.nextDevice(candidate)
+		candidate, foundIndex = d.nextDevice(foundIndex + 1)
 		if _, found := existingDevices[candidate]; !found {
-			d.lastAssignedDevice = candidate
+			d.lastIndex = foundIndex
 			return candidate, nil
 		}
-		if candidate == d.lastAssignedDevice {
+		if foundIndex == d.lastIndex {
 			return "", fmt.Errorf("no devices are available")
 		}
 	}
 }
 
-func (d *deviceAllocator) nextDevice(device mountDevice) mountDevice {
-	dev := []byte(device)
-	for i := d.length - 1; i >= 0; i-- {
-		if dev[i] != 'z' {
-			dev[i]++
-			return mountDevice(dev)
-		}
-		dev[i] = 'a'
+func (d *deviceAllocator) nextDevice(nextIndex int) (mountDevice, int) {
+	if nextIndex < len(d.possibleDevices) {
+		return d.possibleDevices[nextIndex], nextIndex
 	}
-	// all parts of device were 'z', jump to the first device
-	return d.firstDevice
+	return d.possibleDevices[0], 0
 }

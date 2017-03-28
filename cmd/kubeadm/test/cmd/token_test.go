@@ -70,3 +70,31 @@ func TestCmdTokenGenerateTypoError(t *testing.T) {
 		t.Error("'kubeadm ex token genorate' (a deliberate typo) exited without an error when we expected non-zero exit status")
 	}
 }
+func TestCmdTokenDelete(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	var tests = []struct {
+		args     string
+		expected bool
+	}{
+		{"", false},       // no token provided
+		{"foobar", false}, // invalid token
+	}
+
+	for _, rt := range tests {
+		_, _, actual := RunCmd(*kubeadmPath, "ex", "token", "delete", rt.args)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed CmdTokenDelete running 'kubeadm ex token %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+				rt.args,
+				actual,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+		kubeadmReset()
+	}
+}

@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
@@ -84,7 +84,7 @@ func TestQuota(t *testing.T) {
 	controllerCh := make(chan struct{})
 	defer close(controllerCh)
 
-	informers := informers.NewSharedInformerFactory(nil, clientset, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
@@ -94,7 +94,6 @@ func TestQuota(t *testing.T) {
 		false,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
-	informers.Start(controllerCh)
 	go rm.Run(3, controllerCh)
 
 	resourceQuotaRegistry := quotainstall.NewRegistry(clientset, nil)
@@ -103,13 +102,15 @@ func TestQuota(t *testing.T) {
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		KubeClient:                clientset,
+		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		Registry:                  resourceQuotaRegistry,
 		GroupKindsToReplenish:     groupKindsToReplenish,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactoryFromClient(clientset),
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(informers),
 	}
 	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, controllerCh)
+	informers.Start(controllerCh)
 
 	startTime := time.Now()
 	scale(t, ns2.Name, clientset)

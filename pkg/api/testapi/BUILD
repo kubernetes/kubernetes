@@ -13,8 +13,6 @@ go_library(
     srcs = ["testapi.go"],
     tags = ["automanaged"],
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/install:go_default_library",
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/install:go_default_library",
         "//pkg/api:go_default_library",

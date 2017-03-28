@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -48,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
 
-	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
@@ -265,15 +263,6 @@ func init() {
 			externalGroupVersion: externalGroupVersion,
 			internalGroupVersion: authorization.SchemeGroupVersion,
 			internalTypes:        api.Scheme.KnownTypes(authorization.SchemeGroupVersion),
-			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[kubeadm.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: kubeadm.GroupName, Version: api.Registry.GroupOrDie(kubeadm.GroupName).GroupVersion.Version}
-		Groups[kubeadm.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: kubeadm.SchemeGroupVersion,
-			internalTypes:        api.Scheme.KnownTypes(kubeadm.SchemeGroupVersion),
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}

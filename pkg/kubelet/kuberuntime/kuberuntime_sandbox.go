@@ -198,7 +198,9 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIP(podNamespace, podName 
 		return ""
 	}
 	ip := podSandbox.Network.Ip
-	if net.ParseIP(ip) == nil {
+	if len(ip) != 0 && net.ParseIP(ip) == nil {
+		// ip could be an empty string if runtime is not responsible for the
+		// IP (e.g., host networking).
 		glog.Warningf("Pod Sandbox reported an unparseable IP %v", ip)
 		return ""
 	}

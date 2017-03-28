@@ -41,6 +41,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/util/clock"
 )
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
@@ -58,8 +59,9 @@ type Reflector struct {
 	// the beginning of the next one.
 	period       time.Duration
 	resyncPeriod time.Duration
-	// now() returns current time - exposed for testing purposes
-	now func() time.Time
+	ShouldResync func() bool
+	// clock allows tests to manipulate time
+	clock clock.Clock
 	// lastSyncResourceVersion is the resource version token last
 	// observed when doing a sync with the underlying store
 	// it is thread safe, but not synchronized with the underlying store
@@ -103,7 +105,7 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 		expectedType:  reflect.TypeOf(expectedType),
 		period:        time.Second,
 		resyncPeriod:  resyncPeriod,
-		now:           time.Now,
+		clock:         &clock.RealClock{},
 	}
 	return r
 }
@@ -223,8 +225,8 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 	// always fail so we end up listing frequently. Then, if we don't
 	// manually stop the timer, we could end up with many timers active
 	// concurrently.
-	t := time.NewTimer(r.resyncPeriod)
-	return t.C, t.Stop
+	t := r.clock.NewTimer(r.resyncPeriod)
+	return t.C(), t.Stop
 }
 
 // ListAndWatch first lists all items and get the resource version at the moment of call,
@@ -270,10 +272,12 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			case <-cancelCh:
 				return
 			}
-			glog.V(4).Infof("%s: forcing resync", r.name)
-			if err := r.store.Resync(); err != nil {
-				resyncerrc <- err
-				return
+			if r.ShouldResync == nil || r.ShouldResync() {
+				glog.V(4).Infof("%s: forcing resync", r.name)
+				if err := r.store.Resync(); err != nil {
+					resyncerrc <- err
+					return
+				}
 			}
 			cleanup()
 			resyncCh, cleanup = r.resyncChan()
@@ -334,7 +338,7 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 
 // watchHandler watches w and keeps *resourceVersion up to date.
 func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, errc chan error, stopCh <-chan struct{}) error {
-	start := time.Now()
+	start := r.clock.Now()
 	eventCount := 0
 
 	// Stopping the watcher should be idempotent and if we return from this function there's no way
@@ -393,7 +397,7 @@ loop:
 		}
 	}
 
-	watchDuration := time.Now().Sub(start)
+	watchDuration := r.clock.Now().Sub(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
 		glog.V(4).Infof("%s: Unexpected watch close - watch lasted less than a second and no items received", r.name)
 		return errors.New("very short watch")

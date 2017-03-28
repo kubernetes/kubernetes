@@ -181,7 +181,7 @@ var (
     "name": "write-jobs"
   },
   "subjects": [{
-    "apiVersion": "rbac/v1alpha1",
+    "apiGroup": "rbac.authorization.k8s.io",
     "kind": "User",
     "name": "admin"
   }]

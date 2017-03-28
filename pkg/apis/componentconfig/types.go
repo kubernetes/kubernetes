@@ -238,10 +238,10 @@ type KubeletConfiguration struct {
 	// masterServiceNamespace is The namespace from which the kubernetes
 	// master services should be injected into pods.
 	MasterServiceNamespace string
-	// clusterDNS is the IP address for a cluster DNS server.  If set, kubelet
-	// will configure all containers to use this for DNS resolution in
-	// addition to the host's DNS servers
-	ClusterDNS string
+	// clusterDNS is a list of IP address for a cluster DNS server.  If set,
+	// kubelet will configure all containers to use this for DNS resolution
+	// instead of the host's DNS servers
+	ClusterDNS []string
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration
@@ -790,6 +790,9 @@ type KubeControllerManagerConfiguration struct {
 	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
 	// wait between successive executions. Is set to 5 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration
+	// If set to true enables NoExecute Taints and will evict all not-tolerating
+	// Pod running on Nodes tainted with this kind of Taints.
+	EnableTaintManager bool
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

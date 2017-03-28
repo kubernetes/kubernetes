@@ -39,12 +39,13 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
-	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/extensions/v1beta1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
@@ -52,9 +53,6 @@ import (
 )
 
 const (
-	// Daemon sets will periodically check that their daemon pods are running as expected.
-	FullDaemonSetResyncPeriod = 30 * time.Second // TODO: Figure out if this time seems reasonable.
-
 	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues
 	BurstReplicas = 250
 
@@ -188,12 +186,12 @@ func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
 			return
 		}
 		ds, ok = tombstone.Obj.(*extensions.DaemonSet)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a DaemonSet %#v", obj)
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a DaemonSet %#v", obj))
 			return
 		}
 	}
@@ -249,7 +247,7 @@ func (dsc *DaemonSetsController) processNextWorkItem() bool {
 func (dsc *DaemonSetsController) enqueueDaemonSet(ds *extensions.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
 		return
 	}
 
@@ -263,7 +261,7 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *v1.Pod) *extensions.Daemon
 		ds, ok := obj.(*extensions.DaemonSet)
 		if !ok {
 			// This should not happen
-			glog.Errorf("lookup cache does not retuen a ReplicationController object")
+			utilruntime.HandleError(fmt.Errorf("lookup cache does not return a DaemonSet object"))
 			return nil
 		}
 		if dsc.isCacheValid(pod, ds) {
@@ -279,7 +277,7 @@ func (dsc *DaemonSetsController) getPodDaemonSet(pod *v1.Pod) *extensions.Daemon
 		// More than two items in this list indicates user error. If two daemon
 		// sets overlap, sort by creation timestamp, subsort by name, then pick
 		// the first.
-		glog.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels)
+		utilruntime.HandleError(fmt.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels))
 		sort.Sort(byCreationTimestamp(sets))
 	}
 
@@ -324,7 +322,7 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
-			glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
 			return
 		}
 		dsc.expectations.CreationObserved(dsKey)
@@ -369,12 +367,12 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %#v", obj)
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a pod %#v", obj))
 			return
 		}
 	}
@@ -382,7 +380,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	if ds := dsc.getPodDaemonSet(pod); ds != nil {
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
-			glog.Errorf("Couldn't get key for object %#v: %v", ds, err)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
 			return
 		}
 		dsc.expectations.DeletionObserved(dsKey)
@@ -779,13 +777,14 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
-	_, reasons, err := predicates.GeneralPredicates(newPod, nil, nodeInfo)
+	_, reasons, err := daemonSetPredicates(newPod, nodeInfo)
 	if err != nil {
-		glog.Warningf("GeneralPredicates failed on ds '%s/%s' due to unexpected error: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
+		glog.Warningf("daemonSetPredicates failed on ds '%s/%s' due to unexpected error: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
 		return false, false, false, err
 	}
+
 	for _, r := range reasons {
-		glog.V(4).Infof("GeneralPredicates failed on ds '%s/%s' for reason: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
+		glog.V(4).Infof("daemonSetPredicates failed on ds '%s/%s' for reason: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 		switch reason := r.(type) {
 		case *predicates.InsufficientResourceError:
 			dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.Error())
@@ -801,7 +800,9 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				predicates.ErrNodeLabelPresenceViolated,
 				// this one is probably intentional since it's a workaround for not having
 				// pod hard anti affinity.
-				predicates.ErrPodNotFitsHostPorts:
+				predicates.ErrPodNotFitsHostPorts,
+				// DaemonSet is expected to respect taints and tolerations
+				predicates.ErrTaintsTolerationsNotMatch:
 				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
 			// unintentional
 			case
@@ -818,9 +819,9 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 			// unexpected
 			case
 				predicates.ErrPodAffinityNotMatch,
-				predicates.ErrServiceAffinityViolated,
-				predicates.ErrTaintsTolerationsNotMatch:
-				return false, false, false, fmt.Errorf("unexpected reason: GeneralPredicates should not return reason %s", reason.GetReason())
+				predicates.ErrServiceAffinityViolated:
+				glog.Warningf("unexpected predicate failure reason: %s", reason.GetReason())
+				return false, false, false, fmt.Errorf("unexpected reason: daemonSetPredicates should not return reason %s", reason.GetReason())
 			default:
 				glog.V(4).Infof("unknown predicate failure reason: %s", reason.GetReason())
 				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
@@ -832,6 +833,30 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		}
 	}
 	return
+}
+
+// daemonSetPredicates checks if a DaemonSet's pod can be scheduled on a node using GeneralPredicates
+// and PodToleratesNodeTaints predicate
+func daemonSetPredicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	var predicateFails []algorithm.PredicateFailureReason
+
+	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
+	if !fit {
+		predicateFails = append(predicateFails, reasons...)
+	}
+
+	fit, reasons, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
+	if !fit {
+		predicateFails = append(predicateFails, reasons...)
+	}
+
+	return len(predicateFails) == 0, predicateFails, nil
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.

@@ -32,6 +32,7 @@ import (
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni"
@@ -69,6 +70,8 @@ const (
 
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
+
+	defaultCgroupDriver = "cgroupfs"
 
 	// TODO: https://github.com/kubernetes/kubernetes/pull/31169 provides experimental
 	// defaulting of host user namespace that may be enabled when the docker daemon
@@ -175,22 +178,25 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	if err != nil {
 		return nil, fmt.Errorf("didn't find compatible CNI plugin with given settings %+v: %v", pluginSettings, err)
 	}
-	ds.networkPlugin = plug
+	ds.network = network.NewPluginManager(plug)
 	glog.Infof("Docker cri networking managed by %v", plug.Name())
 
 	// NOTE: cgroup driver is only detectable in docker 1.11+
-	var cgroupDriver string
+	cgroupDriver := defaultCgroupDriver
 	dockerInfo, err := ds.client.Info()
 	if err != nil {
-		glog.Errorf("failed to execute Info() call to the Docker client: %v", err)
-		glog.Warningf("Using fallback default of cgroupfs as cgroup driver")
+		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
+		glog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
+	} else if len(dockerInfo.CgroupDriver) == 0 {
+		glog.Warningf("No cgroup driver is set in Docker")
+		glog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
 	} else {
 		cgroupDriver = dockerInfo.CgroupDriver
-		if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
-			return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
-		}
-		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	}
+	if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
+		return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
+	}
+	glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	ds.cgroupDriver = cgroupDriver
 	ds.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
@@ -218,7 +224,7 @@ type dockerService struct {
 	podSandboxImage    string
 	streamingRuntime   *streamingRuntime
 	streamingServer    streaming.Server
-	networkPlugin      network.NetworkPlugin
+	network            *network.PluginManager
 	containerManager   cm.ContainerManager
 	// cgroup driver used by Docker runtime.
 	cgroupDriver      string
@@ -264,10 +270,10 @@ func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeCo
 		return
 	}
 	glog.Infof("docker cri received runtime config %+v", runtimeConfig)
-	if ds.networkPlugin != nil && runtimeConfig.NetworkConfig.PodCidr != "" {
+	if ds.network != nil && runtimeConfig.NetworkConfig.PodCidr != "" {
 		event := make(map[string]interface{})
 		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = runtimeConfig.NetworkConfig.PodCidr
-		ds.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
+		ds.network.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
 	}
 	return
 }
@@ -287,8 +293,14 @@ func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
 func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.PortMapping, error) {
 	// TODO: get portmappings from docker labels for backward compatibility
 	checkpoint, err := ds.checkpointHandler.GetCheckpoint(podSandboxID)
+	// Return empty portMappings if checkpoint is not found
 	if err != nil {
-		return nil, err
+		if err == errors.CheckpointNotFoundError {
+			glog.Warningf("Failed to retrieve checkpoint for sandbox %q: %v", err)
+			return nil, nil
+		} else {
+			return nil, err
+		}
 	}
 
 	portMappings := []*hostport.PortMapping{}
@@ -327,7 +339,7 @@ func (ds *dockerService) Status() (*runtimeapi.RuntimeStatus, error) {
 		runtimeReady.Reason = "DockerDaemonNotReady"
 		runtimeReady.Message = fmt.Sprintf("docker: failed to get docker version: %v", err)
 	}
-	if err := ds.networkPlugin.Status(); err != nil {
+	if err := ds.network.Status(); err != nil {
 		networkReady.Status = false
 		networkReady.Reason = "NetworkPluginNotReady"
 		networkReady.Message = fmt.Sprintf("docker: network plugin is not ready: %v", err)

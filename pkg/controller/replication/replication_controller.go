@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -182,7 +182,7 @@ func (rm *ReplicationManager) getPodController(pod *v1.Pod) *v1.ReplicationContr
 		controller, ok := obj.(*v1.ReplicationController)
 		if !ok {
 			// This should not happen
-			glog.Errorf("lookup cache does not return a ReplicationController object")
+			utilruntime.HandleError(fmt.Errorf("lookup cache does not return a ReplicationController object"))
 			return nil
 		}
 		if cached && rm.isCacheValid(pod, controller) {
@@ -205,7 +205,7 @@ func (rm *ReplicationManager) getPodController(pod *v1.Pod) *v1.ReplicationContr
 		// More than two items in this list indicates user error. If two replication-controller
 		// overlap, sort by creation timestamp, subsort by name, then pick
 		// the first.
-		glog.Errorf("user error! more than one replication controller is selecting pods with labels: %+v", pod.Labels)
+		utilruntime.HandleError(fmt.Errorf("user error! more than one replication controller is selecting pods with labels: %+v", pod.Labels))
 		sort.Sort(OverlappingControllers(controllers))
 	}
 
@@ -291,7 +291,7 @@ func (rm *ReplicationManager) addPod(obj interface{}) {
 	}
 	rcKey, err := controller.KeyFunc(rc)
 	if err != nil {
-		glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for replication controller %#v: %v", rc, err))
 		return
 	}
 
@@ -371,12 +371,12 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %#v", obj)
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a pod %#v", obj))
 			return
 		}
 	}
@@ -384,7 +384,7 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 	if rc := rm.getPodController(pod); rc != nil {
 		rcKey, err := controller.KeyFunc(rc)
 		if err != nil {
-			glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for replication controller %#v: %v", rc, err))
 			return
 		}
 		rm.expectations.DeletionObserved(rcKey, controller.PodKey(pod))
@@ -396,7 +396,7 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 func (rm *ReplicationManager) enqueueController(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
@@ -413,7 +413,7 @@ func (rm *ReplicationManager) enqueueController(obj interface{}) {
 func (rm *ReplicationManager) enqueueControllerAfter(obj interface{}, after time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
@@ -616,7 +616,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		// anymore but has the stale controller ref.
 		pods, err := rm.podLister.Pods(rc.Namespace).List(labels.Everything())
 		if err != nil {
-			glog.Errorf("Error getting pods for rc %q: %v", key, err)
+			utilruntime.HandleError(fmt.Errorf("Error getting pods for rc %q: %v", key, err))
 			rm.queue.Add(key)
 			return err
 		}
@@ -657,7 +657,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	} else {
 		pods, err := rm.podLister.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelectorPreValidated())
 		if err != nil {
-			glog.Errorf("Error getting pods for rc %q: %v", key, err)
+			utilruntime.HandleError(fmt.Errorf("Error getting pods for rc %q: %v", key, err))
 			rm.queue.Add(key)
 			return err
 		}

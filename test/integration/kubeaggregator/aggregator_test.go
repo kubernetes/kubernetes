@@ -18,7 +18,9 @@ package kubeaggregator
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -50,6 +52,12 @@ func runAPIServer(t *testing.T, stopCh <-chan struct{}) string {
 	// Change the ports, because otherwise it will fail if examples/apiserver/apiserver_test and this are run in parallel.
 	serverRunOptions.SecureServing.ServingOptions.BindPort = 6443 + 3
 	serverRunOptions.InsecureServing.BindPort = 8080 + 3
+
+	// Avoid default cert-dir of /var/run/kubernetes to allow this to run on darwin
+	certDir, _ := ioutil.TempDir("", "test-integration-kubeaggregator")
+	defer os.Remove(certDir)
+	serverRunOptions.SecureServing.ServerCert.CertDirectory = certDir
+
 	go func() {
 		if err := serverRunOptions.Run(stopCh); err != nil {
 			t.Fatalf("Error in bringing up the example apiserver: %v", err)

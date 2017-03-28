@@ -49,6 +49,9 @@ func MatchesServerVersion(clientVersion apimachineryversion.Info, client Discove
 //   preference.
 // - If version is provided and the server does not support it,
 //   return an error.
+// TODO negotiation should be reserved for cases where we need a version for a given group.  In those cases, it should return an ordered list of
+// server preferences.  From that list, a separate function can match from an ordered list of client versions.
+// This is not what the function has ever done before, but it makes more logical sense.
 func NegotiateVersion(client DiscoveryInterface, requiredGV *schema.GroupVersion, clientRegisteredGVs []schema.GroupVersion) (*schema.GroupVersion, error) {
 	clientVersions := sets.String{}
 	for _, gv := range clientRegisteredGVs {

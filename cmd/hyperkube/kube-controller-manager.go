@@ -27,8 +27,10 @@ func NewKubeControllerManager() *Server {
 	s := options.NewCMServer()
 
 	hks := Server{
-		SimpleUsage: "controller-manager",
-		Long:        "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
+		name:            "controller-manager",
+		AlternativeName: "kube-controller-manager",
+		SimpleUsage:     "controller-manager",
+		Long:            "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
 		Run: func(_ *Server, args []string) error {
 			return app.Run(s)
 		},

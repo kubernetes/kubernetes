@@ -32,7 +32,7 @@ Currently the test suite has the following:
 How To Run
 ------
 ```
-cd kubernetes/test/component/scheduler/perf
+cd kubernetes/test/integration/scheduler_perf
 ./test-performance.sh
 ```
 

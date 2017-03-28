@@ -24,13 +24,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 // CreateEssentialAddons creates the kube-proxy and kube-dns addons
@@ -51,16 +51,11 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
 	}
 
-	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment, struct {
-		ImageRepository, Arch, Version, DNSDomain string
-		Replicas                                  int
-	}{
+	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment, struct{ ImageRepository, Arch, Version, DNSDomain string }{
 		ImageRepository: kubeadmapi.GlobalEnvParams.RepositoryPrefix,
 		Arch:            runtime.GOARCH,
-		// TODO: Support larger amount of replicas?
-		Replicas:  1,
-		Version:   KubeDNSVersion,
-		DNSDomain: cfg.Networking.DNSDomain,
+		Version:         KubeDNSVersion,
+		DNSDomain:       cfg.Networking.DNSDomain,
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-dns deployment template: %v", err)
@@ -158,5 +153,5 @@ func getClusterCIDR(podsubnet string) string {
 	if len(podsubnet) == 0 {
 		return ""
 	}
-	return "--cluster-cidr" + podsubnet
+	return "- --cluster-cidr=" + podsubnet
 }

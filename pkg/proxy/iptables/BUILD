@@ -20,7 +20,6 @@ go_library(
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",
-        "//pkg/util/slice:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
@@ -46,9 +45,11 @@ go_test(
         "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
+        "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 

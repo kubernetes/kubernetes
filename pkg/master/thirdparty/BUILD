@@ -28,6 +28,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/registry/generic",
         "//vendor:k8s.io/apiserver/pkg/registry/rest",
         "//vendor:k8s.io/apiserver/pkg/server",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
     ],
 )

@@ -14,6 +14,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Wrapper for gcloud compute, running it $RETRIES times in case of failures.
+# Args:
+# $@: all stuff that goes after 'gcloud compute'
+function run-gcloud-compute-with-retries {
+  RETRIES="${RETRIES:-3}"
+  for attempt in $(seq 1 ${RETRIES}); do
+    local -r gcloud_result=$(gcloud compute "$@" 2>&1)
+    local -r ret_val="$?"
+    echo "${gcloud_result}"
+    if [[ "${ret_val}" -ne "0" ]]; then
+      if [[ $(echo "${gcloud_result}" | grep -c "already exists") -gt 0 ]]; then
+        if [[ "${attempt}" == 1 ]]; then
+          echo -e "${color_red}Failed to $1 $2 $3 as the resource hasn't been deleted from a previous run.${color_norm}" >& 2
+          exit 1
+        fi
+        echo -e "${color_yellow}Succeeded to $1 $2 $3 in the previous attempt, but status response wasn't received.${color_norm}"
+        return 0
+      fi
+      echo -e "${color_yellow}Attempt $attempt failed to $1 $2 $3. Retrying.${color_norm}" >& 2
+      sleep $(($attempt * 5))
+    else
+      echo -e "${color_green}Succeeded to gcloud compute $1 $2 $3.${color_norm}"
+      return 0
+    fi
+  done
+  echo -e "${color_red}Failed to $1 $2 $3.${color_norm}" >& 2
+  exit 1
+}
+
 function create-master-instance-with-resources {
   GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
 
@@ -101,35 +130,5 @@ function delete-master-instance-and-resources {
   
 	  gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
     	  ${GCLOUD_COMMON_ARGS} || true
-  fi
-}
-
-function delete-master-instance-and-resources {
-  GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
-
-  gcloud compute instances delete "${MASTER_NAME}" \
-      ${GCLOUD_COMMON_ARGS} || true
-  
-  gcloud compute disks delete "${MASTER_NAME}-pd" \
-      ${GCLOUD_COMMON_ARGS} || true
-  
-  gcloud compute disks delete "${MASTER_NAME}-event-pd" \
-      ${GCLOUD_COMMON_ARGS} &> /dev/null || true
-  
-  gcloud compute addresses delete "${MASTER_NAME}-ip" \
-      --project "${PROJECT}" \
-      --region "${REGION}" \
-      --quiet || true
-  
-  gcloud compute firewall-rules delete "${MASTER_NAME}-https" \
-    --project "${PROJECT}" \
-    --quiet || true
-  
-  if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
-    gcloud compute instances delete "${EVENT_STORE_NAME}" \
-        ${GCLOUD_COMMON_ARGS} || true
-  
-    gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
-        ${GCLOUD_COMMON_ARGS} || true
   fi
 }

@@ -37,8 +37,7 @@ type informerGenerator struct {
 	groupVersion              clientgentypes.GroupVersion
 	typeToGenerate            *types.Type
 	imports                   namer.ImportTracker
-	versionedClientSetPackage string
-	internalClientSetPackage  string
+	clientSetPackage          string
 	listersPackage            string
 	internalInterfacesPackage string
 }
@@ -67,18 +66,8 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 
 	//listerPackage := "k8s.io/kubernetes/pkg/client/listers/" + g.groupVersion.Group.NonEmpty() + "/" + strings.ToLower(g.groupVersion.Version.NonEmpty())
 	listerPackage := fmt.Sprintf("%s/%s/%s", g.listersPackage, g.groupVersion.Group.NonEmpty(), strings.ToLower(g.groupVersion.Version.NonEmpty()))
-
-	var (
-		clientSetInterface *types.Type
-		informerFor        string
-	)
-	if len(g.groupVersion.Version) == 0 {
-		clientSetInterface = c.Universe.Type(types.Name{Package: g.internalClientSetPackage, Name: "Interface"})
-		informerFor = "InternalInformerFor"
-	} else {
-		clientSetInterface = c.Universe.Type(types.Name{Package: g.versionedClientSetPackage, Name: "Interface"})
-		informerFor = "VersionedInformerFor"
-	}
+	clientSetInterface := c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"})
+	informerFor := "InformerFor"
 
 	m := map[string]interface{}{
 		"apiScheme":                       c.Universe.Type(apiScheme),

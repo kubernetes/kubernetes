@@ -406,12 +406,17 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	containerRefManager := kubecontainer.NewRefManager()
 
-	secretManager, err := secret.NewCachingSecretManager(kubeDeps.KubeClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize secret manager: %v", err)
-	}
-
 	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)
+
+	clusterDNS := make([]net.IP, 0, len(kubeCfg.ClusterDNS))
+	for _, ipEntry := range kubeCfg.ClusterDNS {
+		ip := net.ParseIP(ipEntry)
+		if ip == nil {
+			glog.Warningf("Invalid clusterDNS ip '%q'", ipEntry)
+		} else {
+			clusterDNS = append(clusterDNS, ip)
+		}
+	}
 
 	klet := &Kubelet{
 		hostname:                       hostname,
@@ -427,7 +432,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		registerSchedulable:            kubeCfg.RegisterSchedulable,
 		standaloneMode:                 standaloneMode,
 		clusterDomain:                  kubeCfg.ClusterDomain,
-		clusterDNS:                     net.ParseIP(kubeCfg.ClusterDNS),
+		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
 		nodeLister:                     nodeLister,
 		nodeInfo:                       nodeInfo,
@@ -436,7 +441,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		recorder:                       kubeDeps.Recorder,
 		cadvisor:                       kubeDeps.CAdvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
-		secretManager:                  secretManager,
 		cloud:                          kubeDeps.Cloud,
 		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
 		nodeRef:                   nodeRef,
@@ -470,6 +474,11 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 	}
+
+	secretManager := secret.NewCachingSecretManager(
+		kubeDeps.KubeClient, secret.GetObjectTTLFromNodeFunc(klet.GetNode))
+
+	klet.secretManager = secretManager
 
 	if klet.experimentalHostUserNamespaceDefaulting {
 		glog.Infof("Experimental host user namespace defaulting is enabled.")
@@ -531,7 +540,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	var nl *noOpLegacyHost
 	pluginSettings.LegacyRuntimeHost = nl
 
-	if kubeCfg.EnableCRI {
+	// rktnetes cannot be run with CRI.
+	if kubeCfg.ContainerRuntime != "rkt" && kubeCfg.EnableCRI {
 		// kubelet defers to the runtime shim to setup networking. Setting
 		// this to nil will prevent it from trying to invoke the plugin.
 		// It's easier to always probe and initialize plugins till cri
@@ -673,6 +683,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
+	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
 	klet.updatePodCIDR(kubeCfg.PodCIDR)
 
 	// setup containerGC
@@ -852,7 +863,7 @@ type Kubelet struct {
 	clusterDomain string
 
 	// If non-nil, use this for container DNS server.
-	clusterDNS net.IP
+	clusterDNS []net.IP
 
 	// masterServiceNamespace is the namespace that the master service is exposed in.
 	masterServiceNamespace string
@@ -1269,7 +1280,7 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
 		}
 	}
 	useClusterFirstPolicy := pod.Spec.DNSPolicy == v1.DNSClusterFirst
-	if useClusterFirstPolicy && kl.clusterDNS == nil {
+	if useClusterFirstPolicy && len(kl.clusterDNS) == 0 {
 		// clusterDNS is not known.
 		// pod with ClusterDNSFirst Policy cannot be created
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, "MissingClusterDNS", "kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. Falling back to DNSDefault policy.", pod.Spec.DNSPolicy)
@@ -1300,8 +1311,12 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
 	// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
 	// the pod. The cluster DNS server itself will forward queries to other nameservers that is configured to use,
 	// in case the cluster DNS server cannot resolve the DNS query itself
-	dns := []string{kl.clusterDNS.String()}
+	dns := make([]string, len(kl.clusterDNS))
+	for i, ip := range kl.clusterDNS {
+		dns[i] = ip.String()
+	}
 	dnsSearch := kl.formDNSSearch(hostSearch, pod)
+
 	return dns, dnsSearch, nil
 }
 
@@ -1450,8 +1465,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		// exists or the pod is running for the first time
 		podKilled := false
 		if !pcm.Exists(pod) && !firstSync {
-			kl.killPod(pod, nil, podStatus, nil)
-			podKilled = true
+			if err := kl.killPod(pod, nil, podStatus, nil); err == nil {
+				podKilled = true
+			}
 		}
 		// Create and Update pod's Cgroups
 		// Don't create cgroups for run once pod if it was killed above
@@ -1789,7 +1805,6 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		// takes place only after kubelet calls the update handler to process
 		// the update to ensure the internal pod cache is up-to-date.
 		kl.sourcesReady.AddSource(u.Source)
-
 	case e := <-plegCh:
 		if isSyncPodWorthy(e) {
 			// PLEG event for a pod; sync it.

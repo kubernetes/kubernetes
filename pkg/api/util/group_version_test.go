@@ -61,3 +61,33 @@ func TestGetGroup(t *testing.T) {
 		}
 	}
 }
+
+func TestGetGroupVersion(t *testing.T) {
+	testCases := []struct {
+		group   string
+		version string
+		output  string
+	}{
+		{
+			"",
+			"v1",
+			"v1",
+		},
+		{
+			"extensions",
+			"",
+			"extensions/",
+		},
+		{
+			"extensions",
+			"v1beta1",
+			"extensions/v1beta1",
+		},
+	}
+	for _, test := range testCases {
+		actual := GetGroupVersion(test.group, test.version)
+		if test.output != actual {
+			t.Errorf("expect version: %s, got: %s\n", test.output, actual)
+		}
+	}
+}

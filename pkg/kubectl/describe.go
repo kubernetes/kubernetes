@@ -42,6 +42,8 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
+
+	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -1545,7 +1547,8 @@ func describeSecret(secret *api.Secret) (string, error) {
 		w.Write(LEVEL_0, "Name:\t%s\n", secret.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", secret.Namespace)
 		printLabelsMultiline(w, "Labels", secret.Labels)
-		printLabelsMultiline(w, "Annotations", secret.Annotations)
+		skipAnnotations := sets.NewString(annotations.LastAppliedConfigAnnotation)
+		printLabelsMultilineWithFilter(w, "Annotations", secret.Annotations, skipAnnotations)
 
 		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
 
@@ -2191,13 +2194,43 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		w.Write(LEVEL_0, "Reference:\t%s/%s\n",
 			hpa.Spec.ScaleTargetRef.Kind,
 			hpa.Spec.ScaleTargetRef.Name)
-		if hpa.Spec.TargetCPUUtilizationPercentage != nil {
-			w.Write(LEVEL_0, "Target CPU utilization:\t%d%%\n", *hpa.Spec.TargetCPUUtilizationPercentage)
-			w.Write(LEVEL_0, "Current CPU utilization:\t")
-			if hpa.Status.CurrentCPUUtilizationPercentage != nil {
-				w.Write(LEVEL_0, "%d%%\n", *hpa.Status.CurrentCPUUtilizationPercentage)
-			} else {
-				w.Write(LEVEL_0, "<unset>\n")
+		w.Write(LEVEL_0, "Metrics:\t( current / target )\n")
+		for i, metric := range hpa.Spec.Metrics {
+			switch metric.Type {
+			case autoscaling.PodsMetricSourceType:
+				current := "<unknown>"
+				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Pods != nil {
+					current = hpa.Status.CurrentMetrics[i].Pods.CurrentAverageValue.String()
+				}
+				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.MetricName, current, metric.Pods.TargetAverageValue.String())
+			case autoscaling.ObjectMetricSourceType:
+				current := "<unknown>"
+				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+					current = hpa.Status.CurrentMetrics[i].Object.CurrentValue.String()
+				}
+				w.Write(LEVEL_1, "%q on %s/%s:\t%s / %s\n", metric.Object.MetricName, metric.Object.Target.Kind, metric.Object.Target.Name, current, metric.Object.TargetValue.String())
+			case autoscaling.ResourceMetricSourceType:
+				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
+				if metric.Resource.TargetAverageValue != nil {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Resource != nil {
+						current = hpa.Status.CurrentMetrics[i].Resource.CurrentAverageValue.String()
+					}
+					w.Write(LEVEL_0, ":\t%s / %s\n", current, metric.Resource.TargetAverageValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Resource != nil && hpa.Status.CurrentMetrics[i].Resource.CurrentAverageUtilization != nil {
+						current = fmt.Sprintf("%d%% (%s)", *hpa.Status.CurrentMetrics[i].Resource.CurrentAverageUtilization, hpa.Status.CurrentMetrics[i].Resource.CurrentAverageValue.String())
+					}
+
+					target := "<auto>"
+					if metric.Resource.TargetAverageUtilization != nil {
+						target = fmt.Sprintf("%d%%", *metric.Resource.TargetAverageUtilization)
+					}
+					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
+				}
+			default:
+				w.Write(LEVEL_1, "<unknown metric type %q>", string(metric.Type))
 			}
 		}
 		minReplicas := "<unset>"
@@ -2776,13 +2809,18 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 	return s, err
 }
 
+// printLabelsMultilineWithFilter prints filtered multiple labels with a proper alignment.
+func printLabelsMultilineWithFilter(w *PrefixWriter, title string, labels map[string]string, skip sets.String) {
+	printLabelsMultilineWithIndent(w, "", title, "\t", labels, skip)
+}
+
 // printLabelsMultiline prints multiple labels with a proper alignment.
 func printLabelsMultiline(w *PrefixWriter, title string, labels map[string]string) {
-	printLabelsMultilineWithIndent(w, "", title, "\t", labels)
+	printLabelsMultilineWithIndent(w, "", title, "\t", labels, sets.NewString())
 }
 
 // printLabelsMultiline prints multiple labels with a user-defined alignment.
-func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string) {
+func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string, skip sets.String) {
 
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
@@ -2794,7 +2832,14 @@ func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, inner
 	// to print labels in the sorted order
 	keys := make([]string, 0, len(labels))
 	for key := range labels {
+		if skip.Has(key) {
+			continue
+		}
 		keys = append(keys, key)
+	}
+	if len(keys) == 0 {
+		w.WriteLine("<none>")
+		return
 	}
 	sort.Strings(keys)
 

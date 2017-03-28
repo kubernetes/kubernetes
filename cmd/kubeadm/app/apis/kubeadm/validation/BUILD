@@ -38,5 +38,8 @@ go_test(
     srcs = ["validation_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/util/validation/field"],
+    deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
 )

@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
 )
 
 const (
@@ -40,6 +42,7 @@ type CheckpointStore interface {
 	// Write persists a checkpoint with key
 	Write(key string, data []byte) error
 	// Read retrieves a checkpoint with key
+	// Read must return CheckpointNotFoundError if checkpoint is not found
 	Read(key string) ([]byte, error)
 	// Delete deletes a checkpoint with key
 	// Delete must not return error if checkpoint does not exist
@@ -75,7 +78,11 @@ func (fstore *FileStore) Read(key string) ([]byte, error) {
 	if err := validateKey(key); err != nil {
 		return nil, err
 	}
-	return ioutil.ReadFile(fstore.getCheckpointPath(key))
+	bytes, err := ioutil.ReadFile(fstore.getCheckpointPath(key))
+	if os.IsNotExist(err) {
+		return bytes, errors.CheckpointNotFoundError
+	}
+	return bytes, err
 }
 
 func (fstore *FileStore) Delete(key string) error {

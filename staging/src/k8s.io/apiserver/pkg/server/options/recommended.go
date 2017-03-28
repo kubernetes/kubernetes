@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
 // RecommendedOptions contains the recommended options for running an API server
@@ -34,9 +35,9 @@ type RecommendedOptions struct {
 	Features       *FeatureOptions
 }
 
-func NewRecommendedOptions(scheme *runtime.Scheme) *RecommendedOptions {
+func NewRecommendedOptions(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *RecommendedOptions {
 	return &RecommendedOptions{
-		Etcd:           NewEtcdOptions(scheme),
+		Etcd:           NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, copier, codec)),
 		SecureServing:  NewSecureServingOptions(),
 		Authentication: NewDelegatingAuthenticationOptions(),
 		Authorization:  NewDelegatingAuthorizationOptions(),
@@ -55,6 +56,9 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *RecommendedOptions) ApplyTo(config *server.Config) error {
+	if err := o.Etcd.ApplyTo(config); err != nil {
+		return err
+	}
 	if err := o.SecureServing.ApplyTo(config); err != nil {
 		return err
 	}

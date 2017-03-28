@@ -694,6 +694,29 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations, enfo
 	return results
 }
 
+func debugLogObservations(logPrefix string, observations signalObservations) {
+	for k, v := range observations {
+		if !v.time.IsZero() {
+			glog.V(3).Infof("eviction manager: %v: signal=%v, available: %v, capacity: %v, time: %v", logPrefix, k, v.available, v.capacity, v.time)
+		} else {
+			glog.V(3).Infof("eviction manager: %v: signal=%v, available: %v, capacity: %v", logPrefix, k, v.available, v.capacity)
+		}
+	}
+}
+
+func debugLogThresholdsWithObservation(logPrefix string, thresholds []Threshold, observations signalObservations) {
+	for i := range thresholds {
+		threshold := thresholds[i]
+		observed, found := observations[threshold.Signal]
+		if found {
+			quantity := getThresholdQuantity(threshold.Value, observed.capacity)
+			glog.V(3).Infof("eviction manager: %v: threshold [signal=%v, quantity=%v] observed %v", logPrefix, threshold.Signal, quantity, observed.available)
+		} else {
+			glog.V(3).Infof("eviction manager: %v: threshold [signal=%v] had no observation", logPrefix, threshold.Signal)
+		}
+	}
+}
+
 func thresholdsUpdatedStats(thresholds []Threshold, observations, lastObservations signalObservations) []Threshold {
 	results := []Threshold{}
 	for i := range thresholds {

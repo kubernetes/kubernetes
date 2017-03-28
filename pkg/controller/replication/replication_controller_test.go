@@ -44,8 +44,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -161,7 +161,7 @@ type serverResponse struct {
 }
 
 func NewReplicationManagerFromClient(kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int) (*ReplicationManager, coreinformers.PodInformer, coreinformers.ReplicationControllerInformer) {
-	informerFactory := informers.NewSharedInformerFactory(nil, kubeClient, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	rcInformer := informerFactory.Core().V1().ReplicationControllers()
 	rm := NewReplicationManager(podInformer, rcInformer, kubeClient, burstReplicas, lookupCacheSize, false)
@@ -456,7 +456,7 @@ func TestWatchControllers(t *testing.T) {
 	c.AddWatchReactor("replicationcontrollers", core.DefaultWatchReactor(fakeWatch, nil))
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	informers := informers.NewSharedInformerFactory(nil, c, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(c, controller.NoResyncPeriodFunc())
 	podInformer := informers.Core().V1().Pods()
 	rcInformer := informers.Core().V1().ReplicationControllers()
 	manager := NewReplicationManager(podInformer, rcInformer, c, BurstReplicas, 0, false)

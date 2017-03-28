@@ -63,10 +63,6 @@ DOCKERIZED_BINARIES = {
         "base": ":busybox-libc",
         "target": "//plugin/cmd/kube-scheduler:kube-scheduler",
     },
-    "kube-aggregator": {
-        "base": ":busybox-libc",
-        "target": "//cmd/kube-aggregator:kube-aggregator",
-    },
     "kube-proxy": {
         "base": ":busybox-net",
         "target": "//cmd/kube-proxy:kube-proxy",

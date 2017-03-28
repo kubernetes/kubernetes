@@ -30,7 +30,7 @@ import (
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
@@ -99,7 +99,7 @@ func TestNodeDeleted(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(nil, fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{

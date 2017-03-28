@@ -23,10 +23,12 @@ import (
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
+	v1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
 	v1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
 	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
+	v2alpha1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v2alpha1"
 	v1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v1"
 	v2alpha1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v2alpha1"
 	v1beta1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
@@ -46,9 +48,11 @@ type Interface interface {
 	AppsV1beta1() v1beta1apps.AppsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Apps() v1beta1apps.AppsV1beta1Interface
-	AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface
+	AuthenticationV1() v1authentication.AuthenticationV1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Authentication() v1beta1authentication.AuthenticationV1beta1Interface
+	Authentication() v1authentication.AuthenticationV1Interface
+	AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface
+
 	AuthorizationV1() v1authorization.AuthorizationV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Authorization() v1authorization.AuthorizationV1Interface
@@ -57,6 +61,8 @@ type Interface interface {
 	AutoscalingV1() v1autoscaling.AutoscalingV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Autoscaling() v1autoscaling.AutoscalingV1Interface
+	AutoscalingV2alpha1() v2alpha1autoscaling.AutoscalingV2alpha1Interface
+
 	BatchV1() v1batch.BatchV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Batch() v1batch.BatchV1Interface
@@ -87,10 +93,12 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	*v1core.CoreV1Client
 	*v1beta1apps.AppsV1beta1Client
+	*v1authentication.AuthenticationV1Client
 	*v1beta1authentication.AuthenticationV1beta1Client
 	*v1authorization.AuthorizationV1Client
 	*v1beta1authorization.AuthorizationV1beta1Client
 	*v1autoscaling.AutoscalingV1Client
+	*v2alpha1autoscaling.AutoscalingV2alpha1Client
 	*v1batch.BatchV1Client
 	*v2alpha1batch.BatchV2alpha1Client
 	*v1beta1certificates.CertificatesV1beta1Client
@@ -135,17 +143,25 @@ func (c *Clientset) Apps() v1beta1apps.AppsV1beta1Interface {
 	return c.AppsV1beta1Client
 }
 
-// AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
-func (c *Clientset) AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface {
+// AuthenticationV1 retrieves the AuthenticationV1Client
+func (c *Clientset) AuthenticationV1() v1authentication.AuthenticationV1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.AuthenticationV1beta1Client
+	return c.AuthenticationV1Client
 }
 
 // Deprecated: Authentication retrieves the default version of AuthenticationClient.
 // Please explicitly pick a version.
-func (c *Clientset) Authentication() v1beta1authentication.AuthenticationV1beta1Interface {
+func (c *Clientset) Authentication() v1authentication.AuthenticationV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.AuthenticationV1Client
+}
+
+// AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
+func (c *Clientset) AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface {
 	if c == nil {
 		return nil
 	}
@@ -192,6 +208,14 @@ func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingV1Interface {
 		return nil
 	}
 	return c.AutoscalingV1Client
+}
+
+// AutoscalingV2alpha1 retrieves the AutoscalingV2alpha1Client
+func (c *Clientset) AutoscalingV2alpha1() v2alpha1autoscaling.AutoscalingV2alpha1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.AutoscalingV2alpha1Client
 }
 
 // BatchV1 retrieves the BatchV1Client
@@ -336,6 +360,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.AuthenticationV1Client, err = v1authentication.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.AuthenticationV1beta1Client, err = v1beta1authentication.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -349,6 +377,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		return nil, err
 	}
 	cs.AutoscalingV1Client, err = v1autoscaling.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.AutoscalingV2alpha1Client, err = v2alpha1autoscaling.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -399,10 +431,12 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.CoreV1Client = v1core.NewForConfigOrDie(c)
 	cs.AppsV1beta1Client = v1beta1apps.NewForConfigOrDie(c)
+	cs.AuthenticationV1Client = v1authentication.NewForConfigOrDie(c)
 	cs.AuthenticationV1beta1Client = v1beta1authentication.NewForConfigOrDie(c)
 	cs.AuthorizationV1Client = v1authorization.NewForConfigOrDie(c)
 	cs.AuthorizationV1beta1Client = v1beta1authorization.NewForConfigOrDie(c)
 	cs.AutoscalingV1Client = v1autoscaling.NewForConfigOrDie(c)
+	cs.AutoscalingV2alpha1Client = v2alpha1autoscaling.NewForConfigOrDie(c)
 	cs.BatchV1Client = v1batch.NewForConfigOrDie(c)
 	cs.BatchV2alpha1Client = v2alpha1batch.NewForConfigOrDie(c)
 	cs.CertificatesV1beta1Client = v1beta1certificates.NewForConfigOrDie(c)
@@ -421,10 +455,12 @@ func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.CoreV1Client = v1core.New(c)
 	cs.AppsV1beta1Client = v1beta1apps.New(c)
+	cs.AuthenticationV1Client = v1authentication.New(c)
 	cs.AuthenticationV1beta1Client = v1beta1authentication.New(c)
 	cs.AuthorizationV1Client = v1authorization.New(c)
 	cs.AuthorizationV1beta1Client = v1beta1authorization.New(c)
 	cs.AutoscalingV1Client = v1autoscaling.New(c)
+	cs.AutoscalingV2alpha1Client = v2alpha1autoscaling.New(c)
 	cs.BatchV1Client = v1batch.New(c)
 	cs.BatchV2alpha1Client = v2alpha1batch.New(c)
 	cs.CertificatesV1beta1Client = v1beta1certificates.New(c)

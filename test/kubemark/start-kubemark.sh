@@ -19,10 +19,27 @@
 TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
 
-source "${KUBE_ROOT}/test/kubemark/common.sh"
 source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
 source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
 source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
+source "${KUBE_ROOT}/cluster/kubemark/util.sh"
+
+# hack/lib/init.sh will ovewrite ETCD_VERSION if this is unset
+# what what is default in hack/lib/etcd.sh
+# To avoid it, if it is empty, we set it to 'avoid-overwrite' and
+# clean it after that.
+if [ -z "${ETCD_VERSION:-}" ]; then
+  ETCD_VERSION="avoid-overwrite"
+fi
+source "${KUBE_ROOT}/hack/lib/init.sh"
+if [ "${ETCD_VERSION:-}" == "avoid-overwrite" ]; then
+  ETCD_VERSION=""
+fi
+
+KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
+KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
+RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 
 # Write all environment variables that we need to pass to the kubemark master,
 # locally to the file ${RESOURCE_DIRECTORY}/kubemark-master-env.sh.
@@ -153,7 +170,6 @@ EOF
 # Finds the right kubemark binary for 'linux/amd64' platform and uses it to
 # create a docker image for hollow-node and upload it to the appropriate
 # docker container registry for the cloud provider.
-# TODO(shyamjvs): Make the image upload URL and makefile variable w.r.t. provider.
 function create-and-upload-hollow-node-image {
   MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
   KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
@@ -168,7 +184,7 @@ function create-and-upload-hollow-node-image {
   cd "${MAKE_DIR}"
   RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! make; then
+    if ! REGISTRY="${CONTAINER_REGISTRY}" PROJECT="${PROJECT}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
         echo "${color_red}Make failed. Exiting.${color_norm}"
         exit 1
@@ -281,7 +297,6 @@ current-context: kubemark-context")
     --from-literal=npd.kubeconfig="${NPD_KUBECONFIG_CONTENTS}"
 
   # Create addon pods.
-  # TODO(shyamjvs): Make path to docker image variable in heapster_template.json.
   mkdir -p "${RESOURCE_DIRECTORY}/addons"
   sed "s/{{MASTER_IP}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/heapster_template.json" > "${RESOURCE_DIRECTORY}/addons/heapster.json"
   metrics_mem_per_node=4
@@ -293,8 +308,8 @@ current-context: kubemark-context")
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
 
   # Create the replication controller for hollow-nodes.
-  # TODO(shyamjvs): Make path to docker image variable in hollow-node_template.json.
   sed "s/{{numreplicas}}/${NUM_NODES:-10}/g" "${RESOURCE_DIRECTORY}/hollow-node_template.json" > "${RESOURCE_DIRECTORY}/hollow-node.json"
+  sed -i'' -e "s/{{registry}}/${CONTAINER_REGISTRY}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
   sed -i'' -e "s/{{project}}/${PROJECT}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.json" --namespace="kubemark"
@@ -338,8 +353,11 @@ function wait-for-hollow-nodes-to-run-or-timeout {
 }
 
 ############################### Main Function ########################################
+detect-project &> /dev/null
+
 # Setup for master.
 echo -e "${color_yellow}STARTING SETUP FOR MASTER${color_norm}"
+find-release-tars
 create-master-environment-file
 create-master-instance-with-resources
 generate-pki-config

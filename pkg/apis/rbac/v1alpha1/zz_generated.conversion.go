@@ -410,7 +410,7 @@ func Convert_rbac_RoleRef_To_v1alpha1_RoleRef(in *rbac.RoleRef, out *RoleRef, s 
 
 func autoConvert_v1alpha1_Subject_To_rbac_Subject(in *Subject, out *rbac.Subject, s conversion.Scope) error {
 	out.Kind = in.Kind
-	out.APIVersion = in.APIVersion
+	// INFO: in.APIVersion opted out of conversion generation
 	out.Name = in.Name
 	out.Namespace = in.Namespace
 	return nil
@@ -418,12 +418,8 @@ func autoConvert_v1alpha1_Subject_To_rbac_Subject(in *Subject, out *rbac.Subject
 
 func autoConvert_rbac_Subject_To_v1alpha1_Subject(in *rbac.Subject, out *Subject, s conversion.Scope) error {
 	out.Kind = in.Kind
-	out.APIVersion = in.APIVersion
+	// WARNING: in.APIGroup requires manual conversion: does not exist in peer-type
 	out.Name = in.Name
 	out.Namespace = in.Namespace
 	return nil
-}
-
-func Convert_rbac_Subject_To_v1alpha1_Subject(in *rbac.Subject, out *Subject, s conversion.Scope) error {
-	return autoConvert_rbac_Subject_To_v1alpha1_Subject(in, out, s)
 }

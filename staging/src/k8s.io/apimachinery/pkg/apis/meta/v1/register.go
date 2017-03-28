@@ -55,6 +55,11 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		Convert_watch_Event_to_versioned_Event,
 		Convert_versioned_Event_to_versioned_InternalEvent,
 	)
+
+	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
+	scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)
+	AddConversionFuncs(scheme)
+	RegisterDefaults(scheme)
 }
 
 // scheme is the registry for the common types that adhere to the meta v1 API spec.
@@ -70,4 +75,8 @@ func init() {
 		&GetOptions{},
 		&DeleteOptions{},
 	)
+
+	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
+	scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)
+	RegisterDefaults(scheme)
 }

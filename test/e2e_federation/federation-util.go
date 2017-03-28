@@ -217,7 +217,6 @@ func getRegisteredClusters(userAgentName string, f *fedframework.Framework) (map
 */
 func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, service *v1.Service, present bool, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated service shard of service %q in namespace %q from cluster", service.Name, namespace))
-	var clusterService *v1.Service
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		clusterService, err := clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
@@ -225,17 +224,16 @@ func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, 
 			return true, nil // Success
 		}
 		if present && err == nil { // We want it present, and the Get succeeded, so we're all good.
-			By(fmt.Sprintf("Success: shard of federated service %q in namespace %q in cluster is present", service.Name, namespace))
-			return true, nil // Success
+			if equivalent(*clusterService, *service) {
+				By(fmt.Sprintf("Success: shard of federated service %q in namespace %q in cluster is present", service.Name, namespace))
+				return true, nil // Success
+			}
+			return false, nil
 		}
 		By(fmt.Sprintf("Service %q in namespace %q in cluster.  Found: %v, waiting for Found: %v, trying again in %s (err=%v)", service.Name, namespace, clusterService != nil && err == nil, present, framework.Poll, err))
 		return false, nil
 	})
 	framework.ExpectNoError(err, "Failed to verify service %q in namespace %q in cluster: Present=%v", service.Name, namespace, present)
-
-	if present && clusterService != nil {
-		Expect(equivalent(*clusterService, *service))
-	}
 }
 
 /*
@@ -524,5 +522,21 @@ func deleteBackendPodsOrFail(clusters map[string]*cluster, namespace string) {
 		} else {
 			By(fmt.Sprintf("No backend pod to delete for cluster %q", name))
 		}
+	}
+}
+
+// waitForReplicatSetToBeDeletedOrFail waits for the named ReplicaSet in namespace to be deleted.
+// If the deletion fails, the enclosing test fails.
+func waitForReplicaSetToBeDeletedOrFail(clientset *fedclientset.Clientset, namespace string, replicaSet string) {
+	err := wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := clientset.Extensions().ReplicaSets(namespace).Get(replicaSet, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+
+	if err != nil {
+		framework.Failf("Error in deleting replica set %s: %v", replicaSet, err)
 	}
 }

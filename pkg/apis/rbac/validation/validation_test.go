@@ -30,9 +30,9 @@ func TestValidateClusterRoleBinding(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "master"},
 			RoleRef:    rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: "valid"},
 			Subjects: []rbac.Subject{
-				{Name: "validsaname", Namespace: "foo", Kind: rbac.ServiceAccountKind},
-				{Name: "valid@username", Kind: rbac.UserKind},
-				{Name: "valid@groupname", Kind: rbac.GroupKind},
+				{Name: "validsaname", APIGroup: "", Namespace: "foo", Kind: rbac.ServiceAccountKind},
+				{Name: "valid@username", APIGroup: rbac.GroupName, Kind: rbac.UserKind},
+				{Name: "valid@groupname", APIGroup: rbac.GroupName, Kind: rbac.GroupKind},
 			},
 		},
 	)
@@ -145,9 +145,9 @@ func TestValidateRoleBinding(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "master"},
 			RoleRef:    rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: "valid"},
 			Subjects: []rbac.Subject{
-				{Name: "validsaname", Kind: rbac.ServiceAccountKind},
-				{Name: "valid@username", Kind: rbac.UserKind},
-				{Name: "valid@groupname", Kind: rbac.GroupKind},
+				{Name: "validsaname", APIGroup: "", Kind: rbac.ServiceAccountKind},
+				{Name: "valid@username", APIGroup: rbac.GroupName, Kind: rbac.UserKind},
+				{Name: "valid@groupname", APIGroup: rbac.GroupName, Kind: rbac.GroupKind},
 			},
 		},
 	)

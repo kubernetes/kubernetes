@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -197,7 +197,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	versionedClient := client("shared-informers")
 	// TODO replace sharedInformers with newSharedInformers
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, nil, resyncPeriod(s)())
-	newSharedInformers := newinformers.NewSharedInformerFactory(nil, versionedClient, resyncPeriod(s)())
+	newSharedInformers := newinformers.NewSharedInformerFactory(versionedClient, resyncPeriod(s)())
 
 	_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
 	if err != nil {
@@ -229,8 +229,8 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
-			routeController := routecontroller.New(routes, client("route-controller"), s.ClusterName, clusterCIDR)
-			routeController.Run(s.RouteReconciliationPeriod.Duration)
+			routeController := routecontroller.New(routes, client("route-controller"), newSharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
+			routeController.Run(stop, s.RouteReconciliationPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	} else {

@@ -32,7 +32,9 @@ func NewKubeProxy() *Server {
 	config := options.NewProxyConfig()
 
 	hks := Server{
-		SimpleUsage: "proxy",
+		name:            "proxy",
+		AlternativeName: "kube-proxy",
+		SimpleUsage:     "proxy",
 		Long: `The Kubernetes proxy server is responsible for taking traffic directed at
 		services and forwarding it to the appropriate pods. It generally runs on
 		nodes next to the Kubelet and proxies traffic from local pods to remote pods.

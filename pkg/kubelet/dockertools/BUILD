@@ -112,7 +112,6 @@ go_test(
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/network:go_default_library",
-        "//pkg/kubelet/network/mock_network:go_default_library",
         "//pkg/kubelet/network/testing:go_default_library",
         "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/types:go_default_library",

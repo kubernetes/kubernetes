@@ -4,6 +4,7 @@ The `addon-manager` periodically `kubectl apply`s the Kubernetes manifest in the
 and handles any added / updated / deleted addon.
 
 It supports all types of resource.
+The requirement is to label them with `kubernetes.io/cluster-service: "true"`.
 
 The `addon-manager` is built for multiple architectures.
 

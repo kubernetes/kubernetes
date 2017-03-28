@@ -61,8 +61,8 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki",
 			},
 			setupFiles: []string{
-				"manifests/etcd.json",
-				"manifests/kube-apiserver.json",
+				"manifests/etcd.yaml",
+				"manifests/kube-apiserver.yaml",
 				"pki/ca.pem",
 				kubeconfig.AdminKubeConfigFileName,
 				kubeconfig.KubeletKubeConfigFileName,
@@ -93,8 +93,8 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki",
 			},
 			setupFiles: []string{
-				"manifests/etcd.json",
-				"manifests/kube-apiserver.json",
+				"manifests/etcd.yaml",
+				"manifests/kube-apiserver.yaml",
 				"pki/ca.pem",
 				kubeconfig.AdminKubeConfigFileName,
 				kubeconfig.KubeletKubeConfigFileName,
@@ -113,8 +113,8 @@ func TestConfigDirCleaner(t *testing.T) {
 				".mydir",
 			},
 			setupFiles: []string{
-				"manifests/etcd.json",
-				"manifests/kube-apiserver.json",
+				"manifests/etcd.yaml",
+				"manifests/kube-apiserver.yaml",
 				"pki/ca.pem",
 				kubeconfig.AdminKubeConfigFileName,
 				kubeconfig.KubeletKubeConfigFileName,

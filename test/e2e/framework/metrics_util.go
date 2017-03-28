@@ -327,6 +327,11 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 	nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 	ExpectNoError(err)
 
+	subResourceProxyAvailable, err := ServerVersionGTE(SubResourcePodProxyVersion, c.Discovery())
+	if err != nil {
+		return result, err
+	}
+
 	var data string
 	var masterRegistered = false
 	for _, node := range nodes.Items {
@@ -338,14 +343,26 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
 		defer cancel()
 
-		rawData, err := c.Core().RESTClient().Get().
-			Context(ctx).
-			Prefix("proxy").
-			Namespace(metav1.NamespaceSystem).
-			Resource("pods").
-			Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
-			Suffix("metrics").
-			Do().Raw()
+		var rawData []byte
+		if subResourceProxyAvailable {
+			rawData, err = c.Core().RESTClient().Get().
+				Context(ctx).
+				Namespace(metav1.NamespaceSystem).
+				Resource("pods").
+				Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
+				SubResource("proxy").
+				Suffix("metrics").
+				Do().Raw()
+		} else {
+			rawData, err = c.Core().RESTClient().Get().
+				Context(ctx).
+				Prefix("proxy").
+				Namespace(metav1.NamespaceSystem).
+				SubResource("pods").
+				Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
+				Suffix("metrics").
+				Do().Raw()
+		}
 
 		ExpectNoError(err)
 		data = string(rawData)

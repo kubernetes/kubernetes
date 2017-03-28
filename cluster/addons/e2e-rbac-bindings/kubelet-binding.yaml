@@ -3,7 +3,7 @@
 # TODO cjcullen should figure out how wants to manage his upgrade
 # this will only hold the e2e tests until we get an authorizer
 # which authorizes particular nodes
-apiVersion: rbac.authorization.k8s.io/v1alpha1
+apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
   name: kubelet-cluster-admin
@@ -14,6 +14,6 @@ roleRef:
   kind: ClusterRole
   name: system:node
 subjects:
-- apiVersion: rbac/v1alpha1
+- apiGroup: rbac.authorization.k8s.io
   kind: User
   name: kubelet

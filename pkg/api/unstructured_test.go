@@ -28,6 +28,8 @@ import (
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 
+	"k8s.io/apimachinery/pkg/conversion/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 
@@ -95,27 +97,23 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		return
 	}
 
-	// TODO; Enable the following part of test once to/from unstructured
-	// format conversions are implemented.
-	/*
-		newUnstr := make(map[string]interface{})
-		err = unstructured.NewConverter().ToUnstructured(item, &newUnstr)
-		if err != nil {
-			t.Errorf("ToUnstructured failed: %v", err)
-			return
-		}
+	newUnstr := make(map[string]interface{})
+	err = unstructured.NewConverter().ToUnstructured(item, &newUnstr)
+	if err != nil {
+		t.Errorf("ToUnstructured failed: %v", err)
+		return
+	}
 
-		newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-		err = unstructured.NewConverter().FromUnstructured(newUnstr, newObj)
-		if err != nil {
-			t.Errorf("FromUnstructured failed: %v", err)
-			return
-		}
+	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
+	err = unstructured.NewConverter().FromUnstructured(newUnstr, newObj)
+	if err != nil {
+		t.Errorf("FromUnstructured failed: %v", err)
+		return
+	}
 
-		if !apiequality.Semantic.DeepEqual(item, newObj) {
-			t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
-		}
-	*/
+	if !apiequality.Semantic.DeepEqual(item, newObj) {
+		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
+	}
 }
 
 func TestRoundTrip(t *testing.T) {
@@ -135,11 +133,8 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
-// TODO; Enable the following benchmark once to/from unstructured
-// format conversions are implemented.
-/*
 func BenchmarkToFromUnstructured(b *testing.B) {
-	items := benchmarkItems()
+	items := benchmarkItems(b)
 	size := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -154,7 +149,6 @@ func BenchmarkToFromUnstructured(b *testing.B) {
 	}
 	b.StopTimer()
 }
-*/
 
 func BenchmarkToFromUnstructuredViaJSON(b *testing.B) {
 	items := benchmarkItems(b)

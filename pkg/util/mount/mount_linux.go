@@ -21,7 +21,7 @@ package mount
 import (
 	"bufio"
 	"fmt"
-	"hash/adler32"
+	"hash/fnv"
 	"io"
 	"os"
 	"os/exec"
@@ -282,7 +282,7 @@ func readProcMounts(mountFilePath string, out *[]MountPoint) (uint32, error) {
 }
 
 func readProcMountsFrom(file io.Reader, out *[]MountPoint) (uint32, error) {
-	hash := adler32.New()
+	hash := fnv.New32a()
 	scanner := bufio.NewReader(file)
 	for {
 		line, err := scanner.ReadString('\n')

@@ -50,7 +50,3 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	)
 	return nil
 }
-
-func (obj *MasterConfiguration) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-func (obj *NodeConfiguration) GetObjectKind() schema.ObjectKind   { return &obj.TypeMeta }
-func (obj *ClusterInfo) GetObjectKind() schema.ObjectKind         { return &obj.TypeMeta }

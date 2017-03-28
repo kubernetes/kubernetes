@@ -59,7 +59,7 @@ fi
 # containervm. If you are updating the containervm version, update this
 # variable. Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-CVM_VERSION=${CVM_VERSION:-container-vm-v20170201}
+CVM_VERSION=${CVM_VERSION:-container-vm-v20170214}
 GCI_VERSION=${KUBE_GCI_VERSION:-gci-beta-56-9000-80-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}

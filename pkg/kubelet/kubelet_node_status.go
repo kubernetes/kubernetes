@@ -565,7 +565,6 @@ func (kl *Kubelet) setNodeStatusVersionInfo(node *v1.Node) {
 		// TODO: kube-proxy might be different version from kubelet in the future
 		node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
 	}
-
 }
 
 // Set daemonEndpoints for the node.

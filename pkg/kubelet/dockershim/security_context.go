@@ -25,11 +25,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
-	"k8s.io/kubernetes/pkg/kubelet/network"
+	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
 )
 
 // applySandboxSecurityContext updates docker sandbox options according to security context.
-func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig, networkPlugin network.NetworkPlugin, separator rune) {
+func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig, network *knetwork.PluginManager, separator rune) {
 	if lc == nil {
 		return
 	}
@@ -47,8 +47,7 @@ func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *d
 
 	modifyContainerConfig(sc, config)
 	modifyHostConfig(sc, hc, separator)
-	modifySandboxNamespaceOptions(sc.GetNamespaceOptions(), hc, networkPlugin)
-
+	modifySandboxNamespaceOptions(sc.GetNamespaceOptions(), hc, network)
 }
 
 // applyContainerSecurityContext updates docker container options according to security context.
@@ -109,9 +108,9 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 }
 
 // modifySandboxNamespaceOptions apply namespace options for sandbox
-func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig, networkPlugin network.NetworkPlugin) {
+func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig, network *knetwork.PluginManager) {
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForSandbox(nsOpts.HostNetwork, networkPlugin, hostConfig)
+	modifyHostNetworkOptionForSandbox(nsOpts.HostNetwork, network, hostConfig)
 }
 
 // modifyContainerNamespaceOptions apply namespace options for container
@@ -137,18 +136,18 @@ func modifyCommonNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig
 }
 
 // modifyHostNetworkOptionForSandbox applies NetworkMode/UTSMode to sandbox's dockercontainer.HostConfig.
-func modifyHostNetworkOptionForSandbox(hostNetwork bool, networkPlugin network.NetworkPlugin, hc *dockercontainer.HostConfig) {
+func modifyHostNetworkOptionForSandbox(hostNetwork bool, network *knetwork.PluginManager, hc *dockercontainer.HostConfig) {
 	if hostNetwork {
 		hc.NetworkMode = namespaceModeHost
 		return
 	}
 
-	if networkPlugin == nil {
+	if network == nil {
 		hc.NetworkMode = "default"
 		return
 	}
 
-	switch networkPlugin.Name() {
+	switch network.PluginName() {
 	case "cni":
 		fallthrough
 	case "kubenet":

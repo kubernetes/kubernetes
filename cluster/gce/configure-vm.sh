@@ -475,6 +475,7 @@ num_nodes: $(echo "${NUM_NODES:-}" | sed -e "s/'/''/g")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
 initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
+initial_etcd_cluster_state: '$(echo "${INITIAL_ETCD_CLUSTER_STATE:-}" | sed -e "s/'/''/g")'
 
 hostname: $(hostname -s)
 enable_default_storage_class: '$(echo "$ENABLE_DEFAULT_STORAGE_CLASS" | sed -e "s/'/''/g")'
@@ -632,11 +633,6 @@ EOF
 scheduling_algorithm_provider: '$(echo "${SCHEDULING_ALGORITHM_PROVIDER}" | sed -e "s/'/''/g")'
 EOF
     fi
-    if [ -n "${KUBELET_AUTH_CA_CERT:-}" ]; then
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-kubelet_auth_ca_cert: /var/lib/kubelet/kubelet_auth_ca.crt
-EOF
-    fi
 }
 
 # The job of this function is simple, but the basic regular expression syntax makes
@@ -755,11 +751,9 @@ current-context: service-account-context
 EOF
 )
   fi
-  local -r kubelet_auth_ca_file="/srv/salt-overlay/salt/kubelet/kubelet_auth_ca.crt"
-  if [ ! -e "${kubelet_auth_ca_file}" ] && [[ ! -z "${KUBELET_AUTH_CA_CERT:-}" ]]; then
-    (umask 077;
-      echo "${KUBELET_AUTH_CA_CERT}" | base64 --decode > "${kubelet_auth_ca_file}")
-  fi
+  local -r client_ca_file="/srv/salt-overlay/salt/kubelet/ca.crt"
+  (umask 077;
+    echo "${KUBELET_CA_CERT}" | base64 --decode > "${client_ca_file}")
 }
 
 # This should happen both on cluster initialization and node upgrades.

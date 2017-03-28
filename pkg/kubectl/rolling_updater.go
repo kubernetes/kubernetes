@@ -429,7 +429,7 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 			if v1Pod.DeletionTimestamp != nil {
 				continue
 			}
-			if !deploymentutil.IsPodAvailable(v1Pod, minReadySeconds, r.nowFn().Time) {
+			if !v1.IsPodAvailable(v1Pod, minReadySeconds, r.nowFn()) {
 				continue
 			}
 			switch controller.Name {

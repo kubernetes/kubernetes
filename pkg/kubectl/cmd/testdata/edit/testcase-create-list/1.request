@@ -1,31 +1,27 @@
 {
-	"kind": "Service",
 	"apiVersion": "v1",
+	"kind": "Service",
 	"metadata": {
-		"name": "svc1",
-		"namespace": "edit-test",
-		"creationTimestamp": null,
 		"labels": {
 			"app": "svc1",
 			"new-label": "new-value"
-		}
+		},
+		"name": "svc1",
+		"namespace": "edit-test"
 	},
 	"spec": {
 		"ports": [
 			{
 				"name": "81",
-				"protocol": "TCP",
 				"port": 82,
+				"protocol": "TCP",
 				"targetPort": 81
 			}
 		],
 		"selector": {
 			"app": "svc1"
 		},
-		"type": "ClusterIP",
-		"sessionAffinity": "None"
-	},
-	"status": {
-		"loadBalancer": {}
+		"sessionAffinity": "None",
+		"type": "ClusterIP"
 	}
 }

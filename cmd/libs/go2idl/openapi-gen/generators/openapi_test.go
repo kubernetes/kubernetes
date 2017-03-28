@@ -71,7 +71,8 @@ func TestSimple(t *testing.T) {
 package foo
 
 // Blah is a test.
-// +k8s:openapi=true
+// +k8s:openapi-gen=true
+// +k8s:openapi-gen=x-kubernetes-type-tag:type_test
 type Blah struct {
 	// A simple string
 	String string
@@ -107,6 +108,9 @@ type Blah struct {
 	Float32 float32
 	// a base64 encoded characters
 	ByteArray []byte
+	// a member with an extension
+	// +k8s:openapi-gen=x-kubernetes-member-tag:member_test
+	WithExtension string
 }
 		`)
 	if err != nil {
@@ -222,11 +226,28 @@ Type: []string{"string"},
 Format: "byte",
 },
 },
+"WithExtension": {
+spec.VendorExtensible: {
+Extensions: spec.Extensions{
+"x-kubernetes-member-tag": "member_test",
 },
-Required: []string{"String","Int64","Int32","Int16","Int8","Uint","Uint64","Uint32","Uint16","Uint8","Byte","Bool","Float64","Float32","ByteArray"},
+},
+SchemaProps: spec.SchemaProps{
+Description: "a member with an extension",
+Type: []string{"string"},
+Format: "",
+},
+},
+},
+Required: []string{"String","Int64","Int32","Int16","Int8","Uint","Uint64","Uint32","Uint16","Uint8","Byte","Bool","Float64","Float32","ByteArray","WithExtension"},
 },
 },
 Dependencies: []string{
+},
+spec.VendorExtensible: {
+Extensions: spec.Extensions{
+"x-kubernetes-type-tag": "type_test",
+},
 },
 },
 `, buffer.String())

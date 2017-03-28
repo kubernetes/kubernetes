@@ -25,10 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/core"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
@@ -100,7 +100,7 @@ func init() {
 	// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
-	factory.RegisterPriorityFunction2("EqualPriority", scheduler.EqualPriorityMap, nil, 1)
+	factory.RegisterPriorityFunction2("EqualPriority", core.EqualPriorityMap, nil, 1)
 	// ImageLocalityPriority prioritizes nodes based on locality of images requested by a pod. Nodes with larger size
 	// of already-installed packages required by the pod will be preferred over nodes with no already-installed
 	// packages required by the pod or a small total size of already-installed packages required by the pod.

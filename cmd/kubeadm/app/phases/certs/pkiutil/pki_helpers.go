@@ -17,7 +17,6 @@ limitations under the License.
 package pkiutil
 
 import (
-	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
@@ -63,21 +62,55 @@ func NewCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, config certu
 }
 
 func WriteCertAndKey(pkiPath string, name string, cert *x509.Certificate, key *rsa.PrivateKey) error {
-	certificatePath, privateKeyPath := pathsForCertAndKey(pkiPath, name)
+	if err := WriteKey(pkiPath, name, key); err != nil {
+		return err
+	}
 
+	if err := WriteCert(pkiPath, name, cert); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 	if cert == nil {
 		return fmt.Errorf("certificate cannot be nil when writing to file")
 	}
-	if cert == nil {
+
+	certificatePath := pathForCert(pkiPath, name)
+	if err := certutil.WriteCert(certificatePath, certutil.EncodeCertPEM(cert)); err != nil {
+		return fmt.Errorf("unable to write certificate to file %q: [%v]", certificatePath, err)
+	}
+
+	return nil
+}
+
+func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
+	if key == nil {
 		return fmt.Errorf("private key cannot be nil when writing to file")
 	}
 
+	privateKeyPath := pathForKey(pkiPath, name)
 	if err := certutil.WriteKey(privateKeyPath, certutil.EncodePrivateKeyPEM(key)); err != nil {
 		return fmt.Errorf("unable to write private key to file %q: [%v]", privateKeyPath, err)
 	}
 
-	if err := certutil.WriteCert(certificatePath, certutil.EncodeCertPEM(cert)); err != nil {
-		return fmt.Errorf("unable to write certificate to file %q: [%v]", certificatePath, err)
+	return nil
+}
+
+func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
+	if key == nil {
+		return fmt.Errorf("public key cannot be nil when writing to file")
+	}
+
+	publicKeyBytes, err := certutil.EncodePublicKeyPEM(key)
+	if err != nil {
+		return err
+	}
+	publicKeyPath := pathForPublicKey(pkiPath, name)
+	if err := certutil.WriteKey(publicKeyPath, publicKeyBytes); err != nil {
+		return fmt.Errorf("unable to write public key to file %q: [%v]", publicKeyPath, err)
 	}
 
 	return nil
@@ -100,46 +133,78 @@ func CertOrKeyExist(pkiPath, name string) bool {
 
 // TryLoadCertAndKeyFromDisk tries to load a cert and a key from the disk and validates that they are valid
 func TryLoadCertAndKeyFromDisk(pkiPath, name string) (*x509.Certificate, *rsa.PrivateKey, error) {
-	certificatePath, privateKeyPath := pathsForCertAndKey(pkiPath, name)
+	cert, err := TryLoadCertFromDisk(pkiPath, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	key, err := TryLoadKeyFromDisk(pkiPath, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cert, key, nil
+}
+
+// TryLoadCertFromDisk tries to load the cert from the disk and validates that it is valid
+func TryLoadCertFromDisk(pkiPath, name string) (*x509.Certificate, error) {
+	certificatePath := pathForCert(pkiPath, name)
 
 	certs, err := certutil.CertsFromFile(certificatePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't load the certificate file %s: %v", certificatePath, err)
+		return nil, fmt.Errorf("couldn't load the certificate file %s: %v", certificatePath, err)
 	}
 
 	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
 	// TODO: Support multiple certs here in order to be able to rotate certs
 	cert := certs[0]
 
+	// Check so that the certificate is valid now
+	now := time.Now()
+	if now.Before(cert.NotBefore) {
+		return nil, fmt.Errorf("the certificate is not valid yet")
+	}
+	if now.After(cert.NotAfter) {
+		return nil, fmt.Errorf("the certificate has expired")
+	}
+
+	return cert, nil
+}
+
+// TryLoadKeyFromDisk tries to load the key from the disk and validates that it is valid
+func TryLoadKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, error) {
+	privateKeyPath := pathForKey(pkiPath, name)
+
 	// Parse the private key from a file
 	privKey, err := certutil.PrivateKeyFromFile(privateKeyPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't load the private key file %s: %v", privateKeyPath, err)
+		return nil, fmt.Errorf("couldn't load the private key file %s: %v", privateKeyPath, err)
 	}
+
+	// Allow RSA format only
 	var key *rsa.PrivateKey
 	switch k := privKey.(type) {
 	case *rsa.PrivateKey:
 		key = k
-	case *ecdsa.PrivateKey:
-		// TODO: Abstract rsa.PrivateKey away and make certutil.NewSignedCert accept a ecdsa.PrivateKey as well
-		// After that, we can support generating kubeconfig files from ecdsa private keys as well
-		return nil, nil, fmt.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
 	default:
-		return nil, nil, fmt.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
+		return nil, fmt.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
 	}
 
-	// Check so that the certificate is valid now
-	now := time.Now()
-	if now.Before(cert.NotBefore) {
-		return nil, nil, fmt.Errorf("the certificate is not valid yet")
-	}
-	if now.After(cert.NotAfter) {
-		return nil, nil, fmt.Errorf("the certificate is has expired")
-	}
-
-	return cert, key, nil
+	return key, nil
 }
 
 func pathsForCertAndKey(pkiPath, name string) (string, string) {
-	return path.Join(pkiPath, fmt.Sprintf("%s.crt", name)), path.Join(pkiPath, fmt.Sprintf("%s.key", name))
+	return pathForCert(pkiPath, name), pathForKey(pkiPath, name)
+}
+
+func pathForCert(pkiPath, name string) string {
+	return path.Join(pkiPath, fmt.Sprintf("%s.crt", name))
+}
+
+func pathForKey(pkiPath, name string) string {
+	return path.Join(pkiPath, fmt.Sprintf("%s.key", name))
+}
+
+func pathForPublicKey(pkiPath, name string) string {
+	return path.Join(pkiPath, fmt.Sprintf("%s.pub", name))
 }

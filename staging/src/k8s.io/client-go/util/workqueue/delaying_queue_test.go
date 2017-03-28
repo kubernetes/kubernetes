@@ -174,7 +174,6 @@ func TestAddTwoFireEarly(t *testing.T) {
 	if !reflect.DeepEqual(item, third) {
 		t.Errorf("expected %v, got %v", third, item)
 	}
-
 }
 
 func TestCopyShifting(t *testing.T) {

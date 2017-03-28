@@ -113,10 +113,14 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		glog.Fatalf("Wrong CustomArgs type: %T", arguments.CustomArgs)
 	}
 
+	internalVersionPackagePath := filepath.Join(arguments.OutputPackagePath, "internalversion")
+	externalVersionPackagePath := filepath.Join(arguments.OutputPackagePath, "externalversions")
+
 	var packageList generator.Packages
 	typesForGroupVersion := make(map[clientgentypes.GroupVersion][]*types.Type)
 
-	groupVersions := make(map[string]clientgentypes.GroupVersions)
+	externalGroupVersions := make(map[string]clientgentypes.GroupVersions)
+	internalGroupVersions := make(map[string]clientgentypes.GroupVersions)
 	for _, inputDir := range arguments.InputDirs {
 		p := context.Universe.Package(inputDir)
 
@@ -130,6 +134,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 
 		var gv clientgentypes.GroupVersion
+		var targetGroupVersions map[string]clientgentypes.GroupVersions
 
 		if internal {
 			lastSlash := strings.LastIndex(p.Path, "/")
@@ -137,10 +142,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				glog.Fatalf("error constructing internal group version for package %q", p.Path)
 			}
 			gv.Group = clientgentypes.Group(p.Path[lastSlash+1:])
+			targetGroupVersions = internalGroupVersions
 		} else {
 			parts := strings.Split(p.Path, "/")
 			gv.Group = clientgentypes.Group(parts[len(parts)-2])
 			gv.Version = clientgentypes.Version(parts[len(parts)-1])
+			targetGroupVersions = externalGroupVersions
 		}
 
 		var typesToGenerate []*types.Type
@@ -166,31 +173,45 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 
 		icGroupName := namer.IC(gv.Group.NonEmpty())
-		groupVersionsEntry, ok := groupVersions[icGroupName]
+		groupVersionsEntry, ok := targetGroupVersions[icGroupName]
 		if !ok {
 			groupVersionsEntry = clientgentypes.GroupVersions{
 				Group: gv.Group,
 			}
 		}
 		groupVersionsEntry.Versions = append(groupVersionsEntry.Versions, gv.Version)
-		groupVersions[icGroupName] = groupVersionsEntry
+		targetGroupVersions[icGroupName] = groupVersionsEntry
 
 		orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
-		packageList = append(packageList, versionPackage(arguments.OutputPackagePath, gv, boilerplate, typesToGenerate, customArgs.InternalClientSetPackage, customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
+		if internal {
+			packageList = append(packageList, versionPackage(internalVersionPackagePath, gv, boilerplate, typesToGenerate, customArgs.InternalClientSetPackage, customArgs.ListersPackage))
+		} else {
+			packageList = append(packageList, versionPackage(externalVersionPackagePath, gv, boilerplate, typesToGenerate, customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
+		}
 	}
 
-	packageList = append(packageList, factoryInterfacePackage(arguments.OutputPackagePath, boilerplate, customArgs.InternalClientSetPackage, customArgs.VersionedClientSetPackage, typesForGroupVersion))
-	packageList = append(packageList, factoryPackage(arguments.OutputPackagePath, boilerplate, groupVersions, customArgs.InternalClientSetPackage, customArgs.VersionedClientSetPackage, typesForGroupVersion))
-	for _, groupVersionsEntry := range groupVersions {
-		packageList = append(packageList, groupPackage(arguments.OutputPackagePath, groupVersionsEntry, boilerplate))
+	packageList = append(packageList, factoryInterfacePackage(externalVersionPackagePath, boilerplate, customArgs.VersionedClientSetPackage, typesForGroupVersion))
+	packageList = append(packageList, factoryPackage(externalVersionPackagePath, boilerplate, externalGroupVersions, customArgs.VersionedClientSetPackage, typesForGroupVersion))
+	for _, groupVersionsEntry := range externalGroupVersions {
+		packageList = append(packageList, groupPackage(externalVersionPackagePath, groupVersionsEntry, boilerplate))
+	}
+
+	packageList = append(packageList, factoryInterfacePackage(internalVersionPackagePath, boilerplate, customArgs.InternalClientSetPackage, typesForGroupVersion))
+	packageList = append(packageList, factoryPackage(internalVersionPackagePath, boilerplate, internalGroupVersions, customArgs.InternalClientSetPackage, typesForGroupVersion))
+	for _, groupVersionsEntry := range internalGroupVersions {
+		packageList = append(packageList, groupPackage(internalVersionPackagePath, groupVersionsEntry, boilerplate))
 	}
 
 	return packageList
 }
 
-func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, internalClientSetPackage, versionedClientSetPackage string, typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
+func isInternalVersion(gv clientgentypes.GroupVersion) bool {
+	return len(gv.Version) == 0
+}
+
+func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string, typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
 	return &generator.DefaultPackage{
 		PackageName: filepath.Base(basePackage),
 		PackagePath: basePackage,
@@ -203,8 +224,7 @@ func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[st
 				outputPackage:             basePackage,
 				imports:                   generator.NewImportTracker(),
 				groupVersions:             groupVersions,
-				internalClientSetPackage:  internalClientSetPackage,
-				versionedClientSetPackage: versionedClientSetPackage,
+				clientSetPackage:          clientSetPackage,
 				internalInterfacesPackage: packageForInternalInterfaces(basePackage),
 			})
 
@@ -223,7 +243,7 @@ func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[st
 	}
 }
 
-func factoryInterfacePackage(basePackage string, boilerplate []byte, internalClientSetPackage, versionedClientSetPackage string, typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
+func factoryInterfacePackage(basePackage string, boilerplate []byte, clientSetPackage string, typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
 	packagePath := packageForInternalInterfaces(basePackage)
 
 	return &generator.DefaultPackage{
@@ -233,12 +253,11 @@ func factoryInterfacePackage(basePackage string, boilerplate []byte, internalCli
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &factoryInterfaceGenerator{
 				DefaultGen: generator.DefaultGen{
-					OptionalName: "internal_interfaces",
+					OptionalName: "factory_interfaces",
 				},
-				outputPackage:             packagePath,
-				imports:                   generator.NewImportTracker(),
-				internalClientSetPackage:  internalClientSetPackage,
-				versionedClientSetPackage: versionedClientSetPackage,
+				outputPackage:    packagePath,
+				imports:          generator.NewImportTracker(),
+				clientSetPackage: clientSetPackage,
 			})
 
 			return generators
@@ -272,7 +291,7 @@ func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions
 	}
 }
 
-func versionPackage(basePackage string, gv clientgentypes.GroupVersion, boilerplate []byte, typesToGenerate []*types.Type, internalClientSetPackage, versionedClientSetPackage, listersPackage string) generator.Package {
+func versionPackage(basePackage string, gv clientgentypes.GroupVersion, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Package {
 	packagePath := filepath.Join(basePackage, strings.ToLower(gv.Group.NonEmpty()), strings.ToLower(gv.Version.NonEmpty()))
 
 	return &generator.DefaultPackage{
@@ -299,8 +318,7 @@ func versionPackage(basePackage string, gv clientgentypes.GroupVersion, boilerpl
 					groupVersion:              gv,
 					typeToGenerate:            t,
 					imports:                   generator.NewImportTracker(),
-					internalClientSetPackage:  internalClientSetPackage,
-					versionedClientSetPackage: versionedClientSetPackage,
+					clientSetPackage:          clientSetPackage,
 					listersPackage:            listersPackage,
 					internalInterfacesPackage: packageForInternalInterfaces(basePackage),
 				})

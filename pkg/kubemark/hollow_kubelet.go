@@ -128,7 +128,7 @@ func GetHollowKubeletConfig(
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
 	c.MaxPods = int32(maxPods)
 	c.PodsPerCore = int32(podsPerCore)
-	c.ClusterDNS = ""
+	c.ClusterDNS = []string{}
 	c.DockerExecHandlerName = "native"
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80
@@ -160,6 +160,8 @@ func GetHollowKubeletConfig(
 	c.SerializeImagePulls = true
 	c.SystemCgroups = ""
 	c.ProtectKernelDefaults = false
+	// TODO: This is a temporary workaround until we fix CRI+kubemark properly.
+	c.EnableCRI = false
 
 	// TODO(mtaufen): Note that PodInfraContainerImage was being set to the empty value before,
 	//                but this may not have been intentional. (previous code (SimpleKubelet)

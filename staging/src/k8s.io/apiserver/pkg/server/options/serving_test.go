@@ -36,6 +36,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	. "k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
+	restclient "k8s.io/client-go/rest"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
@@ -493,6 +494,7 @@ NextTest:
 			},
 			SNICertKeys: namedCertKeys,
 		}
+		config.LoopbackClientConfig = &restclient.Config{}
 		if err := secureOptions.ApplyTo(&config); err != nil {
 			t.Errorf("%q - failed applying the SecureServingOptions: %v", title, err)
 			continue NextTest

@@ -26,7 +26,6 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
-	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -36,10 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/registry/generic"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -111,7 +109,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	// TODO: register cluster federation resources here.
-	resourceConfig := genericapiserver.NewResourceConfig()
+	resourceConfig := serverstorage.NewResourceConfig()
 
 	if s.Etcd.StorageConfig.DeserializationCacheSize == 0 {
 		// When size of cache is not explicitly set, set it to 50000
@@ -121,9 +119,9 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("error generating storage version map: %s", err)
 	}
-	storageFactory, err := kubeapiserver.BuildDefaultStorageFactory(
+	storageFactory, err := kubeapiserver.NewStorageFactory(
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, api.Codecs,
-		genericapiserver.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
+		serverstorage.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
 		[]schema.GroupVersionResource{}, resourceConfig, s.APIEnablement.RuntimeConfig)
 	if err != nil {
 		return fmt.Errorf("error in initializing storage factory: %s", err)
@@ -148,18 +146,16 @@ func Run(s *options.ServerRunOptions) error {
 		servers := strings.Split(tokens[1], ";")
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
+	if err := s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); err != nil {
+		return err
+	}
 
 	apiAuthenticator, securityDefinitions, err := s.Authentication.ToAuthenticationConfig().New()
 	if err != nil {
 		return fmt.Errorf("invalid Authentication Config: %v", err)
 	}
 
-	privilegedLoopbackToken := uuid.NewRandom().String()
-	selfClientConfig, err := genericapiserver.NewSelfClientConfig(genericConfig.SecureServingInfo, genericConfig.InsecureServingInfo, privilegedLoopbackToken)
-	if err != nil {
-		return fmt.Errorf("failed to create clientset: %v", err)
-	}
-	client, err := internalclientset.NewForConfig(selfClientConfig)
+	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
@@ -184,7 +180,6 @@ func Run(s *options.ServerRunOptions) error {
 
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
-	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
@@ -198,7 +193,7 @@ func Run(s *options.ServerRunOptions) error {
 	)
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
-	if s.GenericServerRunOptions.EnableWatchCache {
+	if s.Etcd.EnableWatchCache {
 		cachesize.InitializeWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
 	}
@@ -211,48 +206,15 @@ func Run(s *options.ServerRunOptions) error {
 	routes.UIRedirect{}.Install(m.HandlerContainer)
 	routes.Logs{}.Install(m.HandlerContainer)
 
-	// TODO: Refactor this code to share it with kube-apiserver rather than duplicating it here.
-	restOptionsFactory := &restOptionsFactory{
-		storageFactory:          storageFactory,
-		enableGarbageCollection: s.Features.EnableGarbageCollection,
-		deleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
-	}
-	if s.GenericServerRunOptions.EnableWatchCache {
-		restOptionsFactory.storageDecorator = genericregistry.StorageWithCacher
-	} else {
-		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
-	}
-
-	installFederationAPIs(m, restOptionsFactory)
-	installCoreAPIs(s, m, restOptionsFactory)
-	installExtensionsAPIs(m, restOptionsFactory)
-	installBatchAPIs(m, restOptionsFactory)
-	installAutoscalingAPIs(m, restOptionsFactory)
+	installFederationAPIs(m, genericConfig.RESTOptionsGetter)
+	installCoreAPIs(s, m, genericConfig.RESTOptionsGetter)
+	installExtensionsAPIs(m, genericConfig.RESTOptionsGetter)
+	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
+	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
 
 	sharedInformers.Start(wait.NeverStop)
 	m.PrepareRun().Run(wait.NeverStop)
 	return nil
-}
-
-type restOptionsFactory struct {
-	storageFactory          genericapiserver.StorageFactory
-	storageDecorator        generic.StorageDecorator
-	deleteCollectionWorkers int
-	enableGarbageCollection bool
-}
-
-func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	config, err := f.storageFactory.NewConfig(resource)
-	if err != nil {
-		return generic.RESTOptions{}, fmt.Errorf("Unable to find storage config for %v, due to %v", resource, err.Error())
-	}
-	return generic.RESTOptions{
-		StorageConfig:           config,
-		Decorator:               f.storageDecorator,
-		DeleteCollectionWorkers: f.deleteCollectionWorkers,
-		EnableGarbageCollection: f.enableGarbageCollection,
-		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
-	}, nil
 }
 
 // PostProcessSpec adds removed definitions for backward compatibility

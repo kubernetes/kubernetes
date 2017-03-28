@@ -40,7 +40,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	return api.Scheme.AddFieldLabelConversionFunc("apps/v1beta1", "StatefulSet",
+	return scheme.AddFieldLabelConversionFunc("apps/v1beta1", "StatefulSet",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":

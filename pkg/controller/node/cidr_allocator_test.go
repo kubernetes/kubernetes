@@ -142,6 +142,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 				t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
 				return
 			}
+			rangeAllocator.recorder = testutil.NewFakeRecorder()
 			if err = rangeAllocator.cidrs.occupy(cidr); err != nil {
 				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
 			}
@@ -223,6 +224,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 				t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
 				return
 			}
+			rangeAllocator.recorder = testutil.NewFakeRecorder()
 			err = rangeAllocator.cidrs.occupy(cidr)
 			if err != nil {
 				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
@@ -334,6 +336,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 				t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
 				return
 			}
+			rangeAllocator.recorder = testutil.NewFakeRecorder()
 			err = rangeAllocator.cidrs.occupy(cidr)
 			if err != nil {
 				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)

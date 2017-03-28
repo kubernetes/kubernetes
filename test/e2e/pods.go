@@ -45,7 +45,8 @@ var _ = framework.KubeDescribe("Pods Extended", func() {
 		BeforeEach(func() {
 			podClient = f.PodClient()
 		})
-		It("should be submitted and removed [Conformance]", func() {
+		// Flaky issue #36821.
+		It("should be submitted and removed [Conformance] [Flaky]", func() {
 			By("creating the pod")
 			name := "pod-submit-remove-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())

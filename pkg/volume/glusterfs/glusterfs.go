@@ -368,7 +368,7 @@ func (plugin *glusterfsPlugin) newProvisionerInternal(options volume.VolumeOptio
 	}, nil
 }
 
-type provisioningConfig struct {
+type provisionerConfig struct {
 	url             string
 	user            string
 	userKey         string
@@ -383,7 +383,7 @@ type provisioningConfig struct {
 
 type glusterfsVolumeProvisioner struct {
 	*glusterfsMounter
-	provisioningConfig
+	provisionerConfig
 	options volume.VolumeOptions
 }
 
@@ -438,7 +438,7 @@ func (plugin *glusterfsPlugin) newDeleterInternal(spec *volume.Spec) (volume.Del
 
 type glusterfsVolumeDeleter struct {
 	*glusterfsMounter
-	provisioningConfig
+	provisionerConfig
 	spec *v1.PersistentVolume
 }
 
@@ -579,9 +579,9 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	if err != nil {
 		return err
 	}
-	d.provisioningConfig = *cfg
+	d.provisionerConfig = *cfg
 
-	glog.V(4).Infof("glusterfs: deleting volume %q with configuration %+v", volumeId, d.provisioningConfig)
+	glog.V(4).Infof("glusterfs: deleting volume %q with configuration %+v", volumeId, d.provisionerConfig)
 
 	gid, exists, err := d.getGid()
 	if err != nil {
@@ -647,9 +647,9 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.provisioningConfig = *cfg
+	r.provisionerConfig = *cfg
 
-	glog.V(4).Infof("glusterfs: creating volume with configuration %+v", r.provisioningConfig)
+	glog.V(4).Infof("glusterfs: creating volume with configuration %+v", r.provisionerConfig)
 
 	gidTable, err := r.plugin.getGidTable(scName, cfg.gidMin, cfg.gidMax)
 	if err != nil {
@@ -695,7 +695,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
-	glog.V(2).Infof("glusterfs: create volume of size: %d bytes and configuration %+v", volSizeBytes, p.provisioningConfig)
+	glog.V(2).Infof("glusterfs: create volume of size: %d bytes and configuration %+v", volSizeBytes, p.provisionerConfig)
 	if p.url == "" {
 		glog.Errorf("glusterfs : rest server endpoint is empty")
 		return nil, 0, fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
@@ -705,7 +705,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		glog.Errorf("glusterfs: failed to create glusterfs rest client")
 		return nil, 0, fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
 	}
-	if p.provisioningConfig.clusterId != "" {
+	if p.provisionerConfig.clusterId != "" {
 		clusterIds = dstrings.Split(p.clusterId, ",")
 		glog.V(4).Infof("glusterfs: provided clusterids: %v", clusterIds)
 	}
@@ -855,8 +855,8 @@ func parseSecret(namespace, secretName string, kubeClient clientset.Interface) (
 }
 
 // parseClassParameters parses StorageClass.Parameters
-func parseClassParameters(params map[string]string, kubeClient clientset.Interface) (*provisioningConfig, error) {
-	var cfg provisioningConfig
+func parseClassParameters(params map[string]string, kubeClient clientset.Interface) (*provisionerConfig, error) {
+	var cfg provisionerConfig
 	var err error
 
 	cfg.gidMin = defaultGidMin

@@ -15,7 +15,7 @@ go_library(
         "//cmd/cloud-controller-manager/app/options:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/informers/informers_generated:go_default_library",
+        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/client/leaderelection:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/cloudprovider:go_default_library",

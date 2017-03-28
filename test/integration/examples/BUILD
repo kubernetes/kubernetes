@@ -12,11 +12,15 @@ go_test(
     srcs = ["apiserver_test.go"],
     tags = ["automanaged"],
     deps = [
-        "//cmd/libs/go2idl/client-gen/test_apis/testgroup/v1:go_default_library",
-        "//examples/apiserver:go_default_library",
+        "//test/integration/framework:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor:k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
+        "//vendor:k8s.io/sample-apiserver/pkg/cmd/server",
     ],
 )
 

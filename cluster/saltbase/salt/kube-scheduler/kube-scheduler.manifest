@@ -1,4 +1,5 @@
-{% set params = "" -%}
+{% set params = "--master=127.0.0.1:8080" -%}
+{% set srv_kube_path = "/srv/kubernetes" -%}
 
 {% set log_level = pillar['log_level'] -%}
 {% if pillar['scheduler_test_log_level'] is defined -%}
@@ -47,7 +48,7 @@
     "command": [
                  "/bin/sh",
                  "-c",
-                 "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080 {{params}} 1>>/var/log/kube-scheduler.log 2>&1"
+                 "/usr/local/bin/kube-scheduler {{params}} 1>>/var/log/kube-scheduler.log 2>&1"
                ],
     "livenessProbe": {
       "httpGet": {
@@ -63,14 +64,23 @@
           "name": "logfile",
           "mountPath": "/var/log/kube-scheduler.log",
           "readOnly": false
+        },
+        {
+          "name": "srvkube",
+          "mountPath": "{{srv_kube_path}}",
+          "readOnly": true
         }
       ]
     }
 ],
 "volumes":[
-  { "name": "logfile",
-    "hostPath": {
-        "path": "/var/log/kube-scheduler.log"}
+  {
+    "name": "srvkube",
+    "hostPath": {"path": "{{srv_kube_path}}"}
+  },
+  {
+    "name": "logfile",
+    "hostPath": {"path": "/var/log/kube-scheduler.log"}
   }
 ]
 }}

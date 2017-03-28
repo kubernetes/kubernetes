@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 // ResumeConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -68,7 +69,7 @@ func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "resume RESOURCE",
-		Short:   "Resume a paused resource",
+		Short:   i18n.T("Resume a paused resource"),
 		Long:    resume_long,
 		Example: resume_example,
 		Run: func(cmd *cobra.Command, args []string) {

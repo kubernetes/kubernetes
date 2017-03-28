@@ -64,11 +64,15 @@ func (dc *DeploymentController) hasFailed(d *extensions.Deployment) (bool, error
 
 	// If the deployment is complete or it is progressing, there is no need to check if it
 	// has timed out.
+	// TODO: Switch to a much higher verbosity level
+	glog.V(2).Infof("Checking if deployment %q is complete or progressing", d.Name)
 	if util.DeploymentComplete(d, &newStatus) || util.DeploymentProgressing(d, &newStatus) {
 		return false, nil
 	}
 
 	// Check if the deployment has timed out.
+	// TODO: Switch to a much higher verbosity level
+	glog.V(2).Infof("Checking if deployment %q has timed out", d.Name)
 	return util.DeploymentTimedOut(d, &newStatus), nil
 }
 

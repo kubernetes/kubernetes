@@ -222,7 +222,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		}
 	}
 
-	if s.MountServiceAccountToken {
+	if s.MountServiceAccountToken && shouldAutomount(serviceAccount, pod) {
 		if err := s.mountServiceAccountToken(serviceAccount, pod); err != nil {
 			if _, ok := err.(errors.APIStatus); ok {
 				return err
@@ -237,6 +237,19 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	}
 
 	return nil
+}
+
+func shouldAutomount(sa *api.ServiceAccount, pod *api.Pod) bool {
+	// Pod's preference wins
+	if pod.Spec.AutomountServiceAccountToken != nil {
+		return *pod.Spec.AutomountServiceAccountToken
+	}
+	// Then service account's
+	if sa.AutomountServiceAccountToken != nil {
+		return *sa.AutomountServiceAccountToken
+	}
+	// Default to true for backwards compatibility
+	return true
 }
 
 // enforceMountableSecrets indicates whether mountable secrets should be enforced for a particular service account

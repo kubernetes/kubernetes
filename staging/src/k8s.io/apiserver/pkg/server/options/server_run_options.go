@@ -39,8 +39,6 @@ type ServerRunOptions struct {
 	AdvertiseAddress           net.IP
 
 	CorsAllowedOriginList       []string
-	DeleteCollectionWorkers     int
-	EnableWatchCache            bool
 	ExternalHost                string
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
@@ -54,8 +52,6 @@ func NewServerRunOptions() *ServerRunOptions {
 
 	return &ServerRunOptions{
 		AdmissionControl:            "AlwaysAdmit",
-		DeleteCollectionWorkers:     1,
-		EnableWatchCache:            true,
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
@@ -123,13 +119,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, ""+
 		"List of allowed origins for CORS, comma separated.  An allowed origin can be a regular "+
 		"expression to support subdomain matching. If this list is empty CORS will not be enabled.")
-
-	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
-		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
-
-	// TODO: enable cache in integration tests.
-	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache,
-		"Enable watch caching in the apiserver")
 
 	fs.IntVar(&s.TargetRAMMB, "target-ram-mb", s.TargetRAMMB,
 		"Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")

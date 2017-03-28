@@ -22,9 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # We need an absolute path to KUBE_ROOT
 ABSOLUTE_ROOT=$(readlink -f ${KUBE_ROOT})
 
-source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
-source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
 
 echo "Kubemark master name: ${MASTER_NAME}"
 
@@ -35,7 +33,7 @@ export KUBECONFIG="${ABSOLUTE_ROOT}/test/kubemark/resources/kubeconfig.kubemark"
 export E2E_MIN_STARTUP_PODS=0
 
 if [[ -z "$@" ]]; then
-	ARGS='--ginkgo.focus=should\sallow\sstarting\s30\spods\sper\snode'
+	ARGS='--ginkgo.focus=\[Feature:performance\]'
 else
 	ARGS=$@
 fi

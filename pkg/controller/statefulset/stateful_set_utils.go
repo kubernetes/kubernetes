@@ -18,23 +18,30 @@ package statefulset
 
 import (
 	"fmt"
-	"sync"
+	"regexp"
+	"strconv"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podapi "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
 )
 
+// maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
+const maxUpdateRetries = 10
+
+// updateConflictError is the error used to indicate that the maximum number of retries against the API server have
+// been attempted and we need to back off
+var updateConflictError = fmt.Errorf("aborting update after %d attempts", maxUpdateRetries)
+
 // overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.
 // Generally used to tie break between StatefulSets that have overlapping selectors.
 type overlappingStatefulSets []apps.StatefulSet
 
-func (o overlappingStatefulSets) Len() int      { return len(o) }
+func (o overlappingStatefulSets) Len() int { return len(o) }
+
 func (o overlappingStatefulSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o overlappingStatefulSets) Less(i, j int) bool {
@@ -44,115 +51,206 @@ func (o overlappingStatefulSets) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }
 
-// updatePetCount attempts to update the Status.Replicas of the given StatefulSet, with a single GET/PUT retry.
-func updatePetCount(psClient appsclientset.StatefulSetsGetter, ps apps.StatefulSet, numPets int) (updateErr error) {
-	if ps.Status.Replicas == int32(numPets) || psClient == nil {
-		return nil
-	}
-	var getErr error
-	for i, ps := 0, &ps; ; i++ {
-		glog.V(4).Infof(fmt.Sprintf("Updating replica count for StatefulSet: %s/%s, ", ps.Namespace, ps.Name) +
-			fmt.Sprintf("replicas %d->%d (need %d), ", ps.Status.Replicas, numPets, *(ps.Spec.Replicas)))
+// statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
+var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
-		ps.Status = apps.StatefulSetStatus{Replicas: int32(numPets)}
-		_, updateErr = psClient.StatefulSets(ps.Namespace).UpdateStatus(ps)
-		if updateErr == nil || i >= statusUpdateRetries {
-			return updateErr
+// getParentNameAndOrdinal gets the name of pod's parent StatefulSet and pod's ordinal as extracted from its Name. If
+// the Pod was not created by a StatefulSet, its parent is considered to be nil, and its ordinal is considered to be
+// -1.
+func getParentNameAndOrdinal(pod *v1.Pod) (string, int) {
+	parent := ""
+	ordinal := -1
+	subMatches := statefulPodRegex.FindStringSubmatch(pod.Name)
+	if len(subMatches) < 3 {
+		return parent, ordinal
+	}
+	parent = subMatches[1]
+	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
+		ordinal = int(i)
+	}
+	return parent, ordinal
+}
+
+// getParentName gets the name of pod's parent StatefulSet. If pod has not parent, the empty string is returned.
+func getParentName(pod *v1.Pod) string {
+	parent, _ := getParentNameAndOrdinal(pod)
+	return parent
+}
+
+//  getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
+func getOrdinal(pod *v1.Pod) int {
+	_, ordinal := getParentNameAndOrdinal(pod)
+	return ordinal
+}
+
+// getPodName gets the name of set's child Pod with an ordinal index of ordinal
+func getPodName(set *apps.StatefulSet, ordinal int) string {
+	return fmt.Sprintf("%s-%d", set.Name, ordinal)
+}
+
+// getPersistentVolumeClaimName getsthe name of PersistentVolumeClaim for a Pod with an ordinal index of ordinal. claim
+// must be a PersistentVolumeClaim from set's VolumeClaims template.
+func getPersistentVolumeClaimName(set *apps.StatefulSet, claim *v1.PersistentVolumeClaim, ordinal int) string {
+	return fmt.Sprintf("%s-%s-%d", claim.Name, set.Name, ordinal)
+}
+
+// isMemberOf tests if pod is a member of set.
+func isMemberOf(set *apps.StatefulSet, pod *v1.Pod) bool {
+	return getParentName(pod) == set.Name
+}
+
+// identityMatches returns true if pod has a valid identity and network identity for a member of set.
+func identityMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
+	parent, ordinal := getParentNameAndOrdinal(pod)
+	return ordinal >= 0 &&
+		set.Name == parent &&
+		pod.Name == getPodName(set, ordinal) &&
+		pod.Namespace == set.Namespace &&
+		pod.Annotations != nil &&
+		pod.Annotations[podapi.PodHostnameAnnotation] == pod.Name &&
+		pod.Annotations[podapi.PodSubdomainAnnotation] == set.Spec.ServiceName
+}
+
+// storageMatches returns true if pod's Volumes cover the set of PersistentVolumeClaims
+func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
+	ordinal := getOrdinal(pod)
+	if ordinal < 0 {
+		return false
+	}
+	volumes := make(map[string]v1.Volume, len(pod.Spec.Volumes))
+	for _, volume := range pod.Spec.Volumes {
+		volumes[volume.Name] = volume
+	}
+	for _, claim := range set.Spec.VolumeClaimTemplates {
+		volume, found := volumes[claim.Name]
+		if !found ||
+			volume.VolumeSource.PersistentVolumeClaim == nil ||
+			volume.VolumeSource.PersistentVolumeClaim.ClaimName !=
+				getPersistentVolumeClaimName(set, &claim, ordinal) {
+			return false
 		}
-		if ps, getErr = psClient.StatefulSets(ps.Namespace).Get(ps.Name, metav1.GetOptions{}); getErr != nil {
-			return getErr
+	}
+	return true
+}
+
+// getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The
+// returned PersistentVolumeClaims are each constructed with a the name specific to the Pod. This name is determined
+// by getPersistentVolumeClaimName.
+func getPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) map[string]v1.PersistentVolumeClaim {
+	ordinal := getOrdinal(pod)
+	templates := set.Spec.VolumeClaimTemplates
+	claims := make(map[string]v1.PersistentVolumeClaim, len(templates))
+	for i := range templates {
+		claim := templates[i]
+		claim.Name = getPersistentVolumeClaimName(set, &claim, ordinal)
+		claim.Namespace = set.Namespace
+		claim.Labels = set.Spec.Selector.MatchLabels
+		claims[templates[i].Name] = claim
+	}
+	return claims
+}
+
+// updateStorage updates pod's Volumes to conform with the PersistentVolumeClaim of set's templates. If pod has
+// conflicting local Volumes these are replaced with Volumes that conform to the set's templates.
+func updateStorage(set *apps.StatefulSet, pod *v1.Pod) {
+	currentVolumes := pod.Spec.Volumes
+	claims := getPersistentVolumeClaims(set, pod)
+	newVolumes := make([]v1.Volume, 0, len(claims))
+	for name, claim := range claims {
+		newVolumes = append(newVolumes, v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: claim.Name,
+					// TODO: Use source definition to set this value when we have one.
+					ReadOnly: false,
+				},
+			},
+		})
+	}
+	for i := range currentVolumes {
+		if _, ok := claims[currentVolumes[i].Name]; !ok {
+			newVolumes = append(newVolumes, currentVolumes[i])
 		}
 	}
+	pod.Spec.Volumes = newVolumes
 }
 
-// unhealthyPetTracker tracks unhealthy pets for statefulsets.
-type unhealthyPetTracker struct {
-	pc        petClient
-	store     cache.Store
-	storeLock sync.Mutex
+// updateIdentity updates pod's name, hostname, and subdomain to conform to set's name and headless service.
+func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
+	pod.Name = getPodName(set, getOrdinal(pod))
+	pod.Namespace = set.Namespace
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[podapi.PodHostnameAnnotation] = pod.Name
+	pod.Annotations[podapi.PodSubdomainAnnotation] = set.Spec.ServiceName
 }
 
-// Get returns a previously recorded blocking pet for the given statefulset.
-func (u *unhealthyPetTracker) Get(ps *apps.StatefulSet, knownPets []*v1.Pod) (*pcb, error) {
-	u.storeLock.Lock()
-	defer u.storeLock.Unlock()
-
-	// We "Get" by key but "Add" by object because the store interface doesn't
-	// allow us to Get/Add a related obj (eg statefulset: blocking pet).
-	key, err := controller.KeyFunc(ps)
-	if err != nil {
-		return nil, err
+// isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady, and if the init
+// annotation has not explicitly disabled the Pod from being ready.
+func isRunningAndReady(pod *v1.Pod) bool {
+	if pod.Status.Phase != v1.PodRunning {
+		return false
 	}
-	obj, exists, err := u.store.GetByKey(key)
-	if err != nil {
-		return nil, err
-	}
-
-	hc := defaultPetHealthChecker{}
-	// There's no unhealthy pet blocking a scale event, but this might be
-	// a controller manager restart. If it is, knownPets can be trusted.
-	if !exists {
-		for _, p := range knownPets {
-			if hc.isHealthy(p) && !hc.isDying(p) {
-				glog.V(4).Infof("Ignoring healthy pod %v for StatefulSet %v", p.Name, ps.Name)
-				continue
-			}
-			glog.V(4).Infof("No recorded blocking pod, but found unhealthy pod %v for StatefulSet %v", p.Name, ps.Name)
-			return &pcb{pod: p, parent: ps}, nil
+	podReady := v1.IsPodReady(pod)
+	// User may have specified a pod readiness override through a debug annotation.
+	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
+	if ok {
+		if initAnnotation, err := strconv.ParseBool(initialized); err != nil {
+			glog.V(4).Infof("Failed to parse %v annotation on pod %v: %v",
+				apps.StatefulSetInitAnnotation, pod.Name, err)
+		} else if !initAnnotation {
+			glog.V(4).Infof("StatefulSet pod %v waiting on annotation %v", pod.Name,
+				apps.StatefulSetInitAnnotation)
+			podReady = initAnnotation
 		}
-		return nil, nil
 	}
-
-	// This is a pet that's blocking further creates/deletes of a statefulset. If it
-	// disappears, it's no longer blocking. If it exists, it continues to block
-	// till it turns healthy or disappears.
-	bp := obj.(*pcb)
-	blockingPet, exists, err := u.pc.Get(bp)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		glog.V(4).Infof("Clearing blocking pod %v for StatefulSet %v because it's been deleted", bp.pod.Name, ps.Name)
-		return nil, nil
-	}
-	blockingPetPod := blockingPet.pod
-	if hc.isHealthy(blockingPetPod) && !hc.isDying(blockingPetPod) {
-		glog.V(4).Infof("Clearing blocking pod %v for StatefulSet %v because it's healthy", bp.pod.Name, ps.Name)
-		u.store.Delete(blockingPet)
-		blockingPet = nil
-	}
-	return blockingPet, nil
+	return podReady
 }
 
-// Add records the given pet as a blocking pet.
-func (u *unhealthyPetTracker) Add(blockingPet *pcb) error {
-	u.storeLock.Lock()
-	defer u.storeLock.Unlock()
-
-	if blockingPet == nil {
-		return nil
-	}
-	glog.V(4).Infof("Adding blocking pod %v for StatefulSet %v", blockingPet.pod.Name, blockingPet.parent.Name)
-	return u.store.Add(blockingPet)
+// isCreated returns true if pod has been created and is maintained by the API server
+func isCreated(pod *v1.Pod) bool {
+	return pod.Status.Phase != ""
 }
 
-// newUnHealthyPetTracker tracks unhealthy pets that block progress of statefulsets.
-func newUnHealthyPetTracker(pc petClient) *unhealthyPetTracker {
-	return &unhealthyPetTracker{pc: pc, store: cache.NewStore(pcbKeyFunc)}
+// isFailed returns true if pod has a Phase of PodFailed
+func isFailed(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed
 }
 
-// pcbKeyFunc computes the key for a given pcb.
-// If it's given a key, it simply returns it.
-func pcbKeyFunc(obj interface{}) (string, error) {
-	if key, ok := obj.(string); ok {
-		return key, nil
-	}
-	p, ok := obj.(*pcb)
-	if !ok {
-		return "", fmt.Errorf("not a valid pod control block %#v", p)
-	}
-	if p.parent == nil {
-		return "", fmt.Errorf("cannot compute pod control block key without parent pointer %#v", p)
-	}
-	return controller.KeyFunc(p.parent)
+// isTerminated returns true if pod's deletion Timestamp has been set
+func isTerminated(pod *v1.Pod) bool {
+	return pod.DeletionTimestamp != nil
+}
+
+// isHealthy returns true if pod is running and ready and has not been terminated
+func isHealthy(pod *v1.Pod) bool {
+	return isRunningAndReady(pod) && !isTerminated(pod)
+}
+
+// newStatefulSetPod returns a new Pod conforming to the set's Spec with an identity generated from ordinal.
+func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
+	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, nil)
+	pod.Name = getPodName(set, ordinal)
+	updateIdentity(set, pod)
+	updateStorage(set, pod)
+	return pod
+}
+
+// ascendingOrdinal is a sort.Interface that Sorts a list of Pods based on the ordinals extracted
+// from the Pod. Pod's that have not been constructed by StatefulSet's have an ordinal of -1, and are therefore pushed
+// to the front of the list.
+type ascendingOrdinal []*v1.Pod
+
+func (ao ascendingOrdinal) Len() int {
+	return len(ao)
+}
+
+func (ao ascendingOrdinal) Swap(i, j int) {
+	ao[i], ao[j] = ao[j], ao[i]
+}
+
+func (ao ascendingOrdinal) Less(i, j int) bool {
+	return getOrdinal(ao[i]) < getOrdinal(ao[j])
 }

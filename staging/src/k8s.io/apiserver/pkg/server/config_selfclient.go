@@ -20,35 +20,11 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"net"
 
 	restclient "k8s.io/client-go/rest"
-
-	"github.com/golang/glog"
 )
-
-// NewSelfClientConfig returns a clientconfig which can be used to talk to this apiserver.
-func NewSelfClientConfig(secureServingInfo *SecureServingInfo, insecureServingInfo *ServingInfo, token string) (*restclient.Config, error) {
-	cfg, err := secureServingInfo.NewSelfClientConfig(token)
-	if cfg != nil && err == nil {
-		return cfg, nil
-	}
-	if err != nil {
-		if insecureServingInfo == nil {
-			// be fatal if insecure port is not available
-			return nil, err
-		}
-
-		glog.Warningf("Failed to create secure local client, falling back to insecure local connection: %v", err)
-	}
-	if cfg, err := insecureServingInfo.NewSelfClientConfig(token); err != nil || cfg != nil {
-		return cfg, err
-	}
-
-	return nil, errors.New("Unable to set url for apiserver local client")
-}
 
 func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Config, error) {
 	if s == nil || (s.Cert == nil && len(s.SNICerts) == 0) {

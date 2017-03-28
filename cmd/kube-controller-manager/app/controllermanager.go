@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
+	newinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -93,6 +93,9 @@ controller, and serviceaccounts controller.`,
 	return cmd
 }
 
+// ResyncPeriod returns a function which generates a duration each time it is
+// invoked; this is so that multiple controllers don't get into lock-step and all
+// hammer the apiserver with list requests simultaneously.
 func ResyncPeriod(s *options.CMServer) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
@@ -267,7 +270,10 @@ func KnownControllers() []string {
 	return sets.StringKeySet(newControllerInitializers()).List()
 }
 
-var ControllersDisabledByDefault = sets.NewString()
+var ControllersDisabledByDefault = sets.NewString(
+	"bootstrapsigner",
+	"tokencleaner",
+)
 
 func newControllerInitializers() map[string]InitFunc {
 	controllers := map[string]InitFunc{}
@@ -287,6 +293,9 @@ func newControllerInitializers() map[string]InitFunc {
 	controllers["statefuleset"] = startStatefulSetController
 	controllers["cronjob"] = startCronJobController
 	controllers["certificatesigningrequests"] = startCSRController
+	controllers["ttl"] = startTTLController
+	controllers["bootstrapsigner"] = startBootstrapSignerController
+	controllers["tokencleaner"] = startTokenCleanerController
 
 	return controllers
 }
@@ -335,7 +344,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	// TODO replace sharedInformers with newSharedInformers
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, nil, ResyncPeriod(s)())
-	newSharedInformers := newinformers.NewSharedInformerFactory(nil, versionedClient, ResyncPeriod(s)())
+	newSharedInformers := newinformers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
 	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	if len(s.ServiceAccountKeyFile) > 0 {
@@ -433,6 +442,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		serviceCIDR,
 		int(s.NodeCIDRMaskSize),
 		s.AllocateNodeCIDRs,
+		s.EnableTaintManager,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize nodecontroller: %v", err)
@@ -454,8 +464,8 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
-			routeController := routecontroller.New(routes, clientBuilder.ClientOrDie("route-controller"), s.ClusterName, clusterCIDR)
-			routeController.Run(s.RouteReconciliationPeriod.Duration)
+			routeController := routecontroller.New(routes, clientBuilder.ClientOrDie("route-controller"), newSharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
+			go routeController.Run(stop, s.RouteReconciliationPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	} else {

@@ -40,8 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
-	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/extensions/v1beta1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -148,6 +148,8 @@ type NodeController struct {
 
 	// allocate/recycle CIDRs for node if allocateNodeCIDRs == true
 	cidrAllocator CIDRAllocator
+	// manages taints
+	taintManager *NoExecuteTaintManager
 
 	forcefullyDeletePod        func(*v1.Pod) error
 	nodeExistsInCloudProvider  func(types.NodeName) (bool, error)
@@ -160,6 +162,10 @@ type NodeController struct {
 	secondaryEvictionLimiterQPS float32
 	largeClusterThreshold       int32
 	unhealthyZoneThreshold      float32
+
+	// if set to true NodeController will start TaintManager that will evict Pods from
+	// tainted nodes, if they're not tolerated.
+	runTaintManager bool
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -183,7 +189,8 @@ func NewNodeController(
 	clusterCIDR *net.IPNet,
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSize int,
-	allocateNodeCIDRs bool) (*NodeController, error) {
+	allocateNodeCIDRs bool,
+	runTaintManager bool) (*NodeController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "controllermanager"})
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -191,7 +198,7 @@ func NewNodeController(
 		glog.V(0).Infof("Sending events to api server.")
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 	} else {
-		glog.V(0).Infof("No api server defined - no events will be sent to API server.")
+		glog.Fatalf("kubeClient is nil when starting NodeController")
 	}
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
@@ -232,14 +239,47 @@ func NewNodeController(
 		largeClusterThreshold:       largeClusterThreshold,
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
 		zoneStates:                  make(map[string]zoneState),
+		runTaintManager:             runTaintManager,
 	}
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    nc.maybeDeleteTerminatingPod,
-		UpdateFunc: func(_, obj interface{}) { nc.maybeDeleteTerminatingPod(obj) },
+		AddFunc: func(obj interface{}) {
+			nc.maybeDeleteTerminatingPod(obj)
+			pod := obj.(*v1.Pod)
+			if nc.taintManager != nil {
+				nc.taintManager.PodUpdated(nil, pod)
+			}
+		},
+		UpdateFunc: func(prev, obj interface{}) {
+			nc.maybeDeleteTerminatingPod(obj)
+			prevPod := prev.(*v1.Pod)
+			newPod := obj.(*v1.Pod)
+			if nc.taintManager != nil {
+				nc.taintManager.PodUpdated(prevPod, newPod)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			pod, isPod := obj.(*v1.Pod)
+			// We can get DeletedFinalStateUnknown instead of *v1.Node here and we need to handle that correctly. #34692
+			if !isPod {
+				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					glog.Errorf("Received unexpected object: %v", obj)
+					return
+				}
+				pod, ok = deletedState.Obj.(*v1.Pod)
+				if !ok {
+					glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+					return
+				}
+			}
+			if nc.taintManager != nil {
+				nc.taintManager.PodUpdated(pod, nil)
+			}
+		},
 	})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
 
@@ -279,9 +319,13 @@ func NewNodeController(
 				if err := nc.cidrAllocator.AllocateOrOccupyCIDR(node); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 				}
+				if nc.taintManager != nil {
+					nc.taintManager.NodeUpdated(nil, node)
+				}
 			},
-			UpdateFunc: func(_, obj interface{}) {
-				node := obj.(*v1.Node)
+			UpdateFunc: func(oldNode, newNode interface{}) {
+				node := newNode.(*v1.Node)
+				prevNode := oldNode.(*v1.Node)
 				// If the PodCIDR is not empty we either:
 				// - already processed a Node that already had a CIDR after NC restarted
 				//   (cidr is marked as used),
@@ -312,6 +356,9 @@ func NewNodeController(
 						utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 					}
 				}
+				if nc.taintManager != nil {
+					nc.taintManager.NodeUpdated(prevNode, node)
+				}
 			},
 			DeleteFunc: func(originalObj interface{}) {
 				obj, err := api.Scheme.DeepCopy(originalObj)
@@ -334,11 +381,18 @@ func NewNodeController(
 						return
 					}
 				}
+				if nc.taintManager != nil {
+					nc.taintManager.NodeUpdated(node, nil)
+				}
 				if err := nc.cidrAllocator.ReleaseCIDR(node); err != nil {
 					glog.Errorf("Error releasing CIDR: %v", err)
 				}
 			},
 		}
+	}
+
+	if nc.runTaintManager {
+		nc.taintManager = NewNoExecuteTaintManager(kubeClient)
 	}
 
 	nodeInformer.Informer().AddEventHandler(nodeEventHandlerFuncs)
@@ -367,6 +421,10 @@ func (nc *NodeController) Run() {
 				glog.Errorf("Error monitoring node status: %v", err)
 			}
 		}, nc.nodeMonitorPeriod, wait.NeverStop)
+
+		if nc.runTaintManager {
+			go nc.taintManager.Run(wait.NeverStop)
+		}
 
 		// Managing eviction of nodes:
 		// When we delete pods off a node, if the node was not empty at the time we then
@@ -742,35 +800,37 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 			if observedReadyCondition.Status != v1.ConditionUnknown {
 				currentReadyCondition.Status = v1.ConditionUnknown
 				currentReadyCondition.Reason = "NodeStatusUnknown"
-				currentReadyCondition.Message = fmt.Sprintf("Kubelet stopped posting node status.")
+				currentReadyCondition.Message = "Kubelet stopped posting node status."
 				// LastProbeTime is the last time we heard from kubelet.
 				currentReadyCondition.LastHeartbeatTime = observedReadyCondition.LastHeartbeatTime
 				currentReadyCondition.LastTransitionTime = nc.now()
 			}
 		}
 
-		// Like NodeReady condition, NodeOutOfDisk was last set longer ago than gracePeriod, so update
-		// it to Unknown (regardless of its current value) in the master.
-		// TODO(madhusudancs): Refactor this with readyCondition to remove duplicated code.
-		_, oodCondition := v1.GetNodeCondition(&node.Status, v1.NodeOutOfDisk)
-		if oodCondition == nil {
-			glog.V(2).Infof("Out of disk condition of node %v is never updated by kubelet", node.Name)
-			node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
-				Type:               v1.NodeOutOfDisk,
-				Status:             v1.ConditionUnknown,
-				Reason:             "NodeStatusNeverUpdated",
-				Message:            fmt.Sprintf("Kubelet never posted node status."),
-				LastHeartbeatTime:  node.CreationTimestamp,
-				LastTransitionTime: nc.now(),
-			})
-		} else {
-			glog.V(4).Infof("node %v hasn't been updated for %+v. Last out of disk condition is: %+v",
-				node.Name, nc.now().Time.Sub(savedNodeStatus.probeTimestamp.Time), oodCondition)
-			if oodCondition.Status != v1.ConditionUnknown {
-				oodCondition.Status = v1.ConditionUnknown
-				oodCondition.Reason = "NodeStatusUnknown"
-				oodCondition.Message = fmt.Sprintf("Kubelet stopped posting node status.")
-				oodCondition.LastTransitionTime = nc.now()
+		// remaining node conditions should also be set to Unknown
+		remainingNodeConditionTypes := []v1.NodeConditionType{v1.NodeOutOfDisk, v1.NodeMemoryPressure, v1.NodeDiskPressure}
+		nowTimestamp := nc.now()
+		for _, nodeConditionType := range remainingNodeConditionTypes {
+			_, currentCondition := v1.GetNodeCondition(&node.Status, nodeConditionType)
+			if currentCondition == nil {
+				glog.V(2).Infof("Condition %v of node %v was never updated by kubelet", nodeConditionType, node.Name)
+				node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
+					Type:               nodeConditionType,
+					Status:             v1.ConditionUnknown,
+					Reason:             "NodeStatusNeverUpdated",
+					Message:            "Kubelet never posted node status.",
+					LastHeartbeatTime:  node.CreationTimestamp,
+					LastTransitionTime: nowTimestamp,
+				})
+			} else {
+				glog.V(4).Infof("node %v hasn't been updated for %+v. Last %v is: %+v",
+					node.Name, nc.now().Time.Sub(savedNodeStatus.probeTimestamp.Time), nodeConditionType, currentCondition)
+				if currentCondition.Status != v1.ConditionUnknown {
+					currentCondition.Status = v1.ConditionUnknown
+					currentCondition.Reason = "NodeStatusUnknown"
+					currentCondition.Message = "Kubelet stopped posting node status."
+					currentCondition.LastTransitionTime = nowTimestamp
+				}
 			}
 		}
 

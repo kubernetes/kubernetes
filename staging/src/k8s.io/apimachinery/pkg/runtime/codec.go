@@ -161,11 +161,12 @@ func (c *parameterCodec) DecodeParameters(parameters url.Values, from schema.Gro
 	if err != nil {
 		return err
 	}
-	targetGVK := targetGVKs[0]
-	if targetGVK.GroupVersion() == from {
-		return c.convertor.Convert(&parameters, into, nil)
+	for i := range targetGVKs {
+		if targetGVKs[i].GroupVersion() == from {
+			return c.convertor.Convert(&parameters, into, nil)
+		}
 	}
-	input, err := c.creator.New(from.WithKind(targetGVK.Kind))
+	input, err := c.creator.New(from.WithKind(targetGVKs[0].Kind))
 	if err != nil {
 		return err
 	}

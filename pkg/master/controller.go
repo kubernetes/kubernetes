@@ -41,9 +41,10 @@ import (
 
 const kubernetesServiceName = "kubernetes"
 
-// Controller is the controller manager for the core bootstrap Kubernetes controller
-// loops, which manage creating the "kubernetes" service, the "default" and "kube-system"
-// namespace, and provide the IP repair check on service IPs
+// Controller is the controller manager for the core bootstrap Kubernetes
+// controller loops, which manage creating the "kubernetes" service, the
+// "default", "kube-system" and "kube-public" namespaces, and provide the IP
+// repair check on service IPs
 type Controller struct {
 	ServiceClient   coreclient.ServicesGetter
 	NamespaceClient coreclient.NamespacesGetter
@@ -84,7 +85,7 @@ func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTSto
 		EndpointReconciler: c.EndpointReconcilerConfig.Reconciler,
 		EndpointInterval:   c.EndpointReconcilerConfig.Interval,
 
-		SystemNamespaces:         []string{metav1.NamespaceSystem},
+		SystemNamespaces:         []string{metav1.NamespaceSystem, metav1.NamespacePublic},
 		SystemNamespacesInterval: 1 * time.Minute,
 
 		ServiceClusterIPRegistry: legacyRESTStorage.ServiceClusterIPAllocator,
@@ -173,7 +174,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 
-	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
+	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
 	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 		return err
 	}
@@ -205,13 +206,13 @@ func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
 
 // createPortAndServiceSpec creates an array of service ports.
 // If the NodePort value is 0, just the servicePort is used, otherwise, a node port is exposed.
-func createPortAndServiceSpec(servicePort int, nodePort int, servicePortName string, extraServicePorts []api.ServicePort) ([]api.ServicePort, api.ServiceType) {
+func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort int, servicePortName string, extraServicePorts []api.ServicePort) ([]api.ServicePort, api.ServiceType) {
 	//Use the Cluster IP type for the service port if NodePort isn't provided.
 	//Otherwise, we will be binding the master service to a NodePort.
 	servicePorts := []api.ServicePort{{Protocol: api.ProtocolTCP,
 		Port:       int32(servicePort),
 		Name:       servicePortName,
-		TargetPort: intstr.FromInt(servicePort)}}
+		TargetPort: intstr.FromInt(targetServicePort)}}
 	serviceType := api.ServiceTypeClusterIP
 	if nodePort > 0 {
 		servicePorts[0].NodePort = int32(nodePort)

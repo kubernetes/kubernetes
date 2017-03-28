@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
 )
@@ -48,7 +48,7 @@ func (*FakeController) LastSyncResourceVersion() string {
 func alwaysReady() bool { return true }
 
 func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer) {
-	informerFactory := informers.NewSharedInformerFactory(nil, kubeClient, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	controller := NewPodGC(kubeClient, podInformer, terminatedPodThreshold)
 	controller.podListerSynced = alwaysReady

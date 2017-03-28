@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -32,7 +33,7 @@ import (
 // phase. Note: the PV is deleted in the AfterEach, not here.
 func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
 
-	// 1. verify that the PV and PVC have binded correctly
+	// 1. verify that the PV and PVC have bound correctly
 	By("Validating the PV-PVC binding")
 	waitOnPVandPVC(c, ns, pv, pvc)
 
@@ -41,9 +42,9 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 	By("Checking pod has write access to PersistentVolume")
 	createWaitAndDeletePod(f, c, ns, pvc.Name)
 
-	// 3. delete the PVC, wait for PV to become "Available"
-	By("Deleting the PVC to invoke the recycler")
-	deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable)
+	// 3. delete the PVC, wait for PV to become "Released"
+	By("Deleting the PVC to invoke the reclaim policy.")
+	deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeReleased)
 }
 
 // Validate pairs of PVs and PVCs, create and verify writer pod, delete PVC and validate
@@ -51,8 +52,7 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 // Note: the PV is deleted in the AfterEach, not here.
 // Note: this func is serialized, we wait for each pod to be deleted before creating the
 //   next pod. Adding concurrency is a TODO item.
-// Note: this func is called recursively when there are more claims than pvs.
-func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols pvmap, claims pvcmap) {
+func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols pvmap, claims pvcmap, expectPhase v1.PersistentVolumePhase) {
 
 	// 1. verify each PV permits write access to a client pod
 	By("Checking pod has write access to PersistentVolumes")
@@ -69,9 +69,9 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 		createWaitAndDeletePod(f, c, pvcKey.Namespace, pvcKey.Name)
 	}
 
-	// 2. delete each PVC, wait for its bound PV to become "Available"
+	// 2. delete each PVC, wait for its bound PV to reach `expectedPhase`
 	By("Deleting PVCs to invoke recycler")
-	deletePVCandValidatePVGroup(c, ns, pvols, claims)
+	deletePVCandValidatePVGroup(c, ns, pvols, claims, expectPhase)
 }
 
 // Creates a PV, PVC, and ClientPod that will run until killed by test or clean up.
@@ -218,7 +218,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 				numPVs, numPVCs := 2, 4
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
-				completeMultiTest(f, c, ns, pvols, claims)
+				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
 			})
 
 			// Create 3 PVs and 3 PVCs.
@@ -227,7 +227,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 				numPVs, numPVCs := 3, 3
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
-				completeMultiTest(f, c, ns, pvols, claims)
+				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
 			})
 
 			// Create 4 PVs and 2 PVCs.
@@ -236,7 +236,57 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 				numPVs, numPVCs := 4, 2
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
-				completeMultiTest(f, c, ns, pvols, claims)
+				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
+			})
+		})
+
+		// This Context isolates and tests the "Recycle" reclaim behavior.  On deprecation of the
+		// Recycler, this entire context can be removed without affecting the test suite or leaving behind
+		// dead code.
+		Context("when invoking the Recycle reclaim policy", func() {
+			var pv *v1.PersistentVolume
+			var pvc *v1.PersistentVolumeClaim
+
+			BeforeEach(func() {
+				pvConfig.reclaimPolicy = v1.PersistentVolumeReclaimRecycle
+				pv, pvc = createPVPVC(c, pvConfig, ns, false)
+				waitOnPVandPVC(c, ns, pv, pvc)
+			})
+
+			AfterEach(func() {
+				framework.Logf("AfterEach: Cleaning up test resources.")
+				pvPvcCleanup(c, ns, pv, pvc)
+			})
+
+			// This It() tests a scenario where a PV is written to by a Pod, recycled, then the volume checked
+			// for files. If files are found, the checking Pod fails, failing the test.  Otherwise, the pod
+			// (and test) succeed.
+			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume][Serial][Flaky]", func() {
+				By("Writing to the volume.")
+				pod := makeWritePod(ns, pvc.Name)
+				pod, err := c.Core().Pods(ns).Create(pod)
+				Expect(err).NotTo(HaveOccurred())
+				err = framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
+				Expect(err).NotTo(HaveOccurred())
+
+				deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable)
+
+				By("Re-mounting the volume.")
+				pvc = makePersistentVolumeClaim(ns)
+				pvc = createPVC(c, ns, pvc)
+				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second)
+				Expect(err).NotTo(HaveOccurred())
+
+				// If a file is detected in /mnt, fail the pod and do not restart it.
+				By("Verifying the mount has been cleaned.")
+				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
+				pod = makePod(ns, pvc.Name, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
+
+				pod, err = c.Core().Pods(ns).Create(pod)
+				Expect(err).NotTo(HaveOccurred())
+				err = framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
+				Expect(err).NotTo(HaveOccurred())
+				framework.Logf("Pod exited without failure; the volume has been recycled.")
 			})
 		})
 	})

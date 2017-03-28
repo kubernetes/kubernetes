@@ -191,7 +191,7 @@ test-e2e:
 	@echo "$$TEST_E2E_HELP_INFO"
 else
 test-e2e: ginkgo generated_files
-	go run hack/e2e.go -v --build --up --test --down
+	go run hack/e2e.go -- -v --build --up --test --down
 endif
 
 define TEST_E2E_NODE_HELP_INFO
@@ -500,7 +500,7 @@ endef
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
 bazel-test:
-	bazel test  //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all
+	bazel test --flaky_test_attempts=3 //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all
 endif
 
 ifeq ($(PRINT_HELP),y)

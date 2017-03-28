@@ -40,15 +40,17 @@ const tagOptional = "optional"
 
 // Known values for the tag.
 const (
-	tagValueTrue  = "true"
-	tagValueFalse = "false"
+	tagValueTrue       = "true"
+	tagValueFalse      = "false"
+	tagExtensionPrefix = "x-kubernetes-"
 )
 
+func getOpenAPITagValue(comments []string) []string {
+	return types.ExtractCommentTags("+", comments)[tagName]
+}
+
 func hasOpenAPITagValue(comments []string, value string) bool {
-	tagValues := types.ExtractCommentTags("+", comments)[tagName]
-	if tagValues == nil {
-		return false
-	}
+	tagValues := getOpenAPITagValue(comments)
 	for _, val := range tagValues {
 		if val == value {
 			return true
@@ -342,6 +344,33 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			}
 			g.Do("\"$.$\",", k)
 		}
+		g.Do("},\n", nil)
+		if err := g.generateExtensions(t.CommentLines); err != nil {
+			return err
+		}
+		g.Do("},\n", nil)
+	}
+	return nil
+}
+
+func (g openAPITypeWriter) generateExtensions(CommentLines []string) error {
+	tagValues := getOpenAPITagValue(CommentLines)
+	anyExtension := false
+	for _, val := range tagValues {
+		if strings.HasPrefix(val, tagExtensionPrefix) {
+			if !anyExtension {
+				g.Do("spec.VendorExtensible: {\nExtensions: spec.Extensions{\n", nil)
+				anyExtension = true
+			}
+			parts := strings.SplitN(val, ":", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("Invalid extension value: %v", val)
+			}
+			g.Do("\"$.$\": ", parts[0])
+			g.Do("\"$.$\",\n", parts[1])
+		}
+	}
+	if anyExtension {
 		g.Do("},\n},\n", nil)
 	}
 	return nil
@@ -396,6 +425,9 @@ func (g openAPITypeWriter) generateProperty(m *types.Member) error {
 		return nil
 	}
 	g.Do("\"$.$\": {\n", name)
+	if err := g.generateExtensions(m.CommentLines); err != nil {
+		return err
+	}
 	g.Do("SchemaProps: spec.SchemaProps{\n", nil)
 	g.generateDescription(m.CommentLines)
 	jsonTags := getJsonTags(m)

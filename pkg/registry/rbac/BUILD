@@ -33,6 +33,7 @@ filegroup(
         ":package-srcs",
         "//pkg/registry/rbac/clusterrole:all-srcs",
         "//pkg/registry/rbac/clusterrolebinding:all-srcs",
+        "//pkg/registry/rbac/reconciliation:all-srcs",
         "//pkg/registry/rbac/rest:all-srcs",
         "//pkg/registry/rbac/role:all-srcs",
         "//pkg/registry/rbac/rolebinding:all-srcs",

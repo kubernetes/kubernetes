@@ -255,7 +255,9 @@ func updateDeploymentOrFail(clientset *fedclientset.Clientset, namespace string)
 func deleteDeploymentOrFail(clientset *fedclientset.Clientset, nsName string, deploymentName string, orphanDependents *bool) {
 	By(fmt.Sprintf("Deleting deployment %q in namespace %q", deploymentName, nsName))
 	err := clientset.Extensions().Deployments(nsName).Delete(deploymentName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
-	framework.ExpectNoError(err, "Error deleting deployment %q in namespace %q", deploymentName, nsName)
+	if err != nil && !errors.IsNotFound(err) {
+		framework.ExpectNoError(err, "Error deleting deployment %q in namespace %q", deploymentName, nsName)
+	}
 
 	// Wait for the deployment to be deleted.
 	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
