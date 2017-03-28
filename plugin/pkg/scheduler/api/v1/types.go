@@ -20,6 +20,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 )
@@ -30,8 +31,8 @@ type Policy struct {
 	Predicates []PredicatePolicy `json:"predicates"`
 	// Holds the information to configure the priority functions
 	Priorities []PriorityPolicy `json:"priorities"`
-	// Holds the information to communicate with the extender(s)
-	ExtenderConfigs []ExtenderConfig `json:"extenders"`
+	// Holds the information to communicate with the extender
+	ExtenderConfig *ExtenderConfig `json:"extender"`
 }
 
 type PredicatePolicy struct {
@@ -118,6 +119,9 @@ type ExtenderConfig struct {
 	FilterVerb string `json:"filterVerb,omitempty"`
 	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
 	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
+	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver.
+	BindVerb string `json:"bindVerb,omitempty"`
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
 	Weight int `json:"weight,omitempty"`
@@ -160,6 +164,24 @@ type ExtenderFilterResult struct {
 	NodeNames *[]string `json:"nodenames,omitempty"`
 	// Filtered out nodes where the pod can't be scheduled and the failure messages
 	FailedNodes FailedNodesMap `json:"failedNodes,omitempty"`
+	// Error message indicating failure
+	Error string `json:"error,omitempty"`
+}
+
+// Binding represents the binding of a pod to a node.
+type Binding struct {
+	// PodName is the name of the pod being bound
+	PodName string `json:"podName"`
+	// PodNamespace is the namespace of the pod being bound
+	PodNamespace string `json:"podNamespace"`
+	// PodUID is the UID of the pod being bound
+	PodUID types.UID `json:"podUID"`
+	// Node selected by the scheduler
+	Node string `json:"node"`
+}
+
+// BindingResult represents the result of binding of a pod to a node.
+type BindingResult struct {
 	// Error message indicating failure
 	Error string `json:"error,omitempty"`
 }
