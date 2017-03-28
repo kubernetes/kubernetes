@@ -59,6 +59,7 @@ go_library(
         "pd.go",
         "persistent_volumes.go",
         "persistent_volumes-disruptive.go",
+        "persistent_volumes-gce.go",
         "persistent_volumes-vsphere.go",
         "pod_gc.go",
         "podpreset.go",

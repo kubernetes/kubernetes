@@ -192,16 +192,16 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 	pod := framework.MakePod(ns, pvc.Name, true, "")
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating nfs client Pod %s on node %s", pod.Name, nodeName)
-	pod, err := c.Core().Pods(ns).Create(pod)
+	pod, err := c.CoreV1().Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
 	err = framework.WaitForPodRunningInNamespace(c, pod)
 	Expect(err).NotTo(HaveOccurred())
 
-	pod, err = c.Core().Pods(ns).Get(pod.Name, metav1.GetOptions{})
+	pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
-	pvc, err = c.Core().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
+	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
-	pv, err = c.Core().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+	pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	return pod, pv, pvc
 }
