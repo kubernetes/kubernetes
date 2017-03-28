@@ -17,45 +17,8 @@ limitations under the License.
 package endpoints
 
 import (
-	"bytes"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api"
-
-	"github.com/emicklei/go-restful"
 )
-
-func TestScopeNamingGenerateLink(t *testing.T) {
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/api/v1/namespaces/other/services/foo",
-		name:        "foo",
-		namespace:   "other",
-	}
-	s := scopeNaming{
-		meta.RESTScopeNamespace,
-		selfLinker,
-		func(name, namespace string) bytes.Buffer {
-			return *bytes.NewBufferString("/api/v1/namespaces/" + namespace + "/services/" + name)
-		},
-		true,
-	}
-	service := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: "other",
-		},
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Service",
-		},
-	}
-	_, err := s.GenerateLink(&restful.Request{}, service)
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
-	}
-}
 
 func TestIsVowel(t *testing.T) {
 	tests := []struct {
