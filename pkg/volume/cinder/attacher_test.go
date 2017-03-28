@@ -565,6 +565,10 @@ func (instances *instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress
 	return []v1.NodeAddress{}, errors.New("Not implemented")
 }
 
+func (instances *instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	return []v1.NodeAddress{}, errors.New("Not implemented")
+}
+
 func (instances *instances) ExternalID(name types.NodeName) (string, error) {
 	return "", errors.New("Not implemented")
 }
@@ -574,6 +578,10 @@ func (instances *instances) InstanceID(name types.NodeName) (string, error) {
 }
 
 func (instances *instances) InstanceType(name types.NodeName) (string, error) {
+	return "", errors.New("Not implemented")
+}
+
+func (instances *instances) InstanceTypeByProviderID(providerID string) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
