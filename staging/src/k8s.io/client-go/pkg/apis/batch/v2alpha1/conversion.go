@@ -19,22 +19,11 @@ package v2alpha1
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/batch"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions
-	err := scheme.AddConversionFuncs(
-		Convert_batch_JobSpec_To_v2alpha1_JobSpec,
-		Convert_v2alpha1_JobSpec_To_batch_JobSpec,
-	)
-	if err != nil {
-		return err
-	}
-
+	var err error
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
 	for _, k := range []string{"Job", "JobTemplate", "CronJob"} {
 		kind := k // don't close over range variables
@@ -50,42 +39,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		if err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func Convert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	out.Parallelism = in.Parallelism
-	out.Completions = in.Completions
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	out.Selector = in.Selector
-	if in.ManualSelector != nil {
-		out.ManualSelector = new(bool)
-		*out.ManualSelector = *in.ManualSelector
-	} else {
-		out.ManualSelector = nil
-	}
-
-	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v2alpha1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	out.Parallelism = in.Parallelism
-	out.Completions = in.Completions
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	out.Selector = in.Selector
-	if in.ManualSelector != nil {
-		out.ManualSelector = new(bool)
-		*out.ManualSelector = *in.ManualSelector
-	} else {
-		out.ManualSelector = nil
-	}
-
-	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
 	}
 	return nil
 }

@@ -28,6 +28,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/batch/v1:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/ugorji/go/codec",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
@@ -47,10 +48,8 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/apis/batch/install:go_default_library",
         "//pkg/apis/batch/v2alpha1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )

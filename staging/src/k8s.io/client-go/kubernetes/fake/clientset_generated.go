@@ -52,6 +52,10 @@ import (
 	fakerbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	fakerbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1/fake"
+	settingsv1alpha1 "k8s.io/client-go/kubernetes/typed/settings/v1alpha1"
+	fakesettingsv1alpha1 "k8s.io/client-go/kubernetes/typed/settings/v1alpha1/fake"
+	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
+	fakestoragev1 "k8s.io/client-go/kubernetes/typed/storage/v1/fake"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 	fakestoragev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1/fake"
 	"k8s.io/client-go/testing"
@@ -215,12 +219,27 @@ func (c *Clientset) RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface {
 	return &fakerbacv1alpha1.FakeRbacV1alpha1{Fake: &c.Fake}
 }
 
+// SettingsV1alpha1 retrieves the SettingsV1alpha1Client
+func (c *Clientset) SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface {
+	return &fakesettingsv1alpha1.FakeSettingsV1alpha1{Fake: &c.Fake}
+}
+
+// Settings retrieves the SettingsV1alpha1Client
+func (c *Clientset) Settings() settingsv1alpha1.SettingsV1alpha1Interface {
+	return &fakesettingsv1alpha1.FakeSettingsV1alpha1{Fake: &c.Fake}
+}
+
 // StorageV1beta1 retrieves the StorageV1beta1Client
 func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
 	return &fakestoragev1beta1.FakeStorageV1beta1{Fake: &c.Fake}
 }
 
-// Storage retrieves the StorageV1beta1Client
-func (c *Clientset) Storage() storagev1beta1.StorageV1beta1Interface {
-	return &fakestoragev1beta1.FakeStorageV1beta1{Fake: &c.Fake}
+// StorageV1 retrieves the StorageV1Client
+func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
+	return &fakestoragev1.FakeStorageV1{Fake: &c.Fake}
+}
+
+// Storage retrieves the StorageV1Client
+func (c *Clientset) Storage() storagev1.StorageV1Interface {
+	return &fakestoragev1.FakeStorageV1{Fake: &c.Fake}
 }

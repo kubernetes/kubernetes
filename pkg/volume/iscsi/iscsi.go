@@ -86,6 +86,10 @@ func (plugin *iscsiPlugin) SupportsMountOption() bool {
 	return true
 }
 
+func (plugin *iscsiPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

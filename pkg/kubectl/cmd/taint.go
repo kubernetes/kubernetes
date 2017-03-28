@@ -61,7 +61,7 @@ var (
 		* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
 		* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
 		* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.
-		* The effect must be NoSchedule or PreferNoSchedule.
+		* The effect must be NoSchedule, PreferNoSchedule or NoExecute.
 		* Currently taint can only apply to node.`)
 
 	taint_example = templates.Examples(`
@@ -226,7 +226,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	}
 
 	mapper, typer := f.Object()
-	o.builder = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	o.builder = resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace()
 	if o.all {

@@ -62,7 +62,7 @@ HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
-
+STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 # enable swagger ui
 ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
 
@@ -71,6 +71,9 @@ ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
 ENABLE_RBAC=${ENABLE_RBAC:-false}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
+
+# Install a default storage class (enabled by default)
+DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
 
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
@@ -149,7 +152,7 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube vendor/k8s.io/kube-aggregator"
+    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
 else
     echo "skipped the build."
 fi
@@ -450,6 +453,7 @@ function start_apiserver {
       --tls-ca-file="${CERT_DIR}/server-ca.crt" \
       --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
+      --storage-backend=${STORAGE_BACKEND} \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --feature-gates="${FEATURE_GATES}" \
@@ -460,6 +464,8 @@ function start_apiserver {
       --requestheader-extra-headers-prefix=X-Remote-Extra- \
       --requestheader-client-ca-file="${CERT_DIR}/request-header-ca.crt" \
       --requestheader-allowed-names=system:auth-proxy \
+      --proxy-client-cert-file="${CERT_DIR}/client-auth-proxy.crt" \
+      --proxy-client-key-file="${CERT_DIR}/client-auth-proxy.key" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
@@ -493,8 +499,6 @@ function start_apiserver {
         fi
     fi
 
-    # create the kube-public namespace for the aggregator
-    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create namespace kube-public
     ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
     ${CONTROLPLANE_SUDO} chown $(whoami) "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
     ${KUBECTL} config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-kube-aggregator.kubeconfig" --server="https://${API_HOST_IP}:31090"
@@ -576,7 +580,6 @@ function start_kubelet {
       if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
         image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
       fi
-
       pod_infra_container_image_args=""
       if [[ -n "${POD_INFRA_CONTAINER_IMAGE}" ]]; then
         pod_infra_container_image_args="--pod-infra-container-image=${POD_INFRA_CONTAINER_IMAGE}"
@@ -613,7 +616,7 @@ function start_kubelet {
         ${image_service_endpoint_args} \
         ${pod_infra_container_image_args} \
         --port="$KUBELET_PORT" \
-	${KUBELET_FLAGS} >"${KUBELET_LOG}" 2>&1 &
+        ${KUBELET_FLAGS} >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
       # Quick check that kubelet is running.
       if ps -p $KUBELET_PID > /dev/null ; then 
@@ -700,6 +703,7 @@ function start_kubedns {
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
         # use kubectl to create kubedns deployment and service
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f ${KUBE_ROOT}/cluster/addons/dns/kubedns-sa.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f ${KUBE_ROOT}/cluster/addons/dns/kubedns-cm.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
         echo "Kube-dns deployment and service successfully deployed."
@@ -712,6 +716,21 @@ function create_psp_policy {
     ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/policies.yaml
     ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/roles.yaml
     ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/bindings.yaml
+}
+
+function create_storage_class {
+    if [ -z "$CLOUD_PROVIDER" ]; then
+        # No cloud provider -> no default storage class
+        return
+    fi
+
+    CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/${CLOUD_PROVIDER}/default.yaml
+    if [ -e $CLASS_FILE ]; then
+        echo "Create default storage class for $CLOUD_PROVIDER"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f $CLASS_FILE
+    else
+        echo "No storage class available for $CLOUD_PROVIDER."
+    fi
 }
 
 function print_success {
@@ -821,6 +840,10 @@ fi
 
 if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
   create_psp_policy
+fi
+
+if [[ "$DEFAULT_STORAGE_CLASS" = "true" ]]; then
+  create_storage_class
 fi
 
 print_success

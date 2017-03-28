@@ -17,15 +17,15 @@ limitations under the License.
 package e2e
 
 import (
-	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/integer"
 	"k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -33,13 +33,18 @@ import (
 
 const (
 	// Duration of delay between any two attempts to check if all logs are ingested
-	ingestionRetryDelay = 10 * time.Second
+	ingestionRetryDelay = 100 * time.Second
 
 	// Amount of requested cores for logging container in millicores
 	loggingContainerCpuRequest = 10
 
 	// Amount of requested memory for logging container in bytes
 	loggingContainerMemoryRequest = 10 * 1024 * 1024
+)
+
+var (
+	// Regexp, matching the contents of log entries, parsed or not
+	logEntryMessageRegex = regexp.MustCompile("(?:I\\d+ \\d+:\\d+:\\d+.\\d+       \\d+ logs_generator.go:67] )?(\\d+) .*")
 )
 
 // Type to track the progress of logs generating pod
@@ -63,19 +68,32 @@ type logEntry struct {
 }
 
 type logsProvider interface {
+	FluentdApplicationName() string
 	EnsureWorking() error
 	ReadEntries(*loggingPod) []*logEntry
 }
 
+type loggingTestConfig struct {
+	LogsProvider              logsProvider
+	Pods                      []*loggingPod
+	IngestionTimeout          time.Duration
+	MaxAllowedLostFraction    float64
+	MaxAllowedFluentdRestarts int
+}
+
 func (entry *logEntry) getLogEntryNumber() (int, bool) {
-	chunks := strings.Split(entry.Payload, " ")
-	lineNumber, err := strconv.Atoi(strings.TrimSpace(chunks[0]))
+	submatch := logEntryMessageRegex.FindStringSubmatch(entry.Payload)
+	if submatch == nil || len(submatch) < 2 {
+		return 0, false
+	}
+
+	lineNumber, err := strconv.Atoi(submatch[1])
 	return lineNumber, err == nil
 }
 
-func createLoggingPod(f *framework.Framework, podName string, totalLines int, loggingDuration time.Duration) *loggingPod {
+func createLoggingPod(f *framework.Framework, podName string, nodeName string, totalLines int, loggingDuration time.Duration) *loggingPod {
 	framework.Logf("Starting pod %s", podName)
-	createLogsGeneratorPod(f, podName, totalLines, loggingDuration)
+	createLogsGeneratorPod(f, podName, nodeName, totalLines, loggingDuration)
 
 	return &loggingPod{
 		Name: podName,
@@ -86,7 +104,7 @@ func createLoggingPod(f *framework.Framework, podName string, totalLines int, lo
 	}
 }
 
-func createLogsGeneratorPod(f *framework.Framework, podName string, linesCount int, duration time.Duration) {
+func createLogsGeneratorPod(f *framework.Framework, podName string, nodeName string, linesCount int, duration time.Duration) {
 	f.PodClient().Create(&api_v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: podName,
@@ -119,31 +137,66 @@ func createLogsGeneratorPod(f *framework.Framework, podName string, linesCount i
 					},
 				},
 			},
+			NodeName: nodeName,
 		},
 	})
 }
 
-func waitForLogsIngestion(logsProvider logsProvider, pods []*loggingPod, ingestionTimeout time.Duration, maxAllowedLostFraction float64) error {
+func waitForSomeLogs(f *framework.Framework, config *loggingTestConfig) error {
+	podHasIngestedLogs := make([]bool, len(config.Pods))
+	podWithIngestedLogsCount := 0
+
+	for start := time.Now(); podWithIngestedLogsCount < len(config.Pods) && time.Since(start) < config.IngestionTimeout; time.Sleep(ingestionRetryDelay) {
+		for podIdx, pod := range config.Pods {
+			if podHasIngestedLogs[podIdx] {
+				continue
+			}
+
+			entries := config.LogsProvider.ReadEntries(pod)
+			if len(entries) == 0 {
+				framework.Logf("No log entries from pod %s", pod.Name)
+				continue
+			}
+
+			for _, entry := range entries {
+				if _, ok := entry.getLogEntryNumber(); ok {
+					framework.Logf("Found some log entries from pod %s", pod.Name)
+					podHasIngestedLogs[podIdx] = true
+					podWithIngestedLogsCount++
+					break
+				}
+			}
+		}
+	}
+
+	if podWithIngestedLogsCount < len(config.Pods) {
+		return fmt.Errorf("some logs were ingested for %d pods out of %d", podWithIngestedLogsCount, len(config.Pods))
+	}
+
+	return nil
+}
+
+func waitForFullLogsIngestion(f *framework.Framework, config *loggingTestConfig) error {
 	expectedLinesNumber := 0
-	for _, pod := range pods {
+	for _, pod := range config.Pods {
 		expectedLinesNumber += pod.ExpectedLinesNumber
 	}
 
 	totalMissing := expectedLinesNumber
 
-	missingByPod := make([]int, len(pods))
-	for podIdx, pod := range pods {
+	missingByPod := make([]int, len(config.Pods))
+	for podIdx, pod := range config.Pods {
 		missingByPod[podIdx] = pod.ExpectedLinesNumber
 	}
 
-	for start := time.Now(); totalMissing > 0 && time.Since(start) < ingestionTimeout; time.Sleep(ingestionRetryDelay) {
+	for start := time.Now(); totalMissing > 0 && time.Since(start) < config.IngestionTimeout; time.Sleep(ingestionRetryDelay) {
 		missing := 0
-		for podIdx, pod := range pods {
+		for podIdx, pod := range config.Pods {
 			if missingByPod[podIdx] == 0 {
 				continue
 			}
 
-			missingByPod[podIdx] = pullMissingLogsCount(logsProvider, pod)
+			missingByPod[podIdx] = pullMissingLogsCount(config.LogsProvider, pod)
 			missing += missingByPod[podIdx]
 		}
 
@@ -156,13 +209,32 @@ func waitForLogsIngestion(logsProvider logsProvider, pods []*loggingPod, ingesti
 	lostFraction := float64(totalMissing) / float64(expectedLinesNumber)
 
 	if totalMissing > 0 {
-		framework.Logf("After %v still missing %d lines, %.2f%% of total number oflines",
-			ingestionTimeout, totalMissing, lostFraction*100)
+		framework.Logf("After %v still missing %d lines, %.2f%% of total number of lines",
+			config.IngestionTimeout, totalMissing, lostFraction*100)
 	}
 
-	if lostFraction > maxAllowedLostFraction {
+	if lostFraction > config.MaxAllowedLostFraction {
 		return fmt.Errorf("lost %.2f%% of lines, but only loss of %.2f%% can be tolerated",
-			lostFraction*100, maxAllowedLostFraction*100)
+			lostFraction*100, config.MaxAllowedLostFraction*100)
+	}
+
+	fluentdPods, err := getFluentdPods(f, config.LogsProvider.FluentdApplicationName())
+	if err != nil {
+		return fmt.Errorf("failed to get fluentd pods due to %v", err)
+	}
+
+	maxRestartCount := 0
+	for _, fluentdPod := range fluentdPods.Items {
+		restartCount := int(fluentdPod.Status.ContainerStatuses[0].RestartCount)
+		maxRestartCount = integer.IntMax(maxRestartCount, restartCount)
+
+		framework.Logf("Fluentd pod %s on node %s was restarted %d times",
+			fluentdPod.Name, fluentdPod.Spec.NodeName, restartCount)
+	}
+
+	if maxRestartCount > config.MaxAllowedFluentdRestarts {
+		return fmt.Errorf("max fluentd pod restarts was %d, which is more than allowed %d",
+			maxRestartCount, config.MaxAllowedFluentdRestarts)
 	}
 
 	return nil
@@ -183,6 +255,8 @@ func pullMissingLogsCount(logsProvider logsProvider, pod *loggingPod) int {
 
 func getMissingLinesCount(logsProvider logsProvider, pod *loggingPod) (int, error) {
 	entries := logsProvider.ReadEntries(pod)
+
+	framework.Logf("Got %d entries from provider", len(entries))
 
 	for _, entry := range entries {
 		lineNumber, ok := entry.getLogEntryNumber()
@@ -211,32 +285,33 @@ func getMissingLinesCount(logsProvider logsProvider, pod *loggingPod) (int, erro
 	return pod.ExpectedLinesNumber - len(pod.Occurrences), nil
 }
 
-func reportLogsFromFluentdPod(f *framework.Framework, pod *loggingPod) error {
-	synthLoggerPod, err := f.PodClient().Get(pod.Name, meta_v1.GetOptions{})
+func ensureSingleFluentdOnEachNode(f *framework.Framework, fluentdApplicationName string) error {
+	fluentdPodList, err := getFluentdPods(f, fluentdApplicationName)
 	if err != nil {
-		return fmt.Errorf("failed to get synth logger pod due to %v", err)
+		return err
 	}
 
-	synthLoggerNodeName := synthLoggerPod.Spec.NodeName
-	if synthLoggerNodeName == "" {
-		return errors.New("Synthlogger pod is not assigned to the node")
+	fluentdPodsPerNode := make(map[string]int)
+	for _, fluentdPod := range fluentdPodList.Items {
+		fluentdPodsPerNode[fluentdPod.Spec.NodeName]++
 	}
 
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "fluentd-logging"}))
-	options := meta_v1.ListOptions{LabelSelector: label.String()}
-	fluentdPods, err := f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	for _, node := range nodeList.Items {
+		fluentdPodCount, ok := fluentdPodsPerNode[node.Name]
 
-	for _, fluentdPod := range fluentdPods.Items {
-		if fluentdPod.Spec.NodeName == synthLoggerNodeName {
-			containerName := fluentdPod.Spec.Containers[0].Name
-			logs, err := framework.GetPodLogs(f.ClientSet, meta_v1.NamespaceSystem, fluentdPod.Name, containerName)
-			if err != nil {
-				return fmt.Errorf("failed to get logs from fluentd pod %s due to %v", fluentdPod.Name, err)
-			}
-			framework.Logf("Logs from fluentd pod %s:\n%s", fluentdPod.Name, logs)
-			return nil
+		if !ok {
+			return fmt.Errorf("node %s doesn't have fluentd instance", node.Name)
+		} else if fluentdPodCount != 1 {
+			return fmt.Errorf("node %s contains %d fluentd instaces, expected exactly one", node.Name, fluentdPodCount)
 		}
 	}
 
-	return fmt.Errorf("failed to find fluentd pod running on node %s", synthLoggerNodeName)
+	return nil
+}
+
+func getFluentdPods(f *framework.Framework, fluentdApplicationName string) (*api_v1.PodList, error) {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": fluentdApplicationName}))
+	options := meta_v1.ListOptions{LabelSelector: label.String()}
+	return f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
 }

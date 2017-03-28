@@ -12,6 +12,7 @@ package photon
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/vmware/photon-controller-go-sdk/photon/lightwave"
 )
 
@@ -20,11 +21,11 @@ type AuthAPI struct {
 	client *Client
 }
 
-const authUrl string = "/auth"
+const authUrl string = rootUrl + "/auth"
 
 // Gets authentication info.
 func (api *AuthAPI) Get() (info *AuthInfo, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+authUrl, "")
+	res, err := api.client.restClient.Get(api.client.Endpoint+authUrl, nil)
 	if err != nil {
 		return
 	}
@@ -53,6 +54,22 @@ func (api *AuthAPI) GetTokensByPassword(username string, password string) (token
 	return api.toTokenOptions(tokenResponse), nil
 }
 
+// GetTokensFromWindowsLogInContext gets tokens based on Windows logged in context
+// In case of running on platform other than Windows, it returns error
+func (api *AuthAPI) GetTokensFromWindowsLogInContext() (tokenOptions *TokenOptions, err error) {
+	oidcClient, err := api.buildOIDCClient()
+	if err != nil {
+		return
+	}
+
+	tokenResponse, err := oidcClient.GetTokensFromWindowsLogInContext()
+	if err != nil {
+		return
+	}
+
+	return api.toTokenOptions(tokenResponse), nil
+}
+
 // Gets tokens from refresh token.
 func (api *AuthAPI) GetTokensByRefreshToken(refreshtoken string) (tokenOptions *TokenOptions, err error) {
 	oidcClient, err := api.buildOIDCClient()
@@ -74,10 +91,6 @@ func (api *AuthAPI) getAuthEndpoint() (endpoint string, err error) {
 		return
 	}
 
-	if !authInfo.Enabled {
-		return "", SdkError{Message: "Authentication not enabled on this endpoint"}
-	}
-
 	if authInfo.Port == 0 {
 		authInfo.Port = 443
 	}
@@ -97,7 +110,7 @@ func (api *AuthAPI) buildOIDCClient() (client *lightwave.OIDCClient, err error) 
 		api.client.restClient.logger), nil
 }
 
-const tokenScope string = "openid offline_access rs_esxcloud at_groups"
+const tokenScope string = "openid offline_access rs_photon_platform at_groups"
 
 func (api *AuthAPI) buildOIDCClientOptions(options *ClientOptions) *lightwave.OIDCClientOptions {
 	return &lightwave.OIDCClientOptions{

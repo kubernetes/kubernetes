@@ -28,6 +28,7 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -285,6 +286,24 @@ func TestPatch(t *testing.T) {
 		} else {
 			t.Logf("%v", string(jsonObj))
 		}
+
+		obj, err := result.Get()
+		if err != nil {
+			t.Fatal(err)
+		}
+		metadata, err := meta.Accessor(obj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// this call waits for the resourceVersion to be reached in the cache before returning.  We need to do this because
+		// the patch gets its initial object from the storage, and the cache serves that.  If it is out of date,
+		// then our initial patch is applied to an old resource version, which conflicts and then the updated object shows
+		// a conflicting diff, which permanently fails the patch.  This gives expected stability in the patch without
+		// retrying on an known number of conflicts below in the test.
+		if _, err := c.Core().Pods(ns.Name).Get(name, metav1.GetOptions{ResourceVersion: metadata.GetResourceVersion()}); err != nil {
+			t.Fatal(err)
+		}
+
 		return nil
 	}
 

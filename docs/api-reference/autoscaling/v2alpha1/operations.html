@@ -442,12 +442,1984 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 </div>
+<div class="sect2">
+<h3 id="_list_or_watch_objects_of_kind_horizontalpodautoscaler">list or watch objects of kind HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/autoscaling/v2alpha1/horizontalpodautoscalers</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_2">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscalerlist">v2alpha1.HorizontalPodAutoscalerList</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_2">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_2">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_2">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_list_or_watch_objects_of_kind_horizontalpodautoscaler_2">list or watch objects of kind HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_2">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_3">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscalerlist">v2alpha1.HorizontalPodAutoscalerList</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_3">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_3">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_3">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_delete_collection_of_horizontalpodautoscaler">delete collection of HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>DELETE /apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_3">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_4">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_status">v1.Status</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_4">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_4">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_4">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_create_a_horizontalpodautoscaler">create a HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>POST /apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_4">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_5">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_5">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_5">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_5">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_read_the_specified_horizontalpodautoscaler">read the specified HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_5">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">export</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Should this value be exported.  Export strips fields that a user can not specify.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">exact</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Should the export be exact.  Exact export maintains cluster-specific fields like <em>Namespace</em>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the HorizontalPodAutoscaler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_6">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_6">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_6">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_6">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_replace_the_specified_horizontalpodautoscaler">replace the specified HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PUT /apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_6">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the HorizontalPodAutoscaler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_7">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_7">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_7">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_7">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_delete_a_horizontalpodautoscaler">delete a HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>DELETE /apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_7">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_deleteoptions">v1.DeleteOptions</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">gracePeriodSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">orphanDependents</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the "orphan" finalizer will be added to/removed from the object&#8217;s finalizers list. Either this field or PropagationPolicy may be set, but not both.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">propagationPolicy</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the HorizontalPodAutoscaler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_8">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_status">v1.Status</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_8">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_8">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_8">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_partially_update_the_specified_horizontalpodautoscaler">partially update the specified HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PATCH /apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_8">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_patch">v1.Patch</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the HorizontalPodAutoscaler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_9">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_9">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json-patch+json</p>
+</li>
+<li>
+<p>application/merge-patch+json</p>
+</li>
+<li>
+<p>application/strategic-merge-patch+json</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_9">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_9">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_read_status_of_the_specified_horizontalpodautoscaler">read status of the specified HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_9">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the HorizontalPodAutoscaler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_10">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_10">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_10">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_10">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_replace_status_of_the_specified_horizontalpodautoscaler">replace status of the specified HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PUT /apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_10">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the HorizontalPodAutoscaler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_11">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_11">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_11">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_11">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_partially_update_status_of_the_specified_horizontalpodautoscaler">partially update status of the specified HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>PATCH /apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_11">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">BodyParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_patch">v1.Patch</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the HorizontalPodAutoscaler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_12">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v2alpha1_horizontalpodautoscaler">v2alpha1.HorizontalPodAutoscaler</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_12">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json-patch+json</p>
+</li>
+<li>
+<p>application/merge-patch+json</p>
+</li>
+<li>
+<p>application/strategic-merge-patch+json</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_12">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_12">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_watch_individual_changes_to_a_list_of_horizontalpodautoscaler">watch individual changes to a list of HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/autoscaling/v2alpha1/watch/horizontalpodautoscalers</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_12">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_13">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_watchevent">v1.WatchEvent</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_13">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_13">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_13">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_watch_individual_changes_to_a_list_of_horizontalpodautoscaler_2">watch individual changes to a list of HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/autoscaling/v2alpha1/watch/namespaces/{namespace}/horizontalpodautoscalers</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_13">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_14">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_watchevent">v1.WatchEvent</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_14">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_14">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_14">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_watch_changes_to_an_object_of_kind_horizontalpodautoscaler">watch changes to an object of kind HorizontalPodAutoscaler</h3>
+<div class="listingblock">
+<div class="content">
+<pre>GET /apis/autoscaling/v2alpha1/watch/namespaces/{namespace}/horizontalpodautoscalers/{name}</pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_parameters_14">Parameters</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;">
+<col style="width:16%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pretty</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If <em>true</em>, then the output is pretty printed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">labelSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their labels. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldSelector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A selector to restrict the list of returned objects by their fields. Defaults to everything.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">watch</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#8217;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QueryParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeoutSeconds</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Timeout for the list/watch call.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object name and auth scope, such as for teams and projects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the HorizontalPodAutoscaler</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_responses_15">Responses</h4>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:33%;">
+<col style="width:33%;">
+<col style="width:33%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1_watchevent">v1.WatchEvent</a></p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect3">
+<h4 id="_consumes_15">Consumes</h4>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>/</strong></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_produces_15">Produces</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>application/json</p>
+</li>
+<li>
+<p>application/yaml</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_tags_15">Tags</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>apisautoscalingv2alpha1</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
 </div>
 </div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-02-01 19:27:06 UTC
+Last updated 2017-03-17 18:31:59 UTC
 </div>
 </div>
 </body>

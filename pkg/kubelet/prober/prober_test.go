@@ -30,6 +30,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
+	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 )
 
 func TestFormatURL(t *testing.T) {
@@ -197,10 +198,6 @@ func TestHTTPHeaders(t *testing.T) {
 }
 
 func TestProbe(t *testing.T) {
-	prober := &prober{
-		refManager: kubecontainer.NewRefManager(),
-		recorder:   &record.FakeRecorder{},
-	}
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
 
 	execProbe := &v1.Probe{
@@ -210,10 +207,12 @@ func TestProbe(t *testing.T) {
 	}
 	tests := []struct {
 		probe          *v1.Probe
+		env            []v1.EnvVar
 		execError      bool
 		expectError    bool
 		execResult     probe.Result
 		expectedResult results.Result
+		expectCommand  []string
 	}{
 		{ // No probe
 			probe:          nil,
@@ -246,12 +245,43 @@ func TestProbe(t *testing.T) {
 			execResult:     probe.Unknown,
 			expectedResult: results.Failure,
 		},
+		{ // Probe arguments are passed through
+			probe: &v1.Probe{
+				Handler: v1.Handler{
+					Exec: &v1.ExecAction{
+						Command: []string{"/bin/bash", "-c", "some script"},
+					},
+				},
+			},
+			expectCommand:  []string{"/bin/bash", "-c", "some script"},
+			execResult:     probe.Success,
+			expectedResult: results.Success,
+		},
+		{ // Probe arguments are passed through
+			probe: &v1.Probe{
+				Handler: v1.Handler{
+					Exec: &v1.ExecAction{
+						Command: []string{"/bin/bash", "-c", "some $(A) $(B)"},
+					},
+				},
+			},
+			env: []v1.EnvVar{
+				{Name: "A", Value: "script"},
+			},
+			expectCommand:  []string{"/bin/bash", "-c", "some script $(B)"},
+			execResult:     probe.Success,
+			expectedResult: results.Success,
+		},
 	}
 
 	for i, test := range tests {
 		for _, probeType := range [...]probeType{liveness, readiness} {
+			prober := &prober{
+				refManager: kubecontainer.NewRefManager(),
+				recorder:   &record.FakeRecorder{},
+			}
 			testID := fmt.Sprintf("%d-%s", i, probeType)
-			testContainer := v1.Container{}
+			testContainer := v1.Container{Env: test.env}
 			switch probeType {
 			case liveness:
 				testContainer.LivenessProbe = test.probe
@@ -273,6 +303,19 @@ func TestProbe(t *testing.T) {
 			}
 			if test.expectedResult != result {
 				t.Errorf("[%s] Expected result to be %v but was %v", testID, test.expectedResult, result)
+			}
+
+			if len(test.expectCommand) > 0 {
+				prober.exec = execprobe.New()
+				prober.runner = &containertest.FakeContainerCommandRunner{}
+				_, err := prober.probe(probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+				if err != nil {
+					t.Errorf("[%s] Didn't expect probe error but got: %v", testID, err)
+					continue
+				}
+				if !reflect.DeepEqual(test.expectCommand, prober.runner.(*containertest.FakeContainerCommandRunner).Cmd) {
+					t.Errorf("[%s] unexpected probe arguments: %v", testID, prober.runner.(*containertest.FakeContainerCommandRunner).Cmd)
+				}
 			}
 		}
 	}

@@ -83,6 +83,10 @@ func (plugin *photonPersistentDiskPlugin) SupportsMountOption() bool {
 	return true
 }
 
+func (plugin *photonPersistentDiskPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *photonPersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod.UID, &PhotonDiskUtil{}, plugin.host.GetMounter())
 }

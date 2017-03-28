@@ -327,10 +327,13 @@ type VolumeSource struct {
 	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,23,opt,name=photonPersistentDisk"`
 	// Items for all in one resources secrets, configmaps, and downward API
-	Projected *ProjectedVolumeSource `json:"projected,omitempty"`
+	Projected *ProjectedVolumeSource `json:"projected,omitempty" protobuf:"bytes,26,opt,name=projected"`
 	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
 	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty" protobuf:"bytes,24,opt,name=portworxVolume"`
+	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// +optional
+	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,25,opt,name=scaleIO"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -419,7 +422,21 @@ type PersistentVolumeSource struct {
 	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
 	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty" protobuf:"bytes,18,opt,name=portworxVolume"`
+	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// +optional
+	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,19,opt,name=scaleIO"`
 }
+
+const (
+	// AlphaStorageClassAnnotation represents the previous alpha storage class
+	// annotation.  It's currently still used and will be held for backwards
+	// compatibility
+	AlphaStorageClassAnnotation = "volume.alpha.kubernetes.io/storage-class"
+
+	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
+	// It's currently still used and will be held for backwards compatibility
+	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
+)
 
 // +genclient=true
 // +nonNamespaced=true
@@ -475,7 +492,7 @@ type PersistentVolumeSpec struct {
 	// Name of StorageClass to which this persistent volume belongs. Empty value
 	// means that this volume does not belong to any StorageClass.
 	// +optional
-	StorageClassName string `json:"storageClassName,omitempty"`
+	StorageClassName string `json:"storageClassName,omitempty" protobuf:"bytes,6,opt,name=storageClassName"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
@@ -574,7 +591,7 @@ type PersistentVolumeClaimSpec struct {
 	// Name of the StorageClass required by the claim.
 	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
 	// +optional
-	StorageClassName *string `json:"storageClassName,omitempty"`
+	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -1127,6 +1144,41 @@ type PortworxVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
+// ScaleIOVolumeSource represents a persistent ScaleIO volume
+type ScaleIOVolumeSource struct {
+	// The host address of the ScaleIO API Gateway.
+	Gateway string `json:"gateway" protobuf:"bytes,1,opt,name=gateway"`
+	// The name of the storage system as configured in ScaleIO.
+	System string `json:"system" protobuf:"bytes,2,opt,name=system"`
+	// SecretRef references to the secret for ScaleIO user and other
+	// sensitive information. If this is not provided, Login operation will fail.
+	SecretRef *LocalObjectReference `json:"secretRef" protobuf:"bytes,3,opt,name=secretRef"`
+	// Flag to enable/disable SSL communication with Gateway, default false
+	// +optional
+	SSLEnabled bool `json:"sslEnabled,omitempty" protobuf:"varint,4,opt,name=sslEnabled"`
+	// The name of the Protection Domain for the configured storage (defaults to "default").
+	// +optional
+	ProtectionDomain string `json:"protectionDomain,omitempty" protobuf:"bytes,5,opt,name=protectionDomain"`
+	// The Storage Pool associated with the protection domain (defaults to "default").
+	// +optional
+	StoragePool string `json:"storagePool,omitempty" protobuf:"bytes,6,opt,name=storagePool"`
+	// Indicates whether the storage for a volume should be thick or thin (defaults to "thin").
+	// +optional
+	StorageMode string `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
+	// The name of a volume already created in the ScaleIO system
+	// that is associated with this volume source.
+	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,8,opt,name=volumeName"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,9,opt,name=fsType"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,10,opt,name=readOnly"`
+}
+
 // Adapts a ConfigMap into a volume.
 //
 // The contents of the target ConfigMap's Data field will be presented in a
@@ -1186,14 +1238,14 @@ type ConfigMapProjection struct {
 // Represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
-	Sources []VolumeProjection `json:"sources"`
+	Sources []VolumeProjection `json:"sources" protobuf:"bytes,1,rep,name=sources"`
 	// Mode bits to use on created files by default. Must be a value between
 	// 0 and 0777.
 	// Directories within the path are not affected by this setting.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
-	DefaultMode *int32 `json:"defaultMode,omitempty"`
+	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 }
 
 // Projection that may be projected along with other supported volume types
@@ -1201,11 +1253,11 @@ type VolumeProjection struct {
 	// all types below are the supported types for projection into the same volume
 
 	// information about the secret data to project
-	Secret *SecretProjection `json:"secret,omitempty"`
+	Secret *SecretProjection `json:"secret,omitempty" protobuf:"bytes,1,opt,name=secret"`
 	// information about the downwardAPI data to project
-	DownwardAPI *DownwardAPIProjection `json:"downwardAPI,omitempty"`
+	DownwardAPI *DownwardAPIProjection `json:"downwardAPI,omitempty" protobuf:"bytes,2,opt,name=downwardAPI"`
 	// information about the configMap data to project
-	ConfigMap *ConfigMapProjection `json:"configMap,omitempty"`
+	ConfigMap *ConfigMapProjection `json:"configMap,omitempty" protobuf:"bytes,3,opt,name=configMap"`
 }
 
 const (
@@ -1440,6 +1492,9 @@ type TCPSocketAction struct {
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
 	Port intstr.IntOrString `json:"port" protobuf:"bytes,1,opt,name=port"`
+	// Optional: Host name to connect to, defaults to the pod IP.
+	// +optional
+	Host string `json:"host,omitempty" protobuf:"bytes,2,opt,name=host"`
 }
 
 // ExecAction describes a "run in container" action.
@@ -1584,8 +1639,8 @@ type Container struct {
 	// +optional
 	Ports []ContainerPort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort" protobuf:"bytes,6,rep,name=ports"`
 	// List of sources to populate environment variables in the container.
-	// The keys defined within a source must be a C_IDENTIFIER. An invalid key
-	// will prevent the container from starting. When a key exists in multiple
+	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
+	// will be reported as an event when the container is starting. When a key exists in multiple
 	// sources, the value associated with the last source will take precedence.
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
@@ -2050,10 +2105,8 @@ type PodAffinityTerm struct {
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
 	// namespaces specifies which namespaces the labelSelector applies to (matches against);
-	// nil list means "this pod's namespace," empty list means "all namespaces"
-	// The json tag here is not "omitempty" since we need to distinguish nil and empty.
-	// See https://golang.org/pkg/encoding/json/#Marshal for more details.
-	Namespaces []string `json:"namespaces" protobuf:"bytes,2,rep,name=namespaces"`
+	// null or empty list means "this pod's namespace"
+	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,2,rep,name=namespaces"`
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
 	// whose value of the label with key topologyKey matches that of any node on which any of the
@@ -2319,7 +2372,7 @@ type PodSpec struct {
 	// If specified, the pod will be dispatched by specified scheduler.
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
-	SchedulerName string `json:"schedulername,omitempty" protobuf:"bytes,19,opt,name=schedulername"`
+	SchedulerName string `json:"schedulerName,omitempty" protobuf:"bytes,19,opt,name=schedulerName"`
 	// If specified, the pod's tolerations.
 	// +optional
 	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
@@ -3061,7 +3114,7 @@ type NodeSpec struct {
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
 	// If specified, the node's taints.
 	// +optional
-	Taints []Taint `json:"taints,omitempty"  protobuf:"bytes,5,opt,name=taints"`
+	Taints []Taint `json:"taints,omitempty" protobuf:"bytes,5,opt,name=taints"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -3478,10 +3531,11 @@ type DeleteOptions struct {
 	OrphanDependents *bool `json:"orphanDependents,omitempty" protobuf:"varint,3,opt,name=orphanDependents"`
 
 	// Whether and how garbage collection will be performed.
-	// Defaults to Default.
 	// Either this field or OrphanDependents may be set, but not both.
+	// The default policy is decided by the existing finalizer set in the
+	// metadata.finalizers and the resource-specific default policy.
 	// +optional
-	PropagationPolicy *DeletionPropagation
+	PropagationPolicy *DeletionPropagation `protobuf:"bytes,4,opt,name=propagationPolicy,casttype=DeletionPropagation"`
 }
 
 // ListOptions is the query options to a standard REST list call.

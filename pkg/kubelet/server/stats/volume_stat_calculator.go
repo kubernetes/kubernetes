@@ -120,7 +120,7 @@ func (s *volumeStatCalculator) parsePodVolumeStats(podName string, metric *volum
 	inodesUsed := uint64(metric.InodesUsed.Value())
 	return stats.VolumeStats{
 		Name: podName,
-		FsStats: stats.FsStats{AvailableBytes: &available, CapacityBytes: &capacity, UsedBytes: &used,
-			Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
+		FsStats: stats.FsStats{Time: metric.Time, AvailableBytes: &available, CapacityBytes: &capacity,
+			UsedBytes: &used, Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
 	}
 }

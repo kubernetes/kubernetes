@@ -117,15 +117,19 @@ func TestValidateToken(t *testing.T) {
 }
 
 func TestGenerateToken(t *testing.T) {
-	td := &kubeadmapi.TokenDiscovery{}
-	if err := GenerateToken(td); err != nil {
+	token, err := GenerateToken()
+	if err != nil {
 		t.Fatalf("GenerateToken returned an unexpected error: %+v", err)
 	}
-	if len(td.ID) != 6 {
-		t.Errorf("failed GenerateToken first part length:\n\texpected: 6\n\t  actual: %d", len(td.ID))
+	tokenID, tokenSecret, err := ParseToken(token)
+	if err != nil {
+		t.Fatalf("GenerateToken returned an unexpected error: %+v", err)
 	}
-	if len(td.Secret) != 16 {
-		t.Errorf("failed GenerateToken second part length:\n\texpected: 16\n\t  actual: %d", len(td.Secret))
+	if len(tokenID) != 6 {
+		t.Errorf("failed GenerateToken first part length:\n\texpected: 6\n\t  actual: %d", len(tokenID))
+	}
+	if len(tokenSecret) != 16 {
+		t.Errorf("failed GenerateToken second part length:\n\texpected: 16\n\t  actual: %d", len(tokenSecret))
 	}
 }
 

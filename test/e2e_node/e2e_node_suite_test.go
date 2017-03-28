@@ -98,7 +98,7 @@ func TestE2eNode(t *testing.T) {
 				glog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if err := system.ValidateDefault(framework.TestContext.ContainerRuntime); err != nil {
+		if _, err := system.ValidateDefault(framework.TestContext.ContainerRuntime); err != nil {
 			glog.Exitf("system validation failed: %v", err)
 		}
 		return
@@ -114,7 +114,7 @@ func TestE2eNode(t *testing.T) {
 			glog.Errorf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory
-			junitFile := fmt.Sprintf("junit_%s%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
+			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
 			junitPath := path.Join(reportDir, junitFile)
 			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}

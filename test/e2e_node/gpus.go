@@ -80,6 +80,20 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 			podSuccess := makePod(gpusAvailable.Value(), "gpus-success")
 			podSuccess = f.PodClient().CreateSync(podSuccess)
 
+			By("Checking the containers in the pod had restarted at-least twice successfully thereby ensuring GPUs are reused")
+			const minContainerRestartCount = 2
+			Eventually(func() bool {
+				p, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podSuccess.Name, metav1.GetOptions{})
+				if err != nil {
+					framework.Logf("failed to get pod status: %v", err)
+					return false
+				}
+				if p.Status.ContainerStatuses[0].RestartCount < minContainerRestartCount {
+					return false
+				}
+				return true
+			}, time.Minute, time.Second).Should(BeTrue())
+
 			By("Checking if the pod outputted Success to its logs")
 			framework.ExpectNoError(f.PodClient().MatchContainerOutput(podSuccess.Name, podSuccess.Name, "Success"))
 
@@ -98,10 +112,10 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 			deleteOptions := metav1.DeleteOptions{
 				GracePeriodSeconds: &gp,
 			}
-			f.PodClient().DeleteSync(podSuccess.Name, &deleteOptions, 30*time.Second)
+			f.PodClient().DeleteSync(podSuccess.Name, &deleteOptions, framework.DefaultPodDeletionTimeout)
 
 			By("attempting to start the failed pod again")
-			f.PodClient().DeleteSync(podFailure.Name, &deleteOptions, 10*time.Second)
+			f.PodClient().DeleteSync(podFailure.Name, &deleteOptions, framework.DefaultPodDeletionTimeout)
 			podFailure = f.PodClient().CreateSync(podFailure)
 
 			By("Checking if the pod outputted Success to its logs")
@@ -116,12 +130,13 @@ func makePod(gpus int64, name string) *v1.Pod {
 			v1.ResourceNvidiaGPU: *resource.NewQuantity(gpus, resource.DecimalSI),
 		},
 	}
-	gpuverificationCmd := fmt.Sprintf("if [[ %d -ne $(ls /dev/ | egrep '^nvidia[0-9]+$') ]]; then exit 1; fi; echo Success; sleep 10240 ", gpus)
+	gpuverificationCmd := fmt.Sprintf("if [[ %d -ne $(ls /dev/ | egrep '^nvidia[0-9]+$') ]]; then exit 1; fi; echo Success", gpus)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyAlways,
 			Containers: []v1.Container{
 				{
 					Image:     "gcr.io/google_containers/busybox:1.24",

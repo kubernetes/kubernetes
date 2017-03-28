@@ -180,7 +180,7 @@ type KubeletBootstrap interface {
 	GetConfiguration() componentconfig.KubeletConfiguration
 	BirthCry()
 	StartGarbageCollection()
-	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool)
+	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool)
 	ListenAndServeReadOnly(address net.IP, port uint)
 	Run(<-chan kubetypes.PodUpdate)
 	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
@@ -349,7 +349,12 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		RootFreeDiskMB:   int(kubeCfg.LowDiskSpaceThresholdMB),
 	}
 
-	thresholds, err := eviction.ParseThresholdConfig(kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
+	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
+	if kubeCfg.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
+		// Do not provide kubeCfg.EnforceNodeAllocatable to eviction threshold parsing if we are not enforcing Evictions
+		enforceNodeAllocatable = []string{}
+	}
+	thresholds, err := eviction.ParseThresholdConfig(enforceNodeAllocatable, kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
 	if err != nil {
 		return nil, err
 	}
@@ -570,6 +575,15 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			if err := server.Start(); err != nil {
 				return nil, err
 			}
+
+			// Create dockerLegacyService when the logging driver is not supported.
+			supported, err := dockershim.IsCRISupportedLogDriver(klet.dockerClient)
+			if err != nil {
+				return nil, err
+			}
+			if !supported {
+				klet.dockerLegacyService = dockershim.NewDockerLegacyService(klet.dockerClient)
+			}
 		case "remote":
 			// No-op.
 			break
@@ -778,7 +792,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	klet.AddPodSyncHandler(activeDeadlineHandler)
 
-	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.getActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
+	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.GetActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
 	klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, criticalPodAdmissionHandler))
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
@@ -788,13 +802,16 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.appArmorValidator = apparmor.NewValidator(kubeCfg.ContainerRuntime)
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
-		if kubeCfg.ContainerRuntime != "docker" {
-			return nil, fmt.Errorf("Accelerators feature is supported with docker runtime only.")
+		if kubeCfg.ContainerRuntime == "docker" {
+			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, klet.dockerClient); err != nil {
+				return nil, err
+			}
+		} else {
+			glog.Errorf("Accelerators feature is supported with docker runtime only. Disabling this feature internally.")
 		}
-		if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, klet.dockerClient); err != nil {
-			return nil, err
-		}
-	} else {
+	}
+	// Set GPU manager to a stub implementation if it is not enabled or cannot be supported.
+	if klet.gpuManager == nil {
 		klet.gpuManager = gpu.NewGPUManagerStub()
 	}
 	// Finally, put the most recent version of the config on the Kubelet, so
@@ -1099,6 +1116,10 @@ type Kubelet struct {
 
 	// GPU Manager
 	gpuManager gpu.GPUManager
+
+	// dockerLegacyService contains some legacy methods for backward compatibility.
+	// It should be set only when docker is using non json-file logging driver.
+	dockerLegacyService dockershim.DockerLegacyService
 }
 
 // setupDataDirs creates:
@@ -1183,7 +1204,7 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Kubelet failed to get node info: %v", err)
 	}
 
-	if err := kl.containerManager.Start(node, kl.getActivePods); err != nil {
+	if err := kl.containerManager.Start(node, kl.GetActivePods); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
@@ -1209,7 +1230,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		glog.Fatalf("Failed to start cAdvisor %v", err)
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl, kl.getActivePods, evictionMonitoringPeriod)
+	kl.evictionManager.Start(kl, kl.GetActivePods, kl, evictionMonitoringPeriod)
 }
 
 // Run starts the kubelet reacting to config updates
@@ -1530,16 +1551,12 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Fetch the pull secrets for the pod
-	pullSecrets, err := kl.getPullSecretsForPod(pod)
-	if err != nil {
-		glog.Errorf("Unable to get pull secrets for pod %q: %v", format.Pod(pod), err)
-		return err
-	}
+	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
-	if err = result.Error(); err != nil {
+	if err := result.Error(); err != nil {
 		return err
 	}
 
@@ -2099,8 +2116,8 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 }
 
 // ListenAndServe runs the kubelet HTTP server.
-func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, kl.containerRuntime, kl.criHandler)
+func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool) {
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, enableContentionProfiling, kl.containerRuntime, kl.criHandler)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.

@@ -52,7 +52,7 @@ type claimDefaulterPlugin struct {
 }
 
 var _ admission.Interface = &claimDefaulterPlugin{}
-var _ = kubeapiserveradmission.WantsInformerFactory(&claimDefaulterPlugin{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&claimDefaulterPlugin{})
 
 // newPlugin creates a new admission plugin.
 func newPlugin() *claimDefaulterPlugin {
@@ -61,13 +61,13 @@ func newPlugin() *claimDefaulterPlugin {
 	}
 }
 
-func (a *claimDefaulterPlugin) SetInformerFactory(f informers.SharedInformerFactory) {
+func (a *claimDefaulterPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	informer := f.Storage().InternalVersion().StorageClasses()
 	a.lister = informer.Lister()
 	a.SetReadyFunc(informer.Informer().HasSynced)
 }
 
-// Validate ensures an authorizer is set.
+// Validate ensures lister is set.
 func (a *claimDefaulterPlugin) Validate() error {
 	if a.lister == nil {
 		return fmt.Errorf("missing lister")
@@ -96,7 +96,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
-	if storageutil.HasStorageClassAnnotation(pvc.ObjectMeta) {
+	if api.PersistentVolumeClaimHasClass(pvc) {
 		// The user asked for a class.
 		return nil
 	}
@@ -113,10 +113,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 	}
 
 	glog.V(4).Infof("defaulting storage class for claim %s (generate: %s) to %s", pvc.Name, pvc.GenerateName, def.Name)
-	if pvc.ObjectMeta.Annotations == nil {
-		pvc.ObjectMeta.Annotations = map[string]string{}
-	}
-	pvc.Annotations[storageutil.StorageClassAnnotation] = def.Name
+	pvc.Spec.StorageClassName = &def.Name
 	return nil
 }
 

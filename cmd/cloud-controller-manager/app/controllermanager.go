@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	goruntime "runtime"
 	"strconv"
 	"time"
 
@@ -111,6 +112,10 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 			mux.HandleFunc("/debug/pprof/", pprof.Index)
 			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+			if s.EnableContentionProfiling {
+				goruntime.SetBlockProfileRate(1)
+			}
 		}
 		configz.InstallHandler(mux)
 		mux.Handle("/metrics", prometheus.Handler())
@@ -203,13 +208,11 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	}
 
 	// Start the CloudNodeController
-	nodeController, err := nodecontroller.NewCloudNodeController(
+	nodeController := nodecontroller.NewCloudNodeController(
 		sharedInformers.Core().V1().Nodes(),
 		client("cloud-node-controller"), cloud,
 		s.NodeMonitorPeriod.Duration)
-	if err != nil {
-		glog.Fatalf("Failed to initialize nodecontroller: %v", err)
-	}
+
 	nodeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 

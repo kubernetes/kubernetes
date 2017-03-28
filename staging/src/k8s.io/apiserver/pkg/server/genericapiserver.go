@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +43,7 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/mux"
 	genericmux "k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	restclient "k8s.io/client-go/rest"
@@ -105,11 +105,10 @@ type GenericAPIServer struct {
 	// The registered APIs
 	HandlerContainer *genericmux.APIContainer
 
-	SecureServingInfo   *SecureServingInfo
-	InsecureServingInfo *ServingInfo
+	SecureServingInfo *SecureServingInfo
 
 	// numerical ports, set after listening
-	effectiveSecurePort, effectiveInsecurePort int
+	effectiveSecurePort int
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
@@ -123,13 +122,20 @@ type GenericAPIServer struct {
 	Serializer runtime.NegotiatedSerializer
 
 	// "Outputs"
-	Handler         http.Handler
-	InsecureHandler http.Handler
+	Handler http.Handler
+	// FallThroughHandler is the final HTTP handler in the chain.
+	// It comes after all filters and the API handling
+	FallThroughHandler *mux.PathRecorderMux
+
+	// listedPathProvider is a lister which provides the set of paths to show at /
+	listedPathProvider routes.ListedPathProvider
 
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
+	// The slice preserves group name insertion order.
 	apiGroupsForDiscoveryLock sync.RWMutex
 	apiGroupsForDiscovery     map[string]metav1.APIGroup
+	apiGroupNamesForDiscovery []string
 
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	swaggerConfig *swagger.Config
@@ -146,6 +152,63 @@ type GenericAPIServer struct {
 	healthzLock    sync.Mutex
 	healthzChecks  []healthz.HealthzChecker
 	healthzCreated bool
+}
+
+// DelegationTarget is an interface which allows for composition of API servers with top level handling that works
+// as expected.
+type DelegationTarget interface {
+	// UnprotectedHandler returns a handler that is NOT protected by a normal chain
+	UnprotectedHandler() http.Handler
+
+	// RequestContextMapper returns the existing RequestContextMapper.  Because we cannot rewire all existing
+	// uses of this function, this will be used in any delegating API server
+	RequestContextMapper() apirequest.RequestContextMapper
+
+	// PostStartHooks returns the post-start hooks that need to be combined
+	PostStartHooks() map[string]postStartHookEntry
+
+	// HealthzChecks returns the healthz checks that need to be combined
+	HealthzChecks() []healthz.HealthzChecker
+
+	// ListedPaths returns the paths for supporting an index
+	ListedPaths() []string
+}
+
+func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
+	return s.HandlerContainer.ServeMux
+}
+func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
+	return s.postStartHooks
+}
+func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
+	return s.healthzChecks
+}
+func (s *GenericAPIServer) ListedPaths() []string {
+	return s.listedPathProvider.ListedPaths()
+}
+
+var EmptyDelegate = emptyDelegate{
+	requestContextMapper: apirequest.NewRequestContextMapper(),
+}
+
+type emptyDelegate struct {
+	requestContextMapper apirequest.RequestContextMapper
+}
+
+func (s emptyDelegate) UnprotectedHandler() http.Handler {
+	return http.NotFoundHandler()
+}
+func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
+	return map[string]postStartHookEntry{}
+}
+func (s emptyDelegate) HealthzChecks() []healthz.HealthzChecker {
+	return []healthz.HealthzChecker{}
+}
+func (s emptyDelegate) ListedPaths() []string {
+	return []string{}
+}
+func (s emptyDelegate) RequestContextMapper() apirequest.RequestContextMapper {
+	return s.requestContextMapper
 }
 
 func init() {
@@ -179,7 +242,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.openAPIConfig != nil {
 		routes.OpenAPI{
 			Config: s.openAPIConfig,
-		}.Install(s.HandlerContainer)
+		}.Install(s.HandlerContainer, s.FallThroughHandler)
 	}
 
 	s.installHealthz()
@@ -190,26 +253,42 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // Run spawns the http servers (secure and insecure). It only returns if stopCh is closed
 // or one of the ports cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
-	if s.SecureServingInfo != nil && s.Handler != nil {
-		if err := s.serveSecurely(stopCh); err != nil {
-			return err
-		}
-	}
-
-	if s.InsecureServingInfo != nil && s.InsecureHandler != nil {
-		if err := s.serveInsecurely(stopCh); err != nil {
-			return err
-		}
-	}
-
-	s.RunPostStartHooks()
-
-	// err == systemd.SdNotifyNoSocket when not running on a systemd system
-	if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+	err := s.NonBlockingRun(stopCh)
+	if err != nil {
+		return err
 	}
 
 	<-stopCh
+	return nil
+}
+
+// NonBlockingRun spawns the http servers (secure and insecure). An error is
+// returned if either of the ports cannot be listened on.
+func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
+	// Use an internal stop channel to allow cleanup of the listeners on error.
+	internalStopCh := make(chan struct{})
+
+	if s.SecureServingInfo != nil && s.Handler != nil {
+		if err := s.serveSecurely(internalStopCh); err != nil {
+			close(internalStopCh)
+			return err
+		}
+	}
+
+	// Now that both listeners have bound successfully, it is the
+	// responsibility of the caller to close the provided channel to
+	// ensure cleanup.
+	go func() {
+		<-stopCh
+		close(internalStopCh)
+	}()
+
+	s.RunPostStartHooks()
+
+	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
+		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+	}
+
 	return nil
 }
 
@@ -221,6 +300,11 @@ func (s *GenericAPIServer) EffectiveSecurePort() int {
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
+			glog.Warningf("Skipping API %v because it has no resources.", groupVersion)
+			continue
+		}
+
 		apiGroupVersion := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
 		if apiGroupInfo.OptionsExternalVersion != nil {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
@@ -310,12 +394,27 @@ func (s *GenericAPIServer) AddAPIGroupForDiscovery(apiGroup metav1.APIGroup) {
 	s.apiGroupsForDiscoveryLock.Lock()
 	defer s.apiGroupsForDiscoveryLock.Unlock()
 
+	// Insert the group into the ordered list if it is not already present
+	if _, exists := s.apiGroupsForDiscovery[apiGroup.Name]; !exists {
+		s.apiGroupNamesForDiscovery = append(s.apiGroupNamesForDiscovery, apiGroup.Name)
+	}
+
 	s.apiGroupsForDiscovery[apiGroup.Name] = apiGroup
 }
 
 func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
 	s.apiGroupsForDiscoveryLock.Lock()
 	defer s.apiGroupsForDiscoveryLock.Unlock()
+
+	// Remove the group from the ordered list
+	// https://github.com/golang/go/wiki/SliceTricks#filtering-without-allocating
+	newOrder := s.apiGroupNamesForDiscovery[:0]
+	for _, orderedGroupName := range s.apiGroupNamesForDiscovery {
+		if orderedGroupName != groupName {
+			newOrder = append(newOrder, orderedGroupName)
+		}
+	}
+	s.apiGroupNamesForDiscovery = newOrder
 
 	delete(s.apiGroupsForDiscovery, groupName)
 }
@@ -342,6 +441,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Convertor:       apiGroupInfo.Scheme,
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
 		Copier:          apiGroupInfo.Scheme,
+		Defaulter:       apiGroupInfo.Scheme,
 		Typer:           apiGroupInfo.Scheme,
 		SubresourceGroupVersionKind: apiGroupInfo.SubresourceGroupVersionKind,
 		Linker: apiGroupInfo.GroupMeta.SelfLinker,
@@ -360,14 +460,10 @@ func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
 		s.apiGroupsForDiscoveryLock.RLock()
 		defer s.apiGroupsForDiscoveryLock.RUnlock()
 
-		// sort to have a deterministic order
 		sortedGroups := []metav1.APIGroup{}
-		groupNames := make([]string, 0, len(s.apiGroupsForDiscovery))
-		for groupName := range s.apiGroupsForDiscovery {
-			groupNames = append(groupNames, groupName)
-		}
-		sort.Strings(groupNames)
-		for _, groupName := range groupNames {
+
+		// ranging over apiGroupNamesForDiscovery preserves the registration order
+		for _, groupName := range s.apiGroupNamesForDiscovery {
 			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
 		}
 

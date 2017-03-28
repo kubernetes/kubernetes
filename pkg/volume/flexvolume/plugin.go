@@ -177,6 +177,10 @@ func (plugin *flexVolumePlugin) unsupported(commands ...string) {
 	plugin.unsupportedCommands = append(plugin.unsupportedCommands, commands...)
 }
 
+func (plugin *flexVolumePlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 // Returns true iff the given command is known to be unsupported.
 func (plugin *flexVolumePlugin) isUnsupported(command string) bool {
 	plugin.Lock()

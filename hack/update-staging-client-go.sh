@@ -22,7 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 kube::util::ensure_clean_working_dir
-kube::util::ensure_godep_version v74
+kube::util::ensure_godep_version v79
 
 cd ${KUBE_ROOT}
 

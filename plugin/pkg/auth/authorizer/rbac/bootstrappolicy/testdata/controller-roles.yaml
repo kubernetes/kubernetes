@@ -171,6 +171,7 @@ items:
     - create
     - delete
     - list
+    - patch
     - watch
   - apiGroups:
     - ""
@@ -945,6 +946,7 @@ items:
     - create
     - delete
     - get
+    - patch
     - update
   - apiGroups:
     - ""

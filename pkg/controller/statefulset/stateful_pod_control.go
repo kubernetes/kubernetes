@@ -49,10 +49,10 @@ type StatefulPodControlInterface interface {
 	// DeleteStatefulPod deletes a Pod in a StatefulSet. The pods PVCs are not deleted. If the delete is successful,
 	// the returned error is nil.
 	DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
-	// UpdateStatefulSetStatus Updates the Status.Replicas of a StatefulSet. set is an in-out parameter, and any
+	// UpdateStatefulSetStatus updates the status of a StatefulSet. set is an in-out parameter, and any
 	// updates made to the set are made visible as mutations to the parameter. If the method is successful, the
-	// returned error is nil, and set has its Status.Replicas field set to replicas.
-	UpdateStatefulSetReplicas(set *apps.StatefulSet, replicas int32) error
+	// returned error is nil, and set has its status updated.
+	UpdateStatefulSetStatus(set *apps.StatefulSet, replicas int32, generation int64) error
 }
 
 func NewRealStatefulPodControl(
@@ -150,9 +150,10 @@ func (spc *realStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod 
 	return err
 }
 
-func (spc *realStatefulPodControl) UpdateStatefulSetReplicas(set *apps.StatefulSet, replicas int32) error {
+func (spc *realStatefulPodControl) UpdateStatefulSetStatus(set *apps.StatefulSet, replicas int32, generation int64) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		set.Status.Replicas = replicas
+		set.Status.ObservedGeneration = &generation
 		_, err := spc.client.Apps().StatefulSets(set.Namespace).UpdateStatus(set)
 		if err == nil {
 			return nil

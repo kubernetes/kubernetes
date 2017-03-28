@@ -91,6 +91,10 @@ func (plugin *awsElasticBlockStorePlugin) SupportsMountOption() bool {
 	return true
 }
 
+func (plugin *awsElasticBlockStorePlugin) SupportsBulkVolumeVerification() bool {
+	return true
+}
+
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

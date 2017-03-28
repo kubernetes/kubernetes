@@ -22,6 +22,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
@@ -29,6 +30,7 @@ import (
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // libcontainerCgroupManagerType defines how to interface with libcontainer
@@ -237,6 +239,11 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 
 // Destroy destroys the specified cgroup
 func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
+	start := time.Now()
+	defer func() {
+		metrics.CgroupManagerLatency.WithLabelValues("destroy").Observe(metrics.SinceInMicroseconds(start))
+	}()
+
 	cgroupPaths := m.buildCgroupPaths(cgroupConfig.Name)
 
 	// we take the location in traditional cgroupfs format.
@@ -276,6 +283,8 @@ type subsystem interface {
 	Name() string
 	// Set the cgroup represented by cgroup.
 	Set(path string, cgroup *libcontainerconfigs.Cgroup) error
+	// GetStats returns the statistics associated with the cgroup
+	GetStats(path string, stats *libcontainercgroups.Stats) error
 }
 
 // Cgroup subsystems we currently support
@@ -327,6 +336,11 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 
 // Update updates the cgroup with the specified Cgroup Configuration
 func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
+	start := time.Now()
+	defer func() {
+		metrics.CgroupManagerLatency.WithLabelValues("update").Observe(metrics.SinceInMicroseconds(start))
+	}()
+
 	// Extract the cgroup resource parameters
 	resourceConfig := cgroupConfig.ResourceParameters
 	resources := m.toResources(resourceConfig)
@@ -362,6 +376,10 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 
 // Create creates the specified cgroup
 func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
+	start := time.Now()
+	defer func() {
+		metrics.CgroupManagerLatency.WithLabelValues("create").Observe(metrics.SinceInMicroseconds(start))
+	}()
 
 	// we take the location in traditional cgroupfs format.
 	abstractCgroupFsName := string(cgroupConfig.Name)
@@ -431,12 +449,16 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 
 		// WalkFunc which is called for each file and directory in the pod cgroup dir
 		visitor := func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				glog.V(4).Infof("cgroup manager encountered error scanning cgroup path %q: %v", path, err)
+				return filepath.SkipDir
+			}
 			if !info.IsDir() {
 				return nil
 			}
 			pids, err = getCgroupProcs(path)
 			if err != nil {
-				glog.V(5).Infof("cgroup manager encountered error getting procs for cgroup path %v", path)
+				glog.V(4).Infof("cgroup manager encountered error getting procs for cgroup path %q: %v", path, err)
 				return filepath.SkipDir
 			}
 			pidsToKill.Insert(pids...)
@@ -446,7 +468,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 		// container cgroups haven't been GCed yet. Get attached processes to
 		// all such unwanted containers under the pod cgroup
 		if err = filepath.Walk(dir, visitor); err != nil {
-			glog.V(5).Infof("cgroup manager encountered error scanning pids for directory: %v", dir)
+			glog.V(4).Infof("cgroup manager encountered error scanning pids for directory: %q: %v", dir, err)
 		}
 	}
 	return pidsToKill.List()
@@ -464,4 +486,35 @@ func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName CgroupName) error {
 		ResourceParameters: resources,
 	}
 	return m.Update(containerConfig)
+}
+
+func getStatsSupportedSubsytems(cgroupPaths map[string]string) (*libcontainercgroups.Stats, error) {
+	stats := libcontainercgroups.NewStats()
+	for _, sys := range supportedSubsystems {
+		if _, ok := cgroupPaths[sys.Name()]; !ok {
+			return nil, fmt.Errorf("Failed to find subsytem mount for subsytem: %v", sys.Name())
+		}
+		if err := sys.GetStats(cgroupPaths[sys.Name()], stats); err != nil {
+			return nil, fmt.Errorf("Failed to get stats for supported subsystems : %v", err)
+		}
+	}
+	return stats, nil
+}
+
+func toResourceStats(stats *libcontainercgroups.Stats) *ResourceStats {
+	return &ResourceStats{
+		MemoryStats: &MemoryStats{
+			Usage: int64(stats.MemoryStats.Usage.Usage),
+		},
+	}
+}
+
+// Get sets the ResourceParameters of the specified cgroup as read from the cgroup fs
+func (m *cgroupManagerImpl) GetResourceStats(name CgroupName) (*ResourceStats, error) {
+	cgroupPaths := m.buildCgroupPaths(name)
+	stats, err := getStatsSupportedSubsytems(cgroupPaths)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stats supported cgroup subsystems for cgroup %v: %v", name, err)
+	}
+	return toResourceStats(stats), nil
 }

@@ -17,7 +17,7 @@ limitations under the License.
 package e2e
 
 import (
-	"strconv"
+	"fmt"
 	"time"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +28,8 @@ import (
 
 const (
 	// TODO(crassirostris): Once test is stable, decrease allowed loses
-	loadTestMaxAllowedLostFraction = 0.1
+	loadTestMaxAllowedLostFraction    = 0.1
+	loadTestMaxAllowedFluentdRestarts = 1
 )
 
 // TODO(crassirostris): Remove Flaky once test is stable
@@ -39,17 +40,20 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		gclLogsProvider, err := newGclLogsProvider(f)
 		framework.ExpectNoError(err, "Failed to create GCL logs provider")
 
-		podCount := 30
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items
+		nodeCount := len(nodes)
+		podCount := 30 * nodeCount
 		loggingDuration := 10 * time.Minute
-		linesPerSecond := 1000
+		linesPerSecond := 1000 * nodeCount
 		linesPerPod := linesPerSecond * int(loggingDuration.Seconds()) / podCount
-		ingestionTimeout := 1 * time.Hour
+		ingestionTimeout := 30 * time.Minute
 
 		By("Running logs generator pods")
 		pods := []*loggingPod{}
 		for podIdx := 0; podIdx < podCount; podIdx++ {
-			podName := f.Namespace.Name + "-logs-generator-" + strconv.Itoa(linesPerPod) + "-" + strconv.Itoa(podIdx)
-			pods = append(pods, createLoggingPod(f, podName, linesPerPod, loggingDuration))
+			node := nodes[podIdx%len(nodes)]
+			podName := fmt.Sprintf("logs-generator-%d-%d", linesPerPod, podIdx)
+			pods = append(pods, createLoggingPod(f, podName, node.Name, linesPerPod, loggingDuration))
 
 			defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
 		}
@@ -58,7 +62,14 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		time.Sleep(loggingDuration)
 
 		By("Waiting for all log lines to be ingested")
-		err = waitForLogsIngestion(gclLogsProvider, pods, ingestionTimeout, loadTestMaxAllowedLostFraction)
+		config := &loggingTestConfig{
+			LogsProvider:              gclLogsProvider,
+			Pods:                      pods,
+			IngestionTimeout:          ingestionTimeout,
+			MaxAllowedLostFraction:    loadTestMaxAllowedLostFraction,
+			MaxAllowedFluentdRestarts: loadTestMaxAllowedFluentdRestarts,
+		}
+		err = waitForFullLogsIngestion(f, config)
 		if err != nil {
 			framework.Failf("Failed to ingest logs: %v", err)
 		} else {
@@ -70,11 +81,12 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		gclLogsProvider, err := newGclLogsProvider(f)
 		framework.ExpectNoError(err, "Failed to create GCL logs provider")
 
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items
 		maxPodCount := 10
 		jobDuration := 1 * time.Minute
-		linesPerPodPerSecond := 10
-		testDuration := 1 * time.Hour
-		ingestionTimeout := 1 * time.Hour
+		linesPerPodPerSecond := 100
+		testDuration := 10 * time.Minute
+		ingestionTimeout := 30 * time.Minute
 
 		podRunDelay := time.Duration(int64(jobDuration) / int64(maxPodCount))
 		podRunCount := int(testDuration.Seconds())/int(podRunDelay.Seconds()) - 1
@@ -82,13 +94,13 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 
 		By("Running short-living pods")
 		pods := []*loggingPod{}
-		for i := 0; i < podRunCount; i++ {
-			podName := f.Namespace.Name + "-job-logs-generator-" +
-				strconv.Itoa(maxPodCount) + "-" + strconv.Itoa(linesPerPod) + "-" + strconv.Itoa(i)
-			pods = append(pods, createLoggingPod(f, podName, linesPerPod, jobDuration))
+		for runIdx := 0; runIdx < podRunCount; runIdx++ {
+			for nodeIdx, node := range nodes {
+				podName := fmt.Sprintf("job-logs-generator-%d-%d-%d-%d", maxPodCount, linesPerPod, runIdx, nodeIdx)
+				pods = append(pods, createLoggingPod(f, podName, node.Name, linesPerPod, jobDuration))
 
-			defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
-
+				defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
+			}
 			time.Sleep(podRunDelay)
 		}
 
@@ -96,7 +108,14 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 		time.Sleep(jobDuration)
 
 		By("Waiting for all log lines to be ingested")
-		err = waitForLogsIngestion(gclLogsProvider, pods, ingestionTimeout, loadTestMaxAllowedLostFraction)
+		config := &loggingTestConfig{
+			LogsProvider:              gclLogsProvider,
+			Pods:                      pods,
+			IngestionTimeout:          ingestionTimeout,
+			MaxAllowedLostFraction:    loadTestMaxAllowedLostFraction,
+			MaxAllowedFluentdRestarts: loadTestMaxAllowedFluentdRestarts,
+		}
+		err = waitForFullLogsIngestion(f, config)
 		if err != nil {
 			framework.Failf("Failed to ingest logs: %v", err)
 		} else {

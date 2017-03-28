@@ -37,6 +37,21 @@ func TestRESTMapper(t *testing.T) {
 	resources := []*APIGroupResources{
 		{
 			Group: metav1.APIGroup{
+				Name: "extensions",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1beta"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1beta": {
+					{Name: "jobs", Namespaced: true, Kind: "Job"},
+					{Name: "pods", Namespaced: true, Kind: "Pod"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
 				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1"},
 					{Version: "v2"},
@@ -52,20 +67,6 @@ func TestRESTMapper(t *testing.T) {
 				},
 			},
 		},
-		{
-			Group: metav1.APIGroup{
-				Name: "extensions",
-				Versions: []metav1.GroupVersionForDiscovery{
-					{Version: "v1beta"},
-				},
-				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1beta"},
-			},
-			VersionedResources: map[string][]metav1.APIResource{
-				"v1beta": {
-					{Name: "jobs", Namespaced: true, Kind: "Job"},
-				},
-			},
-		},
 	}
 
 	restMapper := NewRESTMapper(resources, nil)
@@ -74,6 +75,15 @@ func TestRESTMapper(t *testing.T) {
 		input schema.GroupVersionResource
 		want  schema.GroupVersionKind
 	}{
+		{
+			input: schema.GroupVersionResource{
+				Resource: "pods",
+			},
+			want: schema.GroupVersionKind{
+				Version: "v1",
+				Kind:    "Pod",
+			},
+		},
 		{
 			input: schema.GroupVersionResource{
 				Version:  "v1",
@@ -131,6 +141,15 @@ func TestRESTMapper(t *testing.T) {
 		input schema.GroupVersionResource
 		want  schema.GroupVersionResource
 	}{
+		{
+			input: schema.GroupVersionResource{
+				Resource: "pods",
+			},
+			want: schema.GroupVersionResource{
+				Version:  "v1",
+				Resource: "pods",
+			},
+		},
 		{
 			input: schema.GroupVersionResource{
 				Version:  "v1",

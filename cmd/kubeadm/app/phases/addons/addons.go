@@ -38,7 +38,7 @@ import (
 func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
 	proxyConfigMapBytes, err := kubeadmutil.ParseTemplate(KubeProxyConfigMap, struct{ MasterEndpoint string }{
 		// Fetch this value from the kubeconfig file
-		MasterEndpoint: fmt.Sprintf("https://%s:%d", cfg.API.AdvertiseAddresses[0], cfg.API.Port),
+		MasterEndpoint: fmt.Sprintf("https://%s:%d", cfg.API.AdvertiseAddress, cfg.API.BindPort),
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)

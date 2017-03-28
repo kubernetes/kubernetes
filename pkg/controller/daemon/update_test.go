@@ -24,10 +24,10 @@ import (
 )
 
 func TestDaemonSetUpdatesPods(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	manager, podControl, _ := newTestController(ds)
 	maxUnavailable := 2
 	addNodes(manager.nodeStore, 0, 5, nil)
-	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
 	markPodsReady(podControl.podStore)
@@ -63,10 +63,10 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 }
 
 func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	manager, podControl, _ := newTestController(ds)
 	maxUnavailable := 3
 	addNodes(manager.nodeStore, 0, 5, nil)
-	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
 	markPodsReady(podControl.podStore)
@@ -90,10 +90,10 @@ func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 }
 
 func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	manager, podControl, _ := newTestController(ds)
 	maxUnavailable := 3
 	addNodes(manager.nodeStore, 0, 5, nil)
-	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
 
@@ -116,10 +116,10 @@ func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 }
 
 func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {
-	manager, podControl, _ := newTestController()
+	ds := newDaemonSet("foo")
+	manager, podControl, _ := newTestController(ds)
 	maxUnavailable := 3
 	addNodes(manager.nodeStore, 0, 5, nil)
-	ds := newDaemonSet("foo")
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0)
 

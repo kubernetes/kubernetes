@@ -23,9 +23,10 @@ import (
 	"fmt"
 	"time"
 
-	influxdb "github.com/influxdata/influxdb/client"
+	influxdb "github.com/influxdata/influxdb/client/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -45,12 +46,13 @@ var _ = framework.KubeDescribe("Monitoring", func() {
 })
 
 const (
-	influxdbService      = "monitoring-influxdb"
-	influxdbDatabaseName = "k8s"
-	podlistQuery         = "show tag values from \"cpu/usage\" with key = pod_id"
-	nodelistQuery        = "show tag values from \"cpu/usage\" with key = hostname"
-	sleepBetweenAttempts = 5 * time.Second
-	testTimeout          = 5 * time.Minute
+	influxdbService       = "monitoring-influxdb"
+	influxdbDatabaseName  = "k8s"
+	podlistQuery          = "show tag values from \"cpu/usage\" with key = pod_id"
+	nodelistQuery         = "show tag values from \"cpu/usage\" with key = hostname"
+	sleepBetweenAttempts  = 5 * time.Second
+	testTimeout           = 5 * time.Minute
+	initializationTimeout = 5 * time.Minute
 )
 
 var (
@@ -286,10 +288,27 @@ func validatePodsAndNodes(c clientset.Interface, expectedPods, expectedNodes []s
 
 func testMonitoringUsingHeapsterInfluxdb(c clientset.Interface) {
 	// Check if heapster pods and services are up.
-	expectedPods, err := verifyExpectedRcsExistAndGetExpectedPods(c)
-	framework.ExpectNoError(err)
-	framework.ExpectNoError(expectedServicesExist(c))
-	// TODO: Wait for all pods and services to be running.
+	var expectedPods []string
+	rcErr := fmt.Errorf("failed to verify expected RCs within timeout")
+	serviceErr := fmt.Errorf("failed to verify expected services within timeout")
+	err := wait.PollImmediate(sleepBetweenAttempts, initializationTimeout, func() (bool, error) {
+		expectedPods, rcErr = verifyExpectedRcsExistAndGetExpectedPods(c)
+		if rcErr != nil {
+			framework.Logf("Waiting for expected RCs (got error: %v)", rcErr)
+			return false, nil
+		}
+		serviceErr = expectedServicesExist(c)
+		if serviceErr != nil {
+			framework.Logf("Waiting for expected services (got error: %v)", serviceErr)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		framework.ExpectNoError(rcErr)
+		framework.ExpectNoError(serviceErr)
+		framework.Failf("Failed to verify RCs and services within timeout: %v", err)
+	}
 
 	expectedNodes, err := getAllNodesInCluster(c)
 	framework.ExpectNoError(err)

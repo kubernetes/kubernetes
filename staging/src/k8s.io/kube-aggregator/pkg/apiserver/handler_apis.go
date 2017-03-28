@@ -24,9 +24,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/pkg/api"
 
 	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	apiregistrationv1alpha1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
@@ -35,8 +35,9 @@ import (
 )
 
 // WithAPIs adds the handling for /apis and /apis/<group: -apiregistration.k8s.io>.
-func WithAPIs(handler http.Handler, informer informers.APIServiceInformer, serviceLister v1listers.ServiceLister, endpointsLister v1listers.EndpointsLister) http.Handler {
+func WithAPIs(handler http.Handler, codecs serializer.CodecFactory, informer informers.APIServiceInformer, serviceLister v1listers.ServiceLister, endpointsLister v1listers.EndpointsLister) http.Handler {
 	apisHandler := &apisHandler{
+		codecs:          codecs,
 		lister:          informer.Lister(),
 		delegate:        handler,
 		serviceLister:   serviceLister,
@@ -50,6 +51,7 @@ func WithAPIs(handler http.Handler, informer informers.APIServiceInformer, servi
 // apisHandler serves the `/apis` endpoint.
 // This is registered as a filter so that it never collides with any explictly registered endpoints
 type apisHandler struct {
+	codecs serializer.CodecFactory
 	lister listers.APIServiceLister
 
 	serviceLister   v1listers.ServiceLister
@@ -107,7 +109,7 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	json, err := runtime.Encode(api.Codecs.LegacyCodec(), discoveryGroupList)
+	json, err := runtime.Encode(r.codecs.LegacyCodec(), discoveryGroupList)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -125,25 +127,27 @@ func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService, se
 	var discoveryGroup *metav1.APIGroup
 
 	for _, apiService := range apiServicesByGroup {
-		// skip any API services without actual services
-		if _, err := serviceLister.Services(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name); err != nil {
-			continue
-		}
-
-		hasActiveEndpoints := false
-		endpoints, err := endpointsLister.Endpoints(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
-		// skip any API services without endpoints
-		if err != nil {
-			continue
-		}
-		for _, subset := range endpoints.Subsets {
-			if len(subset.Addresses) > 0 {
-				hasActiveEndpoints = true
-				break
+		if apiService.Spec.Service != nil {
+			// skip any API services without actual services
+			if _, err := serviceLister.Services(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name); err != nil {
+				continue
 			}
-		}
-		if !hasActiveEndpoints {
-			continue
+
+			hasActiveEndpoints := false
+			endpoints, err := endpointsLister.Endpoints(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
+			// skip any API services without endpoints
+			if err != nil {
+				continue
+			}
+			for _, subset := range endpoints.Subsets {
+				if len(subset.Addresses) > 0 {
+					hasActiveEndpoints = true
+					break
+				}
+			}
+			if !hasActiveEndpoints {
+				continue
+			}
 		}
 
 		// the first APIService which is valid becomes the default
@@ -170,18 +174,21 @@ func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService, se
 
 // apiGroupHandler serves the `/apis/<group>` endpoint.
 type apiGroupHandler struct {
+	codecs    serializer.CodecFactory
 	groupName string
 
 	lister listers.APIServiceLister
 
 	serviceLister   v1listers.ServiceLister
 	endpointsLister v1listers.EndpointsLister
+
+	delegate http.Handler
 }
 
 func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// don't handle URLs that aren't /apis/<groupName>
 	if req.URL.Path != "/apis/"+r.groupName && req.URL.Path != "/apis/"+r.groupName+"/" {
-		http.Error(w, "", http.StatusNotFound)
+		r.delegate.ServeHTTP(w, req)
 		return
 	}
 
@@ -212,7 +219,7 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
-	json, err := runtime.Encode(api.Codecs.LegacyCodec(), discoveryGroup)
+	json, err := runtime.Encode(r.codecs.LegacyCodec(), discoveryGroup)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

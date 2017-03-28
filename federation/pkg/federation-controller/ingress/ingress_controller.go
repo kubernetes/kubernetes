@@ -17,6 +17,7 @@ limitations under the License.
 package ingress
 
 import (
+	"crypto/md5"
 	"fmt"
 	"sync"
 	"time"
@@ -55,12 +56,13 @@ const (
 	uidConfigMapName        = "ingress-uid"                                 // Name of the config-map and key the ingress controller stores its uid in.
 	uidConfigMapNamespace   = "kube-system"
 	uidKey                  = "uid"
+	providerUidKey          = "provider-uid"
 	// Annotation on the ingress in federation control plane that is used to keep
 	// track of the first cluster in which we create ingress.
 	// We wait for ingress to be created in this cluster before creating it any
 	// other cluster.
 	firstClusterAnnotation = "ingress.federation.kubernetes.io/first-cluster"
-	ControllerName         = "ingress"
+	ControllerName         = "ingresses"
 )
 
 var (
@@ -272,7 +274,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			glog.V(4).Infof("Attempting to update ConfigMap: %v", configMap)
 			_, err := client.Core().ConfigMaps(configMap.Namespace).Update(configMap)
 			if err == nil {
-				glog.V(4).Infof("Successfully updated ConfigMap %q", configMapName)
+				glog.V(4).Infof("Successfully updated ConfigMap %q %v", configMapName, configMap)
 			} else {
 				glog.V(4).Infof("Failed to update ConfigMap %q: %v", configMapName, err)
 			}
@@ -501,12 +503,6 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 		return
 	}
 
-	ingressList := ic.ingressInformerStore.List()
-	if len(ingressList) <= 0 {
-		glog.V(4).Infof("No federated ingresses, ignore reconcile config map.")
-		return
-	}
-
 	if clusterName == allClustersKey {
 		clusters, err := ic.configMapFederatedInformer.GetReadyClusters()
 		if err != nil {
@@ -529,7 +525,15 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 		uidConfigMapNamespacedName := types.NamespacedName{Name: uidConfigMapName, Namespace: uidConfigMapNamespace}
 		configMapObj, found, err := ic.configMapFederatedInformer.GetTargetStore().GetByKey(cluster.Name, uidConfigMapNamespacedName.String())
 		if !found || err != nil {
-			glog.Errorf("Failed to get ConfigMap %q for cluster %q.  Will try again later: %v", uidConfigMapNamespacedName, cluster.Name, err)
+			logmsg := fmt.Sprintf("Failed to get ConfigMap %q for cluster %q.  Will try again later", uidConfigMapNamespacedName, cluster.Name)
+			if err != nil {
+				logmsg = fmt.Sprintf("%v: %v", logmsg, err)
+			}
+			if len(ic.ingressInformerStore.List()) > 0 { // Error-level if ingresses are active, Info-level otherwise.
+				glog.Errorf(logmsg)
+			} else {
+				glog.V(4).Infof(logmsg)
+			}
 			ic.configMapDeliverer.DeliverAfter(clusterName, nil, ic.configMapReviewDelay)
 			return
 		}
@@ -542,6 +546,12 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 		ic.reconcileConfigMap(cluster, configMap)
 		return
 	}
+}
+
+// getProviderUid returns a provider ID based on the provided clusterName.
+func getProviderUid(clusterName string) string {
+	hashedName := md5.Sum([]byte(clusterName))
+	return fmt.Sprintf("%x", hashedName[:8])
 }
 
 /*
@@ -571,12 +581,29 @@ func (ic *IngressController) reconcileConfigMap(cluster *federationapi.Cluster, 
 	}
 
 	if !clusterIngressUIDExists || clusterIngressUID == "" {
-		ic.updateClusterIngressUIDToMasters(cluster, configMapUID) // Second argument is the fallback, in case this is the only cluster, in which case it becomes the master
-		return
+		glog.V(4).Infof("Cluster %q is the only master", cluster.Name)
+		// Second argument is the fallback, in case this is the only cluster, in which case it becomes the master
+		var err error
+		if clusterIngressUID, err = ic.updateClusterIngressUIDToMasters(cluster, configMapUID); err != nil {
+			return
+		}
+		// If we successfully update the Cluster Object, fallthrough and update the configMap.
 	}
-	if configMapUID != clusterIngressUID { // An update is required
-		glog.V(4).Infof("Ingress UID update is required: configMapUID %q not equal to clusterIngressUID %q", configMapUID, clusterIngressUID)
+
+	// Figure out providerUid.
+	providerUid := getProviderUid(cluster.Name)
+	configMapProviderUid := configMap.Data[providerUidKey]
+
+	if configMapUID == clusterIngressUID && configMapProviderUid == providerUid {
+		glog.V(4).Infof("Ingress configMap update is not required: UID %q and ProviderUid %q are equal", configMapUID, providerUid)
+	} else {
+		if configMapUID != clusterIngressUID {
+			glog.V(4).Infof("Ingress configMap update is required for UID: configMapUID %q not equal to clusterIngressUID %q", configMapUID, clusterIngressUID)
+		} else if configMapProviderUid != providerUid {
+			glog.V(4).Infof("Ingress configMap update is required: configMapProviderUid %q not equal to providerUid %q", configMapProviderUid, providerUid)
+		}
 		configMap.Data[uidKey] = clusterIngressUID
+		configMap.Data[providerUidKey] = providerUid
 		operations := []util.FederatedOperation{{
 			Type:        util.OperationTypeUpdate,
 			Obj:         configMap,
@@ -589,8 +616,6 @@ func (ic *IngressController) reconcileConfigMap(cluster *federationapi.Cluster, 
 			glog.Errorf("Failed to execute update of ConfigMap %q on cluster %q: %v", configMapName, cluster.Name, err)
 			ic.configMapDeliverer.DeliverAfter(cluster.Name, nil, ic.configMapReviewDelay)
 		}
-	} else {
-		glog.V(4).Infof("Ingress UID update is not required: configMapUID %q is equal to clusterIngressUID %q", configMapUID, clusterIngressUID)
 	}
 }
 
@@ -620,13 +645,13 @@ func (ic *IngressController) getMasterCluster() (master *federationapi.Cluster, 
   updateClusterIngressUIDToMasters takes the ingress UID annotation on the master cluster and applies it to cluster.
   If there is no master cluster, then fallbackUID is used (and hence this cluster becomes the master).
 */
-func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federationapi.Cluster, fallbackUID string) {
+func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federationapi.Cluster, fallbackUID string) (string, error) {
 	masterCluster, masterUID, err := ic.getMasterCluster()
 	clusterObj, clusterErr := api.Scheme.DeepCopy(cluster) // Make a clone so that we don't clobber our input param
 	cluster, ok := clusterObj.(*federationapi.Cluster)
 	if clusterErr != nil || !ok {
 		glog.Errorf("Internal error: Failed clone cluster resource while attempting to add master ingress UID annotation (%q = %q) from master cluster %q to cluster %q, will try again later: %v", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name, err)
-		return
+		return "", err
 	}
 	if err == nil {
 		if masterCluster.Name != cluster.Name { // We're not the master, need to get in sync
@@ -636,12 +661,14 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 			cluster.ObjectMeta.Annotations[uidAnnotationKey] = masterUID
 			if _, err = ic.federatedApiClient.Federation().Clusters().Update(cluster); err != nil {
 				glog.Errorf("Failed to add master ingress UID annotation (%q = %q) from master cluster %q to cluster %q, will try again later: %v", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name, err)
-				return
+				return "", err
 			} else {
 				glog.V(4).Infof("Successfully added master ingress UID annotation (%q = %q) from master cluster %q to cluster %q.", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name)
+				return masterUID, nil
 			}
 		} else {
 			glog.V(4).Infof("Cluster %q with ingress UID is already the master with annotation (%q = %q), no need to update.", cluster.Name, uidAnnotationKey, cluster.ObjectMeta.Annotations[uidAnnotationKey])
+			return cluster.ObjectMeta.Annotations[uidAnnotationKey], nil
 		}
 	} else {
 		glog.V(2).Infof("No master cluster found to source an ingress UID from for cluster %q.  Attempting to elect new master cluster %q with ingress UID %q = %q", cluster.Name, cluster.Name, uidAnnotationKey, fallbackUID)
@@ -652,11 +679,14 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 			cluster.ObjectMeta.Annotations[uidAnnotationKey] = fallbackUID
 			if _, err = ic.federatedApiClient.Federation().Clusters().Update(cluster); err != nil {
 				glog.Errorf("Failed to add ingress UID annotation (%q = %q) to cluster %q. No master elected. Will try again later: %v", uidAnnotationKey, fallbackUID, cluster.Name, err)
+				return "", err
 			} else {
 				glog.V(4).Infof("Successfully added ingress UID annotation (%q = %q) to cluster %q.", uidAnnotationKey, fallbackUID, cluster.Name)
+				return fallbackUID, nil
 			}
 		} else {
 			glog.Errorf("No master cluster exists, and fallbackUID for cluster %q is invalid (%q).  This probably means that no clusters have an ingress controller configmap with key %q.  Federated Ingress currently supports clusters running Google Loadbalancer Controller (\"GLBC\")", cluster.Name, fallbackUID, uidKey)
+			return "", err
 		}
 	}
 }

@@ -121,12 +121,7 @@ func (rc *reconciler) updateSyncTime() {
 
 func (rc *reconciler) syncStates() {
 	volumesPerNode := rc.actualStateOfWorld.GetAttachedVolumesPerNode()
-	for nodeName, volumes := range volumesPerNode {
-		err := rc.attacherDetacher.VerifyVolumesAreAttached(volumes, nodeName, rc.actualStateOfWorld)
-		if err != nil {
-			glog.Errorf("Error in syncing states for volumes: %v", err)
-		}
-	}
+	rc.attacherDetacher.VerifyVolumesAreAttached(volumesPerNode, rc.actualStateOfWorld)
 }
 
 func (rc *reconciler) reconcile() {

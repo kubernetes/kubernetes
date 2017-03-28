@@ -73,9 +73,9 @@ func TestQuota(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	admission.(kubeadmission.WantsInternalClientSet).SetInternalClientSet(internalClientset)
+	admission.(kubeadmission.WantsInternalKubeClientSet).SetInternalKubeClientSet(internalClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
-	admission.(kubeadmission.WantsInformerFactory).SetInformerFactory(internalInformers)
+	admission.(kubeadmission.WantsInternalKubeInformerFactory).SetInternalKubeInformerFactory(internalInformers)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
@@ -96,7 +96,6 @@ func TestQuota(t *testing.T) {
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
-		4096,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
 	go rm.Run(3, controllerCh)
@@ -259,9 +258,9 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	admission.(kubeadmission.WantsInternalClientSet).SetInternalClientSet(internalClientset)
+	admission.(kubeadmission.WantsInternalKubeClientSet).SetInternalKubeClientSet(internalClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
-	admission.(kubeadmission.WantsInformerFactory).SetInformerFactory(internalInformers)
+	admission.(kubeadmission.WantsInternalKubeInformerFactory).SetInternalKubeInformerFactory(internalInformers)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
@@ -280,7 +279,6 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
-		4096,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
 	go rm.Run(3, controllerCh)

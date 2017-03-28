@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "apparmor.go",
         "configmaps.go",
         "daemonsets.go",
         "deployments.go",
@@ -32,10 +33,12 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
+        "//pkg/util/version:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/gomega",
+        "//vendor:github.com/onsi/gomega/gstruct",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",

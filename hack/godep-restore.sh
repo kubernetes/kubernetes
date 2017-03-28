@@ -20,9 +20,10 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-export GOPATH=${GOPATH}:${KUBE_ROOT}/staging
-GODEP="${GODEP:-godep}"
+source "${KUBE_ROOT}/hack/lib/util.sh"
+
+kube::util::ensure_godep_version v79
 
 echo "Starting to download all kubernetes godeps. This takes a while"
-"${GODEP}" restore "$@"
+GOPATH=${GOPATH}:${KUBE_ROOT}/staging godep restore "$@"
 echo "Download finished"

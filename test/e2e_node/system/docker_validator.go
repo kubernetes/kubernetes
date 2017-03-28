@@ -37,29 +37,30 @@ func (d *DockerValidator) Name() string {
 }
 
 const (
-	dockerEndpoint     = "unix:///var/run/docker.sock"
-	dockerConfigPrefix = "DOCKER_"
+	dockerEndpoint            = "unix:///var/run/docker.sock"
+	dockerConfigPrefix        = "DOCKER_"
+	maxDockerValidatedVersion = "1.12"
 )
 
 // TODO(random-liu): Add more validating items.
-func (d *DockerValidator) Validate(spec SysSpec) error {
+func (d *DockerValidator) Validate(spec SysSpec) (error, error) {
 	if spec.RuntimeSpec.DockerSpec == nil {
 		// If DockerSpec is not specified, assume current runtime is not
 		// docker, skip the docker configuration validation.
-		return nil
+		return nil, nil
 	}
 	c, err := client.NewClient(dockerEndpoint, "", nil, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create docker client: %v", err)
+		return nil, fmt.Errorf("failed to create docker client: %v", err)
 	}
 	info, err := c.Info(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed to get docker info: %v", err)
+		return nil, fmt.Errorf("failed to get docker info: %v", err)
 	}
 	return d.validateDockerInfo(spec.RuntimeSpec.DockerSpec, info)
 }
 
-func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) error {
+func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) (error, error) {
 	// Validate docker version.
 	matched := false
 	for _, v := range spec.Version {
@@ -70,17 +71,29 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) 
 		}
 	}
 	if !matched {
+		// catch if docker is 1.13+
+		ver := `1\.(1[3-9])\..*|\d{2}\.\d+\.\d+-[a-z]{2}`
+		r := regexp.MustCompile(ver)
+		if r.MatchString(info.ServerVersion) {
+			d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, good)
+			w := fmt.Errorf(
+				"docker version is greater than the most recently validated version. Docker version: %s. Max validated version: %s",
+				info.ServerVersion,
+				maxDockerValidatedVersion,
+			)
+			return w, nil
+		}
 		d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, bad)
-		return fmt.Errorf("unsupported docker version: %s", info.ServerVersion)
+		return nil, fmt.Errorf("unsupported docker version: %s", info.ServerVersion)
 	}
 	// Validate graph driver.
 	item := dockerConfigPrefix + "GRAPH_DRIVER"
 	for _, gd := range spec.GraphDriver {
 		if info.Driver == gd {
 			d.Reporter.Report(item, info.Driver, good)
-			return nil
+			return nil, nil
 		}
 	}
 	d.Reporter.Report(item, info.Driver, bad)
-	return fmt.Errorf("unsupported graph driver: %s", info.Driver)
+	return nil, fmt.Errorf("unsupported graph driver: %s", info.Driver)
 }

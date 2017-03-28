@@ -35,7 +35,9 @@ type StatefulSetListerExpansion interface {
 // StatefulSetNamespaeLister.
 type StatefulSetNamespaceListerExpansion interface{}
 
-// GetPodStatefulSets returns a list of StatefulSets managing a pod. Returns an error only if no matching StatefulSets are found.
+// GetPodStatefulSets returns a list of StatefulSets that potentially match a pod.
+// Only the one specified in the Pod's ControllerRef will actually manage it.
+// Returns an error only if no matching StatefulSets are found.
 func (s *statefulSetLister) GetPodStatefulSets(pod *api.Pod) ([]*apps.StatefulSet, error) {
 	var selector labels.Selector
 	var ps *apps.StatefulSet

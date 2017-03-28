@@ -37,6 +37,7 @@ import (
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -355,7 +356,16 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	}
 
 	errList := []error{}
-	for _, pod := range podList.Items {
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		// Since the client must maintain compatibility with a v1.5 server,
+		// we can't assume the Pods will have ControllerRefs pointing to 'ss'.
+		// However, we can at least avoid interfering with other controllers
+		// that do use ControllerRef.
+		controllerRef := controller.GetControllerOf(pod)
+		if controllerRef != nil && controllerRef.UID != ss.UID {
+			continue
+		}
 		if err := pods.Delete(pod.Name, gracePeriod); err != nil {
 			if !errors.IsNotFound(err) {
 				errList = append(errList, err)
@@ -420,7 +430,6 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	deployments := reaper.dClient.Deployments(namespace)
-	replicaSets := reaper.rsClient.ReplicaSets(namespace)
 	rsReaper := &ReplicaSetReaper{reaper.rsClient, reaper.pollInterval, reaper.timeout}
 
 	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
@@ -442,24 +451,32 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	}
 
 	// Do not cascade deletion for overlapping deployments.
+	// A Deployment with this annotation will not create or manage anything,
+	// so we can assume any matching ReplicaSets belong to another Deployment.
 	if len(deployment.Annotations[deploymentutil.OverlapAnnotation]) > 0 {
 		return deployments.Delete(name, nil)
 	}
 
-	// Stop all replica sets.
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	// Stop all replica sets belonging to this Deployment.
+	rss, err := deploymentutil.ListReplicaSetsInternalV15(deployment,
+		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
+			rsList, err := reaper.rsClient.ReplicaSets(namespace).List(options)
+			if err != nil {
+				return nil, err
+			}
+			rss := make([]*extensions.ReplicaSet, 0, len(rsList.Items))
+			for i := range rsList.Items {
+				rss = append(rss, &rsList.Items[i])
+			}
+			return rss, nil
+		})
 	if err != nil {
 		return err
 	}
 
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	rsList, err := replicaSets.List(options)
-	if err != nil {
-		return err
-	}
 	errList := []error{}
-	for _, rc := range rsList.Items {
-		if err := rsReaper.Stop(rc.Namespace, rc.Name, timeout, gracePeriod); err != nil {
+	for _, rs := range rss {
+		if err := rsReaper.Stop(rs.Namespace, rs.Name, timeout, gracePeriod); err != nil {
 			scaleGetErr, ok := err.(ScaleError)
 			if errors.IsNotFound(err) || (ok && errors.IsNotFound(scaleGetErr.ActualError)) {
 				continue

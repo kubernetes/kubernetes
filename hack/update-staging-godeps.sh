@@ -55,9 +55,8 @@ if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
   exit 1
 fi
 
-kube::util::ensure_clean_working_dir
 kube::util::ensure-temp-dir
-kube::util::ensure_godep_version v74
+kube::util::ensure_godep_version v79
 
 TMP_GOPATH="${KUBE_TEMP}/go"
 
@@ -85,6 +84,8 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
     continue
   fi
 
+  kube::util::ensure_clean_working_dir
+
   cp -a "${KUBE_ROOT}/staging/src/k8s.io/${repo}" "${TMP_GOPATH}/src/k8s.io/"
 
   pushd "${TMP_GOPATH}/src/k8s.io/${repo}" >/dev/null
@@ -98,7 +99,7 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   updateGodepManifest "${repo}"
 
   if [ "${FAIL_ON_DIFF}" == true ]; then
-    diff --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json"
+    diff --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json"
   fi
   if [ "${DRY_RUN}" != true ]; then
     cp "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps"

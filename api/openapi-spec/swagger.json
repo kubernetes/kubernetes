@@ -1066,7 +1066,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -1470,7 +1470,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -1874,7 +1874,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -2278,7 +2278,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -2682,7 +2682,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -3222,7 +3222,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -4692,7 +4692,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -5096,7 +5096,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -5772,7 +5772,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -6312,7 +6312,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -6716,7 +6716,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -7757,7 +7757,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -8331,7 +8331,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -9294,7 +9294,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -15341,7 +15341,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -16083,7 +16083,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -17967,7 +17967,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -18872,7 +18872,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -19810,7 +19810,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -20395,83 +20395,6 @@
      }
     ]
    },
-   "/apis/batch/v2alpha1/jobs": {
-    "get": {
-     "description": "list or watch objects of kind Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf",
-      "application/json;stream=watch",
-      "application/vnd.kubernetes.protobuf;stream=watch"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "listBatchV2alpha1JobForAllNamespaces",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobList"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-      "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-      "name": "labelSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-      "name": "resourceVersion",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "integer",
-      "description": "Timeout for the list/watch call.",
-      "name": "timeoutSeconds",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-      "name": "watch",
-      "in": "query"
-     }
-    ]
-   },
    "/apis/batch/v2alpha1/namespaces/{namespace}/cronjobs": {
     "get": {
      "description": "list or watch objects of kind CronJob",
@@ -20792,7 +20715,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -20991,546 +20914,6 @@
       "uniqueItems": true,
       "type": "string",
       "description": "name of the CronJob",
-      "name": "name",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     }
-    ]
-   },
-   "/apis/batch/v2alpha1/namespaces/{namespace}/jobs": {
-    "get": {
-     "description": "list or watch objects of kind Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf",
-      "application/json;stream=watch",
-      "application/vnd.kubernetes.protobuf;stream=watch"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "listBatchV2alpha1NamespacedJob",
-     "parameters": [
-      {
-       "uniqueItems": true,
-       "type": "string",
-       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-       "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "string",
-       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-       "name": "labelSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "string",
-       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-       "name": "resourceVersion",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "integer",
-       "description": "Timeout for the list/watch call.",
-       "name": "timeoutSeconds",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-       "name": "watch",
-       "in": "query"
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobList"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "post": {
-     "description": "create a Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "createBatchV2alpha1NamespacedJob",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "delete": {
-     "description": "delete collection of Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "deleteBatchV2alpha1CollectionNamespacedJob",
-     "parameters": [
-      {
-       "uniqueItems": true,
-       "type": "string",
-       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-       "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "string",
-       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-       "name": "labelSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "string",
-       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-       "name": "resourceVersion",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "integer",
-       "description": "Timeout for the list/watch call.",
-       "name": "timeoutSeconds",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-       "name": "watch",
-       "in": "query"
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     }
-    ]
-   },
-   "/apis/batch/v2alpha1/namespaces/{namespace}/jobs/{name}": {
-    "get": {
-     "description": "read the specified Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "readBatchV2alpha1NamespacedJob",
-     "parameters": [
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
-       "name": "exact",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
-       "name": "export",
-       "in": "query"
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "put": {
-     "description": "replace the specified Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "replaceBatchV2alpha1NamespacedJob",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "delete": {
-     "description": "delete a Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "deleteBatchV2alpha1NamespacedJob",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
-       }
-      },
-      {
-       "uniqueItems": true,
-       "type": "integer",
-       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
-       "name": "gracePeriodSeconds",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
-       "name": "orphanDependents",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
-       "name": "propagationPolicy",
-       "in": "query"
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "patch": {
-     "description": "partially update the specified Job",
-     "consumes": [
-      "application/json-patch+json",
-      "application/merge-patch+json",
-      "application/strategic-merge-patch+json"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "patchBatchV2alpha1NamespacedJob",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "name of the Job",
-      "name": "name",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     }
-    ]
-   },
-   "/apis/batch/v2alpha1/namespaces/{namespace}/jobs/{name}/status": {
-    "get": {
-     "description": "read status of the specified Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "readBatchV2alpha1NamespacedJobStatus",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "put": {
-     "description": "replace status of the specified Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "replaceBatchV2alpha1NamespacedJobStatus",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "patch": {
-     "description": "partially update status of the specified Job",
-     "consumes": [
-      "application/json-patch+json",
-      "application/merge-patch+json",
-      "application/strategic-merge-patch+json"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "patchBatchV2alpha1NamespacedJobStatus",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "name of the Job",
       "name": "name",
       "in": "path",
       "required": true
@@ -21872,7 +21255,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -22246,83 +21629,6 @@
      }
     ]
    },
-   "/apis/batch/v2alpha1/watch/jobs": {
-    "get": {
-     "description": "watch individual changes to a list of Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf",
-      "application/json;stream=watch",
-      "application/vnd.kubernetes.protobuf;stream=watch"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "watchBatchV2alpha1JobListForAllNamespaces",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-      "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-      "name": "labelSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-      "name": "resourceVersion",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "integer",
-      "description": "Timeout for the list/watch call.",
-      "name": "timeoutSeconds",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-      "name": "watch",
-      "in": "query"
-     }
-    ]
-   },
    "/apis/batch/v2alpha1/watch/namespaces/{namespace}/cronjobs": {
     "get": {
      "description": "watch individual changes to a list of CronJob",
@@ -22459,184 +21765,6 @@
       "uniqueItems": true,
       "type": "string",
       "description": "name of the CronJob",
-      "name": "name",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-      "name": "resourceVersion",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "integer",
-      "description": "Timeout for the list/watch call.",
-      "name": "timeoutSeconds",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-      "name": "watch",
-      "in": "query"
-     }
-    ]
-   },
-   "/apis/batch/v2alpha1/watch/namespaces/{namespace}/jobs": {
-    "get": {
-     "description": "watch individual changes to a list of Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf",
-      "application/json;stream=watch",
-      "application/vnd.kubernetes.protobuf;stream=watch"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "watchBatchV2alpha1NamespacedJobList",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-      "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-      "name": "labelSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-      "name": "resourceVersion",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "integer",
-      "description": "Timeout for the list/watch call.",
-      "name": "timeoutSeconds",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-      "name": "watch",
-      "in": "query"
-     }
-    ]
-   },
-   "/apis/batch/v2alpha1/watch/namespaces/{namespace}/jobs/{name}": {
-    "get": {
-     "description": "watch changes to an object of kind Job",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf",
-      "application/json;stream=watch",
-      "application/vnd.kubernetes.protobuf;stream=watch"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "batch_v2alpha1"
-     ],
-     "operationId": "watchBatchV2alpha1NamespacedJob",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-      "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-      "name": "labelSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "name of the Job",
       "name": "name",
       "in": "path",
       "required": true
@@ -23312,7 +22440,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -24283,7 +23411,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -24823,7 +23951,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -25565,7 +24693,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -26105,7 +25233,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -26509,7 +25637,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -27390,7 +26518,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -27855,7 +26983,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -29916,7 +29044,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -30830,7 +29958,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -31202,7 +30330,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -31582,7 +30710,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -31970,7 +31098,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -33371,7 +32499,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -33743,7 +32871,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -34123,7 +33251,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -34511,7 +33639,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -35583,6 +34711,808 @@
      }
     ]
    },
+   "/apis/settings.k8s.io/": {
+    "get": {
+     "description": "get information of a group",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings"
+     ],
+     "operationId": "getSettingsAPIGroup",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
+   "/apis/settings.k8s.io/v1alpha1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "getSettingsV1alpha1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
+   "/apis/settings.k8s.io/v1alpha1/namespaces/{namespace}/podpresets": {
+    "get": {
+     "description": "list or watch objects of kind PodPreset",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "listSettingsV1alpha1NamespacedPodPreset",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPresetList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a PodPreset",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "createSettingsV1alpha1NamespacedPodPreset",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPreset"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPreset"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of PodPreset",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "deleteSettingsV1alpha1CollectionNamespacedPodPreset",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/settings.k8s.io/v1alpha1/namespaces/{namespace}/podpresets/{name}": {
+    "get": {
+     "description": "read the specified PodPreset",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "readSettingsV1alpha1NamespacedPodPreset",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPreset"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified PodPreset",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "replaceSettingsV1alpha1NamespacedPodPreset",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPreset"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPreset"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a PodPreset",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "deleteSettingsV1alpha1NamespacedPodPreset",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
+       "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+       "name": "propagationPolicy",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified PodPreset",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "patchSettingsV1alpha1NamespacedPodPreset",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPreset"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the PodPreset",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/settings.k8s.io/v1alpha1/podpresets": {
+    "get": {
+     "description": "list or watch objects of kind PodPreset",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "listSettingsV1alpha1PodPresetForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPresetList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/settings.k8s.io/v1alpha1/watch/namespaces/{namespace}/podpresets": {
+    "get": {
+     "description": "watch individual changes to a list of PodPreset",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "watchSettingsV1alpha1NamespacedPodPresetList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/settings.k8s.io/v1alpha1/watch/namespaces/{namespace}/podpresets/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind PodPreset",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "watchSettingsV1alpha1NamespacedPodPreset",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the PodPreset",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/settings.k8s.io/v1alpha1/watch/podpresets": {
+    "get": {
+     "description": "watch individual changes to a list of PodPreset",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "settings_v1alpha1"
+     ],
+     "operationId": "watchSettingsV1alpha1PodPresetListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/storage.k8s.io/": {
     "get": {
      "description": "get information of a group",
@@ -35615,6 +35545,589 @@
       }
      }
     }
+   },
+   "/apis/storage.k8s.io/v1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "getStorageV1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
+   },
+   "/apis/storage.k8s.io/v1/storageclasses": {
+    "get": {
+     "description": "list or watch objects of kind StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "listStorageV1StorageClass",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClassList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "createStorageV1StorageClass",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "deleteStorageV1CollectionStorageClass",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/storage.k8s.io/v1/storageclasses/{name}": {
+    "get": {
+     "description": "read the specified StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "readStorageV1StorageClass",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "replaceStorageV1StorageClass",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "deleteStorageV1StorageClass",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
+       "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+       "name": "propagationPolicy",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified StorageClass",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "patchStorageV1StorageClass",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the StorageClass",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/storage.k8s.io/v1/watch/storageclasses": {
+    "get": {
+     "description": "watch individual changes to a list of StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "watchStorageV1StorageClassList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/storage.k8s.io/v1/watch/storageclasses/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind StorageClass",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "storage_v1"
+     ],
+     "operationId": "watchStorageV1StorageClass",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the StorageClass",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
    },
    "/apis/storage.k8s.io/v1beta1/": {
     "get": {
@@ -35961,7 +36474,7 @@
       {
        "uniqueItems": true,
        "type": "string",
-       "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
        "name": "propagationPolicy",
        "in": "query"
       }
@@ -36342,6 +36855,7 @@
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",
+     "singularName",
      "namespaced",
      "kind",
      "verbs"
@@ -36352,7 +36866,7 @@
       "type": "string"
      },
      "name": {
-      "description": "name is the name of the resource.",
+      "description": "name is the plural name of the resource.",
       "type": "string"
      },
      "namespaced": {
@@ -36365,6 +36879,10 @@
       "items": {
        "type": "string"
       }
+     },
+     "singularName": {
+      "description": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
+      "type": "string"
      },
      "verbs": {
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
@@ -36459,7 +36977,7 @@
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions"
      },
      "propagationPolicy": {
-      "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+      "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
       "type": "string"
      }
     }
@@ -37319,7 +37837,7 @@
       }
      },
      "envFrom": {
-      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. An invalid key will prevent the container from starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EnvFromSource"
@@ -39205,6 +39723,10 @@
       "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RBDVolumeSource"
      },
+     "scaleIO": {
+      "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ScaleIOVolumeSource"
+     },
      "storageClassName": {
       "description": "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
       "type": "string"
@@ -39301,16 +39823,13 @@
    },
    "io.k8s.kubernetes.pkg.api.v1.PodAffinityTerm": {
     "description": "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key \u003ctopologyKey\u003e tches that of any node on which a pod of the set of pods is running",
-    "required": [
-     "namespaces"
-    ],
     "properties": {
      "labelSelector": {
       "description": "A label query over a set of resources, in this case pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "namespaces": {
-      "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); nil list means \"this pod's namespace,\" empty list means \"all namespaces\" The json tag here is not \"omitempty\" since we need to distinguish nil and empty. See https://golang.org/pkg/encoding/json/#Marshal for more details.",
+      "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\"",
       "type": "array",
       "items": {
        "type": "string"
@@ -39514,7 +40033,7 @@
       "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy",
       "type": "string"
      },
-     "schedulername": {
+     "schedulerName": {
       "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
       "type": "string"
      },
@@ -40182,6 +40701,56 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.ScaleIOVolumeSource": {
+    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+    "required": [
+     "gateway",
+     "system",
+     "secretRef"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "gateway": {
+      "description": "The host address of the ScaleIO API Gateway.",
+      "type": "string"
+     },
+     "protectionDomain": {
+      "description": "The name of the Protection Domain for the configured storage (defaults to \"default\").",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     },
+     "secretRef": {
+      "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalObjectReference"
+     },
+     "sslEnabled": {
+      "description": "Flag to enable/disable SSL communication with Gateway, default false",
+      "type": "boolean"
+     },
+     "storageMode": {
+      "description": "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\").",
+      "type": "string"
+     },
+     "storagePool": {
+      "description": "The Storage Pool associated with the protection domain (defaults to \"default\").",
+      "type": "string"
+     },
+     "system": {
+      "description": "The name of the storage system as configured in ScaleIO.",
+      "type": "string"
+     },
+     "volumeName": {
+      "description": "The name of a volume already created in the ScaleIO system that is associated with this volume source.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.Secret": {
     "description": "Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.",
     "properties": {
@@ -40614,6 +41183,10 @@
      "port"
     ],
     "properties": {
+     "host": {
+      "description": "Optional: Host name to connect to, defaults to the pod IP.",
+      "type": "string"
+     },
      "port": {
       "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
@@ -40772,6 +41345,10 @@
      "rbd": {
       "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RBDVolumeSource"
+     },
+     "scaleIO": {
+      "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ScaleIOVolumeSource"
      },
      "secret": {
       "description": "Secret represents a secret that should populate this volume. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
@@ -42742,175 +43319,6 @@
      }
     }
    },
-   "io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job": {
-    "description": "Job represents the configuration of a single job.",
-    "properties": {
-     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-      "type": "string"
-     },
-     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "type": "string"
-     },
-     "metadata": {
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
-     },
-     "spec": {
-      "description": "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobSpec"
-     },
-     "status": {
-      "description": "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobStatus"
-     }
-    },
-    "x-kubernetes-group-version-kind": [
-     {
-      "Group": "batch",
-      "Version": "v2alpha1",
-      "Kind": "Job"
-     }
-    ]
-   },
-   "io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobCondition": {
-    "description": "JobCondition describes current state of a job.",
-    "required": [
-     "type",
-     "status"
-    ],
-    "properties": {
-     "lastProbeTime": {
-      "description": "Last time the condition was checked.",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
-     },
-     "lastTransitionTime": {
-      "description": "Last time the condition transit from one status to another.",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
-     },
-     "message": {
-      "description": "Human readable message indicating details about last transition.",
-      "type": "string"
-     },
-     "reason": {
-      "description": "(brief) reason for the condition's last transition.",
-      "type": "string"
-     },
-     "status": {
-      "description": "Status of the condition, one of True, False, Unknown.",
-      "type": "string"
-     },
-     "type": {
-      "description": "Type of job condition, Complete or Failed.",
-      "type": "string"
-     }
-    }
-   },
-   "io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobList": {
-    "description": "JobList is a collection of jobs.",
-    "required": [
-     "items"
-    ],
-    "properties": {
-     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-      "type": "string"
-     },
-     "items": {
-      "description": "Items is the list of Job.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.Job"
-      }
-     },
-     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "type": "string"
-     },
-     "metadata": {
-      "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
-     }
-    },
-    "x-kubernetes-group-version-kind": [
-     {
-      "Group": "batch",
-      "Version": "v2alpha1",
-      "Kind": "JobList"
-     }
-    ]
-   },
-   "io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobSpec": {
-    "description": "JobSpec describes how the job execution will look like.",
-    "required": [
-     "template"
-    ],
-    "properties": {
-     "activeDeadlineSeconds": {
-      "description": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer",
-      "type": "integer",
-      "format": "int64"
-     },
-     "completions": {
-      "description": "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
-      "type": "integer",
-      "format": "int32"
-     },
-     "manualSelector": {
-      "description": "ManualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
-      "type": "boolean"
-     },
-     "parallelism": {
-      "description": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) \u003c .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs",
-      "type": "integer",
-      "format": "int32"
-     },
-     "selector": {
-      "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
-     },
-     "template": {
-      "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
-      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"
-     }
-    }
-   },
-   "io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobStatus": {
-    "description": "JobStatus represents the current state of a Job.",
-    "properties": {
-     "active": {
-      "description": "Active is the number of actively running pods.",
-      "type": "integer",
-      "format": "int32"
-     },
-     "completionTime": {
-      "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
-     },
-     "conditions": {
-      "description": "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobCondition"
-      }
-     },
-     "failed": {
-      "description": "Failed is the number of pods which reached Phase Failed.",
-      "type": "integer",
-      "format": "int32"
-     },
-     "startTime": {
-      "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
-     },
-     "succeeded": {
-      "description": "Succeeded is the number of pods which reached Phase Succeeded.",
-      "type": "integer",
-      "format": "int32"
-     }
-    }
-   },
    "io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobTemplateSpec": {
     "description": "JobTemplateSpec describes the data a Job should have when created from a template",
     "properties": {
@@ -42920,7 +43328,7 @@
      },
      "spec": {
       "description": "Specification of the desired behavior of the job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v2alpha1.JobSpec"
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.batch.v1.JobSpec"
      }
     }
    },
@@ -43095,11 +43503,11 @@
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "spec": {
-      "description": "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "description": "The desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetSpec"
      },
      "status": {
-      "description": "Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "description": "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetStatus"
      }
     },
@@ -43122,7 +43530,7 @@
       "type": "string"
      },
      "items": {
-      "description": "Items is a list of daemon sets.",
+      "description": "A list of daemon sets.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSet"
@@ -43152,16 +43560,16 @@
     ],
     "properties": {
      "minReadySeconds": {
-      "description": "MinReadySeconds minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+      "description": "The minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
       "type": "integer",
       "format": "int32"
      },
      "selector": {
-      "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+      "description": "A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "template": {
-      "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
+      "description": "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"
      },
      "templateGeneration": {
@@ -43170,7 +43578,7 @@
       "format": "int64"
      },
      "updateStrategy": {
-      "description": "UpdateStrategy to replace existing DaemonSet pods with new pods.",
+      "description": "An update strategy to replace existing DaemonSet pods with new pods.",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetUpdateStrategy"
      }
     }
@@ -43185,42 +43593,42 @@
     ],
     "properties": {
      "currentNumberScheduled": {
-      "description": "CurrentNumberScheduled is the number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+      "description": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
       "type": "integer",
       "format": "int32"
      },
      "desiredNumberScheduled": {
-      "description": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+      "description": "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
       "type": "integer",
       "format": "int32"
      },
      "numberAvailable": {
-      "description": "NumberAvailable is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least minReadySeconds)",
+      "description": "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least spec.minReadySeconds)",
       "type": "integer",
       "format": "int32"
      },
      "numberMisscheduled": {
-      "description": "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+      "description": "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
       "type": "integer",
       "format": "int32"
      },
      "numberReady": {
-      "description": "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
+      "description": "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
       "type": "integer",
       "format": "int32"
      },
      "numberUnavailable": {
-      "description": "NumberUnavailable is the number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least minReadySeconds)",
+      "description": "The number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least spec.minReadySeconds)",
       "type": "integer",
       "format": "int32"
      },
      "observedGeneration": {
-      "description": "ObservedGeneration is the most recent generation observed by the daemon set controller.",
+      "description": "The most recent generation observed by the daemon set controller.",
       "type": "integer",
       "format": "int64"
      },
      "updatedNumberScheduled": {
-      "description": "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod",
+      "description": "The total number of nodes that are running updated daemon pod",
       "type": "integer",
       "format": "int32"
      }
@@ -43229,7 +43637,7 @@
    "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetUpdateStrategy": {
     "properties": {
      "rollingUpdate": {
-      "description": "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.",
+      "description": "Rolling update config params. Present only if type = \"RollingUpdate\".",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollingUpdateDaemonSet"
      },
      "type": {
@@ -44144,7 +44552,7 @@
     "description": "Spec to control the desired behavior of daemon set rolling update.",
     "properties": {
      "maxUnavailable": {
-      "description": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+      "description": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      }
     }
@@ -45239,6 +45647,175 @@
       "type": "string"
      }
     }
+   },
+   "io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPreset": {
+    "description": "PodPreset is a policy resource that defines additional runtime requirements for a Pod.",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPresetSpec"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPreset"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPresetList": {
+    "description": "PodPresetList is a list of PodPreset objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "description": "Items is a list of schema objects.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPreset"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "settings.k8s.io",
+      "Version": "v1alpha1",
+      "Kind": "PodPresetList"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.settings.v1alpha1.PodPresetSpec": {
+    "description": "PodPresetSpec is a description of a pod injection policy.",
+    "properties": {
+     "env": {
+      "description": "Env defines the collection of EnvVar to inject into containers.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EnvVar"
+      }
+     },
+     "envFrom": {
+      "description": "EnvFrom defines the collection of EnvFromSource to inject into containers.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EnvFromSource"
+      }
+     },
+     "selector": {
+      "description": "Selector is a label query over a set of resources, in this case pods. Required.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+     },
+     "volumeMounts": {
+      "description": "VolumeMounts defines the collection of VolumeMount to inject into containers.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.VolumeMount"
+      }
+     },
+     "volumes": {
+      "description": "Volumes defines the collection of Volume to inject into the pod.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Volume"
+      }
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass": {
+    "description": "StorageClass describes the parameters for a class of storage for which PersistentVolumes can be dynamically provisioned.\n\nStorageClasses are non-namespaced; the name of the storage class according to etcd is in ObjectMeta.Name.",
+    "required": [
+     "provisioner"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "parameters": {
+      "description": "Parameters holds the parameters for the provisioner that should create volumes of this storage class.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "provisioner": {
+      "description": "Provisioner indicates the type of the provisioner.",
+      "type": "string"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClass"
+     }
+    ]
+   },
+   "io.k8s.kubernetes.pkg.apis.storage.v1.StorageClassList": {
+    "description": "StorageClassList is a collection of storage classes.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "description": "Items is the list of StorageClasses",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.storage.v1.StorageClass"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "Group": "storage.k8s.io",
+      "Version": "v1",
+      "Kind": "StorageClassList"
+     }
+    ]
    },
    "io.k8s.kubernetes.pkg.apis.storage.v1beta1.StorageClass": {
     "description": "StorageClass describes the parameters for a class of storage for which PersistentVolumes can be dynamically provisioned.\n\nStorageClasses are non-namespaced; the name of the storage class according to etcd is in ObjectMeta.Name.",

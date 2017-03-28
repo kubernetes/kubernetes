@@ -28,10 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/security/apparmor"
-	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -80,6 +79,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 				},
+				StorageClassName: "valid",
 			}),
 		},
 		"good-volume-with-retain-policy": {
@@ -206,28 +206,17 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
 			}),
 		},
-		"volume with valid mount option for nfs": {
-			isExpectedFailure: false,
-			volume: testVolumeWithMountOption("good-nfs-mount-volume", "", "ro,nfsvers=3", api.PersistentVolumeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-				},
-				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					NFS: &api.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
-				},
-			}),
-		},
-		"volume with mount option for host path": {
+		"invalid-storage-class-name": {
 			isExpectedFailure: true,
-			volume: testVolumeWithMountOption("bad-hostpath-mount-volume", "", "ro,nfsvers=3", api.PersistentVolumeSpec{
+			volume: testVolume("invalid-storage-class-name", "", api.PersistentVolumeSpec{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/a/.."},
+					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 				},
+				StorageClassName: "-invalid-",
 			}),
 		},
 	}
@@ -253,7 +242,7 @@ func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeCla
 
 func testVolumeClaimStorageClass(name string, namespace string, annval string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
 	annotations := map[string]string{
-		storageutil.StorageClassAnnotation: annval,
+		v1.BetaStorageClassAnnotation: annval,
 	}
 
 	return &api.PersistentVolumeClaim{
@@ -263,25 +252,6 @@ func testVolumeClaimStorageClass(name string, namespace string, annval string, s
 			Annotations: annotations,
 		},
 		Spec: spec,
-	}
-}
-
-func testVolumeWithMountOption(name string, namespace string, mountOptions string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
-	annotations := map[string]string{
-		volume.MountOptionAnnotation: mountOptions,
-	}
-	objMeta := metav1.ObjectMeta{
-		Name:        name,
-		Annotations: annotations,
-	}
-
-	if namespace != "" {
-		objMeta.Namespace = namespace
-	}
-
-	return &api.PersistentVolume{
-		ObjectMeta: objMeta,
-		Spec:       spec,
 	}
 }
 
@@ -301,6 +271,8 @@ func testVolumeClaimAnnotation(name string, namespace string, ann string, annval
 }
 
 func TestValidatePersistentVolumeClaim(t *testing.T) {
+	invalidClassName := "-invalid-"
+	validClassName := "valid"
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		claim             *api.PersistentVolumeClaim
@@ -325,6 +297,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 					},
 				},
+				StorageClassName: &validClassName,
 			}),
 		},
 		"invalid-label-selector": {
@@ -426,6 +399,29 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 						api.ResourceName(api.ResourceStorage): resource.MustParse("-10G"),
 					},
 				},
+			}),
+		},
+		"invalid-storage-class-name": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "Exists",
+						},
+					},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+					api.ReadOnlyMany,
+				},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+				StorageClassName: &invalidClassName,
 			}),
 		},
 	}
@@ -1928,10 +1924,69 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "azureDisk.diskURI",
 		},
+		// ScaleIO
+		{
+			name: "valid scaleio volume",
+			vol: api.Volume{
+				Name: "scaleio-volume",
+				VolumeSource: api.VolumeSource{
+					ScaleIO: &api.ScaleIOVolumeSource{
+						Gateway:    "http://abcd/efg",
+						System:     "test-system",
+						VolumeName: "test-vol-1",
+					},
+				},
+			},
+		},
+		{
+			name: "ScaleIO with empty name",
+			vol: api.Volume{
+				Name: "scaleio-volume",
+				VolumeSource: api.VolumeSource{
+					ScaleIO: &api.ScaleIOVolumeSource{
+						Gateway:    "http://abcd/efg",
+						System:     "test-system",
+						VolumeName: "",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "scaleIO.volumeName",
+		},
+		{
+			name: "ScaleIO with empty gateway",
+			vol: api.Volume{
+				Name: "scaleio-volume",
+				VolumeSource: api.VolumeSource{
+					ScaleIO: &api.ScaleIOVolumeSource{
+						Gateway:    "",
+						System:     "test-system",
+						VolumeName: "test-vol-1",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "scaleIO.gateway",
+		},
+		{
+			name: "ScaleIO with empty system",
+			vol: api.Volume{
+				Name: "scaleio-volume",
+				VolumeSource: api.VolumeSource{
+					ScaleIO: &api.ScaleIOVolumeSource{
+						Gateway:    "http://agc/efg/gateway",
+						System:     "",
+						VolumeName: "test-vol-1",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "scaleIO.system",
+		},
 	}
 
 	for i, tc := range testCases {
-		names, errs := validateVolumes([]api.Volume{tc.vol}, field.NewPath("field"))
+		names, errs := ValidateVolumes([]api.Volume{tc.vol}, field.NewPath("field"))
 		if len(errs) > 0 && tc.errtype == "" {
 			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
 		} else if len(errs) > 1 {
@@ -1957,7 +2012,7 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "abc", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 		{Name: "abc", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 	}
-	_, errs := validateVolumes(dupsCase, field.NewPath("field"))
+	_, errs := ValidateVolumes(dupsCase, field.NewPath("field"))
 	if len(errs) == 0 {
 		t.Errorf("expected error")
 	} else if len(errs) != 1 {
@@ -2121,7 +2176,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 	}
-	if errs := validateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -2303,7 +2358,7 @@ func TestValidateEnv(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCases {
-		if errs := validateEnv(tc.envs, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateEnv(tc.envs, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
@@ -2341,7 +2396,7 @@ func TestValidateEnvFrom(t *testing.T) {
 			},
 		},
 	}
-	if errs := validateEnvFrom(successCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateEnvFrom(successCase, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -2413,7 +2468,7 @@ func TestValidateEnvFrom(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCases {
-		if errs := validateEnvFrom(tc.envs, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateEnvFrom(tc.envs, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
@@ -2439,7 +2494,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
 		{Name: "abc", MountPath: "c:/foo/bar"},
 	}
-	if errs := validateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -2454,7 +2509,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"subpath ends in ..":  {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
 	}
 	for k, v := range errorCases {
-		if errs := validateVolumeMounts(v, volumes, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, volumes, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}

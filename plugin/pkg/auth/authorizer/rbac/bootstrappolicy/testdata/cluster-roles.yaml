@@ -646,6 +646,14 @@ items:
     - list
     - watch
   - apiGroups:
+    - apps
+    resources:
+    - statefulsets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
     - ""
     resources:
     - persistentvolumeclaims

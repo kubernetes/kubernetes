@@ -19,11 +19,11 @@ type TasksAPI struct {
 	client *Client
 }
 
-var taskUrl string = "/tasks"
+var taskUrl string = rootUrl + "/tasks"
 
 // Gets a task by ID.
 func (api *TasksAPI) Get(id string) (task *Task, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+taskUrl+"/"+id, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.client.Endpoint+taskUrl+"/"+id, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -39,7 +39,7 @@ func (api *TasksAPI) GetAll(options *TaskGetOptions) (result *TaskList, err erro
 	if options != nil {
 		uri += getQueryString(options)
 	}
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}

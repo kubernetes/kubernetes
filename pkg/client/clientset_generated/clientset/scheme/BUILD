@@ -30,6 +30,8 @@ go_library(
         "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",
+        "//pkg/apis/settings/v1alpha1:go_default_library",
+        "//pkg/apis/storage/v1:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",

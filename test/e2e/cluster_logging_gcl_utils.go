@@ -35,8 +35,8 @@ const (
 	// quota limit exceeded. So we retry for some time in case the problem will go away.
 	// Quota is enforced every 100 seconds, so we have to wait for more than
 	// that to reliably get the next portion.
-	queryGclRetryDelay   = 10 * time.Second
-	queryGclRetryTimeout = 200 * time.Second
+	queryGclRetryDelay   = 100 * time.Second
+	queryGclRetryTimeout = 250 * time.Second
 )
 
 type gclLogsProvider struct {
@@ -62,6 +62,10 @@ func newGclLogsProvider(f *framework.Framework) (*gclLogsProvider, error) {
 		Framework:  f,
 	}
 	return provider, nil
+}
+
+func (logsProvider *gclLogsProvider) FluentdApplicationName() string {
+	return "fluentd-gcp"
 }
 
 // Since GCL API is not easily available from the outside of cluster

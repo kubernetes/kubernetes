@@ -48,6 +48,13 @@ function config-ip-firewall {
     iptables -A FORWARD -w -p UDP -j ACCEPT
     iptables -A FORWARD -w -p ICMP -j ACCEPT
   fi
+
+  iptables -N KUBE-METADATA-SERVER
+  iptables -A FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
+
+  if [[ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]]; then
+    iptables -A KUBE-METADATA-SERVER -j DROP
+  fi
 }
 
 function create-dirs {
@@ -209,6 +216,10 @@ function create-node-pki {
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
     echo "${KUBELET_KEY}" | base64 --decode > "${KUBELET_KEY_PATH}"
   fi
+
+  # TODO(mikedanese): remove this when we don't support downgrading to versions
+  # < 1.6.
+  ln -sf "${CA_CERT_BUNDLE_PATH}" /etc/srv/kubernetes/ca.crt
 }
 
 function create-master-pki {
@@ -258,6 +269,11 @@ function create-master-pki {
 
   SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
   echo "${SERVICEACCOUNT_KEY}" | base64 --decode > "${SERVICEACCOUNT_KEY_PATH}"
+
+  # TODO(mikedanese): remove this when we don't support downgrading to versions
+  # < 1.6.
+  ln -sf "${APISERVER_SERVER_KEY_PATH}" /etc/srv/kubernetes/server.key
+  ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.cert
 }
 
 # After the first boot and on upgrade, these files exist on the master-pd
@@ -668,7 +684,6 @@ function start-kubelet {
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
       flags+=" --api-servers=https://${KUBELET_APISERVER}"
       flags+=" --register-schedulable=false"
-      flags+=" --register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule"
     else
       # Standalone mode (not widely used?)
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
@@ -1074,13 +1089,27 @@ function start-kube-apiserver {
 
 
   local authorization_mode="RBAC"
-  # Load existing ABAC policy files written by versions < 1.6 of this script
-  # TODO: only default to this legacy path when in upgrade mode
-  ABAC_AUTHZ_FILE="${ABAC_AUTHZ_FILE:-/etc/srv/kubernetes/abac-authz-policy.jsonl}"
-  if [[ -n "${ABAC_AUTHZ_FILE:-}" && -e "${ABAC_AUTHZ_FILE}" ]]; then
-    params+=" --authorization-policy-file=${ABAC_AUTHZ_FILE}"
+  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
+
+  # Enable ABAC mode unless the user explicitly opts out with ENABLE_LEGACY_ABAC=false
+  if [[ "${ENABLE_LEGACY_ABAC:-}" != "false" ]]; then  
+    echo "Warning: Enabling legacy ABAC policy. All service accounts will have superuser API access. Set ENABLE_LEGACY_ABAC=false to disable this."
+    # Create the ABAC file if it doesn't exist yet, or if we have a KUBE_USER set (to ensure the right user is given permissions)
+    if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
+      local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
+      remove-salt-config-comments "${abac_policy_json}"
+      if [[ -n "${KUBE_USER:-}" ]]; then
+        sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
+      else
+        sed -i -e "/{{kube_user}}/d" "${abac_policy_json}"
+      fi
+      cp "${abac_policy_json}" /etc/srv/kubernetes/
+    fi
+
+    params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
     authorization_mode+=",ABAC"
   fi
+
   local webhook_config_mount=""
   local webhook_config_volume=""
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
@@ -1089,7 +1118,6 @@ function start-kube-apiserver {
     webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
   fi
-  local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   params+=" --authorization-mode=${authorization_mode}"
 
   local container_env=""
@@ -1294,6 +1322,7 @@ function start-kube-addons {
   # Set up manifests of other addons.
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "google" ]] || \
+     [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "standalone" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "googleinfluxdb" ]]; then
     local -r file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"

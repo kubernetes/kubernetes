@@ -64,7 +64,7 @@ type quotaAdmission struct {
 	evaluator     Evaluator
 }
 
-var _ = kubeapiserveradmission.WantsInternalClientSet(&quotaAdmission{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&quotaAdmission{})
 
 type liveLookupEntry struct {
 	expiry time.Time
@@ -91,11 +91,11 @@ func NewResourceQuota(registry quota.Registry, config *resourcequotaapi.Configur
 	}, nil
 }
 
-func (a *quotaAdmission) SetInternalClientSet(client internalclientset.Interface) {
+func (a *quotaAdmission) SetInternalKubeClientSet(client internalclientset.Interface) {
 	a.quotaAccessor.client = client
 }
 
-func (a *quotaAdmission) SetInformerFactory(f informers.SharedInformerFactory) {
+func (a *quotaAdmission) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	a.quotaAccessor.lister = f.Core().InternalVersion().ResourceQuotas().Lister()
 }
 

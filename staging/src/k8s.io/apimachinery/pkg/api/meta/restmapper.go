@@ -79,9 +79,6 @@ type DefaultRESTMapper struct {
 	pluralToSingular     map[schema.GroupVersionResource]schema.GroupVersionResource
 
 	interfacesFunc VersionInterfacesFunc
-
-	// aliasToResource is used for mapping aliases to resources
-	aliasToResource map[string][]string
 }
 
 func (m *DefaultRESTMapper) String() string {
@@ -105,7 +102,6 @@ func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion, f VersionI
 	kindToScope := make(map[schema.GroupVersionKind]RESTScope)
 	singularToPlural := make(map[schema.GroupVersionResource]schema.GroupVersionResource)
 	pluralToSingular := make(map[schema.GroupVersionResource]schema.GroupVersionResource)
-	aliasToResource := make(map[string][]string)
 	// TODO: verify name mappings work correctly when versions differ
 
 	return &DefaultRESTMapper{
@@ -115,7 +111,6 @@ func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion, f VersionI
 		defaultGroupVersions: defaultGroupVersions,
 		singularToPlural:     singularToPlural,
 		pluralToSingular:     pluralToSingular,
-		aliasToResource:      aliasToResource,
 		interfacesFunc:       f,
 	}
 }
@@ -547,20 +542,4 @@ func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string
 		return nil, &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Group: gk.Group, Resource: gk.Kind}}
 	}
 	return mappings, nil
-}
-
-// AddResourceAlias maps aliases to resources
-func (m *DefaultRESTMapper) AddResourceAlias(alias string, resources ...string) {
-	if len(resources) == 0 {
-		return
-	}
-	m.aliasToResource[alias] = resources
-}
-
-// AliasesForResource returns whether a resource has an alias or not
-func (m *DefaultRESTMapper) AliasesForResource(alias string) ([]string, bool) {
-	if res, ok := m.aliasToResource[alias]; ok {
-		return res, true
-	}
-	return nil, false
 }

@@ -305,18 +305,13 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
-	serviceConfig := proxyconfig.NewServiceConfig()
+	serviceConfig := proxyconfig.NewServiceConfig(client.Core().RESTClient(), config.ConfigSyncPeriod)
 	serviceConfig.RegisterHandler(proxier)
+	go serviceConfig.Run(wait.NeverStop)
 
-	endpointsConfig := proxyconfig.NewEndpointsConfig()
+	endpointsConfig := proxyconfig.NewEndpointsConfig(client.Core().RESTClient(), config.ConfigSyncPeriod)
 	endpointsConfig.RegisterHandler(endpointsHandler)
-
-	proxyconfig.NewSourceAPI(
-		client.Core().RESTClient(),
-		config.ConfigSyncPeriod,
-		serviceConfig.Channel("api"),
-		endpointsConfig.Channel("api"),
-	)
+	go endpointsConfig.Run(wait.NeverStop)
 
 	config.NodeRef = &clientv1.ObjectReference{
 		Kind:      "Node",

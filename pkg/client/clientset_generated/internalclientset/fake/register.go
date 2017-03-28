@@ -33,6 +33,7 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/install"
 	policy "k8s.io/kubernetes/pkg/apis/policy/install"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/install"
+	settings "k8s.io/kubernetes/pkg/apis/settings/install"
 	storage "k8s.io/kubernetes/pkg/apis/storage/install"
 	os "os"
 )
@@ -61,6 +62,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	extensions.Install(groupFactoryRegistry, registry, scheme)
 	policy.Install(groupFactoryRegistry, registry, scheme)
 	rbac.Install(groupFactoryRegistry, registry, scheme)
+	settings.Install(groupFactoryRegistry, registry, scheme)
 	storage.Install(groupFactoryRegistry, registry, scheme)
 
 }

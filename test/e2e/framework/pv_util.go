@@ -100,7 +100,7 @@ func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMa
 func DeletePersistentVolume(c clientset.Interface, pvName string) {
 	if c != nil && len(pvName) > 0 {
 		Logf("Deleting PersistentVolume %v", pvName)
-		err := c.Core().PersistentVolumes().Delete(pvName, nil)
+		err := c.CoreV1().PersistentVolumes().Delete(pvName, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
 			Expect(err).NotTo(HaveOccurred())
 		}
@@ -111,7 +111,7 @@ func DeletePersistentVolume(c clientset.Interface, pvName string) {
 func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns string) {
 	if c != nil && len(pvcName) > 0 {
 		Logf("Deleting PersistentVolumeClaim %v", pvcName)
-		err := c.Core().PersistentVolumeClaims(ns).Delete(pvcName, nil)
+		err := c.CoreV1().PersistentVolumeClaims(ns).Delete(pvcName, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
 			Expect(err).NotTo(HaveOccurred())
 		}
@@ -128,7 +128,7 @@ func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 	DeletePersistentVolumeClaim(c, pvc.Name, ns)
 
 	// Check that the PVC is really deleted.
-	pvc, err := c.Core().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
+	pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 	Expect(apierrs.IsNotFound(err)).To(BeTrue())
 
 	// Wait for the PV's phase to return to be `expectPVPhase`
@@ -137,7 +137,7 @@ func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 	Expect(err).NotTo(HaveOccurred())
 
 	// examine the pv's ClaimRef and UID and compare to expected values
-	pv, err = c.Core().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+	pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	cr := pv.Spec.ClaimRef
 	if expectPVPhase == v1.VolumeAvailable {
@@ -162,7 +162,7 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, 
 	var boundPVs, deletedPVCs int
 
 	for pvName := range pvols {
-		pv, err := c.Core().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+		pv, err := c.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 		Expect(apierrs.IsNotFound(err)).To(BeFalse())
 		cr := pv.Spec.ClaimRef
 		// if pv is bound then delete the pvc it is bound to
@@ -173,7 +173,7 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, 
 			pvcKey := makePvcKey(ns, cr.Name)
 			_, found := claims[pvcKey]
 			Expect(found).To(BeTrue())
-			pvc, err := c.Core().PersistentVolumeClaims(ns).Get(cr.Name, metav1.GetOptions{})
+			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(cr.Name, metav1.GetOptions{})
 			Expect(apierrs.IsNotFound(err)).To(BeFalse())
 			DeletePVCandValidatePV(c, ns, pvc, pv, expectPVPhase)
 			delete(claims, pvcKey)
@@ -186,7 +186,7 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, 
 // create the PV resource. Fails test on error.
 func createPV(c clientset.Interface, pv *v1.PersistentVolume) *v1.PersistentVolume {
 
-	pv, err := c.Core().PersistentVolumes().Create(pv)
+	pv, err := c.CoreV1().PersistentVolumes().Create(pv)
 	Expect(err).NotTo(HaveOccurred())
 	return pv
 }
@@ -194,7 +194,7 @@ func createPV(c clientset.Interface, pv *v1.PersistentVolume) *v1.PersistentVolu
 // create the PVC resource. Fails test on error.
 func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 
-	pvc, err := c.Core().PersistentVolumeClaims(ns).Create(pvc)
+	pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
 	Expect(err).NotTo(HaveOccurred())
 	return pvc
 }
@@ -316,11 +316,11 @@ func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, p
 	Expect(err).NotTo(HaveOccurred())
 
 	// Re-get the pv and pvc objects
-	pv, err = c.Core().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+	pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Re-get the pvc and
-	pvc, err = c.Core().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
+	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// The pv and pvc are both bound, but to each other?
@@ -354,7 +354,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 		}
 		Expect(err).NotTo(HaveOccurred())
 
-		pv, err := c.Core().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+		pv, err := c.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		if cr := pv.Spec.ClaimRef; cr != nil && len(cr.Name) > 0 {
 			// Assert bound pvc is a test resource. Failing assertion could
@@ -391,7 +391,7 @@ func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) {
 		return
 	}
 	Logf("Deleting pod %v", pod.Name)
-	err := c.Core().Pods(pod.Namespace).Delete(pod.Name, nil)
+	err := c.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			return // assume pod was deleted already
@@ -418,7 +418,7 @@ func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, clai
 	pod := MakeWritePod(ns, claimName)
 
 	// Instantiate pod (Create)
-	runPod, err := c.Core().Pods(ns).Create(pod)
+	runPod, err := c.CoreV1().Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(runPod).NotTo(BeNil())
 
@@ -536,7 +536,7 @@ func MakePod(ns string, pvcName string, isPrivileged bool, command string) *v1.P
 			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "client-",
+			GenerateName: "pvc-tester-",
 			Namespace:    ns,
 		},
 		Spec: v1.PodSpec{
@@ -575,13 +575,13 @@ func MakePod(ns string, pvcName string, isPrivileged bool, command string) *v1.P
 // Define and create a pod with a mounted PV.  Pod runs infinite loop until killed.
 func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
 	clientPod := MakePod(ns, pvc.Name, true, "")
-	clientPod, err := c.Core().Pods(ns).Create(clientPod)
+	clientPod, err := c.CoreV1().Pods(ns).Create(clientPod)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify the pod is running before returning it
 	err = WaitForPodRunningInNamespace(c, clientPod)
 	Expect(err).NotTo(HaveOccurred())
-	clientPod, err = c.Core().Pods(ns).Get(clientPod.Name, metav1.GetOptions{})
+	clientPod, err = c.CoreV1().Pods(ns).Get(clientPod.Name, metav1.GetOptions{})
 	Expect(apierrs.IsNotFound(err)).To(BeFalse())
 	return clientPod
 }

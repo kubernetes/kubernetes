@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -118,6 +117,10 @@ func (plugin *glusterfsPlugin) RequiresRemount() bool {
 
 func (plugin *glusterfsPlugin) SupportsMountOption() bool {
 	return true
+}
+
+func (plugin *glusterfsPlugin) SupportsBulkVolumeVerification() bool {
+	return false
 }
 
 func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -471,7 +474,7 @@ func (p *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAllocato
 	}
 
 	for _, pv := range pvList.Items {
-		if storageutil.GetVolumeStorageClass(&pv) != className {
+		if v1.GetPersistentVolumeClass(&pv) != className {
 			continue
 		}
 
@@ -650,7 +653,7 @@ func (r *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
 	}
 	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", r.options)
-	scName := storageutil.GetClaimStorageClass(r.options.PVC)
+	scName := v1.GetPersistentVolumeClaimClass(r.options.PVC)
 	cfg, err := parseClassParameters(r.options.Parameters, r.plugin.host.GetKubeClient())
 	if err != nil {
 		return nil, err

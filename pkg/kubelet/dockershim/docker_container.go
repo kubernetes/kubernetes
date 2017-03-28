@@ -32,6 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
+const (
+	dockerDefaultLoggingDriver = "json-file"
+)
+
 // ListContainers lists all containers matching the filter.
 func (ds *dockerService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
 	opts := dockertypes.ContainerListOptions{All: true}
@@ -217,13 +221,35 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get container %q log path: %v", containerID, err)
 	}
-	if path != "" {
-		// Only create the symlink when container log path is specified.
+
+	if path == "" {
+		glog.V(5).Infof("Container %s log path isn't specified, will not create the symlink", containerID)
+		return nil
+	}
+
+	if realPath != "" {
+		// Only create the symlink when container log path is specified and log file exists.
 		if err = ds.os.Symlink(realPath, path); err != nil {
 			return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q: %v",
 				path, realPath, containerID, err)
 		}
+	} else {
+		dockerLoggingDriver := ""
+		dockerInfo, err := ds.client.Info()
+		if err != nil {
+			glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
+		} else {
+			dockerLoggingDriver = dockerInfo.LoggingDriver
+			glog.V(10).Infof("Docker logging driver is %s", dockerLoggingDriver)
+		}
+
+		if dockerLoggingDriver == dockerDefaultLoggingDriver {
+			glog.Errorf("Cannot create symbolic link because container log file doesn't exist!")
+		} else {
+			glog.V(5).Infof("Unsupported logging driver: %s", dockerLoggingDriver)
+		}
 	}
+
 	return nil
 }
 

@@ -46,6 +46,10 @@ func newEsLogsProvider(f *framework.Framework) (*esLogsProvider, error) {
 	return &esLogsProvider{Framework: f}, nil
 }
 
+func (logsProvider *esLogsProvider) FluentdApplicationName() string {
+	return "fluentd-es"
+}
+
 // Ensures that elasticsearch is running and ready to serve requests
 func (logsProvider *esLogsProvider) EnsureWorking() error {
 	f := logsProvider.Framework
@@ -162,15 +166,15 @@ func (logsProvider *esLogsProvider) ReadEntries(pod *loggingPod) []*logEntry {
 		return nil
 	}
 
+	query := fmt.Sprintf("kubernetes.pod_name:%s AND kubernetes.namespace_name:%s", pod.Name, f.Namespace.Name)
+	framework.Logf("Sending a search request to Elasticsearch with the following query: %s", query)
+
 	// Ask Elasticsearch to return all the log lines that were tagged with the
 	// pod name. Ask for ten times as many log lines because duplication is possible.
 	body, err := proxyRequest.Namespace(api.NamespaceSystem).
 		Name("elasticsearch-logging").
 		Suffix("_search").
-		// TODO: Change filter to only match records from current test run
-		// after fluent-plugin-kubernetes_metadata_filter is enabled
-		// and optimize current query
-		Param("q", fmt.Sprintf("tag:*%s*", pod.Name)).
+		Param("q", query).
 		// Ask for more in case we included some unrelated records in our query
 		Param("size", strconv.Itoa(pod.ExpectedLinesNumber*10)).
 		DoRaw()

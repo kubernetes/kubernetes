@@ -40,7 +40,7 @@ import (
 // TestValidOpenAPISpec verifies that the open api is added
 // at the proper endpoint and the spec is valid.
 func TestValidOpenAPISpec(t *testing.T) {
-	_, etcdserver, config, assert := setUp(t)
+	etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
 	config.GenericConfig.EnableIndex = true

@@ -139,9 +139,9 @@ func createAndWaitForADummyDeployment(client *clientset.Clientset) error {
 
 	fmt.Println("[apiclient] Test deployment succeeded")
 
-	falseVar := false
+	foreground := metav1.DeletePropagationForeground
 	if err := client.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).Delete("dummy", &metav1.DeleteOptions{
-		OrphanDependents: &falseVar,
+		PropagationPolicy: &foreground,
 	}); err != nil {
 		fmt.Printf("[apiclient] Failed to delete test deployment [%v] (will ignore)\n", err)
 	}

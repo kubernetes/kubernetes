@@ -45,8 +45,8 @@ type exists struct {
 	namespaceLister corelisters.NamespaceLister
 }
 
-var _ = kubeapiserveradmission.WantsInformerFactory(&exists{})
-var _ = kubeapiserveradmission.WantsInternalClientSet(&exists{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&exists{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&exists{})
 
 func (e *exists) Admit(a admission.Attributes) error {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
@@ -87,11 +87,11 @@ func NewExists() admission.Interface {
 	}
 }
 
-func (e *exists) SetInternalClientSet(client internalclientset.Interface) {
+func (e *exists) SetInternalKubeClientSet(client internalclientset.Interface) {
 	e.client = client
 }
 
-func (e *exists) SetInformerFactory(f informers.SharedInformerFactory) {
+func (e *exists) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().InternalVersion().Namespaces()
 	e.namespaceLister = namespaceInformer.Lister()
 	e.SetReadyFunc(namespaceInformer.Informer().HasSynced)

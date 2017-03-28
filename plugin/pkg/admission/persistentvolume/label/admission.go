@@ -17,6 +17,7 @@ limitations under the License.
 package label
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"sync"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
 
@@ -44,8 +46,11 @@ type persistentVolumeLabel struct {
 
 	mutex            sync.Mutex
 	ebsVolumes       aws.Volumes
+	cloudConfig      []byte
 	gceCloudProvider *gce.GCECloud
 }
+
+var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 
 // NewPersistentVolumeLabel returns an admission.Interface implementation which adds labels to PersistentVolume CREATE requests,
 // based on the labels provided by the underlying cloud provider.
@@ -55,6 +60,10 @@ func NewPersistentVolumeLabel() *persistentVolumeLabel {
 	return &persistentVolumeLabel{
 		Handler: admission.NewHandler(admission.Create),
 	}
+}
+
+func (l *persistentVolumeLabel) SetCloudConfig(cloudConfig []byte) {
+	l.cloudConfig = cloudConfig
 }
 
 func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
@@ -131,7 +140,11 @@ func (l *persistentVolumeLabel) getEBSVolumes() (aws.Volumes, error) {
 	defer l.mutex.Unlock()
 
 	if l.ebsVolumes == nil {
-		cloudProvider, err := cloudprovider.GetCloudProvider("aws", nil)
+		var cloudConfigReader io.Reader
+		if len(l.cloudConfig) > 0 {
+			cloudConfigReader = bytes.NewReader(l.cloudConfig)
+		}
+		cloudProvider, err := cloudprovider.GetCloudProvider("aws", cloudConfigReader)
 		if err != nil || cloudProvider == nil {
 			return nil, err
 		}
@@ -176,7 +189,11 @@ func (l *persistentVolumeLabel) getGCECloudProvider() (*gce.GCECloud, error) {
 	defer l.mutex.Unlock()
 
 	if l.gceCloudProvider == nil {
-		cloudProvider, err := cloudprovider.GetCloudProvider("gce", nil)
+		var cloudConfigReader io.Reader
+		if len(l.cloudConfig) > 0 {
+			cloudConfigReader = bytes.NewReader(l.cloudConfig)
+		}
+		cloudProvider, err := cloudprovider.GetCloudProvider("gce", cloudConfigReader)
 		if err != nil || cloudProvider == nil {
 			return nil, err
 		}

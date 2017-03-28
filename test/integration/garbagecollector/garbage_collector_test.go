@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -607,7 +608,7 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	s, gc, clientSet := setup(t)
 	defer s.Close()
 
-	ns := framework.CreateTestingNamespace("gc-foreground2", s, t)
+	ns := framework.CreateTestingNamespace("gc-foreground3", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	podClient := clientSet.Core().Pods(ns.Name)
@@ -631,6 +632,19 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
 	defer close(stopCh)
+
+	// this makes sure the garbage collector will have added the pod to its
+	// dependency graph before handling the foreground deletion of the rc.
+	timeout := make(chan struct{})
+	go func() {
+		select {
+		case <-time.After(5 * time.Second):
+			close(timeout)
+		}
+	}()
+	if !cache.WaitForCacheSync(timeout, gc.HasSynced) {
+		t.Fatalf("failed to wait for garbage collector to be synced")
+	}
 
 	err = rcClient.Delete(toBeDeletedRCName, getForegroundOptions())
 	if err != nil {

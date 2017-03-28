@@ -192,10 +192,9 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				metav1.LabelHostname:       kl.hostname,
-				metav1.LabelOS:             goruntime.GOOS,
-				metav1.LabelArch:           goruntime.GOARCH,
-				metav1.LabelFluentdDsReady: "true",
+				metav1.LabelHostname: kl.hostname,
+				metav1.LabelOS:       goruntime.GOOS,
+				metav1.LabelArch:     goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{
@@ -528,6 +527,14 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 	// Set Allocatable.
 	if node.Status.Allocatable == nil {
 		node.Status.Allocatable = make(v1.ResourceList)
+	}
+	// Remove opaque integer resources from allocatable that are no longer
+	// present in capacity.
+	for k := range node.Status.Allocatable {
+		_, found := node.Status.Capacity[k]
+		if !found && v1.IsOpaqueIntResourceName(k) {
+			delete(node.Status.Allocatable, k)
+		}
 	}
 	allocatableReservation := kl.containerManager.GetNodeAllocatableReservation()
 	for k, v := range node.Status.Capacity {

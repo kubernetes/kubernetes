@@ -84,6 +84,10 @@ func VisitPodSecretNames(pod *api.Pod, visitor func(string) bool) bool {
 			if !visitor(source.Secret.SecretName) {
 				return false
 			}
+		case source.ScaleIO != nil:
+			if source.ScaleIO.SecretRef != nil && !visitor(source.ScaleIO.SecretRef.Name) {
+				return false
+			}
 		}
 	}
 	return true

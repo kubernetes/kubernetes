@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -53,7 +52,7 @@ type RuntimeHelper interface {
 	GetClusterDNS(pod *v1.Pod) (dnsServers []string, dnsSearches []string, useClusterFirstPolicy bool, err error)
 	// GetPodCgroupParent returns the the CgroupName identifer, and its literal cgroupfs form on the host
 	// of a pod.
-	GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string)
+	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
 	GeneratePodHostNameAndDomain(pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
@@ -119,8 +118,31 @@ func EnvVarsToMap(envs []EnvVar) map[string]string {
 	for _, env := range envs {
 		result[env.Name] = env.Value
 	}
+	return result
+}
+
+// V1EnvVarsToMap constructs a map of environment name to value from a slice
+// of env vars.
+func V1EnvVarsToMap(envs []v1.EnvVar) map[string]string {
+	result := map[string]string{}
+	for _, env := range envs {
+		result[env.Name] = env.Value
+	}
 
 	return result
+}
+
+// ExpandContainerCommandOnlyStatic substitutes only static environment variable values from the
+// container environment definitions. This does *not* include valueFrom substitutions.
+// TODO: callers should use ExpandContainerCommandAndArgs with a fully resolved list of environment.
+func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVar) (command []string) {
+	mapping := expansion.MappingFuncFor(V1EnvVarsToMap(envs))
+	if len(containerCommand) != 0 {
+		for _, cmd := range containerCommand {
+			command = append(command, expansion.Expand(cmd, mapping))
+		}
+	}
+	return command
 }
 
 func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (command []string, args []string) {

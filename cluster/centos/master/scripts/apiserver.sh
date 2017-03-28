@@ -56,7 +56,7 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 # Comma-delimited list of:
 #   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists,
 #   NamespaceLifecycle, NamespaceAutoProvision, AlwaysAdmit,
-#   ServiceAccount, ResourceQuota, DefaultStorageClass, DefaultTolerationSeconds
+#   ServiceAccount, DefaultStorageClass, DefaultTolerationSeconds, ResourceQuota
 KUBE_ADMISSION_CONTROL="--admission-control=${ADMISSION_CONTROL}"
 
 # --client-ca-file="": If set, any request presenting a client certificate signed

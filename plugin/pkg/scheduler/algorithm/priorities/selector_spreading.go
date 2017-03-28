@@ -31,7 +31,7 @@ import (
 )
 
 // The maximum priority value to give to a node
-// Prioritiy values range from 0-maxPriority
+// Priority values range from 0-maxPriority
 const maxPriority float32 = 10
 
 // When zone information is present, give 2/3 of the weighting to zone spreading, 1/3 to node spreading

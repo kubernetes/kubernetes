@@ -28,7 +28,7 @@ import (
 
 // ValidateStorageClass validates a StorageClass.
 func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMeta(&storageClass.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&storageClass.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateProvisioner(storageClass.Provisioner, field.NewPath("provisioner"))...)
 	allErrs = append(allErrs, validateParameters(storageClass.Parameters, field.NewPath("parameters"))...)
 

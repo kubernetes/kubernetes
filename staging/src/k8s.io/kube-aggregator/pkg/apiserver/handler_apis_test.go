@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/pkg/api"
 	corev1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -49,6 +48,7 @@ func TestAPIsDelegation(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	delegate := &delegationHTTPHandler{}
 	handler := &apisHandler{
+		codecs:   Codecs,
 		lister:   listers.NewAPIServiceLister(indexer),
 		delegate: delegate,
 	}
@@ -115,7 +115,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -127,7 +127,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -176,7 +176,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -188,7 +188,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v2.bar"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -200,7 +200,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v2.foo"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -212,7 +212,7 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -271,6 +271,7 @@ func TestAPIs(t *testing.T) {
 		endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		delegate := &delegationHTTPHandler{}
 		handler := &apisHandler{
+			codecs:          Codecs,
 			serviceLister:   v1listers.NewServiceLister(serviceIndexer),
 			endpointsLister: v1listers.NewEndpointsLister(endpointsIndexer),
 			lister:          listers.NewAPIServiceLister(indexer),
@@ -303,7 +304,7 @@ func TestAPIs(t *testing.T) {
 		}
 
 		actual := &metav1.APIGroupList{}
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), bytes, actual); err != nil {
+		if err := runtime.DecodeInto(Codecs.UniversalDecoder(), bytes, actual); err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
 		}
@@ -317,28 +318,42 @@ func TestAPIs(t *testing.T) {
 func TestAPIGroupMissing(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	handler := &apiGroupHandler{
+		codecs:    Codecs,
 		lister:    listers.NewAPIServiceLister(indexer),
-		groupName: "foo",
+		groupName: "groupName",
+		delegate: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		}),
 	}
 
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
+	// this call should delegate
 	resp, err := http.Get(server.URL + "/apis/groupName/foo")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("expected %v, got %v", resp.StatusCode, http.StatusNotFound)
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected %v, got %v", http.StatusForbidden, resp.StatusCode)
 	}
 
-	// foo still has no api services for it (like it was deleted), it should 404
+	// groupName still has no api services for it (like it was deleted), it should 404
 	resp, err = http.Get(server.URL + "/apis/groupName/")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("expected %v, got %v", resp.StatusCode, http.StatusNotFound)
+		t.Fatalf("expected %v, got %v", http.StatusNotFound, resp.StatusCode)
+	}
+
+	// missing group should delegate still has no api services for it (like it was deleted)
+	resp, err = http.Get(server.URL + "/apis/missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected %v, got %v", http.StatusForbidden, resp.StatusCode)
 	}
 }
 
@@ -356,7 +371,7 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -368,7 +383,7 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v2.bar"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -380,7 +395,7 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v2.foo"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -392,7 +407,7 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
-						Service: apiregistration.ServiceReference{
+						Service: &apiregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "api",
 						},
@@ -428,6 +443,7 @@ func TestAPIGroup(t *testing.T) {
 		serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		handler := &apiGroupHandler{
+			codecs:          Codecs,
 			lister:          listers.NewAPIServiceLister(indexer),
 			serviceLister:   v1listers.NewServiceLister(serviceIndexer),
 			endpointsLister: v1listers.NewEndpointsLister(endpointsIndexer),
@@ -465,7 +481,7 @@ func TestAPIGroup(t *testing.T) {
 		}
 
 		actual := &metav1.APIGroup{}
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), bytes, actual); err != nil {
+		if err := runtime.DecodeInto(Codecs.UniversalDecoder(), bytes, actual); err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
 		}

@@ -35,7 +35,9 @@ type ReplicaSetListerExpansion interface {
 // ReplicaSetNamespaeLister.
 type ReplicaSetNamespaceListerExpansion interface{}
 
-// GetPodReplicaSets returns a list of ReplicaSets managing a pod. Returns an error only if no matching ReplicaSets are found.
+// GetPodReplicaSets returns a list of ReplicaSets that potentially match a pod.
+// Only the one specified in the Pod's ControllerRef will actually manage it.
+// Returns an error only if no matching ReplicaSets are found.
 func (s *replicaSetLister) GetPodReplicaSets(pod *v1.Pod) ([]*extensions.ReplicaSet, error) {
 	if len(pod.Labels) == 0 {
 		return nil, fmt.Errorf("no ReplicaSets found for pod %v because it has no labels", pod.Name)

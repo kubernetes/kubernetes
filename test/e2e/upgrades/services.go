@@ -34,14 +34,14 @@ type ServiceUpgradeTest struct {
 	svcPort      int
 }
 
+func (ServiceUpgradeTest) Name() string { return "service-upgrade" }
+
 // Setup creates a service with a load balancer and makes sure it's reachable.
 func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 	serviceName := "service-test"
 	jig := framework.NewServiceTestJig(f.ClientSet, serviceName)
 
-	// Grab a unique namespace so we don't collide.
-	ns, err := f.CreateNamespace("service-upgrade", nil)
-	framework.ExpectNoError(err)
+	ns := f.Namespace
 
 	By("creating a TCP service " + serviceName + " with type=LoadBalancer in namespace " + ns.Name)
 	tcpService := jig.CreateTCPServiceOrFail(ns.Name, func(s *v1.Service) {

@@ -179,6 +179,10 @@ func (plugin *portworxVolumePlugin) SupportsMountOption() bool {
 	return false
 }
 
+func (plugin *portworxVolumePlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func getVolumeSource(
 	spec *volume.Spec) (*v1.PortworxVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.PortworxVolume != nil {

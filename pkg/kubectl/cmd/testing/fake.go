@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
+	"time"
 
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/spf13/cobra"
@@ -224,6 +226,7 @@ type TestFactory struct {
 	Err                error
 	Command            string
 	GenericPrinter     bool
+	TmpDir             string
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -272,6 +275,10 @@ func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander, err := cmdutil.NewShortcutExpander(mapper, fakeDs)
 	return expander, typer, err
+}
+
+func (f *FakeFactory) CategoryExpander() resource.CategoryExpander {
+	return resource.LegacyCategoryExpander
 }
 
 func (f *FakeFactory) Decoder(bool) runtime.Decoder {
@@ -373,7 +380,7 @@ func (f *FakeFactory) LabelsForObject(runtime.Object) (map[string]string, error)
 	return nil, nil
 }
 
-func (f *FakeFactory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
+func (f *FakeFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
 	return nil, nil
 }
 
@@ -420,7 +427,7 @@ func (f *FakeFactory) CanBeAutoscaled(schema.GroupKind) error {
 	return nil
 }
 
-func (f *FakeFactory) AttachablePodForObject(ob runtime.Object) (*api.Pod, error) {
+func (f *FakeFactory) AttachablePodForObject(ob runtime.Object, timeout time.Duration) (*api.Pod, error) {
 	return nil, nil
 }
 
@@ -567,6 +574,19 @@ func (f *fakeAPIFactory) RESTClient() (*restclient.RESTClient, error) {
 	return restClient, f.tf.Err
 }
 
+func (f *fakeAPIFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	fakeClient := f.tf.Client.(*fake.RESTClient)
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(f.tf.ClientConfig)
+	discoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+
+	cacheDir := filepath.Join(f.tf.TmpDir, ".kube", "cache", "discovery")
+	return cmdutil.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+}
+
+func (f *fakeAPIFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
+	return f.ClientSet()
+}
+
 func (f *fakeAPIFactory) ClientConfig() (*restclient.Config, error) {
 	return f.tf.ClientConfig, f.tf.Err
 }
@@ -597,7 +617,7 @@ func (f *fakeAPIFactory) Printer(mapping *meta.RESTMapping, options printers.Pri
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
+func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
 	c, err := f.ClientSet()
 	if err != nil {
 		panic(err)
@@ -619,7 +639,7 @@ func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restcli
 	}
 }
 
-func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object) (*api.Pod, error) {
+func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
 	switch t := object.(type) {
 	case *api.Pod:
 		return t, nil
@@ -673,7 +693,7 @@ func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RES
 func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
 
-	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }
 
 func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {

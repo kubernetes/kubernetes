@@ -1,4 +1,5 @@
 cluster/addons/fluentd-elasticsearch/es-image
+cluster/gce/gci/mounter
 cluster/images/etcd/attachlease
 cluster/images/etcd/rollback
 cmd/clicheck
@@ -14,10 +15,10 @@ cmd/kube-apiserver/app
 cmd/kube-apiserver/app/options
 cmd/kube-controller-manager
 cmd/kube-controller-manager/app/options
-cmd/kube-discovery
 cmd/kube-proxy
 cmd/kubeadm
 cmd/kubeadm/app/apis/kubeadm/install
+cmd/kubeadm/app/discovery/https
 cmd/kubeadm/app/phases/apiconfig
 cmd/kubeadm/app/phases/certs
 cmd/kubeadm/app/phases/kubeconfig
@@ -79,6 +80,8 @@ pkg/apis/imagepolicy/install
 pkg/apis/policy/install
 pkg/apis/rbac/install
 pkg/apis/rbac/v1alpha1
+pkg/apis/settings/install
+pkg/apis/settings/validation
 pkg/apis/storage/install
 pkg/apis/storage/validation
 pkg/bootstrap/api
@@ -103,7 +106,10 @@ pkg/client/informers/informers_generated/externalversions/policy/v1beta1
 pkg/client/informers/informers_generated/externalversions/rbac
 pkg/client/informers/informers_generated/externalversions/rbac/v1alpha1
 pkg/client/informers/informers_generated/externalversions/rbac/v1beta1
+pkg/client/informers/informers_generated/externalversions/settings
+pkg/client/informers/informers_generated/externalversions/settings/v1alpha1
 pkg/client/informers/informers_generated/externalversions/storage
+pkg/client/informers/informers_generated/externalversions/storage/v1
 pkg/client/informers/informers_generated/externalversions/storage/v1beta1
 pkg/client/informers/informers_generated/internalversion
 pkg/client/informers/informers_generated/internalversion/apps
@@ -122,6 +128,8 @@ pkg/client/informers/informers_generated/internalversion/policy
 pkg/client/informers/informers_generated/internalversion/policy/internalversion
 pkg/client/informers/informers_generated/internalversion/rbac
 pkg/client/informers/informers_generated/internalversion/rbac/internalversion
+pkg/client/informers/informers_generated/internalversion/settings
+pkg/client/informers/informers_generated/internalversion/settings/internalversion
 pkg/client/informers/informers_generated/internalversion/storage
 pkg/client/informers/informers_generated/internalversion/storage/internalversion
 pkg/client/listers/apps/internalversion
@@ -152,7 +160,10 @@ pkg/client/listers/policy/v1beta1
 pkg/client/listers/rbac/internalversion
 pkg/client/listers/rbac/v1alpha1
 pkg/client/listers/rbac/v1beta1
+pkg/client/listers/settings/internalversion
+pkg/client/listers/settings/v1alpha1
 pkg/client/listers/storage/internalversion
+pkg/client/listers/storage/v1
 pkg/client/listers/storage/v1beta1
 pkg/client/metrics
 pkg/client/metrics/prometheus
@@ -174,6 +185,7 @@ pkg/kubelet/container
 pkg/kubelet/envvars
 pkg/kubelet/eviction
 pkg/kubelet/eviction/api
+pkg/kubelet/gpu/nvidia
 pkg/kubelet/util/csr
 pkg/kubelet/util/format
 pkg/kubelet/util/ioutils
@@ -252,6 +264,7 @@ pkg/volume/util/nestedpendingoperations
 pkg/volume/util/operationexecutor
 pkg/volume/util/types
 pkg/volume/util/volumehelper
+pkg/volume/validation
 pkg/watch
 pkg/watch/json
 pkg/watch/versioned
@@ -273,6 +286,10 @@ plugin/pkg/auth
 plugin/pkg/auth/authenticator/token/bootstrap
 plugin/pkg/auth/authorizer
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
+plugin/pkg/scheduler
+plugin/pkg/scheduler/algorithmprovider
+plugin/pkg/scheduler/algorithmprovider/defaults
+plugin/pkg/scheduler/api/validation
 staging/src/k8s.io/apimachinery/pkg/api/equality
 staging/src/k8s.io/apimachinery/pkg/api/errors
 staging/src/k8s.io/apimachinery/pkg/api/resource
@@ -334,7 +351,10 @@ staging/src/k8s.io/client-go/informers/policy/v1beta1
 staging/src/k8s.io/client-go/informers/rbac
 staging/src/k8s.io/client-go/informers/rbac/v1alpha1
 staging/src/k8s.io/client-go/informers/rbac/v1beta1
+staging/src/k8s.io/client-go/informers/settings
+staging/src/k8s.io/client-go/informers/settings/v1alpha1
 staging/src/k8s.io/client-go/informers/storage
+staging/src/k8s.io/client-go/informers/storage/v1
 staging/src/k8s.io/client-go/informers/storage/v1beta1
 staging/src/k8s.io/client-go/listers/apps/v1beta1
 staging/src/k8s.io/client-go/listers/autoscaling/v1
@@ -347,6 +367,8 @@ staging/src/k8s.io/client-go/listers/extensions/v1beta1
 staging/src/k8s.io/client-go/listers/policy/v1beta1
 staging/src/k8s.io/client-go/listers/rbac/v1alpha1
 staging/src/k8s.io/client-go/listers/rbac/v1beta1
+staging/src/k8s.io/client-go/listers/settings/v1alpha1
+staging/src/k8s.io/client-go/listers/storage/v1
 staging/src/k8s.io/client-go/listers/storage/v1beta1
 staging/src/k8s.io/client-go/plugin/pkg/client/auth
 staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp
@@ -369,6 +391,7 @@ staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1alpha1
 staging/src/k8s.io/sample-apiserver
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/install
 test/e2e/perftype
+test/e2e_federation/upgrades
 test/e2e_node/runner/local
 test/images/clusterapi-tester
 test/images/entrypoint-tester

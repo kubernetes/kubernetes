@@ -82,7 +82,7 @@ func (plugin *podSecurityPolicyPlugin) Validate() error {
 
 var _ admission.Interface = &podSecurityPolicyPlugin{}
 var _ kubeapiserveradmission.WantsAuthorizer = &podSecurityPolicyPlugin{}
-var _ kubeapiserveradmission.WantsInformerFactory = &podSecurityPolicyPlugin{}
+var _ kubeapiserveradmission.WantsInternalKubeInformerFactory = &podSecurityPolicyPlugin{}
 
 // NewPlugin creates a new PSP admission plugin.
 func NewPlugin(strategyFactory psp.StrategyFactory, pspMatcher PSPMatchFn, failOnNoPolicies bool) *podSecurityPolicyPlugin {
@@ -94,7 +94,7 @@ func NewPlugin(strategyFactory psp.StrategyFactory, pspMatcher PSPMatchFn, failO
 	}
 }
 
-func (a *podSecurityPolicyPlugin) SetInformerFactory(f informers.SharedInformerFactory) {
+func (a *podSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	podSecurityPolicyInformer := f.Extensions().InternalVersion().PodSecurityPolicies()
 	a.lister = podSecurityPolicyInformer.Lister()
 	a.SetReadyFunc(podSecurityPolicyInformer.Informer().HasSynced)
@@ -288,7 +288,8 @@ func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user 
 	}
 
 	for _, constraint := range list {
-		if authorizedForPolicy(user, constraint, authz) || authorizedForPolicy(sa, constraint, authz) {
+		// if no user info exists then the API is being hit via the unsecured port. In this case authorize the request.
+		if user == nil || authorizedForPolicy(user, constraint, authz) || authorizedForPolicy(sa, constraint, authz) {
 			matchedPolicies = append(matchedPolicies, constraint)
 		}
 	}
@@ -298,13 +299,14 @@ func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user 
 
 // authorizedForPolicy returns true if info is authorized to perform a "get" on policy.
 func authorizedForPolicy(info user.Info, policy *extensions.PodSecurityPolicy, authz authorizer.Authorizer) bool {
-	// if no info exists then the API is being hit via the unsecured port.  In this case
-	// authorize the request.
 	if info == nil {
-		return true
+		return false
 	}
 	attr := buildAttributes(info, policy)
-	allowed, _, _ := authz.Authorize(attr)
+	allowed, reason, err := authz.Authorize(attr)
+	if err != nil {
+		glog.V(5).Infof("cannot authorized for policy: %v,%v", reason, err)
+	}
 	return allowed
 }
 

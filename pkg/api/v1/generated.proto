@@ -418,8 +418,8 @@ message Container {
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
-  // The keys defined within a source must be a C_IDENTIFIER. An invalid key
-  // will prevent the container from starting. When a key exists in multiple
+  // The keys defined within a source must be a C_IDENTIFIER. All invalid keys
+  // will be reported as an event when the container is starting. When a key exists in multiple
   // sources, the value associated with the last source will take precedence.
   // Values defined by an Env with a duplicate key will take precedence.
   // Cannot be updated.
@@ -688,8 +688,9 @@ message DeleteOptions {
   optional bool orphanDependents = 3;
 
   // Whether and how garbage collection will be performed.
-  // Defaults to Default.
   // Either this field or OrphanDependents may be set, but not both.
+  // The default policy is decided by the existing finalizer set in the
+  // metadata.finalizers and the resource-specific default policy.
   // +optional
   optional string propagationPolicy = 4;
 }
@@ -2140,6 +2141,10 @@ message PersistentVolumeSource {
   // PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
   // +optional
   optional PortworxVolumeSource portworxVolume = 18;
+
+  // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+  // +optional
+  optional ScaleIOVolumeSource scaleIO = 19;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2274,9 +2279,7 @@ message PodAffinityTerm {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
 
   // namespaces specifies which namespaces the labelSelector applies to (matches against);
-  // nil list means "this pod's namespace," empty list means "all namespaces"
-  // The json tag here is not "omitempty" since we need to distinguish nil and empty.
-  // See https://golang.org/pkg/encoding/json/#Marshal for more details.
+  // null or empty list means "this pod's namespace"
   repeated string namespaces = 2;
 
   // This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
@@ -2688,7 +2691,7 @@ message PodSpec {
   // If specified, the pod will be dispatched by specified scheduler.
   // If not specified, the pod will be dispatched by default scheduler.
   // +optional
-  optional string schedulername = 19;
+  optional string schedulerName = 19;
 
   // If specified, the pod's tolerations.
   // +optional
@@ -3210,6 +3213,50 @@ message SELinuxOptions {
   optional string level = 4;
 }
 
+// ScaleIOVolumeSource represents a persistent ScaleIO volume
+message ScaleIOVolumeSource {
+  // The host address of the ScaleIO API Gateway.
+  optional string gateway = 1;
+
+  // The name of the storage system as configured in ScaleIO.
+  optional string system = 2;
+
+  // SecretRef references to the secret for ScaleIO user and other
+  // sensitive information. If this is not provided, Login operation will fail.
+  optional LocalObjectReference secretRef = 3;
+
+  // Flag to enable/disable SSL communication with Gateway, default false
+  // +optional
+  optional bool sslEnabled = 4;
+
+  // The name of the Protection Domain for the configured storage (defaults to "default").
+  // +optional
+  optional string protectionDomain = 5;
+
+  // The Storage Pool associated with the protection domain (defaults to "default").
+  // +optional
+  optional string storagePool = 6;
+
+  // Indicates whether the storage for a volume should be thick or thin (defaults to "thin").
+  // +optional
+  optional string storageMode = 7;
+
+  // The name of a volume already created in the ScaleIO system
+  // that is associated with this volume source.
+  optional string volumeName = 8;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 9;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 10;
+}
+
 // Secret holds secret data of a certain type. The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
 message Secret {
@@ -3621,6 +3668,10 @@ message TCPSocketAction {
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 1;
+
+  // Optional: Host name to connect to, defaults to the pod IP.
+  // +optional
+  optional string host = 2;
 }
 
 // The node this Taint is attached to has the effect "effect" on
@@ -3840,11 +3891,15 @@ message VolumeSource {
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
 
   // Items for all in one resources secrets, configmaps, and downward API
-  optional ProjectedVolumeSource projected = 25;
+  optional ProjectedVolumeSource projected = 26;
 
   // PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
   // +optional
   optional PortworxVolumeSource portworxVolume = 24;
+
+  // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+  // +optional
+  optional ScaleIOVolumeSource scaleIO = 25;
 }
 
 // Represents a vSphere volume resource.

@@ -195,16 +195,17 @@ func (c *parameterCodec) EncodeParameters(obj Object, to schema.GroupVersion) (u
 }
 
 type base64Serializer struct {
-	Serializer
+	Encoder
+	Decoder
 }
 
-func NewBase64Serializer(s Serializer) Serializer {
-	return &base64Serializer{s}
+func NewBase64Serializer(e Encoder, d Decoder) Serializer {
+	return &base64Serializer{e, d}
 }
 
 func (s base64Serializer) Encode(obj Object, stream io.Writer) error {
 	e := base64.NewEncoder(base64.StdEncoding, stream)
-	err := s.Serializer.Encode(obj, e)
+	err := s.Encoder.Encode(obj, e)
 	e.Close()
 	return err
 }
@@ -215,7 +216,7 @@ func (s base64Serializer) Decode(data []byte, defaults *schema.GroupVersionKind,
 	if err != nil {
 		return nil, nil, err
 	}
-	return s.Serializer.Decode(out[:n], defaults, into)
+	return s.Decoder.Decode(out[:n], defaults, into)
 }
 
 // SerializerInfoForMediaType returns the first info in types that has a matching media type (which cannot

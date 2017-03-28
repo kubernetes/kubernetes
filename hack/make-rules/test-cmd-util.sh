@@ -672,10 +672,12 @@ __EOF__
   "apiVersion": "v1",
   "metadata": {
     "name": "node-v1-test",
-    "annotations": {"a":"b"}
+    "annotations": {"a":"b"},
+    "resourceVersion": "0"
   }
 }
 __EOF__
+
   # Post-condition: the node command succeeds
   kube::test::get_object_assert "node node-v1-test" "{{.metadata.annotations.a}}" 'b'
   kubectl delete node node-v1-test "${kube_flags[@]}"
@@ -1046,11 +1048,23 @@ run_kubectl_run_tests() {
   # Pre-Condition: no Deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run nginx "--image=$IMAGE_NGINX" --generator=deployment/v1beta1 "${kube_flags[@]}"
+  kubectl run nginx-extensions "--image=$IMAGE_NGINX" "${kube_flags[@]}"
   # Post-Condition: Deployment "nginx" is created
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
+  kube::test::get_object_assert deployment.extensions "{{range.items}}{{$id_field}}:{{end}}" 'nginx-extensions:'
+  # and old generator was used, iow. old defaults are applied
+  output_message=$(kubectl get deployment.extensions/nginx-extensions -o jsonpath='{.spec.revisionHistoryLimit}')
+  kube::test::if_has_not_string "${output_message}" '2'
   # Clean up
-  kubectl delete deployment nginx "${kube_flags[@]}"
+  kubectl delete deployment nginx-extensions "${kube_flags[@]}"
+  # Command
+  kubectl run nginx-apps "--image=$IMAGE_NGINX" --generator=deployment/apps.v1beta1 "${kube_flags[@]}"
+  # Post-Condition: Deployment "nginx" is created
+  kube::test::get_object_assert deployment.apps "{{range.items}}{{$id_field}}:{{end}}" 'nginx-apps:'
+  # and new generator was used, iow. new defaults are applied
+  output_message=$(kubectl get deployment/nginx-apps -o jsonpath='{.spec.revisionHistoryLimit}')
+  kube::test::if_has_string "${output_message}" '2'
+  # Clean up
+  kubectl delete deployment nginx-apps "${kube_flags[@]}"
 }
 
 run_kubectl_get_tests() {
@@ -1106,6 +1120,10 @@ run_kubectl_get_tests() {
   # Post-condition: The text "No resources found" should be part of the output
   kube::test::if_has_string "${output_message}" 'No resources found'
   # Command
+  output_message=$(kubectl get pods --ignore-not-found 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "No resources found" should not be part of the output
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
   output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o wide)
   # Post-condition: The text "No resources found" should be part of the output
   kube::test::if_has_string "${output_message}" 'No resources found'
@@ -1133,7 +1151,7 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" "/apis/apps/v1beta1/namespaces/default/statefulsets 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/autoscaling/v1/namespaces/default/horizontalpodautoscalers 200"
   kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/apps/v1beta1/namespaces/default/deployments 200 OK"
+  kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"
 
   ### Test --allow-missing-template-keys
@@ -1159,6 +1177,19 @@ run_kubectl_get_tests() {
   ## check --allow-missing-template-keys=false results in an error for a missing key with go
   output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o go-template='{{.missing}}' "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'map has no entry for key "missing"'
+
+  ### Test kubectl get watch
+  output_message=$(kubectl get pods -w --request-timeout=1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'STATUS'    # headers
+  kube::test::if_has_string "${output_message}" 'valid-pod' # pod details
+  output_message=$(kubectl get pods/valid-pod -o name -w --request-timeout=1 "${kube_flags[@]}")
+  kube::test::if_has_not_string "${output_message}" 'STATUS' # no headers
+  kube::test::if_has_string     "${output_message}" 'pods/valid-pod' # resource name
+  output_message=$(kubectl get pods/valid-pod -o yaml -w --request-timeout=1 "${kube_flags[@]}")
+  kube::test::if_has_not_string "${output_message}" 'STATUS'          # no headers
+  kube::test::if_has_string     "${output_message}" 'name: valid-pod' # yaml
+  output_message=$(! kubectl get pods/invalid-pod -w --request-timeout=1 "${kube_flags[@]}" 2>&1)
+  kube::test::if_has_string "${output_message}" '"invalid-pod" not found'
 
   # cleanup
   kubectl delete pods valid-pod "${kube_flags[@]}"
@@ -2036,7 +2067,7 @@ run_rc_tests() {
   # Post-condition: frontend replication controller is created
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # Describe command should print detailed information
-  kube::test::describe_object_assert rc 'frontend' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  kube::test::describe_object_assert rc 'frontend' "Name:" "Pod Template:" "Labels:" "Selector:" "Replicas:" "Pods Status:" "Volumes:" "GET_HOSTS_FROM:"
   # Describe command should print events information by default
   kube::test::describe_object_events_assert rc 'frontend'
   # Describe command should not print events information when show-events=false
@@ -2044,7 +2075,7 @@ run_rc_tests() {
   # Describe command should print events information when show-events=true
   kube::test::describe_object_events_assert rc 'frontend' true
   # Describe command (resource only) should print detailed information
-  kube::test::describe_resource_assert rc "Name:" "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  kube::test::describe_resource_assert rc "Name:" "Name:" "Pod Template:" "Labels:" "Selector:" "Replicas:" "Pods Status:" "Volumes:" "GET_HOSTS_FROM:"
   # Describe command should print events information by default
   kube::test::describe_resource_events_assert rc
   # Describe command should not print events information when show-events=false
@@ -2266,17 +2297,35 @@ run_rc_tests() {
 }
 
 run_deployment_tests() {
-  # Test kubectl create deployment
-  kubectl create deployment test-nginx --image=gcr.io/google-containers/nginx:test-cmd
-  # Post-Condition: Deployment has 2 replicas defined in its spec.
-  kube::test::get_object_assert 'deploy test-nginx' "{{$container_name_field}}" 'nginx'
+  # Test kubectl create deployment (using default - old generator)
+  kubectl create deployment test-nginx-extensions --image=gcr.io/google-containers/nginx:test-cmd
+  # Post-Condition: Deployment "nginx" is created.
+  kube::test::get_object_assert 'deploy test-nginx-extensions' "{{$container_name_field}}" 'nginx'
+  # and old generator was used, iow. old defaults are applied
+  output_message=$(kubectl get deployment.extensions/test-nginx-extensions -o jsonpath='{.spec.revisionHistoryLimit}')
+  kube::test::if_has_not_string "${output_message}" '2'
   # Ensure we can interact with deployments through extensions and apps endpoints
   output_message=$(kubectl get deployment.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get deployment.apps -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'apps/v1beta1'
   # Clean up
-  kubectl delete deployment test-nginx "${kube_flags[@]}"
+  kubectl delete deployment test-nginx-extensions "${kube_flags[@]}"
+
+  # Test kubectl create deployment
+  kubectl create deployment test-nginx-apps --image=gcr.io/google-containers/nginx:test-cmd --generator=deployment-basic/apps.v1beta1
+  # Post-Condition: Deployment "nginx" is created.
+  kube::test::get_object_assert 'deploy test-nginx-apps' "{{$container_name_field}}" 'nginx'
+  # and new generator was used, iow. new defaults are applied
+  output_message=$(kubectl get deployment/test-nginx-apps -o jsonpath='{.spec.revisionHistoryLimit}')
+  kube::test::if_has_string "${output_message}" '2'
+  # Ensure we can interact with deployments through extensions and apps endpoints
+  output_message=$(kubectl get deployment.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
+  output_message=$(kubectl get deployment.apps -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'apps/v1beta1'
+  # Clean up
+  kubectl delete deployment test-nginx-apps "${kube_flags[@]}"
 
   ### Test cascading deletion
   ## Test that rs is deleted when deployment is deleted.
@@ -2365,10 +2414,6 @@ run_deployment_tests() {
   # Check that trying to watch the status of a superseded revision returns an error
   ! kubectl rollout status deployment/nginx --revision=3
   cat hack/testdata/deployment-revision1.yaml | $SED "s/name: nginx$/name: nginx2/" | kubectl create -f - "${kube_flags[@]}"
-  # Newest deployment should be marked as overlapping
-  kubectl get deployment nginx2 -o yaml "${kube_flags[@]}" | grep "deployment.kubernetes.io/error-selector-overlapping-with"
-  # Oldest deployment should not be marked as overlapping
-  ! kubectl get deployment nginx -o yaml "${kube_flags[@]}" | grep "deployment.kubernetes.io/error-selector-overlapping-with"
   # Deletion of both deployments should not be blocked
    kubectl delete deployment nginx2 "${kube_flags[@]}"
   # Clean up
@@ -2444,7 +2489,7 @@ run_rs_tests() {
   # Post-condition: frontend replica set is created
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # Describe command should print detailed information
-  kube::test::describe_object_assert rs 'frontend' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  kube::test::describe_object_assert rs 'frontend' "Name:" "Pod Template:" "Labels:" "Selector:" "Replicas:" "Pods Status:" "Volumes:"
   # Describe command should print events information by default
   kube::test::describe_object_events_assert rs 'frontend'
   # Describe command should not print events information when show-events=false
@@ -2452,7 +2497,7 @@ run_rs_tests() {
   # Describe command should print events information when show-events=true
   kube::test::describe_object_events_assert rs 'frontend' true
   # Describe command (resource only) should print detailed information
-  kube::test::describe_resource_assert rs "Name:" "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  kube::test::describe_resource_assert rs "Name:" "Pod Template:" "Labels:" "Selector:" "Replicas:" "Pods Status:" "Volumes:"
   # Describe command should print events information by default
   kube::test::describe_resource_events_assert rs
   # Describe command should not print events information when show-events=false
@@ -2747,6 +2792,7 @@ runTests() {
   hpa_max_field=".spec.maxReplicas"
   hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
   statefulset_replicas_field=".spec.replicas"
+  statefulset_observed_generation=".status.observedGeneration"
   job_parallelism_field=".spec.parallelism"
   deployment_replicas=".spec.replicas"
   secret_data=".data"
@@ -2912,7 +2958,7 @@ runTests() {
   output_message=$(kubectl get --raw=/api/v1)
 
   ## test if a short name is exported during discovery
-  kube::test::if_has_string "${output_message}" '{"name":"configmaps","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
+  kube::test::if_has_string "${output_message}" '{"name":"configmaps","singularName":"","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
 
   ###########################
   # POD creation / deletion #
@@ -3180,10 +3226,12 @@ runTests() {
     ### Scale statefulset test with current-replicas and replicas
     # Pre-condition: 0 replicas
     kube::test::get_object_assert 'statefulset nginx' "{{$statefulset_replicas_field}}" '0'
+    kube::test::wait_object_assert 'statefulset nginx' "{{$statefulset_observed_generation}}" '1'
     # Command: Scale up
     kubectl scale --current-replicas=0 --replicas=1 statefulset nginx "${kube_flags[@]}"
     # Post-condition: 1 replica, named nginx-0
     kube::test::get_object_assert 'statefulset nginx' "{{$statefulset_replicas_field}}" '1'
+    kube::test::wait_object_assert 'statefulset nginx' "{{$statefulset_observed_generation}}" '2'
     # Typically we'd wait and confirm that N>1 replicas are up, but this framework
     # doesn't start  the scheduler, so pet-0 will block all others.
     # TODO: test robust scaling in an e2e.
@@ -3282,7 +3330,7 @@ runTests() {
     kubectl create -f - "${kube_flags[@]}" << __EOF__
 {
   "kind": "StorageClass",
-  "apiVersion": "storage.k8s.io/v1beta1",
+  "apiVersion": "storage.k8s.io/v1",
   "metadata": {
     "name": "storage-class-name"
   },

@@ -76,6 +76,10 @@ func (plugin *cephfsPlugin) SupportsMountOption() bool {
 	return true
 }
 
+func (plugin *cephfsPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *cephfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

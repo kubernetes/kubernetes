@@ -33,14 +33,9 @@ func (s *SecureServingInfo) NewLoopbackClientConfig(token string, loopbackCert [
 		return nil, nil
 	}
 
-	host, port, err := net.SplitHostPort(s.ServingInfo.BindAddress)
+	host, port, err := LoopbackHostPort(s.BindAddress)
 	if err != nil {
-		// should never happen
-		return nil, fmt.Errorf("invalid secure bind address: %q", s.ServingInfo.BindAddress)
-	}
-	if host == "0.0.0.0" {
-		// compare MaybeDefaultWithSelfSignedCerts which adds "localhost" to the cert as alternateDNS
-		host = "localhost"
+		return nil, err
 	}
 
 	return &restclient.Config{
@@ -95,18 +90,21 @@ func findCA(chain []*x509.Certificate) (*x509.Certificate, error) {
 	return nil, fmt.Errorf("no certificate with CA:TRUE found in chain")
 }
 
-func (s *ServingInfo) NewLoopbackClientConfig(token string) (*restclient.Config, error) {
-	if s == nil {
-		return nil, nil
+// LoopbackHostPort returns the host and port loopback REST clients should use
+// to contact the server.
+func LoopbackHostPort(bindAddress string) (string, string, error) {
+	host, port, err := net.SplitHostPort(bindAddress)
+	if err != nil {
+		// should never happen
+		return "", "", fmt.Errorf("invalid server bind address: %q", bindAddress)
 	}
-	return &restclient.Config{
-		Host: s.BindAddress,
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}, nil
+
+	// Value is expected to be an IP or DNS name, not "0.0.0.0".
+	if host == "0.0.0.0" {
+		// compare MaybeDefaultWithSelfSignedCerts which adds "localhost" to the cert as alternateDNS
+		host = "localhost"
+	}
+	return host, port, nil
 }
 
 func certMatchesName(cert *x509.Certificate, name string) bool {

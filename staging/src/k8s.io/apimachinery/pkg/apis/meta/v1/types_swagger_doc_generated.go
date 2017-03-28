@@ -49,12 +49,13 @@ func (APIGroupList) SwaggerDoc() map[string]string {
 }
 
 var map_APIResource = map[string]string{
-	"":           "APIResource specifies the name of a resource and whether it is namespaced.",
-	"name":       "name is the name of the resource.",
-	"namespaced": "namespaced indicates if a resource is namespaced or not.",
-	"kind":       "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
-	"verbs":      "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
-	"shortNames": "shortNames is a list of suggested short names of the resource.",
+	"":             "APIResource specifies the name of a resource and whether it is namespaced.",
+	"name":         "name is the plural name of the resource.",
+	"singularName": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
+	"namespaced":   "namespaced indicates if a resource is namespaced or not.",
+	"kind":         "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
+	"verbs":        "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
+	"shortNames":   "shortNames is a list of suggested short names of the resource.",
 }
 
 func (APIResource) SwaggerDoc() map[string]string {
@@ -86,7 +87,7 @@ var map_DeleteOptions = map[string]string{
 	"gracePeriodSeconds": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
 	"preconditions":      "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
 	"orphanDependents":   "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
-	"propagationPolicy":  "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+	"propagationPolicy":  "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
 }
 
 func (DeleteOptions) SwaggerDoc() map[string]string {

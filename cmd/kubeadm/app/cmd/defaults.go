@@ -18,7 +18,7 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
+	"net"
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -30,19 +30,17 @@ import (
 	"github.com/blang/semver"
 )
 
-var (
-	minK8sVersion = semver.MustParse(kubeadmconstants.MinimumControlPlaneVersion)
-)
+var minK8sVersion = semver.MustParse(kubeadmconstants.MinimumControlPlaneVersion)
 
 func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
-	// Auto-detect the IP
-	if len(cfg.API.AdvertiseAddresses) == 0 {
-		ip, err := netutil.ChooseHostInterface()
-		if err != nil {
-			return err
-		}
-		cfg.API.AdvertiseAddresses = []string{ip.String()}
+
+	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
+	// This is the same logic as the API Server uses
+	ip, err := netutil.ChooseBindAddress(net.ParseIP(cfg.API.AdvertiseAddress))
+	if err != nil {
+		return err
 	}
+	cfg.API.AdvertiseAddress = ip.String()
 
 	// Validate version argument
 	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
@@ -73,23 +71,11 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		fmt.Println("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
 	}
 
-	// Validate token if any, otherwise generate
-	if cfg.Discovery.Token != nil {
-		if cfg.Discovery.Token.ID != "" && cfg.Discovery.Token.Secret != "" {
-			fmt.Printf("[init] A token has been provided, validating [%s]\n", tokenutil.BearerToken(cfg.Discovery.Token))
-			if valid, err := tokenutil.ValidateToken(cfg.Discovery.Token); valid == false {
-				return err
-			}
-		} else {
-			fmt.Println("[init] A token has not been provided, generating one")
-			if err := tokenutil.GenerateToken(cfg.Discovery.Token); err != nil {
-				return err
-			}
-		}
-
-		// If there aren't any addresses specified, default to the first advertised address which can be user-provided or the default network interface's IP address
-		if len(cfg.Discovery.Token.Addresses) == 0 {
-			cfg.Discovery.Token.Addresses = []string{cfg.API.AdvertiseAddresses[0] + ":" + strconv.Itoa(kubeadmapiext.DefaultDiscoveryBindPort)}
+	if cfg.Token == "" {
+		var err error
+		cfg.Token, err = tokenutil.GenerateToken()
+		if err != nil {
+			return fmt.Errorf("couldn't generate random token: %v", err)
 		}
 	}
 

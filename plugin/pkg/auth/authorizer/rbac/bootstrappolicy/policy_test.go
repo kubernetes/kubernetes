@@ -187,6 +187,28 @@ func TestBootstrapNamespaceRoles(t *testing.T) {
 	testObjects(t, list, "namespace-roles.yaml")
 }
 
+func TestBootstrapNamespaceRoleBindings(t *testing.T) {
+	list := &api.List{}
+	names := sets.NewString()
+	roleBindings := map[string]runtime.Object{}
+
+	namespaceRoleBindings := bootstrappolicy.NamespaceRoleBindings()
+	for _, namespace := range sets.StringKeySet(namespaceRoleBindings).List() {
+		bootstrapRoleBindings := namespaceRoleBindings[namespace]
+		for i := range bootstrapRoleBindings {
+			roleBinding := bootstrapRoleBindings[i]
+			names.Insert(roleBinding.Name)
+			roleBindings[roleBinding.Name] = &roleBinding
+		}
+
+		for _, name := range names.List() {
+			list.Items = append(list.Items, roleBindings[name])
+		}
+	}
+
+	testObjects(t, list, "namespace-role-bindings.yaml")
+}
+
 func TestBootstrapClusterRoles(t *testing.T) {
 	list := &api.List{}
 	names := sets.NewString()

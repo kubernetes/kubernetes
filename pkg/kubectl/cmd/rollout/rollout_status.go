@@ -84,7 +84,7 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 		return err
 	}
 
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
 		ResourceTypeOrNameArgs(true, args...).

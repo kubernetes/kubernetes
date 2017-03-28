@@ -101,12 +101,14 @@ func (s *StatefulSetTester) CreateStatefulSet(manifestPath, ns string) *apps.Sta
 		return filepath.Join(manifestPath, file)
 	}
 	ss := StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
+	svcYaml := generated.ReadOrDie(mkpath("service.yaml"))
+	ssYaml := generated.ReadOrDie(mkpath("statefulset.yaml"))
 
 	Logf(fmt.Sprintf("creating " + ss.Name + " service"))
-	RunKubectlOrDie("create", "-f", mkpath("service.yaml"), fmt.Sprintf("--namespace=%v", ns))
+	RunKubectlOrDieInput(string(svcYaml[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 
 	Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
-	RunKubectlOrDie("create", "-f", mkpath("statefulset.yaml"), fmt.Sprintf("--namespace=%v", ns))
+	RunKubectlOrDieInput(string(ssYaml[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 	s.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	return ss
 }
@@ -355,7 +357,8 @@ func (s *StatefulSetTester) SetHealthy(ss *apps.StatefulSet) {
 	}
 }
 
-func (s *StatefulSetTester) waitForStatus(ss *apps.StatefulSet, expectedReplicas int32) {
+// WaitForStatus waits for the ss.Status.Replicas to be equal to expectedReplicas
+func (s *StatefulSetTester) WaitForStatus(ss *apps.StatefulSet, expectedReplicas int32) {
 	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
@@ -364,6 +367,9 @@ func (s *StatefulSetTester) waitForStatus(ss *apps.StatefulSet, expectedReplicas
 			ssGet, err := s.c.Apps().StatefulSets(ns).Get(name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
+			}
+			if *ssGet.Status.ObservedGeneration < ss.Generation {
+				return false, nil
 			}
 			if ssGet.Status.Replicas != expectedReplicas {
 				Logf("Waiting for stateful set status to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
@@ -402,9 +408,11 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		if err := sst.Scale(&ss, 0); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
-		sst.waitForStatus(&ss, 0)
+		sst.WaitForStatus(&ss, 0)
 		Logf("Deleting statefulset %v", ss.Name)
-		if err := c.Apps().StatefulSets(ss.Namespace).Delete(ss.Name, nil); err != nil {
+		// Use OrphanDependents=false so it's deleted synchronously.
+		// We already made sure the Pods are gone inside Scale().
+		if err := c.Apps().StatefulSets(ss.Namespace).Delete(ss.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
 	}

@@ -283,7 +283,13 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
 		By("wait for the rc to be deleted")
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+		// Orphaning the 100 pods takes 100 PATCH operations. The default qps of
+		// a client is 5. If the qps is saturated, it will take 20s to orphan
+		// the pods. However, apiserver takes hundreds of ms to finish one
+		// PATCH, and the gc sends the patching in a single thread, so the
+		// actual qps is less than 5. According to the test logs, 60s is enough
+		// time.
+		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
 			rcs, err := rcClient.List(metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("Failed to list rcs: %v", err)

@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/flag"
@@ -135,10 +136,10 @@ func main() {
 
 		iptInterface := fakeiptables.NewFake()
 
-		serviceConfig := proxyconfig.NewServiceConfig()
+		serviceConfig := proxyconfig.NewServiceConfig(internalClientset.Core().RESTClient(), 15*time.Minute)
 		serviceConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
-		endpointsConfig := proxyconfig.NewEndpointsConfig()
+		endpointsConfig := proxyconfig.NewEndpointsConfig(internalClientset.Core().RESTClient(), 15*time.Minute)
 		endpointsConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
 		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
