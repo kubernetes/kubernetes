@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -136,7 +137,7 @@ func CreateTestClient() *fake.Clientset {
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{
-							Name:       TestPluginName + "/volumeName",
+							Name:       TestPluginName + "/lostVolumeName",
 							DevicePath: "fake/path",
 						},
 					},
@@ -208,11 +209,10 @@ func NewPodWithVolume(podName, volumeName, nodeName string) *v1.Pod {
 }
 
 type TestPlugin struct {
-	ErrorEncountered   bool
-	attachedVolumeMap  map[string][]string
-	detachedVolumeMap  map[string][]string
-	attachedVolumeLock *sync.RWMutex
-	detachedVolumeLock *sync.RWMutex
+	ErrorEncountered  bool
+	attachedVolumeMap map[string][]string
+	detachedVolumeMap map[string][]string
+	pluginLock        *sync.RWMutex
 }
 
 func (plugin *TestPlugin) Init(host volume.VolumeHost) error {
@@ -224,10 +224,22 @@ func (plugin *TestPlugin) GetPluginName() string {
 }
 
 func (plugin *TestPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	plugin.pluginLock.Lock()
+	defer plugin.pluginLock.Unlock()
+	if spec == nil {
+		glog.Errorf("GetVolumeName called with nil volume spec")
+		plugin.ErrorEncountered = true
+	}
 	return spec.Name(), nil
 }
 
 func (plugin *TestPlugin) CanSupport(spec *volume.Spec) bool {
+	plugin.pluginLock.Lock()
+	defer plugin.pluginLock.Unlock()
+	if spec == nil {
+		glog.Errorf("CanSupport called with nil volume spec")
+		plugin.ErrorEncountered = true
+	}
 	return true
 }
 
@@ -236,6 +248,12 @@ func (plugin *TestPlugin) RequiresRemount() bool {
 }
 
 func (plugin *TestPlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	plugin.pluginLock.Lock()
+	defer plugin.pluginLock.Unlock()
+	if spec == nil {
+		glog.Errorf("NewMounter called with nil volume spec")
+		plugin.ErrorEncountered = true
+	}
 	return nil, nil
 }
 
@@ -261,7 +279,7 @@ func (plugin *TestPlugin) NewAttacher() (volume.Attacher, error) {
 	attacher := testPluginAttacher{
 		ErrorEncountered:  &plugin.ErrorEncountered,
 		attachedVolumeMap: plugin.attachedVolumeMap,
-		mapLock:           plugin.attachedVolumeLock,
+		pluginLock:        plugin.pluginLock,
 	}
 	return &attacher, nil
 }
@@ -269,7 +287,7 @@ func (plugin *TestPlugin) NewAttacher() (volume.Attacher, error) {
 func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
 	detacher := testPluginDetacher{
 		detachedVolumeMap: plugin.detachedVolumeMap,
-		mapLock:           plugin.detachedVolumeLock,
+		pluginLock:        plugin.pluginLock,
 	}
 	return &detacher, nil
 }
@@ -287,12 +305,14 @@ func (plugin *TestPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *TestPlugin) GetErrorEncountered() bool {
+	plugin.pluginLock.RLock()
+	defer plugin.pluginLock.RUnlock()
 	return plugin.ErrorEncountered
 }
 
 func (plugin *TestPlugin) GetAttachedVolumes() map[string][]string {
-	plugin.attachedVolumeLock.RLock()
-	defer plugin.attachedVolumeLock.RUnlock()
+	plugin.pluginLock.RLock()
+	defer plugin.pluginLock.RUnlock()
 	ret := make(map[string][]string)
 	for nodeName, volumeList := range plugin.attachedVolumeMap {
 		ret[nodeName] = make([]string, len(volumeList))
@@ -302,8 +322,8 @@ func (plugin *TestPlugin) GetAttachedVolumes() map[string][]string {
 }
 
 func (plugin *TestPlugin) GetDetachedVolumes() map[string][]string {
-	plugin.detachedVolumeLock.RLock()
-	defer plugin.detachedVolumeLock.RUnlock()
+	plugin.pluginLock.RLock()
+	defer plugin.pluginLock.RUnlock()
 	ret := make(map[string][]string)
 	for nodeName, volumeList := range plugin.detachedVolumeMap {
 		ret[nodeName] = make([]string, len(volumeList))
@@ -315,14 +335,11 @@ func (plugin *TestPlugin) GetDetachedVolumes() map[string][]string {
 func CreateTestPlugin() []volume.VolumePlugin {
 	attachedVolumes := make(map[string][]string)
 	detachedVolumes := make(map[string][]string)
-	attachedLock := &sync.RWMutex{}
-	detachedLock := &sync.RWMutex{}
 	return []volume.VolumePlugin{&TestPlugin{
-		ErrorEncountered:   false,
-		attachedVolumeMap:  attachedVolumes,
-		detachedVolumeMap:  detachedVolumes,
-		attachedVolumeLock: attachedLock,
-		detachedVolumeLock: detachedLock,
+		ErrorEncountered:  false,
+		attachedVolumeMap: attachedVolumes,
+		detachedVolumeMap: detachedVolumes,
+		pluginLock:        &sync.RWMutex{},
 	}}
 }
 
@@ -330,14 +347,15 @@ func CreateTestPlugin() []volume.VolumePlugin {
 type testPluginAttacher struct {
 	ErrorEncountered  *bool
 	attachedVolumeMap map[string][]string
-	mapLock           *sync.RWMutex
+	pluginLock        *sync.RWMutex
 }
 
 func (attacher *testPluginAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
-	attacher.mapLock.Lock()
-	defer attacher.mapLock.Unlock()
+	attacher.pluginLock.Lock()
+	defer attacher.pluginLock.Unlock()
 	if spec == nil {
 		*attacher.ErrorEncountered = true
+		glog.Errorf("Attach called with nil volume spec")
 		return "", fmt.Errorf("Attach called with nil volume spec")
 	}
 	attacher.attachedVolumeMap[string(nodeName)] = append(attacher.attachedVolumeMap[string(nodeName)], spec.Name())
@@ -349,8 +367,11 @@ func (attacher *testPluginAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 }
 
 func (attacher *testPluginAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
+	attacher.pluginLock.Lock()
+	defer attacher.pluginLock.Unlock()
 	if spec == nil {
 		*attacher.ErrorEncountered = true
+		glog.Errorf("WaitForAttach called with nil volume spec")
 		return "", fmt.Errorf("WaitForAttach called with nil volume spec")
 	}
 	fakePath := fmt.Sprintf("%s/%s", devicePath, spec.Name())
@@ -358,16 +379,22 @@ func (attacher *testPluginAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 }
 
 func (attacher *testPluginAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
+	attacher.pluginLock.Lock()
+	defer attacher.pluginLock.Unlock()
 	if spec == nil {
 		*attacher.ErrorEncountered = true
+		glog.Errorf("GetDeviceMountPath called with nil volume spec")
 		return "", fmt.Errorf("GetDeviceMountPath called with nil volume spec")
 	}
 	return "", nil
 }
 
 func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	attacher.pluginLock.Lock()
+	defer attacher.pluginLock.Unlock()
 	if spec == nil {
 		*attacher.ErrorEncountered = true
+		glog.Errorf("MountDevice called with nil volume spec")
 		return fmt.Errorf("MountDevice called with nil volume spec")
 	}
 	return nil
@@ -376,12 +403,12 @@ func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath st
 // Detacher
 type testPluginDetacher struct {
 	detachedVolumeMap map[string][]string
-	mapLock           *sync.RWMutex
+	pluginLock        *sync.RWMutex
 }
 
 func (detacher *testPluginDetacher) Detach(volumeName string, nodeName types.NodeName) error {
-	detacher.mapLock.Lock()
-	defer detacher.mapLock.Unlock()
+	detacher.pluginLock.Lock()
+	defer detacher.pluginLock.Unlock()
 	detacher.detachedVolumeMap[string(nodeName)] = append(detacher.detachedVolumeMap[string(nodeName)], volumeName)
 	return nil
 }

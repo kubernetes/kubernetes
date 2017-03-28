@@ -193,7 +193,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		nil, /* cloud */
 		plugins,
 		false,
-		time.Second*5)
+		time.Second*1)
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
 	}
@@ -236,6 +236,8 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
 
+	time.Sleep(time.Second * 1) // Wait so the reconciler calls sync at least once
+
 	testPlugin := plugins[0].(*controllervolumetesting.TestPlugin)
 	for i = 0; i <= 10; i++ {
 		var attachedVolumesNum int = 0
@@ -249,15 +251,14 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 			detachedVolumesNum += len(volumeList)
 		}
 
-		// All the "extra pods" should result in volume to be attached, the pods with
-		// no nodes should result in volume to be detached (all but one), the others
-		// should be just attach-touched
-		if attachedVolumesNum == extraPodsNum && detachedVolumesNum == podsNum-1 {
+		// All the "extra pods" should result in volume to be attached, the pods all share one volume
+		// which should be attached (+1), the volumes found only in the nodes status should be detached
+		if attachedVolumesNum == 1+extraPodsNum && detachedVolumesNum == nodesNum {
 			break
 		}
 		if i == 10 { // 10 seconds time out
 			t.Fatalf("Waiting for the volumes to attach/detach timed out: attached %d (expected %d); detached %d (%d)",
-				attachedVolumesNum, extraPodsNum, detachedVolumesNum, podsNum-nodesNum)
+				attachedVolumesNum, 1+extraPodsNum, detachedVolumesNum, nodesNum)
 			break
 		}
 	}
