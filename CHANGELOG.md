@@ -624,7 +624,7 @@ Anyway, the cluster should get back to the proper size after 10 min.
 * Cluster federation servers have changed the location in etcd where federated services are stored, so existing federated services must be deleted and recreated. Before upgrading, export all federated services from the federation server and delete the services. After upgrading the cluster, recreate the federated services from the exported data. ([[#37770](https://github.com/kubernetes/kubernetes/pull/37770)](https://github.com/kubernetes/kubernetes/pull/37770), [[@enj](https://github.com/enj)](https://github.com/enj))
 
 ### Internal Storage Layer
-* upgrade to etcd3 prior to upgrading to 1.6 **OR** explicitly specify `--storage-type=etcd2 --storage-media-type=application/json` when starting the apiserver
+* upgrade to etcd3 prior to upgrading to 1.6 **OR** explicitly specify `--storage-backend=etcd2 --storage-media-type=application/json` when starting the apiserver
 
 ### Node Components
 * **Kubelet with the Docker-CRI implementation**
