@@ -901,14 +901,14 @@ function sha1sum-file() {
   fi
 }
 
-# Downloads cfssl into ${KUBE_TEMP}/cfssl directory
+# Downloads cfssl into $1 directory
 #
 # Assumed vars:
-#   KUBE_TEMP: temporary directory
+#   $1 (cfssl directory)
 #
 function download-cfssl {
-  mkdir -p "${KUBE_TEMP}/cfssl"
-  pushd "${KUBE_TEMP}/cfssl"
+  mkdir -p "$1"
+  pushd "$1"
 
   kernel=$(uname -s)
   case "${kernel}" in
@@ -1023,7 +1023,7 @@ function generate-certs {
     ./easyrsa --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
     ./easyrsa build-client-full kube-apiserver nopass
 
-    download-cfssl
+    download-cfssl "${KUBE_TEMP}/cfssl"
 
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
@@ -1044,6 +1044,132 @@ function generate-certs {
     echo "=== Failed to generate certificates: Aborting ===" >&2
     exit 2
   }
+}
+
+# Run the cfssl command to generates certificate files for etcd service, the
+# certificate files will save in $1 directory.
+#
+# Optional vars:
+#   GEN_ETCD_CA_CERT (CA cert encode with base64 and ZIP compression)
+#   GEN_ETCD_CA_KEY (CA key encode with base64)
+#
+# If GEN_ETCD_CA_CERT or GEN_ETCD_CA_KEY is not specified, it will generates certs for CA.
+#
+# Args:
+#   $1 (the directory that certificate files to save)
+#   $2 (the ip of etcd member)
+#   $3 (the type of etcd certificates, must be one of client, server, peer)
+#   $4 (the prefix of the certificate filename, default is $3)
+function generate-etcd-cert() {
+  local cert_dir=${1}
+  local member_ip=${2}
+  local type_cert=${3}
+  local prefix=${4:-"${type_cert}"}
+
+  local GEN_ETCD_CA_CERT=${GEN_ETCD_CA_CERT:-}
+  local GEN_ETCD_CA_KEY=${GEN_ETCD_CA_KEY:-}
+
+  mkdir -p "${cert_dir}"
+  pushd "${cert_dir}"
+
+  if [ ! -x cfssl ] || [ ! -x cfssljson ]; then
+    echo "Download cfssl & cfssljson ..."
+    download-cfssl .
+  fi
+
+  if [ ! -r "ca-config.json" ]; then
+    cat >ca-config.json <<EOF
+{
+    "signing": {
+        "default": {
+            "expiry": "43800h"
+        },
+        "profiles": {
+            "server": {
+                "expiry": "43800h",
+                "usages": [
+                    "signing",
+                    "key encipherment",
+                    "server auth"
+                ]
+            },
+            "client": {
+                "expiry": "43800h",
+                "usages": [
+                    "signing",
+                    "key encipherment",
+                    "client auth"
+                ]
+            },
+            "peer": {
+                "expiry": "43800h",
+                "usages": [
+                    "signing",
+                    "key encipherment",
+                    "server auth",
+                    "client auth"
+                ]
+            }
+        }
+    }
+}
+EOF
+  fi
+
+  if [ ! -r "ca-csr.json" ]; then
+    cat >ca-csr.json <<EOF
+{
+    "CN": "Kubernetes",
+    "key": {
+        "algo": "ecdsa",
+        "size": 256
+    },
+    "names": [
+        {
+            "C": "US",
+            "L": "CA",
+            "O": "kubernetes.io"
+        }
+    ]
+}
+EOF
+  fi
+
+  if [[ -n "${GEN_ETCD_CA_CERT}" && -n "${GEN_ETCD_CA_KEY}" ]]; then
+    echo "${ca_cert}" | base64 --decode | gunzip > ca.pem
+    echo "${ca_key}" | base64 --decode > ca-key.pem
+  fi
+
+  if [[ ! -r "ca.pem" || ! -r "ca-key.pem" ]]; then
+    ./cfssl gencert -initca ca-csr.json | ./cfssljson -bare ca -
+  fi
+
+  case "${type_cert}" in
+    client)
+      echo "Generate client certificates..."
+      echo '{"CN":"client","hosts":["*"],"key":{"algo":"ecdsa","size":256}}' \
+       | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client - \
+       | ./cfssljson -bare "${prefix}"
+      ;;
+    server)
+      echo "Generate server certificates..."
+      echo '{"CN":"'${member_ip}'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
+       | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server -hostname="${member_ip},127.0.0.1" - \
+       | ./cfssljson -bare "${prefix}"
+      ;;
+    peer)
+      echo "Generate peer certificates..."
+      echo '{"CN":"'${member_ip}'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
+       | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=peer -hostname="${member_ip},127.0.0.1" - \
+       | ./cfssljson -bare "${prefix}"
+      ;;
+    *)
+      echo "Unknow, unsupported etcd certs type: ${type_cert}" >&2
+      echo "Supported type: client, server, peer" >&2
+      exit 2
+  esac
+
+  popd
 }
 
 #
@@ -1148,4 +1274,14 @@ function verify-kube-binaries() {
     exit 1
   fi
   "${get_binaries_script}"
+}
+
+# Run pushd without stack output
+function pushd() {
+  command pushd $@ > /dev/null
+}
+
+# Run popd without stack output
+function popd() {
+  command popd $@ > /dev/null
 }
