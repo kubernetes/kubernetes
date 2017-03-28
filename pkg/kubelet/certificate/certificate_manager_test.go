@@ -86,10 +86,12 @@ func TestShouldRotate(t *testing.T) {
 		notAfter     time.Time
 		shouldRotate bool
 	}{
-		{"half way", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), false},
-		{"nearly there", now.Add(-99 * time.Hour), now.Add(1 * time.Hour), true},
-		{"just started", now.Add(-1 * time.Hour), now.Add(99 * time.Hour), false},
-		{"already expired", now.Add(-10 * time.Hour), now.Add(-1 * time.Hour), true},
+		{"just issued, still good", now.Add(-1 * time.Hour), now.Add(99 * time.Hour), false},
+		{"half way expired, still good", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), false},
+		{"mostly expired, still good", now.Add(-69 * time.Hour), now.Add(31 * time.Hour), false},
+		{"just about expired, should rotate", now.Add(-91 * time.Hour), now.Add(9 * time.Hour), true},
+		{"nearly expired, should rotate", now.Add(-99 * time.Hour), now.Add(1 * time.Hour), true},
+		{"already expired, should rotate", now.Add(-10 * time.Hour), now.Add(-1 * time.Hour), true},
 	}
 
 	for _, test := range tests {
