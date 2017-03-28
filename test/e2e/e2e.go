@@ -140,7 +140,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
-	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, framework.ImagePullerLabels, true); err != nil {
+	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, framework.ImagePullerLabels); err != nil {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		framework.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
