@@ -254,8 +254,11 @@ func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fldPath *field
 	return allErrs
 }
 
-func ValidateRollingUpdateDeployment(rollingUpdate *extensions.RollingUpdateDeployment, fldPath *field.Path) field.ErrorList {
+func ValidateRollingUpdateDeployment(rollingUpdate *extensions.RollingUpdateDeployment, replicas int32, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if rollingUpdate.MaxUnavailable.Type == intstr.Int && rollingUpdate.MaxUnavailable.IntValue() > int(replicas) {
+		rollingUpdate.MaxUnavailable.IntVal = replicas
+	}
 	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
 	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
 	if getIntOrPercentValue(rollingUpdate.MaxUnavailable) == 0 && getIntOrPercentValue(rollingUpdate.MaxSurge) == 0 {
@@ -267,7 +270,7 @@ func ValidateRollingUpdateDeployment(rollingUpdate *extensions.RollingUpdateDepl
 	return allErrs
 }
 
-func ValidateDeploymentStrategy(strategy *extensions.DeploymentStrategy, fldPath *field.Path) field.ErrorList {
+func ValidateDeploymentStrategy(strategy *extensions.DeploymentStrategy, replicas int32, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch strategy.Type {
 	case extensions.RecreateDeploymentStrategyType:
@@ -279,7 +282,7 @@ func ValidateDeploymentStrategy(strategy *extensions.DeploymentStrategy, fldPath
 		if strategy.RollingUpdate == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), "this should be defaulted and never be nil"))
 		} else {
-			allErrs = append(allErrs, ValidateRollingUpdateDeployment(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
+			allErrs = append(allErrs, ValidateRollingUpdateDeployment(strategy.RollingUpdate, replicas, fldPath.Child("rollingUpdate"))...)
 		}
 	default:
 		validValues := []string{string(extensions.RecreateDeploymentStrategyType), string(extensions.RollingUpdateDeploymentStrategyType)}
@@ -316,7 +319,7 @@ func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path
 		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"))...)
 	}
 
-	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, fldPath.Child("strategy"))...)
+	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, spec.Replicas, fldPath.Child("strategy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	if spec.RevisionHistoryLimit != nil {
 		// zero is a valid RevisionHistoryLimit

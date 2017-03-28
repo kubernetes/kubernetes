@@ -1192,6 +1192,21 @@ func TestValidateDeployment(t *testing.T) {
 			t.Errorf("unexpected error: %q, expected: %q", errs[0].Error(), k)
 		}
 	}
+	// validate when maxUnavailable > spec.Replicas, we should set the maxUnavailable to the spec.Replicas
+	invalidMaxUnavailableGreaterThanReplica := validDeployment()
+	invalidMaxUnavailableGreaterThanReplica.Spec.Replicas = 2
+	invalidMaxUnavailableGreaterThanReplica.Spec.Strategy = extensions.DeploymentStrategy{
+		Type: extensions.RollingUpdateDeploymentStrategyType,
+		RollingUpdate: &extensions.RollingUpdateDeployment{
+			MaxUnavailable: intstr.FromInt(10),
+		},
+	}
+	if errs := ValidateDeployment(invalidMaxUnavailableGreaterThanReplica); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+	if invalidMaxUnavailableGreaterThanReplica.Spec.Replicas != invalidMaxUnavailableGreaterThanReplica.Spec.Strategy.RollingUpdate.MaxUnavailable.IntVal {
+		t.Errorf("we should set the maxUnavailabel to spec.Replicas when maxUnvalilable > replicas")
+	}
 }
 
 func TestValidateDeploymentStatus(t *testing.T) {
