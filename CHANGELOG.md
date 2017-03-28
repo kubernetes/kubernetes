@@ -3,7 +3,7 @@
   - [Downloads for v1.6.0](#downloads-for-v160)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
-  - [WARNING: etcd backup strongly recommended](#warning:-etcd-backup-strongly-recommended)
+  - [WARNING: etcd backup strongly recommended](#warning-etcd-backup-strongly-recommended)
   - [Major updates and release themes](#major-updates-and-release-themes)
   - [Action Required](#action-required)
     - [Certificates API](#certificates-api)
@@ -17,11 +17,11 @@
     - [Scheduling](#scheduling)
     - [Service](#service)
     - [StatefulSet](#statefulset)
-    - [Volume](#volume)
+    - [Volumes](#volumes)
   - [Notable Features](#notable-features)
     - [Autoscaling](#autoscaling)
-    - [DaemonSets](#daemonsets)
-    - [Deployments](#deployments)
+    - [DaemonSet](#daemonset)
+    - [Deployment](#deployment-1)
     - [Federation](#federation-1)
     - [Internal Storage Layer](#internal-storage-layer-1)
     - [kubeadm](#kubeadm)
@@ -29,11 +29,11 @@
     - [RBAC](#rbac-1)
     - [Scheduling](#scheduling-1)
     - [Service Catalog](#service-catalog)
-    - [Volumes](#volumes)
+    - [Volumes](#volumes-1)
   - [Deprecations](#deprecations)
     - [Cluster Provisioning Scripts](#cluster-provisioning-scripts)
+    - [kubeadm](#kubeadm-1)
     - [Other Deprecations](#other-deprecations)
-      - [kubeadm](#kubeadm-1)
   - [Changes to API Resources](#changes-to-api-resources)
     - [ABAC](#abac)
     - [Admission Control](#admission-control)
@@ -41,20 +41,20 @@
     - [Authorization](#authorization)
     - [Autoscaling](#autoscaling-1)
     - [Certificates](#certificates)
-    - [Config Map](#config-map)
+    - [ConfigMap](#configmap)
     - [CronJob](#cronjob)
-    - [Daemon Set](#daemon-set)
-    - [Deployment](#deployment-1)
+    - [DaemonSet](#daemonset-1)
+    - [Deployment](#deployment-2)
     - [Node](#node)
     - [Pod](#pod)
     - [Pod Security Policy](#pod-security-policy)
     - [RBAC](#rbac-2)
-    - [Replica Set](#replica-set)
+    - [ReplicaSet](#replicaset)
     - [Secrets](#secrets)
     - [Service](#service-1)
-    - [Stateful Set](#stateful-set)
+    - [StatefulSet](#statefulset-1)
     - [Taints and Tolerations](#taints-and-tolerations)
-    - [Volumes](#volumes-1)
+    - [Volumes](#volumes-2)
   - [Changes to Major Components](#changes-to-major-components)
     - [API Server](#api-server)
     - [API Server Aggregator](#api-server-aggregator)
@@ -576,7 +576,14 @@ backup.
 
 Also, please note:
 - using `application/vnd.kubernetes.protobuf` as the media storage type for 1.6 is default but not required
-- the ability to rollback to etcd2 can be preserved by continuing to use `application/json` as the storage media type. This can be changed to `application/vnd.kubernetes.protobuf` at a later time.
+- the ability to rollback to etcd2 can be preserved by setting the storage media type flag on `kube-apiserver`
+
+  ```
+  --storage-media-type application/json
+  ```
+  
+  to continue to use `application/json` as the storage media type which can be changed to
+  `application/vnd.kubernetes.protobuf` at a later time.
 
 ## Major updates and release themes
 
@@ -704,7 +711,7 @@ Anyway, the cluster should get back to the proper size after 10 min.
 ### StatefulSet
 * StatefulSet now respects ControllerRef to avoid fighting over Pods. At the time of upgrade, **you must not have StatefulSets with selectors that overlap** with any other controllers (such as ReplicaSets), or else [ownership of Pods may change](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/controller-ref.md#upgrading). ([[#42080](https://github.com/kubernetes/kubernetes/pull/42080)](https://github.com/kubernetes/kubernetes/pull/42080), [[@enisoc](https://github.com/enisoc)](https://github.com/enisoc))
 
-### Volume
+### Volumes
 * StorageClass pre-installed and set as default on Azure, AWS, GCE, OpenStack, and vSphere.
   * This is something to pay close attention to if you’ve been using Kubernetes for a while, because it changes the default behavior of PersistentVolumeClaim objects on these clouds.
   * Marking a StorageClass as default makes it so that even a PersistentVolumeClaim without a StorageClass specified will trigger dynamic provisioning (instead of binding to an existing pool of PVs).
@@ -721,10 +728,10 @@ Features for this release were tracked via the use of the [kubernetes/features](
 * Cluster Autoscaler can continue operations while some nodes are broken or unready.
 * Cluster Autoscaler respects Pod Disruption Budgets when removing a node.
 
-### DaemonSets
+### DaemonSet
 * **[beta]** Introduce the rolling update feature for DaemonSet. See [Performing a Rolling Update on a DaemonSet](https://deploy-preview-2878--kubernetes-io-master-staging.netlify.com/docs/tasks/manage-daemon/update-daemon-set/).
 
-### Deployments
+### Deployment
 * **[beta]** Deployments that cannot make progress in rolling out the newest version will now indicate via the API they are blocked ([docs](https://kubernetes.io/docs/user-guide/deployments/#deployment-status))
 
 ### Federation
@@ -820,11 +827,11 @@ Features for this release were tracked via the use of the [kubernetes/features](
 * Remove Azure kube-up as the Azure community has focused efforts elsewhere. ([[#41672](https://github.com/kubernetes/kubernetes/pull/41672)](https://github.com/kubernetes/kubernetes/pull/41672), [[@mikedanese](https://github.com/mikedanese)](https://github.com/mikedanese))
 * Remove the deprecated vsphere kube-up. ([[#39140](https://github.com/kubernetes/kubernetes/pull/39140)](https://github.com/kubernetes/kubernetes/pull/39140), [[@kerneltime](https://github.com/kerneltime)](https://github.com/kerneltime))
 
+### kubeadm
+* Quite a few flags been renamed or removed.  Those options that are removed as flags can still be accessed via the config file.  Most noteably this includes external etcd settings and the option for setting the cloud provider on the API server.  The [kubeadm reference documentation](https://kubernetes.io/docs/admin/kubeadm/) is up to date with the new flags.
+
 ### Other Deprecations
 * Remove cmd/kube-discovery from the tree since it's not necessary anymore ([[#42070](https://github.com/kubernetes/kubernetes/pull/42070)](https://github.com/kubernetes/kubernetes/pull/42070), [[@luxas](https://github.com/luxas)](https://github.com/luxas))
-
-#### kubeadm
-* Quite a few flags been renamed or removed.  Those options that are removed as flags can still be accessed via the config file.  Most noteably this includes external etcd settings and the option for setting the cloud provider on the API server.  The [kubeadm reference documentation](https://kubernetes.io/docs/admin/kubeadm/) is up to date with the new flags.
 
 ## Changes to API Resources
 ### ABAC
@@ -855,14 +862,14 @@ Features for this release were tracked via the use of the [kubernetes/features](
 * The CertificateSigningRequest API added the `extra` field to persist all information about the requesting user. This mirrors the fields in the SubjectAccessReview API used to check authorization. ([[#41755](https://github.com/kubernetes/kubernetes/pull/41755)](https://github.com/kubernetes/kubernetes/pull/41755), [[@liggitt](https://github.com/liggitt)](https://github.com/liggitt))
 * Native support for token based bootstrap flow.  This includes signing a well known ConfigMap in the `kube-public` namespace and cleaning out expired tokens. ([[#36101](https://github.com/kubernetes/kubernetes/pull/36101)](https://github.com/kubernetes/kubernetes/pull/36101), [[@jbeda](https://github.com/jbeda)](https://github.com/jbeda))
 
-### Config Map
+### ConfigMap
 * Volumes and environment variables populated from ConfigMap and Secret objects can now tolerate the named source object or specific keys being missing, by adding `optional: true` to the volume or environment variable source specifications. ([[#39981](https://github.com/kubernetes/kubernetes/pull/39981)](https://github.com/kubernetes/kubernetes/pull/39981), [[@fraenkel](https://github.com/fraenkel)](https://github.com/fraenkel))
 * Allow pods to define multiple environment variables from a whole ConfigMap ([[#36245](https://github.com/kubernetes/kubernetes/pull/36245)](https://github.com/kubernetes/kubernetes/pull/36245), [[@fraenkel](https://github.com/fraenkel)](https://github.com/fraenkel))
 
 ### CronJob
 * Add configurable limits to CronJob resource to specify how many successful and failed jobs are preserved. ([[#40932](https://github.com/kubernetes/kubernetes/pull/40932)](https://github.com/kubernetes/kubernetes/pull/40932), [[@peay](https://github.com/peay)](https://github.com/peay))
 
-### Daemon Set
+### DaemonSet
 * DaemonSet now respects ControllerRef to avoid fighting over Pods. ([[#42173](https://github.com/kubernetes/kubernetes/pull/42173)](https://github.com/kubernetes/kubernetes/pull/42173), [[@enisoc](https://github.com/enisoc)](https://github.com/enisoc))
 * Make DaemonSet respect critical pods annotation when scheduling.  ([[#42028](https://github.com/kubernetes/kubernetes/pull/42028)](https://github.com/kubernetes/kubernetes/pull/42028), [[@janetkuo](https://github.com/janetkuo)](https://github.com/janetkuo))
 * Implement the update feature for DaemonSet. ([[#41116](https://github.com/kubernetes/kubernetes/pull/41116)](https://github.com/kubernetes/kubernetes/pull/41116), [[@lukaszo](https://github.com/lukaszo)](https://github.com/lukaszo))
@@ -895,7 +902,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
 * the `attributeRestrictions` field has been removed from the PolicyRule type in the rbac.authorization.k8s.io/v1alpha1 API. The field was not used by the RBAC authorizer. ([[#39625](https://github.com/kubernetes/kubernetes/pull/39625)](https://github.com/kubernetes/kubernetes/pull/39625), [[@deads2k](https://github.com/deads2k)](https://github.com/deads2k))
 * A user can now be authorized to bind a particular role by having permission to perform the `bind` verb on the referenced role ([[#39383](https://github.com/kubernetes/kubernetes/pull/39383)](https://github.com/kubernetes/kubernetes/pull/39383), [[@liggitt](https://github.com/liggitt)](https://github.com/liggitt))
 
-### Replica Set
+### ReplicaSet
 * ReplicaSet has onwer ref of the Deployment that created it ([[#35676](https://github.com/kubernetes/kubernetes/pull/35676)](https://github.com/kubernetes/kubernetes/pull/35676), [[@krmayankk](https://github.com/krmayankk)](https://github.com/krmayankk))
 
 ### Secrets
@@ -908,7 +915,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
 * Bug fix. Incoming UDP packets not reach newly deployed services ([[#32561](https://github.com/kubernetes/kubernetes/pull/32561)](https://github.com/kubernetes/kubernetes/pull/32561), [[@zreigz](https://github.com/zreigz)](https://github.com/zreigz))
 * Services of type loadbalancer consume both loadbalancer and nodeport quota. ([[#39364](https://github.com/kubernetes/kubernetes/pull/39364)](https://github.com/kubernetes/kubernetes/pull/39364), [[@zhouhaibing089](https://github.com/zhouhaibing089)](https://github.com/zhouhaibing089))
 
-### Stateful Set
+### StatefulSet
 
 * Fix zone placement heuristics so that multiple mounts in a StatefulSet pod are created in the same zone ([[#40910](https://github.com/kubernetes/kubernetes/pull/40910)](https://github.com/kubernetes/kubernetes/pull/40910), [[@justinsb](https://github.com/justinsb)](https://github.com/justinsb))
 * Fixes issue [[#38418](https://github.com/kubernetes/kubernetes/pull/38418)](https://github.com/kubernetes/kubernetes/pull/38418) which, under circumstance, could cause StatefulSet to deadlock.  ([[#40838](https://github.com/kubernetes/kubernetes/pull/40838)](https://github.com/kubernetes/kubernetes/pull/40838), [[@kow3ns](https://github.com/kow3ns)](https://github.com/kow3ns))
