@@ -674,43 +674,61 @@ func setMigSizes(sizes map[string]int) {
 
 func makeNodeUnschedulable(c clientset.Interface, node *v1.Node) error {
 	By(fmt.Sprintf("Taint node %s", node.Name))
-	freshNode, err := c.Core().Nodes().Get(node.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	for _, taint := range freshNode.Spec.Taints {
-		if taint.Key == disabledTaint {
+	for j := 0; j < 3; j++ {
+		freshNode, err := c.Core().Nodes().Get(node.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		for _, taint := range freshNode.Spec.Taints {
+			if taint.Key == disabledTaint {
+				return nil
+			}
+		}
+		freshNode.Spec.Taints = append(freshNode.Spec.Taints, v1.Taint{
+			Key:    disabledTaint,
+			Value:  "DisabledForTest",
+			Effect: v1.TaintEffectNoSchedule,
+		})
+		_, err = c.Core().Nodes().Update(freshNode)
+		if err == nil {
 			return nil
 		}
+		if !errors.IsConflict(err) {
+			return err
+		}
+		glog.Warningf("Got 409 conflict when trying to taint node, retries left: %v", 3-j)
 	}
-	freshNode.Spec.Taints = append(freshNode.Spec.Taints, v1.Taint{
-		Key:    disabledTaint,
-		Value:  "DisabledForTest",
-		Effect: v1.TaintEffectNoSchedule,
-	})
-	_, err = c.Core().Nodes().Update(freshNode)
-	return err
+	return fmt.Errorf("Failed to taint node in allowed number of retries")
 }
 
 func makeNodeSchedulable(c clientset.Interface, node *v1.Node) error {
 	By(fmt.Sprintf("Remove taint from node %s", node.Name))
-	freshNode, err := c.Core().Nodes().Get(node.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	newTaints := make([]v1.Taint, 0)
-	for _, taint := range freshNode.Spec.Taints {
-		if taint.Key != disabledTaint {
-			newTaints = append(newTaints, taint)
+	for j := 0; j < 3; j++ {
+		freshNode, err := c.Core().Nodes().Get(node.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
-	}
+		newTaints := make([]v1.Taint, 0)
+		for _, taint := range freshNode.Spec.Taints {
+			if taint.Key != disabledTaint {
+				newTaints = append(newTaints, taint)
+			}
+		}
 
-	if len(newTaints) != len(freshNode.Spec.Taints) {
+		if len(newTaints) == len(freshNode.Spec.Taints) {
+			return nil
+		}
 		freshNode.Spec.Taints = newTaints
 		_, err = c.Core().Nodes().Update(freshNode)
-		return err
+		if err == nil {
+			return nil
+		}
+		if !errors.IsConflict(err) {
+			return err
+		}
+		glog.Warningf("Got 409 conflict when trying to taint node, retries left: %v", 3-j)
 	}
-	return nil
+	return fmt.Errorf("Failed to remove taint from node in allowed number of retries")
 }
 
 // Creat an RC running a given number of pods on each node without adding any constraint forcing
