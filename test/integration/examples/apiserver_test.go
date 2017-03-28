@@ -97,8 +97,8 @@ func TestAggregatedAPIServer(t *testing.T) {
 			}
 
 			kubeAPIServerOptions := options.NewServerRunOptions()
-			kubeAPIServerOptions.SecureServing.ServingOptions.BindAddress = net.ParseIP("127.0.0.1")
-			kubeAPIServerOptions.SecureServing.ServingOptions.BindPort = kubePort
+			kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+			kubeAPIServerOptions.SecureServing.BindPort = kubePort
 			kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 			kubeAPIServerOptions.InsecureServing.BindPort = 0
 			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
@@ -111,7 +111,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			kubeAPIServerOptions.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
 			kubeAPIServerOptions.Authorization.Mode = "RBAC"
 
-			kubeAPIServerConfig, sharedInformers, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions)
+			kubeAPIServerConfig, sharedInformers, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions)
 			if err != nil {
 				t.Fatal(err)
 			}
