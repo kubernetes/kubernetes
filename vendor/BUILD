@@ -16400,3 +16400,32 @@ go_library(
         "//vendor:k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion",
     ],
 )
+
+go_library(
+    name = "k8s.io/apiserver/pkg/admission/initializer",
+    srcs = [
+        "k8s.io/apiserver/pkg/admission/initializer/initializer.go",
+        "k8s.io/apiserver/pkg/admission/initializer/interfaces.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/informers",
+        "//vendor:k8s.io/client-go/kubernetes",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/admission/initializer_xtest",
+    srcs = ["k8s.io/apiserver/pkg/admission/initializer/initializer_test.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/admission/initializer",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/informers",
+        "//vendor:k8s.io/client-go/kubernetes",
+        "//vendor:k8s.io/client-go/kubernetes/fake",
+    ],
+)
