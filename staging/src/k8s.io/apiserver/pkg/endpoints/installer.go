@@ -17,10 +17,8 @@ limitations under the License.
 package endpoints
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
-	"net/url"
 	gpath "path"
 	"reflect"
 	"sort"
@@ -28,7 +26,6 @@ import (
 	"time"
 	"unicode"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -78,9 +75,6 @@ var toDiscoveryKubeVerb = map[string]string{
 	"WATCH":            "watch",
 	"WATCHLIST":        "watch",
 }
-
-// errEmptyName is returned when API requests do not fill the name section of the path.
-var errEmptyName = errors.NewBadRequest("name must be provided")
 
 // Installs handlers for API resources.
 func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []metav1.APIResource, errors []error) {
@@ -191,6 +185,9 @@ func (a *APIInstaller) restMapping(resource string) (*meta.RESTMapping, error) {
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*metav1.APIResource, error) {
 	admit := a.group.Admit
 	context := a.group.Context
+	if context == nil {
+		return nil, fmt.Errorf("%v missing Context", a.group.GroupVersion)
+	}
 
 	optionsExternalVersion := a.group.GroupVersion
 	if a.group.OptionsExternalVersion != nil {
@@ -342,14 +339,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var ctxFn handlers.ContextFunc
-	ctxFn = func(req *restful.Request) request.Context {
-		if context == nil {
-			return request.WithUserAgent(request.NewContext(), req.HeaderParameter("User-Agent"))
+	ctxFn = func(req *http.Request) request.Context {
+		if ctx, ok := context.Get(req); ok {
+			return request.WithUserAgent(ctx, req.Header.Get("User-Agent"))
 		}
-		if ctx, ok := context.Get(req.Request); ok {
-			return request.WithUserAgent(ctx, req.HeaderParameter("User-Agent"))
-		}
-		return request.WithUserAgent(request.NewContext(), req.HeaderParameter("User-Agent"))
+		return request.WithUserAgent(request.NewContext(), req.Header.Get("User-Agent"))
 	}
 
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
@@ -394,7 +388,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Name = path
 		apiResource.Namespaced = false
 		apiResource.Kind = resourceKind
-		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, resourcePath, "/"), suffix}
+		namer := handlers.ContextBasedNaming{
+			GetContext:         ctxFn,
+			SelfLinker:         a.group.Linker,
+			ClusterScoped:      true,
+			SelfLinkPathPrefix: gpath.Join(a.prefix, resourcePath, "/"),
+			SelfLinkPathSuffix: suffix,
+		}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		// Add actions at the resource path: /api/apiVersion/resource
@@ -430,9 +430,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		resourcePath := namespacedPath
 		resourceParams := namespaceParams
-		itemPathPrefix := gpath.Join(a.prefix, scope.ParamName()) + "/"
 		itemPath := namespacedPath + "/{name}"
-		itemPathMiddle := "/" + resource + "/"
 		nameParams := append(namespaceParams, nameParam)
 		proxyParams := append(nameParams, pathParam)
 		itemPathSuffix := ""
@@ -445,17 +443,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Name = path
 		apiResource.Namespaced = true
 		apiResource.Kind = resourceKind
-
-		itemPathFn := func(name, namespace string) bytes.Buffer {
-			var buf bytes.Buffer
-			buf.WriteString(itemPathPrefix)
-			buf.WriteString(url.QueryEscape(namespace))
-			buf.WriteString(itemPathMiddle)
-			buf.WriteString(url.QueryEscape(name))
-			buf.WriteString(itemPathSuffix)
-			return buf
+		namer := handlers.ContextBasedNaming{
+			GetContext:         ctxFn,
+			SelfLinker:         a.group.Linker,
+			ClusterScoped:      false,
+			SelfLinkPathPrefix: gpath.Join(a.prefix, scope.ParamName()) + "/",
+			SelfLinkPathSuffix: itemPathSuffix,
 		}
-		namer := scopeNaming{scope, a.group.Linker, itemPathFn, false}
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
@@ -484,7 +478,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 		if !hasSubresource {
-			namer = scopeNaming{scope, a.group.Linker, itemPathFn, true}
 			actions = appendIf(actions, action{"LIST", resource, params, namer, true}, isLister)
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true}, allowWatchList)
 		}
@@ -809,149 +802,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	apiResource.ShortNames = shortNames
 
 	return &apiResource, nil
-}
-
-// rootScopeNaming reads only names from a request and ignores namespaces. It implements ScopeNamer
-// for root scoped resources.
-type rootScopeNaming struct {
-	scope meta.RESTScope
-	runtime.SelfLinker
-	pathPrefix string
-	pathSuffix string
-}
-
-// rootScopeNaming implements ScopeNamer
-var _ handlers.ScopeNamer = rootScopeNaming{}
-
-// Namespace returns an empty string because root scoped objects have no namespace.
-func (n rootScopeNaming) Namespace(req *restful.Request) (namespace string, err error) {
-	return "", nil
-}
-
-// Name returns the name from the path and an empty string for namespace, or an error if the
-// name is empty.
-func (n rootScopeNaming) Name(req *restful.Request) (namespace, name string, err error) {
-	name = req.PathParameter("name")
-	if len(name) == 0 {
-		return "", "", errEmptyName
-	}
-	return "", name, nil
-}
-
-// GenerateLink returns the appropriate path and query to locate an object by its canonical path.
-func (n rootScopeNaming) GenerateLink(req *restful.Request, obj runtime.Object) (uri string, err error) {
-	_, name, err := n.ObjectName(obj)
-	if err != nil {
-		return "", err
-	}
-	if len(name) == 0 {
-		_, name, err = n.Name(req)
-		if err != nil {
-			return "", err
-		}
-	}
-	return n.pathPrefix + url.QueryEscape(name) + n.pathSuffix, nil
-}
-
-// GenerateListLink returns the appropriate path and query to locate a list by its canonical path.
-func (n rootScopeNaming) GenerateListLink(req *restful.Request) (uri string, err error) {
-	if len(req.Request.URL.RawPath) > 0 {
-		return req.Request.URL.RawPath, nil
-	}
-	return req.Request.URL.EscapedPath(), nil
-}
-
-// ObjectName returns the name set on the object, or an error if the
-// name cannot be returned. Namespace is empty
-// TODO: distinguish between objects with name/namespace and without via a specific error.
-func (n rootScopeNaming) ObjectName(obj runtime.Object) (namespace, name string, err error) {
-	name, err = n.SelfLinker.Name(obj)
-	if err != nil {
-		return "", "", err
-	}
-	if len(name) == 0 {
-		return "", "", errEmptyName
-	}
-	return "", name, nil
-}
-
-// scopeNaming returns naming information from a request. It implements ScopeNamer for
-// namespace scoped resources.
-type scopeNaming struct {
-	scope meta.RESTScope
-	runtime.SelfLinker
-	itemPathFn    func(name, namespace string) bytes.Buffer
-	allNamespaces bool
-}
-
-// scopeNaming implements ScopeNamer
-var _ handlers.ScopeNamer = scopeNaming{}
-
-// Namespace returns the namespace from the path or the default.
-func (n scopeNaming) Namespace(req *restful.Request) (namespace string, err error) {
-	if n.allNamespaces {
-		return "", nil
-	}
-	namespace = req.PathParameter(n.scope.ArgumentName())
-	if len(namespace) == 0 {
-		// a URL was constructed without the namespace, or this method was invoked
-		// on an object without a namespace path parameter.
-		return "", fmt.Errorf("no namespace parameter found on request")
-	}
-	return namespace, nil
-}
-
-// Name returns the name from the path, the namespace (or default), or an error if the
-// name is empty.
-func (n scopeNaming) Name(req *restful.Request) (namespace, name string, err error) {
-	namespace, _ = n.Namespace(req)
-	name = req.PathParameter("name")
-	if len(name) == 0 {
-		return "", "", errEmptyName
-	}
-	return
-}
-
-// GenerateLink returns the appropriate path and query to locate an object by its canonical path.
-func (n scopeNaming) GenerateLink(req *restful.Request, obj runtime.Object) (uri string, err error) {
-	namespace, name, err := n.ObjectName(obj)
-	if err != nil {
-		return "", err
-	}
-	if len(namespace) == 0 && len(name) == 0 {
-		namespace, name, err = n.Name(req)
-		if err != nil {
-			return "", err
-		}
-	}
-	if len(name) == 0 {
-		return "", errEmptyName
-	}
-	result := n.itemPathFn(name, namespace)
-	return result.String(), nil
-}
-
-// GenerateListLink returns the appropriate path and query to locate a list by its canonical path.
-func (n scopeNaming) GenerateListLink(req *restful.Request) (uri string, err error) {
-	if len(req.Request.URL.RawPath) > 0 {
-		return req.Request.URL.RawPath, nil
-	}
-	return req.Request.URL.EscapedPath(), nil
-}
-
-// ObjectName returns the name and namespace set on the object, or an error if the
-// name cannot be returned.
-// TODO: distinguish between objects with name/namespace and without via a specific error.
-func (n scopeNaming) ObjectName(obj runtime.Object) (namespace, name string, err error) {
-	name, err = n.SelfLinker.Name(obj)
-	if err != nil {
-		return "", "", err
-	}
-	namespace, err = n.SelfLinker.Namespace(obj)
-	if err != nil {
-		return "", "", err
-	}
-	return namespace, name, err
 }
 
 // This magic incantation returns *ptrToObject for an arbitrary pointer
