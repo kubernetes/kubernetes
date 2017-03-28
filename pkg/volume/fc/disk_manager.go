@@ -67,7 +67,7 @@ func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mou
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(&b, fsGroup)
+		volume.SetVolumeOwnership(&b, fsGroup, b.GetPath())
 	}
 
 	return nil

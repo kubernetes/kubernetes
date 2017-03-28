@@ -79,7 +79,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 	}
 
 	if !b.ReadOnly {
-		volume.SetVolumeOwnership(&b, fsGroup)
+		volume.SetVolumeOwnership(&b, fsGroup, b.GetPath())
 	}
 
 	return nil

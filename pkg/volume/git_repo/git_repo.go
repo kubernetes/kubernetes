@@ -232,7 +232,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("failed to exec 'git reset --hard': %s: %v", output, err)
 	}
 
-	volume.SetVolumeOwnership(b, fsGroup)
+	volume.SetVolumeOwnership(b, fsGroup, b.GetPath())
 
 	volumeutil.SetReady(b.getMetaDir())
 	return nil

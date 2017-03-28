@@ -285,7 +285,7 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, fsGroup)
+		volume.SetVolumeOwnership(b, fsGroup, b.GetPath())
 	}
 	glog.V(4).Infof("Portworx Volume %s mounted to %s", b.volumeID, dir)
 	return nil

@@ -295,7 +295,7 @@ func (b *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, fsGroup)
+		volume.SetVolumeOwnership(b, fsGroup, b.GetPath())
 	}
 	glog.V(3).Infof("Azure disk volume %s mounted to %s", b.diskName, dir)
 	return nil

@@ -38,15 +38,19 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64, mountPath string) error {
 
 	if fsGroup == nil {
 		return nil
 	}
 
+	if mountPath == "" {
+		mountPath = mounter.GetPath()
+	}
+
 	chownRunner := chown.New()
 	chmodRunner := chmod.New()
-	return filepath.Walk(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(mountPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

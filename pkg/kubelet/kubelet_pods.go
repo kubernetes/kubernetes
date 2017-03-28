@@ -30,6 +30,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/golang/glog"
@@ -135,7 +136,37 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			return nil, err
 		}
 		if mount.SubPath != "" {
+			fileinfo, err := os.Lstat(hostPath)
+			if err != nil {
+				return nil, err
+			}
+			gid := fileinfo.Sys().(*syscall.Stat_t).Gid
+			perm := fileinfo.Mode()
+
 			hostPath = filepath.Join(hostPath, mount.SubPath)
+
+			// If fsGroup volume ownership was set for the mounter path, set it for the sub path too
+			fsGroup := pod.Spec.SecurityContext.FSGroup
+			if gid == uint32(*fsGroup) {
+				if err := os.MkdirAll(hostPath, perm); err != nil {
+					glog.Errorf("failed to mkdir:%s", hostPath)
+					return nil, err
+				}
+				volume.SetVolumeOwnership(vol.Mounter, fsGroup, hostPath)
+
+				// If umask is preventing us from making the sub path have the same permissions as the
+				// mounter path, chmod the sub path
+				fileinfo, err := os.Lstat(hostPath)
+				if err != nil {
+					return nil, err
+				}
+				if fileinfo.Mode().Perm() != perm.Perm() {
+					err := os.Chmod(hostPath, perm)
+					if err != nil {
+						return nil, err
+					}
+				}
+			}
 		}
 
 		// Docker Volume Mounts fail on Windows if it is not of the form C:/

@@ -219,7 +219,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(b, fsGroup)
+	err = volume.SetVolumeOwnership(b, fsGroup, b.GetPath())
 	if err != nil {
 		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
 		return err
