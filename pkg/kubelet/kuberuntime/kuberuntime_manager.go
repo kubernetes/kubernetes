@@ -452,14 +452,26 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *v1.Pod, podS
 	// check the status of containers.
 	for index, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
-		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
+		if containerStatus == nil {
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
+				// If we are here it means that the container never existed and should be created or was GC'd.
+				message := fmt.Sprintf("Container %+v has not been created, and will create it soon.", container)
+				glog.Info(message)
+				changes.ContainersToStart[index] = message
+			}
+			continue
+		} else if containerStatus.State != kubecontainer.ContainerStateRunning {
+			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
+				// If we are here it means that the container is dead and should be restarted.
+				// We may be inserting this ID again if the container has changed and it has
+				// RestartPolicy::Always, but it's not a big deal.
 				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				glog.Info(message)
 				changes.ContainersToStart[index] = message
 			}
 			continue
 		}
+
 		if sandboxChanged {
 			if pod.Spec.RestartPolicy != v1.RestartPolicyNever {
 				message := fmt.Sprintf("Container %+v's pod sandbox is dead, the container will be recreated.", container)
