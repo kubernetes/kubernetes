@@ -19,7 +19,6 @@ package rest
 import (
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"path"
@@ -275,11 +274,6 @@ func DefaultKubernetesUserAgent() string {
 // running inside a pod running on kubernetes. It will return an error if
 // called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
-	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
-	if len(host) == 0 || len(port) == 0 {
-		return nil, fmt.Errorf("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
-	}
-
 	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountTokenKey)
 	if err != nil {
 		return nil, err
@@ -293,8 +287,7 @@ func InClusterConfig() (*Config, error) {
 	}
 
 	return &Config{
-		// TODO: switch to using cluster DNS.
-		Host:            "https://" + net.JoinHostPort(host, port),
+		Host:            "https://kubernetes.default.svc:443",
 		BearerToken:     string(token),
 		TLSClientConfig: tlsClientConfig,
 	}, nil
