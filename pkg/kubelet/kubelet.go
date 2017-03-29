@@ -445,6 +445,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		diskSpaceManager:               diskSpaceManager,
 		cloud:                          kubeDeps.Cloud,
 		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
+		externalCloudProvider:     cloudprovider.IsExternal(kubeCfg.CloudProvider),
+		providerId:                kubeCfg.ProviderID,
 		nodeRef:                   nodeRef,
 		nodeLabels:                kubeCfg.NodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
@@ -952,7 +954,8 @@ type Kubelet struct {
 	// Cloud provider interface.
 	cloud                   cloudprovider.Interface
 	autoDetectCloudProvider bool
-
+	// Indicates that the node initialization happens in an external cloud controller
+	externalCloudProvider bool
 	// Reference to this node.
 	nodeRef *clientv1.ObjectReference
 
@@ -1045,6 +1048,9 @@ type Kubelet struct {
 
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP
+
+	// If non-nil, this is a unique identifier for the node in an external database, eg. cloudprovider
+	providerID string
 
 	// clock is an interface that provides time related functionality in a way that makes it
 	// easy to test the code.
