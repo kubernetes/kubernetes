@@ -51,7 +51,6 @@ go_library(
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/gomega",
         "//vendor:golang.org/x/net/websocket",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",
