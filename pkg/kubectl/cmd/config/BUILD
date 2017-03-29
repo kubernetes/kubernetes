@@ -55,6 +55,7 @@ go_test(
         "get_clusters_test.go",
         "get_contexts_test.go",
         "navigation_step_parser_test.go",
+        "unset_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
