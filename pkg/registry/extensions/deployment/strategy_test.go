@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -64,6 +65,31 @@ func TestStatusUpdates(t *testing.T) {
 	}
 }
 
+func TestInvalidMaxUnavailable(t *testing.T) {
+	deployment := newDeploymentWithStategyAndReplica(10, extensions.DeploymentStrategy{
+		Type: extensions.RollingUpdateDeploymentStrategyType,
+		RollingUpdate: &extensions.RollingUpdateDeployment{
+			MaxSurge:       func(i int) intstr.IntOrString { x := intstr.FromInt(i); return x }(3),
+			MaxUnavailable: func(i int) intstr.IntOrString { x := intstr.FromInt(i); return x }(20),
+		},
+	})
+	deploymentStrategy{}.PrepareForCreate(genericapirequest.NewContext(), deployment)
+	if deployment.Spec.Strategy.RollingUpdate.MaxUnavailable.IntValue() != 10 {
+		t.Errorf("Unexpected maxUnavalible! Expected:\n%#v\ngot:\n%#v", 10, deployment.Spec.Strategy.RollingUpdate.MaxUnavailable.IntValue())
+	}
+	oldDeployment := newDeploymentWithStategyAndReplica(10, extensions.DeploymentStrategy{
+		Type: extensions.RollingUpdateDeploymentStrategyType,
+		RollingUpdate: &extensions.RollingUpdateDeployment{
+			MaxSurge:       func(i int) intstr.IntOrString { x := intstr.FromInt(i); return x }(3),
+			MaxUnavailable: func(i int) intstr.IntOrString { x := intstr.FromInt(i); return x }(3),
+		},
+	})
+	deploymentStrategy{}.PrepareForUpdate(genericapirequest.NewContext(), deployment, oldDeployment)
+	if deployment.Spec.Strategy.RollingUpdate.MaxUnavailable.IntValue() != 10 {
+		t.Errorf("Unexpected maxUnavalible! Expected:\n%#v\ngot:\n%#v", 10, deployment.Spec.Strategy.RollingUpdate.MaxUnavailable.IntValue())
+	}
+}
+
 func newDeployment(labels, annotations map[string]string) *extensions.Deployment {
 	return &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -76,6 +102,28 @@ func newDeployment(labels, annotations map[string]string) *extensions.Deployment
 			Strategy: extensions.DeploymentStrategy{
 				Type: extensions.RecreateDeploymentStrategyType,
 			},
+			Template: api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "test",
+							Image: "test",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func newDeploymentWithStategyAndReplica(replicas int32, strategy extensions.DeploymentStrategy) *extensions.Deployment {
+	return &extensions.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+		Spec: extensions.DeploymentSpec{
+			Replicas: replicas,
+			Strategy: strategy,
 			Template: api.PodTemplateSpec{
 				Spec: api.PodSpec{
 					Containers: []api.Container{

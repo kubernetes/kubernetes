@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -60,6 +61,7 @@ func (deploymentStrategy) PrepareForCreate(ctx genericapirequest.Context, obj ru
 	deployment := obj.(*extensions.Deployment)
 	deployment.Status = extensions.DeploymentStatus{}
 	deployment.Generation = 1
+	checkAndSetMaxUnavailableForRollingUpdate(deployment)
 }
 
 // Validate validates a new deployment.
@@ -90,6 +92,7 @@ func (deploymentStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, o
 		!reflect.DeepEqual(newDeployment.Annotations, oldDeployment.Annotations) {
 		newDeployment.Generation = oldDeployment.Generation + 1
 	}
+	checkAndSetMaxUnavailableForRollingUpdate(newDeployment)
 }
 
 // ValidateUpdate is the default update validation for an end user.
@@ -142,5 +145,16 @@ func MatchDeployment(label labels.Selector, field fields.Selector) apistorage.Se
 		Label:    label,
 		Field:    field,
 		GetAttrs: GetAttrs,
+	}
+}
+
+// checkAndSetMaxUnAvailableForRollingUpdate will set the rollingUpdate.MaxUnavailable to spec.Replicas if maxUnavalible > replicas
+func checkAndSetMaxUnavailableForRollingUpdate(deployment *extensions.Deployment) {
+	strategy := deployment.Spec.Strategy
+	if strategy.Type == extensions.RollingUpdateDeploymentStrategyType && strategy.RollingUpdate != nil {
+		rollingStrategy := strategy.RollingUpdate
+		if rollingStrategy.MaxUnavailable.Type == intstr.Int && rollingStrategy.MaxUnavailable.IntVal > deployment.Spec.Replicas {
+			rollingStrategy.MaxUnavailable.IntVal = deployment.Spec.Replicas
+		}
 	}
 }
