@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -31,6 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
+)
+
+var (
+	supportedFeatures = sets.NewString("layering", "exclusive-lock")
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -249,7 +254,8 @@ func (plugin *rbdPlugin) newProvisionerInternal(options volume.VolumeOptions, ma
 
 type rbdVolumeProvisioner struct {
 	*rbdMounter
-	options volume.VolumeOptions
+	options  volume.VolumeOptions
+	features string
 }
 
 func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
@@ -261,6 +267,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	adminSecretNamespace := "default"
 	secretName := ""
 	secret := ""
+	r.features = ""
 
 	for k, v := range r.options.Parameters {
 		switch dstrings.ToLower(k) {
@@ -281,6 +288,20 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			r.Pool = v
 		case "usersecretname":
 			secretName = v
+		case "features":
+			features := dstrings.Split(v, ",")
+			for _, feature := range features {
+				if !supportedFeatures.Has(string(feature)) {
+					return nil, fmt.Errorf("invalid feature %q for volume plugin %s, supported features are: %v", feature, r.plugin.GetPluginName(), supportedFeatures)
+				} else {
+					if len(r.features) == 0 {
+						r.features = feature
+					} else {
+						r.features += "," + feature
+					}
+				}
+			}
+
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
 		}

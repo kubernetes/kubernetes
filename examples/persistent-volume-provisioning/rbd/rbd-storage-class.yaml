@@ -11,4 +11,4 @@ parameters:
     pool: kube
     userId: kube
     userSecretName: ceph-secret-user
-
+    features: "exclusive-lock"
