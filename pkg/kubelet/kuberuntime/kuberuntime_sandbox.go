@@ -74,16 +74,19 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		Annotations: newPodAnnotations(pod),
 	}
 
+	dnsServers, dnsSearches, useClusterFirstPolicy, err := m.runtimeHelper.GetClusterDNS(pod)
+	if err != nil {
+		return nil, err
+	}
+	podSandboxConfig.DnsConfig = &runtimeapi.DNSConfig{
+		Servers:  dnsServers,
+		Searches: dnsSearches,
+	}
+	if useClusterFirstPolicy {
+		podSandboxConfig.DnsConfig.Options = defaultDNSOptions
+	}
+
 	if !kubecontainer.IsHostNetworkPod(pod) {
-		dnsServers, dnsSearches, err := m.runtimeHelper.GetClusterDNS(pod)
-		if err != nil {
-			return nil, err
-		}
-		podSandboxConfig.DnsConfig = &runtimeapi.DNSConfig{
-			Servers:  dnsServers,
-			Searches: dnsSearches,
-			Options:  defaultDNSOptions,
-		}
 		// TODO: Add domain support in new runtime interface
 		hostname, _, err := m.runtimeHelper.GeneratePodHostNameAndDomain(pod)
 		if err != nil {
@@ -114,7 +117,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 
 	}
 
-	_, cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
+	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
 	podSandboxConfig.Linux = m.generatePodSandboxLinuxConfig(pod, cgroupParent)
 	if len(portMappings) > 0 {
 		podSandboxConfig.PortMappings = portMappings

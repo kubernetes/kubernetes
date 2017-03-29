@@ -36,7 +36,6 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
-		int(ctx.Options.LookupCacheSizeForDaemonSet),
 	).Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
 	return true, nil
 }
@@ -63,7 +62,6 @@ func startReplicaSetController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
-		int(ctx.Options.LookupCacheSizeForRS),
 	).Run(int(ctx.Options.ConcurrentRSSyncs), ctx.Stop)
 	return true, nil
 }

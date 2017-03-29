@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "builder.go",
+        "categories.go",
         "doc.go",
         "helper.go",
         "interfaces.go",
@@ -40,6 +41,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/yaml",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/discovery",
         "//vendor:k8s.io/client-go/rest",
     ],
 )
@@ -48,6 +50,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "builder_test.go",
+        "categories_test.go",
         "helper_test.go",
         "visitor_test.go",
     ],
@@ -72,6 +75,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/streaming",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/watch",

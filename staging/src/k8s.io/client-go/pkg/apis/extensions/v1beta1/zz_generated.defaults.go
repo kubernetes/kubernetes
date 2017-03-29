@@ -84,6 +84,9 @@ func SetObjectDefaults_DaemonSet(in *DaemonSet) {
 				}
 			}
 		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
@@ -221,6 +224,9 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 					}
 				}
 			}
+		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
@@ -370,6 +376,9 @@ func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
 					}
 				}
 			}
+		}
+		if a.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {

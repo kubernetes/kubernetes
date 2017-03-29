@@ -31,7 +31,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          image: gcr.io/google-samples/cassandra:v11
+          image: gcr.io/google-samples/cassandra:v12
           name: cassandra
           ports:
             - containerPort: 7000

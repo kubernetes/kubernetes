@@ -50,13 +50,18 @@ type HumanReadablePrinter struct {
 	options      PrintOptions
 	lastType     reflect.Type
 	hiddenObjNum int
+	encoder      runtime.Encoder
+	decoder      runtime.Decoder
 }
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
-func NewHumanReadablePrinter(options PrintOptions) *HumanReadablePrinter {
+// If encoder and decoder are provided, an attempt to convert unstructured types to internal types is made.
+func NewHumanReadablePrinter(encoder runtime.Encoder, decoder runtime.Decoder, options PrintOptions) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
 		options:    options,
+		encoder:    encoder,
+		decoder:    decoder,
 	}
 	return printer
 }
@@ -167,7 +172,9 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 	// check if the object is unstructured.  If so, let's attempt to convert it to a type we can understand before
 	// trying to print, since the printers are keyed by type.  This is extremely expensive.
-	//obj, _ = DecodeUnknownObject(obj)
+	if h.encoder != nil && h.decoder != nil {
+		obj, _ = decodeUnknownObject(obj, h.encoder, h.decoder)
+	}
 
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {
@@ -326,4 +333,19 @@ func appendAllLabels(showLabels bool, itemLabels map[string]string) string {
 	buffer.WriteString("\n")
 
 	return buffer.String()
+}
+
+// check if the object is unstructured. If so, attempt to convert it to a type we can understand.
+func decodeUnknownObject(obj runtime.Object, encoder runtime.Encoder, decoder runtime.Decoder) (runtime.Object, error) {
+	var err error
+	switch obj.(type) {
+	case runtime.Unstructured, *runtime.Unknown:
+		if objBytes, err := runtime.Encode(encoder, obj); err == nil {
+			if decodedObj, err := runtime.Decode(decoder, objBytes); err == nil {
+				obj = decodedObj
+			}
+		}
+	}
+
+	return obj, err
 }

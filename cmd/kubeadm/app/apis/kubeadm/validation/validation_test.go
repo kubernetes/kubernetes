@@ -25,17 +25,16 @@ import (
 
 func TestValidateTokenDiscovery(t *testing.T) {
 	var tests = []struct {
-		c        *kubeadm.TokenDiscovery
+		c        *kubeadm.NodeConfiguration
 		f        *field.Path
 		expected bool
 	}{
-		{&kubeadm.TokenDiscovery{ID: "772ef5", Secret: "6b6baab1d4a0a171", Addresses: []string{"192.168.122.100:9898"}}, nil, true},
-		{&kubeadm.TokenDiscovery{ID: "", Secret: "6b6baab1d4a0a171", Addresses: []string{"192.168.122.100:9898"}}, nil, false},
-		{&kubeadm.TokenDiscovery{ID: "772ef5", Secret: "", Addresses: []string{"192.168.122.100:9898"}}, nil, false},
-		{&kubeadm.TokenDiscovery{ID: "772ef5", Secret: "6b6baab1d4a0a171", Addresses: []string{}}, nil, false},
+		{&kubeadm.NodeConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, true},
+		{&kubeadm.NodeConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, false},
+		{&kubeadm.NodeConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, false},
 	}
 	for _, rt := range tests {
-		err := ValidateTokenDiscovery(rt.c, rt.f).ToAggregate()
+		err := ValidateToken(rt.c.Token, rt.f).ToAggregate()
 		if (err == nil) != rt.expected {
 			t.Errorf(
 				"failed ValidateTokenDiscovery:\n\texpected: %t\n\t  actual: %t",
@@ -70,31 +69,6 @@ func TestValidateAuthorizationMode(t *testing.T) {
 	}
 }
 
-func TestValidateServiceSubnet(t *testing.T) {
-	var tests = []struct {
-		s        string
-		f        *field.Path
-		expected bool
-	}{
-		{"", nil, false},
-		{"this is not a cidr", nil, false}, // not a CIDR
-		{"10.0.0.1", nil, false},           // not a CIDR
-		{"10.96.0.1/29", nil, false},       // CIDR too small, only 8 addresses and we require at least 10
-		{"10.96.0.1/28", nil, true},        // a /28 subnet is ok because it can contain 16 addresses
-		{"10.96.0.1/12", nil, true},        // the default subnet should obviously pass as well
-	}
-	for _, rt := range tests {
-		actual := ValidateServiceSubnet(rt.s, rt.f)
-		if (len(actual) == 0) != rt.expected {
-			t.Errorf(
-				"failed ValidateServiceSubnet:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(len(actual) == 0),
-			)
-		}
-	}
-}
-
 func TestValidateCloudProvider(t *testing.T) {
 	var tests = []struct {
 		s        string
@@ -119,6 +93,78 @@ func TestValidateCloudProvider(t *testing.T) {
 	}
 }
 
+func TestValidateAPIServerCertSANs(t *testing.T) {
+	var tests = []struct {
+		sans     []string
+		expected bool
+	}{
+		{[]string{}, true},                                                  // ok if not provided
+		{[]string{"1,2,,3"}, false},                                         // not a DNS label or IP
+		{[]string{"my-hostname", "???&?.garbage"}, false},                   // not valid
+		{[]string{"my-hostname", "my.subdomain", "1.2.3.4"}, true},          // supported
+		{[]string{"my-hostname2", "my.other.subdomain", "10.0.0.10"}, true}, // supported
+	}
+	for _, rt := range tests {
+		actual := ValidateAPIServerCertSANs(rt.sans, nil)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateAPIServerCertSANs:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
+func TestValidateIPFromString(t *testing.T) {
+	var tests = []struct {
+		ip       string
+		expected bool
+	}{
+		{"", false},           // not valid
+		{"1234", false},       // not valid
+		{"1.2", false},        // not valid
+		{"1.2.3.4/16", false}, // not valid
+		{"1.2.3.4", true},     // valid
+		{"16.0.1.1", true},    // valid
+	}
+	for _, rt := range tests {
+		actual := ValidateIPFromString(rt.ip, nil)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateIPFromString:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
+func TestValidateIPNetFromString(t *testing.T) {
+	var tests = []struct {
+		subnet   string
+		minaddrs int64
+		expected bool
+	}{
+		{"", 0, false},              // not valid
+		{"1234", 0, false},          // not valid
+		{"abc", 0, false},           // not valid
+		{"1.2.3.4", 0, false},       // ip not valid
+		{"10.0.0.16/29", 10, false}, // valid, but too small. At least 10 addrs needed
+		{"10.0.0.16/12", 10, true},  // valid
+	}
+	for _, rt := range tests {
+		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, nil)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateIPNetFromString:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
 func TestValidateMasterConfiguration(t *testing.T) {
 	var tests = []struct {
 		s        *kubeadm.MasterConfiguration
@@ -126,50 +172,21 @@ func TestValidateMasterConfiguration(t *testing.T) {
 	}{
 		{&kubeadm.MasterConfiguration{}, false},
 		{&kubeadm.MasterConfiguration{
-			Discovery: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
-				File:  &kubeadm.FileDiscovery{Path: "foo"},
-				Token: &kubeadm.TokenDiscovery{
-					ID:        "abcdef",
-					Secret:    "1234567890123456",
-					Addresses: []string{"foobar"},
-				},
-			},
 			AuthorizationMode: "RBAC",
 			Networking: kubeadm.Networking{
 				ServiceSubnet: "10.96.0.1/12",
+				DNSDomain:     "cluster.local",
 			},
+			CertificatesDir: "/some/cert/dir",
 		}, false},
 		{&kubeadm.MasterConfiguration{
-			Discovery: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
-			},
 			AuthorizationMode: "RBAC",
 			Networking: kubeadm.Networking{
 				ServiceSubnet: "10.96.0.1/12",
+				DNSDomain:     "cluster.local",
 			},
-		}, true},
-		{&kubeadm.MasterConfiguration{
-			Discovery: kubeadm.Discovery{
-				File: &kubeadm.FileDiscovery{Path: "foo"},
-			},
-			AuthorizationMode: "RBAC",
-			Networking: kubeadm.Networking{
-				ServiceSubnet: "10.96.0.1/12",
-			},
-		}, true},
-		{&kubeadm.MasterConfiguration{
-			Discovery: kubeadm.Discovery{
-				Token: &kubeadm.TokenDiscovery{
-					ID:        "abcdef",
-					Secret:    "1234567890123456",
-					Addresses: []string{"foobar"},
-				},
-			},
-			AuthorizationMode: "RBAC",
-			Networking: kubeadm.Networking{
-				ServiceSubnet: "10.96.0.1/12",
-			},
+			CertificatesDir: "/some/other/cert/dir",
+			Token:           "abcdef.0123456789abcdef",
 		}, true},
 	}
 	for _, rt := range tests {
@@ -191,45 +208,10 @@ func TestValidateNodeConfiguration(t *testing.T) {
 	}{
 		{&kubeadm.NodeConfiguration{}, false},
 		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
-				File:  &kubeadm.FileDiscovery{Path: "foo"},
-				Token: &kubeadm.TokenDiscovery{
-					ID:        "abcdef",
-					Secret:    "1234567890123456",
-					Addresses: []string{"foobar"},
-				},
-			},
-			CACertPath: "/some/cert.crt",
+			DiscoveryFile:  "foo",
+			DiscoveryToken: "abcdef.1234567890123456@foobar",
+			CACertPath:     "/some/cert.crt",
 		}, false},
-		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
-			},
-			CACertPath: "/some/path", // no .crt suffix
-		}, false},
-		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				HTTPS: &kubeadm.HTTPSDiscovery{URL: "foo"},
-			},
-			CACertPath: "/some/cert.crt",
-		}, true},
-		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				File: &kubeadm.FileDiscovery{Path: "foo"},
-			},
-			CACertPath: "/some/other/cert.crt",
-		}, true},
-		{&kubeadm.NodeConfiguration{
-			Discovery: kubeadm.Discovery{
-				Token: &kubeadm.TokenDiscovery{
-					ID:        "abcdef",
-					Secret:    "1234567890123456",
-					Addresses: []string{"foobar"},
-				},
-			},
-			CACertPath: "/a/third/cert.crt",
-		}, true},
 	}
 	for _, rt := range tests {
 		actual := ValidateNodeConfiguration(rt.s)

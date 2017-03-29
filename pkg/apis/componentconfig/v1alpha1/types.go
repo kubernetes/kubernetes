@@ -264,6 +264,8 @@ type KubeletConfiguration struct {
 	// enableDebuggingHandlers enables server endpoints for log collection
 	// and local running of containers and commands
 	EnableDebuggingHandlers *bool `json:"enableDebuggingHandlers"`
+	// enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true.
+	EnableContentionProfiling bool `json:"enableContentionProfiling"`
 	// minimumGCAge is the minimum age for a finished container before it is
 	// garbage collected.
 	MinimumGCAge metav1.Duration `json:"minimumGCAge"`
@@ -407,8 +409,6 @@ type KubeletConfiguration struct {
 	BabysitDaemons bool `json:"babysitDaemons"`
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32 `json:"maxPods"`
-	// nvidiaGPUs is the number of NVIDIA GPU devices on this node.
-	NvidiaGPUs int32 `json:"nvidiaGPUs"`
 	// dockerExecHandlerName is the handler to use when executing a command
 	// in a container. Valid values are 'native' and 'nsenter'. Defaults to
 	// 'native'.
@@ -478,6 +478,10 @@ type KubeletConfiguration struct {
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
 	EnableControllerAttachDetach *bool `json:"enableControllerAttachDetach"`
+	// A set of ResourceName=Percentage (e.g. memory=50%) pairs that describe
+	// how pod resource requests are reserved at the QoS level.
+	// Currently only memory is supported. [default=none]"
+	ExperimentalQOSReserved map[string]string `json:"experimentalQOSReserved"`
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool `json:"protectKernelDefaults"`
 	// If true, Kubelet ensures a set of iptables rules are present on host.

@@ -79,8 +79,8 @@ type serviceAccount struct {
 	secretLister         corelisters.SecretLister
 }
 
-var _ = kubeapiserveradmission.WantsInternalClientSet(&serviceAccount{})
-var _ = kubeapiserveradmission.WantsInformerFactory(&serviceAccount{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&serviceAccount{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&serviceAccount{})
 
 // NewServiceAccount returns an admission.Interface implementation which limits admission of Pod CREATE requests based on the pod's ServiceAccount:
 // 1. If the pod does not specify a ServiceAccount, it sets the pod's ServiceAccount to "default"
@@ -100,11 +100,11 @@ func NewServiceAccount() *serviceAccount {
 	}
 }
 
-func (a *serviceAccount) SetInternalClientSet(cl internalclientset.Interface) {
+func (a *serviceAccount) SetInternalKubeClientSet(cl internalclientset.Interface) {
 	a.client = cl
 }
 
-func (a *serviceAccount) SetInformerFactory(f informers.SharedInformerFactory) {
+func (a *serviceAccount) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	serviceAccountInformer := f.Core().InternalVersion().ServiceAccounts()
 	a.serviceAccountLister = serviceAccountInformer.Lister()
 

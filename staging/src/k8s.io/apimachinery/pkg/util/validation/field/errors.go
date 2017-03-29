@@ -50,7 +50,10 @@ func (v *Error) ErrorBody() string {
 		s = fmt.Sprintf("%s", v.Type)
 	default:
 		value := v.BadValue
-		if reflect.TypeOf(value).Kind() == reflect.Ptr {
+		valueType := reflect.TypeOf(value)
+		if value == nil || valueType == nil {
+			value = "null"
+		} else if valueType.Kind() == reflect.Ptr {
 			if reflectValue := reflect.ValueOf(value); reflectValue.IsNil() {
 				value = "null"
 			} else {

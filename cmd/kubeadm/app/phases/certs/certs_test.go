@@ -45,29 +45,32 @@ func TestCreatePKIAssets(t *testing.T) {
 		{
 			// CIDR too small
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadmapi.API{AdvertiseAddresses: []string{"10.0.0.1"}},
-				Networking: kubeadmapi.Networking{ServiceSubnet: "10.0.0.1/1"},
+				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.0.0.1/1"},
+				CertificatesDir: fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir),
 			},
 			expected: false,
 		},
 		{
 			// CIDR invalid
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadmapi.API{AdvertiseAddresses: []string{"10.0.0.1"}},
-				Networking: kubeadmapi.Networking{ServiceSubnet: "invalid"},
+				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "invalid"},
+				CertificatesDir: fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir),
 			},
 			expected: false,
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadmapi.API{AdvertiseAddresses: []string{"10.0.0.1"}},
-				Networking: kubeadmapi.Networking{ServiceSubnet: "10.0.0.1/24"},
+				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.0.0.1/24"},
+				CertificatesDir: fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir),
 			},
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
-		actual := CreatePKIAssets(rt.cfg, fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir))
+		actual := CreatePKIAssets(rt.cfg)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed CreatePKIAssets with an error:\n\texpected: %t\n\t  actual: %t",
@@ -123,6 +126,49 @@ func TestCheckAltNamesExist(t *testing.T) {
 				rt.succeed,
 				succeeded,
 			)
+		}
+	}
+}
+
+func TestGetAltNames(t *testing.T) {
+	var tests = []struct {
+		cfgaltnames      []string
+		hostname         string
+		dnsdomain        string
+		servicecidr      string
+		expectedIPs      []string
+		expectedDNSNames []string
+	}{
+		{
+			cfgaltnames:      []string{"foo", "192.168.200.1", "bar.baz"},
+			hostname:         "my-node",
+			dnsdomain:        "cluster.external",
+			servicecidr:      "10.96.0.1/12",
+			expectedIPs:      []string{"192.168.200.1", "10.96.0.1"},
+			expectedDNSNames: []string{"my-node", "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.external", "foo", "bar.baz"},
+		},
+	}
+
+	for _, rt := range tests {
+		_, svcSubnet, _ := net.ParseCIDR(rt.servicecidr)
+		actual := getAltNames(rt.cfgaltnames, rt.hostname, rt.dnsdomain, svcSubnet)
+		for i := range actual.IPs {
+			if rt.expectedIPs[i] != actual.IPs[i].String() {
+				t.Errorf(
+					"failed getAltNames:\n\texpected: %s\n\t  actual: %s",
+					rt.expectedIPs[i],
+					actual.IPs[i].String(),
+				)
+			}
+		}
+		for i := range actual.DNSNames {
+			if rt.expectedDNSNames[i] != actual.DNSNames[i] {
+				t.Errorf(
+					"failed getAltNames:\n\texpected: %s\n\t  actual: %s",
+					rt.expectedDNSNames[i],
+					actual.DNSNames[i],
+				)
+			}
 		}
 	}
 }

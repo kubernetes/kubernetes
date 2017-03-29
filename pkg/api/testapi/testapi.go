@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/imagepolicy"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/storage"
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
@@ -60,6 +61,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 	_ "k8s.io/kubernetes/pkg/apis/policy/install"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	_ "k8s.io/kubernetes/pkg/apis/settings/install"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 )
 
@@ -75,6 +77,7 @@ var (
 	Federation    TestGroup
 	Rbac          TestGroup
 	Certificates  TestGroup
+	Settings      TestGroup
 	Storage       TestGroup
 	ImagePolicy   TestGroup
 
@@ -230,6 +233,15 @@ func init() {
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
+	if _, ok := Groups[settings.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: settings.GroupName, Version: api.Registry.GroupOrDie(settings.GroupName).GroupVersion.Version}
+		Groups[settings.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: settings.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(settings.SchemeGroupVersion),
+			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
 	if _, ok := Groups[storage.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: storage.GroupName, Version: api.Registry.GroupOrDie(storage.GroupName).GroupVersion.Version}
 		Groups[storage.GroupName] = TestGroup{
@@ -276,6 +288,7 @@ func init() {
 	Extensions = Groups[extensions.GroupName]
 	Federation = Groups[federation.GroupName]
 	Rbac = Groups[rbac.GroupName]
+	Settings = Groups[settings.GroupName]
 	Storage = Groups[storage.GroupName]
 	ImagePolicy = Groups[imagepolicy.GroupName]
 	Authorization = Groups[authorization.GroupName]
@@ -336,7 +349,7 @@ func (g TestGroup) StorageCodec() runtime.Codec {
 	// etcd2 only supports string data - we must wrap any result before returning
 	// TODO: remove for etcd3 / make parameterizable
 	if !storageSerializer.EncodesAsText {
-		s = runtime.NewBase64Serializer(s)
+		s = runtime.NewBase64Serializer(s, s)
 	}
 	ds := recognizer.NewDecoder(s, api.Codecs.UniversalDeserializer())
 

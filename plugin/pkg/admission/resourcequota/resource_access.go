@@ -69,7 +69,7 @@ func newQuotaAccessor() (*quotaAccessor, error) {
 		return nil, err
 	}
 
-	// client and lister will be set when SetInternalClientSet and SetInformerFactory are invoked
+	// client and lister will be set when SetInternalKubeClientSet and SetInternalKubeInformerFactory are invoked
 	return &quotaAccessor{
 		liveLookupCache: liveLookupCache,
 		liveTTL:         time.Duration(30 * time.Second),

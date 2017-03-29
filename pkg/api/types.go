@@ -299,6 +299,9 @@ type VolumeSource struct {
 	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
 	PortworxVolume *PortworxVolumeSource
+	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// +optional
+	ScaleIO *ScaleIOVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -364,6 +367,9 @@ type PersistentVolumeSource struct {
 	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
 	PortworxVolume *PortworxVolumeSource
+	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// +optional
+	ScaleIO *ScaleIOVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -374,6 +380,12 @@ type PersistentVolumeClaimVolumeSource struct {
 	// +optional
 	ReadOnly bool
 }
+
+const (
+	// BetaStorageClassAnnotation represents the beta/previous StorageClass annotation.
+	// It's currently still used and will be held for backwards compatibility
+	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
+)
 
 // +genclient=true
 // +nonNamespaced=true
@@ -1050,6 +1062,41 @@ type AzureDiskVolumeSource struct {
 	ReadOnly *bool
 }
 
+// ScaleIOVolumeSource represents a persistent ScaleIO volume
+type ScaleIOVolumeSource struct {
+	// The host address of the ScaleIO API Gateway.
+	Gateway string
+	// The name of the storage system as configured in ScaleIO.
+	System string
+	// SecretRef references to the secret for ScaleIO user and other
+	// sensitive information. If this is not provided, Login operation will fail.
+	SecretRef *LocalObjectReference
+	// Flag to enable/disable SSL communication with Gateway, default false
+	// +optional
+	SSLEnabled bool
+	// The name of the Protection Domain for the configured storage (defaults to "default").
+	// +optional
+	ProtectionDomain string
+	// The Storage Pool associated with the protection domain (defaults to "default").
+	// +optional
+	StoragePool string
+	// Indicates whether the storage for a volume should be thick or thin (defaults to "thin").
+	// +optional
+	StorageMode string
+	// The name of a volume already created in the ScaleIO system
+	// that is associated with this volume source.
+	VolumeName string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+}
+
 // Adapts a ConfigMap into a volume.
 //
 // The contents of the target ConfigMap's Data field will be presented in a
@@ -1344,6 +1391,9 @@ type TCPSocketAction struct {
 	// Required: Port to connect to.
 	// +optional
 	Port intstr.IntOrString
+	// Optional: Host name to connect to, defaults to the pod IP.
+	// +optional
+	Host string
 }
 
 // ExecAction describes a "run in container" action.
@@ -1456,8 +1506,8 @@ type Container struct {
 	// +optional
 	Ports []ContainerPort
 	// List of sources to populate environment variables in the container.
-	// The keys defined within a source must be a C_IDENTIFIER. An invalid key
-	// will prevent the container from starting. When a key exists in multiple
+	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
+	// will be reported as an event when the container is starting. When a key exists in multiple
 	// sources, the value associated with the last source will take precedence.
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
@@ -1679,9 +1729,14 @@ type PodList struct {
 type DNSPolicy string
 
 const (
+	// DNSClusterFirstWithHostNet indicates that the pod should use cluster DNS
+	// first, if it is available, then fall back on the default
+	// (as determined by kubelet) DNS settings.
+	DNSClusterFirstWithHostNet DNSPolicy = "ClusterFirstWithHostNet"
+
 	// DNSClusterFirst indicates that the pod should use cluster DNS
-	// first, if it is available, then fall back on the default (as
-	// determined by kubelet) DNS settings.
+	// first unless hostNetwork is true, if it is available, then
+	// fall back on the default (as determined by kubelet) DNS settings.
 	DNSClusterFirst DNSPolicy = "ClusterFirst"
 
 	// DNSDefault indicates that the pod should use the default (as
@@ -1834,9 +1889,7 @@ type PodAffinityTerm struct {
 	// +optional
 	LabelSelector *metav1.LabelSelector
 	// namespaces specifies which namespaces the labelSelector applies to (matches against);
-	// nil list means "this pod's namespace," empty list means "all namespaces"
-	// The json tag here is not "omitempty" since we need to distinguish nil and empty.
-	// See https://golang.org/pkg/encoding/json/#Marshal for more details.
+	// null or empty list means "this pod's namespace"
 	Namespaces []string
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
@@ -3038,8 +3091,9 @@ type DeleteOptions struct {
 	OrphanDependents *bool
 
 	// Whether and how garbage collection will be performed.
-	// Defaults to Default.
 	// Either this field or OrphanDependents may be set, but not both.
+	// The default policy is decided by the existing finalizer set in the
+	// metadata.finalizers and the resource-specific default policy.
 	// +optional
 	PropagationPolicy *DeletionPropagation
 }

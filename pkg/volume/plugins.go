@@ -107,6 +107,16 @@ type VolumePlugin interface {
 	// information from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk
 	ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error)
+
+	// SupportsMountOption returns true if volume plugins supports Mount options
+	// Specifying mount options in a volume plugin that doesn't support
+	// user specified mount options will result in error creating persistent volumes
+	SupportsMountOption() bool
+
+	// SupportsBulkVolumeVerification checks if volume plugin type is capable
+	// of enabling bulk polling of all nodes. This can speed up verification of
+	// attached volumes by quite a bit, but underlying pluging must support it.
+	SupportsBulkVolumeVerification() bool
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used
@@ -146,6 +156,8 @@ const (
 	// Name of a volume in external cloud that is being provisioned and thus
 	// should be ignored by rest of Kubernetes.
 	ProvisionedVolumeName = "placeholder-for-provisioning"
+	// Mount options annotations
+	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
 // ProvisionableVolumePlugin is an extended interface of VolumePlugin and is

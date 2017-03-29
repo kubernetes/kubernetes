@@ -203,7 +203,8 @@ func (attacher *photonPersistentDiskAttacher) MountDevice(spec *volume.Spec, dev
 
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
-		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, options)
+		mountOptions := volume.MountOptionFromSpec(spec)
+		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
 			return err

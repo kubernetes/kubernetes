@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strconv"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podapi "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -230,9 +231,23 @@ func isHealthy(pod *v1.Pod) bool {
 	return isRunningAndReady(pod) && !isTerminated(pod)
 }
 
+// newControllerRef returns an ControllerRef pointing to a given StatefulSet.
+func newControllerRef(set *apps.StatefulSet) *metav1.OwnerReference {
+	blockOwnerDeletion := true
+	isController := true
+	return &metav1.OwnerReference{
+		APIVersion:         controllerKind.GroupVersion().String(),
+		Kind:               controllerKind.Kind,
+		Name:               set.Name,
+		UID:                set.UID,
+		BlockOwnerDeletion: &blockOwnerDeletion,
+		Controller:         &isController,
+	}
+}
+
 // newStatefulSetPod returns a new Pod conforming to the set's Spec with an identity generated from ordinal.
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
-	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, nil)
+	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, newControllerRef(set))
 	pod.Name = getPodName(set, ordinal)
 	updateIdentity(set, pod)
 	updateStorage(set, pod)

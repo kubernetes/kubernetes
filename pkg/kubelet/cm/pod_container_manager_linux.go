@@ -38,8 +38,6 @@ const (
 // It is the general implementation which allows pod level container
 // management if qos Cgroup is enabled.
 type podContainerManagerImpl struct {
-	// nodeInfo stores information about the node resource capacity
-	nodeInfo *v1.Node
 	// qosContainersInfo hold absolute paths of the top level qos containers
 	qosContainersInfo QOSContainersInfo
 	// Stores the mounted cgroup subsystems

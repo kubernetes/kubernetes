@@ -166,11 +166,19 @@ func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string
 	return volume.NewSpecFromVolume(flexVolume), nil
 }
 
+func (plugin *flexVolumePlugin) SupportsMountOption() bool {
+	return false
+}
+
 // Mark the given commands as unsupported.
 func (plugin *flexVolumePlugin) unsupported(commands ...string) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	plugin.unsupportedCommands = append(plugin.unsupportedCommands, commands...)
+}
+
+func (plugin *flexVolumePlugin) SupportsBulkVolumeVerification() bool {
+	return false
 }
 
 // Returns true iff the given command is known to be unsupported.

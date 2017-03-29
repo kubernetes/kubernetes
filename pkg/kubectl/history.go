@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -46,7 +47,7 @@ type HistoryViewer interface {
 
 func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryViewer, error) {
 	switch kind {
-	case extensions.Kind("Deployment"):
+	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		return &DeploymentHistoryViewer{c}, nil
 	}
 	return nil, fmt.Errorf("no history viewer has been implemented for %q", kind)
@@ -64,7 +65,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
 	}
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, versionedClient)
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSetsV15(deployment, versionedClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", name, err)
 	}
@@ -104,7 +105,8 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 		}
-		printersinternal.DescribePodTemplate(internalTemplate, buf)
+		w := printersinternal.NewPrefixWriter(buf)
+		printersinternal.DescribePodTemplate(internalTemplate, w)
 		return buf.String(), nil
 	}
 

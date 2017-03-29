@@ -32,6 +32,7 @@ go_library(
         "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation",
         "//vendor:k8s.io/client-go/util/cert",
     ],
 )

@@ -197,7 +197,7 @@ func (tw *baseTimeoutWriter) timeout(err *apierrors.StatusError) {
 	if !tw.wroteHeader && !tw.hijacked {
 		tw.w.WriteHeader(http.StatusGatewayTimeout)
 		enc := json.NewEncoder(tw.w)
-		enc.Encode(err)
+		enc.Encode(&err.ErrStatus)
 	} else {
 		// The timeout writer has been used by the inner handler. There is
 		// no way to timeout the HTTP request at the point. We have to shutdown

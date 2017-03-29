@@ -65,6 +65,7 @@ const (
 	ImageGCFailed                        = "ImageGCFailed"
 	FailedNodeAllocatableEnforcement     = "FailedNodeAllocatableEnforcement"
 	SuccessfulNodeAllocatableEnforcement = "NodeAllocatableEnforced"
+	UnsupportedMountOption               = "UnsupportedMountOption"
 
 	// Image manager event reason list
 	InvalidDiskCapacity = "InvalidDiskCapacity"

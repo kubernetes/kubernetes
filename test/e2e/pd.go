@@ -118,11 +118,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 
 		framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
 
-		v, err := f.ReadFileViaContainer(host1Pod.Name, containerName, testFile)
-		framework.ExpectNoError(err)
-		framework.Logf("Read value: %v", v)
-
-		Expect(strings.TrimSpace(v)).To(Equal(strings.TrimSpace(testFileContents)))
+		verifyPDContentsViaContainer(f, host1Pod.Name, containerName, map[string]string{testFile: testFileContents})
 
 		// Verify that disk is removed from node 1's VolumeInUse list
 		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, false /* shouldExist */))
@@ -182,11 +178,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 
 		framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
 
-		v, err := f.ReadFileViaContainer(host1Pod.Name, containerName, testFile)
-		framework.ExpectNoError(err)
-		framework.Logf("Read value: %v", v)
-
-		Expect(strings.TrimSpace(v)).To(Equal(strings.TrimSpace(testFileContents)))
+		verifyPDContentsViaContainer(f, host1Pod.Name, containerName, map[string]string{testFile: testFileContents})
 
 		// Verify that disk is removed from node 1's VolumeInUse list
 		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, false /* shouldExist */))
@@ -523,6 +515,13 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		// The disk should be detached from host0 on its deletion
 		By("Waiting for pd to detach from host0")
 		framework.ExpectNoError(waitForPDDetach(diskName, host0Name), "Timed out waiting for detach pd")
+	})
+
+	It("should be able to delete a non-existent PD without error", func() {
+		framework.SkipUnlessProviderIs("gce")
+
+		By("delete a PD")
+		framework.DeletePDWithRetry("non-exist")
 	})
 })
 

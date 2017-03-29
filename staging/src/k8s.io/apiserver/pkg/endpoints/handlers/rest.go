@@ -84,6 +84,7 @@ type RequestScope struct {
 
 	Creater         runtime.ObjectCreater
 	Convertor       runtime.ObjectConvertor
+	Defaulter       runtime.ObjectDefaulter
 	Copier          runtime.ObjectCopier
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
@@ -103,8 +104,8 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 // may be used to deserialize an options object to pass to the getter.
 type getterFunc func(ctx request.Context, name string, req *restful.Request) (runtime.Object, error)
 
-// maxRetryWhenPatchConflicts is the maximum number of conflicts retry during a patch operation before returning failure
-const maxRetryWhenPatchConflicts = 5
+// MaxRetryWhenPatchConflicts is the maximum number of conflicts retry during a patch operation before returning failure
+const MaxRetryWhenPatchConflicts = 5
 
 // getResourceHandler is an HTTP handler function for get requests. It delegates to the
 // passed-in getterFunc to perform the actual get.
@@ -525,7 +526,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 
 		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS,
-			scope.Namer, scope.Copier, scope.Creater, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec)
+			scope.Namer, scope.Copier, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
@@ -556,6 +557,7 @@ func patchResource(
 	namer ScopeNamer,
 	copier runtime.ObjectCopier,
 	creater runtime.ObjectCreater,
+	defaulter runtime.ObjectDefaulter,
 	unsafeConvertor runtime.ObjectConvertor,
 	kind schema.GroupVersionKind,
 	resource schema.GroupVersionResource,
@@ -565,11 +567,12 @@ func patchResource(
 	namespace := request.NamespaceValue(ctx)
 
 	var (
-		originalObjJS        []byte
-		originalPatchedObjJS []byte
-		originalObjMap       map[string]interface{}
-		originalPatchMap     map[string]interface{}
-		lastConflictErr      error
+		originalObjJS           []byte
+		originalPatchedObjJS    []byte
+		originalObjMap          map[string]interface{}
+		originalPatchMap        map[string]interface{}
+		lastConflictErr         error
+		originalResourceVersion string
 	)
 
 	// applyPatch is called every time GuaranteedUpdate asks for the updated object,
@@ -582,12 +585,18 @@ func patchResource(
 			return nil, errors.NewNotFound(resource.GroupResource(), name)
 		}
 
+		currentResourceVersion := ""
+		if currentMetadata, err := meta.Accessor(currentObject); err == nil {
+			currentResourceVersion = currentMetadata.GetResourceVersion()
+		}
+
 		switch {
 		case originalObjJS == nil && originalObjMap == nil:
 			// first time through,
 			// 1. apply the patch
 			// 2. save the original and patched to detect whether there were conflicting changes on retries
 
+			originalResourceVersion = currentResourceVersion
 			objToUpdate := patcher.New()
 
 			// For performance reasons, in case of strategicpatch, we avoid json
@@ -612,7 +621,7 @@ func patchResource(
 				if err != nil {
 					return nil, err
 				}
-				originalMap, patchMap, err := strategicPatchObject(codec, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
+				originalMap, patchMap, err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
 				if err != nil {
 					return nil, err
 				}
@@ -690,11 +699,12 @@ func patchResource(
 			if err != nil {
 				return nil, err
 			}
+
 			if hasConflicts {
 				diff1, _ := json.Marshal(currentPatchMap)
 				diff2, _ := json.Marshal(originalPatchMap)
-				patchDiffErr := fmt.Errorf("there is a meaningful conflict:\n diff1=%v\n, diff2=%v\n", diff1, diff2)
-				glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict.\n diff1=%v\n, diff2=%v\n", name, diff1, diff2)
+				patchDiffErr := fmt.Errorf("there is a meaningful conflict (firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
+				glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict(firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", name, originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
 
 				// Return the last conflict error we got if we have one
 				if lastConflictErr != nil {
@@ -708,7 +718,7 @@ func patchResource(
 			if err != nil {
 				return nil, err
 			}
-			if err := applyPatchToObject(codec, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
+			if err := applyPatchToObject(codec, defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
 				return nil, err
 			}
 			// Convert the object back to unversioned.
@@ -732,7 +742,7 @@ func patchResource(
 
 	return finishRequest(timeout, func() (runtime.Object, error) {
 		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo)
-		for i := 0; i < maxRetryWhenPatchConflicts && (errors.IsConflict(updateErr)); i++ {
+		for i := 0; i < MaxRetryWhenPatchConflicts && (errors.IsConflict(updateErr)); i++ {
 			lastConflictErr = updateErr
 			updateObject, _, updateErr = patcher.Update(ctx, name, updatedObjectInfo)
 		}

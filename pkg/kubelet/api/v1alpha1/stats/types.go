@@ -191,6 +191,8 @@ type VolumeStats struct {
 
 // FsStats contains data about filesystem usage.
 type FsStats struct {
+	// The time at which these stats were updated.
+	Time metav1.Time `json:"time"`
 	// AvailableBytes represents the storage space available (bytes) for the filesystem.
 	// +optional
 	AvailableBytes *uint64 `json:"availableBytes,omitempty"`

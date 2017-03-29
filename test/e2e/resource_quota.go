@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -38,6 +37,8 @@ const (
 	// how long to wait for a resource quota update to occur
 	resourceQuotaTimeout = 30 * time.Second
 )
+
+var classGold string = "gold"
 
 var _ = framework.KubeDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("resourcequota")
@@ -331,17 +332,15 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
 		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("0")
 		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("0")
-		usedResources[core.V1ResourceByStorageClass("gold", v1.ResourcePersistentVolumeClaims)] = resource.MustParse("0")
-		usedResources[core.V1ResourceByStorageClass("gold", v1.ResourceRequestsStorage)] = resource.MustParse("0")
+		usedResources[core.V1ResourceByStorageClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("0")
+		usedResources[core.V1ResourceByStorageClass(classGold, v1.ResourceRequestsStorage)] = resource.MustParse("0")
 
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a PersistentVolumeClaim with storage class")
 		pvc := newTestPersistentVolumeClaimForQuota("test-claim")
-		pvc.Annotations = map[string]string{
-			util.StorageClassAnnotation: "gold",
-		}
+		pvc.Spec.StorageClassName = &classGold
 		pvc, err = f.ClientSet.Core().PersistentVolumeClaims(f.Namespace.Name).Create(pvc)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -349,8 +348,8 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources = v1.ResourceList{}
 		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("1")
 		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("1Gi")
-		usedResources[core.V1ResourceByStorageClass("gold", v1.ResourcePersistentVolumeClaims)] = resource.MustParse("1")
-		usedResources[core.V1ResourceByStorageClass("gold", v1.ResourceRequestsStorage)] = resource.MustParse("1Gi")
+		usedResources[core.V1ResourceByStorageClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("1")
+		usedResources[core.V1ResourceByStorageClass(classGold, v1.ResourceRequestsStorage)] = resource.MustParse("1Gi")
 
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
@@ -362,8 +361,8 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		By("Ensuring resource quota status released usage")
 		usedResources[v1.ResourcePersistentVolumeClaims] = resource.MustParse("0")
 		usedResources[v1.ResourceRequestsStorage] = resource.MustParse("0")
-		usedResources[core.V1ResourceByStorageClass("gold", v1.ResourcePersistentVolumeClaims)] = resource.MustParse("0")
-		usedResources[core.V1ResourceByStorageClass("gold", v1.ResourceRequestsStorage)] = resource.MustParse("0")
+		usedResources[core.V1ResourceByStorageClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("0")
+		usedResources[core.V1ResourceByStorageClass(classGold, v1.ResourceRequestsStorage)] = resource.MustParse("0")
 
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
@@ -580,8 +579,8 @@ func newTestResourceQuota(name string) *v1.ResourceQuota {
 	hard[v1.ResourceSecrets] = resource.MustParse("10")
 	hard[v1.ResourcePersistentVolumeClaims] = resource.MustParse("10")
 	hard[v1.ResourceRequestsStorage] = resource.MustParse("10Gi")
-	hard[core.V1ResourceByStorageClass("gold", v1.ResourcePersistentVolumeClaims)] = resource.MustParse("10")
-	hard[core.V1ResourceByStorageClass("gold", v1.ResourceRequestsStorage)] = resource.MustParse("10Gi")
+	hard[core.V1ResourceByStorageClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("10")
+	hard[core.V1ResourceByStorageClass(classGold, v1.ResourceRequestsStorage)] = resource.MustParse("10Gi")
 	return &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       v1.ResourceQuotaSpec{Hard: hard},

@@ -19,6 +19,7 @@ go_library(
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/validation",
         "//vendor:k8s.io/apimachinery/pkg/labels",

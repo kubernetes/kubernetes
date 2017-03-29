@@ -234,7 +234,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("verifying pod deletion was observed")
 		deleted := false
 		var lastPod *v1.Pod
-		timer := time.After(2 * time.Minute)
+		timer := time.After(framework.DefaultPodDeletionTimeout)
 		for !deleted {
 			select {
 			case event, _ := <-w.ResultChan():

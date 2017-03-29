@@ -68,7 +68,7 @@ max_hints_delivery_threads: 2
 
 # Directory where Cassandra should store hints.
 # If not set, the default directory is $CASSANDRA_HOME/data/hints.
-# hints_directory: /var/lib/cassandra/hints
+hints_directory: /cassandra_data/hints
 
 # How often hints should be flushed from the internal buffers to disk.
 # Will *not* trigger fsync.

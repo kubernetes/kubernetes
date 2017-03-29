@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -98,7 +99,27 @@ func ValidateDaemonSet(ds *extensions.DaemonSet) field.ErrorList {
 // ValidateDaemonSetUpdate tests if required fields in the DaemonSet are set.
 func ValidateDaemonSetUpdate(ds, oldDS *extensions.DaemonSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDaemonSetSpecUpdate(&ds.Spec, &oldDS.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateDaemonSetSpecUpdate(newSpec, oldSpec *extensions.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// TemplateGeneration shouldn't be decremented
+	if newSpec.TemplateGeneration < oldSpec.TemplateGeneration {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("templateGeneration"), newSpec.TemplateGeneration, "must not be decremented"))
+	}
+
+	// TemplateGeneration should be increased when and only when template is changed
+	templateUpdated := !apiequality.Semantic.DeepEqual(newSpec.Template, oldSpec.Template)
+	if newSpec.TemplateGeneration == oldSpec.TemplateGeneration && templateUpdated {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("templateGeneration"), newSpec.TemplateGeneration, "must be incremented upon template update"))
+	} else if newSpec.TemplateGeneration > oldSpec.TemplateGeneration && !templateUpdated {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("templateGeneration"), newSpec.TemplateGeneration, "must not be incremented without template update"))
+	}
+
 	return allErrs
 }
 
@@ -332,7 +353,9 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	if status.AvailableReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
 	}
-	if status.AvailableReplicas > status.ReadyReplicas {
+	// TODO: ReadyReplicas is introduced in 1.6 and this check breaks the Deployment controller when pre-1.6 clusters get upgraded.
+	// 		 Remove the comparison to zero once we stop supporting upgrades from 1.5.
+	if status.ReadyReplicas > 0 && status.AvailableReplicas > status.ReadyReplicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
 	}
 	return allErrs

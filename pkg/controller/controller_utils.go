@@ -155,6 +155,7 @@ func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
 func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
 		if exp.Fulfilled() {
+			glog.V(4).Infof("Controller expectations fulfilled %#v", exp)
 			return true
 		} else if exp.isExpired() {
 			glog.V(4).Infof("Controller expectations expired %#v", exp)
@@ -284,7 +285,7 @@ type UIDSet struct {
 // UIDTrackingControllerExpectations tracks the UID of the pods it deletes.
 // This cache is needed over plain old expectations to safely handle graceful
 // deletion. The desired behavior is to treat an update that sets the
-// DeletionTimestamp on an object as a delete. To do so consistenly, one needs
+// DeletionTimestamp on an object as a delete. To do so consistently, one needs
 // to remember the expected deletes so they aren't double counted.
 // TODO: Track creates as well (#22599)
 type UIDTrackingControllerExpectations struct {
@@ -400,8 +401,9 @@ func (r RealRSControl) PatchReplicaSet(namespace, name string, data []byte) erro
 type PodControlInterface interface {
 	// CreatePods creates new pods according to the spec.
 	CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error
-	// CreatePodsOnNode creates a new pod according to the spec on the specified node.
-	CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object) error
+	// CreatePodsOnNode creates a new pod according to the spec on the specified node,
+	// and sets the ControllerRef.
+	CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error
 	// CreatePodsWithControllerRef creates new pods according to the spec, and sets object as the pod's controller.
 	CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error
 	// DeletePod deletes the pod identified by podID.
@@ -466,11 +468,7 @@ func getPodsPrefix(controllerName string) string {
 	return prefix
 }
 
-func (r RealPodControl) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
-	return r.createPods("", namespace, template, object, nil)
-}
-
-func (r RealPodControl) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, controllerObject runtime.Object, controllerRef *metav1.OwnerReference) error {
+func validateControllerRef(controllerRef *metav1.OwnerReference) error {
 	if controllerRef == nil {
 		return fmt.Errorf("controllerRef is nil")
 	}
@@ -481,16 +479,30 @@ func (r RealPodControl) CreatePodsWithControllerRef(namespace string, template *
 		return fmt.Errorf("controllerRef has empty Kind")
 	}
 	if controllerRef.Controller == nil || *controllerRef.Controller != true {
-		return fmt.Errorf("controllerRef.Controller is not set")
+		return fmt.Errorf("controllerRef.Controller is not set to true")
 	}
 	if controllerRef.BlockOwnerDeletion == nil || *controllerRef.BlockOwnerDeletion != true {
 		return fmt.Errorf("controllerRef.BlockOwnerDeletion is not set")
 	}
+	return nil
+}
+
+func (r RealPodControl) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
+	return r.createPods("", namespace, template, object, nil)
+}
+
+func (r RealPodControl) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, controllerObject runtime.Object, controllerRef *metav1.OwnerReference) error {
+	if err := validateControllerRef(controllerRef); err != nil {
+		return err
+	}
 	return r.createPods("", namespace, template, controllerObject, controllerRef)
 }
 
-func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
-	return r.createPods(nodeName, namespace, template, object, nil)
+func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+	if err := validateControllerRef(controllerRef); err != nil {
+		return err
+	}
+	return r.createPods(nodeName, namespace, template, object, controllerRef)
 }
 
 func (r RealPodControl) PatchPod(namespace, name string, data []byte) error {
@@ -613,10 +625,11 @@ func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *v1.
 	return nil
 }
 
-func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
+func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	f.Lock()
 	defer f.Unlock()
 	f.Templates = append(f.Templates, *template)
+	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
 	if f.Err != nil {
 		return f.Err
 	}
@@ -879,7 +892,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint *v1.Ta
 // If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
 // any API calls.
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint, node *v1.Node) error {
-	// Short circuit for limiting amout of API calls.
+	// Short circuit for limiting amount of API calls.
 	if node != nil {
 		match := false
 		for i := range node.Spec.Taints {

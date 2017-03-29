@@ -20,9 +20,9 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-export GOPATH=${GOPATH}:${KUBE_ROOT}/staging
-GODEP="${GODEP:-godep}"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
+kube::util::ensure_godep_version v79
 
 # Some things we want in godeps aren't code dependencies, so ./...
 # won't pick them up.
@@ -34,8 +34,8 @@ REQUIRED_BINS=(
 )
 
 pushd "${KUBE_ROOT}" > /dev/null
-  "${GODEP}" version
-  GO15VENDOREXPERIMENT=1 ${GODEP} save "${REQUIRED_BINS[@]}"
+  GOPATH=${GOPATH}:${KUBE_ROOT}/staging godep save "${REQUIRED_BINS[@]}"
+
   # create a symlink in vendor directory pointing to the staging client. This
   # let other packages use the staging client as if it were vendored.
   if [ ! -e "vendor/k8s.io/client-go" ]; then

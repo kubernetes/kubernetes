@@ -192,10 +192,9 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				metav1.LabelHostname:       kl.hostname,
-				metav1.LabelOS:             goruntime.GOOS,
-				metav1.LabelArch:           goruntime.GOARCH,
-				metav1.LabelFluentdDsReady: "true",
+				metav1.LabelHostname: kl.hostname,
+				metav1.LabelOS:       goruntime.GOOS,
+				metav1.LabelArch:     goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{
@@ -482,6 +481,14 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		node.Status.Capacity = v1.ResourceList{}
 	}
 
+	// populate GPU capacity.
+	gpuCapacity := kl.gpuManager.Capacity()
+	if gpuCapacity != nil {
+		for k, v := range gpuCapacity {
+			node.Status.Capacity[k] = v
+		}
+	}
+
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
 	// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.
 	info, err := kl.GetCachedMachineInfo()
@@ -491,8 +498,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
 		node.Status.Capacity[v1.ResourceMemory] = resource.MustParse("0Gi")
 		node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(int64(kl.maxPods), resource.DecimalSI)
-		node.Status.Capacity[v1.ResourceNvidiaGPU] = *resource.NewQuantity(int64(kl.nvidiaGPUs), resource.DecimalSI)
-
 		glog.Errorf("Error getting machine info: %v", err)
 	} else {
 		node.Status.NodeInfo.MachineID = info.MachineID
@@ -509,8 +514,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
 				int64(kl.maxPods), resource.DecimalSI)
 		}
-		node.Status.Capacity[v1.ResourceNvidiaGPU] = *resource.NewQuantity(
-			int64(kl.nvidiaGPUs), resource.DecimalSI)
 		if node.Status.NodeInfo.BootID != "" &&
 			node.Status.NodeInfo.BootID != info.BootID {
 			// TODO: This requires a transaction, either both node status is updated
@@ -524,6 +527,14 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 	// Set Allocatable.
 	if node.Status.Allocatable == nil {
 		node.Status.Allocatable = make(v1.ResourceList)
+	}
+	// Remove opaque integer resources from allocatable that are no longer
+	// present in capacity.
+	for k := range node.Status.Allocatable {
+		_, found := node.Status.Capacity[k]
+		if !found && v1.IsOpaqueIntResourceName(k) {
+			delete(node.Status.Allocatable, k)
+		}
 	}
 	allocatableReservation := kl.containerManager.GetNodeAllocatableReservation()
 	for k, v := range node.Status.Capacity {

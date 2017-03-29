@@ -27,12 +27,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -177,14 +177,17 @@ func TestGenerateRunContainerOptions_DNSConfigurationParams(t *testing.T) {
 	kubelet.clusterDomain = "kubernetes.io"
 	kubelet.clusterDNS = []net.IP{net.ParseIP(clusterNS)}
 
-	pods := newTestPods(2)
-	pods[0].Spec.DNSPolicy = v1.DNSClusterFirst
-	pods[1].Spec.DNSPolicy = v1.DNSDefault
+	pods := newTestPods(4)
+	pods[0].Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
+	pods[1].Spec.DNSPolicy = v1.DNSClusterFirst
+	pods[2].Spec.DNSPolicy = v1.DNSClusterFirst
+	pods[2].Spec.HostNetwork = false
+	pods[3].Spec.DNSPolicy = v1.DNSDefault
 
-	options := make([]*kubecontainer.RunContainerOptions, 2)
+	options := make([]*kubecontainer.RunContainerOptions, 4)
 	for i, pod := range pods {
 		var err error
-		options[i], err = kubelet.GenerateRunContainerOptions(pod, &v1.Container{}, "")
+		options[i], _, err = kubelet.GenerateRunContainerOptions(pod, &v1.Container{}, "")
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -201,11 +204,23 @@ func TestGenerateRunContainerOptions_DNSConfigurationParams(t *testing.T) {
 	if len(options[1].DNSSearch) != 1 || options[1].DNSSearch[0] != "." {
 		t.Errorf("expected search \".\", got %+v", options[1].DNSSearch)
 	}
+	if len(options[2].DNS) != 1 || options[2].DNS[0] != clusterNS {
+		t.Errorf("expected nameserver %s, got %+v", clusterNS, options[2].DNS)
+	}
+	if len(options[2].DNSSearch) == 0 || options[2].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
+		t.Errorf("expected search %s, got %+v", ".svc."+kubelet.clusterDomain, options[2].DNSSearch)
+	}
+	if len(options[3].DNS) != 1 || options[3].DNS[0] != "127.0.0.1" {
+		t.Errorf("expected nameserver 127.0.0.1, got %+v", options[3].DNS)
+	}
+	if len(options[3].DNSSearch) != 1 || options[3].DNSSearch[0] != "." {
+		t.Errorf("expected search \".\", got %+v", options[3].DNSSearch)
+	}
 
 	kubelet.resolverConfig = "/etc/resolv.conf"
 	for i, pod := range pods {
 		var err error
-		options[i], err = kubelet.GenerateRunContainerOptions(pod, &v1.Container{}, "")
+		options[i], _, err = kubelet.GenerateRunContainerOptions(pod, &v1.Container{}, "")
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -223,6 +238,16 @@ func TestGenerateRunContainerOptions_DNSConfigurationParams(t *testing.T) {
 	if len(options[0].DNSSearch) != expLength {
 		t.Errorf("expected prepend of cluster domain, got %+v", options[0].DNSSearch)
 	} else if options[0].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
+		t.Errorf("expected domain %s, got %s", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
+	}
+	if len(options[2].DNS) != 1 {
+		t.Errorf("expected cluster nameserver only, got %+v", options[2].DNS)
+	} else if options[2].DNS[0] != clusterNS {
+		t.Errorf("expected nameserver %s, got %v", clusterNS, options[2].DNS[0])
+	}
+	if len(options[2].DNSSearch) != expLength {
+		t.Errorf("expected prepend of cluster domain, got %+v", options[2].DNSSearch)
+	} else if options[2].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
 		t.Errorf("expected domain %s, got %s", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
 	}
 }
@@ -283,6 +308,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		secret          *v1.Secret             // an optional Secret to pull from
 		expectedEnvs    []kubecontainer.EnvVar // a set of expected environment vars
 		expectedError   bool                   // does the test fail
+		expectedEvent   string                 // does the test emit an event
 	}{
 		{
 			name: "api server = Y, kubelet = Y",
@@ -840,7 +866,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name: "configmap_invalid_keys",
-			ns:   "test1",
+			ns:   "test",
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}}},
@@ -854,9 +880,17 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				},
 				Data: map[string]string{
 					"1234": "abc",
+					"1z":   "abc",
+					"key":  "value",
 				},
 			},
-			expectedError: true,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "key",
+					Value: "value",
+				},
+			},
+			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom configMap test/test-config-map were skipped since they are considered invalid environment variable names.",
 		},
 		{
 			name: "configmap_invalid_keys_valid",
@@ -1007,7 +1041,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name: "secret_invalid_keys",
-			ns:   "test1",
+			ns:   "test",
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}}},
@@ -1021,9 +1055,17 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				},
 				Data: map[string][]byte{
 					"1234": []byte("abc"),
+					"1z":   []byte("abc"),
+					"key":  []byte("value"),
 				},
 			},
-			expectedError: true,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "key",
+					Value: "value",
+				},
+			},
+			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom secret test/test-secret were skipped since they are considered invalid environment variable names.",
 		},
 		{
 			name: "secret_invalid_keys_valid",
@@ -1056,7 +1098,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		fakeRecorder := record.NewFakeRecorder(1)
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet.kubelet.recorder = fakeRecorder
 		defer testKubelet.Cleanup()
 		kl := testKubelet.kubelet
 		kl.masterServiceNamespace = tc.masterServiceNs
@@ -1102,6 +1146,12 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		podIP := "1.2.3.4"
 
 		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP)
+		select {
+		case e := <-fakeRecorder.Events:
+			assert.Equal(t, tc.expectedEvent, e)
+		default:
+			assert.Equal(t, "", tc.expectedEvent)
+		}
 		if tc.expectedError {
 			assert.Error(t, err, tc.name)
 		} else {
@@ -1709,39 +1759,6 @@ func TestGetHostPortConflicts(t *testing.T) {
 	// The new pod should cause conflict and be reported.
 	pods = append(pods, expected)
 	assert.True(t, hasHostPortConflicts(pods), "Should have port conflicts")
-}
-
-func TestMakeDevices(t *testing.T) {
-	testCases := []struct {
-		container *v1.Container
-		devices   []kubecontainer.DeviceInfo
-		test      string
-	}{
-		{
-			test:      "no device",
-			container: &v1.Container{},
-			devices:   nil,
-		},
-		{
-			test: "gpu",
-			container: &v1.Container{
-				Resources: v1.ResourceRequirements{
-					Limits: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceNvidiaGPU: resource.MustParse("1000"),
-					},
-				},
-			},
-			devices: []kubecontainer.DeviceInfo{
-				{PathOnHost: "/dev/nvidia0", PathInContainer: "/dev/nvidia0", Permissions: "mrw"},
-				{PathOnHost: "/dev/nvidiactl", PathInContainer: "/dev/nvidiactl", Permissions: "mrw"},
-				{PathOnHost: "/dev/nvidia-uvm", PathInContainer: "/dev/nvidia-uvm", Permissions: "mrw"},
-			},
-		},
-	}
-
-	for _, test := range testCases {
-		assert.Equal(t, test.devices, makeDevices(test.container), "[test %q]", test.test)
-	}
 }
 
 func TestHasHostMountPVC(t *testing.T) {

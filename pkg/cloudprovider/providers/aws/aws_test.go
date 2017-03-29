@@ -146,7 +146,7 @@ func NewFakeAWSServices() *FakeAWSServices {
 	s.instances = []*ec2.Instance{selfInstance}
 
 	var tag ec2.Tag
-	tag.Key = aws.String(TagNameKubernetesCluster)
+	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
 	tag.Value = aws.String(TestClusterId)
 	selfInstance.Tags = []*ec2.Tag{&tag}
 
@@ -175,24 +175,6 @@ func (s *FakeAWSServices) Autoscaling(region string) (ASG, error) {
 
 func (s *FakeAWSServices) Metadata() (EC2Metadata, error) {
 	return s.metadata, nil
-}
-
-func TestFilterTags(t *testing.T) {
-	awsServices := NewFakeAWSServices()
-	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
-	if err != nil {
-		t.Errorf("Error building aws cloud: %v", err)
-		return
-	}
-
-	if len(c.filterTags) != 1 {
-		t.Errorf("unexpected filter tags: %v", c.filterTags)
-		return
-	}
-
-	if c.filterTags[TagNameKubernetesCluster] != TestClusterId {
-		t.Errorf("unexpected filter tags: %v", c.filterTags)
-	}
 }
 
 func TestNewAWSCloud(t *testing.T) {
@@ -279,6 +261,15 @@ func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
 		return contains(filter.Values, *instance.State.Name)
 	}
 
+	if name == "tag-key" {
+		for _, instanceTag := range instance.Tags {
+			if contains(filter.Values, aws.StringValue(instanceTag.Key)) {
+				return true
+			}
+		}
+		return false
+	}
+
 	if strings.HasPrefix(name, "tag:") {
 		tagName := name[4:]
 		for _, instanceTag := range instance.Tags {
@@ -286,7 +277,9 @@ func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
 				return true
 			}
 		}
+		return false
 	}
+
 	panic("Unknown filter name: " + name)
 }
 
@@ -974,13 +967,14 @@ func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
 		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
 	}
 }
+
 func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
 	awsServices := NewFakeAWSServices()
 
 	nodeName := types.NodeName("my-dns.internal")
 
 	var tag ec2.Tag
-	tag.Key = aws.String(TagNameKubernetesCluster)
+	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
 	tag.Value = aws.String(TestClusterId)
 	tags := []*ec2.Tag{&tag}
 
@@ -1024,8 +1018,8 @@ func TestFindInstancesByNodeNameCached(t *testing.T) {
 	nodeNameTwo := "my-dns-two.internal"
 
 	var tag ec2.Tag
-	tag.Key = aws.String(TagNameKubernetesCluster)
-	tag.Value = aws.String(TestClusterId)
+	tag.Key = aws.String(TagNameKubernetesClusterPrefix + TestClusterId)
+	tag.Value = aws.String("")
 	tags := []*ec2.Tag{&tag}
 
 	var runningInstance ec2.Instance

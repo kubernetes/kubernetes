@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -68,6 +69,7 @@ func init() {
 	// map eviction signals to node conditions
 	signalToNodeCondition = map[evictionapi.Signal]v1.NodeConditionType{}
 	signalToNodeCondition[evictionapi.SignalMemoryAvailable] = v1.NodeMemoryPressure
+	signalToNodeCondition[evictionapi.SignalAllocatableMemoryAvailable] = v1.NodeMemoryPressure
 	signalToNodeCondition[evictionapi.SignalImageFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalNodeFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalImageFsInodesFree] = v1.NodeDiskPressure
@@ -76,6 +78,7 @@ func init() {
 	// map signals to resources (and vice-versa)
 	signalToResource = map[evictionapi.Signal]v1.ResourceName{}
 	signalToResource[evictionapi.SignalMemoryAvailable] = v1.ResourceMemory
+	signalToResource[evictionapi.SignalAllocatableMemoryAvailable] = v1.ResourceMemory
 	signalToResource[evictionapi.SignalImageFsAvailable] = resourceImageFs
 	signalToResource[evictionapi.SignalImageFsInodesFree] = resourceImageFsInodes
 	signalToResource[evictionapi.SignalNodeFsAvailable] = resourceNodeFs
@@ -93,8 +96,10 @@ func validSignal(signal evictionapi.Signal) bool {
 }
 
 // ParseThresholdConfig parses the flags for thresholds.
-func ParseThresholdConfig(evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim string) ([]evictionapi.Threshold, error) {
+func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim string) ([]evictionapi.Threshold, error) {
 	results := []evictionapi.Threshold{}
+	allocatableThresholds := getAllocatableThreshold(allocatableConfig)
+	results = append(results, allocatableThresholds...)
 
 	hardThresholds, err := parseThresholdStatements(evictionHard)
 	if err != nil {
@@ -212,6 +217,27 @@ func parseThresholdStatement(statement string) (evictionapi.Threshold, error) {
 			Quantity: &quantity,
 		},
 	}, nil
+}
+
+// getAllocatableThreshold returns the thresholds applicable for the allocatable configuration
+func getAllocatableThreshold(allocatableConfig []string) []evictionapi.Threshold {
+	for _, key := range allocatableConfig {
+		if key == cm.NodeAllocatableEnforcementKey {
+			return []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+				},
+			}
+		}
+	}
+	return []evictionapi.Threshold{}
 }
 
 // parsePercentage parses a string representing a percentage value
@@ -611,8 +637,12 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObservations, statsFunc, error) {
+func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider NodeProvider) (signalObservations, statsFunc, error) {
 	summary, err := summaryProvider.Get()
+	if err != nil {
+		return nil, nil, err
+	}
+	node, err := nodeProvider.GetNode()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -634,14 +664,14 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 			result[evictionapi.SignalNodeFsAvailable] = signalObservation{
 				available: resource.NewQuantity(int64(*nodeFs.AvailableBytes), resource.BinarySI),
 				capacity:  resource.NewQuantity(int64(*nodeFs.CapacityBytes), resource.BinarySI),
-				// TODO: add timestamp to stat (see memory stat)
+				time:      nodeFs.Time,
 			}
 		}
 		if nodeFs.InodesFree != nil && nodeFs.Inodes != nil {
 			result[evictionapi.SignalNodeFsInodesFree] = signalObservation{
 				available: resource.NewQuantity(int64(*nodeFs.InodesFree), resource.BinarySI),
 				capacity:  resource.NewQuantity(int64(*nodeFs.Inodes), resource.BinarySI),
-				// TODO: add timestamp to stat (see memory stat)
+				time:      nodeFs.Time,
 			}
 		}
 	}
@@ -651,16 +681,29 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 				result[evictionapi.SignalImageFsAvailable] = signalObservation{
 					available: resource.NewQuantity(int64(*imageFs.AvailableBytes), resource.BinarySI),
 					capacity:  resource.NewQuantity(int64(*imageFs.CapacityBytes), resource.BinarySI),
-					// TODO: add timestamp to stat (see memory stat)
+					time:      imageFs.Time,
 				}
 				if imageFs.InodesFree != nil && imageFs.Inodes != nil {
 					result[evictionapi.SignalImageFsInodesFree] = signalObservation{
 						available: resource.NewQuantity(int64(*imageFs.InodesFree), resource.BinarySI),
 						capacity:  resource.NewQuantity(int64(*imageFs.Inodes), resource.BinarySI),
-						// TODO: add timestamp to stat (see memory stat)
+						time:      imageFs.Time,
 					}
 				}
 			}
+		}
+	}
+	if memoryAllocatableCapacity, ok := node.Status.Allocatable[v1.ResourceMemory]; ok {
+		memoryAllocatableAvailable := memoryAllocatableCapacity.Copy()
+		for _, pod := range summary.Pods {
+			mu, err := podMemoryUsage(pod)
+			if err == nil {
+				memoryAllocatableAvailable.Sub(mu[v1.ResourceMemory])
+			}
+		}
+		result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
+			available: memoryAllocatableAvailable,
+			capacity:  memoryAllocatableCapacity.Copy(),
 		}
 	}
 	return result, statsFunc, nil
@@ -696,24 +739,30 @@ func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObserv
 }
 
 func debugLogObservations(logPrefix string, observations signalObservations) {
+	if !glog.V(3) {
+		return
+	}
 	for k, v := range observations {
 		if !v.time.IsZero() {
-			glog.V(3).Infof("eviction manager: %v: signal=%v, available: %v, capacity: %v, time: %v", logPrefix, k, v.available, v.capacity, v.time)
+			glog.Infof("eviction manager: %v: signal=%v, available: %v, capacity: %v, time: %v", logPrefix, k, v.available, v.capacity, v.time)
 		} else {
-			glog.V(3).Infof("eviction manager: %v: signal=%v, available: %v, capacity: %v", logPrefix, k, v.available, v.capacity)
+			glog.Infof("eviction manager: %v: signal=%v, available: %v, capacity: %v", logPrefix, k, v.available, v.capacity)
 		}
 	}
 }
 
 func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionapi.Threshold, observations signalObservations) {
+	if !glog.V(3) {
+		return
+	}
 	for i := range thresholds {
 		threshold := thresholds[i]
 		observed, found := observations[threshold.Signal]
 		if found {
 			quantity := evictionapi.GetThresholdQuantity(threshold.Value, observed.capacity)
-			glog.V(3).Infof("eviction manager: %v: threshold [signal=%v, quantity=%v] observed %v", logPrefix, threshold.Signal, quantity, observed.available)
+			glog.Infof("eviction manager: %v: threshold [signal=%v, quantity=%v] observed %v", logPrefix, threshold.Signal, quantity, observed.available)
 		} else {
-			glog.V(3).Infof("eviction manager: %v: threshold [signal=%v] had no observation", logPrefix, threshold.Signal)
+			glog.Infof("eviction manager: %v: threshold [signal=%v] had no observation", logPrefix, threshold.Signal)
 		}
 	}
 }

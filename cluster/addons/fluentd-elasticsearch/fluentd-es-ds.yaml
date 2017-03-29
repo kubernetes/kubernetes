@@ -41,7 +41,7 @@ spec:
           mountPath: /var/lib/docker/containers
           readOnly: true
       nodeSelector:
-        alpha.kubernetes.io/fluentd-ds-ready: "true"
+        beta.kubernetes.io/fluentd-ds-ready: "true"
       tolerations:
       - key : "node.alpha.kubernetes.io/ismaster"
         effect: "NoSchedule"

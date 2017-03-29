@@ -529,7 +529,7 @@
         "type": "string",
         "paramType": "query",
         "name": "propagationPolicy",
-        "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both.",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
         "required": false,
         "allowMultiple": false
        },
@@ -1325,7 +1325,7 @@
      },
      "dnsPolicy": {
       "type": "string",
-      "description": "Set DNS policy for containers within the pod. One of 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\"."
+      "description": "Set DNS policy for containers within the pod. One of 'ClusterFirstWithHostNet', 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\". To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'."
      },
      "nodeSelector": {
       "type": "object",
@@ -1382,7 +1382,7 @@
       "$ref": "v1.Affinity",
       "description": "If specified, the pod's scheduling constraints"
      },
-     "schedulername": {
+     "schedulerName": {
       "type": "string",
       "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler."
      },
@@ -1505,6 +1505,10 @@
      "portworxVolume": {
       "$ref": "v1.PortworxVolumeSource",
       "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine"
+     },
+     "scaleIO": {
+      "$ref": "v1.ScaleIOVolumeSource",
+      "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
      }
     }
    },
@@ -2285,6 +2289,57 @@
      }
     }
    },
+   "v1.ScaleIOVolumeSource": {
+    "id": "v1.ScaleIOVolumeSource",
+    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+    "required": [
+     "gateway",
+     "system",
+     "secretRef"
+    ],
+    "properties": {
+     "gateway": {
+      "type": "string",
+      "description": "The host address of the ScaleIO API Gateway."
+     },
+     "system": {
+      "type": "string",
+      "description": "The name of the storage system as configured in ScaleIO."
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail."
+     },
+     "sslEnabled": {
+      "type": "boolean",
+      "description": "Flag to enable/disable SSL communication with Gateway, default false"
+     },
+     "protectionDomain": {
+      "type": "string",
+      "description": "The name of the Protection Domain for the configured storage (defaults to \"default\")."
+     },
+     "storagePool": {
+      "type": "string",
+      "description": "The Storage Pool associated with the protection domain (defaults to \"default\")."
+     },
+     "storageMode": {
+      "type": "string",
+      "description": "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\")."
+     },
+     "volumeName": {
+      "type": "string",
+      "description": "The name of a volume already created in the ScaleIO system that is associated with this volume source."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
    "v1.Container": {
     "id": "v1.Container",
     "description": "A single application container that you want to run within a pod.",
@@ -2330,7 +2385,7 @@
       "items": {
        "$ref": "v1.EnvFromSource"
       },
-      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. An invalid key will prevent the container from starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated."
+      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated."
      },
      "env": {
       "type": "array",
@@ -2710,6 +2765,10 @@
      "port": {
       "type": "string",
       "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
+     },
+     "host": {
+      "type": "string",
+      "description": "Optional: Host name to connect to, defaults to the pod IP."
      }
     }
    },
@@ -2987,9 +3046,6 @@
    "v1.PodAffinityTerm": {
     "id": "v1.PodAffinityTerm",
     "description": "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key \u003ctopologyKey\u003e tches that of any node on which a pod of the set of pods is running",
-    "required": [
-     "namespaces"
-    ],
     "properties": {
      "labelSelector": {
       "$ref": "v1.LabelSelector",
@@ -3000,7 +3056,7 @@
       "items": {
        "type": "string"
       },
-      "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); nil list means \"this pod's namespace,\" empty list means \"all namespaces\" The json tag here is not \"omitempty\" since we need to distinguish nil and empty. See https://golang.org/pkg/encoding/json/#Marshal for more details."
+      "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\""
      },
      "topologyKey": {
       "type": "string",
@@ -3278,7 +3334,7 @@
      },
      "propagationPolicy": {
       "$ref": "v1.DeletionPropagation",
-      "description": "Whether and how garbage collection will be performed. Defaults to Default. Either this field or OrphanDependents may be set, but not both."
+      "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy."
      }
     }
    },
@@ -3334,6 +3390,7 @@
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",
+     "singularName",
      "namespaced",
      "kind",
      "verbs"
@@ -3341,7 +3398,11 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "name is the name of the resource."
+      "description": "name is the plural name of the resource."
+     },
+     "singularName": {
+      "type": "string",
+      "description": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface."
      },
      "namespaced": {
       "type": "boolean",

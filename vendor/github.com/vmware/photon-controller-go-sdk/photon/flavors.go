@@ -25,7 +25,7 @@ type FlavorGetOptions struct {
 	Kind string `urlParam:"kind"`
 }
 
-var flavorUrl string = "/flavors"
+var flavorUrl string = rootUrl + "/flavors"
 
 // Creates a flavor.
 func (api *FlavorsAPI) Create(spec *FlavorCreateSpec) (task *Task, err error) {
@@ -37,7 +37,7 @@ func (api *FlavorsAPI) Create(spec *FlavorCreateSpec) (task *Task, err error) {
 		api.client.Endpoint+flavorUrl,
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -48,7 +48,7 @@ func (api *FlavorsAPI) Create(spec *FlavorCreateSpec) (task *Task, err error) {
 
 // Gets details of flavor with specified ID.
 func (api *FlavorsAPI) Get(flavorID string) (flavor *Flavor, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+flavorUrl+"/"+flavorID, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.client.Endpoint+flavorUrl+"/"+flavorID, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -68,7 +68,7 @@ func (api *FlavorsAPI) GetAll(options *FlavorGetOptions) (flavors *FlavorList, e
 	if options != nil {
 		uri += getQueryString(options)
 	}
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -80,7 +80,7 @@ func (api *FlavorsAPI) GetAll(options *FlavorGetOptions) (flavors *FlavorList, e
 
 // Deletes flavor with specified ID.
 func (api *FlavorsAPI) Delete(flavorID string) (task *Task, err error) {
-	res, err := api.client.restClient.Delete(api.client.Endpoint+flavorUrl+"/"+flavorID, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Delete(api.client.Endpoint+flavorUrl+"/"+flavorID, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -97,7 +97,7 @@ func (api *FlavorsAPI) GetTasks(id string, options *TaskGetOptions) (result *Tas
 		uri += getQueryString(options)
 	}
 
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}

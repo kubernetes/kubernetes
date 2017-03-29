@@ -37,13 +37,8 @@ import (
 )
 
 const (
-	FederatedServiceTimeout = 60 * time.Second
-
 	FederatedServiceName    = "federated-service"
 	FederatedServicePodName = "federated-service-test-pod"
-
-	KubeDNSConfigMapName      = "kube-dns"
-	KubeDNSConfigMapNamespace = "kube-system"
 )
 
 var FederatedServiceLabels = map[string]string{
@@ -254,7 +249,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 				})
 
-				It("should be able to discover a non-local federated service", func() {
+				PIt("should be able to discover a non-local federated service", func() {
 					fedframework.SkipUnlessFederated(f.ClientSet)
 
 					nsName := f.FederationNamespace.Name

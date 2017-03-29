@@ -17,9 +17,8 @@ limitations under the License.
 package kubemark
 
 import (
-	"time"
-
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
@@ -40,8 +39,8 @@ type HollowProxy struct {
 
 type FakeProxyHandler struct{}
 
-func (*FakeProxyHandler) OnServiceUpdate(services []api.Service)      {}
-func (*FakeProxyHandler) OnEndpointsUpdate(endpoints []api.Endpoints) {}
+func (*FakeProxyHandler) OnServiceUpdate(services []api.Service)       {}
+func (*FakeProxyHandler) OnEndpointsUpdate(endpoints []*api.Endpoints) {}
 
 type FakeProxier struct{}
 
@@ -71,12 +70,9 @@ func NewHollowProxyOrDie(
 		UID:       types.UID(nodeName),
 		Namespace: "",
 	}
-	proxyconfig.NewSourceAPI(
-		client.Core().RESTClient(),
-		15*time.Minute,
-		serviceConfig.Channel("api"),
-		endpointsConfig.Channel("api"),
-	)
+
+	go endpointsConfig.Run(wait.NeverStop)
+	go serviceConfig.Run(wait.NeverStop)
 
 	hollowProxy, err := proxyapp.NewProxyServer(client, eventClient, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake")
 	if err != nil {

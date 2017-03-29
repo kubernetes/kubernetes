@@ -125,6 +125,10 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Garbage Collector: Shutting down")
 }
 
+func (gc *GarbageCollector) HasSynced() bool {
+	return gc.dependencyGraphBuilder.HasSynced()
+}
+
 func (gc *GarbageCollector) runAttemptToDeleteWorker() {
 	for gc.attemptToDeleteWorker() {
 	}
@@ -143,6 +147,12 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 	}
 	err := gc.attemptToDeleteItem(n)
 	if err != nil {
+		// TODO: remove this block when gc starts using dynamic RESTMapper.
+		if restMappingError, ok := err.(*restMappingError); ok {
+			utilruntime.HandleError(fmt.Errorf("Ignore syncing item %#v: %s", n, restMappingError.Message()))
+			// The RESTMapper is static, so no need to retry, otherwise we'll get the same error.
+			return true
+		}
 		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", n, err))
 		// retry if garbage collection of an object failed.
 		gc.attemptToDelete.AddRateLimited(item)

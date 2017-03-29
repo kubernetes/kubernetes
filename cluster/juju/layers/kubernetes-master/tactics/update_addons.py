@@ -104,6 +104,10 @@ def update_addons(dest):
         add_addon(repo, "dashboard/dashboard-controller.yaml", dest)
         add_addon(repo, "dashboard/dashboard-service.yaml", dest)
         try:
+            add_addon(repo, "dns/kubedns-sa.yaml",
+                      dest + "/kubedns-sa.yaml")
+            add_addon(repo, "dns/kubedns-cm.yaml",
+                      dest + "/kubedns-cm.yaml")
             add_addon(repo, "dns/kubedns-controller.yaml.in",
                       dest + "/kubedns-controller.yaml")
             add_addon(repo, "dns/kubedns-svc.yaml.in",

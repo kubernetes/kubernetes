@@ -94,6 +94,7 @@ go_library(
         "//pkg/volume/projected:go_default_library",
         "//pkg/volume/quobyte:go_default_library",
         "//pkg/volume/rbd:go_default_library",
+        "//pkg/volume/scaleio:go_default_library",
         "//pkg/volume/secret:go_default_library",
         "//pkg/volume/vsphere_volume:go_default_library",
         "//vendor:github.com/golang/glog",

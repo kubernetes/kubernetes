@@ -115,24 +115,24 @@ function split-commas {
 }
 
 function install-gci-mounter-tools {
-    CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
-    mkdir "${CONTAINERIZED_MOUNTER_HOME}"
-    chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
-    mkdir "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
-    local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
-    download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
-    cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
-    chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
-    mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
-    tar xvf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
-    rm /tmp/mounter.tar
-    mkdir "${CONTAINERIZED_MOUNTER_HOME}/rootfs/var/lib/kubelet"
+  CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
+  mkdir -p "${CONTAINERIZED_MOUNTER_HOME}"
+  chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
+  mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
+  local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
+  download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
+  cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
+  chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
+  mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
+  tar xvf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
+  rm /tmp/mounter.tar
+  mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs/var/lib/kubelet"
 }
 
 # Install node problem detector binary.
 function install-node-problem-detector {
-  local -r npd_version="v0.3.0-alpha.1"
-  local -r npd_sha1="46f963fac14d92021c8b2a648a6cb0337c1bc833"
+  local -r npd_version="v0.3.0"
+  local -r npd_sha1="2e6423c5798e14464271d9c944e56a637ee5a4bc"
   local -r npd_release_path="https://storage.googleapis.com/kubernetes-release"
   local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
   download-or-bust "${npd_sha1}" "${npd_release_path}/node-problem-detector/${npd_tar}"
@@ -184,8 +184,8 @@ function install-kube-binary-config {
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
-    local -r cni_tar="cni-07a8a28637e97b22eb8dfe710eeae1344f69d16e.tar.gz"
-    local -r cni_sha1="19d49f7b2b99cd2493d5ae0ace896c64e289ccbb"
+    local -r cni_tar="cni-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz"
+    local -r cni_sha1="1d9788b0f5420e1a219aad2cb8681823fc515e7c"
     download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
     local -r cni_dir="${KUBE_HOME}/cni"
     mkdir -p "${cni_dir}"

@@ -67,11 +67,6 @@ func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource serverstora
 	version := batchapiv2alpha1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobstore.NewREST(restOptionsGetter)
-		storage["jobs"] = jobsStorage
-		storage["jobs/status"] = jobsStatusStorage
-	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("cronjobs")) {
 		cronJobsStorage, cronJobsStatusStorage := cronjobstore.NewREST(restOptionsGetter)
 		storage["cronjobs"] = cronJobsStorage

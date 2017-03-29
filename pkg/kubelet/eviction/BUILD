@@ -33,6 +33,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
+        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/types:go_default_library",

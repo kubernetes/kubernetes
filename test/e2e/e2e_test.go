@@ -19,7 +19,10 @@ package e2e
 import (
 	"testing"
 
+	_ "k8s.io/kubernetes/test/e2e/cluster-logging"
 	"k8s.io/kubernetes/test/e2e/framework"
+	_ "k8s.io/kubernetes/test/e2e/perf"
+	_ "k8s.io/kubernetes/test/e2e/scheduling"
 )
 
 func init() {

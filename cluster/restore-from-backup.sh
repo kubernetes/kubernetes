@@ -101,7 +101,7 @@ wait_for_cluster_healthy() {
 # Wait until etcd and apiserver pods are down.
 wait_for_etcd_and_apiserver_down() {
   for i in $(seq 120); do
-    etcd=$(docker ps | grep etcd | grep -v etcd-empty-dir | wc -l)
+    etcd=$(docker ps | grep etcd | grep -v etcd-empty-dir | grep -v etcd-monitor | wc -l)
     apiserver=$(docker ps | grep apiserver | wc -l)
     # TODO: Theoretically it is possible, that apiserver and or etcd
     # are currently down, but Kubelet is now restarting them and they

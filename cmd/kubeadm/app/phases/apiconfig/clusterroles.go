@@ -24,33 +24,35 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	rbac "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
 const (
-	// TODO: This role should eventually be a system:-prefixed, automatically bootstrapped ClusterRole
-
-	// KubeDNSClusterRoleName sets the name for the kube-dns ClusterRole
-	KubeDNSClusterRoleName = "kubeadm:kube-dns"
 	// KubeProxyClusterRoleName sets the name for the kube-proxy ClusterRole
 	KubeProxyClusterRoleName = "system:node-proxier"
 	// NodeBootstrapperClusterRoleName sets the name for the TLS Node Bootstrapper ClusterRole
 	NodeBootstrapperClusterRoleName = "system:node-bootstrapper"
+	// BootstrapSignerClusterRoleName sets the name for the ClusterRole that allows access to ConfigMaps in the kube-public ns
+	BootstrapSignerClusterRoleName = "system:bootstrap-signer-clusterinfo"
 
 	// Constants
 	clusterRoleKind    = "ClusterRole"
+	roleKind           = "Role"
 	serviceAccountKind = "ServiceAccount"
 	rbacAPIGroup       = "rbac.authorization.k8s.io"
+	anonymousUser      = "system:anonymous"
 )
 
 // TODO: Are there any unit tests that could be made for this file other than duplicating all values and logic in a separate file?
 
 // CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
 func CreateRBACRules(clientset *clientset.Clientset) error {
-	// Create the ClusterRoles we need for our RBAC rules
-	if err := CreateClusterRoles(clientset); err != nil {
+	if err := CreateRoles(clientset); err != nil {
 		return err
 	}
-	// Create the CreateClusterRoleBindings we need for our RBAC rules
+	if err := CreateRoleBindings(clientset); err != nil {
+		return err
+	}
 	if err := CreateClusterRoleBindings(clientset); err != nil {
 		return err
 	}
@@ -84,19 +86,53 @@ func CreateServiceAccounts(clientset *clientset.Clientset) error {
 	return nil
 }
 
-// CreateClusterRoles creates the ClusterRoles that aren't bootstrapped by the apiserver
-func CreateClusterRoles(clientset *clientset.Clientset) error {
-	// TODO: Remove this ClusterRole when it's automatically bootstrapped in the apiserver
-	clusterRole := rbac.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: KubeDNSClusterRoleName},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("list", "watch").Groups("").Resources("endpoints", "services").RuleOrDie(),
-			// TODO: remove watch rule when https://github.com/kubernetes/kubernetes/pull/38816 gets merged
-			rbac.NewRule("get", "list", "watch").Groups("").Resources("configmaps").RuleOrDie(),
+// CreateRoles creates namespaces RBAC Roles
+func CreateRoles(clientset *clientset.Clientset) error {
+	roles := []rbac.Role{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      BootstrapSignerClusterRoleName,
+				Namespace: metav1.NamespacePublic,
+			},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get").Groups("").Resources("configmaps").RuleOrDie(),
+			},
 		},
 	}
-	if _, err := clientset.Rbac().ClusterRoles().Create(&clusterRole); err != nil {
-		return err
+	for _, role := range roles {
+		if _, err := clientset.RbacV1beta1().Roles(metav1.NamespacePublic).Create(&role); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CreateRoleBindings creates all namespaced and necessary bindings between bootstrapped & kubeadm-created ClusterRoles and subjects kubeadm is using
+func CreateRoleBindings(clientset *clientset.Clientset) error {
+	roleBindings := []rbac.RoleBinding{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "kubeadm:bootstrap-signer-clusterinfo",
+				Namespace: metav1.NamespacePublic,
+			},
+			RoleRef: rbac.RoleRef{
+				APIGroup: rbacAPIGroup,
+				Kind:     roleKind,
+				Name:     BootstrapSignerClusterRoleName,
+			},
+			Subjects: []rbac.Subject{
+				{
+					Kind: "User",
+					Name: anonymousUser,
+				},
+			},
+		},
+	}
+
+	for _, roleBinding := range roleBindings {
+		if _, err := clientset.RbacV1beta1().RoleBindings(metav1.NamespacePublic).Create(&roleBinding); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -116,24 +152,7 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 			Subjects: []rbac.Subject{
 				{
 					Kind: "Group",
-					Name: kubeadmconstants.CSVTokenBootstrapGroup,
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "kubeadm:kube-dns",
-			},
-			RoleRef: rbac.RoleRef{
-				APIGroup: rbacAPIGroup,
-				Kind:     clusterRoleKind,
-				Name:     KubeDNSClusterRoleName,
-			},
-			Subjects: []rbac.Subject{
-				{
-					Kind:      serviceAccountKind,
-					Name:      kubeadmconstants.KubeDNSServiceAccountName,
-					Namespace: metav1.NamespaceSystem,
+					Name: bootstrapapi.BootstrapGroup,
 				},
 			},
 		},
@@ -157,7 +176,7 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 	}
 
 	for _, clusterRoleBinding := range clusterRoleBindings {
-		if _, err := clientset.Rbac().ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
+		if _, err := clientset.RbacV1beta1().ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
 			return err
 		}
 	}

@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -63,6 +64,9 @@ const (
 	lbIP     = "10.20.30.40"
 	nodeIP   = "10.20.30.50"
 	nodePort = 32111
+
+	testAPIGroup   = "testGroup"
+	testAPIVersion = "testVersion"
 )
 
 func TestInitFederation(t *testing.T) {
@@ -79,21 +83,24 @@ func TestInitFederation(t *testing.T) {
 	defer kubefedtesting.RemoveFakeKubeconfigFiles(fakeKubeFiles)
 
 	testCases := []struct {
-		federation            string
-		kubeconfigGlobal      string
-		kubeconfigExplicit    string
-		dnsZoneName           string
-		lbIP                  string
-		apiserverServiceType  v1.ServiceType
-		advertiseAddress      string
-		image                 string
-		etcdPVCapacity        string
-		etcdPersistence       string
-		expectedErr           string
-		dnsProviderConfig     string
-		dryRun                string
-		apiserverArgOverrides string
-		cmArgOverrides        string
+		federation                   string
+		kubeconfigGlobal             string
+		kubeconfigExplicit           string
+		dnsZoneName                  string
+		lbIP                         string
+		apiserverServiceType         v1.ServiceType
+		advertiseAddress             string
+		image                        string
+		etcdPVCapacity               string
+		etcdPersistence              string
+		expectedErr                  string
+		dnsProviderConfig            string
+		dryRun                       string
+		apiserverArgOverrides        string
+		cmArgOverrides               string
+		apiserverEnableHTTPBasicAuth bool
+		apiserverEnableTokenAuth     bool
+		isRBACAPIAvailable           bool
 	}{
 		{
 			federation:            "union",
@@ -175,12 +182,29 @@ func TestInitFederation(t *testing.T) {
 			expectedErr:          "",
 			dryRun:               "",
 		},
+		{
+			federation:           "union",
+			kubeconfigGlobal:     fakeKubeFiles[0],
+			kubeconfigExplicit:   "",
+			dnsZoneName:          "example.test.",
+			apiserverServiceType: v1.ServiceTypeNodePort,
+			advertiseAddress:     nodeIP,
+			image:                "example.test/foo:bar",
+			etcdPVCapacity:       "5Gi",
+			etcdPersistence:      "true",
+			expectedErr:          "",
+			dryRun:               "",
+			apiserverEnableHTTPBasicAuth: true,
+			apiserverEnableTokenAuth:     true,
+			isRBACAPIAvailable:           true,
+		},
 	}
 
 	//TODO: implement a negative case for dry run
 
 	for i, tc := range testCases {
 		cmdErrMsg = ""
+		tmpDirPath := ""
 		buf := bytes.NewBuffer([]byte{})
 
 		if tc.dnsProviderConfig != "" {
@@ -191,7 +215,16 @@ func TestInitFederation(t *testing.T) {
 			tc.dnsProviderConfig = tmpfile.Name()
 			defer os.Remove(tmpfile.Name())
 		}
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides)
+
+		// Check pkg/kubectl/cmd/testing/fake (fakeAPIFactory.DiscoveryClient()) for details of tmpDir
+		// We want an unique discovery cache path for each test run, else the case from previous case would be used
+		tmpDirPath, err = ioutil.TempDir("", "")
+		if err != nil {
+			t.Fatalf("[%d] unexpected error: %v", i, err)
+		}
+		defer os.Remove(tmpDirPath)
+
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -227,6 +260,12 @@ func TestInitFederation(t *testing.T) {
 		if tc.dryRun == "valid-run" {
 			cmd.Flags().Set("dry-run", "true")
 		}
+		if tc.apiserverEnableHTTPBasicAuth {
+			cmd.Flags().Set("apiserver-enable-basic-auth", "true")
+		}
+		if tc.apiserverEnableTokenAuth {
+			cmd.Flags().Set("apiserver-enable-token-auth", "true")
+		}
 
 		cmd.Run(cmd, []string{tc.federation})
 
@@ -253,7 +292,7 @@ func TestInitFederation(t *testing.T) {
 			return
 		}
 
-		testKubeconfigUpdate(t, tc.apiserverServiceType, tc.federation, tc.advertiseAddress, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit)
+		testKubeconfigUpdate(t, tc.apiserverServiceType, tc.federation, tc.advertiseAddress, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth)
 	}
 }
 
@@ -554,7 +593,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, apiserverOverrideArg, cmOverrideArg string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -782,6 +821,12 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	} else {
 		apiserverArgs = append(apiserverArgs, "--client-ca-file=/etc/federation/apiserver/ca.crt")
 	}
+	if apiserverEnableHTTPBasicAuth {
+		apiserverArgs = append(apiserverArgs, "--basic-auth-file=/etc/federation/apiserver/basicauth.csv")
+	}
+	if apiserverEnableTokenAuth {
+		apiserverArgs = append(apiserverArgs, "--token-auth-file=/etc/federation/apiserver/token.csv")
+	}
 	sort.Strings(apiserverArgs)
 	apiserverCommand = append(apiserverCommand, apiserverArgs...)
 
@@ -907,7 +952,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			Namespace: namespaceName,
 			Labels:    componentLabel,
 			Annotations: map[string]string{
-				util.FedDomainMapKey: fmt.Sprintf("%s=%s", federationName, dnsZoneName),
+				util.FedDomainMapKey: fmt.Sprintf("%s=%s", federationName, strings.TrimRight(dnsZoneName, ".")),
 			},
 		},
 		Spec: v1beta1.DeploymentSpec{
@@ -953,11 +998,13 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 							},
 						},
 					},
-					ServiceAccountName:       "federation-controller-manager",
-					DeprecatedServiceAccount: "federation-controller-manager",
 				},
 			},
 		},
+	}
+	if isRBACAPIAvailable {
+		cm.Spec.Template.Spec.ServiceAccountName = "federation-controller-manager"
+		cm.Spec.Template.Spec.DeprecatedServiceAccount = "federation-controller-manager"
 	}
 	if dnsProviderConfig != "" {
 		cm = addDNSProviderConfigTest(cm, cmDNSProviderSecret.Name)
@@ -995,11 +1042,37 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	podList.Items = append(podList.Items, apiServerPod)
 	podList.Items = append(podList.Items, cmPod)
 
+	apiGroupList := &metav1.APIGroupList{}
+	testGroup := metav1.APIGroup{
+		Name: testAPIGroup,
+		Versions: []metav1.GroupVersionForDiscovery{
+			{
+				GroupVersion: testAPIGroup + "/" + testAPIVersion,
+				Version:      testAPIVersion,
+			},
+		},
+	}
+	rbacGroup := metav1.APIGroup{
+		Name: rbac.GroupName,
+		Versions: []metav1.GroupVersionForDiscovery{
+			{
+				GroupVersion: rbac.GroupName + "/v1beta1",
+				Version:      "v1beta1",
+			},
+		},
+	}
+
+	apiGroupList.Groups = append(apiGroupList.Groups, testGroup)
+	if isRBACAPIAvailable {
+		apiGroupList.Groups = append(apiGroupList.Groups, rbacGroup)
+	}
+
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	extCodec := testapi.Extensions.Codec()
 	rbacCodec := testapi.Rbac.Codec()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
+	tf.TmpDir = tmpDirPath
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
@@ -1007,6 +1080,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/healthz":
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte("ok")))}, nil
+			case p == "/api" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &metav1.APIVersions{})}, nil
+			case p == "/apis" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, apiGroupList)}, nil
 			case p == "/api/v1/namespaces" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
@@ -1018,7 +1095,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, err
 				}
 				if !apiequality.Semantic.DeepEqual(got, namespace) {
-					return nil, fmt.Errorf("Unexpected namespace object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, namespace))
+					return nil, fmt.Errorf("unexpected namespace object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, namespace))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &namespace)}, nil
 			case p == svcUrlPrefix && m == http.MethodPost:
@@ -1032,7 +1109,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, err
 				}
 				if !apiequality.Semantic.DeepEqual(got, svc) {
-					return nil, fmt.Errorf("Unexpected service object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, svc))
+					return nil, fmt.Errorf("unexpected service object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, svc))
 				}
 				if apiserverServiceType == v1.ServiceTypeNodePort {
 					svc.Spec.Type = v1.ServiceTypeNodePort
@@ -1055,21 +1132,36 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				if err != nil {
 					return nil, err
 				}
-				// Obtained secret contains generated data which cannot
-				// be compared, so we just nullify the generated part
-				// and compare the rest of the secret. The generated
-				// parts are tested in other tests.
-				got.Data = nil
+
 				switch got.Name {
 				case credSecretName:
 					want = credSecret
+					if apiserverEnableHTTPBasicAuth {
+						if got.Data["basicauth.csv"] == nil {
+							return nil, fmt.Errorf("expected secret data key 'basicauth.csv', but got nil")
+						}
+					} else {
+						if got.Data["basicauth.csv"] != nil {
+							return nil, fmt.Errorf("unexpected secret data key 'basicauth.csv'")
+						}
+					}
+					if apiserverEnableTokenAuth {
+						if got.Data["token.csv"] == nil {
+							return nil, fmt.Errorf("expected secret data key 'token.csv', but got nil")
+						}
+					} else {
+						if got.Data["token.csv"] != nil {
+							return nil, fmt.Errorf("unexpected secret data key 'token.csv'")
+						}
+					}
 				case cmKubeconfigSecretName:
 					want = cmKubeconfigSecret
 				case dnsProviderSecretName:
 					want = cmDNSProviderSecret
 				}
+				got.Data = nil
 				if !apiequality.Semantic.DeepEqual(got, want) {
-					return nil, fmt.Errorf("Unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
+					return nil, fmt.Errorf("unexpected secret object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &want)}, nil
 			case p == "/api/v1/namespaces/federation-system/persistentvolumeclaims" && m == http.MethodPost:
@@ -1083,7 +1175,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, err
 				}
 				if !apiequality.Semantic.DeepEqual(got, pvc) {
-					return nil, fmt.Errorf("Unexpected PVC object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, pvc))
+					return nil, fmt.Errorf("unexpected PVC object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, pvc))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &pvc)}, nil
 			case p == "/apis/extensions/v1beta1/namespaces/federation-system/deployments" && m == http.MethodPost:
@@ -1103,7 +1195,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					want = *cm
 				}
 				if !apiequality.Semantic.DeepEqual(got, want) {
-					return nil, fmt.Errorf("Unexpected deployment object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
+					return nil, fmt.Errorf("unexpected deployment object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(extCodec, &want)}, nil
 			case p == "/api/v1/namespaces/federation-system/pods" && m == http.MethodGet:
@@ -1119,7 +1211,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, err
 				}
 				if !api.Semantic.DeepEqual(got, sa) {
-					return nil, fmt.Errorf("Unexpected service account object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, sa))
+					return nil, fmt.Errorf("unexpected service account object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, sa))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &sa)}, nil
 			case p == "/apis/rbac.authorization.k8s.io/v1beta1/namespaces/federation-system/roles" && m == http.MethodPost:
@@ -1133,7 +1225,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, err
 				}
 				if !api.Semantic.DeepEqual(got, role) {
-					return nil, fmt.Errorf("Unexpected role object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, role))
+					return nil, fmt.Errorf("unexpected role object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, role))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &role)}, nil
 			case p == "/apis/rbac.authorization.k8s.io/v1beta1/namespaces/federation-system/rolebindings" && m == http.MethodPost:
@@ -1147,7 +1239,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, err
 				}
 				if !api.Semantic.DeepEqual(got, rolebinding) {
-					return nil, fmt.Errorf("Unexpected rolebinding object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, rolebinding))
+					return nil, fmt.Errorf("unexpected rolebinding object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, rolebinding))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &rolebinding)}, nil
 			case p == "/api/v1/nodes" && m == http.MethodGet:
@@ -1160,7 +1252,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	return f, nil
 }
 
-func testKubeconfigUpdate(t *testing.T, apiserverServiceType v1.ServiceType, federationName, advertiseAddress, lbIP, kubeconfigGlobal, kubeconfigExplicit string) {
+func testKubeconfigUpdate(t *testing.T, apiserverServiceType v1.ServiceType, federationName, advertiseAddress, lbIP, kubeconfigGlobal, kubeconfigExplicit string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth bool) {
 	filename := kubeconfigGlobal
 	if kubeconfigExplicit != "" {
 		filename = kubeconfigExplicit
@@ -1197,8 +1289,30 @@ func testKubeconfigUpdate(t *testing.T, apiserverServiceType v1.ServiceType, fed
 		t.Errorf("Expected client key to be non-empty")
 		return
 	}
-	if authInfo.Username != AdminCN {
-		t.Errorf("Want username: %q, got: %q", AdminCN, authInfo.Username)
+	if !apiserverEnableTokenAuth && len(authInfo.Token) != 0 {
+		t.Errorf("Expected token to be empty: got: %s", authInfo.Token)
+	}
+	if apiserverEnableTokenAuth && len(authInfo.Token) == 0 {
+		t.Errorf("Expected token to be non-empty")
+	}
+
+	httpBasicAuthInfo, ok := config.AuthInfos[fmt.Sprintf("%s-basic-auth", federationName)]
+	if !apiserverEnableHTTPBasicAuth && ok {
+		t.Errorf("Expected basic auth AuthInfo entry not to exist: got %v", httpBasicAuthInfo)
+		return
+	}
+
+	if apiserverEnableHTTPBasicAuth {
+		if !ok {
+			t.Errorf("Expected basic auth AuthInfo entry to exist")
+			return
+		}
+		if httpBasicAuthInfo.Username != "admin" {
+			t.Errorf("Unexpected username in basic auth AuthInfo entry: got %s, want admin", httpBasicAuthInfo.Username)
+		}
+		if len(httpBasicAuthInfo.Password) == 0 {
+			t.Errorf("Expected basic auth AuthInfo entry to contain password")
+		}
 	}
 
 	context, ok := config.Contexts[federationName]

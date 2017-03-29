@@ -18,6 +18,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//cmd/kubeadm/app/constants:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",

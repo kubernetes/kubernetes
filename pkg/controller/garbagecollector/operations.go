@@ -36,7 +36,7 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), apiVersion)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get REST mapping for kind: %s, version: %s", kind, apiVersion)
+		return nil, newRESTMappingError(kind, apiVersion)
 	}
 	glog.V(5).Infof("map kind %s, version %s to resource %s", kind, apiVersion, mapping.Resource)
 	resource := metav1.APIResource{

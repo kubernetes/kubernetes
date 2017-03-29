@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	"k8s.io/kubernetes/pkg/util/version"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -31,6 +32,19 @@ type StatefulSetUpgradeTest struct {
 	tester  *framework.StatefulSetTester
 	service *v1.Service
 	set     *apps.StatefulSet
+}
+
+func (StatefulSetUpgradeTest) Name() string { return "statefulset-upgrade" }
+
+func (StatefulSetUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+	minVersion := version.MustParseSemantic("1.5.0")
+
+	for _, vCtx := range upgCtx.Versions {
+		if vCtx.Version.LessThan(minVersion) {
+			return true
+		}
+	}
+	return false
 }
 
 // Setup creates a StatefulSet and a HeadlessService. It verifies the basic SatefulSet properties

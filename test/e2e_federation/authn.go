@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
@@ -30,6 +29,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// TODO: These tests should be integration tests rather than e2e tests, when the
+// integration test harness is ready.
 var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federation-apiserver-authn")
 
@@ -38,72 +39,163 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 		})
 
-		It("should accept cluster resources when the client has right authentication credentials", func() {
-			fedframework.SkipUnlessFederated(f.ClientSet)
+		It("should accept cluster resources when the client has certificate authentication credentials", func() {
+			fcs, err := federationClientSetWithCert()
+			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			svc := createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
+			svc := createServiceOrFail(fcs, nsName, FederatedServiceName)
 			deleteServiceOrFail(f.FederationClientset, nsName, svc.Name, nil)
 		})
 
-		It("should not accept cluster resources when the client has invalid authentication credentials", func() {
-			fedframework.SkipUnlessFederated(f.ClientSet)
-
-			contexts := f.GetUnderlyingFederatedContexts()
-
-			// `contexts` is obtained by calling
-			// `f.GetUnderlyingFederatedContexts()`. This function in turn
-			// checks that the contexts it returns does not include the
-			// federation API server context. So `contexts` is guaranteed to
-			// contain only the underlying Kubernetes cluster contexts.
-			fcs, err := invalidAuthFederationClientSet(contexts[0].User)
+		It("should accept cluster resources when the client has HTTP Basic authentication credentials", func() {
+			fcs, err := federationClientSetWithBasicAuth(true /* valid */)
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
 			svc, err := createService(fcs, nsName, FederatedServiceName)
-			Expect(errors.IsUnauthorized(err)).To(BeTrue())
-			if err == nil && svc != nil {
-				deleteServiceOrFail(fcs, nsName, svc.Name, nil)
-			}
+			Expect(err).NotTo(HaveOccurred())
+			deleteServiceOrFail(fcs, nsName, svc.Name, nil)
+		})
+
+		It("should accept cluster resources when the client has token authentication credentials", func() {
+			fcs, err := federationClientSetWithToken(true /* valid */)
+			framework.ExpectNoError(err)
+
+			nsName := f.FederationNamespace.Name
+			svc, err := createService(fcs, nsName, FederatedServiceName)
+			Expect(err).NotTo(HaveOccurred())
+			deleteServiceOrFail(fcs, nsName, svc.Name, nil)
 		})
 
 		It("should not accept cluster resources when the client has no authentication credentials", func() {
-			fedframework.SkipUnlessFederated(f.ClientSet)
-
-			fcs, err := invalidAuthFederationClientSet(nil)
+			fcs, err := unauthenticatedFederationClientSet()
 			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
-			svc, err := createService(fcs, nsName, FederatedServiceName)
+			_, err = createService(fcs, nsName, FederatedServiceName)
 			Expect(errors.IsUnauthorized(err)).To(BeTrue())
-			if err == nil && svc != nil {
-				deleteServiceOrFail(fcs, nsName, svc.Name, nil)
-			}
 		})
+
+		// TODO: Add a test for invalid certificate credentials. The certificate is validated for
+		// correct format, so it cannot contain random noise.
+
+		It("should not accept cluster resources when the client has invalid HTTP Basic authentication credentials", func() {
+			fcs, err := federationClientSetWithBasicAuth(false /* invalid */)
+			framework.ExpectNoError(err)
+
+			nsName := f.FederationNamespace.Name
+			_, err = createService(fcs, nsName, FederatedServiceName)
+			Expect(errors.IsUnauthorized(err)).To(BeTrue())
+		})
+
+		It("should not accept cluster resources when the client has invalid token authentication credentials", func() {
+			fcs, err := federationClientSetWithToken(false /* invalid */)
+			framework.ExpectNoError(err)
+
+			nsName := f.FederationNamespace.Name
+			_, err = createService(fcs, nsName, FederatedServiceName)
+			Expect(errors.IsUnauthorized(err)).To(BeTrue())
+		})
+
 	})
 })
 
-func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_clientset.Clientset, error) {
-	overrides := &clientcmd.ConfigOverrides{}
-	if user != nil {
-		overrides = &clientcmd.ConfigOverrides{
-			AuthInfo: clientcmdapi.AuthInfo{
-				Token:    user.User.Token,
-				Username: user.User.Username,
-				Password: user.User.Password,
-			},
-		}
+// unauthenticatedFederationClientSet returns a Federation Clientset configured with
+// no authentication credentials.
+func unauthenticatedFederationClientSet() (*federation_clientset.Clientset, error) {
+	config, err := fedframework.LoadFederatedConfig(&clientcmd.ConfigOverrides{})
+	if err != nil {
+		return nil, err
+	}
+	config.Insecure = true
+	config.CAData = []byte{}
+	config.CertData = []byte{}
+	config.KeyData = []byte{}
+	config.BearerToken = ""
+
+	c, err := federation_clientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating federation clientset: %v", err)
 	}
 
-	config, err := fedframework.LoadFederatedConfig(overrides)
+	return c, nil
+}
+
+// federationClientSetWithCert returns a Federation Clientset configured with
+// certificate authentication credentials.
+func federationClientSetWithCert() (*federation_clientset.Clientset, error) {
+	config, err := fedframework.LoadFederatedConfig(&clientcmd.ConfigOverrides{})
 	if err != nil {
 		return nil, err
 	}
 
-	if user == nil {
-		config.Password = ""
-		config.BearerToken = ""
+	config.BearerToken = ""
+
+	c, err := federation_clientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating federation clientset: %v", err)
+	}
+
+	return c, nil
+}
+
+// federationClientSetWithBasicAuth returns a Federation Clientset configured with
+// HTTP Basic authentication credentials.
+func federationClientSetWithBasicAuth(valid bool) (*federation_clientset.Clientset, error) {
+	config, err := fedframework.LoadFederatedConfig(&clientcmd.ConfigOverrides{})
+	if err != nil {
+		return nil, err
+	}
+
+	config.Insecure = true
+	config.CAData = []byte{}
+	config.CertData = []byte{}
+	config.KeyData = []byte{}
+	config.BearerToken = ""
+
+	if !valid {
 		config.Username = ""
+		config.Password = ""
+	} else {
+		// This is a hacky approach to getting the basic auth credentials, but since
+		// the token and the username/password cannot live in the same AuthInfo object,
+		// and because we do not want to store basic auth credentials with token and
+		// certificate credentials for security reasons, we must dig it out by hand.
+		c, err := framework.RestclientConfig(framework.TestContext.FederatedKubeContext)
+		if err != nil {
+			return nil, err
+		}
+		if authInfo, ok := c.AuthInfos[fmt.Sprintf("%s-basic-auth", framework.TestContext.FederatedKubeContext)]; ok {
+			config.Username = authInfo.Username
+			config.Password = authInfo.Password
+		}
+	}
+
+	c, err := federation_clientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating federation clientset: %v", err)
+	}
+
+	return c, nil
+}
+
+// federationClientSetWithToken returns a Federation Clientset configured with
+// token authentication credentials.
+func federationClientSetWithToken(valid bool) (*federation_clientset.Clientset, error) {
+	config, err := fedframework.LoadFederatedConfig(&clientcmd.ConfigOverrides{})
+	if err != nil {
+		return nil, err
+	}
+	config.Insecure = true
+	config.CAData = []byte{}
+	config.CertData = []byte{}
+	config.KeyData = []byte{}
+	config.Username = ""
+	config.Password = ""
+
+	if !valid {
+		config.BearerToken = "invalid"
 	}
 
 	c, err := federation_clientset.NewForConfig(config)

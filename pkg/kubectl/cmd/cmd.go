@@ -183,11 +183,12 @@ __custom_func() {
 
     * all
     * certificatesigningrequests (aka 'csr')
-    * clusters (valid only for federation apiservers)
     * clusterrolebindings
     * clusterroles
+    * clusters (valid only for federation apiservers)
     * componentstatuses (aka 'cs')
     * configmaps (aka 'cm')
+    * cronjobs
     * daemonsets (aka 'ds')
     * deployments (aka 'deploy')
     * endpoints (aka 'ep')
@@ -201,8 +202,8 @@ __custom_func() {
     * nodes (aka 'no')
     * persistentvolumeclaims (aka 'pvc')
     * persistentvolumes (aka 'pv')
-    * pods (aka 'po')
     * poddisruptionbudgets (aka 'pdb')
+    * pods (aka 'po')
     * podsecuritypolicies (aka 'psp')
     * podtemplates
     * replicasets (aka 'rs')

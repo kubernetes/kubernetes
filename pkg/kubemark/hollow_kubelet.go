@@ -150,7 +150,6 @@ func GetHollowKubeletConfig(
 	c.MaxContainerCount = 100
 	c.MaxOpenFiles = 1024
 	c.MaxPerPodContainerCount = 2
-	c.NvidiaGPUs = 0
 	c.RegisterNode = true
 	c.RegisterSchedulable = true
 	c.RegistryBurst = 10
@@ -160,8 +159,6 @@ func GetHollowKubeletConfig(
 	c.SerializeImagePulls = true
 	c.SystemCgroups = ""
 	c.ProtectKernelDefaults = false
-	// TODO: This is a temporary workaround until we fix CRI+kubemark properly.
-	c.EnableCRI = false
 
 	// TODO(mtaufen): Note that PodInfraContainerImage was being set to the empty value before,
 	//                but this may not have been intentional. (previous code (SimpleKubelet)

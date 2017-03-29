@@ -17,26 +17,17 @@ limitations under the License.
 package framework
 
 import (
-	"fmt"
-	"regexp"
+	"os"
 
-	validationutil "k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api/validation"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 )
 
-// GetValidDNSSubdomainName massages the given name to be a valid dns subdomain name.
-// Most resources (such as secrets, clusters) require the names to be valid dns subdomain.
-// This is a generic function (not specific to federation). Should be moved to a more generic location if others want to use it.
-func GetValidDNSSubdomainName(name string) (string, error) {
-	// "_" are not allowed. Replace them by "-".
-	name = regexp.MustCompile("_").ReplaceAllLiteralString(name, "-")
-	maxLength := validationutil.DNS1123SubdomainMaxLength
-	if len(name) > maxLength {
-		name = name[0 : maxLength-1]
+// FederationSystemNamespace returns the namespace in which
+// the federation system components are hosted.
+func FederationSystemNamespace() string {
+	federationNS := os.Getenv("FEDERATION_NAMESPACE")
+	if federationNS != "" {
+		return federationNS
 	}
-	// Verify that name now passes the validation.
-	if errors := validation.NameIsDNSSubdomain(name, false); len(errors) != 0 {
-		return "", fmt.Errorf("errors in converting name to a valid DNS subdomain %s", errors)
-	}
-	return name, nil
+	return federationapi.FederationNamespaceSystem
 }

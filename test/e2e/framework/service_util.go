@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/retry"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -843,20 +844,34 @@ func (t *ServiceTestFixture) Cleanup() []error {
 	var errs []error
 	for rcName := range t.rcs {
 		By("stopping RC " + rcName + " in namespace " + t.Namespace)
-		// First, resize the RC to 0.
-		old, err := t.Client.Core().ReplicationControllers(t.Namespace).Get(rcName, metav1.GetOptions{})
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			// First, resize the RC to 0.
+			old, err := t.Client.Core().ReplicationControllers(t.Namespace).Get(rcName, metav1.GetOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+			x := int32(0)
+			old.Spec.Replicas = &x
+			if _, err := t.Client.Core().ReplicationControllers(t.Namespace).Update(old); err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+			return nil
+		})
 		if err != nil {
-			errs = append(errs, err)
-		}
-		x := int32(0)
-		old.Spec.Replicas = &x
-		if _, err := t.Client.Core().ReplicationControllers(t.Namespace).Update(old); err != nil {
 			errs = append(errs, err)
 		}
 		// TODO(mikedanese): Wait.
 		// Then, delete the RC altogether.
 		if err := t.Client.Core().ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
-			errs = append(errs, err)
+			if !errors.IsNotFound(err) {
+				errs = append(errs, err)
+			}
 		}
 	}
 
@@ -864,7 +879,9 @@ func (t *ServiceTestFixture) Cleanup() []error {
 		By("deleting service " + serviceName + " in namespace " + t.Namespace)
 		err := t.Client.Core().Services(t.Namespace).Delete(serviceName, nil)
 		if err != nil {
-			errs = append(errs, err)
+			if !errors.IsNotFound(err) {
+				errs = append(errs, err)
+			}
 		}
 	}
 

@@ -128,12 +128,14 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 	}
 
 	rootStats := sb.containerInfoV2ToStats("", &rootInfo)
+	cStats, _ := sb.latestContainerStats(&rootInfo)
 	nodeStats := stats.NodeStats{
 		NodeName: sb.node.Name,
 		CPU:      rootStats.CPU,
 		Memory:   rootStats.Memory,
 		Network:  sb.containerInfoV2ToNetworkStats("node:"+sb.node.Name, &rootInfo),
 		Fs: &stats.FsStats{
+			Time:           metav1.NewTime(cStats.Timestamp),
 			AvailableBytes: &sb.rootFsInfo.Available,
 			CapacityBytes:  &sb.rootFsInfo.Capacity,
 			UsedBytes:      &sb.rootFsInfo.Usage,
@@ -144,6 +146,7 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 		StartTime: rootStats.StartTime,
 		Runtime: &stats.RuntimeStats{
 			ImageFs: &stats.FsStats{
+				Time:           metav1.NewTime(cStats.Timestamp),
 				AvailableBytes: &sb.imageFsInfo.Available,
 				CapacityBytes:  &sb.imageFsInfo.Capacity,
 				UsedBytes:      &sb.imageStats.TotalStorageBytes,
@@ -181,8 +184,14 @@ func (sb *summaryBuilder) containerInfoV2FsStats(
 	info *cadvisorapiv2.ContainerInfo,
 	cs *stats.ContainerStats) {
 
+	lcs, found := sb.latestContainerStats(info)
+	if !found {
+		return
+	}
+
 	// The container logs live on the node rootfs device
 	cs.Logs = &stats.FsStats{
+		Time:           metav1.NewTime(lcs.Timestamp),
 		AvailableBytes: &sb.rootFsInfo.Available,
 		CapacityBytes:  &sb.rootFsInfo.Capacity,
 		InodesFree:     sb.rootFsInfo.InodesFree,
@@ -196,14 +205,11 @@ func (sb *summaryBuilder) containerInfoV2FsStats(
 
 	// The container rootFs lives on the imageFs devices (which may not be the node root fs)
 	cs.Rootfs = &stats.FsStats{
+		Time:           metav1.NewTime(lcs.Timestamp),
 		AvailableBytes: &sb.imageFsInfo.Available,
 		CapacityBytes:  &sb.imageFsInfo.Capacity,
 		InodesFree:     sb.imageFsInfo.InodesFree,
 		Inodes:         sb.imageFsInfo.Inodes,
-	}
-	lcs, found := sb.latestContainerStats(info)
-	if !found {
-		return
 	}
 	cfs := lcs.Filesystem
 

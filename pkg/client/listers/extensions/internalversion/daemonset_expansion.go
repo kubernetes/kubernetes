@@ -35,8 +35,9 @@ type DaemonSetListerExpansion interface {
 // DaemonSetNamespaeLister.
 type DaemonSetNamespaceListerExpansion interface{}
 
-// GetPodDaemonSets returns a list of daemon sets managing a pod.
-// Returns an error if and only if no matching daemon sets are found.
+// GetPodDaemonSets returns a list of DaemonSets that potentially match a pod.
+// Only the one specified in the Pod's ControllerRef will actually manage it.
+// Returns an error only if no matching DaemonSets are found.
 func (s *daemonSetLister) GetPodDaemonSets(pod *api.Pod) ([]*extensions.DaemonSet, error) {
 	var selector labels.Selector
 	var daemonSet *extensions.DaemonSet

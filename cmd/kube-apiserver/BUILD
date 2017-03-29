@@ -25,6 +25,7 @@ go_library(
         "//pkg/version/prometheus:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/util/flag",
         "//vendor:k8s.io/apiserver/pkg/util/logs",
     ],

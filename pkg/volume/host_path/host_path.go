@@ -83,6 +83,14 @@ func (plugin *hostPathPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *hostPathPlugin) SupportsMountOption() bool {
+	return false
+}
+
+func (plugin *hostPathPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *hostPathPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

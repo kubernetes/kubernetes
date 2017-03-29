@@ -36,8 +36,7 @@ import (
 )
 
 const (
-	FederationDeploymentName   = "federation-deployment"
-	FederatedDeploymentTimeout = 120 * time.Second
+	FederationDeploymentName = "federation-deployment"
 )
 
 // Create/delete deployment api objects
@@ -186,14 +185,14 @@ func waitForDeploymentOrFail(c *fedclientset.Clientset, namespace string, deploy
 }
 
 func waitForDeployment(c *fedclientset.Clientset, namespace string, deploymentName string, clusters map[string]*cluster) error {
-	err := wait.Poll(10*time.Second, FederatedDeploymentTimeout, func() (bool, error) {
+	err := wait.Poll(10*time.Second, federatedDefaultTestTimeout, func() (bool, error) {
 		fdep, err := c.Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		specReplicas, statusReplicas := int32(0), int32(0)
 		for _, cluster := range clusters {
-			dep, err := cluster.Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+			dep, err := cluster.Extensions().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				By(fmt.Sprintf("Failed getting deployment: %q/%q/%q, err: %v", cluster.name, namespace, deploymentName, err))
 				return false, err
@@ -245,11 +244,11 @@ func updateDeploymentOrFail(clientset *fedclientset.Clientset, namespace string)
 
 	deployment := newDeploymentForFed(namespace, FederationDeploymentName, 15)
 
-	newRs, err := clientset.Deployments(namespace).Update(deployment)
+	newDeployment, err := clientset.Deployments(namespace).Update(deployment)
 	framework.ExpectNoError(err, "Updating deployment %q in namespace %q", deployment.Name, namespace)
 	By(fmt.Sprintf("Successfully updated federation deployment %q in namespace %q", FederationDeploymentName, namespace))
 
-	return newRs
+	return newDeployment
 }
 
 func deleteDeploymentOrFail(clientset *fedclientset.Clientset, nsName string, deploymentName string, orphanDependents *bool) {
@@ -260,7 +259,7 @@ func deleteDeploymentOrFail(clientset *fedclientset.Clientset, nsName string, de
 	}
 
 	// Wait for the deployment to be deleted.
-	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+	err = wait.Poll(10*time.Second, federatedDefaultTestTimeout, func() (bool, error) {
 		_, err := clientset.Extensions().Deployments(nsName).Get(deploymentName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			return true, nil

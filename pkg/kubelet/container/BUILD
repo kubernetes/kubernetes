@@ -29,7 +29,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
-        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",

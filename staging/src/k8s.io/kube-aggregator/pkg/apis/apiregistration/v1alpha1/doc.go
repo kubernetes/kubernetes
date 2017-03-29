@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=k8s.io/kube-aggregator/pkg/apis/apiregistration
+// +k8s:conversion-gen=k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration
 
 // Package v1alpha1 is the v1alpha1 version of the API.
 // +groupName=apiregistration.k8s.io
-package v1alpha1
+package v1alpha1 // import "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"

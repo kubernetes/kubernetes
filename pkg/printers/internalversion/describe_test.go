@@ -402,7 +402,7 @@ func TestDescribeContainers(t *testing.T) {
 				ContainerStatuses: []api.ContainerStatus{testCase.status},
 			},
 		}
-		writer := &PrefixWriter{out}
+		writer := NewPrefixWriter(out)
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(&pod), writer, "")
 		output := out.String()
 		for _, expected := range testCase.expectedElements {
@@ -670,7 +670,13 @@ func TestDescribeDeployment(t *testing.T) {
 		Spec: v1beta1.DeploymentSpec{
 			Replicas: util.Int32Ptr(1),
 			Selector: &metav1.LabelSelector{},
-			Template: v1.PodTemplateSpec{},
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Image: "mytest-image:latest"},
+					},
+				},
+			},
 		},
 	})
 	d := DeploymentDescriber{fake, versionedFake}
@@ -678,7 +684,7 @@ func TestDescribeDeployment(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") {
+	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") || !strings.Contains(out, "Containers:") || !strings.Contains(out, "mytest-image:latest") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -1291,7 +1297,7 @@ func TestPrintLabelsMultiline(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		out := new(bytes.Buffer)
-		writer := &PrefixWriter{out}
+		writer := NewPrefixWriter(out)
 		printAnnotationsMultiline(writer, "Annotations", testCase.annotations)
 		output := out.String()
 		if output != testCase.expectPrint {

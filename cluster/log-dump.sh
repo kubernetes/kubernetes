@@ -37,7 +37,8 @@ readonly master_ssh_supported_providers="gce aws kubemark"
 readonly node_ssh_supported_providers="gce gke aws kubemark"
 
 readonly master_logfiles="kube-apiserver kube-scheduler rescheduler kube-controller-manager etcd etcd-events glbc cluster-autoscaler kube-addon-manager fluentd"
-readonly node_logfiles="kube-proxy fluentd"
+readonly node_logfiles="kube-proxy fluentd node-problem-detector"
+readonly node_systemd_services="node-problem-detector"
 readonly hollow_node_logfiles="kubelet-hollow-node-* kubeproxy-hollow-node-* npd-*"
 readonly aws_logfiles="cloud-init-output"
 readonly gce_logfiles="startupscript"
@@ -115,12 +116,14 @@ function copy-logs-from-node() {
 }
 
 # Save logs for node $1 into directory $2. Pass in any non-common files in $3.
-# $3 should be a space-separated list of files.
+# Pass in any non-common systemd services in $4.
+# $3 and $4 should be a space-separated list of files.
 # This function shouldn't ever trigger errexit
 function save-logs() {
     local -r node_name="${1}"
     local -r dir="${2}"
     local files="${3}"
+    local opt_systemd_services="${4:-""}"
     if [[ -n "${use_custom_instance_list}" ]]; then
       if [[ -n "${LOG_DUMP_SAVE_LOGS:-}" ]]; then
         files="${files} ${LOG_DUMP_SAVE_LOGS:-}"
@@ -138,7 +141,7 @@ function save-logs() {
           ;;
       esac
     fi
-    local -r services=( ${systemd_services} ${LOG_DUMP_SAVE_SERVICES:-} )
+    local -r services=( ${systemd_services} ${opt_systemd_services} ${LOG_DUMP_SAVE_SERVICES:-} )
 
     if log-dump-ssh "${node_name}" "command -v journalctl" &> /dev/null; then
         log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-installation.service" > "${dir}/kube-node-installation.log" || true
@@ -223,7 +226,7 @@ function dump_nodes() {
     mkdir -p "${node_dir}"
     # Save logs in the background. This speeds up things when there are
     # many nodes.
-    save-logs "${node_name}" "${node_dir}" "${node_logfiles}" &
+    save-logs "${node_name}" "${node_dir}" "${node_logfiles}" "${node_systemd_services}" &
 
     # We don't want to run more than ${max_scp_processes} at a time, so
     # wait once we hit that many nodes. This isn't ideal, since one might

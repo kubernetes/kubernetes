@@ -25,12 +25,22 @@ import (
 
 type AppsV1beta1Interface interface {
 	RESTClient() rest.Interface
+	DeploymentsGetter
+	ScalesGetter
 	StatefulSetsGetter
 }
 
 // AppsV1beta1Client is used to interact with features provided by the apps group.
 type AppsV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AppsV1beta1Client) Deployments(namespace string) DeploymentInterface {
+	return newDeployments(c, namespace)
+}
+
+func (c *AppsV1beta1Client) Scales(namespace string) ScaleInterface {
+	return newScales(c, namespace)
 }
 
 func (c *AppsV1beta1Client) StatefulSets(namespace string) StatefulSetInterface {

@@ -76,6 +76,7 @@ go_library(
         "//pkg/volume:go_default_library",
         "//pkg/volume/aws_ebs:go_default_library",
         "//pkg/volume/azure_dd:go_default_library",
+        "//pkg/volume/azure_file:go_default_library",
         "//pkg/volume/cinder:go_default_library",
         "//pkg/volume/flexvolume:go_default_library",
         "//pkg/volume/flocker:go_default_library",
@@ -87,6 +88,7 @@ go_library(
         "//pkg/volume/portworx:go_default_library",
         "//pkg/volume/quobyte:go_default_library",
         "//pkg/volume/rbd:go_default_library",
+        "//pkg/volume/scaleio:go_default_library",
         "//pkg/volume/vsphere_volume:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/prometheus/client_golang/prometheus",
@@ -107,6 +109,10 @@ go_library(
         "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/record",
         "//vendor:k8s.io/client-go/util/cert",
+        "//vendor:k8s.io/metrics/pkg/apis/custom_metrics/install",
+        "//vendor:k8s.io/metrics/pkg/apis/metrics/install",
+        "//vendor:k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+        "//vendor:k8s.io/metrics/pkg/client/custom_metrics",
     ],
 )
 

@@ -82,6 +82,14 @@ func (plugin *gcePersistentDiskPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *gcePersistentDiskPlugin) SupportsMountOption() bool {
+	return true
+}
+
+func (plugin *gcePersistentDiskPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

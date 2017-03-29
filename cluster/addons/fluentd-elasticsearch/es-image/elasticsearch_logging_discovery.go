@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -56,7 +56,7 @@ func main() {
 	namespace := metav1.NamespaceSystem
 	envNamespace := os.Getenv("NAMESPACE")
 	if envNamespace != "" {
-		if _, err := client.Core().Namespaces().Get(envNamespace, meta_v1.GetOptions{}); err != nil {
+		if _, err := client.Core().Namespaces().Get(envNamespace, metav1.GetOptions{}); err != nil {
 			glog.Fatalf("%s namespace doesn't exist: %v", envNamespace, err)
 		}
 		namespace = envNamespace
@@ -66,7 +66,7 @@ func main() {
 	// Look for endpoints associated with the Elasticsearch loggging service.
 	// First wait for the service to become available.
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
-		elasticsearch, err = client.Core().Services(namespace).Get("elasticsearch-logging", meta_v1.GetOptions{})
+		elasticsearch, err = client.Core().Services(namespace).Get("elasticsearch-logging", metav1.GetOptions{})
 		if err == nil {
 			break
 		}
@@ -83,7 +83,7 @@ func main() {
 	// Wait for some endpoints.
 	count := 0
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
-		endpoints, err = client.Core().Endpoints(namespace).Get("elasticsearch-logging", meta_v1.GetOptions{})
+		endpoints, err = client.Core().Endpoints(namespace).Get("elasticsearch-logging", metav1.GetOptions{})
 		if err != nil {
 			continue
 		}

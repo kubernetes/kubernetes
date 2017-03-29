@@ -79,7 +79,7 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 	}
 
 	// TODO use generalized labels once they are implemented (#341)
-	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).
@@ -102,9 +102,9 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 				}
 			} else {
 				if len(client.GroupVersion.Group) == 0 {
-					link = client.Host + "/api/" + client.GroupVersion.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+					link = client.Host + "/api/" + client.GroupVersion.Version + "/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name + "/proxy"
 				} else {
-					link = client.Host + "/api/" + client.GroupVersion.Group + "/" + client.GroupVersion.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+					link = client.Host + "/api/" + client.GroupVersion.Group + "/" + client.GroupVersion.Version + "/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name + "/proxy"
 
 				}
 			}

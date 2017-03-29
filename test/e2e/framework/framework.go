@@ -108,12 +108,6 @@ func NewDefaultFramework(baseName string) *Framework {
 	return NewFramework(baseName, options, nil)
 }
 
-func NewDefaultGroupVersionFramework(baseName string, groupVersion schema.GroupVersion) *Framework {
-	f := NewDefaultFramework(baseName)
-	f.Options.GroupVersion = &groupVersion
-	return f
-}
-
 func NewFramework(baseName string, options FrameworkOptions, client clientset.Interface) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,

@@ -88,6 +88,14 @@ func (plugin *nfsPlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *nfsPlugin) SupportsMountOption() bool {
+	return true
+}
+
+func (plugin *nfsPlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *nfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -113,9 +121,10 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 			pod:     pod,
 			plugin:  plugin,
 		},
-		server:     source.Server,
-		exportPath: source.Path,
-		readOnly:   readOnly,
+		server:       source.Server,
+		exportPath:   source.Path,
+		readOnly:     readOnly,
+		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -207,9 +216,10 @@ func (nfsMounter *nfsMounter) CanMount() error {
 
 type nfsMounter struct {
 	*nfs
-	server     string
-	exportPath string
-	readOnly   bool
+	server       string
+	exportPath   string
+	readOnly     bool
+	mountOptions []string
 }
 
 var _ volume.Mounter = &nfsMounter{}
@@ -242,7 +252,8 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if b.readOnly {
 		options = append(options, "ro")
 	}
-	err = b.mounter.Mount(source, dir, "nfs", options)
+	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+	err = b.mounter.Mount(source, dir, "nfs", mountOptions)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {

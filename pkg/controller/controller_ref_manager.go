@@ -18,7 +18,7 @@ package controller
 
 import (
 	"fmt"
-	"strings"
+	"sync"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,13 +46,26 @@ func GetControllerOf(controllee metav1.Object) *metav1.OwnerReference {
 type baseControllerRefManager struct {
 	controller metav1.Object
 	selector   labels.Selector
+
+	canAdoptErr  error
+	canAdoptOnce sync.Once
+	canAdoptFunc func() error
+}
+
+func (m *baseControllerRefManager) canAdopt() error {
+	m.canAdoptOnce.Do(func() {
+		if m.canAdoptFunc != nil {
+			m.canAdoptErr = m.canAdoptFunc()
+		}
+	})
+	return m.canAdoptErr
 }
 
 // claimObject tries to take ownership of an object for this controller.
 //
 // It will reconcile the following:
-//   * Adopt orphans if the selector matches.
-//   * Release owned objects if the selector no longer matches.
+//   * Adopt orphans if the match function returns true.
+//   * Release owned objects if the match function returns false.
 //
 // A non-nil error is returned if some form of reconciliation was attemped and
 // failed. Usually, controllers should try again later in case reconciliation
@@ -63,14 +76,14 @@ type baseControllerRefManager struct {
 // own the object.
 //
 // No reconciliation will be attempted if the controller is being deleted.
-func (m *baseControllerRefManager) claimObject(obj metav1.Object, adopt, release func(metav1.Object) error) (bool, error) {
+func (m *baseControllerRefManager) claimObject(obj metav1.Object, match func(metav1.Object) bool, adopt, release func(metav1.Object) error) (bool, error) {
 	controllerRef := GetControllerOf(obj)
 	if controllerRef != nil {
 		if controllerRef.UID != m.controller.GetUID() {
 			// Owned by someone else. Ignore.
 			return false, nil
 		}
-		if m.selector.Matches(labels.Set(obj.GetLabels())) {
+		if match(obj) {
 			// We already own it and the selector matches.
 			// Return true (successfully claimed) before checking deletion timestamp.
 			// We're still allowed to claim things we already own while being deleted
@@ -96,8 +109,7 @@ func (m *baseControllerRefManager) claimObject(obj metav1.Object, adopt, release
 	}
 
 	// It's an orphan.
-	if m.controller.GetDeletionTimestamp() != nil ||
-		!m.selector.Matches(labels.Set(obj.GetLabels())) {
+	if m.controller.GetDeletionTimestamp() != nil || !match(obj) {
 		// Ignore if we're being deleted or selector doesn't match.
 		return false, nil
 	}
@@ -123,16 +135,27 @@ type PodControllerRefManager struct {
 
 // NewPodControllerRefManager returns a PodControllerRefManager that exposes
 // methods to manage the controllerRef of pods.
+//
+// The canAdopt() function can be used to perform a potentially expensive check
+// (such as a live GET from the API server) prior to the first adoption.
+// It will only be called (at most once) if an adoption is actually attempted.
+// If canAdopt() returns a non-nil error, all adoptions will fail.
+//
+// NOTE: Once canAdopt() is called, it will not be called again by the same
+//       PodControllerRefManager instance. Create a new instance if it makes
+//       sense to check canAdopt() again (e.g. in a different sync pass).
 func NewPodControllerRefManager(
 	podControl PodControlInterface,
 	controller metav1.Object,
 	selector labels.Selector,
 	controllerKind schema.GroupVersionKind,
+	canAdopt func() error,
 ) *PodControllerRefManager {
 	return &PodControllerRefManager{
 		baseControllerRefManager: baseControllerRefManager{
-			controller: controller,
-			selector:   selector,
+			controller:   controller,
+			selector:     selector,
+			canAdoptFunc: canAdopt,
 		},
 		controllerKind: controllerKind,
 		podControl:     podControl,
@@ -145,16 +168,32 @@ func NewPodControllerRefManager(
 //   * Adopt orphans if the selector matches.
 //   * Release owned objects if the selector no longer matches.
 //
+// Optional: If one or more filters are specified, a Pod will only be claimed if
+// all filters return true.
+//
 // A non-nil error is returned if some form of reconciliation was attemped and
 // failed. Usually, controllers should try again later in case reconciliation
 // is still needed.
 //
 // If the error is nil, either the reconciliation succeeded, or no
 // reconciliation was necessary. The list of Pods that you now own is returned.
-func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod) ([]*v1.Pod, error) {
+func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod, filters ...func(*v1.Pod) bool) ([]*v1.Pod, error) {
 	var claimed []*v1.Pod
 	var errlist []error
 
+	match := func(obj metav1.Object) bool {
+		pod := obj.(*v1.Pod)
+		// Check selector first so filters only run on potentially matching Pods.
+		if !m.selector.Matches(labels.Set(pod.Labels)) {
+			return false
+		}
+		for _, filter := range filters {
+			if !filter(pod) {
+				return false
+			}
+		}
+		return true
+	}
 	adopt := func(obj metav1.Object) error {
 		return m.AdoptPod(obj.(*v1.Pod))
 	}
@@ -163,12 +202,7 @@ func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod) ([]*v1.Pod, error) {
 	}
 
 	for _, pod := range pods {
-		if !IsPodActive(pod) {
-			glog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
-				pod.Namespace, pod.Name, pod.Status.Phase, pod.DeletionTimestamp)
-			continue
-		}
-		ok, err := m.claimObject(pod, adopt, release)
+		ok, err := m.claimObject(pod, match, adopt, release)
 		if err != nil {
 			errlist = append(errlist, err)
 			continue
@@ -183,10 +217,8 @@ func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod) ([]*v1.Pod, error) {
 // AdoptPod sends a patch to take control of the pod. It returns the error if
 // the patching fails.
 func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
-	// we should not adopt any pods if the controller is about to be deleted
-	if m.controller.GetDeletionTimestamp() != nil {
-		return fmt.Errorf("cancel the adopt attempt for pod %s because the controller is being deleted",
-			strings.Join([]string{pod.Namespace, pod.Name, string(pod.UID)}, "_"))
+	if err := m.canAdopt(); err != nil {
+		return fmt.Errorf("can't adopt Pod %v/%v (%v): %v", pod.Namespace, pod.Name, pod.UID, err)
 	}
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
@@ -237,16 +269,27 @@ type ReplicaSetControllerRefManager struct {
 
 // NewReplicaSetControllerRefManager returns a ReplicaSetControllerRefManager that exposes
 // methods to manage the controllerRef of ReplicaSets.
+//
+// The canAdopt() function can be used to perform a potentially expensive check
+// (such as a live GET from the API server) prior to the first adoption.
+// It will only be called (at most once) if an adoption is actually attempted.
+// If canAdopt() returns a non-nil error, all adoptions will fail.
+//
+// NOTE: Once canAdopt() is called, it will not be called again by the same
+//       ReplicaSetControllerRefManager instance. Create a new instance if it
+//       makes sense to check canAdopt() again (e.g. in a different sync pass).
 func NewReplicaSetControllerRefManager(
 	rsControl RSControlInterface,
 	controller metav1.Object,
 	selector labels.Selector,
 	controllerKind schema.GroupVersionKind,
+	canAdopt func() error,
 ) *ReplicaSetControllerRefManager {
 	return &ReplicaSetControllerRefManager{
 		baseControllerRefManager: baseControllerRefManager{
-			controller: controller,
-			selector:   selector,
+			controller:   controller,
+			selector:     selector,
+			canAdoptFunc: canAdopt,
 		},
 		controllerKind: controllerKind,
 		rsControl:      rsControl,
@@ -270,6 +313,9 @@ func (m *ReplicaSetControllerRefManager) ClaimReplicaSets(sets []*extensions.Rep
 	var claimed []*extensions.ReplicaSet
 	var errlist []error
 
+	match := func(obj metav1.Object) bool {
+		return m.selector.Matches(labels.Set(obj.GetLabels()))
+	}
 	adopt := func(obj metav1.Object) error {
 		return m.AdoptReplicaSet(obj.(*extensions.ReplicaSet))
 	}
@@ -278,7 +324,7 @@ func (m *ReplicaSetControllerRefManager) ClaimReplicaSets(sets []*extensions.Rep
 	}
 
 	for _, rs := range sets {
-		ok, err := m.claimObject(rs, adopt, release)
+		ok, err := m.claimObject(rs, match, adopt, release)
 		if err != nil {
 			errlist = append(errlist, err)
 			continue
@@ -292,19 +338,17 @@ func (m *ReplicaSetControllerRefManager) ClaimReplicaSets(sets []*extensions.Rep
 
 // AdoptReplicaSet sends a patch to take control of the ReplicaSet. It returns the error if
 // the patching fails.
-func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(replicaSet *extensions.ReplicaSet) error {
-	// we should not adopt any ReplicaSets if the Deployment is about to be deleted
-	if m.controller.GetDeletionTimestamp() != nil {
-		return fmt.Errorf("cancel the adopt attempt for RS %s because the controller %v is being deleted",
-			strings.Join([]string{replicaSet.Namespace, replicaSet.Name, string(replicaSet.UID)}, "_"), m.controller.GetName())
+func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *extensions.ReplicaSet) error {
+	if err := m.canAdopt(); err != nil {
+		return fmt.Errorf("can't adopt ReplicaSet %v/%v (%v): %v", rs.Namespace, rs.Name, rs.UID, err)
 	}
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
 	addControllerPatch := fmt.Sprintf(
-		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true}],"uid":"%s"}}`,
+		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
 		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
-		m.controller.GetName(), m.controller.GetUID(), replicaSet.UID)
-	return m.rsControl.PatchReplicaSet(replicaSet.Namespace, replicaSet.Name, []byte(addControllerPatch))
+		m.controller.GetName(), m.controller.GetUID(), rs.UID)
+	return m.rsControl.PatchReplicaSet(rs.Namespace, rs.Name, []byte(addControllerPatch))
 }
 
 // ReleaseReplicaSet sends a patch to free the ReplicaSet from the control of the Deployment controller.
@@ -328,4 +372,21 @@ func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *extension
 		}
 	}
 	return err
+}
+
+// RecheckDeletionTimestamp returns a canAdopt() function to recheck deletion.
+//
+// The canAdopt() function calls getObject() to fetch the latest value,
+// and denies adoption attempts if that object has a non-nil DeletionTimestamp.
+func RecheckDeletionTimestamp(getObject func() (metav1.Object, error)) func() error {
+	return func() error {
+		obj, err := getObject()
+		if err != nil {
+			return fmt.Errorf("can't recheck DeletionTimestamp: %v", err)
+		}
+		if obj.GetDeletionTimestamp() != nil {
+			return fmt.Errorf("%v/%v has just been deleted at %v", obj.GetNamespace(), obj.GetName(), obj.GetDeletionTimestamp())
+		}
+		return nil
+	}
 }

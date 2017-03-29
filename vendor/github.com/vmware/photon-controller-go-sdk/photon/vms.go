@@ -20,10 +20,10 @@ type VmAPI struct {
 	client *Client
 }
 
-var vmUrl string = "/vms/"
+var vmUrl string = rootUrl + "/vms/"
 
 func (api *VmAPI) Get(id string) (vm *VM, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+vmUrl+id, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.client.Endpoint+vmUrl+id, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -38,7 +38,7 @@ func (api *VmAPI) Get(id string) (vm *VM, err error) {
 }
 
 func (api *VmAPI) Delete(id string) (task *Task, err error) {
-	res, err := api.client.restClient.Delete(api.client.Endpoint+vmUrl+id, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Delete(api.client.Endpoint+vmUrl+id, api.client.options.TokenOptions)
 
 	if err != nil {
 		return
@@ -57,7 +57,7 @@ func (api *VmAPI) AttachDisk(id string, op *VmDiskOperation) (task *Task, err er
 		api.client.Endpoint+vmUrl+id+"/attach_disk",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -75,7 +75,7 @@ func (api *VmAPI) DetachDisk(id string, op *VmDiskOperation) (task *Task, err er
 		api.client.Endpoint+vmUrl+id+"/detach_disk",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -84,9 +84,9 @@ func (api *VmAPI) DetachDisk(id string, op *VmDiskOperation) (task *Task, err er
 	return
 }
 
-func (api *VmAPI) AttachISO(id string, reader io.Reader, name string) (task *Task, err error) {
+func (api *VmAPI) AttachISO(id string, reader io.ReadSeeker, name string) (task *Task, err error) {
 	res, err := api.client.restClient.MultipartUpload(
-		api.client.Endpoint+vmUrl+id+"/attach_iso", reader, name, nil, api.client.options.TokenOptions.AccessToken)
+		api.client.Endpoint+vmUrl+id+"/attach_iso", reader, name, nil, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -104,7 +104,7 @@ func (api *VmAPI) DetachISO(id string) (task *Task, err error) {
 		api.client.Endpoint+vmUrl+id+"/detach_iso",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -122,7 +122,7 @@ func (api *VmAPI) Start(id string) (task *Task, err error) {
 		api.client.Endpoint+vmUrl+id+"/start",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -140,7 +140,7 @@ func (api *VmAPI) Stop(id string) (task *Task, err error) {
 		api.client.Endpoint+vmUrl+id+"/stop",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -158,7 +158,7 @@ func (api *VmAPI) Restart(id string) (task *Task, err error) {
 		api.client.Endpoint+vmUrl+id+"/restart",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -176,7 +176,7 @@ func (api *VmAPI) Resume(id string) (task *Task, err error) {
 		api.client.Endpoint+vmUrl+id+"/resume",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -194,7 +194,7 @@ func (api *VmAPI) Suspend(id string) (task *Task, err error) {
 		api.client.Endpoint+vmUrl+id+"/suspend",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -212,7 +212,7 @@ func (api *VmAPI) SetMetadata(id string, metadata *VmMetadata) (task *Task, err 
 		api.client.Endpoint+vmUrl+id+"/set_metadata",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -228,7 +228,7 @@ func (api *VmAPI) GetTasks(id string, options *TaskGetOptions) (result *TaskList
 	if options != nil {
 		uri += getQueryString(options)
 	}
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -239,7 +239,7 @@ func (api *VmAPI) GetTasks(id string, options *TaskGetOptions) (result *TaskList
 }
 
 func (api *VmAPI) GetNetworks(id string) (task *Task, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+vmUrl+id+"/subnets", api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.client.Endpoint+vmUrl+id+"/subnets", api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -258,7 +258,7 @@ func (api *VmAPI) AcquireFloatingIp(id string, spec *VmFloatingIpSpec) (task *Ta
 		api.client.Endpoint+vmUrl+id+"/acquire_floating_ip",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -271,7 +271,7 @@ func (api *VmAPI) ReleaseFloatingIp(id string) (task *Task, err error) {
 
 	res, err := api.client.restClient.Delete(
 		api.client.Endpoint+vmUrl+id+"/release_floating_ip",
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -281,7 +281,7 @@ func (api *VmAPI) ReleaseFloatingIp(id string) (task *Task, err error) {
 }
 
 func (api *VmAPI) GetMKSTicket(id string) (task *Task, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+vmUrl+id+"/mks_ticket", api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.client.Endpoint+vmUrl+id+"/mks_ticket", api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -299,7 +299,7 @@ func (api *VmAPI) SetTag(id string, tag *VmTag) (task *Task, err error) {
 		api.client.Endpoint+vmUrl+id+"/tags",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -317,7 +317,7 @@ func (api *VmAPI) CreateImage(id string, options *ImageCreateSpec) (task *Task, 
 		api.client.Endpoint+vmUrl+id+"/create_image",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}

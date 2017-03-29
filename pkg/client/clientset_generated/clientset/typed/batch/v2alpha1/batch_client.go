@@ -26,7 +26,6 @@ import (
 type BatchV2alpha1Interface interface {
 	RESTClient() rest.Interface
 	CronJobsGetter
-	JobsGetter
 }
 
 // BatchV2alpha1Client is used to interact with features provided by the batch group.
@@ -36,10 +35,6 @@ type BatchV2alpha1Client struct {
 
 func (c *BatchV2alpha1Client) CronJobs(namespace string) CronJobInterface {
 	return newCronJobs(c, namespace)
-}
-
-func (c *BatchV2alpha1Client) Jobs(namespace string) JobInterface {
-	return newJobs(c, namespace)
 }
 
 // NewForConfig creates a new BatchV2alpha1Client for the given config.

@@ -85,7 +85,7 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  debian_iptables_version=v6
+  debian_iptables_version=v7
   case $1 in
     "amd64")
         local targets=(
@@ -93,7 +93,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,busybox
           kube-scheduler,busybox
           kube-aggregator,busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:${debian_iptables_version}
+          kube-proxy,gcr.io/google-containers/debian-iptables-amd64:${debian_iptables_version}
         );;
     "arm")
         local targets=(
@@ -101,7 +101,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
           kube-aggregator,armel/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm:${debian_iptables_version}
+          kube-proxy,gcr.io/google-containers/debian-iptables-arm:${debian_iptables_version}
         );;
     "arm64")
         local targets=(
@@ -109,7 +109,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
           kube-aggregator,aarch64/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:${debian_iptables_version}
+          kube-proxy,gcr.io/google-containers/debian-iptables-arm64:${debian_iptables_version}
         );;
     "ppc64le")
         local targets=(
@@ -117,7 +117,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
           kube-aggregator,ppc64le/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:${debian_iptables_version}
+          kube-proxy,gcr.io/google-containers/debian-iptables-ppc64le:${debian_iptables_version}
         );;
     "s390x")
         local targets=(
@@ -125,8 +125,8 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,s390x/busybox
           kube-scheduler,s390x/busybox
           kube-aggregator,s390x/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-s390x:${debian_iptables_version}
-        );;		
+          kube-proxy,gcr.io/google-containers/debian-iptables-s390x:${debian_iptables_version}
+        );;
   esac
 
   echo "${targets[@]}"
@@ -704,6 +704,7 @@ function kube::build::copy_output() {
     --filter='+ zz_generated.*' \
     --filter='+ generated.proto' \
     --filter='+ *.pb.go' \
+    --filter='+ types.go' \
     --filter='+ */' \
     --filter='- /**' \
     "rsync://k8s@${KUBE_RSYNC_ADDR}/k8s/" "${KUBE_ROOT}"

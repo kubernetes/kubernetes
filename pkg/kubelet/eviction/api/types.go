@@ -36,6 +36,8 @@ const (
 	SignalImageFsAvailable Signal = "imagefs.available"
 	// SignalImageFsInodesFree is amount of inodes available on filesystem that container runtime uses for storing images and container writeable layers.
 	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
+	// SignalAllocatableMemoryAvailable is amount of memory available for pod allocation (i.e. allocatable - workingSet (of pods), in bytes.
+	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
 )
 
 // ThresholdOperator is the operator used to express a Threshold.

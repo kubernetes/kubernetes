@@ -24,8 +24,8 @@ go_repositories()
 debs = (
     (
         "busybox_deb",
-        "f262cc9cf893740bb70c3dd01da9429b858c94be696badd4a702e0a8c7f6f80b",
-        "http://ftp.us.debian.org/debian/pool/main/b/busybox/busybox-static_1.22.0-19+b1_amd64.deb",
+        "7465567f5e5255188b1d004d7081066cd79f77a5c18a5d418d27966d698e0bef",
+        "http://ftp.us.debian.org/debian/pool/main/b/busybox/busybox-static_1.22.0-19+b2_amd64.deb",
     ),
     (
         "libc_deb",
@@ -62,6 +62,6 @@ debs = (
 
 http_file(
     name = "kubernetes_cni",
-    sha256 = "ddcb7a429f82b284a13bdb36313eeffd997753b6fa5191205f1e978dcfeb0792",
-    url = " https://storage.googleapis.com/kubernetes-release/network-plugins/cni-amd64-07a8a28637e97b22eb8dfe710eeae1344f69d16e.tar.gz",
+    sha256 = "05ab3937bc68562e989dc143362ec4d4275262ba9f359338aed720fc914457a5",
+    url = "https://storage.googleapis.com/kubernetes-release/network-plugins/cni-amd64-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz",
 )

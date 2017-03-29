@@ -45,8 +45,8 @@ type provision struct {
 	namespaceLister corelisters.NamespaceLister
 }
 
-var _ = kubeapiserveradmission.WantsInformerFactory(&provision{})
-var _ = kubeapiserveradmission.WantsInternalClientSet(&provision{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&provision{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&provision{})
 
 func (p *provision) Admit(a admission.Attributes) error {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
@@ -92,11 +92,11 @@ func NewProvision() admission.Interface {
 	}
 }
 
-func (p *provision) SetInternalClientSet(client internalclientset.Interface) {
+func (p *provision) SetInternalKubeClientSet(client internalclientset.Interface) {
 	p.client = client
 }
 
-func (p *provision) SetInformerFactory(f informers.SharedInformerFactory) {
+func (p *provision) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().InternalVersion().Namespaces()
 	p.namespaceLister = namespaceInformer.Lister()
 	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)

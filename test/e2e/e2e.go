@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -116,7 +115,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 				metav1.NamespaceSystem,
 				metav1.NamespaceDefault,
 				metav1.NamespacePublic,
-				federationapi.FederationNamespaceSystem,
+				framework.FederationSystemNamespace(),
 			})
 		if err != nil {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
@@ -141,7 +140,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
-	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, framework.ImagePullerLabels, true); err != nil {
+	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, framework.ImagePullerLabels); err != nil {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		framework.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)

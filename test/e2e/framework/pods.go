@@ -37,6 +37,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const DefaultPodDeletionTimeout = 3 * time.Minute
+
 // ImageWhiteList is the images used in the current test suite. It should be initialized in test suite and
 // the images in the white list should be pre-pulled in the test suite.  Currently, this is only used by
 // node e2e test.
@@ -224,7 +226,7 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 	return ev, err
 }
 
-// MatchContainerOutput gest output of a container and match expected regexp in the output.
+// MatchContainerOutput gets output of a container and match expected regexp in the output.
 func (c *PodClient) MatchContainerOutput(name string, containerName string, expectedRegexp string) error {
 	f := c.f
 	output, err := GetPodLogs(f.ClientSet, f.Namespace.Name, name, containerName)

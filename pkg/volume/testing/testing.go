@@ -203,6 +203,14 @@ func (plugin *FakeVolumePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *FakeVolumePlugin) SupportsMountOption() bool {
+	return true
+}
+
+func (plugin *FakeVolumePlugin) SupportsBulkVolumeVerification() bool {
+	return false
+}
+
 func (plugin *FakeVolumePlugin) NewMounter(spec *Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
@@ -745,4 +753,14 @@ func CreateTestPVC(capacity string, accessModes []v1.PersistentVolumeAccessMode)
 		},
 	}
 	return &claim
+}
+
+func MetricsEqualIgnoreTimestamp(a *Metrics, b *Metrics) bool {
+	available := a.Available == b.Available
+	capacity := a.Capacity == b.Capacity
+	used := a.Used == b.Used
+	inodes := a.Inodes == b.Inodes
+	inodesFree := a.InodesFree == b.InodesFree
+	inodesUsed := a.InodesUsed == b.InodesUsed
+	return available && capacity && used && inodes && inodesFree && inodesUsed
 }

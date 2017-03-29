@@ -34,7 +34,10 @@ type DeploymentListerExpansion interface {
 // DeploymentNamespaeLister.
 type DeploymentNamespaceListerExpansion interface{}
 
-// GetDeploymentsForReplicaSet returns a list of deployments managing a replica set. Returns an error only if no matching deployments are found.
+// GetDeploymentsForReplicaSet returns a list of Deployments that potentially
+// match a ReplicaSet. Only the one specified in the ReplicaSet's ControllerRef
+// will actually manage it.
+// Returns an error only if no matching Deployments are found.
 func (s *deploymentLister) GetDeploymentsForReplicaSet(rs *extensions.ReplicaSet) ([]*extensions.Deployment, error) {
 	if len(rs.Labels) == 0 {
 		return nil, fmt.Errorf("no deployments found for ReplicaSet %v because it has no labels", rs.Name)

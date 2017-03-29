@@ -21,10 +21,8 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
@@ -54,7 +52,7 @@ type RuleOwner interface {
 	SetRules([]rbac.PolicyRule)
 }
 
-type ReconcileClusterRoleOptions struct {
+type ReconcileRoleOptions struct {
 	// Role is the expected role that will be reconciled
 	Role RuleOwner
 	// Confirm indicates writes should be performed. When false, results are returned as a dry-run.
@@ -85,11 +83,11 @@ type ReconcileClusterRoleResult struct {
 	Protected bool
 }
 
-func (o *ReconcileClusterRoleOptions) Run() (*ReconcileClusterRoleResult, error) {
+func (o *ReconcileRoleOptions) Run() (*ReconcileClusterRoleResult, error) {
 	return o.run(0)
 }
 
-func (o *ReconcileClusterRoleOptions) run(attempts int) (*ReconcileClusterRoleResult, error) {
+func (o *ReconcileRoleOptions) run(attempts int) (*ReconcileClusterRoleResult, error) {
 	// This keeps us from retrying forever if a role keeps appearing and disappearing as we reconcile.
 	// Conflict errors on update are handled at a higher level.
 	if attempts > 2 {
@@ -214,69 +212,4 @@ func merge(maps ...map[string]string) map[string]string {
 		}
 	}
 	return output
-}
-
-type ClusterRoleRuleOwner struct {
-	ClusterRole *rbac.ClusterRole
-}
-
-func (o ClusterRoleRuleOwner) GetNamespace() string {
-	return o.ClusterRole.Namespace
-}
-
-func (o ClusterRoleRuleOwner) GetName() string {
-	return o.ClusterRole.Name
-}
-
-func (o ClusterRoleRuleOwner) GetLabels() map[string]string {
-	return o.ClusterRole.Labels
-}
-
-func (o ClusterRoleRuleOwner) SetLabels(in map[string]string) {
-	o.ClusterRole.Labels = in
-}
-
-func (o ClusterRoleRuleOwner) GetAnnotations() map[string]string {
-	return o.ClusterRole.Annotations
-}
-
-func (o ClusterRoleRuleOwner) SetAnnotations(in map[string]string) {
-	o.ClusterRole.Annotations = in
-}
-
-func (o ClusterRoleRuleOwner) GetRules() []rbac.PolicyRule {
-	return o.ClusterRole.Rules
-}
-
-func (o ClusterRoleRuleOwner) SetRules(in []rbac.PolicyRule) {
-	o.ClusterRole.Rules = in
-}
-
-type ClusterRoleModifier struct {
-	Client internalversion.ClusterRoleInterface
-}
-
-func (c ClusterRoleModifier) Get(namespace, name string) (RuleOwner, error) {
-	ret, err := c.Client.Get(name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return ClusterRoleRuleOwner{ClusterRole: ret}, err
-}
-
-func (c ClusterRoleModifier) Create(in RuleOwner) (RuleOwner, error) {
-	ret, err := c.Client.Create(in.(ClusterRoleRuleOwner).ClusterRole)
-	if err != nil {
-		return nil, err
-	}
-	return ClusterRoleRuleOwner{ClusterRole: ret}, err
-}
-
-func (c ClusterRoleModifier) Update(in RuleOwner) (RuleOwner, error) {
-	ret, err := c.Client.Create(in.(ClusterRoleRuleOwner).ClusterRole)
-	if err != nil {
-		return nil, err
-	}
-	return ClusterRoleRuleOwner{ClusterRole: ret}, err
-
 }

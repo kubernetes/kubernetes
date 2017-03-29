@@ -453,26 +453,33 @@ kube::util::godep_restored() {
   return 0
 }
 
-# Exits script if working directory is dirty.
+# Exits script if working directory is dirty. If it's run interactively in the terminal
+# the user can commit changes in a second terminal. This script will wait.
 kube::util::ensure_clean_working_dir() {
-  if ! git diff --exit-code; then
-    echo -e "\nUnexpected dirty working directory."
-    exit 1
-  fi
+  while ! git diff HEAD --exit-code &>/dev/null; do
+    echo -e "\nUnexpected dirty working directory:\n"
+    git status -s | sed 's/^/  /'
+    if ! tty -s; then
+        exit 1
+    fi
+    echo -e "\nCommit your changes in another terminal and then continue here by pressing enter."
+    read
+  done 1>&2
 }
 
 # Ensure that the given godep version is installed and in the path
 kube::util::ensure_godep_version() {
-  if [[ "$(godep version)" == *"godep ${1}"* ]]; then
+  GODEP_VERSION=${1:-"v79"}
+  if [[ "$(godep version)" == *"godep ${GODEP_VERSION}"* ]]; then
     return
   fi
 
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
 
-  GOPATH="${KUBE_TEMP}/go" go get -u github.com/tools/godep 2>/dev/null
+  GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep 2>/dev/null
   pushd "${KUBE_TEMP}/go/src/github.com/tools/godep" >/dev/null
-    git checkout "${1:-v74}"
+    git checkout "${GODEP_VERSION}"
     GOPATH="${KUBE_TEMP}/go" go install .
   popd >/dev/null
 

@@ -58,7 +58,7 @@ func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImage
 		network.UseDefaultMTU,
 	)
 	osInterface := &containertest.FakeOS{}
-	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, networkPlugin, osInterface)
+	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, networkPlugin, osInterface, &containertest.FakeRuntimeHelper{})
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 

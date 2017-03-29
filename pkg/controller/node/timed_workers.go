@@ -121,12 +121,12 @@ func (q *TimedWorkerQueue) AddWork(args *WorkArgs, createdAt time.Time, fireAt t
 
 // CancelWork removes scheduled function execution from the queue. Returns true if work was cancelled.
 func (q *TimedWorkerQueue) CancelWork(key string) bool {
-	glog.V(4).Infof("Cancelling TimedWorkerQueue item %v at %v", key, time.Now())
 	q.Lock()
 	defer q.Unlock()
 	worker, found := q.workers[key]
 	result := false
 	if found {
+		glog.V(4).Infof("Cancelling TimedWorkerQueue item %v at %v", key, time.Now())
 		if worker != nil {
 			result = true
 			worker.Cancel()

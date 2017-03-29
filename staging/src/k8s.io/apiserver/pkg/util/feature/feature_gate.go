@@ -50,10 +50,7 @@ var (
 	}
 
 	// DefaultFeatureGate is a shared global FeatureGate.
-	DefaultFeatureGate = &featureGate{
-		known:   defaultFeatures,
-		special: specialFeatures,
-	}
+	DefaultFeatureGate FeatureGate = NewFeatureGate()
 )
 
 type FeatureSpec struct {
@@ -75,43 +72,9 @@ const (
 type FeatureGate interface {
 	AddFlag(fs *pflag.FlagSet)
 	Set(value string) error
-	Add(features map[Feature]FeatureSpec)
+	Enabled(key Feature) bool
+	Add(features map[Feature]FeatureSpec) error
 	KnownFeatures() []string
-
-	// Every feature gate should add method here following this template:
-	//
-	// // owner: @username
-	// // alpha: v1.4
-	// MyFeature() bool
-
-	// owner: @timstclair
-	// beta: v1.4
-	AppArmor() bool
-
-	// owner: @girishkalele
-	// alpha: v1.4
-	ExternalTrafficLocalOnly() bool
-
-	// owner: @saad-ali
-	// alpha: v1.3
-	DynamicVolumeProvisioning() bool
-
-	// owner: @mtaufen
-	// alpha: v1.4
-	DynamicKubeletConfig() bool
-
-	// owner: timstclair
-	// alpha: v1.5
-	StreamingProxyRedirects() bool
-
-	// owner: @pweil-
-	// alpha: v1.5
-	ExperimentalHostUserNamespaceDefaulting() bool
-
-	// owner: @davidopp
-	// alpha: v1.6
-	// TODO: remove when alpha support for affinity is removed
-	AffinityInAnnotations() bool
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -137,10 +100,21 @@ func setUnsetAlphaGates(f *featureGate, val bool) {
 // Set, String, and Type implement pflag.Value
 var _ pflag.Value = &featureGate{}
 
+func NewFeatureGate() *featureGate {
+	f := &featureGate{
+		known:   map[Feature]FeatureSpec{},
+		special: specialFeatures,
+		enabled: map[Feature]bool{},
+	}
+	for k, v := range defaultFeatures {
+		f.known[k] = v
+	}
+	return f
+}
+
 // Set Parses a string of the form // "key1=value1,key2=value2,..." into a
 // map[string]bool of known keys or returns an error.
 func (f *featureGate) Set(value string) error {
-	f.enabled = make(map[Feature]bool)
 	for _, s := range strings.Split(value, ",") {
 		if len(s) == 0 {
 			continue

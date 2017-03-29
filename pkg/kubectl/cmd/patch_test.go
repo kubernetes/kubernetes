@@ -93,6 +93,60 @@ func TestPatchObjectFromFile(t *testing.T) {
 	}
 }
 
+func TestPatchNoop(t *testing.T) {
+	_, svc, _ := testData()
+	getObject := &svc.Items[0]
+	patchObject := &svc.Items[0]
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/services/frontend" && m == "PATCH":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, patchObject)}, nil
+			case p == "/namespaces/test/services/frontend" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, getObject)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+
+	// No-op
+	{
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdPatch(f, buf)
+		cmd.Flags().Set("namespace", "test")
+		cmd.Flags().Set("patch", `{}`)
+		cmd.Run(cmd, []string{"services", "frontend"})
+		if buf.String() != "service \"baz\" not patched\n" {
+			t.Errorf("unexpected output: %s", buf.String())
+		}
+	}
+
+	// Patched
+	{
+		copied, _ := api.Scheme.DeepCopy(patchObject)
+		patchObject = copied.(*api.Service)
+		if patchObject.Annotations == nil {
+			patchObject.Annotations = map[string]string{}
+		}
+		patchObject.Annotations["foo"] = "bar"
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdPatch(f, buf)
+		cmd.Flags().Set("namespace", "test")
+		cmd.Flags().Set("patch", `{"metadata":{"annotations":{"foo":"bar"}}}`)
+		cmd.Run(cmd, []string{"services", "frontend"})
+		if buf.String() != "service \"baz\" patched\n" {
+			t.Errorf("unexpected output: %s", buf.String())
+		}
+	}
+}
+
 func TestPatchObjectFromFileOutput(t *testing.T) {
 	_, svc, _ := testData()
 

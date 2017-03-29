@@ -11,15 +11,16 @@ allowed-not-ready-nodes
 allow-missing-template-keys
 allow-privileged
 anonymous-auth
-api-advertise-addresses
 api-burst
 api-external-dns-names
-api-port
 api-prefix
 api-rate
 api-server-advertise-address
+apiserver-advertise-address
 apiserver-arg-overrides
 apiserver-arg-overrides
+apiserver-bind-port
+apiserver-cert-extra-sans
 apiserver-count
 apiserver-count
 apiserver-count
@@ -31,6 +32,11 @@ api-servers
 api-server-service-type
 api-token
 api-version
+apiserver-arg-overrides
+apiserver-count
+apiserver-count
+apiserver-enable-basic-auth
+apiserver-enable-token-auth
 attach-detach-reconcile-sync-period
 audit-log-maxage
 audit-log-maxbackup
@@ -67,6 +73,7 @@ build-only
 build-tag
 ca-cert-path
 cadvisor-port
+cert-altnames
 cert-dir
 certificate-authority
 cgroup-driver
@@ -154,8 +161,11 @@ disable-attach-detach-reconcile-sync
 disable-filter
 disable-kubenet
 disable-log-dump
+discovery-file
 discovery-port
+discovery-token
 dns-bind-address
+dns-domain
 dns-port
 dns-provider
 dns-provider-config
@@ -234,6 +244,7 @@ experimental-keystone-url
 experimental-mounter-path
 experimental-nvidia-gpus
 experimental-prefix
+experimental-qos-reserved
 external-etcd-cafile
 external-etcd-certfile
 external-etcd-endpoints
@@ -251,6 +262,7 @@ federated-api-qps
 federated-kube-context
 federation-name
 federation-system-namespace
+federation-upgrade-target
 file-check-frequency
 file_content_in_loop
 file-suffix
@@ -259,6 +271,7 @@ forward-services
 framework-name
 framework-store-uri
 framework-weburi
+from-env-file
 from-file
 from-literal
 func-dest
@@ -270,6 +283,7 @@ gather-metrics-at-teardown
 gather-resource-usage
 gce-project
 gce-service-account
+gce-upgrade-script
 gce-zone
 ginkgo-flags
 gke-cluster
@@ -503,6 +517,7 @@ pod-infra-container-image
 pod-manifest-path
 pod-network-cidr
 pod-running
+pod-running-timeout
 pods-per-core
 policy-config-file
 poll-interval
@@ -646,11 +661,13 @@ tcp-services
 terminated-pod-gc-threshold
 test-flags
 test-timeout
+tls-bootstrap-token
 tls-ca-file
 tls-cert-file
 tls-private-key-file
 tls-sni-cert-key
 token-auth-file
+token-ttl
 to-version
 to-version
 ttl-keys-prefix
@@ -665,10 +682,10 @@ upgrade-image
 upgrade-target
 use-kubernetes-cluster-service
 use-kubernetes-version
+use-service-account-credentials
 user-whitelist
 use-service-account-credentials
 use-service-account-credentials
-use-taint-based-evictions
 verb
 verify-only
 versioned-clientset-package
@@ -685,3 +702,5 @@ windows-line-endings
 www-prefix
 zone-id
 zone-name
+
+horizontal-pod-autoscaler-use-rest-clients
