@@ -26,6 +26,12 @@ const (
 	LabelOS   = "beta.kubernetes.io/os"
 	LabelArch = "beta.kubernetes.io/arch"
 
+	// When kubelet is started with the "external" cloud provider, then
+	// it sets this label on the node to denote an ip address set from the
+	// cmd line flag. This ip is verified with the cloudprovider as valid by
+	// the cloud-controller-manager
+	LabelProvidedIPAddr = "beta.kubernetes.io/provided-node-ip"
+
 	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeNotReady would be automatically added by node controller
 	// when node is not ready, and removed when node becomes ready.
@@ -36,6 +42,12 @@ const (
 	// when node becomes unreachable (corresponding to NodeReady status ConditionUnknown)
 	// and removed when node becomes reachable (NodeReady status ConditionTrue).
 	TaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
+
+	// When kubelet is started with the "external" cloud provider, then
+	// it sets this taint on a node to mark it as unusable, until a controller
+	// from the cloud-controller-manager intitializes this node, and then removes
+	// the taint
+	TaintExternalCloudProvider = "node.cloudprovider.kubernetes.io/uninitialized"
 )
 
 // Role labels are applied to Nodes to mark their purpose.  In particular, we
