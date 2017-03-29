@@ -617,8 +617,8 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.Write(output)
 			},
 			expected: map[schema.GroupVersionResource]struct{}{
-				schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}:     {},
-				schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}: {},
+				{Group: "", Version: "v1", Resource: "pods"}:     {},
+				{Group: "", Version: "v1", Resource: "services"}: {},
 			},
 		},
 		{
@@ -660,8 +660,8 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.Write(output)
 			},
 			expected: map[schema.GroupVersionResource]struct{}{
-				schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}:           {},
-				schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {},
+				{Group: "batch", Version: "v1", Resource: "jobs"}:           {},
+				{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {},
 			},
 		},
 		{
@@ -703,8 +703,8 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 				w.Write(output)
 			},
 			expected: map[schema.GroupVersionResource]struct{}{
-				schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "jobs"}:     {},
-				schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {},
+				{Group: "batch", Version: "v2alpha1", Resource: "jobs"}:     {},
+				{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {},
 			},
 		},
 	}
