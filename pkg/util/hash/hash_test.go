@@ -56,10 +56,10 @@ func TestDeepHashObject(t *testing.T) {
 		func() interface{} {
 			return B{[]int{8, 6, 7}, map[string]bool{"5": true, "3": true, "0": true, "9": true}}
 		},
-		func() interface{} { return map[A]bool{A{8675309, "Jenny"}: true, A{9765683, "!Jenny"}: false} },
-		func() interface{} { return map[C]bool{C{8675309, "Jenny"}: true, C{9765683, "!Jenny"}: false} },
-		func() interface{} { return map[*A]bool{&A{8675309, "Jenny"}: true, &A{9765683, "!Jenny"}: false} },
-		func() interface{} { return map[*C]bool{&C{8675309, "Jenny"}: true, &C{9765683, "!Jenny"}: false} },
+		func() interface{} { return map[A]bool{{8675309, "Jenny"}: true, {9765683, "!Jenny"}: false} },
+		func() interface{} { return map[C]bool{{8675309, "Jenny"}: true, {9765683, "!Jenny"}: false} },
+		func() interface{} { return map[*A]bool{{8675309, "Jenny"}: true, {9765683, "!Jenny"}: false} },
+		func() interface{} { return map[*C]bool{{8675309, "Jenny"}: true, {9765683, "!Jenny"}: false} },
 	}
 
 	for _, tc := range successCases {
