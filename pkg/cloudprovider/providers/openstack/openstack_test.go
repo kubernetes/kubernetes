@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/util/rand"
 
-	"github.com/rackspace/gophercloud"
+	"github.com/gophercloud/gophercloud"
 	"k8s.io/kubernetes/pkg/api"
 )
 
