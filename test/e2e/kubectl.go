@@ -602,8 +602,8 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			framework.ExpectNoError(err)
 			kubectlPath = strings.TrimSpace(string(kubectlPathNormalized))
 
-			inClusterHost := strings.TrimSpace(framework.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_HOST"))
-			inClusterPort := strings.TrimSpace(framework.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_PORT"))
+			inClusterHost := "kubernetes.default.svc"
+			inClusterPort := "443"
 
 			framework.Logf("copying %s to the %s pod", kubectlPath, simplePodName)
 			framework.RunKubectlOrDie("cp", kubectlPath, ns+"/"+simplePodName+":/tmp/")
