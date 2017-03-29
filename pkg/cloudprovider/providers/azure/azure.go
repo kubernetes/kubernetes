@@ -128,26 +128,31 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az.SubnetsClient = network.NewSubnetsClient(az.SubscriptionID)
 	az.SubnetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.SubnetsClient.Authorizer = servicePrincipalToken
+	az.SubnetsClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.SubnetsClient.Client)
 
 	az.RouteTablesClient = network.NewRouteTablesClient(az.SubscriptionID)
 	az.RouteTablesClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.RouteTablesClient.Authorizer = servicePrincipalToken
+	az.RouteTablesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.RouteTablesClient.Client)
 
 	az.RoutesClient = network.NewRoutesClient(az.SubscriptionID)
 	az.RoutesClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.RoutesClient.Authorizer = servicePrincipalToken
+	az.RoutesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.RoutesClient.Client)
 
 	az.InterfacesClient = network.NewInterfacesClient(az.SubscriptionID)
 	az.InterfacesClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.InterfacesClient.Authorizer = servicePrincipalToken
+	az.InterfacesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.InterfacesClient.Client)
 
 	az.LoadBalancerClient = network.NewLoadBalancersClient(az.SubscriptionID)
 	az.LoadBalancerClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.LoadBalancerClient.Authorizer = servicePrincipalToken
+	az.LoadBalancerClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.LoadBalancerClient.Client)
 
 	az.VirtualMachinesClient = compute.NewVirtualMachinesClient(az.SubscriptionID)
@@ -159,11 +164,13 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az.PublicIPAddressesClient = network.NewPublicIPAddressesClient(az.SubscriptionID)
 	az.PublicIPAddressesClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.PublicIPAddressesClient.Authorizer = servicePrincipalToken
+	az.PublicIPAddressesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.PublicIPAddressesClient.Client)
 
 	az.SecurityGroupsClient = network.NewSecurityGroupsClient(az.SubscriptionID)
 	az.SecurityGroupsClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.SecurityGroupsClient.Authorizer = servicePrincipalToken
+	az.SecurityGroupsClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.SecurityGroupsClient.Client)
 
 	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
