@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -89,6 +91,14 @@ var _ = framework.KubeDescribe("ReplicaSet", func() {
 
 	It("should surface a failure condition on a common issue like exceeded quota", func() {
 		rsConditionCheck(f)
+	})
+
+	It("should adopt matching pods on creation", func() {
+		testRSAdoptMatchingOrphans(f)
+	})
+
+	It("should release no longer matching pods", func() {
+		testRSReleaseControlledNotMatching(f)
 	})
 })
 
@@ -247,5 +257,87 @@ func rsConditionCheck(f *framework.Framework) {
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("rs controller never removed the failure condition for rs %q: %#v", name, conditions)
 	}
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func testRSAdoptMatchingOrphans(f *framework.Framework) {
+	name := "pod-adoption"
+	By(fmt.Sprintf("Given a Pod with a 'name' label %s is created", name))
+	p := f.PodClient().CreateSync(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": name,
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  name,
+					Image: nginxImageName,
+				},
+			},
+		},
+	})
+
+	By("When a replicaset with a matching selector is created")
+	replicas := int32(1)
+	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, nginxImageName)
+	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
+	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(rsSt)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Then the orphan pod is adopted")
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		// The Pod p should either be adopted or deleted by the ReplicaSet
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		Expect(err).NotTo(HaveOccurred())
+		for _, owner := range p2.OwnerReferences {
+			if *owner.Controller && owner.UID == rs.UID {
+				// pod adopted
+				return true, nil
+			}
+		}
+		// pod still not adopted
+		return false, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func testRSReleaseControlledNotMatching(f *framework.Framework) {
+	name := "pod-release"
+	By("Given a ReplicaSet is created")
+	replicas := int32(1)
+	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, nginxImageName)
+	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
+	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(rsSt)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("When the matched label of one of its pods change")
+	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rs.Name, replicas)
+	Expect(err).NotTo(HaveOccurred())
+
+	p := pods.Items[0]
+	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
+	patch := []byte("{\"metadata\":{\"labels\":{\"name\":\"not-matching-name\"}}}")
+	_, err = podClient.Patch(p.Name, types.StrategicMergePatchType, patch)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Then the pod is released")
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		p2, err := podClient.Get(p.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		for _, owner := range p2.OwnerReferences {
+			if *owner.Controller && owner.UID == rs.UID {
+				// pod still belonging to the replicaset
+				return false, nil
+			}
+		}
+		// pod already released
+		return true, nil
+	})
 	Expect(err).NotTo(HaveOccurred())
 }
