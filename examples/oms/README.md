@@ -24,7 +24,7 @@ If you don't have a Microsoft Azure account, you can create a free OMS account b
 
 ## Step 2
 
-You will need to edit the [omsagent-daemonset.yaml](./omsagent-daemonset.yaml) file to add your Workspace ID and Primary Key of your OMS account.
+You will need to edit the [omsagent.yaml](https://github.com/Microsoft/OMS-docker/blob/master/Kubernetes/omsagent.yaml) file to add your Workspace ID and Primary Key of your OMS account.
 
 ```
 - env:
