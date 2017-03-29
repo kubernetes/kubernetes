@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // TODO: in the near future, this will be changed to be more restrictive
@@ -329,7 +330,7 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
-	tmpDir, err := volume.RenameDirectory(dir, ed.volName+".deleting~")
+	tmpDir, err := volume.RenameDirectory(dir, ed.volName+volumehelper.VolumeDeletingSuffix)
 	if err != nil {
 		return err
 	}

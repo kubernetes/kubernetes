@@ -648,6 +648,12 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 
 			unescapePluginName := strings.UnescapeQualifiedNameForDisk(pluginName)
 			for _, volumeName := range volumePluginDirs {
+				if volumehelper.IsVolumeDeleting(volumeName) {
+					// Ignore volumes that are being deleted
+					glog.V(4).Infof("Ignoring volume at %q", path.Join(volumePluginPath, volumeName))
+					continue
+				}
+
 				mountPath := path.Join(volumePluginPath, volumeName)
 				volumes = append(volumes, podVolume{
 					podName:        volumetypes.UniquePodName(podName),
