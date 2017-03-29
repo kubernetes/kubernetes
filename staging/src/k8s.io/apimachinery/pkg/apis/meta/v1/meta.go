@@ -36,20 +36,6 @@ func ObjectMetaFor(obj runtime.Object) (*ObjectMeta, error) {
 	return meta, err
 }
 
-// ListMetaFor returns a pointer to a provided object's ListMeta,
-// or an error if the object does not have that pointer.
-// TODO: allow runtime.Unknown to extract this object
-// TODO: Remove this function and use meta.ObjectMetaAccessor() instead.
-func ListMetaFor(obj runtime.Object) (*ListMeta, error) {
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	var meta *ListMeta
-	err = runtime.FieldPtr(v, "ListMeta", &meta)
-	return meta, err
-}
-
 // TODO: move this, Object, List, and Type to a different package
 type ObjectMetaAccessor interface {
 	GetObjectMeta() Object
