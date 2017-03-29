@@ -5,14 +5,14 @@ The [Microsoft Operations Management Suite (OMS)](https://www.microsoft.com/en-u
 This example will create a DeamonSet to deploy the OMS Linux agents running as containers to every node in the Kubernetes cluster.
 
 ### Supported Linux Operating Systems & Docker
-- Docker 1.10 thru 1.12.1
+- Docker 1.11 thru 1.13
 
 - An x64 version of the following:
 	- Ubuntu 14.04 LTS, 16.04 LTS
 	- CoreOS (stable)
 	- Amazon Linux 2016.09.0
 	- openSUSE 13.2
-	- CentOS 7
+	- CentOS 7.2, 7.3
 	- SLES 12
 	- RHEL 7.2
 
