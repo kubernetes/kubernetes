@@ -19,6 +19,7 @@ package master
 import (
 	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -44,8 +45,9 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 	fmt.Println("[apiclient] Created API client, waiting for the control plane to become ready")
 	WaitForAPI(client)
 
-	fmt.Println("[apiclient] Waiting for at least one node to register and become ready")
+	fmt.Println("[apiclient] Waiting for at least one node to register")
 	start := time.Now()
+	firstNodeIsReady := false
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		nodeList, err := client.Nodes().List(metav1.ListOptions{})
 		if err != nil {
@@ -56,17 +58,35 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 			return false, nil
 		}
 		n := &nodeList.Items[0]
-		if !v1.IsNodeReady(n) {
-			fmt.Println("[apiclient] First node has registered, but is not ready yet")
-			return false, nil
+		if v1.IsNodeReady(n) {
+			firstNodeIsReady = true
+		} else {
+			networkNotReady := false
+			for _, c := range n.Status.Conditions {
+				if c.Type == v1.NodeReady {
+					if strings.Contains(c.Message, "reason:NetworkPluginNotReady") {
+						networkNotReady = true
+					}
+				}
+			}
+
+			if networkNotReady {
+				fmt.Println("[apiclient] First node has registered, but its network is unconfigured.  Will proceed with initialization")
+			} else {
+				return false, nil
+			}
 		}
 
-		fmt.Printf("[apiclient] First node is ready after %f seconds\n", time.Since(start).Seconds())
+		fmt.Printf("[apiclient] First node is registered after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
 
-	if err := createAndWaitForADummyDeployment(client); err != nil {
-		return nil, err
+	if firstNodeIsReady {
+		if err := createAndWaitForADummyDeployment(client); err != nil {
+			return nil, err
+		}
+	} else {
+		fmt.Println("[apiclient] Skipping dummy deployment, no registered nodes are ready")
 	}
 
 	return client, nil
