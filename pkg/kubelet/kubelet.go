@@ -187,7 +187,7 @@ type KubeletBootstrap interface {
 }
 
 // create and initialize a Kubelet instance
-type KubeletBuilder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir string) (KubeletBootstrap, error)
+type KubeletBuilder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir, providerID string) (KubeletBootstrap, error)
 
 // KubeletDeps is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -282,7 +282,7 @@ func getRuntimeAndImageServices(config *componentconfig.KubeletConfiguration) (i
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
-func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir string) (*Kubelet, error) {
+func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool, hostnameOverride, nodeIP, dockershimRootDir, providerID string) (*Kubelet, error) {
 	if kubeCfg.RootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", kubeCfg.RootDirectory)
 	}
@@ -445,6 +445,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		diskSpaceManager:               diskSpaceManager,
 		cloud:                          kubeDeps.Cloud,
 		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
+		externalCloudProvider:     cloudprovider.IsExternal(kubeCfg.CloudProvider),
+		providerID:                providerID,
 		nodeRef:                   nodeRef,
 		nodeLabels:                kubeCfg.NodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
@@ -952,7 +954,8 @@ type Kubelet struct {
 	// Cloud provider interface.
 	cloud                   cloudprovider.Interface
 	autoDetectCloudProvider bool
-
+	// Indicates that the node initialization happens in an external cloud controller
+	externalCloudProvider bool
 	// Reference to this node.
 	nodeRef *clientv1.ObjectReference
 
@@ -1045,6 +1048,9 @@ type Kubelet struct {
 
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP
+
+	// If non-nil, this is a unique identifier for the node in an external database, eg. cloudprovider
+	providerID string
 
 	// clock is an interface that provides time related functionality in a way that makes it
 	// easy to test the code.
