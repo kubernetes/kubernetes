@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -115,21 +116,21 @@ func (s ClusterRoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, err
 		Kind:     "ClusterRole",
 		Name:     s.ClusterRole,
 	}
-	for _, user := range s.Users {
+	for _, user := range sets.NewString(s.Users...).List() {
 		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{
 			Kind:     rbac.UserKind,
 			APIGroup: rbac.GroupName,
 			Name:     user,
 		})
 	}
-	for _, group := range s.Groups {
+	for _, group := range sets.NewString(s.Groups...).List() {
 		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{
 			Kind:     rbac.GroupKind,
 			APIGroup: rbac.GroupName,
 			Name:     group,
 		})
 	}
-	for _, sa := range s.ServiceAccounts {
+	for _, sa := range sets.NewString(s.ServiceAccounts...).List() {
 		tokens := strings.Split(sa, ":")
 		if len(tokens) != 2 {
 			return nil, fmt.Errorf("serviceaccount must be <namespace>:<name>")
