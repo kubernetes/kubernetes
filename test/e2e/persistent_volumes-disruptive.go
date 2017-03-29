@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This test references
-// persistent_volumes.go
-// volumes.go
-
 package e2e
 
 import (

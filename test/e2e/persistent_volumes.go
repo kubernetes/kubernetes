@@ -77,12 +77,12 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 // initNFSserverPod wraps volumes.go's startVolumeServer to return a running nfs host pod
 // commonly used by persistent volume testing
 func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
-	return startVolumeServer(c, VolumeTestConfig{
-		namespace:   ns,
-		prefix:      "nfs",
-		serverImage: NfsServerImage,
-		serverPorts: []int{2049},
-		serverArgs:  []string{"-G", "777", "/exports"},
+	return framework.StartVolumeServer(c, framework.VolumeTestConfig{
+		Namespace:   ns,
+		Prefix:      "nfs",
+		ServerImage: framework.NfsServerImage,
+		ServerPorts: []int{2049},
+		ServerArgs:  []string{"-G", "777", "/exports"},
 	})
 }
 
