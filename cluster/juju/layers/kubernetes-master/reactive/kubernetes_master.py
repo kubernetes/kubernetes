@@ -252,9 +252,9 @@ def idle_status():
 
 
 @when('etcd.available', 'kubernetes-master.components.installed',
-      'certificates.server.cert.available', 'authentication.setup')
+      'tls_client.server.certificate.saved', 'authentication.setup')
 @when_not('kubernetes-master.components.started')
-def start_master(etcd, tls):
+def start_master(etcd):
     '''Run the Kubernetes master components.'''
     hookenv.status_set('maintenance',
                        'Rendering the Kubernetes master systemd files.')
