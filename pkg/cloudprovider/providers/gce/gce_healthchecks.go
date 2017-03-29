@@ -16,13 +16,9 @@ limitations under the License.
 
 package gce
 
-import (
-	"net/http"
+import compute "google.golang.org/api/compute/v1"
 
-	compute "google.golang.org/api/compute/v1"
-)
-
-// Health Checks
+// Legacy HTTP Health Checks
 
 // GetHttpHealthCheck returns the given HttpHealthCheck by name.
 func (gce *GCECloud) GetHttpHealthCheck(name string) (*compute.HttpHealthCheck, error) {
@@ -42,9 +38,6 @@ func (gce *GCECloud) UpdateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 func (gce *GCECloud) DeleteHttpHealthCheck(name string) error {
 	op, err := gce.service.HttpHealthChecks.Delete(gce.projectID, name).Do()
 	if err != nil {
-		if isHTTPErrorCode(err, http.StatusNotFound) {
-			return nil
-		}
 		return err
 	}
 	return gce.waitForGlobalOp(op)
@@ -59,8 +52,88 @@ func (gce *GCECloud) CreateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 	return gce.waitForGlobalOp(op)
 }
 
-// ListHttpHealthCheck lists all HttpHealthChecks in the project.
+// ListHttpHealthChecks lists all HttpHealthChecks in the project.
 func (gce *GCECloud) ListHttpHealthChecks() (*compute.HttpHealthCheckList, error) {
 	// TODO: use PageToken to list all not just the first 500
 	return gce.service.HttpHealthChecks.List(gce.projectID).Do()
+}
+
+// Legacy HTTPS Health Checks
+
+// GetHttpsHealthCheck returns the given HttpsHealthCheck by name.
+func (gce *GCECloud) GetHttpsHealthCheck(name string) (*compute.HttpsHealthCheck, error) {
+	return gce.service.HttpsHealthChecks.Get(gce.projectID, name).Do()
+}
+
+// UpdateHttpsHealthCheck applies the given HttpsHealthCheck as an update.
+func (gce *GCECloud) UpdateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error {
+	op, err := gce.service.HttpsHealthChecks.Update(gce.projectID, hc.Name, hc).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteHttpsHealthCheck deletes the given HttpsHealthCheck by name.
+func (gce *GCECloud) DeleteHttpsHealthCheck(name string) error {
+	op, err := gce.service.HttpsHealthChecks.Delete(gce.projectID, name).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// CreateHttpsHealthCheck creates the given HttpsHealthCheck.
+func (gce *GCECloud) CreateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error {
+	op, err := gce.service.HttpsHealthChecks.Insert(gce.projectID, hc).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// ListHttpsHealthChecks lists all HttpsHealthChecks in the project.
+func (gce *GCECloud) ListHttpsHealthChecks() (*compute.HttpsHealthCheckList, error) {
+	// TODO: use PageToken to list all not just the first 500
+	return gce.service.HttpsHealthChecks.List(gce.projectID).Do()
+}
+
+// Generic HealthCheck
+
+// GetHealthCheck returns the given HealthCheck by name.
+func (gce *GCECloud) GetHealthCheck(name string) (*compute.HealthCheck, error) {
+	return gce.service.HealthChecks.Get(gce.projectID, name).Do()
+}
+
+// UpdateHealthCheck applies the given HealthCheck as an update.
+func (gce *GCECloud) UpdateHealthCheck(hc *compute.HealthCheck) error {
+	op, err := gce.service.HealthChecks.Update(gce.projectID, hc.Name, hc).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// DeleteHealthCheck deletes the given HealthCheck by name.
+func (gce *GCECloud) DeleteHealthCheck(name string) error {
+	op, err := gce.service.HealthChecks.Delete(gce.projectID, name).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// CreateHealthCheck creates the given HealthCheck.
+func (gce *GCECloud) CreateHealthCheck(hc *compute.HealthCheck) error {
+	op, err := gce.service.HealthChecks.Insert(gce.projectID, hc).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+// ListHealthChecks lists all HealthCheck in the project.
+func (gce *GCECloud) ListHealthChecks() (*compute.HealthCheckList, error) {
+	// TODO: use PageToken to list all not just the first 500
+	return gce.service.HealthChecks.List(gce.projectID).Do()
 }
