@@ -23,20 +23,22 @@ import (
 )
 
 func TestAddFlagsFlag(t *testing.T) {
-	// TODO: This only tests the enable-swagger-ui flag for now.
 	// Expand the test to include other flags as well.
 	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s := NewServerRunOptions()
 	s.AddFlags(f)
-	if s.Features.EnableSwaggerUI {
-		t.Errorf("Expected s.EnableSwaggerUI to be false by default")
+
+	if s.Features.EnableSwaggerUI || s.Features.EnableContentionProfiling || !s.Features.EnableProfiling {
+		t.Errorf("Expected SwaggerUI,ContentionProfiling to be false,Profiling to be true by default")
 	}
 
 	args := []string{
 		"--enable-swagger-ui=true",
+		"--profiling=true",
+		"--contention-profiling=false",
 	}
 	f.Parse(args)
-	if !s.Features.EnableSwaggerUI {
-		t.Errorf("Expected s.EnableSwaggerUI to be true")
+	if !s.Features.EnableSwaggerUI || !s.Features.EnableContentionProfiling || !s.Features.EnableProfiling {
+		t.Errorf("Expected s.EnableSwaggerUI,ContentionProfiling to be true,EnableProfiling to be false")
 	}
 }
