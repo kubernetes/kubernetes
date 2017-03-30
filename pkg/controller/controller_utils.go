@@ -44,6 +44,8 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
 	"github.com/golang/glog"
 )
@@ -542,6 +544,39 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	return pod, nil
 }
 
+func (r RealPodControl) validateNodeConflict(pod *v1.Pod) error {
+	if len(pod.Spec.NodeName) == 0 {
+		return nil
+	}
+
+	node, err := r.KubeClient.Core().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	nodeInfo := schedulercache.NewNodeInfo()
+	err = nodeInfo.SetNode(node)
+	if err != nil {
+		return err
+	}
+
+	fit, reasons, err := predicates.PodSelectorMatches(pod, nil, nodeInfo)
+	if err != nil {
+		return err
+	}
+
+	if !fit {
+		switch reasons[0].(type) {
+		case *predicates.PredicateFailureError:
+			err = fmt.Errorf("%s", predicates.ErrNodeSelectorNotMatch)
+			return err
+		default:
+		}
+	}
+
+	return nil
+}
+
 func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	pod, err := GetPodFromTemplate(template, object, controllerRef)
 	if err != nil {
@@ -553,6 +588,13 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	if labels.Set(pod.Labels).AsSelectorPreValidated().Empty() {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
+
+	err = r.validateNodeConflict(pod)
+	if err != nil {
+		r.Recorder.Eventf(object, api.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
+		return fmt.Errorf("unable to create pods: %v", err)
+	}
+
 	if newPod, err := r.KubeClient.Core().Pods(namespace).Create(pod); err != nil {
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
 		return fmt.Errorf("unable to create pods: %v", err)
