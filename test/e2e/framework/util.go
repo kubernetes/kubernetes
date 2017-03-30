@@ -19,6 +19,7 @@ package framework
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -2599,6 +2600,55 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 		return false, nil
 	}
 	return true, nil
+}
+
+//AddOrUpdateAvoidPodOnNode adds avoidPods annotations to node, will override if it exists
+func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods v1.AvoidPods) {
+	err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
+		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		ExpectNoError(err)
+
+		taintsData, err := json.Marshal(avoidPods)
+		ExpectNoError(err)
+
+		if node.Annotations == nil {
+			node.Annotations = make(map[string]string)
+		}
+		node.Annotations[v1.PreferAvoidPodsAnnotationKey] = string(taintsData)
+		_, err = c.CoreV1().Nodes().Update(node)
+		if err != nil {
+			if !apierrs.IsConflict(err) {
+				ExpectNoError(err)
+			} else {
+				Logf("Conflict when trying to add/update avoidPonds %v to %v", avoidPods, nodeName)
+			}
+		}
+		return true, nil
+	})
+	ExpectNoError(err)
+}
+
+//RemoveAnnotationOffNode removes AvoidPods annotations from the node. It does not fail if no such annotation exists.
+func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
+	err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
+		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		ExpectNoError(err)
+
+		if node.Annotations == nil {
+			return true, nil
+		}
+		delete(node.Annotations, v1.PreferAvoidPodsAnnotationKey)
+		_, err = c.CoreV1().Nodes().Update(node)
+		if err != nil {
+			if !apierrs.IsConflict(err) {
+				ExpectNoError(err)
+			} else {
+				Logf("Conflict when trying to remove avoidPods to %v", nodeName)
+			}
+		}
+		return true, nil
+	})
+	ExpectNoError(err)
 }
 
 func getScalerForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Scaler, error) {
