@@ -235,9 +235,9 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			glog.V(4).Infof("Attempting to create Ingress: %v", ingress)
 			_, err := client.Extensions().Ingresses(ingress.Namespace).Create(ingress)
 			if err != nil {
-				glog.Errorf("Error creating ingress %q: %v", types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, err)
+				glog.Errorf("Error creating Ingress %q: %v", types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, err)
 			} else {
-				glog.V(4).Infof("Successfully created ingress %q", types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace})
+				glog.V(4).Infof("Successfully created Ingress %q", types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace})
 			}
 			return err
 		},
@@ -256,6 +256,16 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			ingress := obj.(*extensionsv1beta1.Ingress)
 			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
 			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &metav1.DeleteOptions{})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("Ingress %s/%s no longer exists", ingress.Namespace, ingress.Name)
+				return nil
+			}
+			if err != nil {
+				glog.Errorf("Failed to delete Ingress %s/%s: %v", ingress.Namespace, ingress.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully deleted Ingress %s/%s", ingress.Namespace, ingress.Name)
+			}
 			return err
 		})
 
@@ -266,6 +276,11 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to create ConfigMap: %q", configMapName)
 			_, err := client.Core().ConfigMaps(configMap.Namespace).Create(configMap)
+			if err != nil {
+				glog.Errorf("Failed to create ConfigMap %q: %v", configMapName, err)
+			} else {
+				glog.V(4).Infof("Successfully created ConfigMap %q", configMapName)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
@@ -285,6 +300,16 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to delete ConfigMap: %q", configMapName)
 			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("ConfigMap %q no longer exists", configMapName)
+				return nil
+			}
+			if err != nil {
+				glog.Errorf("Failed to delete ConfigMap %q: %v", configMapName, err)
+			} else {
+				glog.V(4).Infof("Successfully deleted ConfigMap %q", configMapName)
+			}
 			return err
 		})
 

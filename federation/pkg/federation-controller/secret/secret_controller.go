@@ -158,17 +158,40 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 	secretcontroller.federatedUpdater = util.NewFederatedUpdater(secretcontroller.secretFederatedInformer,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			secret := obj.(*apiv1.Secret)
+			glog.V(4).Infof("Attempting to create secret: %s/%s", secret.Namespace, secret.Name)
 			_, err := client.Core().Secrets(secret.Namespace).Create(secret)
+			if err != nil {
+				glog.Errorf("Failed to create secret %s/%s: %v", secret.Namespace, secret.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully created secret %s/%s", secret.Namespace, secret.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			secret := obj.(*apiv1.Secret)
+			glog.V(4).Infof("Attempting to update secret: %s/%s", secret.Namespace, secret.Name)
 			_, err := client.Core().Secrets(secret.Namespace).Update(secret)
+			if err != nil {
+				glog.Errorf("Failed to update secret %s/%s: %v", secret.Namespace, secret.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully updated secret %s/%s", secret.Namespace, secret.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			secret := obj.(*apiv1.Secret)
+			glog.V(4).Infof("Attempting to delete secret: %s/%s", secret.Namespace, secret.Name)
 			err := client.Core().Secrets(secret.Namespace).Delete(secret.Name, &metav1.DeleteOptions{})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("Secret %s/%s no longer exists", secret.Namespace, secret.Name)
+				return nil
+			}
+			if err != nil {
+				glog.Errorf("Failed to delete secret %s/%s: %v", secret.Namespace, secret.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully deleted secret %s/%s", secret.Namespace, secret.Name)
+			}
 			return err
 		})
 

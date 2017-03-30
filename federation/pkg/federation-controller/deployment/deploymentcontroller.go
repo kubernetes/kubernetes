@@ -190,18 +190,41 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 
 	fdc.fedUpdater = fedutil.NewFederatedUpdater(fdc.fedDeploymentInformer,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
-			rs := obj.(*extensionsv1.Deployment)
-			_, err := client.Extensions().Deployments(rs.Namespace).Create(rs)
+			deployment := obj.(*extensionsv1.Deployment)
+			glog.V(4).Infof("Attempting to create deployment: %s/%s", deployment.Namespace, deployment.Name)
+			_, err := client.Extensions().Deployments(deployment.Namespace).Create(deployment)
+			if err != nil {
+				glog.Errorf("Failed to create deployment %s/%s: %v", deployment.Namespace, deployment.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully created deployment %s/%s", deployment.Namespace, deployment.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
-			rs := obj.(*extensionsv1.Deployment)
-			_, err := client.Extensions().Deployments(rs.Namespace).Update(rs)
+			deployment := obj.(*extensionsv1.Deployment)
+			glog.V(4).Infof("Attempting to update deployment: %s/%s", deployment.Namespace, deployment.Name)
+			_, err := client.Extensions().Deployments(deployment.Namespace).Update(deployment)
+			if err != nil {
+				glog.Errorf("Failed to update deployment %s/%s: %v", deployment.Namespace, deployment.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully updated deployment %s/%s", deployment.Namespace, deployment.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
-			rs := obj.(*extensionsv1.Deployment)
-			err := client.Extensions().Deployments(rs.Namespace).Delete(rs.Name, &metav1.DeleteOptions{})
+			deployment := obj.(*extensionsv1.Deployment)
+			glog.V(4).Infof("Attempting to delete deployment: %s/%s", deployment.Namespace, deployment.Name)
+			err := client.Extensions().Deployments(deployment.Namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("Deployment %s/%s no longer exists", deployment.Namespace, deployment.Name)
+				return nil
+			}
+			if err != nil {
+				glog.Errorf("Failed to delete deployment %s/%s: %v", deployment.Namespace, deployment.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully deleted deployment %s/%s", deployment.Namespace, deployment.Name)
+			}
 			return err
 		})
 

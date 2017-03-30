@@ -281,17 +281,40 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	federatedUpdater := fedutil.NewFederatedUpdater(s.federatedInformer,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
+			glog.V(4).Infof("Attempting to create service: %s/%s", svc.Namespace, svc.Name)
 			_, err := client.Core().Services(svc.Namespace).Create(svc)
+			if err != nil {
+				glog.Errorf("Failed to create service %s/%s: %v", svc.Namespace, svc.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully created service %s/%s", svc.Namespace, svc.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
+			glog.V(4).Infof("Attempting to update service: %s/%s", svc.Namespace, svc.Name)
 			_, err := client.Core().Services(svc.Namespace).Update(svc)
+			if err != nil {
+				glog.Errorf("Failed to update service %s/%s: %v", svc.Namespace, svc.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully updated service %s/%s", svc.Namespace, svc.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
+			glog.V(4).Infof("Attempting to delete service: %s/%s", svc.Namespace, svc.Name)
 			err := client.Core().Services(svc.Namespace).Delete(svc.Name, &metav1.DeleteOptions{})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("Service %s/%s no longer exists", svc.Namespace, svc.Name)
+				return nil
+			}
+			if err != nil {
+				glog.Errorf("Failed to delete service %s/%s: %v", svc.Namespace, svc.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully deleted service %s/%s", svc.Namespace, svc.Name)
+			}
 			return err
 		})
 

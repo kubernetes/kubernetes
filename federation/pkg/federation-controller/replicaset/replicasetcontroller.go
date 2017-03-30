@@ -199,17 +199,40 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
+			glog.V(4).Infof("Attempting to create ReplicaSet: %s/%s", rs.Namespace, rs.Name)
 			_, err := client.Extensions().ReplicaSets(rs.Namespace).Create(rs)
+			if err != nil {
+				glog.Errorf("Failed to create ReplicaSet %s/%s: %v", rs.Namespace, rs.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully created ReplicaSet %s/%s", rs.Namespace, rs.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
+			glog.V(4).Infof("Attempting to update ReplicaSet: %s/%s", rs.Namespace, rs.Name)
 			_, err := client.Extensions().ReplicaSets(rs.Namespace).Update(rs)
+			if err != nil {
+				glog.Errorf("Failed to update ReplicaSet %s/%s: %v", rs.Namespace, rs.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully updated ReplicaSet %s/%s", rs.Namespace, rs.Name)
+			}
 			return err
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
+			glog.V(4).Infof("Attempting to delete ReplicaSet: %s/%s", rs.Namespace, rs.Name)
 			err := client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, &metav1.DeleteOptions{})
+			// IsNotFound error is fine since that means the object is deleted already.
+			if errors.IsNotFound(err) {
+				glog.V(4).Infof("ReplicaSet %s/%s no longer exists", rs.Namespace, rs.Name)
+				return nil
+			}
+			if err != nil {
+				glog.Errorf("Failed to delete ReplicaSet %s/%s: %v", rs.Namespace, rs.Name, err)
+			} else {
+				glog.V(4).Infof("Successfully deleted ReplicaSet %s/%s", rs.Namespace, rs.Name)
+			}
 			return err
 		})
 
