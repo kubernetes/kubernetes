@@ -27,6 +27,7 @@ reviewers:
 approvers:
   - deads2k
   - enisoc
+  - eparis
   - erictune
   - fabianofranz # for test/e2e/kubectl.go
   - fejta
