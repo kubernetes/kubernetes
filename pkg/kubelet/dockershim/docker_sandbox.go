@@ -322,8 +322,13 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 		return nil, err
 	}
 	network := &runtimeapi.PodSandboxNetworkStatus{Ip: IP}
-	netNS := getNetworkNamespace(r)
 	hostNetwork := sharesHostNetwork(r)
+
+	// Only non-host-network pods have a network namespace
+	netNS, err := getNetworkNamespace(r)
+	if !hostNetwork && err != nil {
+		return nil, err
+	}
 
 	// If the sandbox has no containerTypeLabelKey label, treat it as a legacy sandbox.
 	if _, ok := r.Config.Labels[containerTypeLabelKey]; !ok {

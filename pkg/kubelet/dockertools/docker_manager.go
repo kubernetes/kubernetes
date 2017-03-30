@@ -2660,6 +2660,10 @@ func (dm *DockerManager) GetNetNS(containerID kubecontainer.ContainerID) (string
 		glog.Errorf("Error inspecting container: '%v'", err)
 		return "", err
 	}
+	if inspectResult.State.Pid == 0 {
+		// Docker reports pid 0 for an exited container.
+		return "", fmt.Errorf("Cannot find network namespace for the terminated container %q", containerID.ID)
+	}
 	netnsPath := fmt.Sprintf(DockerNetnsFmt, inspectResult.State.Pid)
 	return netnsPath, nil
 }

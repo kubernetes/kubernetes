@@ -144,6 +144,8 @@ type Host interface {
 // CNI plugin wrappers like kubenet.
 type NamespaceGetter interface {
 	// GetNetNS returns network namespace information for the given containerID.
+	// Runtimes should *never* return an empty namespace and nil error for
+	// a container; if error is nil then the namespace string must be valid.
 	GetNetNS(containerID string) (string, error)
 }
 
