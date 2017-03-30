@@ -55,19 +55,10 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 		if len(nodeList.Items) < 1 {
 			return false, nil
 		}
-		n := &nodeList.Items[0]
-		if !v1.IsNodeReady(n) {
-			fmt.Println("[apiclient] First node has registered, but is not ready yet")
-			return false, nil
-		}
 
-		fmt.Printf("[apiclient] First node is ready after %f seconds\n", time.Since(start).Seconds())
+		fmt.Printf("[apiclient] First node has registered after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
-
-	if err := createAndWaitForADummyDeployment(client); err != nil {
-		return nil, err
-	}
 
 	return client, nil
 }
