@@ -1189,3 +1189,68 @@ func TestDeploymentTimedOut(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxUnavailable(t *testing.T) {
+	tests := []struct {
+		name       string
+		deployment extensions.Deployment
+		expected   int32
+	}{
+		{
+			name: "maxUnavalibale less than replicas",
+			deployment: extensions.Deployment{
+				Spec: extensions.DeploymentSpec{
+					Replicas: func(i int32) *int32 { return &i }(10),
+					Strategy: extensions.DeploymentStrategy{
+						RollingUpdate: &extensions.RollingUpdateDeployment{
+							MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
+							MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(3)),
+						},
+						Type: extensions.RollingUpdateDeploymentStrategyType,
+					},
+				},
+			},
+			expected: int32(3),
+		},
+		{
+			name: "maxUnavalibale equal replicas",
+			deployment: extensions.Deployment{
+				Spec: extensions.DeploymentSpec{
+					Replicas: func(i int32) *int32 { return &i }(10),
+					Strategy: extensions.DeploymentStrategy{
+						RollingUpdate: &extensions.RollingUpdateDeployment{
+							MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
+							MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(10)),
+						},
+						Type: extensions.RollingUpdateDeploymentStrategyType,
+					},
+				},
+			},
+			expected: int32(10),
+		},
+		{
+			name: "maxUnavalibale greater than replicas",
+			deployment: extensions.Deployment{
+				Spec: extensions.DeploymentSpec{
+					Replicas: func(i int32) *int32 { return &i }(5),
+					Strategy: extensions.DeploymentStrategy{
+						RollingUpdate: &extensions.RollingUpdateDeployment{
+							MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
+							MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(10)),
+						},
+						Type: extensions.RollingUpdateDeploymentStrategyType,
+					},
+				},
+			},
+			expected: int32(5),
+		},
+	}
+
+	for _, test := range tests {
+		t.Log(test.name)
+		maxUnavailable := MaxUnavailable(test.deployment)
+		if test.expected != maxUnavailable {
+			t.Fatalf("expected:%v, got:%v", test.expected, maxUnavailable)
+		}
+	}
+}
