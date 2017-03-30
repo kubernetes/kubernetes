@@ -19,7 +19,7 @@ const (
 	// kubelet eventDispatcher address
 	eventDispatcherAddress = "localhost:5433"
 	// iso-client own address
-	eventHandlerLocalAddress = "localhost:5444"
+	isolatorLocalAddress = "localhost:5444"
 	// name of isolator
 	name = "iso"
 )
@@ -36,18 +36,18 @@ func main() {
 	glog.Infof("Detected topology: %v", cpuTopo)
 
 	var wg sync.WaitGroup
-	// Starting eventHandlerServer
-	server := aff.NewEventHandler(name, eventHandlerLocalAddress)
-	err := server.RegisterEventHandler()
+	// Starting isolatorServer
+	server := aff.NewIsolator(name, isolatorLocalAddress)
+	err := server.RegisterIsolator()
 	if err != nil {
-		glog.Fatalf("Cannot register EventHandler: %v", err)
+		glog.Fatalf("Cannot register isolator: %v", err)
 		os.Exit(1)
 	}
 	wg.Add(1)
 	go server.Serve(wg)
 
-	// Sening address of local eventHandlerServer
-	client, err := aff.NewEventDispatcherClient(name, eventDispatcherAddress, eventHandlerLocalAddress)
+	// Sending address of local isolatorServer
+	client, err := aff.NewEventDispatcherClient(name, eventDispatcherAddress, isolatorLocalAddress)
 	if err != nil {
 		glog.Fatalf("Cannot create eventDispatcherClient: %v", err)
 		os.Exit(1)
@@ -55,10 +55,10 @@ func main() {
 
 	reply, err := client.Register()
 	if err != nil {
-		glog.Fatalf("Failed to register handler: %v . Reply: %v", err, reply)
+		glog.Fatalf("Failed to register isolator: %v . Reply: %v", err, reply)
 		os.Exit(1)
 	}
-	glog.Infof("Registering eventDispatcherClient. Reply: %v", reply)
+	glog.Infof("Registering isolator. Reply: %v", reply)
 
 	// Handling SigTerm
 	c := make(chan os.Signal, 2)

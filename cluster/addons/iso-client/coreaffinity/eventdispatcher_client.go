@@ -32,7 +32,6 @@ func NewEventDispatcherClient(name string, serverAddress string, clientAddress s
 			Address: clientAddress,
 		},
 		nil
-
 }
 
 // Create RegisterRequest and register eventDispatcherClient
@@ -44,7 +43,7 @@ func (edc *eventDispatcherClient) Register() (reply *lifecycle.RegisterReply, er
 		Token:         registerToken,
 	}
 
-	glog.Infof("Attempting to register evenDispatcherClient. Request: %v", registerRequest)
+	glog.Infof("Attempting to register eventDispatcherClient. Request: %v", registerRequest)
 	reply, err = edc.EventDispatcherClient.Register(edc.Ctx, registerRequest)
 	if err != nil {
 		return reply, err
@@ -68,5 +67,4 @@ func HandleSIGTERM(c chan os.Signal, client *eventDispatcherClient) {
 	glog.Infof("Unregistering iso: %v\n", rep)
 
 	os.Exit(0)
-
 }

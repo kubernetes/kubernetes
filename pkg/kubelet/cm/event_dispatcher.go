@@ -32,8 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
 
-// EventDispatcher manages a set of registered lifecycle event handlers and
-// dispatches lifecycle events to them.
+// EventDispatcher manages a set of registered isolators and dispatches
+// lifecycle events to them.
 type EventDispatcher interface {
 	// PreStartPod is invoked after the pod sandbox is created but before any
 	// of a pod's containers are started.
@@ -43,7 +43,7 @@ type EventDispatcher interface {
 	// stopped running, but before the pod sandbox is destroyed.
 	PostStopPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error)
 
-	// Start starts the dispatcher. After the dispatcher is started , handlers
+	// Start starts the dispatcher. After the dispatcher is started, isolators
 	// can register themselves to receive lifecycle events.
 	Start(socketAddress string)
 
@@ -51,11 +51,11 @@ type EventDispatcher interface {
 	ResourceConfigFromReplies(reply *lifecycle.EventReply, resources *ResourceConfig) *ResourceConfig
 }
 
-// Represents a registered event handler
-type registeredHandler struct {
-	// name by which the handler registered itself, unique
+// Represents a registered isolator
+type registeredIsolator struct {
+	// name by which the isolator registered itself, unique
 	name string
-	// location of the event handler service.
+	// location of the isolator service.
 	socketAddress string
 	// token to identify this registration
 	token string
@@ -63,8 +63,8 @@ type registeredHandler struct {
 
 type eventDispatcher struct {
 	sync.Mutex
-	started  bool
-	handlers map[string]*registeredHandler
+	started   bool
+	isolators map[string]*registeredIsolator
 }
 
 var dispatcher *eventDispatcher
@@ -73,7 +73,7 @@ var once sync.Once
 func newEventDispatcher() *eventDispatcher {
 	once.Do(func() {
 		dispatcher = &eventDispatcher{
-			handlers: map[string]*registeredHandler{},
+			isolators: map[string]*registeredIsolator{},
 		}
 		dispatcher.Start(":5433") // "life" on a North American keypad
 	})
@@ -99,21 +99,21 @@ func (ed *eventDispatcher) dispatchEvent(pod *v1.Pod, cgroupPath string, kind li
 	var errlist []error
 	// TODO(CD): Re-evaluate nondeterministic delegation order arising
 	//           from Go map iteration.
-	for name, handler := range ed.handlers {
+	for name, isolator := range ed.isolators {
 		// TODO(CD): Improve this by building a cancelable context
 		ctx := context.Background()
 
 		// Create a gRPC client connection
-		// TODO(CD): Use SSL to connect to event handlers
-		cxn, err := grpc.Dial(handler.socketAddress, grpc.WithInsecure())
+		// TODO(CD): Use SSL to connect to isolators
+		cxn, err := grpc.Dial(isolator.socketAddress, grpc.WithInsecure())
 		if err != nil {
-			glog.Fatalf("failed to connect to event handler [%s] at [%s]: %v", handler.name, handler.socketAddress, err)
+			glog.Fatalf("failed to connect to isolator [%s] at [%s]: %v", isolator.name, isolator.socketAddress, err)
 			errlist = append(errlist, err)
 		}
 		defer cxn.Close()
-		client := lifecycle.NewEventHandlerClient(cxn)
+		client := lifecycle.NewIsolatorClient(cxn)
 
-		glog.Infof("Dispatching to event handler: %s", name)
+		glog.Infof("Dispatching to isolator: %s", name)
 		reply, err := client.Notify(ctx, ev)
 		if err != nil {
 			errlist = append(errlist, err)
@@ -166,45 +166,45 @@ func (ed *eventDispatcher) Start(socketAddress string) {
 }
 
 func (ed *eventDispatcher) Register(ctx context.Context, request *lifecycle.RegisterRequest) (*lifecycle.RegisterReply, error) {
-	// Create a registeredHandler instance
-	h := &registeredHandler{
+	// Create a registeredIsolator instance
+	isolator := &registeredIsolator{
 		name:          request.Name,
 		socketAddress: request.SocketAddress,
 		token:         uuid.NewUUID().String(),
 	}
 
-	glog.Infof("attempting to register event handler [%s]", h.name)
+	glog.Infof("attempting to register isolator [%s]", isolator.name)
 
 	// Check registered name for uniqueness
-	reg := ed.handler(h.name)
+	reg := ed.isolator(isolator.name)
 	if reg != nil {
 		if reg.token != request.Token {
-			msg := fmt.Sprintf("registration failed: an event handler named [%s] is already registered and the supplied registration token does not match.", reg.name)
+			msg := fmt.Sprintf("registration failed: an isolator named [%s] is already registered and the supplied registration token does not match.", reg.name)
 			glog.Warning(msg)
 			return &lifecycle.RegisterReply{Error: msg}, nil
 		}
-		glog.Infof("re-registering event handler [%s]", h.name)
+		glog.Infof("re-registering isolator [%s]", isolator.name)
 	}
 
-	// Save registeredHandler
-	ed.handlers[h.name] = h
+	// Save registeredIsolator
+	ed.isolators[isolator.name] = isolator
 
-	return &lifecycle.RegisterReply{Token: h.token}, nil
+	return &lifecycle.RegisterReply{Token: isolator.token}, nil
 }
 
 func (ed *eventDispatcher) Unregister(ctx context.Context, request *lifecycle.UnregisterRequest) (*lifecycle.UnregisterReply, error) {
-	reg := ed.handler(request.Name)
+	reg := ed.isolator(request.Name)
 	if reg == nil {
-		msg := fmt.Sprintf("unregistration failed: no handler named [%s] is currently registered.", request.Name)
+		msg := fmt.Sprintf("unregistration failed: no isolator named [%s] is currently registered.", request.Name)
 		glog.Warning(msg)
 		return &lifecycle.UnregisterReply{Error: msg}, nil
 	}
 	if reg.token != request.Token {
-		msg := fmt.Sprintf("unregistration failed: token mismatch for handler [%s].", request.Name)
+		msg := fmt.Sprintf("unregistration failed: token mismatch for isolator [%s].", request.Name)
 		glog.Warning(msg)
 		return &lifecycle.UnregisterReply{Error: msg}, nil
 	}
-	delete(ed.handlers, request.Name)
+	delete(ed.isolators, request.Name)
 	return &lifecycle.UnregisterReply{}, nil
 }
 
@@ -218,10 +218,10 @@ func (ed *eventDispatcher) ResourceConfigFromReplies(reply *lifecycle.EventReply
 	return updatedResources
 }
 
-func (ed *eventDispatcher) handler(name string) *registeredHandler {
-	for _, h := range ed.handlers {
-		if h.name == name {
-			return h
+func (ed *eventDispatcher) isolator(name string) *registeredIsolator {
+	for _, isolator := range ed.isolators {
+		if isolator.name == name {
+			return isolator
 		}
 	}
 	return nil

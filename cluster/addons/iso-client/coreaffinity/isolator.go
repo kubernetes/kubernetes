@@ -11,7 +11,7 @@ import (
 
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
 
@@ -20,49 +20,49 @@ const (
 	cgroupSufix  = "/cpuset.cpus"
 )
 
-type EventHandler interface {
-	RegisterEventHandler() error
+type Isolator interface {
+	RegisterIsolator() error
 	Serve(sync.WaitGroup)
 }
 
-type eventHandler struct {
+type isolator struct {
 	Name       string
 	Address    string
 	GrpcServer *grpc.Server
 	Socket     net.Listener
 }
 
-// Constructor for EventHandler
-func NewEventHandler(eventHandlerName string, eventHandlerAddress string) (e *eventHandler) {
-	return &eventHandler{
-		Name:    eventHandlerName,
-		Address: eventHandlerAddress,
+// Constructor for Isolator
+func NewIsolator(isolatorName string, isolatorAddress string) (e *isolator) {
+	return &isolator{
+		Name:    isolatorName,
+		Address: isolatorAddress,
 	}
 }
 
-// Registering eventHandler server
-func (e *eventHandler) RegisterEventHandler() (err error) {
-	e.Socket, err = net.Listen("tcp", e.Address)
+// Registering isolator server
+func (i *isolator) RegisterIsolator() (err error) {
+	i.Socket, err = net.Listen("tcp", e.Address)
 	if err != nil {
 		return fmt.Errorf("Failed to bind to socket address: %v", err)
 	}
-	e.GrpcServer = grpc.NewServer()
+	i.GrpcServer = grpc.NewServer()
 
-	lifecycle.RegisterEventHandlerServer(e.GrpcServer, e)
-	glog.Info("EvenHandler Server has been registered")
+	lifecycle.RegisterIsolatorServer(i.GrpcServer, i)
+	glog.Info("Isolator Server has been registered")
 
 	return nil
 
 }
 
 // Start serving Grpc
-func (e *eventHandler) Serve(wg sync.WaitGroup) {
+func (i *isolator) Serve(wg sync.WaitGroup) {
 	defer wg.Done()
 	glog.Info("Starting serving")
-	if err := e.GrpcServer.Serve(e.Socket); err != nil {
-		glog.Fatalf("EventHandler server stopped serving : %v", err)
+	if err := i.GrpcServer.Serve(i.Socket); err != nil {
+		glog.Fatalf("Isolator server stopped serving : %v", err)
 	}
-	glog.Info("Stopping eventHandlerServer")
+	glog.Info("Stopping isolatorServer")
 }
 
 // isolation api
@@ -71,8 +71,8 @@ type isoSpec struct {
 }
 
 // extract Pod object from Event
-func getPod(bytePod []byte) (pod *api.Pod, err error) {
-	pod = &api.Pod{}
+func getPod(bytePod []byte) (pod *v1.Pod, err error) {
+	pod = &v1.Pod{}
 	err = json.Unmarshal(bytePod, pod)
 	if err != nil {
 		glog.Fatalf("Cannot Unmarshal pod: %v", err)
@@ -82,7 +82,7 @@ func getPod(bytePod []byte) (pod *api.Pod, err error) {
 }
 
 // check wheter pod should be isolated
-func isIsoPod(pod *api.Pod) bool {
+func isIsoPod(pod *v1.Pod) bool {
 	if pod.Annotations["pod.alpha.kubernetes.io/isolation-api"] != "" {
 		return true
 	}
@@ -109,7 +109,7 @@ func validateIsoSpec(spec *isoSpec) (err error) {
 }
 
 // TODO: implement PostStop
-func (e *eventHandler) Notify(context context.Context, event *lifecycle.Event) (reply *lifecycle.EventReply, err error) {
+func (i *isolator) Notify(context context.Context, event *lifecycle.Event) (reply *lifecycle.EventReply, err error) {
 	switch event.Kind {
 	case lifecycle.Event_POD_PRE_START:
 		glog.Infof("Received PreStart event: %v\n", event.CgroupInfo)
