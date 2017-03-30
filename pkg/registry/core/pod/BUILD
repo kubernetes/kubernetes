@@ -52,6 +52,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/storage",
     ],
 )
 
