@@ -451,13 +451,15 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		volumeToMount.Pod,
 		volume.VolumeOptions{})
 	if newMounterErr != nil {
-		return nil, fmt.Errorf(
+		errMsg := fmt.Errorf(
 			"MountVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
 			volumeToMount.VolumeName,
 			volumeToMount.VolumeSpec.Name(),
 			volumeToMount.PodName,
 			volumeToMount.Pod.UID,
 			newMounterErr)
+		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, errMsg.Error())
+		return nil, errMsg
 	}
 
 	mountCheckError := checkMountOptionSupport(og, volumeToMount, volumePlugin)

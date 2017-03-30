@@ -114,7 +114,7 @@ parameters:
 * `restauthenabled` : Gluster REST service authentication boolean that enables authentication to the REST server. If this value is 'true', `restuser` and `restuserkey` or `secretNamespace` + `secretName` have to be filled. This option is deprecated, authentication is enabled when any of `restuser`, `restuserkey`, `secretName` or `secretNamespace` is specified.
 * `restuser` : Gluster REST service/Heketi user who has access to create volumes in the Gluster Trusted Pool.
 * `restuserkey` : Gluster REST service/Heketi user's password which will be used for authentication to the REST server. This parameter is deprecated in favor of `secretNamespace` + `secretName`.
-* `secretNamespace` + `secretName` : Identification of Secret instance that containes user password to use when talking to Gluster REST service. These parameters are optional, empty password will be used when both `secretNamespace` and `secretName` are omitted. The provided secret must have type "kubernetes.io/glusterfs".
+* `secretNamespace` + `secretName` : Identification of Secret instance that contains user password to use when talking to Gluster REST service. These parameters are optional, empty password will be used when both `secretNamespace` and `secretName` are omitted. The provided secret must have type "kubernetes.io/glusterfs".
 When both `restuserkey` and `secretNamespace` + `secretName` is specified, the secret will be used.
 * `clusterid`: `630372ccdc720a92c681fb928f27b53f` is the ID of the cluster which will be used by Heketi when provisioning the volume. It can also be a list of clusterids, for ex:
 "8452344e2becec931ece4e33c4674e4e,42982310de6c63381718ccfa6d8cf397". This is an optional parameter.
@@ -206,8 +206,8 @@ parameters:
 <!-- END MUNGE: EXAMPLE quobyte/quobyte-storage-class.yaml -->
 
 * **quobyteAPIServer** API Server of Quobyte in the format http(s)://api-server:7860
-* **registry** Quobyte registry to use to mount the volume. You can specifiy the registry as <host>:<port> pair or if you want to specify multiple registries you just have to put a comma between them e.q. <host1>:<port>,<host2>:<port>,<host3>:<port>. The host can be an IP address or if you have a working DNS you can also provide the DNS names.
-* **adminSecretName** secret that holds information about the Quobyte user and the password to authenticate agains the API server. The provided secret must have type "kubernetes.io/quobyte".
+* **registry** Quobyte registry to use to mount the volume. You can specify the registry as <host>:<port> pair or if you want to specify multiple registries you just have to put a comma between them e.q. <host1>:<port>,<host2>:<port>,<host3>:<port>. The host can be an IP address or if you have a working DNS you can also provide the DNS names.
+* **adminSecretName** secret that holds information about the Quobyte user and the password to authenticate against the API server. The provided secret must have type "kubernetes.io/quobyte".
 * **adminSecretNamespace** The namespace for **adminSecretName**. Default is `default`.
 * **user** maps all access to this user. Default is `root`.
 * **group** maps all access to this group. Default is `nfsnobody`.
@@ -268,7 +268,7 @@ Create a Pod to use the PVC:
 $ kubectl create -f examples/persistent-volume-provisioning/quobyte/example-pod.yaml
 ```
 
-#### Azure Disk
+#### <a name="azure-disk">Azure Disk</a>
 
 ```yaml
 kind: StorageClass
@@ -286,6 +286,22 @@ parameters:
 * `location`: Azure storage account location. Default is empty.
 * `storageAccount`: Azure storage account name. If storage account is not provided, all storage accounts associated with the resource group are searched to find one that matches `skuName` and `location`. If storage account is provided, it must reside in the same resource group as the cluster, and `skuName` and `location` are ignored.
 
+#### Azure File
+
+```yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: slow
+provisioner: kubernetes.io/azure-file
+parameters:
+  skuName: Standard_LRS
+  location: eastus
+  storageAccount: azure_storage_account_name
+```
+
+The parameters are the same as those used by [Azure Disk](#azure-disk)
+
 ### User provisioning requests
 
 Users request dynamically provisioned storage by including a storage class in their `PersistentVolumeClaim` using `spec.storageClassName` attribute.
@@ -297,7 +313,6 @@ It is required that this value matches the name of a `StorageClass` configured b
   "apiVersion": "v1",
   "metadata": {
     "name": "claim1"
-    }
   },
   "spec": {
     "accessModes": [

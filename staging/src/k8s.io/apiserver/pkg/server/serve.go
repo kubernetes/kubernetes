@@ -56,6 +56,13 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 		},
 	}
 
+	if s.SecureServingInfo.MinTLSVersion > 0 {
+		secureServer.TLSConfig.MinVersion = s.SecureServingInfo.MinTLSVersion
+	}
+	if len(s.SecureServingInfo.CipherSuites) > 0 {
+		secureServer.TLSConfig.CipherSuites = s.SecureServingInfo.CipherSuites
+	}
+
 	if s.SecureServingInfo.Cert != nil {
 		secureServer.TLSConfig.Certificates = []tls.Certificate{*s.SecureServingInfo.Cert}
 	}
@@ -78,28 +85,13 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 
 	glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
 	var err error
-	s.effectiveSecurePort, err = runServer(secureServer, s.SecureServingInfo.BindNetwork, stopCh)
+	s.effectiveSecurePort, err = RunServer(secureServer, s.SecureServingInfo.BindNetwork, stopCh)
 	return err
 }
 
-// serveInsecurely run the insecure http server. It fails only if the initial listen
-// call fails. The actual server loop (stoppable by closing stopCh) runs in a go
-// routine, i.e. serveInsecurely does not block.
-func (s *GenericAPIServer) serveInsecurely(stopCh <-chan struct{}) error {
-	insecureServer := &http.Server{
-		Addr:           s.InsecureServingInfo.BindAddress,
-		Handler:        s.InsecureHandler,
-		MaxHeaderBytes: 1 << 20,
-	}
-	glog.Infof("Serving insecurely on %s", s.InsecureServingInfo.BindAddress)
-	var err error
-	s.effectiveInsecurePort, err = runServer(insecureServer, s.InsecureServingInfo.BindNetwork, stopCh)
-	return err
-}
-
-// runServer listens on the given port, then spawns a go-routine continuously serving
+// RunServer listens on the given port, then spawns a go-routine continuously serving
 // until the stopCh is closed. The port is returned. This function does not block.
-func runServer(server *http.Server, network string, stopCh <-chan struct{}) (int, error) {
+func RunServer(server *http.Server, network string, stopCh <-chan struct{}) (int, error) {
 	if len(server.Addr) == 0 {
 		return 0, errors.New("address cannot be empty")
 	}

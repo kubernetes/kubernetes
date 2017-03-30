@@ -8633,6 +8633,7 @@
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",
+     "singularName",
      "namespaced",
      "kind",
      "verbs"
@@ -8643,7 +8644,7 @@
       "type": "string"
      },
      "name": {
-      "description": "name is the name of the resource.",
+      "description": "name is the plural name of the resource.",
       "type": "string"
      },
      "namespaced": {
@@ -8656,6 +8657,10 @@
       "items": {
        "type": "string"
       }
+     },
+     "singularName": {
+      "description": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
+      "type": "string"
      },
      "verbs": {
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
@@ -11422,6 +11427,10 @@
      "port"
     ],
     "properties": {
+     "host": {
+      "description": "Optional: Host name to connect to, defaults to the pod IP.",
+      "type": "string"
+     },
      "port": {
       "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"

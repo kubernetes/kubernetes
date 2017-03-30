@@ -402,7 +402,7 @@ func TestDescribeContainers(t *testing.T) {
 				ContainerStatuses: []api.ContainerStatus{testCase.status},
 			},
 		}
-		writer := &PrefixWriter{out}
+		writer := NewPrefixWriter(out)
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(&pod), writer, "")
 		output := out.String()
 		for _, expected := range testCase.expectedElements {
@@ -1297,7 +1297,7 @@ func TestPrintLabelsMultiline(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		out := new(bytes.Buffer)
-		writer := &PrefixWriter{out}
+		writer := NewPrefixWriter(out)
 		printAnnotationsMultiline(writer, "Annotations", testCase.annotations)
 		output := out.String()
 		if output != testCase.expectPrint {

@@ -637,7 +637,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 			return err
 		}
 		// So far the cleanup policy was executed once a deployment was paused, scaled up/down, or it
-		// succesfully completed deploying a replica set. Decouple it from the strategies and have it
+		// successfully completed deploying a replica set. Decouple it from the strategies and have it
 		// run almost unconditionally - cleanupDeployment is safe by default.
 		dc.cleanupDeployment(oldRSs, d)
 	}

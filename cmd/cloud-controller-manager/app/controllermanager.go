@@ -208,13 +208,11 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	}
 
 	// Start the CloudNodeController
-	nodeController, err := nodecontroller.NewCloudNodeController(
+	nodeController := nodecontroller.NewCloudNodeController(
 		sharedInformers.Core().V1().Nodes(),
 		client("cloud-node-controller"), cloud,
 		s.NodeMonitorPeriod.Duration)
-	if err != nil {
-		glog.Fatalf("Failed to initialize nodecontroller: %v", err)
-	}
+
 	nodeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 

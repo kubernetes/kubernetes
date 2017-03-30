@@ -109,7 +109,7 @@ type ReplicaSetController struct {
 	defaultPlanner *planner.Planner
 }
 
-// NewclusterController returns a new cluster controller
+// NewReplicaSetController returns a new replicaset controller
 func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSetController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))

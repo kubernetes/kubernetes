@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "azure.go",
         "azure_blob.go",
+        "azure_file.go",
         "azure_instances.go",
         "azure_loadbalancer.go",
         "azure_routes.go",
@@ -28,6 +29,7 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/Azure/azure-sdk-for-go/arm/compute",
         "//vendor:github.com/Azure/azure-sdk-for-go/arm/network",

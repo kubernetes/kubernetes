@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This is the default algorithm provider for the scheduler.
 package defaults
 
 import (
@@ -35,13 +34,19 @@ import (
 )
 
 const (
+	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
 	// GCE instances can have up to 16 PD volumes attached.
 	DefaultMaxGCEPDVolumes = 16
-	// Larger Azure VMs can actually have much more disks attached. TODO We should determine the max based on VM size
+	// DefaultMaxAzureDiskVolumes defines the maximum number of PD Volumes for Azure
+	// Larger Azure VMs can actually have much more disks attached.
+	// TODO We should determine the max based on VM size
 	DefaultMaxAzureDiskVolumes = 16
-	ClusterAutoscalerProvider  = "ClusterAutoscalerProvider"
-	StatefulSetKind            = "StatefulSet"
-	KubeMaxPDVols              = "KUBE_MAX_PD_VOLS"
+	// ClusterAutoscalerProvider defines the default autoscaler provider
+	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
+	// StatefulSetKind defines the name of 'StatefulSet' kind
+	StatefulSetKind = "StatefulSet"
+	// KubeMaxPDVols defines the maximum number of PD Volumes per kubelet
+	KubeMaxPDVols = "KUBE_MAX_PD_VOLS"
 )
 
 func init() {
@@ -242,22 +247,21 @@ func copyAndReplace(set sets.String, replaceWhat, replaceWith string) sets.Strin
 
 // GetEquivalencePod returns a EquivalencePod which contains a group of pod attributes which can be reused.
 func GetEquivalencePod(pod *v1.Pod) interface{} {
-	equivalencePod := EquivalencePod{}
 	// For now we only consider pods:
 	// 1. OwnerReferences is Controller
-	// 2. OwnerReferences kind is in valid controller kinds
-	// 3. with same OwnerReferences
+	// 2. with same OwnerReferences
 	// to be equivalent
 	if len(pod.OwnerReferences) != 0 {
 		for _, ref := range pod.OwnerReferences {
 			if *ref.Controller {
-				equivalencePod.ControllerRef = ref
 				// a pod can only belongs to one controller
-				break
+				return &EquivalencePod{
+					ControllerRef: ref,
+				}
 			}
 		}
 	}
-	return &equivalencePod
+	return nil
 }
 
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.

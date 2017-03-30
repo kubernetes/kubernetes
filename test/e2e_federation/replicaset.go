@@ -35,6 +35,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedreplicsetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 )
@@ -170,7 +171,7 @@ var _ = framework.KubeDescribe("Federated ReplicaSet [Feature:Federation]", func
 			})
 
 			// test for rebalancing
-			It("should create replicasets and rebalance them", func() {
+			PIt("should create replicasets and rebalance them", func() {
 				nsName := f.FederationNamespace.Name
 				pref1, pref2, replicas, expect1, expect2 := generateFedRSPrefsForRebalancing(clusters)
 
@@ -477,6 +478,12 @@ func updateReplicaSetOrFail(clientset *fedclientset.Clientset, replicaset *v1bet
 }
 
 func newReplicaSetObj(namespace string, replicas int32, pref *federation.FederatedReplicaSetPreferences) *v1beta1.ReplicaSet {
+	// When the tests are run in parallel, replicasets from different tests can
+	// collide with each other. Prevent that by creating a unique label and
+	// label selector for each created replica set.
+	uuidString := string(uuid.NewUUID())
+	rsLabel := fmt.Sprintf("myrs-%s", uuidString)
+
 	rs := &v1beta1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   namespace,
@@ -485,11 +492,11 @@ func newReplicaSetObj(namespace string, replicas int32, pref *federation.Federat
 		Spec: v1beta1.ReplicaSetSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"name": "myrs"},
+				MatchLabels: map[string]string{"name": rsLabel},
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"name": "myrs"},
+					Labels: map[string]string{"name": rsLabel},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{

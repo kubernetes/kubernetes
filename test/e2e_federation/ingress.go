@@ -45,7 +45,7 @@ import (
 
 const (
 	MaxRetriesOnFederatedApiserver = 3
-	FederatedIngressTimeout        = 10 * time.Minute
+	FederatedIngressTimeout        = 15 * time.Minute
 	FederatedIngressDeleteTimeout  = 2 * time.Minute
 	FederatedIngressName           = "federated-ingress"
 	FederatedIngressServiceName    = "federated-ingress-service"
@@ -260,7 +260,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				// TODO check dns record in global dns server
 			})
 
-			It("should be able to connect to a federated ingress via its load balancer", func() {
+			PIt("should be able to connect to a federated ingress via its load balancer", func() {
 				By(fmt.Sprintf("Waiting for Federated Ingress on %v", jig.ing.Name))
 				// check the traffic on federation ingress
 				jig.waitForFederatedIngress()

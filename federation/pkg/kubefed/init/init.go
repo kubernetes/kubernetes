@@ -16,18 +16,8 @@ limitations under the License.
 
 // TODO(madhusdancs):
 // 1. Make printSuccess prepend protocol/scheme to the IPs/hostnames.
-// 1. Add a dry-run support.
-// 2. Make all the API object names customizable.
-//    Ex: federation-apiserver, federation-controller-manager, etc.
-// 3. Make image name and tag customizable.
-// 4. Separate etcd container from API server pod as a first step towards enabling HA.
-// 5. Generate credentials of the following types for the API server:
-//    i.  "known_tokens.csv"
-//    ii. "basic_auth.csv"
-// 6. Add the ability to customize DNS domain suffix. It should probably be derived
-//    from cluster config.
-// 7. Make etcd PVC size configurable.
-// 8. Make API server and controller manager replicas customizable via the HA work.
+// 2. Separate etcd container from API server pod as a first step towards enabling HA.
+// 3. Make API server and controller manager replicas customizable via the HA work.
 package init
 
 import (

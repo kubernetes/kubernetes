@@ -179,7 +179,7 @@ func assertFilesExist(fileNames []string, fileDir string, pod *v1.Pod, client cl
 func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client clientset.Interface, check bool, expected string) {
 	var failed []string
 
-	framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+	framework.ExpectNoError(wait.Poll(time.Second*10, time.Second*600, func() (bool, error) {
 		failed = []string{}
 		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, client.Discovery())
 		if err != nil {
