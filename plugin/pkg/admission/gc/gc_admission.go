@@ -71,18 +71,18 @@ func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err e
 		return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
 	}
 
-	// further check if the user is setting ownerReference.blockOwnerDeletion,
-	// and if so, only allows the change if the user has delete permission of
+	// Further check if the user is setting ownerReference.blockOwnerDeletion.
+	// If so, only allows the change if the user has delete permission of
 	// the _OWNER_
 	changedRefs := changingBlockOwnerDeletion(attributes.GetObject(), attributes.GetOldObject())
 	for _, ref := range changedRefs {
 		attribute, err := a.toDeleteAttribute(ref, attributes)
 		if err != nil {
-			// An error occurs if ref.APIVersion and ref.Kind cannot be parsed.
-			// If it's caused by a non-kubernetes core API, currently garbage
-			// collector doesn't handle such object, so it's ok to admit changes
-			// to such owner ref. Other errors should be prevented by the
-			// validation code.
+			// An error occurs if a RESTMapping cannot be found for
+			// ref.APIVersion and ref.Kind.  If it's caused by a non-kubernetes
+			// core API, currently garbage collector doesn't handle such object,
+			// so it's ok to admit changes to such owner refs. Other errors
+			// should be prevented at the validation stage.
 			continue
 		}
 		allowed, reason, err := a.authorizer.Authorize(attribute)
@@ -126,7 +126,7 @@ func isChangingOwnerReference(newObj, oldObj runtime.Object) bool {
 	return false
 }
 
-// translate ref to a DeleteAttribute deleting the object ref refers to.
+// translates ref to a DeleteAttribute deleting the object referred by the ref.
 func (a *gcPermissionsEnforcement) toDeleteAttribute(ref metav1.OwnerReference, attributes admission.Attributes) (authorizer.AttributesRecord, error) {
 	groupVersion, err := schema.ParseGroupVersion(ref.APIVersion)
 	if err != nil {
@@ -169,7 +169,7 @@ func indexByUID(refs []metav1.OwnerReference) map[types.UID]metav1.OwnerReferenc
 	return ret
 }
 
-// Returns new blocking ownerReferences, or references whose blockOwnerDeletion field is changed.
+// Returns new blocking ownerReferences, and references whose blockOwnerDeletion field is changed.
 // Changes between nil and false are ignored.
 func changingBlockOwnerDeletion(newObj, oldObj runtime.Object) []metav1.OwnerReference {
 	newMeta, err := meta.Accessor(newObj)
