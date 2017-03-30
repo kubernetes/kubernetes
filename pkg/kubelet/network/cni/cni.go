@@ -251,9 +251,11 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	if err := plugin.checkInitialized(); err != nil {
 		return err
 	}
+
+	// Lack of namespace should not be fatal on teardown
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
-		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
+		glog.Warningf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
 	return plugin.deleteFromNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath)

@@ -315,7 +315,7 @@ func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return getNetworkNamespace(r), nil
+	return getNetworkNamespace(r)
 }
 
 // GetPodPortMappings returns the port mappings of the given podSandbox ID.
