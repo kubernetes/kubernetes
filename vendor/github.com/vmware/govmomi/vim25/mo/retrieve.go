@@ -17,12 +17,12 @@ limitations under the License.
 package mo
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 func ignoreMissingProperty(ref types.ManagedObjectReference, p types.MissingProperty) bool {

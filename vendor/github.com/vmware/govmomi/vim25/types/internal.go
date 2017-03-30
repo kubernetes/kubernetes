@@ -237,6 +237,10 @@ type RetrieveManagedMethodExecuter struct {
 	This ManagedObjectReference `xml:"_this"`
 }
 
+func init() {
+	t["RetrieveManagedMethodExecuter"] = reflect.TypeOf((*RetrieveManagedMethodExecuter)(nil)).Elem()
+}
+
 type RetrieveManagedMethodExecuterResponse struct {
 	Returnval *ReflectManagedMethodExecuter `xml:"urn:vim25 returnval"`
 }

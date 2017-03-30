@@ -984,6 +984,18 @@ func init() {
 	t["HttpNfcLease"] = reflect.TypeOf((*HttpNfcLease)(nil)).Elem()
 }
 
+type InternalDynamicTypeManager struct {
+	Self types.ManagedObjectReference
+}
+
+func (m InternalDynamicTypeManager) Reference() types.ManagedObjectReference {
+	return m.Self
+}
+
+func init() {
+	t["InternalDynamicTypeManager"] = reflect.TypeOf((*InternalDynamicTypeManager)(nil)).Elem()
+}
+
 type InventoryView struct {
 	ManagedObjectView
 }
@@ -1290,6 +1302,18 @@ func init() {
 	t["PropertyFilter"] = reflect.TypeOf((*PropertyFilter)(nil)).Elem()
 }
 
+type ReflectManagedMethodExecuter struct {
+	Self types.ManagedObjectReference
+}
+
+func (m ReflectManagedMethodExecuter) Reference() types.ManagedObjectReference {
+	return m.Self
+}
+
+func init() {
+	t["ReflectManagedMethodExecuter"] = reflect.TypeOf((*ReflectManagedMethodExecuter)(nil)).Elem()
+}
+
 type ResourcePlanningManager struct {
 	Self types.ManagedObjectReference
 }
@@ -1494,18 +1518,6 @@ func (m UserDirectory) Reference() types.ManagedObjectReference {
 
 func init() {
 	t["UserDirectory"] = reflect.TypeOf((*UserDirectory)(nil)).Elem()
-}
-
-type VRPResourceManager struct {
-	Self types.ManagedObjectReference
-}
-
-func (m VRPResourceManager) Reference() types.ManagedObjectReference {
-	return m.Self
-}
-
-func init() {
-	t["VRPResourceManager"] = reflect.TypeOf((*VRPResourceManager)(nil)).Elem()
 }
 
 type View struct {
