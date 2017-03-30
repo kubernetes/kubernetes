@@ -480,6 +480,12 @@ function create-node-template() {
   if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
     preemptible_minions="--preemptible --maintenance-policy TERMINATE"
   fi
+  local local_ssds=""
+  if [ ! -z ${NODE_LOCAL_SSDS+x} ]; then
+      for i in $(seq ${NODE_LOCAL_SSDS}); do
+          local_ssds="$local_ssds--local-ssd=interface=SCSI "
+      done
+  fi
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
     if ! gcloud compute instance-templates create "$template_name" \
@@ -491,6 +497,7 @@ function create-node-template() {
       --image "${NODE_IMAGE}" \
       --tags "${NODE_TAG}" \
       --network "${NETWORK}" \
+      ${local_ssds} \
       ${preemptible_minions} \
       $2 \
       --can-ip-forward \

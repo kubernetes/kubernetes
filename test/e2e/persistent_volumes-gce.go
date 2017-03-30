@@ -21,6 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -37,9 +39,9 @@ func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 }
 
 // initializeGCETestSpec creates a PV, PVC, and ClientPod that will run until killed by test or clean up.
-func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig framework.PersistentVolumeConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	By("Creating the PV and PVC")
-	pv, pvc := framework.CreatePVPVC(c, pvConfig, ns, isPrebound)
+	pv, pvc := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, isPrebound)
 	framework.WaitOnPVandPVC(c, ns, pv, pvc)
 
 	By("Creating the Client Pod")
@@ -58,6 +60,9 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 		pvc       *v1.PersistentVolumeClaim
 		clientPod *v1.Pod
 		pvConfig  framework.PersistentVolumeConfig
+		pvcConfig framework.PersistentVolumeClaimConfig
+		volLabel  labels.Set
+		selector  *metav1.LabelSelector
 		node      types.NodeName
 	)
 
@@ -66,24 +71,33 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 
+		// Enforce binding only within test space via selector labels
+		volLabel = labels.Set{framework.VolumeSelectorKey: ns}
+		selector = metav1.SetAsLabelSelector(volLabel)
+
 		framework.SkipUnlessProviderIs("gce", "gke")
 		By("Initializing Test Spec")
-		if diskName == "" {
-			diskName, err = framework.CreatePDWithRetry()
-			Expect(err).NotTo(HaveOccurred())
-			pvConfig = framework.PersistentVolumeConfig{
-				NamePrefix: "gce-",
-				PVSource: v1.PersistentVolumeSource{
-					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-						PDName:   diskName,
-						FSType:   "ext3",
-						ReadOnly: false,
-					},
+		diskName, err = framework.CreatePDWithRetry()
+		Expect(err).NotTo(HaveOccurred())
+		pvConfig = framework.PersistentVolumeConfig{
+			NamePrefix: "gce-",
+			Labels:     volLabel,
+			PVSource: v1.PersistentVolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+					PDName:   diskName,
+					FSType:   "ext3",
+					ReadOnly: false,
 				},
-				Prebind: nil,
-			}
+			},
+			Prebind: nil,
 		}
-		clientPod, pv, pvc = initializeGCETestSpec(c, ns, pvConfig, false)
+		pvcConfig = framework.PersistentVolumeClaimConfig{
+			Annotations: map[string]string{
+				v1.BetaStorageClassAnnotation: "",
+			},
+			Selector: selector,
+		}
+		clientPod, pv, pvc = initializeGCETestSpec(c, ns, pvConfig, pvcConfig, false)
 		node = types.NodeName(clientPod.Spec.NodeName)
 	})
 

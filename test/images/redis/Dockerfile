@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine
+FROM alpine:3.5
 
-RUN apk add --no-cache bind-tools
+RUN apk add --no-cache redis
+
+COPY redis.conf /etc/redis.conf
+
+EXPOSE 6379
+VOLUME /data
+
+CMD ["redis-server", "/etc/redis.conf"]

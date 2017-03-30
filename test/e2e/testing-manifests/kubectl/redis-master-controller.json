@@ -25,7 +25,7 @@
             "containers":[
                {
                   "name":"redis-master",
-		  "image": "gcr.io/google_containers/redis:e2e",
+		  "image": "gcr.io/k8s-testimages/redis:e2e",
                   "ports":[
                      {
                         "name":"redis-server",
