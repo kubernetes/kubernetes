@@ -19,6 +19,7 @@ package master
 import (
 	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -44,8 +45,10 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 	fmt.Println("[apiclient] Created API client, waiting for the control plane to become ready")
 	WaitForAPI(client)
 
-	fmt.Println("[apiclient] Waiting for at least one node to register and become ready")
+	fmt.Println("[apiclient] Waiting for at least one node to register")
 	start := time.Now()
+	skipDummyDeployment := false
+
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		nodeList, err := client.Nodes().List(metav1.ListOptions{})
 		if err != nil {
@@ -55,20 +58,39 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 		if len(nodeList.Items) < 1 {
 			return false, nil
 		}
+
 		n := &nodeList.Items[0]
 		if !v1.IsNodeReady(n) {
-			fmt.Println("[apiclient] First node has registered, but is not ready yet")
-			return false, nil
+			// Node is not ready.  Is this due to the network plugin not being initialized?
+			causedByNetwork := false
+			for _, c := range n.Status.Conditions {
+				if c.Type == v1.NodeReady && strings.Contains(c.Message, "reason:NetworkPluginNotReady") {
+					causedByNetwork = true
+					break
+				}
+			}
+
+			// If it's not ready due to some other reason, keep waiting
+			if !causedByNetwork {
+				return false, nil
+			}
+
+			fmt.Println("[apiclient] First node has registered, but its network is unconfigured.  Will proceed with initialization")
+			skipDummyDeployment = true
 		}
 
-		fmt.Printf("[apiclient] First node is ready after %f seconds\n", time.Since(start).Seconds())
+		fmt.Printf("[apiclient] First node is registered after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
+
+	if skipDummyDeployment {
+		fmt.Println("[apiclient] Skipping dummy deployment, no registered nodes are ready")
+		return client, nil
+	}
 
 	if err := createAndWaitForADummyDeployment(client); err != nil {
 		return nil, err
 	}
-
 	return client, nil
 }
 
