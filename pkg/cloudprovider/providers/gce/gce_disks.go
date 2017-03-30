@@ -98,8 +98,8 @@ func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOn
 		readWrite = "READ_ONLY"
 	}
 	attachedDisk := gce.convertDiskToAttachedDisk(disk, readWrite)
-
-	attachOp, err := gce.service.Instances.AttachDisk(gce.projectID, disk.Zone, instance.Name, attachedDisk).Do()
+	dc := contextWithNamespace(diskName, "gce_attach_disk")
+	attachOp, err := gce.service.Instances.AttachDisk(gce.projectID, disk.Zone, instance.Name, attachedDisk).Context(dc).Do()
 	if err != nil {
 		return err
 	}
@@ -122,8 +122,8 @@ func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) erro
 
 		return fmt.Errorf("error getting instance %q", instanceName)
 	}
-
-	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, inst.Zone, inst.Name, devicePath).Do()
+	dc := contextWithNamespace(devicePath, "gce_detach_disk")
+	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, inst.Zone, inst.Name, devicePath).Context(dc).Do()
 	if err != nil {
 		return err
 	}
@@ -227,8 +227,8 @@ func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeG
 		Description: tagsStr,
 		Type:        diskTypeUri,
 	}
-
-	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Do()
+	dc := contextWithNamespace(name, "gce_disk_insert")
+	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Context(dc).Do()
 	if err != nil {
 		return err
 	}
@@ -303,7 +303,8 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 // Returns a gceDisk for the disk, if it is found in the specified zone.
 // If not found, returns (nil, nil)
 func (gce *GCECloud) findDiskByName(diskName string, zone string) (*gceDisk, error) {
-	disk, err := gce.service.Disks.Get(gce.projectID, zone, diskName).Do()
+	dc := contextWithNamespace(diskName, "gce_list_disk")
+	disk, err := gce.service.Disks.Get(gce.projectID, zone, diskName).Context(dc).Do()
 	if err == nil {
 		d := &gceDisk{
 			Zone: lastComponent(disk.Zone),
@@ -387,7 +388,8 @@ func (gce *GCECloud) doDeleteDisk(diskToDelete string) error {
 		return err
 	}
 
-	deleteOp, err := gce.service.Disks.Delete(gce.projectID, disk.Zone, disk.Name).Do()
+	dc := contextWithNamespace(diskToDelete, "gce_disk_delete")
+	deleteOp, err := gce.service.Disks.Delete(gce.projectID, disk.Zone, disk.Name).Context(dc).Do()
 	if err != nil {
 		return err
 	}
