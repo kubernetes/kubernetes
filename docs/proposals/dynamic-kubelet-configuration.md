@@ -1,32 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Dynamic Kubelet Configuration
 
 ## Abstract
@@ -80,10 +51,11 @@ Two really important questions:
 
 #### Cluster-level object
 - The Kubelet's configuration should be stored as a `JSON` or `YAML` blob under the `kubelet` key in a `ConfigMap` object. This allows the `ConfigMap`'s schema to be extended to other `Node`-level components, e.g. adding a key for `kube-proxy`.
-- The Kubelet's configuration type should be organized in the cluster as a structured monolith. 
+- The Kubelet's configuration information should be organized in the cluster as a structured monolith. 
   + *Structured*, so that it is readable.
   + *Monolithic*, so that all Kubelet parameters roll out to a given `Node` in unison.
-- The `ConfigMap` containing the desired configuration should be specified via the `Node` object corresponding to the Kubelet. The `Node` will have a new `spec` subfield, `config`, which is an `ObjectReference` intended to refer to a `ConfigMap`.
+  + Note that this does not mean the type itself has to be monolithic, just that everything the Kubelet needs makes it to the `Node` in one piece.
+- The `ConfigMap` containing the desired configuration should be specified via the `Node` object corresponding to the Kubelet. The `Node` will have a new `spec` subfield, `config`, which is a new type, `NodeConfigSource` (described below).
 - The name of the `ConfigMap` containing the desired configuration should be of the form `blah-blah-blah-{hash}`, where `{hash}` is a SHA-1 hash of the `data` field of the `ConfigMap`. The hash will be produced by serializing the `data` to a `JSON` string, and then taking the hash of this string. Depending on ordering guarantees, we may also need to ensure that keys are sorted in the serialization to ensure consistent hashing.
   + The Kubelet will verify the downloaded `ConfigMap` by performing this same procedure and comparing the result to the hash in the name. This helps prevent the "shoot yourself in the foot" scenario detailed below in *Operational Considerations/Rollout workflow*.
 
@@ -121,23 +93,39 @@ Recovery involves:
 
 ##### Finding and checkpointing intended configuration
 
-The Kubelet finds its intended configuration by looking for the `ConfigMap` referenced via it's `Node`'s `spec.config` field. This field is an `ObjectReference`. We consider this field to be "empty" if it lacks the information necessary to resolve to an object. The field must provide at least `name` or `uid`, to be considered "non-empty." If no `namespace` or `uid` is provided, the `default` namespace is assumed. 
+The Kubelet finds its intended configuration by looking for the `ConfigMap` referenced via it's `Node`'s optional `spec.configSource` field. This field will be a new type:
+```
+type NodeConfigSource struct {
+  ConfigMapRef *ObjectReference
+}
+```
+
+For now, this type just contains an `ObjectReference`. The `spec.configSource` field will be of type `*NodeConfigSource`, because it is optional. 
+
+The `spec.configSource` field can be considered "correct," "empty," or "invalid." The field is "empty" if and only if it is `nil`. The field is "correct" if and only if it is neither "empty" nor "invalid." The field is "invalid" if it fails to meet any of the following criteria:
+- Exactly one subfield of `NodeConfigSource` must be non-`nil`.
+- All information contained in the non-`nil` subfield meets the requirements of that subfield.
+
+The requirements of the `ConfigMapRef` subfield are as follows:
+- `ConfigMapRef.Namespace` must be non-empty.
+- `ConfigMapRef.Name` or `ConfigMapRef.UID` must be non-empty.
+- If both `ConfigMapRef.Name` and `ConfigMapRef.UID` are specified, they must refer to the same object.
+- The referent must exist.
+- The referent must be a `ConfigMap` object.
 
 The Kubelet must have permission to read the namespace that contains the referenced `ConfigMap`. 
 
-If the field is empty, the Kubelet will use its `config-dir/init` configuration, or built-in defaults if `config-dir/init` is also absent.
+If the `spec.configSource` is empty, the Kubelet will use its `config-dir/init` configuration, or built-in defaults if `config-dir/init` is also absent.
 
-If `config-dir/init` is not present, the Kubelet should fall back to its built-in defaults.
+If the `spec.configSource` is invalid, the Kubelet will defer to its last-known-good configuration and report the non-existence via a `NodeCondition` in `Node.status.conditions` (described later in this proposal).
 
-If the referenced `ConfigMap` does not exist, the Kubelet will continue using its current configuration and report the non-existence via the node status.
-
-If the Kubelet can find the referenced `ConfigMap`, it then downloads this `ConfigMap` to `config-dir`, storing each `Data` key's contents in a file as described above in the *Representing and Referencing Configuration* section.
+If the `spec.configSource` is correct and using `ConfigMapRef`, the Kubelet downloads this `ConfigMap` to `config-dir`, storing each `Data` key's contents in a file as described above in the *Representing and Referencing Configuration* section.
 
 The Kubelet sets its current configuration by directing a symlink called `_current`, which lives at `config-dir/_current`, to point at the directory associated with the desired `ConfigMap`. This symlink will not exist when the node is initially provisioned; the Kubelet will create it if it does not exist. If `config-dir/init` exists, the Kubelet will initially create the symlink such that it points to `config-dir/init`. Otherwise, the Kubelet will wait until a `ConfigMap` is downloaded, and then point `config-dir/_current` to the associated directory.
 
 To begin using a new configuration, the Kubelet simply sets `config-dir/_current`, calls `os.Exit(0)`, and relies on the process manager (e.g. `systemd`) to restart it.
 
-The Kubelet detects new configuration by watching the `Node` object for changes to the `NodeConfig` field. When the Kubelet detects new configuration, it checkpoints it as necessary, sets `config-dir/_current`, and restarts to begin using it.
+The Kubelet detects new configuration by watching the `Node` object for changes to the `spec.configSource` field. When the Kubelet detects new configuration, it checkpoints it as necessary, sets `config-dir/_current`, and restarts to begin using it.
 
 ##### Metrics for Bad Configuration
 
@@ -166,7 +154,7 @@ The init configuration (`config-dir/init`) will be automatically considered good
 
 This is very important, because the init configuration is the initial last-known-good configuration. If the init configuration turns out to be bad, there is nothing to fall back to. We presume a user provisions nodes with an init configuration when the Kubelet defaults are inappropriate for their use case. It would thus be inappropriate to fall back to the Kubelet defaults if the init configuration exists.
 
-As the init configuration and the built-in defaults are automatically considered good, intentionally setting `spec.config` on the `Node` to its empty default will reset the last-known-good symlink. If `config-dir/init` exists, the symlink will be updated to point there. If `config-dir/init` does not exist, the symlink will be deleted, meaning the built-in defaults become the last-known-good config.
+As the init configuration and the built-in defaults are automatically considered good, intentionally setting `spec.configSource` on the `Node` to its empty default will reset the last-known-good symlink. If `config-dir/init` exists, the symlink will be updated to point there. If `config-dir/init` does not exist, the symlink will be deleted, meaning the built-in defaults become the last-known-good config.
 
 ##### Rolling back to the LKG config
 
@@ -197,7 +185,7 @@ Regarding (3), the Kubelet should report via the `Node`'s status:
 
 We may use imperfect indicators to detect bad configuration. Thus, the Kubelet may revert to LKG when the configuration was not actually the issue. These are two possible solutions to this problem:
 - Allow the belief that a configuration is bad to decay over time. The user may adjust this period to balance time to respond against time to automatically recover from false alarms. This period would be measured against the timestamp in `config-dir/bad-configs.json`.
-- Provide a Kubelet endpoint, e.g. `/accept-node-config`, which forces the Kubelet to remove the `config-dir/bad-configs.json` entry for the `ConfigMap` currently referenced by the `Node`'s `NodeConfig` field, and then restart to take up the `Node`'s specified config.
+- Provide a Kubelet endpoint, e.g. `/accept-node-config`, which forces the Kubelet to remove the `config-dir/bad-configs.json` entry for the `ConfigMap` currently referenced by the `Node`'s `spec.configSource` field, and then restart to take up the `Node`'s specified config.
 
 Additionally, imagine that one configuration prevents the Kubelet from accessing the API server to detect new configurations. There are at least a few options here:
 - Correlate API server connectivity with the configuration lifetime and use it to detect bad configuration. This, of course, means that network issues may cause false alarms regarding bad config.
@@ -214,7 +202,7 @@ All `NodeCondition`s contain the fields: `lastHeartbeatTime:Time`, `lastTransiti
 These are some brief descriptions of how these fields should be interpreted for node-configuration related conditions:
 - `lastHeartbeatTime`: The last time the Kubelet updated the condition. The Kubelet will typically do this whenever it is restarted, because that is when configuration changes occur. The Kubelet will update this on restart regardless of whether the configuration, or the condition, has changed.
 - `lastTransitionTime`: The last time this condition changed. The Kubelet will not update this unless it intends to set a different condition than is currently set.
-- `message`: A report on the Think of this as the "effect" of the `reason`.
+- `message`: Think of this as the "effect" of the `reason`.
 - `reason`: Think of this as the "cause" of the `message`.
 - `status`: `True` if the currently set configuration is considered OK, `False` otherwise. `Unknown` should not be used in these condition messages. One *might* say that a config in its trial period has "unknown" goodness, but the `status` should still be `True` because the Kubelet is treating it as OK.
 - `type`: `ConfigOK` will always be used for these conditions.
@@ -238,22 +226,22 @@ status: "True"
 No remote config specified:
 ```
 message: "using local init config"
-reason: "this Node's spec.config was empty"
+reason: "this Node's spec.configSource was empty"
 status: "True"
-```
-
-If `Node.spec.config` refers to an object which is not a `ConfigMap`, we treat similarly to an empty `spec.config`, but report status `False`, as this is likely an error:
-```
-message: "using local init config"
-reason: "this Node's spec.config does not refer to a ConfigMap"
-status: "False"
 ```
 
 No remote config specified, no local `init` config provided:
 ```
 message: "using defaults"
-reason: "this Node's spec.config was empty, and local init config does not exist"
+reason: "this Node's spec.configSource was empty, and local init config does not exist"
 status: "True"
+```
+
+If `Node.spec.configSource` is invalid:
+```
+message: "using last-known-good: namespace/name"
+reason: "this Node's spec.configSource was invalid"
+status: "False"
 ```
 
 When reading or validation fails, the specific `ConfigMap` key(s) should be indicated. As `reason`s should be brief, the precise details of the error should be available in the Kubelet log. The `reason` should specify a short string to search for in the Kubelet log, to make finding the error easier.
@@ -292,7 +280,7 @@ status: "False"
 
 Kubernetes does not have the concepts of immutable, or even undeleteable API objects. This makes it easy to "shoot yourself in the foot" by modifying or deleting a `ConfigMap`. This results in undefined behavior given the behaviors described in this document, because the assumption is that these `ConfigMaps` are not mutated once deployed. For example, this design includes no method for invalidating the Kubelet's local cache of configurations, so there is no concept of eventually consistent results from edits or deletes of a `ConfigMap`. You may, in such a scenario, end up with partially consistent results or no results at all.
 
-Thus, we recommend that rollout workflow consist only of creating new `ConfigMap` objects and updating the `NodeConfig` field on each `Node` to point to that new object. This results in a controlled rollout with well-defined behavior.
+Thus, we recommend that rollout workflow consist only of creating new `ConfigMap` objects and updating the `spec.configSource` field on each `Node` to point to that new object. This results in a controlled rollout with well-defined behavior.
 
 There is discussion in [#10179](https://github.com/kubernetes/kubernetes/issues/10179) regarding ways to prevent unintentional mutation and deletion of objects.
 
