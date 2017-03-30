@@ -29,8 +29,11 @@ func NewCmdPhase(out io.Writer) *cobra.Command {
 		Short: "Invoke subsets of kubeadm functions separately for a manual install.",
 		RunE:  subCmdRunE("phase"),
 	}
+
 	cmd.AddCommand(NewCmdKubeConfig(out))
 	cmd.AddCommand(NewCmdCerts())
+	cmd.AddCommand(NewCmdValidate())
+
 	return cmd
 }
 
