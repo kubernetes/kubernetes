@@ -17,14 +17,23 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
+	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/version"
 )
+
+type Version struct {
+	ClientVersion *apimachineryversion.Info `json:"kubeadmVersion,omitempty" yaml:"kubeadmVersion,omitempty"`
+}
 
 func NewCmdVersion(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -35,10 +44,39 @@ func NewCmdVersion(out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 		},
 	}
+	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
+	cmd.Flags().StringP("output", "o", "", "output format, options available are yaml and json")
 	return cmd
 }
 
 func RunVersion(out io.Writer, cmd *cobra.Command) error {
-	fmt.Fprintf(out, "kubeadm version: %#v\n", version.Get())
+	v := Version{}
+
+	clientVersion := version.Get()
+	v.ClientVersion = &clientVersion
+
+	switch of := cmdutil.GetFlagString(cmd, "output"); of {
+	case "":
+		if cmdutil.GetFlagBool(cmd, "short") {
+			fmt.Fprintf(out, "Kubeadm Version: %s\n", clientVersion.GitVersion)
+		} else {
+			fmt.Fprintf(out, "Kubeadm Version: %s\n", fmt.Sprintf("%#v", clientVersion))
+		}
+	case "yaml":
+		y, err := yaml.Marshal(&v)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, string(y))
+	case "json":
+		y, err := json.Marshal(&v)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, string(y))
+	default:
+		return errors.New("invalid output format: " + of)
+	}
+
 	return nil
 }
