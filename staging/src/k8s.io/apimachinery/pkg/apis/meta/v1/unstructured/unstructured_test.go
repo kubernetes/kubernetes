@@ -34,3 +34,8 @@ func TestUnstructuredList(t *testing.T) {
 		t.Fatalf("unexpected fields: %#v", items[0])
 	}
 }
+
+func TestNilDeletionTimestamp(t *testing.T) {
+	var u Unstructured
+	u.SetDeletionTimestamp(u.GetDeletionTimestamp())
+}

@@ -153,7 +153,7 @@ func (_ Time) OpenAPIDefinition() openapi.OpenAPIDefinition {
 }
 
 // MarshalQueryParameter converts to a URL query parameter value
-func (t Time) MarshalQueryParameter() (string, error) {
+func (t *Time) MarshalQueryParameter() (string, error) {
 	if t.IsZero() {
 		// Encode unset/nil objects as an empty string
 		return "", nil
