@@ -171,3 +171,20 @@ func TestTimeProto(t *testing.T) {
 		}
 	}
 }
+
+func TestMarshalQueryParameterNilPointer(t *testing.T) {
+	var x *Time
+	v, err := x.MarshalQueryParameter()
+	if err != nil || v != "" {
+		t.Errorf("Unexpected results: '%s', %v", v, err)
+	}
+}
+
+func TestMarshalJSONNilPointer(t *testing.T) {
+	t.Skip("not sure if this should be supported")
+	var x *Time
+	v, err := x.MarshalJSON()
+	if err != nil || string(v) != "null" {
+		t.Errorf("Unexpected results: '%s', %v", v, err)
+	}
+}
