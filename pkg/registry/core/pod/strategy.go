@@ -160,6 +160,23 @@ func (podStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old 
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
+type PodFastPredicate struct {
+	storage.SelectionPredicate
+}
+
+func (p *PodFastPredicate) Matches(obj runtime.Object) (bool, error) {
+	if p.Label.Empty() && p.Field.Len() == 1 {
+		if name, ok := p.Field.RequiresExactMatch("spec.NodeName"); ok {
+			pod, ok := obj.(*api.Pod)
+			if !ok {
+				return false, fmt.Errorf("not a pod")
+			}
+			return name == pod.Spec.NodeName, nil
+		}
+	}
+	return p.SelectionPredicate.Matches(obj)
+}
+
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod, ok := obj.(*api.Pod)
