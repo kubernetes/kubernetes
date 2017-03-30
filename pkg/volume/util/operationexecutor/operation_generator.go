@@ -453,7 +453,9 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			return detailedErr
 		}
 
-		glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.SetUp succeeded", ""))
+		mountMsg := volumeToMount.GenerateMsgDetailed("MountVolume.SetUp succeeded", "")
+		glog.Infof(mountMsg)
+		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, mountMsg)
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
