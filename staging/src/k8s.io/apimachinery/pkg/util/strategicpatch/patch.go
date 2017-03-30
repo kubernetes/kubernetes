@@ -476,6 +476,7 @@ func StrategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte
 // StrategicMergePatch applies a strategic merge patch. The original and patch documents
 // must be JSONMap. A patch can be created from an original and modified document by
 // calling CreateTwoWayMergeMapPatch.
+// Warning: the original and patch JSONMap objects are mutated by this function and should not be reused.
 func StrategicMergeMapPatch(original, patch JSONMap, dataStruct interface{}) (JSONMap, error) {
 	t, err := getTagStructType(dataStruct)
 	if err != nil {
