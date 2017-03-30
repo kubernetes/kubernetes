@@ -21,9 +21,15 @@ import (
 	"fmt"
 )
 
-var ErrBadJSONDoc = errors.New("Invalid JSON document")
-var ErrNoListOfLists = errors.New("Lists of lists are not supported")
-var ErrBadPatchFormatForPrimitiveList = errors.New("Invalid patch format of primitive list")
+var (
+	ErrBadJSONDoc                     = errors.New("Invalid JSON document")
+	ErrNoListOfLists                  = errors.New("Lists of lists are not supported")
+	ErrBadPatchFormatForPrimitiveList = errors.New("Invalid patch format of primitive list")
+
+	ErrNoMergeKeyFmt   = "map: %v does not contain declared merge key: %s"
+	ErrBadArgTypeFmt   = "expected a %s, but received a %s"
+	ErrBadPatchTypeFmt = "unknown patch type: %s in map: %v"
+)
 
 // IsPreconditionFailed returns true if the provided error indicates
 // a precondition failed.
