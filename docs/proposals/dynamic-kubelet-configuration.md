@@ -1,32 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Dynamic Kubelet Configuration
 
 ## Abstract
@@ -214,7 +185,7 @@ All `NodeCondition`s contain the fields: `lastHeartbeatTime:Time`, `lastTransiti
 These are some brief descriptions of how these fields should be interpreted for node-configuration related conditions:
 - `lastHeartbeatTime`: The last time the Kubelet updated the condition. The Kubelet will typically do this whenever it is restarted, because that is when configuration changes occur. The Kubelet will update this on restart regardless of whether the configuration, or the condition, has changed.
 - `lastTransitionTime`: The last time this condition changed. The Kubelet will not update this unless it intends to set a different condition than is currently set.
-- `message`: A report on the Think of this as the "effect" of the `reason`.
+- `message`: Think of this as the "effect" of the `reason`.
 - `reason`: Think of this as the "cause" of the `message`.
 - `status`: `True` if the currently set configuration is considered OK, `False` otherwise. `Unknown` should not be used in these condition messages. One *might* say that a config in its trial period has "unknown" goodness, but the `status` should still be `True` because the Kubelet is treating it as OK.
 - `type`: `ConfigOK` will always be used for these conditions.
