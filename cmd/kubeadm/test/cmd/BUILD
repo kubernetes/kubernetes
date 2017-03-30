@@ -21,6 +21,7 @@ go_test(
         "init_test.go",
         "join_test.go",
         "token_test.go",
+        "version_test.go",
     ],
     args = ["--kubeadm-path=../../kubeadm"],
     data = ["//cmd/kubeadm"],
