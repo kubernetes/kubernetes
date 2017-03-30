@@ -27,7 +27,7 @@ import (
 // utils.go contains functions used accross test suites.
 
 const (
-	cniRelease   = "07a8a28637e97b22eb8dfe710eeae1344f69d16e"
+	cniRelease   = "0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff"
 	cniDirectory = "cni"
 	cniURL       = "https://storage.googleapis.com/kubernetes-release/network-plugins/cni-" + cniRelease + ".tar.gz"
 )

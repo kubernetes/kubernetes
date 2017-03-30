@@ -33,7 +33,8 @@ var upgradeTests = []upgrades.Test{
 	&upgrades.DeploymentUpgradeTest{},
 	&upgrades.JobUpgradeTest{},
 	&upgrades.ConfigMapUpgradeTest{},
-	&upgrades.HPAUpgradeTest{},
+	// Disabling until can be debugged, causing upgrade jobs to timeout
+	// &upgrades.HPAUpgradeTest{},
 	&upgrades.PersistentVolumeUpgradeTest{},
 	&upgrades.DaemonSetUpgradeTest{},
 	&upgrades.IngressUpgradeTest{},

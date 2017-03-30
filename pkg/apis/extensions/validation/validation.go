@@ -165,6 +165,9 @@ func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) 
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"), spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
 	}
+	if spec.Template.Spec.ActiveDeadlineSeconds != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "spec", "activeDeadlineSeconds"), spec.Template.Spec.ActiveDeadlineSeconds, "must not be specified"))
+	}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.TemplateGeneration), fldPath.Child("templateGeneration"))...)
 
@@ -353,7 +356,9 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	if status.AvailableReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
 	}
-	if status.AvailableReplicas > status.ReadyReplicas {
+	// TODO: ReadyReplicas is introduced in 1.6 and this check breaks the Deployment controller when pre-1.6 clusters get upgraded.
+	// 		 Remove the comparison to zero once we stop supporting upgrades from 1.5.
+	if status.ReadyReplicas > 0 && status.AvailableReplicas > status.ReadyReplicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
 	}
 	return allErrs
@@ -645,6 +650,9 @@ func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selecto
 		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 		if template.Spec.RestartPolicy != api.RestartPolicyAlways {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "restartPolicy"), template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+		}
+		if template.Spec.ActiveDeadlineSeconds != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "activeDeadlineSeconds"), template.Spec.ActiveDeadlineSeconds, "must not be specified"))
 		}
 	}
 	return allErrs

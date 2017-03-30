@@ -155,6 +155,7 @@ func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
 func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
 		if exp.Fulfilled() {
+			glog.V(4).Infof("Controller expectations fulfilled %#v", exp)
 			return true
 		} else if exp.isExpired() {
 			glog.V(4).Infof("Controller expectations expired %#v", exp)
@@ -284,7 +285,7 @@ type UIDSet struct {
 // UIDTrackingControllerExpectations tracks the UID of the pods it deletes.
 // This cache is needed over plain old expectations to safely handle graceful
 // deletion. The desired behavior is to treat an update that sets the
-// DeletionTimestamp on an object as a delete. To do so consistenly, one needs
+// DeletionTimestamp on an object as a delete. To do so consistently, one needs
 // to remember the expected deletes so they aren't double counted.
 // TODO: Track creates as well (#22599)
 type UIDTrackingControllerExpectations struct {
@@ -891,7 +892,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint *v1.Ta
 // If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
 // any API calls.
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint, node *v1.Node) error {
-	// Short circuit for limiting amout of API calls.
+	// Short circuit for limiting amount of API calls.
 	if node != nil {
 		match := false
 		for i := range node.Spec.Taints {

@@ -99,6 +99,7 @@ go_library(
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/procfs:go_default_library",
+        "//pkg/util/removeall:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",

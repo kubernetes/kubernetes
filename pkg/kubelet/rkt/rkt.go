@@ -1315,6 +1315,20 @@ func (r *Runtime) setupPodNetwork(pod *v1.Pod) (string, string, error) {
 	return netnsName, status.IP.String(), nil
 }
 
+// For a hostPath volume: rkt doesn't create any missing volume on the node/host so we need to create it
+func createHostPathVolumes(pod *v1.Pod) (err error) {
+	for _, v := range pod.Spec.Volumes {
+		if v.VolumeSource.HostPath != nil {
+			err = os.MkdirAll(v.HostPath.Path, os.ModePerm)
+			if err != nil && !os.IsExist(err) {
+				return err
+			}
+			glog.V(4).Infof("Created volume HostPath %q for Pod %q", v.HostPath.Path, format.Pod(pod))
+		}
+	}
+	return nil
+}
+
 // RunPod first creates the unit file for a pod, and then
 // starts the unit over d-bus.
 func (r *Runtime) RunPod(pod *v1.Pod, pullSecrets []v1.Secret) error {
@@ -1323,6 +1337,12 @@ func (r *Runtime) RunPod(pod *v1.Pod, pullSecrets []v1.Secret) error {
 	var err error
 	var netnsName string
 	var podIP string
+
+	err = createHostPathVolumes(pod)
+	if err != nil {
+		return err
+	}
+
 	netnsName, podIP, err = r.setupPodNetwork(pod)
 	if err != nil {
 		r.cleanupPodNetwork(pod)

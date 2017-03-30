@@ -485,29 +485,19 @@ func WaitForPodsSuccess(c clientset.Interface, ns string, successPodLabels map[s
 // ready. It has separate behavior from other 'wait for' pods functions in
 // that it requests the list of pods on every iteration. This is useful, for
 // example, in cluster startup, because the number of pods increases while
-// waiting.
-// If ignoreLabels is not empty, pods matching this selector are ignored and
-// this function waits for minPods to enter Running/Ready and for all pods
-// matching ignoreLabels to enter Success phase. Otherwise an error is returned
-// even if there are minPods pods, some of which are in Running/Ready
-// and some in Success. This is to allow the client to decide if "Success"
-// means "Ready" or not.
-// If skipSucceeded is true, any pods that are Succeeded are not counted.
-func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedNotReadyPods int32, timeout time.Duration, ignoreLabels map[string]string, skipSucceeded bool) error {
+// waiting. All pods that are in SUCCESS state are not counted.
+//
+// If ignoreLabels is not empty, pods matching this selector are ignored.
+func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedNotReadyPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
 	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	var waitForSuccessError error
 	var ignoreNotReady bool
 	badPods := []v1.Pod{}
 	desiredPods := 0
-	go func() {
-		waitForSuccessError = WaitForPodsSuccess(c, ns, ignoreLabels, timeout)
-		wg.Done()
-	}()
 
 	if wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		// We get the new list of pods, replication controllers, and
@@ -554,7 +544,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			switch {
 			case res && err == nil:
 				nOk++
-			case pod.Status.Phase == v1.PodSucceeded && skipSucceeded:
+			case pod.Status.Phase == v1.PodSucceeded:
 				continue
 			case pod.Status.Phase == v1.PodSucceeded:
 				Logf("The status of Pod %s is Succeeded which is unexpected", pod.ObjectMeta.Name)
@@ -589,10 +579,6 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout))
 		}
 		Logf("Number of not-ready pods is allowed.")
-	}
-	wg.Wait()
-	if waitForSuccessError != nil {
-		return waitForSuccessError
 	}
 	return nil
 }
@@ -830,7 +816,7 @@ func WaitForPersistentVolumeClaimPhase(phase v1.PersistentVolumeClaimPhase, c cl
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
 		pvc, err := c.Core().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
 		if err != nil {
-			Logf("Get persistent volume claim %s in failed, ignoring for %v: %v", pvcName, Poll, err)
+			Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, Poll, err)
 			continue
 		} else {
 			if pvc.Status.Phase == phase {
@@ -2236,7 +2222,7 @@ func (f *Framework) MatchContainerOutput(
 			}
 			Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, container.Name, logs)
 		}
-		return fmt.Errorf("expected pod %q success: %v", pod.Name, err)
+		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, err)
 	}
 
 	Logf("Trying to get logs from node %s pod %s container %s: %v",
@@ -3849,6 +3835,7 @@ func IssueSSHCommand(cmd, provider string, node *v1.Node) error {
 
 // NewHostExecPodSpec returns the pod spec of hostexec pod
 func NewHostExecPodSpec(ns, name string) *v1.Pod {
+	immediate := int64(0)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -3862,8 +3849,9 @@ func NewHostExecPodSpec(ns, name string) *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
-			HostNetwork:     true,
-			SecurityContext: &v1.PodSecurityContext{},
+			HostNetwork:                   true,
+			SecurityContext:               &v1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: &immediate,
 		},
 	}
 	return pod
@@ -4980,11 +4968,21 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 	return
 }
 
-// CheckConnectivityToHost launches a pod running wget on the
-// specified node to test connectivity to the specified host.  An
-// error will be returned if the host is not reachable from the pod.
+// CheckConnectivityToHost launches a pod to test connectivity to the specified
+// host. An error will be returned if the host is not reachable from the pod.
+//
+// An empty nodeName will use the schedule to choose where the pod is executed.
 func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeout int) error {
 	contName := fmt.Sprintf("%s-container", podName)
+
+	command := []string{
+		"ping",
+		"-c", "3", // send 3 pings
+		"-W", "2", // wait at most 2 seconds for a reply
+		"-w", strconv.Itoa(timeout),
+		host,
+	}
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
@@ -4994,7 +4992,7 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeo
 				{
 					Name:    contName,
 					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"wget", fmt.Sprintf("--timeout=%d", timeout), "-s", host},
+					Command: command,
 				},
 			},
 			NodeName:      nodeName,
@@ -5013,7 +5011,7 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeo
 		if logErr != nil {
 			Logf("Warning: Failed to get logs from pod %q: %v", pod.Name, logErr)
 		} else {
-			Logf("pod %s/%s \"wget\" logs:\n%s", f.Namespace.Name, pod.Name, logs)
+			Logf("pod %s/%s logs:\n%s", f.Namespace.Name, pod.Name, logs)
 		}
 	}
 
@@ -5481,4 +5479,10 @@ func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.
 			},
 		},
 	}
+}
+
+// create empty file at given path on the pod.
+func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
+	_, err := RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
+	return err
 }

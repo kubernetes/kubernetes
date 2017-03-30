@@ -104,7 +104,7 @@ type DeploymentController struct {
 	defaultPlanner *planner.Planner
 }
 
-// NewclusterController returns a new cluster controller
+// NewDeploymentController returns a new deployment controller
 func NewDeploymentController(federationClient fedclientset.Interface) *DeploymentController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))

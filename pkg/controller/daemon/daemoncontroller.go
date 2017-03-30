@@ -265,7 +265,7 @@ func (dsc *DaemonSetsController) getPodDaemonSets(pod *v1.Pod) []*extensions.Dae
 		return nil
 	}
 	if len(sets) > 1 {
-		// ControllerRef will ensure we don't do anythign crazy, but more than one
+		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
 		utilruntime.HandleError(fmt.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels))
 	}

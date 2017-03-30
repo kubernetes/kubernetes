@@ -480,6 +480,12 @@ function create-node-template() {
   if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
     preemptible_minions="--preemptible --maintenance-policy TERMINATE"
   fi
+  local local_ssds=""
+  if [ ! -z ${NODE_LOCAL_SSDS+x} ]; then
+      for i in $(seq ${NODE_LOCAL_SSDS}); do
+          local_ssds="$local_ssds--local-ssd=interface=SCSI "
+      done
+  fi
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
     if ! gcloud compute instance-templates create "$template_name" \
@@ -491,6 +497,7 @@ function create-node-template() {
       --image "${NODE_IMAGE}" \
       --tags "${NODE_TAG}" \
       --network "${NETWORK}" \
+      ${local_ssds} \
       ${preemptible_minions} \
       $2 \
       --can-ip-forward \
@@ -742,44 +749,14 @@ function create-etcd-certs {
   local ca_cert=${2:-}
   local ca_key=${3:-}
 
-  download-cfssl
+  GEN_ETCD_CA_CERT="${ca_cert}" GEN_ETCD_CA_KEY="${ca_key}" \
+    generate-etcd-cert "${KUBE_TEMP}/cfssl" "${host}" "peer" "peer"
 
   pushd "${KUBE_TEMP}/cfssl"
-
-  cat >ca-config.json <<EOF
-{
-    "signing": {
-        "default": {
-            "expiry": "168h"
-        },
-        "profiles": {
-            "client-server": {
-                "expiry": "43800h",
-                "usages": [
-                    "signing",
-                    "key encipherment"
-                ]
-            }
-        }
-    }
-}
-EOF
-  if [[ ! -z "${ca_key}" && ! -z "${ca_cert}" ]]; then
-    echo "${ca_key}" | base64 --decode > ca-key.pem
-    echo "${ca_cert}" | base64 --decode | gunzip > ca.pem
-  else
-    ./cfssl print-defaults csr > ca-csr.json
-    ./cfssl gencert -initca ca-csr.json | ./cfssljson -bare ca -
-  fi
-
-  echo '{"CN":"'"${host}"'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
-      | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client-server -hostname="${host}" - \
-      | ./cfssljson -bare etcd
-
   ETCD_CA_KEY_BASE64=$(cat "ca-key.pem" | base64 | tr -d '\r\n')
   ETCD_CA_CERT_BASE64=$(cat "ca.pem" | gzip | base64 | tr -d '\r\n')
-  ETCD_PEER_KEY_BASE64=$(cat "etcd-key.pem" | base64 | tr -d '\r\n')
-  ETCD_PEER_CERT_BASE64=$(cat "etcd.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_PEER_KEY_BASE64=$(cat "peer-key.pem" | base64 | tr -d '\r\n')
+  ETCD_PEER_CERT_BASE64=$(cat "peer.pem" | gzip | base64 | tr -d '\r\n')
   popd
 }
 

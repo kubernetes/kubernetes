@@ -126,6 +126,7 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, o
 
 func (f *ring2Factory) NewBuilder() *resource.Builder {
 	mapper, typer := f.objectMappingFactory.Object()
+	categoryExpander := f.objectMappingFactory.CategoryExpander()
 
-	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping), f.clientAccessFactory.Decoder(true))
+	return resource.NewBuilder(mapper, categoryExpander, typer, resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping), f.clientAccessFactory.Decoder(true))
 }

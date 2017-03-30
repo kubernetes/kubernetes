@@ -17,47 +17,82 @@ limitations under the License.
 package mux
 
 import (
+	"fmt"
 	"net/http"
+	"runtime/debug"
+	"sort"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-// Mux is an object that can register http handlers.
-type Mux interface {
-	Handle(pattern string, handler http.Handler)
-	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
-}
-
-// PathRecorderMux wraps a mux object and records the registered paths. It is _not_ go routine safe.
+// PathRecorderMux wraps a mux object and records the registered exposedPaths. It is _not_ go routine safe.
 type PathRecorderMux struct {
-	mux   Mux
-	paths []string
+	mux          *http.ServeMux
+	exposedPaths []string
+
+	// pathStacks holds the stacks of all registered paths.  This allows us to show a more helpful message
+	// before the "http: multiple registrations for %s" panic.
+	pathStacks map[string]string
 }
 
 // NewPathRecorderMux creates a new PathRecorderMux with the given mux as the base mux.
-func NewPathRecorderMux(mux Mux) *PathRecorderMux {
+func NewPathRecorderMux() *PathRecorderMux {
 	return &PathRecorderMux{
-		mux: mux,
+		mux:        http.NewServeMux(),
+		pathStacks: map[string]string{},
 	}
 }
 
-// BaseMux returns the underlying mux.
-func (m *PathRecorderMux) BaseMux() Mux {
-	return m.mux
+// ListedPaths returns the registered handler exposedPaths.
+func (m *PathRecorderMux) ListedPaths() []string {
+	handledPaths := append([]string{}, m.exposedPaths...)
+	sort.Strings(handledPaths)
+
+	return handledPaths
 }
 
-// HandledPaths returns the registered handler paths.
-func (m *PathRecorderMux) HandledPaths() []string {
-	return append([]string{}, m.paths...)
+func (m *PathRecorderMux) trackCallers(path string) {
+	if existingStack, ok := m.pathStacks[path]; ok {
+		utilruntime.HandleError(fmt.Errorf("registered %q from %v", path, existingStack))
+	}
+	m.pathStacks[path] = string(debug.Stack())
 }
 
 // Handle registers the handler for the given pattern.
 // If a handler already exists for pattern, Handle panics.
 func (m *PathRecorderMux) Handle(path string, handler http.Handler) {
-	m.paths = append(m.paths, path)
+	m.trackCallers(path)
+
+	m.exposedPaths = append(m.exposedPaths, path)
 	m.mux.Handle(path, handler)
 }
 
 // HandleFunc registers the handler function for the given pattern.
+// If a handler already exists for pattern, Handle panics.
 func (m *PathRecorderMux) HandleFunc(path string, handler func(http.ResponseWriter, *http.Request)) {
-	m.paths = append(m.paths, path)
+	m.trackCallers(path)
+
+	m.exposedPaths = append(m.exposedPaths, path)
 	m.mux.HandleFunc(path, handler)
+}
+
+// UnlistedHandle registers the handler for the given pattern, but doesn't list it.
+// If a handler already exists for pattern, Handle panics.
+func (m *PathRecorderMux) UnlistedHandle(path string, handler http.Handler) {
+	m.trackCallers(path)
+
+	m.mux.Handle(path, handler)
+}
+
+// UnlistedHandleFunc registers the handler function for the given pattern, but doesn't list it.
+// If a handler already exists for pattern, Handle panics.
+func (m *PathRecorderMux) UnlistedHandleFunc(path string, handler func(http.ResponseWriter, *http.Request)) {
+	m.trackCallers(path)
+
+	m.mux.HandleFunc(path, handler)
+}
+
+// ServeHTTP makes it an http.Handler
+func (m *PathRecorderMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	m.mux.ServeHTTP(w, r)
 }

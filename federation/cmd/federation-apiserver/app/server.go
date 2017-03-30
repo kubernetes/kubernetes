@@ -45,6 +45,8 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/version"
@@ -81,10 +83,13 @@ func Run(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 // stop with the given channel.
 func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// set defaults
-	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
+	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
 		return err
 	}
-	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String()); err != nil {
+	if err := kubeoptions.DefaultAdvertiseAddress(s.GenericServerRunOptions, s.InsecureServing); err != nil {
+		return err
+	}
+	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), nil, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
@@ -98,13 +103,12 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		return utilerrors.NewAggregate(errs)
 	}
 
-	genericConfig := genericapiserver.NewConfig().
-		WithSerializer(api.Codecs)
-
+	genericConfig := genericapiserver.NewConfig(api.Codecs)
 	if err := s.GenericServerRunOptions.ApplyTo(genericConfig); err != nil {
 		return err
 	}
-	if err := s.InsecureServing.ApplyTo(genericConfig); err != nil {
+	insecureServingOptions, err := s.InsecureServing.ApplyTo(genericConfig)
+	if err != nil {
 		return err
 	}
 	if err := s.SecureServing.ApplyTo(genericConfig); err != nil {
@@ -223,7 +227,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	routes.UIRedirect{}.Install(m.HandlerContainer)
+	routes.UIRedirect{}.Install(m.FallThroughHandler)
 	routes.Logs{}.Install(m.HandlerContainer)
 
 	installFederationAPIs(m, genericConfig.RESTOptionsGetter)
@@ -233,6 +237,14 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// TODO: Uncomment this once 1.6 is released.
 	//	installBatchAPIs(m, genericConfig.RESTOptionsGetter)
 	//	installAutoscalingAPIs(m, genericConfig.RESTOptionsGetter)
+
+	// run the insecure server now
+	if insecureServingOptions != nil {
+		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(m.HandlerContainer.ServeMux, genericConfig)
+		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, stopCh); err != nil {
+			return err
+		}
+	}
 
 	err = m.PrepareRun().NonBlockingRun(stopCh)
 	if err == nil {

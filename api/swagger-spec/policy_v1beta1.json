@@ -1474,6 +1474,7 @@
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",
+     "singularName",
      "namespaced",
      "kind",
      "verbs"
@@ -1481,7 +1482,11 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "name is the name of the resource."
+      "description": "name is the plural name of the resource."
+     },
+     "singularName": {
+      "type": "string",
+      "description": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface."
      },
      "namespaced": {
       "type": "boolean",

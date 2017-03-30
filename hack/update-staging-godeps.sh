@@ -51,7 +51,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 
 echo "Checking whether godeps are restored"
 if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
-  echo -e '\nRun 'godep restore' to download dependencies.' 1>&2
+  echo -e '\nExecute script 'hack/godep-restore.sh' to download dependencies.' 1>&2
   exit 1
 fi
 
@@ -99,7 +99,7 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   updateGodepManifest "${repo}"
 
   if [ "${FAIL_ON_DIFF}" == true ]; then
-    diff --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json"
+    diff --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\"' -u "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps" "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json"
   fi
   if [ "${DRY_RUN}" != true ]; then
     cp "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps"

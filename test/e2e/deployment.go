@@ -50,7 +50,7 @@ const (
 
 	// nginxImage defined in kubectl.go
 	nginxImageName = "nginx"
-	redisImage     = "gcr.io/google_containers/redis:e2e"
+	redisImage     = "gcr.io/k8s-testimages/redis:e2e"
 	redisImageName = "redis"
 )
 

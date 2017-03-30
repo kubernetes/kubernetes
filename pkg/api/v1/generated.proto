@@ -3668,6 +3668,10 @@ message TCPSocketAction {
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 1;
+
+  // Optional: Host name to connect to, defaults to the pod IP.
+  // +optional
+  optional string host = 2;
 }
 
 // The node this Taint is attached to has the effect "effect" on

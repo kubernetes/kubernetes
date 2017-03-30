@@ -78,7 +78,7 @@ func NewGroupMetaFactory(groupArgs *GroupMetaFactoryArgs, versions VersionToSche
 
 // Announce adds this Group factory to the global factory registry. It should
 // only be called if you constructed the GroupMetaFactory yourself via
-// NewGroupMetadFactory.
+// NewGroupMetaFactory.
 // Note that this will panic on an error, since it's expected that you'll be
 // calling this at initialization time and any error is a result of a
 // programmer importing the wrong set of packages. If this assumption doesn't

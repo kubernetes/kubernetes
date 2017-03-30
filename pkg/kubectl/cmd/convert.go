@@ -132,9 +132,9 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 
 	if o.local {
 		fmt.Fprintln(os.Stderr, "running in local mode...")
-		o.builder = resource.NewBuilder(mapper, typer, resource.DisabledClientForMapping{ClientMapper: clientMapper}, f.Decoder(true))
+		o.builder = resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.DisabledClientForMapping{ClientMapper: clientMapper}, f.Decoder(true))
 	} else {
-		o.builder = resource.NewBuilder(mapper, typer, clientMapper, f.Decoder(true))
+		o.builder = resource.NewBuilder(mapper, f.CategoryExpander(), typer, clientMapper, f.Decoder(true))
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 		if err != nil {
 			return err
