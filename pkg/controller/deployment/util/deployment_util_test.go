@@ -1189,3 +1189,65 @@ func TestDeploymentTimedOut(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxUnavailable(t *testing.T) {
+	deployment := func(replicas, maxUnavailable int32) extensions.Deployment {
+		return extensions.Deployment{
+			Spec: extensions.DeploymentSpec{
+				Replicas: func(i int32) *int32 { return &i }(replicas),
+				Strategy: extensions.DeploymentStrategy{
+					RollingUpdate: &extensions.RollingUpdateDeployment{
+						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
+						MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxUnavailable)),
+					},
+					Type: extensions.RollingUpdateDeploymentStrategyType,
+				},
+			},
+		}
+	}
+	tests := []struct {
+		name       string
+		deployment extensions.Deployment
+		expected   int32
+	}{
+		{
+			name:       "maxUnavailable less than replicas",
+			deployment: deployment(10, 5),
+			expected:   int32(5),
+		},
+		{
+			name:       "maxUnavailable equal replicas",
+			deployment: deployment(10, 10),
+			expected:   int32(10),
+		},
+		{
+			name:       "maxUnavailable greater than replicas",
+			deployment: deployment(5, 10),
+			expected:   int32(5),
+		},
+		{
+			name:       "maxUnavailable with replicas is 0",
+			deployment: deployment(0, 10),
+			expected:   int32(0),
+		},
+		{
+			name: "maxUnavailable with Recreate deployment strategy",
+			deployment: extensions.Deployment{
+				Spec: extensions.DeploymentSpec{
+					Strategy: extensions.DeploymentStrategy{
+						Type: extensions.RecreateDeploymentStrategyType,
+					},
+				},
+			},
+			expected: int32(0),
+		},
+	}
+
+	for _, test := range tests {
+		t.Log(test.name)
+		maxUnavailable := MaxUnavailable(test.deployment)
+		if test.expected != maxUnavailable {
+			t.Fatalf("expected:%v, got:%v", test.expected, maxUnavailable)
+		}
+	}
+}
