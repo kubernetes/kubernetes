@@ -621,7 +621,7 @@ func patchResource(
 				if err != nil {
 					return nil, err
 				}
-				originalMap, patchMap, err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
+				originalMap, patchMap, err := strategicPatchObjectInPlace(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
 				if err != nil {
 					return nil, err
 				}
@@ -718,7 +718,7 @@ func patchResource(
 			if err != nil {
 				return nil, err
 			}
-			if err := applyPatchToObject(codec, defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
+			if err := applyPatchToObjectInPlace(codec, defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
 				return nil, err
 			}
 			// Convert the object back to unversioned.
