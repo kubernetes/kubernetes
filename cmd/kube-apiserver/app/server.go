@@ -66,11 +66,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
+	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
@@ -352,6 +354,9 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 	genericConfig.Authorizer, err = BuildAuthorizer(s, sharedInformers)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("invalid authorization config: %v", err)
+	}
+	if !sets.NewString(s.Authorization.Modes()...).Has(modes.ModeRBAC) {
+		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
 	genericConfig.AdmissionControl, err = BuildAdmission(s, client, sharedInformers, genericConfig.Authorizer)
