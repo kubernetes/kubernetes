@@ -214,12 +214,13 @@ func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, ro
 		if err == nil {
 			return nil
 		}
-		if i == updateNodeStatusMaxRetries || !errors.IsConflict(err) {
+		if !errors.IsConflict(err) {
 			glog.Errorf("Error updating node %s: %v", nodeName, err)
 			return err
 		}
 		glog.Errorf("Error updating node %s, retrying: %v", nodeName, err)
 	}
+	glog.Errorf("Error updating node %s: %v", nodeName, err)
 	return err
 }
 
