@@ -17,7 +17,9 @@ limitations under the License.
 package spdy
 
 import (
+	"bufio"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 
@@ -30,6 +32,19 @@ const HeaderSpdy31 = "SPDY/3.1"
 // responseUpgrader knows how to upgrade HTTP responses. It
 // implements the httpstream.ResponseUpgrader interface.
 type responseUpgrader struct {
+}
+
+// connWrapper is used to wrap a hijacked connection its bufio.Reader. All
+// calls will be handled directly by the underlying net.Conn with the exception
+// of Read calls, which will read from the bufio.Reader. This ensures that data
+// already inside the used bufio.Reader instance is also read.
+type connWrapper struct {
+	net.Conn
+	bufReader *bufio.Reader
+}
+
+func (w *connWrapper) Read(b []byte) (n int, err error) {
+	return w.bufReader.Read(b)
 }
 
 // NewResponseUpgrader returns a new httpstream.ResponseUpgrader that is
@@ -62,13 +77,14 @@ func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Reque
 	w.Header().Add(httpstream.HeaderUpgrade, HeaderSpdy31)
 	w.WriteHeader(http.StatusSwitchingProtocols)
 
-	conn, _, err := hijacker.Hijack()
+	conn, bufrw, err := hijacker.Hijack()
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("unable to upgrade: error hijacking response: %v", err))
 		return nil
 	}
 
-	spdyConn, err := NewServerConnection(conn, newStreamHandler)
+	connWithBuf := &connWrapper{Conn: conn, bufReader: bufrw.Reader}
+	spdyConn, err := NewServerConnection(connWithBuf, newStreamHandler)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("unable to upgrade: error creating SPDY server connection: %v", err))
 		return nil

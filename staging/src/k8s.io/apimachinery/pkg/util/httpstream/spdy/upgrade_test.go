@@ -20,6 +20,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 
 func TestUpgradeResponse(t *testing.T) {
@@ -89,5 +92,62 @@ func TestUpgradeResponse(t *testing.T) {
 		if resp.StatusCode != http.StatusSwitchingProtocols {
 			t.Fatalf("%d: expected status 101 switching protocols, got %d", i, resp.StatusCode)
 		}
+	}
+}
+
+func TestUpgradeResponseWithRoundTrip(t *testing.T) {
+	var serverDone chan struct{}
+	fakeServer := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer close(serverDone)
+		upgrader := NewResponseUpgrader()
+		recvStream := make(chan httpstream.Stream, 1)
+		conn := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream, replySent <-chan struct{}) error {
+			go func() {
+				<-replySent
+				recvStream <- stream
+			}()
+			return nil
+		})
+		if conn == nil {
+			t.Fatal("unexpected nil conn")
+		}
+		defer conn.Close()
+		select {
+		case stream := <-recvStream:
+			defer stream.Reset()
+			headerValue := stream.Headers().Get("mykey")
+			if headerValue != "myvalue" {
+				t.Errorf("expected headers.Get(mykey)=myvalue, got %q", headerValue)
+			}
+		case <-time.After(5 * time.Second):
+			t.Errorf("timeout waiting for created stream to arrive on server")
+		}
+	})
+	for i := 0; i < 1000; i++ {
+		serverDone = make(chan struct{})
+		server := httptest.NewServer(fakeServer)
+		defer server.Close()
+		req, err := http.NewRequest("GET", server.URL, nil)
+		if err != nil {
+			t.Fatalf("error creating request: %s", err)
+		}
+		upgradeRoundTripper := NewRoundTripper(nil)
+		client := &http.Client{Transport: upgradeRoundTripper}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("unexpected non-nil err from client.Do: %s", err)
+		}
+		conn, err := upgradeRoundTripper.NewConnection(resp)
+		if err != nil {
+			t.Fatalf("unexpected non-nil err from upgradeRoundTripper.NewConnection: %s", err)
+		}
+		defer conn.Close()
+		headers := http.Header{}
+		headers.Set("mykey", "myvalue")
+		_, err = conn.CreateStream(headers)
+		if err != nil {
+			t.Fatalf("unexpected non-nil err from conn.CreateStream: %s", err)
+		}
+		<-serverDone
 	}
 }
