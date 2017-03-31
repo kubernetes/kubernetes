@@ -14677,6 +14677,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/metrics",
         "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
 )

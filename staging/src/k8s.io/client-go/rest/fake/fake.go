@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
 )
 
@@ -50,9 +51,10 @@ type RESTClient struct {
 	APIRegistry          *registered.APIRegistrationManager
 	VersionedAPIPath     string
 
-	Req  *http.Request
-	Resp *http.Response
-	Err  error
+	Req           *http.Request
+	Resp          *http.Response
+	Err           error
+	ClientMetrics metrics.ClientMetrics
 }
 
 func (c *RESTClient) Get() *restclient.Request {
@@ -111,7 +113,7 @@ func (c *RESTClient) request(verb string) *restclient.Request {
 		serializers.StreamingSerializer = info.StreamSerializer.Serializer
 		serializers.Framer = info.StreamSerializer.Framer
 	}
-	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil)
+	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, c.ClientMetrics)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {
