@@ -132,16 +132,19 @@ func (o *ViewLastAppliedOptions) Validate(cmd *cobra.Command) error {
 
 func (o *ViewLastAppliedOptions) RunApplyViewLastApplied() error {
 	for _, str := range o.LastAppliedConfigurationList {
-		yamlOutput, err := yaml.JSONToYAML([]byte(str))
 		switch o.OutputFormat {
 		case "json":
 			jsonBuffer := &bytes.Buffer{}
-			err = json.Indent(jsonBuffer, []byte(str), "", "  ")
+			err := json.Indent(jsonBuffer, []byte(str), "", "  ")
 			if err != nil {
 				return err
 			}
 			fmt.Fprintf(o.Out, string(jsonBuffer.Bytes()))
 		case "yaml":
+			yamlOutput, err := yaml.JSONToYAML([]byte(str))
+			if err != nil {
+				return err
+			}
 			fmt.Fprintf(o.Out, string(yamlOutput))
 		}
 	}
