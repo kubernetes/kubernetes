@@ -12878,8 +12878,22 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.LeaderElectionConfiguration"),
 							},
 						},
+						"policyConfigMapName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "PolicyConfigMapName is the name of the ConfigMap object that specifies the scheduler's policy config. If UseLegacyPolicyConfig is true, scheduler uses PolicyConfigFile. If UseLegacyPolicyConfig is false and PolicyConfigMapName is not empty, the ConfigMap object with this name must exist before scheduler initialization.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"useLegacyPolicyConfig": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and to use PolicyConfigFile if available.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 					},
-					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection"},
+					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection", "policyConfigMapName", "useLegacyPolicyConfig"},
 				},
 			},
 			Dependencies: []string{
