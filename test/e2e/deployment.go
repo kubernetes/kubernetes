@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	It("RollingUpdateDeployment should delete old pods and create new ones", func() {
 		testRollingUpdateDeployment(f)
 	})
-	It("RecreateDeployment should delete old pods and create new ones", func() {
+	It("RecreateDeployment should delete old pods and create new ones [Flaky]", func() {
 		testRecreateDeployment(f)
 	})
 	It("deployment should delete old replica sets", func() {
