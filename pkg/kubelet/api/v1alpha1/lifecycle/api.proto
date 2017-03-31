@@ -39,7 +39,7 @@ message UnregisterReply {
   string error = 1;
 }
 
-service EventHandler {
+service Isolator {
   rpc Notify(Event) returns (EventReply) {}
 }
 
