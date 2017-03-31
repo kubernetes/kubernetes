@@ -422,25 +422,6 @@ func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) {
 	Logf("Ignore \"not found\" error above. Pod %v successfully deleted", pod.Name)
 }
 
-// Create the test pod, wait for (hopefully) success, and then delete the pod.
-func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, claimName string) {
-
-	Logf("Creating nfs test pod")
-
-	// Make pod spec
-	pod := MakeWritePod(ns, claimName)
-
-	// Instantiate pod (Create)
-	runPod, err := c.CoreV1().Pods(ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(runPod).NotTo(BeNil())
-
-	defer DeletePodWithWait(f, c, runPod)
-
-	// Wait for the test pod to complete its lifecycle
-	testPodSuccessOrFail(c, ns, runPod)
-}
-
 // Sanity check for GCE testing.  Verify the persistent disk attached to the node.
 func VerifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 	gceCloud, err := GetGCECloud()
@@ -530,75 +511,6 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 			},
 		},
 	}
-}
-
-// Returns a pod definition based on the namespace. The pod references the PVC's
-// name.
-func MakeWritePod(ns string, pvcName string) *v1.Pod {
-	return MakePod(ns, pvcName, true, "touch /mnt/SUCCESS && (id -G | grep -E '\\b777\\b')")
-}
-
-// Returns a pod definition based on the namespace. The pod references the PVC's
-// name.  A slice of BASH commands can be supplied as args to be run by the pod
-func MakePod(ns string, pvcName string, isPrivileged bool, command string) *v1.Pod {
-
-	if len(command) == 0 {
-		command = "while true; do sleep 1; done"
-	}
-	return &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-tester-",
-			Namespace:    ns,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    "write-pod",
-					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", command},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      pvcName,
-							MountPath: "/mnt",
-						},
-					},
-					SecurityContext: &v1.SecurityContext{
-						Privileged: &isPrivileged,
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyOnFailure,
-			Volumes: []v1.Volume{
-				{
-					Name: pvcName,
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: pvcName,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-// Define and create a pod with a mounted PV.  Pod runs infinite loop until killed.
-func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
-	clientPod := MakePod(ns, pvc.Name, true, "")
-	clientPod, err := c.CoreV1().Pods(ns).Create(clientPod)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Verify the pod is running before returning it
-	err = WaitForPodRunningInNamespace(c, clientPod)
-	Expect(err).NotTo(HaveOccurred())
-	clientPod, err = c.CoreV1().Pods(ns).Get(clientPod.Name, metav1.GetOptions{})
-	Expect(apierrs.IsNotFound(err)).To(BeFalse())
-	return clientPod
 }
 
 func CreatePDWithRetry() (string, error) {
@@ -702,4 +614,106 @@ func deletePD(pdName string) error {
 	} else {
 		return fmt.Errorf("Provider does not support volume deletion")
 	}
+}
+
+// Create the test pod, wait for (hopefully) success, and then delete the pod.
+func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) {
+	Logf("Creating nfs test pod")
+	// Make pod spec
+	pod := MakeWritePod(ns, pvc)
+
+	// Instantiate pod (Create)
+	runPod, err := c.CoreV1().Pods(ns).Create(pod)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(runPod).NotTo(BeNil())
+
+	defer DeletePodWithWait(f, c, runPod)
+
+	// Wait for the test pod to complete its lifecycle
+	testPodSuccessOrFail(c, ns, runPod)
+}
+
+// Returns a pod definition based on the namespace. The pod references the PVC's
+// name.
+func MakeWritePod(ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
+	return MakePod(ns, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
+}
+
+// Returns a pod definition based on the namespace. The pod references the PVC's
+// name.  A slice of BASH commands can be supplied as args to be run by the pod
+func MakePod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *v1.Pod {
+	if len(command) == 0 {
+		command = "while true; do sleep 1; done"
+	}
+	podSpec := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "pvc-tester-",
+			Namespace:    ns,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    "write-pod",
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", command},
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &isPrivileged,
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyOnFailure,
+		},
+	}
+	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
+	var volumes = make([]v1.Volume, len(pvclaims))
+	for index, pvclaim := range pvclaims {
+		volumename := fmt.Sprintf("volume%v", index+1)
+		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
+		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+	}
+	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
+	podSpec.Spec.Volumes = volumes
+	return podSpec
+}
+
+// create pod with given claims
+func CreatePod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *v1.Pod {
+	podSpec := MakePod(namespace, pvclaims, isPrivileged, command)
+	pod, err := client.CoreV1().Pods(namespace).Create(podSpec)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Waiting for pod to be running
+	Expect(WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
+
+	// get fresh pod info
+	pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	return pod
+}
+
+// Define and create a pod with a mounted PV.  Pod runs infinite loop until killed.
+func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
+	return CreatePod(c, ns, []*v1.PersistentVolumeClaim{pvc}, true, "")
+}
+
+// wait until all pvcs phase set to bound
+func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim) []*v1.PersistentVolume {
+	var persistentvolumes = make([]*v1.PersistentVolume, len(pvclaims))
+	for index, claim := range pvclaims {
+		err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, Poll, ClaimProvisionTimeout)
+		Expect(err).NotTo(HaveOccurred())
+		// Get new copy of the claim
+		claim, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		// Get the bounded PV
+		persistentvolumes[index], err = client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+	}
+	return persistentvolumes
 }

@@ -40,7 +40,7 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 	// 2. create the nfs writer pod, test if the write was successful,
 	//    then delete the pod and verify that it was deleted
 	By("Checking pod has write access to PersistentVolume")
-	framework.CreateWaitAndDeletePod(f, c, ns, pvc.Name)
+	framework.CreateWaitAndDeletePod(f, c, ns, pvc)
 
 	// 3. delete the PVC, wait for PV to become "Released"
 	By("Deleting the PVC to invoke the reclaim policy.")
@@ -66,7 +66,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 		_, found := pvols[pvc.Spec.VolumeName]
 		Expect(found).To(BeTrue())
 		// TODO: currently a serialized test of each PV
-		framework.CreateWaitAndDeletePod(f, c, pvcKey.Namespace, pvcKey.Name)
+		framework.CreateWaitAndDeletePod(f, c, pvcKey.Namespace, pvc)
 	}
 
 	// 2. delete each PVC, wait for its bound PV to reach `expectedPhase`
@@ -262,7 +262,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
 			// (and test) succeed.
 			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume] [Flaky]", func() {
 				By("Writing to the volume.")
-				pod := framework.MakeWritePod(ns, pvc.Name)
+				pod := framework.MakeWritePod(ns, pvc)
 				pod, err := c.CoreV1().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
 				err = framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
@@ -279,8 +279,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
-				pod = framework.MakePod(ns, pvc.Name, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
-
+				pod = framework.MakePod(ns, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
 				err = framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)

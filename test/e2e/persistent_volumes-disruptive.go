@@ -202,7 +202,7 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 // initTestCase initializes spec resources (pv, pvc, and pod) and returns pointers to be consumed by the test
 func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, ns, nodeName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	pv, pvc := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
-	pod := framework.MakePod(ns, pvc.Name, true, "")
+	pod := framework.MakePod(ns, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating nfs client Pod %s on node %s", pod.Name, nodeName)
 	pod, err := c.CoreV1().Pods(ns).Create(pod)
