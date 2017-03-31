@@ -118,7 +118,7 @@ endif
 push: build
 	gcloud docker -- push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
 ifeq ($(ARCH),amd64)
-	docker rmi ${REGISTRY}/hyperkube:${VERSION} || true
+	docker rmi ${REGISTRY}/hyperkube:${VERSION} 2>/dev/null || true
 	docker tag ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
 	gcloud docker -- push ${REGISTRY}/hyperkube:${VERSION}
 endif
