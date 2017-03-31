@@ -48,10 +48,10 @@ EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi"}
 EVICTION_SOFT=${EVICTION_SOFT:-""}
 EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 
-# We disable cluster DNS by default because this script uses docker0 (or whatever
-# container bridge docker is currently using) and we don't know the IP of the
-# DNS pod to pass in as --cluster-dns. To set this up by hand, set this flag
-# and change DNS_SERVER_IP to the appropriate IP.
+# This script uses docker0 (or whatever container bridge docker is currently using)
+# and we don't know the IP of the DNS pod to pass in as --cluster-dns.
+# To set this up by hand, set this flag and change DNS_SERVER_IP.
+# Note also that you need API_HOST (defined above) for correct DNS.
 ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
