@@ -190,6 +190,7 @@ KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
+LOG_DIR=${LOG_DIR:-"/tmp"}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
@@ -456,7 +457,7 @@ function start_apiserver {
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-aggregator
 
 
-    APISERVER_LOG=/tmp/kube-apiserver.log
+    APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
@@ -532,7 +533,7 @@ function start_controller_manager {
       node_cidr_args="--allocate-node-cidrs=true --cluster-cidr=10.1.0.0/16 "
     fi
 
-    CTLRMGR_LOG=/tmp/kube-controller-manager.log
+    CTLRMGR_LOG=${LOG_DIR}/kube-controller-manager.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" controller-manager \
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -550,7 +551,7 @@ function start_controller_manager {
 }
 
 function start_kubelet {
-    KUBELET_LOG=/tmp/kubelet.log
+    KUBELET_LOG=${LOG_DIR}/kubelet.log
     mkdir -p ${POD_MANIFEST_PATH} || true
 
     priv_arg=""
@@ -678,7 +679,7 @@ function start_kubelet {
 }
 
 function start_kubeproxy {
-    PROXY_LOG=/tmp/kube-proxy.log
+    PROXY_LOG=${LOG_DIR}/kube-proxy.log
     sudo "${GO_OUT}/hyperkube" proxy \
       --v=${LOG_LEVEL} \
       --hostname-override="${HOSTNAME_OVERRIDE}" \
@@ -687,7 +688,7 @@ function start_kubeproxy {
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 
-    SCHEDULER_LOG=/tmp/kube-scheduler.log
+    SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
       --kubeconfig "$CERT_DIR"/scheduler.kubeconfig \
