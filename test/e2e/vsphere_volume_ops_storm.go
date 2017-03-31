@@ -19,13 +19,10 @@ package e2e
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
@@ -107,13 +104,13 @@ var _ = framework.KubeDescribe("vsphere volume operations storm [Volume]", func(
 		}
 
 		By("Waiting for all claims to be in bound phase")
-		persistentvolumes = waitForPVClaimBoundPhase(client, pvclaims)
+		persistentvolumes = framework.WaitForPVClaimBoundPhase(client, pvclaims)
 
 		By("Creating pod to attach PVs to the node")
-		pod := createPod(client, namespace, pvclaims)
+		pod := framework.CreatePod(client, namespace, pvclaims, false, "")
 
 		By("Verify all volumes are accessible and available in the pod")
-		verifyVolumesAccessible(pod, persistentvolumes, vsp)
+		verifyVSphereVolumesAccessible(pod, persistentvolumes, vsp)
 
 		By("Deleting pod")
 		framework.DeletePodWithWait(f, client, pod)
@@ -124,80 +121,3 @@ var _ = framework.KubeDescribe("vsphere volume operations storm [Volume]", func(
 		}
 	})
 })
-
-// create pod with given claims
-func createPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim) *v1.Pod {
-	podSpec := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pod-many-volumes-",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    "volume-tester",
-					Image:   "gcr.io/google_containers/busybox:1.24",
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "while true ; do sleep 2 ; done"},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
-	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
-	var volumes = make([]v1.Volume, len(pvclaims))
-	for index, pvclaim := range pvclaims {
-		volumename := fmt.Sprintf("volume%v", index+1)
-		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
-		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
-	}
-	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
-	podSpec.Spec.Volumes = volumes
-
-	pod, err := client.CoreV1().Pods(namespace).Create(podSpec)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Waiting for pod to be running
-	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
-
-	// get fresh pod info
-	pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	return pod
-}
-
-// verify volumes are attached to the node and are accessible in pod
-func verifyVolumesAccessible(pod *v1.Pod, persistentvolumes []*v1.PersistentVolume, vsp *vsphere.VSphere) {
-	nodeName := pod.Spec.NodeName
-	namespace := pod.Namespace
-	for index, pv := range persistentvolumes {
-		// Verify disks are attached to the node
-		isAttached, err := verifyVSphereDiskAttached(vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(nodeName))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
-		// Verify Volumes are accessible
-		filepath := filepath.Join("/mnt/", fmt.Sprintf("volume%v", index+1), "/emptyFile.txt")
-		_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/touch", filepath}, "", time.Minute)
-		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
-// wait until all pvcs phase set to bound
-func waitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim) []*v1.PersistentVolume {
-	var persistentvolumes = make([]*v1.PersistentVolume, len(pvclaims))
-	for index, claim := range pvclaims {
-		err := framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
-		// Get new copy of the claim
-		claim, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
-
-		// Get the bounded PV
-		persistentvolumes[index], err = client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
-	}
-	return persistentvolumes
-}
