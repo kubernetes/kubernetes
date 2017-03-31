@@ -95,6 +95,8 @@ type Config struct {
 	EnableContentionProfiling bool
 	EnableMetrics             bool
 
+	DisabledPostStartHooks sets.String
+
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
 	// AuditWriter is the destination for audit logs.  If nil, they will not be written.
@@ -197,6 +199,7 @@ func NewConfig() *Config {
 		RequestContextMapper:        apirequest.NewRequestContextMapper(),
 		BuildHandlerChainsFunc:      DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
+		DisabledPostStartHooks:      sets.NewString(),
 		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz},
 		EnableIndex:                 true,
 		EnableProfiling:             true,
@@ -395,8 +398,10 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		swaggerConfig: c.SwaggerConfig,
 		openAPIConfig: c.OpenAPIConfig,
 
-		postStartHooks: map[string]postStartHookEntry{},
-		healthzChecks:  c.HealthzChecks,
+		postStartHooks:         map[string]postStartHookEntry{},
+		disabledPostStartHooks: c.DisabledPostStartHooks,
+
+		healthzChecks: c.HealthzChecks,
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
