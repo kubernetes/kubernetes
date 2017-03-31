@@ -260,6 +260,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return err
 	}
 	var options []string
+	// Linux system default is 50% of capacity.
 	if memoryLimits > 0 {
 		options = []string{fmt.Sprintf("size=%d", memoryLimits)}
 	}

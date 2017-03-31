@@ -20,18 +20,16 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
-
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 )
 
 const (
-	// Default name for the devShm volume.
-	defaultDevShmVolumeName string = "dev-shm"
 	// Default mount directory for the shm volume.
-	defaultDevShmMountPath string = "/dev/shm"
+	defaultDevShmMountPath        string = "/dev/shm"
+	defaultDevShmVolumeNamePrefix string = "dev-shm"
 )
 
 func init() {
@@ -66,26 +64,58 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 		return errors.NewBadRequest(fmt.Sprintf("expected *api.Pod but got %T", attributes.GetObject()))
 	}
 
-	// Find the volume and volume name for the ServiceAccountTokenSecret if it already exists
-	hasDevShmVolume := false
-	glog.Errorf("%+v", pod.Spec.Volumes)
-	for _, volume := range pod.Spec.Volumes {
-		if volume.EmptyDir != nil && volume.EmptyDir.Medium == api.StorageMediumMemory && volume.Name == defaultDevShmVolumeName {
-			hasDevShmVolume = true
+	// Check if the /dev/shm volume needs to be mounted on any containers.
+	needDevShmVolume := false
+	for _, container := range pod.Spec.InitContainers {
+		devShmVolumeExists := false
+		for _, volumeMount := range container.VolumeMounts {
+			if volumeMount.MountPath == defaultDevShmMountPath {
+				devShmVolumeExists = true
+			}
+		}
+		if !devShmVolumeExists {
+			needDevShmVolume = true
 			break
 		}
 	}
+	if !needDevShmVolume {
+		for _, container := range pod.Spec.Containers {
+			devShmVolumeExists := false
+			for _, volumeMount := range container.VolumeMounts {
+				if volumeMount.MountPath == defaultDevShmMountPath {
+					devShmVolumeExists = true
+				}
+			}
+			if !devShmVolumeExists {
+				needDevShmVolume = true
+				break
+			}
+		}
+	}
+
+	if !needDevShmVolume {
+		return nil
+	}
+	devShmVolumeName := defaultDevShmVolumeNamePrefix + string(uuid.NewUUID())
+	volume := api.Volume{
+		Name: devShmVolumeName,
+		VolumeSource: api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{
+				Medium: api.StorageMediumMemory,
+			},
+		},
+	}
+	pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+
 	// Create the prototypical VolumeMount
 	volumeMount := api.VolumeMount{
-		Name:      defaultDevShmVolumeName,
+		Name:      devShmVolumeName,
 		MountPath: defaultDevShmMountPath,
 	}
 	// Ensure every container mounts the shm volume
-	needsDevShmVolume := false
 	for i, container := range pod.Spec.InitContainers {
 		existingContainerMount := false
 		for _, volumeMount := range container.VolumeMounts {
-			// Existing mounts at the default mount path prevent mounting of the API token
 			if volumeMount.MountPath == defaultDevShmMountPath {
 				existingContainerMount = true
 				break
@@ -93,14 +123,11 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 		}
 		if !existingContainerMount {
 			pod.Spec.InitContainers[i].VolumeMounts = append(pod.Spec.InitContainers[i].VolumeMounts, volumeMount)
-			needsDevShmVolume = true
-			glog.Errorf("%+v", pod.Spec.InitContainers[i].VolumeMounts)
 		}
 	}
 	for i, container := range pod.Spec.Containers {
 		existingContainerMount := false
 		for _, volumeMount := range container.VolumeMounts {
-			// Existing mounts at the default mount path prevent mounting of the API token
 			if volumeMount.MountPath == defaultDevShmMountPath {
 				existingContainerMount = true
 				break
@@ -108,21 +135,7 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 		}
 		if !existingContainerMount {
 			pod.Spec.Containers[i].VolumeMounts = append(pod.Spec.Containers[i].VolumeMounts, volumeMount)
-			glog.Errorf("%+v", pod.Spec.Containers[i].VolumeMounts)
-			needsDevShmVolume = true
 		}
-	}
-	// Add the volume if a container needs it
-	if !hasDevShmVolume && needsDevShmVolume {
-		volume := api.Volume{
-			Name: defaultDevShmVolumeName,
-			VolumeSource: api.VolumeSource{
-				EmptyDir: &api.EmptyDirVolumeSource{
-					Medium: api.StorageMediumMemory,
-				},
-			},
-		}
-		pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
 	}
 	return nil
 }
