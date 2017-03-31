@@ -42,6 +42,7 @@ filegroup(
         "//cmd/kubeadm/app/phases/certs:all-srcs",
         "//cmd/kubeadm/app/phases/kubeconfig:all-srcs",
         "//cmd/kubeadm/app/phases/token:all-srcs",
+        "//cmd/kubeadm/app/phases/validate:all-srcs",
         "//cmd/kubeadm/app/preflight:all-srcs",
         "//cmd/kubeadm/app/util:all-srcs",
     ],
