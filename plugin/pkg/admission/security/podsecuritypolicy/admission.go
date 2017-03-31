@@ -288,8 +288,7 @@ func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user 
 	}
 
 	for _, constraint := range list {
-		// if no user info exists then the API is being hit via the unsecured port. In this case authorize the request.
-		if user == nil || authorizedForPolicy(user, namespace, constraint, authz) || authorizedForPolicy(sa, namespace, constraint, authz) {
+		if authorizedForPolicy(user, namespace, constraint, authz) || authorizedForPolicy(sa, namespace, constraint, authz) {
 			matchedPolicies = append(matchedPolicies, constraint)
 		}
 	}
