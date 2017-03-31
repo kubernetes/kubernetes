@@ -63,9 +63,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
+	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
@@ -323,6 +325,9 @@ func BuildMasterConfig(s *options.ServerRunOptions) (*master.Config, informers.S
 	apiAuthenticator, securityDefinitions, err := authenticatorConfig.New()
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid authentication config: %v", err)
+	}
+	if !sets.NewString(s.Authorization.Modes()...).Has(modes.ModeRBAC) {
+		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
