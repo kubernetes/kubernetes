@@ -96,7 +96,7 @@ func Test_getProxyMode(t *testing.T) {
 			flag:            "iptables",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIPTables,
+			expected:        proxyModeUserspace,
 		},
 		{ // detect, error
 			flag:          "",
@@ -118,7 +118,7 @@ func Test_getProxyMode(t *testing.T) {
 			flag:            "",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIPTables,
+			expected:        proxyModeUserspace,
 		},
 	}
 	for i, c := range cases {
