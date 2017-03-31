@@ -28,7 +28,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -503,11 +502,7 @@ func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	podList, err := ListPods(deployment, rsList, podListFromClient(c))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList, podList)
+	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -526,11 +521,7 @@ func GetAllReplicaSetsV15(deployment *extensions.Deployment, c clientset.Interfa
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	podList, err := ListPodsV15(deployment, rsList, podListFromClient(c))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList, podList)
+	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -548,11 +539,7 @@ func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 	if err != nil {
 		return nil, nil, err
 	}
-	podList, err := ListPods(deployment, rsList, podListFromClient(c))
-	if err != nil {
-		return nil, nil, err
-	}
-	return FindOldReplicaSets(deployment, rsList, podList)
+	return FindOldReplicaSets(deployment, rsList)
 }
 
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
@@ -794,44 +781,24 @@ func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.R
 	return nil, nil
 }
 
-// FindOldReplicaSets returns the old replica sets targeted by the given Deployment, with the given PodList and slice of RSes.
+// FindOldReplicaSets returns the old replica sets targeted by the given Deployment, with the given slice of RSes.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, podList *v1.PodList) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	// Find all pods whose labels match deployment.Spec.Selector, and corresponding replica sets for pods in podList.
-	// All pods and replica sets are labeled with pod-template-hash to prevent overlapping
-	oldRSs := map[string]*extensions.ReplicaSet{}
-	allOldRSs := map[string]*extensions.ReplicaSet{}
-	requiredRSs := []*extensions.ReplicaSet{}
-	allRSs := []*extensions.ReplicaSet{}
+func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+	var requiredRSs []*extensions.ReplicaSet
+	var allRSs []*extensions.ReplicaSet
 	newRS, err := FindNewReplicaSet(deployment, rsList)
 	if err != nil {
-		return requiredRSs, allRSs, err
+		return nil, nil, err
 	}
-	for _, pod := range podList.Items {
-		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
-		for _, rs := range rsList {
-			rsLabelsSelector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
-			if err != nil {
-				return nil, nil, fmt.Errorf("invalid label selector: %v", err)
-			}
-			// Filter out new replica set
-			if newRS != nil && rs.UID == newRS.UID {
-				continue
-			}
-			// TODO: If there are no pods for a deployment, we will never return old replica sets....!
-			allOldRSs[rs.ObjectMeta.Name] = rs
-			if rsLabelsSelector.Matches(podLabelsSelector) {
-				oldRSs[rs.ObjectMeta.Name] = rs
-			}
+	for _, rs := range rsList {
+		// Filter out new replica set
+		if newRS != nil && rs.UID == newRS.UID {
+			continue
 		}
-	}
-	for key := range oldRSs {
-		value := oldRSs[key]
-		requiredRSs = append(requiredRSs, value)
-	}
-	for key := range allOldRSs {
-		value := allOldRSs[key]
-		allRSs = append(allRSs, value)
+		allRSs = append(allRSs, rs)
+		if *(rs.Spec.Replicas) != 0 {
+			requiredRSs = append(requiredRSs, rs)
+		}
 	}
 	return requiredRSs, allRSs, nil
 }

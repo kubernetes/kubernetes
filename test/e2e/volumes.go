@@ -381,9 +381,8 @@ func deleteCinderVolume(name string) error {
 	return err
 }
 
-// These tests need privileged containers, which are disabled by default.  Run
-// the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
-var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
+// These tests need privileged containers, which are disabled by default.
+var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	f := framework.NewDefaultFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
@@ -403,7 +402,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("NFS", func() {
-		It("should be mountable [Volume]", func() {
+		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
@@ -442,8 +441,8 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("GlusterFS", func() {
-		It("should be mountable [Volume]", func() {
+	framework.KubeDescribe("GlusterFS [Feature:Volumes]", func() {
+		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "gluster",
@@ -527,8 +526,8 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// are installed on all nodes!
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
 
-	framework.KubeDescribe("iSCSI", func() {
-		It("should be mountable [Volume]", func() {
+	framework.KubeDescribe("iSCSI [Feature:Volumes]", func() {
+		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "iscsi",
@@ -574,8 +573,8 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// Ceph RBD
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("Ceph RBD", func() {
-		It("should be mountable [Volume]", func() {
+	framework.KubeDescribe("Ceph RBD [Feature:Volumes]", func() {
+		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "rbd",
@@ -652,8 +651,8 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// Ceph
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("CephFS", func() {
-		It("should be mountable [Volume]", func() {
+	framework.KubeDescribe("CephFS [Feature:Volumes]", func() {
+		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "cephfs",
@@ -730,8 +729,8 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// and that the usual OpenStack authentication env. variables are set
 	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
 
-	framework.KubeDescribe("Cinder", func() {
-		It("should be mountable [Volume]", func() {
+	framework.KubeDescribe("Cinder [Feature:Volumes]", func() {
+		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("openstack")
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
@@ -807,7 +806,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("PD", func() {
-		It("should be mountable [Volume]", func() {
+		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
@@ -857,7 +856,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("ConfigMap", func() {
-		It("should be mountable [Volume]", func() {
+		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
 				prefix:    "configmap",
@@ -934,7 +933,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// vSphere
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("vsphere", func() {
+	framework.KubeDescribe("vsphere [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			var (

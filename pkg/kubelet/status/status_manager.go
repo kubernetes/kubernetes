@@ -441,7 +441,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		// TODO: handle conflict as a retry, make that easier too.
 		pod, err = m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
 		if err == nil {
-			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
+			glog.V(3).Infof("Status for pod %q updated successfully: (%d, %+v)", format.Pod(pod), status.version, status.status)
 			m.apiStatusVersions[pod.UID] = status.version
 			if kubepod.IsMirrorPod(pod) {
 				// We don't handle graceful deletion of mirror pods.
