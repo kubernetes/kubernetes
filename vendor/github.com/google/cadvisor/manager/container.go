@@ -32,6 +32,7 @@ import (
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/container/docker"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/summary"
@@ -39,6 +40,7 @@ import (
 
 	units "github.com/docker/go-units"
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
 // Housekeeping interval.
@@ -52,6 +54,29 @@ type containerInfo struct {
 	Subcontainers []info.ContainerReference
 	Spec          info.ContainerSpec
 }
+
+type gpuSpecInfo struct {
+	id		uint64
+	powerLimit	float64
+	memoryTotal	uint64
+}
+
+type gpuStatsInfo struct {
+	coreUsage	uint64
+	memoryUsage	uint64
+	powerDraw	float64
+	temperature	float64
+}
+
+// used to store the spec of gpus
+var gpuSpecMap map[int]gpuSpecInfo = make(map[int]gpuSpecInfo)
+
+// used to store the gpu stats
+var gpuStatMap map[int]gpuStatsInfo = make(map[int]gpuStatsInfo)
+
+const (
+	nvidiaFullpathRE            = `^/dev/nvidia[0-9]*$`
+)
 
 type containerData struct {
 	handler                  container.ContainerHandler
@@ -489,10 +514,110 @@ func (c *containerData) updateSpec() error {
 		spec.HasCustomMetrics = true
 		spec.CustomMetrics = customMetrics
 	}
+
+	spec.HasGpu = false
+	gpuSpec := getGpuSpec(c)
+	if gpuSpec != nil && gpuSpec.Limit > 0 {
+		spec.HasGpu = true
+		spec.Gpu = *gpuSpec
+	}
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.info.Spec = spec
 	return nil
+}
+
+// collect gpu spec from gpuSpecMap in these following assumptions.
+// 1. one gpu can only be attached to one container.
+// 2. gpu spec info would not change since being discoverd.
+func getGpuSpec(container *containerData) *info.GpuSpec {
+	client, err := docker.Client()
+	if err != nil {
+		glog.V(4).Info("can not load docker client when getting gpu spec.")
+		return nil
+	}
+	id := container.info.Id
+	containerJson, err := client.ContainerInspect(context.Background(), id)
+	if err != nil {
+		glog.V(4).Info("error in inspecting container:%s", id)
+		return nil
+	}
+	deviceMappings := containerJson.HostConfig.Devices
+	if deviceMappings == nil {
+		return nil
+	}
+
+	gpuSpec := &info.GpuSpec{}
+
+	gpuNum := 0
+	for _, device := range deviceMappings {
+		if isValidPath(device.PathOnHost) {
+			// obtain the index of the gpu device, such as 0,1,2
+			index := device.PathOnHost[len(device.PathOnHost) - 1:]
+			temp, err := strconv.Atoi(index)
+			if err != nil {
+				glog.Errorf("error in tansferring gpu device index:%s", err)
+				return nil
+			}
+
+			if _, ok := gpuSpecMap[temp]; ok {
+				gpuNum++
+				gpuSpec.MemoryTotal = append(gpuSpec.MemoryTotal, gpuSpecMap[temp].memoryTotal)
+				gpuSpec.PowerLimit = append(gpuSpec.PowerLimit, gpuSpecMap[temp].powerLimit)
+			}
+		}
+	}
+	if gpuNum > 0 {
+		gpuSpec.Limit = uint64(gpuNum)
+	}
+
+	return gpuSpec
+}
+
+func getGpuStats(container *containerData) *info.GpuStats {
+	client, err := docker.Client()
+	if err != nil {
+		glog.V(4).Info("can not load docker client when getting gpu spec.")
+		return nil
+	}
+	id := container.info.Id
+	containerJson, err := client.ContainerInspect(context.Background(), id)
+	if err != nil {
+		glog.V(4).Info("error in inspecting container:%s", id)
+		return nil
+	}
+	deviceMappings := containerJson.HostConfig.Devices
+	if deviceMappings == nil {
+		return nil
+	}
+
+	gpuStats := &info.GpuStats{}
+
+	for _, device := range deviceMappings {
+		if isValidPath(device.PathOnHost) {
+			// obtain the index of the gpu device, such as 0,1,2
+			index := device.PathOnHost[len(device.PathOnHost) - 1:]
+			temp, err := strconv.Atoi(index)
+			if err != nil {
+				glog.Errorf("error in tansferring gpu device index:%s", err)
+				return nil
+			}
+
+			if _, ok := gpuStatMap[temp]; ok {
+				gpuStats.CoreUsage = append(gpuStats.CoreUsage, gpuStatMap[temp].coreUsage)
+				gpuStats.MemoryUsage = append(gpuStats.MemoryUsage, gpuStatMap[temp].memoryUsage)
+				gpuStats.PowerDraw = append(gpuStats.PowerDraw, gpuStatMap[temp].powerDraw)
+				gpuStats.Temperature = append(gpuStats.Temperature, gpuStatMap[temp].temperature)
+			}
+		}
+	}
+
+	return gpuStats
+}
+
+func isValidPath(path string) bool {
+	return regexp.MustCompile(nvidiaFullpathRE).MatchString(path)
 }
 
 // Calculate new smoothed load average using the new sample of runnable threads.
@@ -563,6 +688,12 @@ func (c *containerData) updateStats() error {
 		}
 		return err
 	}
+
+	gpuStats := getGpuStats(c)
+	if gpuStats != nil {
+		stats.Gpu = *gpuStats
+	}
+
 	err = c.memoryCache.AddStats(ref, stats)
 	if err != nil {
 		return err

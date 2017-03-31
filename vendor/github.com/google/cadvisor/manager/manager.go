@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"strconv"
 	"strings"
@@ -233,6 +234,8 @@ type manager struct {
 	containerWatchers        []watcher.ContainerWatcher
 	eventsChannel            chan watcher.ContainerEvent
 	collectorHttpClient      *http.Client
+	gpuSpecLock              sync.RWMutex
+	gpuStatLock              sync.RWMutex
 }
 
 // Start the container manager.
@@ -279,6 +282,16 @@ func (self *manager) Start() error {
 	if !container.HasFactories() {
 		return nil
 	}
+
+	// continuously collect gpu data if errors
+	gpuSpecSucChannel := make(chan error)
+	go self.tickGpuSpec(gpuSpecSucChannel)
+	self.quitChannels = append(self.quitChannels, gpuSpecSucChannel)
+
+	// collect gpu stats every maxHouseKeepingInterval
+	gpuStatsSucChannel := make(chan error)
+	go self.tickGpuStats(self.maxHousekeepingInterval, gpuStatsSucChannel)
+	self.quitChannels = append(self.quitChannels, gpuStatsSucChannel)
 
 	// Create root and then recover all containers.
 	err = self.createContainer("/", watcher.Raw)
@@ -373,6 +386,148 @@ func (self *manager) getContainerData(containerName string) (*containerData, err
 		return nil, fmt.Errorf("unknown container %q", containerName)
 	}
 	return cont, nil
+}
+
+func (self *manager) tickGpuSpec(quit chan error) {
+	ticker := time.Tick(5 * time.Second)
+	for {
+		select {
+		case <-ticker:
+			if self.collectGpuSpec() == true {
+				return
+			}
+		case <-quit:
+			// Quit if asked to do so.
+			quit <- nil
+			glog.Infof("Exiting collecting gpu spec.")
+			return
+		}
+	}
+}
+
+// collect gpu spec once start the manager. Note: this function will be called only once.
+func (self *manager) collectGpuSpec() bool {
+	self.gpuSpecLock.Lock()
+	defer self.gpuSpecLock.Unlock()
+
+	glog.V(4).Info("Start collecting gpu spec.")
+	smiCmd := exec.Command("bash", "-c", "nvidia-smi --format=csv,noheader,nounits --query-gpu=memory.total,power.limit")
+	lsOut, err := smiCmd.Output()
+	if err != nil {
+		glog.V(4).Infof("error in executing nvidia-smi command:%s", err)
+		return false
+	}
+	result := string(lsOut)
+	gpus := strings.Split(result, "\n")
+	for i := 0; i < len(gpus); i++ {
+		values := strings.Split(gpus[i], ",")
+		if len(values) == 2 {
+			gpuSpec := &gpuSpecInfo{}
+			gpuSpec.id = uint64(i)
+			value := strings.TrimSpace(values[0])
+			if len(value) > 0 {
+				temp, err := strconv.Atoi(value)
+				if err != nil {
+					glog.V(4).Infof("error in tansferring node gpu memory.total to int:%s", err)
+					return false
+				}
+				gpuSpec.memoryTotal = uint64(temp)
+			}
+
+			value = strings.TrimSpace(values[1])
+			if len(value) > 0 {
+				temp, err := strconv.ParseFloat(value, 64)
+				if err != nil {
+					glog.V(4).Infof("error in tansferring node gpu power.limit to float:%s", err)
+					return false
+				}
+				gpuSpec.powerLimit = temp
+			}
+
+			gpuSpecMap[i] = *gpuSpec
+		} else {
+			glog.Warning("Got empty string while transferring node gpu spec.")
+		}
+	}
+	glog.V(4).Infof("Successfully collect gpu spec. result:%v", gpuSpecMap)
+
+	return true
+}
+
+func (self *manager) tickGpuStats(duration time.Duration, quit chan error) {
+	ticker := time.Tick(duration)
+	for {
+		select {
+		case <-ticker:
+			self.collectGpuStats()
+		case <-quit:
+			// Quit if asked to do so.
+			quit <- nil
+			glog.Infof("Exiting collecting gpu stats.")
+			return
+		}
+	}
+}
+
+// collect gpu stats once start the manager. Note: will be called every default interval.
+func (self *manager) collectGpuStats() {
+	self.gpuStatLock.Lock()
+	defer self.gpuStatLock.Unlock()
+
+	glog.V(4).Info("Start collecting gpu stats.")
+	smiCmd := exec.Command("bash", "-c", "nvidia-smi --format=csv,noheader,nounits --query-gpu=utilization.gpu,memory.used,power.draw,temperature.gpu")
+	lsOut, err := smiCmd.Output()
+	if err != nil {
+		glog.V(4).Infof("error in executing nvidia-smi command:%s", err)
+		return
+	}
+	result := string(lsOut)
+	stats := strings.Split(result, "\n")
+	for i := 0; i < len(stats); i++ {
+		if len(stats[i]) > 0 {
+			nums := strings.Split(stats[i], ",")
+			if len(nums) == 4 {
+				statsInfo := &gpuStatsInfo{}
+
+				temp, err := strconv.Atoi(strings.TrimSpace(nums[0]))
+				if err != nil {
+					glog.Errorf("error in converting gpu core usage to int:%s", err)
+					statsInfo.coreUsage = 0
+				} else {
+					statsInfo.coreUsage = uint64(temp)
+				}
+
+				temp2, err := strconv.Atoi(strings.TrimSpace(nums[1]))
+				if err != nil {
+					glog.Errorf("error in converting gpu memory usage to int:%s", err)
+					statsInfo.memoryUsage = 0
+				} else {
+					statsInfo.memoryUsage = uint64(temp2)
+				}
+
+				temp3, err := strconv.ParseFloat(strings.TrimSpace(nums[2]), 64)
+				if err != nil {
+					glog.Errorf("error in converting gpu power draw to float:%s", err)
+					statsInfo.powerDraw = 0
+				} else {
+					statsInfo.powerDraw = temp3
+				}
+
+				temp4, err := strconv.ParseFloat(strings.TrimSpace(nums[3]), 64)
+				if err != nil {
+					glog.Errorf("error in converting gpu temperature to float:%s", err)
+					statsInfo.temperature = 0
+				} else {
+					statsInfo.temperature = temp4
+				}
+
+				gpuStatMap[i] = *statsInfo
+			} else {
+				glog.Errorf("result collection counts not fit in nvidia-smi, we need 4 but got:%v", len(nums))
+			}
+		}
+	}
+	glog.V(4).Infof("Successfully collect gpu stats. result:%v", gpuStatMap)
 }
 
 func (self *manager) GetDerivedStats(containerName string, options v2.RequestOptions) (map[string]v2.DerivedStats, error) {

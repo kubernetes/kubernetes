@@ -41,6 +41,12 @@ type MemorySpec struct {
 	SwapLimit uint64 `json:"swap_limit,omitempty"`
 }
 
+type GpuSpec struct {
+	Limit        uint64	`json:"limit,omitempty"`
+	MemoryTotal  []uint64	`json:"memory_total,omitempty"`
+	PowerLimit   []float64	`json:"power_limit,omitempty"`
+}
+
 type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
@@ -55,6 +61,9 @@ type ContainerSpec struct {
 
 	HasMemory bool       `json:"has_memory"`
 	Memory    MemorySpec `json:"memory,omitempty"`
+
+	HasGpu bool	`json:"has_gpu"`
+	Gpu    GpuSpec	`json:"gpu,omitempty"`
 
 	HasNetwork bool `json:"has_network"`
 
@@ -306,6 +315,13 @@ type CpuStats struct {
 	LoadAverage int32 `json:"load_average"`
 }
 
+type GpuStats struct {
+	CoreUsage	[]uint64	`json:"core_usage,omitempty"`
+	MemoryUsage	[]uint64	`json:"memory_usage,omitempty"`
+	PowerDraw	[]float64	`json:"power_draw,omitempty"`
+	Temperature	[]float64	`json:"temperature,omitempty"`
+}
+
 type PerDiskStats struct {
 	Major uint64            `json:"major"`
 	Minor uint64            `json:"minor"`
@@ -504,6 +520,7 @@ type ContainerStats struct {
 	DiskIo    DiskIoStats  `json:"diskio,omitempty"`
 	Memory    MemoryStats  `json:"memory,omitempty"`
 	Network   NetworkStats `json:"network,omitempty"`
+	Gpu       GpuStats     `json:"gpu,omitempty"`
 
 	// Filesystem statistics
 	Filesystem []FsStats `json:"filesystem,omitempty"`
