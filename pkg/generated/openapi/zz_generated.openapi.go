@@ -12880,7 +12880,14 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 						},
 						"policyConfigMapName": {
 							SchemaProps: spec.SchemaProps{
-								Description: "PolicyConfigMapName is the name of the ConfigMap object that specifies the scheduler's policy config. If UseLegacyPolicyConfig is true, scheduler uses PolicyConfigFile. If UseLegacyPolicyConfig is false and PolicyConfigMapName is not empty, the ConfigMap object with this name must exist in the default system namespace (\"kube-system\") before scheduler initialization.",
+								Description: "PolicyConfigMapName is the name of the ConfigMap object that specifies the scheduler's policy config. If UseLegacyPolicyConfig is true, scheduler uses PolicyConfigFile. If UseLegacyPolicyConfig is false and PolicyConfigMapName is not empty, the ConfigMap object with this name must exist in PolicyConfigMapNamespace before scheduler initialization.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"policyConfigMapNamespace": {
+							SchemaProps: spec.SchemaProps{
+								Description: "PolicyConfigMapNamespace is the namespace where the above policy config map is located. If none is provided default system namespace (\"kube-system\") will be used.",
 								Type:        []string{"string"},
 								Format:      "",
 							},
@@ -12893,7 +12900,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection"},
+					Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection", "policyConfigMapName", "policyConfigMapNamespace", "useLegacyPolicyConfig"},
 				},
 			},
 			Dependencies: []string{
