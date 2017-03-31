@@ -139,6 +139,9 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 	}
 	out.LockObjectNamespace = in.LockObjectNamespace
 	out.LockObjectName = in.LockObjectName
+	out.PolicyConfigMapName = in.PolicyConfigMapName
+	out.PolicyConfigMapNamespace = in.PolicyConfigMapNamespace
+	out.UseLegacyPolicyConfig = in.UseLegacyPolicyConfig
 	return nil
 }
 
@@ -166,6 +169,9 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 	}
 	out.LockObjectNamespace = in.LockObjectNamespace
 	out.LockObjectName = in.LockObjectName
+	out.PolicyConfigMapName = in.PolicyConfigMapName
+	out.PolicyConfigMapNamespace = in.PolicyConfigMapNamespace
+	out.UseLegacyPolicyConfig = in.UseLegacyPolicyConfig
 	return nil
 }
 
