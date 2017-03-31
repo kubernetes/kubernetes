@@ -82,23 +82,18 @@ func patchObjectJSON(
 func strategicPatchObjectInPlace(
 	codec runtime.Codec,
 	defaulter runtime.ObjectDefaulter,
-	originalObject runtime.Object,
+	originalObjMap map[string]interface{},
 	patchJS []byte,
 	objToUpdate runtime.Object,
 	versionedObj runtime.Object,
-) (originalObjMap map[string]interface{}, patchMap map[string]interface{}, retErr error) {
-	originalObjMap = make(map[string]interface{})
-	if err := unstructured.DefaultConverter.ToUnstructured(originalObject, &originalObjMap); err != nil {
-		return nil, nil, err
-	}
-
+) (patchMap map[string]interface{}, retErr error) {
 	patchMap = make(map[string]interface{})
 	if err := json.Unmarshal(patchJS, &patchMap); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if err := applyPatchToObjectInPlace(codec, defaulter, originalObjMap, patchMap, objToUpdate, versionedObj); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	return
 }
