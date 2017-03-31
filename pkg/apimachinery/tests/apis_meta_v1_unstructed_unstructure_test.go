@@ -89,7 +89,7 @@ func TestDecode(t *testing.T) {
 			json: []byte(`{"items": [{"metadata": {"name": "object1"}, "apiVersion": "test", "kind": "test_kind"}, {"metadata": {"name": "object2"}, "apiVersion": "test", "kind": "test_kind"}], "apiVersion": "test", "kind": "test_list"}`),
 			want: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{"apiVersion": "test", "kind": "test_list"},
-				Items: []*unstructured.Unstructured{
+				Items: []unstructured.Unstructured{
 					{
 						Object: map[string]interface{}{
 							"metadata":   map[string]interface{}{"name": "object1"},
