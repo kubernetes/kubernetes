@@ -246,7 +246,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
 	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
-		glog.Errorf("Error adding network: %v", err)
+		glog.Errorf("Error adding network when buliding cni runtime conf: %v", err)
 		return nil, err
 	}
 
@@ -264,7 +264,7 @@ func (network *cniNetwork) addToNetwork(podName string, podNamespace string, pod
 func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) error {
 	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
-		glog.Errorf("Error deleting network: %v", err)
+		glog.Errorf("Error deleting network when buliding cni runtime conf: %v", err)
 		return err
 	}
 
