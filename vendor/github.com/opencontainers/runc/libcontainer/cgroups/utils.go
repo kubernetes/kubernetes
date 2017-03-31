@@ -23,36 +23,14 @@ const (
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cgroups.txt
 func FindCgroupMountpoint(subsystem string) (string, error) {
-	// We are not using mount.GetMounts() because it's super-inefficient,
-	// parsing it directly sped up x10 times because of not using Sscanf.
-	// It was one of two major performance drawbacks in container start.
-	if !isSubsystemAvailable(subsystem) {
-		return "", NewNotFoundError(subsystem)
-	}
-	f, err := os.Open("/proc/self/mountinfo")
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		txt := scanner.Text()
-		fields := strings.Split(txt, " ")
-		for _, opt := range strings.Split(fields[len(fields)-1], ",") {
-			if opt == subsystem {
-				return fields[4], nil
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-
-	return "", NewNotFoundError(subsystem)
+	mnt, _, err := FindCgroupMountpointAndRoot(subsystem)
+	return mnt, err
 }
 
 func FindCgroupMountpointAndRoot(subsystem string) (string, string, error) {
+	// We are not using mount.GetMounts() because it's super-inefficient,
+	// parsing it directly sped up x10 times because of not using Sscanf.
+	// It was one of two major performance drawbacks in container start.
 	if !isSubsystemAvailable(subsystem) {
 		return "", "", NewNotFoundError(subsystem)
 	}
@@ -149,7 +127,7 @@ func getCgroupMountsHelper(ss map[string]bool, mi io.Reader, all bool) ([]Mount,
 		if sepIdx == -1 {
 			return nil, fmt.Errorf("invalid mountinfo format")
 		}
-		if txt[sepIdx+3:sepIdx+9] != "cgroup" {
+		if txt[sepIdx+3:sepIdx+10] == "cgroup2" || txt[sepIdx+3:sepIdx+9] != "cgroup" {
 			continue
 		}
 		fields := strings.Split(txt, " ")
@@ -211,9 +189,6 @@ func GetAllSubsystems() ([]string, error) {
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
 		text := s.Text()
 		if text[0] != '#' {
 			parts := strings.Fields(text)
@@ -221,6 +196,9 @@ func GetAllSubsystems() ([]string, error) {
 				subsystems = append(subsystems, parts[0])
 			}
 		}
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
 	}
 	return subsystems, nil
 }
@@ -287,10 +265,6 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 	cgroups := make(map[string]string)
 
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
-
 		text := s.Text()
 		// from cgroups(7):
 		// /proc/[pid]/cgroup
@@ -307,6 +281,10 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 			cgroups[subs] = parts[2]
 		}
 	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+
 	return cgroups, nil
 }
 

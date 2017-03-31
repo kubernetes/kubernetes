@@ -26,27 +26,27 @@ import (
 
 func TestSandboxNameRoundTrip(t *testing.T) {
 	config := makeSandboxConfig("foo", "bar", "iamuid", 3)
-	actualName := makeSandboxName(config)
+	actualName := MakeSandboxName(config)
 	assert.Equal(t, "k8s_POD_foo_bar_iamuid_3", actualName)
 
-	actualMetadata, err := parseSandboxName(actualName)
+	actualMetadata, err := ParseSandboxName(actualName)
 	assert.NoError(t, err)
 	assert.Equal(t, config.Metadata, actualMetadata)
 }
 
 func TestNonParsableSandboxNames(t *testing.T) {
 	// All names must start with the kubernetes prefix "k8s".
-	_, err := parseSandboxName("owner_POD_foo_bar_iamuid_4")
+	_, err := ParseSandboxName("owner_POD_foo_bar_iamuid_4")
 	assert.Error(t, err)
 
 	// All names must contain exactly 6 parts.
-	_, err = parseSandboxName("k8s_POD_dummy_foo_bar_iamuid_4")
+	_, err = ParseSandboxName("k8s_POD_dummy_foo_bar_iamuid_4")
 	assert.Error(t, err)
-	_, err = parseSandboxName("k8s_foo_bar_iamuid_4")
+	_, err = ParseSandboxName("k8s_foo_bar_iamuid_4")
 	assert.Error(t, err)
 
 	// Should be able to parse attempt number.
-	_, err = parseSandboxName("k8s_POD_foo_bar_iamuid_notanumber")
+	_, err = ParseSandboxName("k8s_POD_foo_bar_iamuid_notanumber")
 	assert.Error(t, err)
 }
 
@@ -59,35 +59,35 @@ func TestContainerNameRoundTrip(t *testing.T) {
 			Attempt: attempt,
 		},
 	}
-	actualName := makeContainerName(sConfig, config)
+	actualName := MakeContainerName(sConfig, config)
 	assert.Equal(t, "k8s_pause_foo_bar_iamuid_5", actualName)
 
-	actualMetadata, err := parseContainerName(actualName)
+	actualMetadata, err := ParseContainerName(actualName)
 	assert.NoError(t, err)
 	assert.Equal(t, config.Metadata, actualMetadata)
 }
 
 func TestNonParsableContainerNames(t *testing.T) {
 	// All names must start with the kubernetes prefix "k8s".
-	_, err := parseContainerName("owner_frontend_foo_bar_iamuid_4")
+	_, err := ParseContainerName("owner_frontend_foo_bar_iamuid_4")
 	assert.Error(t, err)
 
 	// All names must contain exactly 6 parts.
-	_, err = parseContainerName("k8s_frontend_dummy_foo_bar_iamuid_4")
+	_, err = ParseContainerName("k8s_frontend_dummy_foo_bar_iamuid_4")
 	assert.Error(t, err)
-	_, err = parseContainerName("k8s_foo_bar_iamuid_4")
+	_, err = ParseContainerName("k8s_foo_bar_iamuid_4")
 	assert.Error(t, err)
 
 	// Should be able to parse attempt number.
-	_, err = parseContainerName("k8s_frontend_foo_bar_iamuid_notanumber")
+	_, err = ParseContainerName("k8s_frontend_foo_bar_iamuid_notanumber")
 	assert.Error(t, err)
 }
 
 func TestParseRandomizedNames(t *testing.T) {
 	// Test randomized sandbox name.
 	sConfig := makeSandboxConfig("foo", "bar", "iamuid", 3)
-	sActualName := randomizeName(makeSandboxName(sConfig))
-	sActualMetadata, err := parseSandboxName(sActualName)
+	sActualName := randomizeName(MakeSandboxName(sConfig))
+	sActualMetadata, err := ParseSandboxName(sActualName)
 	assert.NoError(t, err)
 	assert.Equal(t, sConfig.Metadata, sActualMetadata)
 
@@ -99,8 +99,8 @@ func TestParseRandomizedNames(t *testing.T) {
 			Attempt: attempt,
 		},
 	}
-	actualName := randomizeName(makeContainerName(sConfig, config))
-	actualMetadata, err := parseContainerName(actualName)
+	actualName := randomizeName(MakeContainerName(sConfig, config))
+	actualMetadata, err := ParseContainerName(actualName)
 	assert.NoError(t, err)
 	assert.Equal(t, config.Metadata, actualMetadata)
 }

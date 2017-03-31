@@ -343,7 +343,7 @@ func GetExecUser(userSpec string, defaults *ExecUser, passwd, group io.Reader) (
 			if len(groups) > 0 {
 				// First match wins, even if there's more than one matching entry.
 				user.Gid = groups[0].Gid
-			} else if groupArg != "" {
+			} else {
 				// If we can't find a group with the given name, the only other valid
 				// option is if it's a numeric group name with no associated entry in group.
 

@@ -36,6 +36,8 @@ func Compare(cmp Cmp, result string, v interface{}) Cmp {
 	switch result {
 	case "=":
 		r = pb.Compare_EQUAL
+	case "!=":
+		r = pb.Compare_NOT_EQUAL
 	case ">":
 		r = pb.Compare_GREATER
 	case "<":

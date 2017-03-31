@@ -52,7 +52,8 @@ var (
 
 var (
 	// Number of retries discovery will attempt before giving up and erroring out.
-	nRetries = uint(math.MaxUint32)
+	nRetries             = uint(math.MaxUint32)
+	maxExpoentialRetries = uint(8)
 )
 
 // JoinCluster will connect to the discovery service at the given url, and
@@ -243,7 +244,7 @@ func (d *discovery) checkCluster() ([]*client.Node, int, uint64, error) {
 		}
 		return nil, 0, 0, err
 	}
-	nodes := make([]*client.Node, 0)
+	var nodes []*client.Node
 	// append non-config keys to nodes
 	for _, n := range resp.Node.Nodes {
 		if !(path.Base(n.Key) == path.Base(configKey)) {
@@ -268,9 +269,14 @@ func (d *discovery) checkCluster() ([]*client.Node, int, uint64, error) {
 
 func (d *discovery) logAndBackoffForRetry(step string) {
 	d.retries++
-	retryTime := time.Second * (0x1 << d.retries)
-	plog.Infof("%s: error connecting to %s, retrying in %s", step, d.url, retryTime)
-	d.clock.Sleep(retryTime)
+	// logAndBackoffForRetry stops exponential backoff when the retries are more than maxExpoentialRetries and is set to a constant backoff afterward.
+	retries := d.retries
+	if retries > maxExpoentialRetries {
+		retries = maxExpoentialRetries
+	}
+	retryTimeInSecond := time.Duration(0x1<<retries) * time.Second
+	plog.Infof("%s: error connecting to %s, retrying in %s", step, d.url, retryTimeInSecond)
+	d.clock.Sleep(retryTimeInSecond)
 }
 
 func (d *discovery) checkClusterRetry() ([]*client.Node, int, uint64, error) {

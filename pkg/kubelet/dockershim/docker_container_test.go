@@ -228,7 +228,7 @@ func TestContainerLogPath(t *testing.T) {
 func TestContainerCreationConflict(t *testing.T) {
 	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
 	config := makeContainerConfig(sConfig, "pause", "iamimage", 0, map[string]string{}, map[string]string{})
-	containerName := makeContainerName(sConfig, config)
+	containerName := MakeContainerName(sConfig, config)
 	const sandboxId = "sandboxid"
 	const containerId = "containerid"
 	conflictError := fmt.Errorf("Error response from daemon: Conflict. The name \"/%s\" is already in use by container %s. You have to remove (or rename) that container to be able to reuse that name.",

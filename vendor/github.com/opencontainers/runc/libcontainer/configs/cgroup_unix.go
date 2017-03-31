@@ -22,7 +22,7 @@ type Cgroup struct {
 	// The path is assumed to be relative to the host system cgroup mountpoint.
 	Path string `json:"path"`
 
-	// ScopePrefix decribes prefix for the scope name
+	// ScopePrefix describes prefix for the scope name
 	ScopePrefix string `json:"scope_prefix"`
 
 	// Paths represent the absolute cgroups paths to join.
@@ -95,7 +95,7 @@ type Resources struct {
 	// IO read rate limit per cgroup per device, bytes per second.
 	BlkioThrottleReadBpsDevice []*ThrottleDevice `json:"blkio_throttle_read_bps_device"`
 
-	// IO write rate limit per cgroup per divice, bytes per second.
+	// IO write rate limit per cgroup per device, bytes per second.
 	BlkioThrottleWriteBpsDevice []*ThrottleDevice `json:"blkio_throttle_write_bps_device"`
 
 	// IO read rate limit per cgroup per device, IO per second.

@@ -140,7 +140,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 	}
 
 	var dockerClient dockertools.DockerInterface
-	if s.ContainerRuntime == "docker" {
+	if s.ContainerRuntime == "docker" || s.ContainerRuntime == "containerd" {
 		dockerClient = dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration,
 			s.ImagePullProgressDeadline.Duration)
 	} else {

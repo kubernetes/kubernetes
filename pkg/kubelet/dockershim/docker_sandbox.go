@@ -228,7 +228,7 @@ func (ds *dockerService) RemovePodSandbox(podSandboxID string) error {
 
 // getIPFromPlugin interrogates the network plugin for an IP.
 func (ds *dockerService) getIPFromPlugin(sandbox *dockertypes.ContainerJSON) (string, error) {
-	metadata, err := parseSandboxName(sandbox.Name)
+	metadata, err := ParseSandboxName(sandbox.Name)
 	if err != nil {
 		return "", err
 	}
@@ -314,7 +314,7 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 		hostNetwork = !hostNetwork
 	}
 
-	metadata, err := parseSandboxName(r.Name)
+	metadata, err := ParseSandboxName(r.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +476,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 
 	hc := &dockercontainer.HostConfig{}
 	createConfig := &dockertypes.ContainerCreateConfig{
-		Name: makeSandboxName(c),
+		Name: MakeSandboxName(c),
 		Config: &dockercontainer.Config{
 			Hostname: c.Hostname,
 			// TODO: Handle environment variables.

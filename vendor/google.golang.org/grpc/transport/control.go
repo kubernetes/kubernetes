@@ -111,35 +111,9 @@ func newQuotaPool(q int) *quotaPool {
 	return qb
 }
 
-// add adds n to the available quota and tries to send it on acquire.
-func (qb *quotaPool) add(n int) {
-	qb.mu.Lock()
-	defer qb.mu.Unlock()
-	qb.quota += n
-	if qb.quota <= 0 {
-		return
-	}
-	select {
-	case qb.c <- qb.quota:
-		qb.quota = 0
-	default:
-	}
-}
-
-// cancel cancels the pending quota sent on acquire, if any.
-func (qb *quotaPool) cancel() {
-	qb.mu.Lock()
-	defer qb.mu.Unlock()
-	select {
-	case n := <-qb.c:
-		qb.quota += n
-	default:
-	}
-}
-
-// reset cancels the pending quota sent on acquired, incremented by v and sends
+// add cancels the pending quota sent on acquired, incremented by v and sends
 // it back on acquire.
-func (qb *quotaPool) reset(v int) {
+func (qb *quotaPool) add(v int) {
 	qb.mu.Lock()
 	defer qb.mu.Unlock()
 	select {
@@ -151,6 +125,10 @@ func (qb *quotaPool) reset(v int) {
 	if qb.quota <= 0 {
 		return
 	}
+	// After the pool has been created, this is the only place that sends on
+	// the channel. Since mu is held at this point and any quota that was sent
+	// on the channel has been retrieved, we know that this code will always
+	// place any positive quota value on the channel.
 	select {
 	case qb.c <- qb.quota:
 		qb.quota = 0

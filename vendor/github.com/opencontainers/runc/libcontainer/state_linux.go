@@ -39,7 +39,7 @@ type containerState interface {
 
 func destroy(c *linuxContainer) error {
 	if !c.config.Namespaces.Contains(configs.NEWPID) {
-		if err := killCgroupProcesses(c.cgroupManager); err != nil {
+		if err := signalAllProcesses(c.cgroupManager, syscall.SIGKILL); err != nil {
 			logrus.Warn(err)
 		}
 	}
@@ -60,7 +60,6 @@ func runPoststopHooks(c *linuxContainer) error {
 		s := configs.HookState{
 			Version:    c.config.Version,
 			ID:         c.id,
-			Root:       c.config.Rootfs,
 			BundlePath: utils.SearchLabels(c.config.Labels, "bundle"),
 		}
 		for _, hook := range c.config.Hooks.Poststop {
@@ -83,10 +82,7 @@ func (b *stoppedState) status() Status {
 
 func (b *stoppedState) transition(s containerState) error {
 	switch s.(type) {
-	case *runningState:
-		b.c.state = s
-		return nil
-	case *restoredState:
+	case *runningState, *restoredState:
 		b.c.state = s
 		return nil
 	case *stoppedState:
@@ -212,9 +208,7 @@ func (r *restoredState) status() Status {
 
 func (r *restoredState) transition(s containerState) error {
 	switch s.(type) {
-	case *stoppedState:
-		return nil
-	case *runningState:
+	case *stoppedState, *runningState:
 		return nil
 	}
 	return newStateTransitionError(r, s)

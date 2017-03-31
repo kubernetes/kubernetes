@@ -278,6 +278,8 @@ go_library(
 go_library(
     name = "github.com/Sirupsen/logrus",
     srcs = [
+        "github.com/Sirupsen/logrus/alt_exit.go",
+        "github.com/Sirupsen/logrus/doc.go",
         "github.com/Sirupsen/logrus/entry.go",
         "github.com/Sirupsen/logrus/exported.go",
         "github.com/Sirupsen/logrus/formatter.go",
@@ -288,6 +290,7 @@ go_library(
         "github.com/Sirupsen/logrus/terminal_linux.go",
         "github.com/Sirupsen/logrus/terminal_notwindows.go",
         "github.com/Sirupsen/logrus/text_formatter.go",
+        "github.com/Sirupsen/logrus/writer.go",
     ],
     tags = ["automanaged"],
 )
@@ -1211,6 +1214,7 @@ go_library(
         "//vendor:github.com/coreos/pkg/capnslog",
         "//vendor:golang.org/x/crypto/bcrypt",
         "//vendor:golang.org/x/net/context",
+        "//vendor:google.golang.org/grpc/metadata",
     ],
 )
 
@@ -1276,8 +1280,10 @@ go_library(
         "//vendor:github.com/coreos/etcd/mvcc/mvccpb",
         "//vendor:github.com/coreos/etcd/pkg/tlsutil",
         "//vendor:github.com/ghodss/yaml",
+        "//vendor:github.com/grpc-ecosystem/go-grpc-prometheus",
         "//vendor:golang.org/x/net/context",
         "//vendor:google.golang.org/grpc",
+        "//vendor:google.golang.org/grpc/codes",
         "//vendor:google.golang.org/grpc/credentials",
         "//vendor:google.golang.org/grpc/grpclog",
         "//vendor:google.golang.org/grpc/metadata",
@@ -1384,7 +1390,6 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:golang.org/x/net/context",
-        "//vendor:google.golang.org/grpc/metadata",
     ],
 )
 
@@ -1487,6 +1492,7 @@ go_library(
         "//vendor:github.com/coreos/etcd/version",
         "//vendor:github.com/coreos/pkg/capnslog",
         "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/grpc-ecosystem/go-grpc-prometheus",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:golang.org/x/net/context",
         "//vendor:google.golang.org/grpc",
@@ -1571,6 +1577,7 @@ go_library(
         "//vendor:github.com/coreos/etcd/version",
         "//vendor:github.com/coreos/go-semver/semver",
         "//vendor:github.com/coreos/pkg/capnslog",
+        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -1594,6 +1601,7 @@ go_library(
     srcs = [
         "github.com/coreos/etcd/integration/bridge.go",
         "github.com/coreos/etcd/integration/cluster.go",
+        "github.com/coreos/etcd/integration/cluster_direct.go",
         "github.com/coreos/etcd/integration/doc.go",
     ],
     tags = ["automanaged"],
@@ -1625,6 +1633,7 @@ go_library(
     deps = [
         "//vendor:github.com/coreos/etcd/lease/leasepb",
         "//vendor:github.com/coreos/etcd/mvcc/backend",
+        "//vendor:github.com/coreos/etcd/pkg/monotime",
     ],
 )
 
@@ -1638,6 +1647,8 @@ go_library(
     deps = [
         "//vendor:github.com/coreos/etcd/etcdserver/etcdserverpb",
         "//vendor:github.com/coreos/etcd/lease",
+        "//vendor:github.com/coreos/etcd/lease/leasepb",
+        "//vendor:github.com/coreos/etcd/pkg/httputil",
         "//vendor:golang.org/x/net/context",
     ],
 )
@@ -1646,7 +1657,10 @@ go_library(
     name = "github.com/coreos/etcd/lease/leasepb",
     srcs = ["github.com/coreos/etcd/lease/leasepb/lease.pb.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/protobuf/proto"],
+    deps = [
+        "//vendor:github.com/coreos/etcd/etcdserver/etcdserverpb",
+        "//vendor:github.com/golang/protobuf/proto",
+    ],
 )
 
 go_library(
@@ -1722,6 +1736,15 @@ go_library(
 )
 
 go_library(
+    name = "github.com/coreos/etcd/pkg/cpuutil",
+    srcs = [
+        "github.com/coreos/etcd/pkg/cpuutil/doc.go",
+        "github.com/coreos/etcd/pkg/cpuutil/endian.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/coreos/etcd/pkg/crc",
     srcs = ["github.com/coreos/etcd/pkg/crc/crc.go"],
     tags = ["automanaged"],
@@ -1776,15 +1799,28 @@ go_library(
 )
 
 go_library(
+    name = "github.com/coreos/etcd/pkg/monotime",
+    srcs = [
+        "github.com/coreos/etcd/pkg/monotime/issue15006.s",
+        "github.com/coreos/etcd/pkg/monotime/monotime.go",
+        "github.com/coreos/etcd/pkg/monotime/nanotime.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/coreos/etcd/pkg/netutil",
     srcs = [
         "github.com/coreos/etcd/pkg/netutil/isolate_linux.go",
         "github.com/coreos/etcd/pkg/netutil/netutil.go",
+        "github.com/coreos/etcd/pkg/netutil/routes_linux.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//vendor:github.com/coreos/etcd/pkg/cpuutil",
         "//vendor:github.com/coreos/etcd/pkg/types",
         "//vendor:github.com/coreos/pkg/capnslog",
+        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -1882,6 +1918,53 @@ go_library(
 )
 
 go_library(
+    name = "github.com/coreos/etcd/proxy/grpcproxy",
+    srcs = [
+        "github.com/coreos/etcd/proxy/grpcproxy/auth.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/cluster.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/doc.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/kv.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/kv_client_adapter.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/lease.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/maintenance.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/metrics.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watch.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watch_broadcast.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watch_broadcasts.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watch_client_adapter.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watch_ranges.go",
+        "github.com/coreos/etcd/proxy/grpcproxy/watcher.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/coreos/etcd/clientv3",
+        "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc",
+        "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
+        "//vendor:github.com/coreos/etcd/etcdserver/etcdserverpb",
+        "//vendor:github.com/coreos/etcd/mvcc",
+        "//vendor:github.com/coreos/etcd/mvcc/mvccpb",
+        "//vendor:github.com/coreos/etcd/proxy/grpcproxy/cache",
+        "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:golang.org/x/time/rate",
+        "//vendor:google.golang.org/grpc",
+        "//vendor:google.golang.org/grpc/metadata",
+    ],
+)
+
+go_library(
+    name = "github.com/coreos/etcd/proxy/grpcproxy/cache",
+    srcs = ["github.com/coreos/etcd/proxy/grpcproxy/cache/store.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
+        "//vendor:github.com/coreos/etcd/etcdserver/etcdserverpb",
+        "//vendor:github.com/coreos/etcd/pkg/adt",
+        "//vendor:github.com/karlseguin/ccache",
+    ],
+)
+
+go_library(
     name = "github.com/coreos/etcd/raft",
     srcs = [
         "github.com/coreos/etcd/raft/doc.go",
@@ -1892,6 +1975,7 @@ go_library(
         "github.com/coreos/etcd/raft/progress.go",
         "github.com/coreos/etcd/raft/raft.go",
         "github.com/coreos/etcd/raft/rawnode.go",
+        "github.com/coreos/etcd/raft/read_only.go",
         "github.com/coreos/etcd/raft/status.go",
         "github.com/coreos/etcd/raft/storage.go",
         "github.com/coreos/etcd/raft/util.go",
@@ -2008,10 +2092,7 @@ go_library(
     name = "github.com/coreos/etcd/version",
     srcs = ["github.com/coreos/etcd/version/version.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/coreos/etcd/pkg/fileutil",
-        "//vendor:github.com/coreos/etcd/pkg/types",
-    ],
+    deps = ["//vendor:github.com/coreos/go-semver/semver"],
 )
 
 go_library(
@@ -2323,6 +2404,257 @@ go_library(
         "github.com/dgrijalva/jwt-go/token.go",
     ],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/docker/containerd",
+    srcs = [
+        "github.com/docker/containerd/config.go",
+        "github.com/docker/containerd/container.go",
+        "github.com/docker/containerd/errors.go",
+        "github.com/docker/containerd/event.go",
+        "github.com/docker/containerd/mount.go",
+        "github.com/docker/containerd/runtime.go",
+        "github.com/docker/containerd/version.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/net/context"],
+)
+
+go_library(
+    name = "github.com/docker/containerd/api/services/execution",
+    srcs = ["github.com/docker/containerd/api/services/execution/execution.pb.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/docker/containerd/api/types/container",
+        "//vendor:github.com/docker/containerd/api/types/mount",
+        "//vendor:github.com/gogo/protobuf/gogoproto",
+        "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/gogo/protobuf/types",
+        "//vendor:github.com/golang/protobuf/ptypes/empty",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:google.golang.org/grpc",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/api/services/rootfs",
+    srcs = ["github.com/docker/containerd/api/services/rootfs/rootfs.pb.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/docker/containerd/api/types/descriptor",
+        "//vendor:github.com/docker/containerd/api/types/mount",
+        "//vendor:github.com/gogo/protobuf/gogoproto",
+        "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/opencontainers/go-digest",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:google.golang.org/grpc",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/api/services/shim",
+    srcs = ["github.com/docker/containerd/api/services/shim/shim.pb.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/docker/containerd/api/types/container",
+        "//vendor:github.com/docker/containerd/api/types/mount",
+        "//vendor:github.com/gogo/protobuf/gogoproto",
+        "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/golang/protobuf/ptypes/empty",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:google.golang.org/grpc",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/api/types/container",
+    srcs = ["github.com/docker/containerd/api/types/container/container.pb.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gogo/protobuf/gogoproto",
+        "//vendor:github.com/gogo/protobuf/proto",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/api/types/descriptor",
+    srcs = ["github.com/docker/containerd/api/types/descriptor/descriptor.pb.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gogo/protobuf/gogoproto",
+        "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/opencontainers/go-digest",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/api/types/mount",
+    srcs = ["github.com/docker/containerd/api/types/mount/mount.pb.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gogo/protobuf/gogoproto",
+        "//vendor:github.com/gogo/protobuf/proto",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/archive",
+    srcs = [
+        "github.com/docker/containerd/archive/tar.go",
+        "github.com/docker/containerd/archive/tar_linux.go",
+        "github.com/docker/containerd/archive/time.go",
+        "github.com/docker/containerd/archive/time_linux.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/docker/containerd/fs",
+        "//vendor:github.com/docker/containerd/log",
+        "//vendor:github.com/opencontainers/runc/libcontainer/system",
+        "//vendor:github.com/pkg/errors",
+        "//vendor:github.com/stevvooe/continuity/sysx",
+        "//vendor:golang.org/x/sys/unix",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/archive/compression",
+    srcs = ["github.com/docker/containerd/archive/compression/compression.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/docker/containerd/content",
+    srcs = [
+        "github.com/docker/containerd/content/content.go",
+        "github.com/docker/containerd/content/helpers.go",
+        "github.com/docker/containerd/content/locks.go",
+        "github.com/docker/containerd/content/store.go",
+        "github.com/docker/containerd/content/writer.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/docker/containerd/log",
+        "//vendor:github.com/nightlyone/lockfile",
+        "//vendor:github.com/opencontainers/go-digest",
+        "//vendor:github.com/pkg/errors",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/fs",
+    srcs = [
+        "github.com/docker/containerd/fs/copy.go",
+        "github.com/docker/containerd/fs/copy_linux.go",
+        "github.com/docker/containerd/fs/diff.go",
+        "github.com/docker/containerd/fs/diff_linux.go",
+        "github.com/docker/containerd/fs/hardlink.go",
+        "github.com/docker/containerd/fs/hardlink_unix.go",
+        "github.com/docker/containerd/fs/path.go",
+        "github.com/docker/containerd/fs/time.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/Sirupsen/logrus",
+        "//vendor:github.com/pkg/errors",
+        "//vendor:github.com/stevvooe/continuity/sysx",
+        "//vendor:golang.org/x/sync/errgroup",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/log",
+    srcs = [
+        "github.com/docker/containerd/log/context.go",
+        "github.com/docker/containerd/log/grpc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/Sirupsen/logrus",
+        "//vendor:google.golang.org/grpc/grpclog",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/plugin",
+    srcs = [
+        "github.com/docker/containerd/plugin/plugin.go",
+        "github.com/docker/containerd/plugin/plugin_other.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/docker/containerd",
+        "//vendor:github.com/docker/containerd/content",
+        "//vendor:github.com/docker/containerd/snapshot",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:google.golang.org/grpc",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/rootfs",
+    srcs = [
+        "github.com/docker/containerd/rootfs/apply.go",
+        "github.com/docker/containerd/rootfs/init.go",
+        "github.com/docker/containerd/rootfs/init_linux.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/docker/containerd",
+        "//vendor:github.com/docker/containerd/archive",
+        "//vendor:github.com/docker/containerd/archive/compression",
+        "//vendor:github.com/docker/containerd/log",
+        "//vendor:github.com/docker/containerd/snapshot",
+        "//vendor:github.com/opencontainers/go-digest",
+        "//vendor:github.com/opencontainers/image-spec/identity",
+        "//vendor:github.com/opencontainers/image-spec/specs-go/v1",
+        "//vendor:github.com/pkg/errors",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/services/rootfs",
+    srcs = [
+        "github.com/docker/containerd/services/rootfs/preparer.go",
+        "github.com/docker/containerd/services/rootfs/service.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/docker/containerd",
+        "//vendor:github.com/docker/containerd/api/services/rootfs",
+        "//vendor:github.com/docker/containerd/api/types/descriptor",
+        "//vendor:github.com/docker/containerd/api/types/mount",
+        "//vendor:github.com/docker/containerd/content",
+        "//vendor:github.com/docker/containerd/log",
+        "//vendor:github.com/docker/containerd/plugin",
+        "//vendor:github.com/docker/containerd/rootfs",
+        "//vendor:github.com/docker/containerd/snapshot",
+        "//vendor:github.com/opencontainers/go-digest",
+        "//vendor:github.com/opencontainers/image-spec/specs-go/v1",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:google.golang.org/grpc",
+        "//vendor:google.golang.org/grpc/codes",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/containerd/snapshot",
+    srcs = ["github.com/docker/containerd/snapshot/snapshotter.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/docker/containerd"],
+)
+
+go_library(
+    name = "github.com/docker/containerd/sys",
+    srcs = [
+        "github.com/docker/containerd/sys/epoll.go",
+        "github.com/docker/containerd/sys/fds.go",
+        "github.com/docker/containerd/sys/prctl.go",
+        "github.com/docker/containerd/sys/proc.go",
+        "github.com/docker/containerd/sys/reaper.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/opencontainers/runc/libcontainer/system"],
 )
 
 go_library(
@@ -3313,6 +3645,8 @@ go_library(
         "github.com/gogo/protobuf/proto/clone.go",
         "github.com/gogo/protobuf/proto/decode.go",
         "github.com/gogo/protobuf/proto/decode_gogo.go",
+        "github.com/gogo/protobuf/proto/duration.go",
+        "github.com/gogo/protobuf/proto/duration_gogo.go",
         "github.com/gogo/protobuf/proto/encode.go",
         "github.com/gogo/protobuf/proto/encode_gogo.go",
         "github.com/gogo/protobuf/proto/equal.go",
@@ -3329,6 +3663,8 @@ go_library(
         "github.com/gogo/protobuf/proto/text.go",
         "github.com/gogo/protobuf/proto/text_gogo.go",
         "github.com/gogo/protobuf/proto/text_parser.go",
+        "github.com/gogo/protobuf/proto/timestamp.go",
+        "github.com/gogo/protobuf/proto/timestamp_gogo.go",
     ],
     tags = ["automanaged"],
 )
@@ -3336,8 +3672,9 @@ go_library(
 go_library(
     name = "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
     srcs = [
+        "github.com/gogo/protobuf/protoc-gen-gogo/descriptor/descriptor.go",
         "github.com/gogo/protobuf/protoc-gen-gogo/descriptor/descriptor.pb.go",
-        "github.com/gogo/protobuf/protoc-gen-gogo/descriptor/gostring.go",
+        "github.com/gogo/protobuf/protoc-gen-gogo/descriptor/descriptor_gostring.gen.go",
         "github.com/gogo/protobuf/protoc-gen-gogo/descriptor/helper.go",
     ],
     tags = ["automanaged"],
@@ -3383,6 +3720,30 @@ go_library(
     name = "github.com/gogo/protobuf/sortkeys",
     srcs = ["github.com/gogo/protobuf/sortkeys/sortkeys.go"],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gogo/protobuf/types",
+    srcs = [
+        "github.com/gogo/protobuf/types/any.go",
+        "github.com/gogo/protobuf/types/any.pb.go",
+        "github.com/gogo/protobuf/types/doc.go",
+        "github.com/gogo/protobuf/types/duration.go",
+        "github.com/gogo/protobuf/types/duration.pb.go",
+        "github.com/gogo/protobuf/types/duration_gogo.go",
+        "github.com/gogo/protobuf/types/empty.pb.go",
+        "github.com/gogo/protobuf/types/field_mask.pb.go",
+        "github.com/gogo/protobuf/types/struct.pb.go",
+        "github.com/gogo/protobuf/types/timestamp.go",
+        "github.com/gogo/protobuf/types/timestamp.pb.go",
+        "github.com/gogo/protobuf/types/timestamp_gogo.go",
+        "github.com/gogo/protobuf/types/wrappers.pb.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/gogo/protobuf/sortkeys",
+    ],
 )
 
 go_library(
@@ -3479,6 +3840,13 @@ go_library(
         "github.com/golang/protobuf/proto/text_parser.go",
     ],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/golang/protobuf/ptypes/empty",
+    srcs = ["github.com/golang/protobuf/ptypes/empty/empty.pb.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/golang/protobuf/proto"],
 )
 
 go_library(
@@ -4580,6 +4948,24 @@ go_library(
 )
 
 go_library(
+    name = "github.com/grpc-ecosystem/go-grpc-prometheus",
+    srcs = [
+        "github.com/grpc-ecosystem/go-grpc-prometheus/client.go",
+        "github.com/grpc-ecosystem/go-grpc-prometheus/client_reporter.go",
+        "github.com/grpc-ecosystem/go-grpc-prometheus/server.go",
+        "github.com/grpc-ecosystem/go-grpc-prometheus/server_reporter.go",
+        "github.com/grpc-ecosystem/go-grpc-prometheus/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:google.golang.org/grpc",
+        "//vendor:google.golang.org/grpc/codes",
+    ],
+)
+
+go_library(
     name = "github.com/grpc-ecosystem/grpc-gateway/runtime",
     srcs = [
         "github.com/grpc-ecosystem/grpc-gateway/runtime/context.go",
@@ -4932,6 +5318,20 @@ go_library(
 )
 
 go_library(
+    name = "github.com/karlseguin/ccache",
+    srcs = [
+        "github.com/karlseguin/ccache/bucket.go",
+        "github.com/karlseguin/ccache/cache.go",
+        "github.com/karlseguin/ccache/configuration.go",
+        "github.com/karlseguin/ccache/item.go",
+        "github.com/karlseguin/ccache/layeredbucket.go",
+        "github.com/karlseguin/ccache/layeredcache.go",
+        "github.com/karlseguin/ccache/secondarycache.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/kr/fs",
     srcs = [
         "github.com/kr/fs/filesystem.go",
@@ -5232,6 +5632,15 @@ go_library(
 )
 
 go_library(
+    name = "github.com/mrunalp/fileutils",
+    srcs = [
+        "github.com/mrunalp/fileutils/fileutils.go",
+        "github.com/mrunalp/fileutils/idtools.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/mvdan/xurls",
     srcs = [
         "github.com/mvdan/xurls/regex.go",
@@ -5249,6 +5658,15 @@ go_library(
         "github.com/mxk/go-flowrate/flowrate/flowrate.go",
         "github.com/mxk/go-flowrate/flowrate/io.go",
         "github.com/mxk/go-flowrate/flowrate/util.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/nightlyone/lockfile",
+    srcs = [
+        "github.com/nightlyone/lockfile/lockfile.go",
+        "github.com/nightlyone/lockfile/lockfile_unix.go",
     ],
     tags = ["automanaged"],
 )
@@ -5739,9 +6157,58 @@ go_library(
 )
 
 go_library(
+    name = "github.com/opencontainers/go-digest",
+    srcs = [
+        "github.com/opencontainers/go-digest/algorithm.go",
+        "github.com/opencontainers/go-digest/digest.go",
+        "github.com/opencontainers/go-digest/digester.go",
+        "github.com/opencontainers/go-digest/doc.go",
+        "github.com/opencontainers/go-digest/verifiers.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/opencontainers/image-spec/identity",
+    srcs = [
+        "github.com/opencontainers/image-spec/identity/chainid.go",
+        "github.com/opencontainers/image-spec/identity/helpers.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/opencontainers/go-digest"],
+)
+
+go_library(
+    name = "github.com/opencontainers/image-spec/specs-go",
+    srcs = [
+        "github.com/opencontainers/image-spec/specs-go/version.go",
+        "github.com/opencontainers/image-spec/specs-go/versioned.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/opencontainers/image-spec/specs-go/v1",
+    srcs = [
+        "github.com/opencontainers/image-spec/specs-go/v1/config.go",
+        "github.com/opencontainers/image-spec/specs-go/v1/descriptor.go",
+        "github.com/opencontainers/image-spec/specs-go/v1/image_index.go",
+        "github.com/opencontainers/image-spec/specs-go/v1/layout.go",
+        "github.com/opencontainers/image-spec/specs-go/v1/manifest.go",
+        "github.com/opencontainers/image-spec/specs-go/v1/mediatype.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/opencontainers/go-digest",
+        "//vendor:github.com/opencontainers/image-spec/specs-go",
+    ],
+)
+
+go_library(
     name = "github.com/opencontainers/runc/libcontainer",
     srcs = [
         "github.com/opencontainers/runc/libcontainer/capabilities_linux.go",
+        "github.com/opencontainers/runc/libcontainer/capabilities_noambient.go",
         "github.com/opencontainers/runc/libcontainer/console.go",
         "github.com/opencontainers/runc/libcontainer/console_linux.go",
         "github.com/opencontainers/runc/libcontainer/container.go",
@@ -5765,6 +6232,7 @@ go_library(
         "github.com/opencontainers/runc/libcontainer/state_linux.go",
         "github.com/opencontainers/runc/libcontainer/stats.go",
         "github.com/opencontainers/runc/libcontainer/stats_linux.go",
+        "github.com/opencontainers/runc/libcontainer/sync.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -5772,6 +6240,7 @@ go_library(
         "//vendor:github.com/docker/docker/pkg/mount",
         "//vendor:github.com/docker/docker/pkg/symlink",
         "//vendor:github.com/golang/protobuf/proto",
+        "//vendor:github.com/mrunalp/fileutils",
         "//vendor:github.com/opencontainers/runc/libcontainer/apparmor",
         "//vendor:github.com/opencontainers/runc/libcontainer/cgroups",
         "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/fs",
@@ -5872,7 +6341,10 @@ go_library(
         "github.com/opencontainers/runc/libcontainer/configs/network.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/Sirupsen/logrus"],
+    deps = [
+        "//vendor:github.com/Sirupsen/logrus",
+        "//vendor:github.com/opencontainers/runtime-spec/specs-go",
+    ],
 )
 
 go_library(
@@ -5966,11 +6438,38 @@ go_library(
     tags = ["automanaged"],
 )
 
+cgo_genrule(
+    name = "github.com/opencontainers/runc/libcontainer/utils_cgo",
+    srcs = [
+        "github.com/opencontainers/runc/libcontainer/utils/cmsg.c",
+        "github.com/opencontainers/runc/libcontainer/utils/cmsg.go",
+        "github.com/opencontainers/runc/libcontainer/utils/cmsg.h",
+    ],
+    clinkopts = [
+        "-lz",
+        "-lm",
+        "-lpthread",
+        "-ldl",
+    ],
+    tags = ["automanaged"],
+)
+
 go_library(
     name = "github.com/opencontainers/runc/libcontainer/utils",
     srcs = [
         "github.com/opencontainers/runc/libcontainer/utils/utils.go",
         "github.com/opencontainers/runc/libcontainer/utils/utils_unix.go",
+    ],
+    library = ":github.com/opencontainers/runc/libcontainer/utils_cgo",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/opencontainers/runtime-spec/specs-go",
+    srcs = [
+        "github.com/opencontainers/runtime-spec/specs-go/config.go",
+        "github.com/opencontainers/runtime-spec/specs-go/state.go",
+        "github.com/opencontainers/runtime-spec/specs-go/version.go",
     ],
     tags = ["automanaged"],
 )
@@ -6747,6 +7246,22 @@ go_library(
 )
 
 go_library(
+    name = "github.com/stevvooe/continuity/sysx",
+    srcs = [
+        "github.com/stevvooe/continuity/sysx/asm.s",
+        "github.com/stevvooe/continuity/sysx/chmod_linux.go",
+        "github.com/stevvooe/continuity/sysx/copy_linux.go",
+        "github.com/stevvooe/continuity/sysx/copy_linux_amd64.go",
+        "github.com/stevvooe/continuity/sysx/sys.go",
+        "github.com/stevvooe/continuity/sysx/sysnum_linux_amd64.go",
+        "github.com/stevvooe/continuity/sysx/xattr.go",
+        "github.com/stevvooe/continuity/sysx/xattr_linux.go",
+        "github.com/stevvooe/continuity/sysx/xattr_linux_amd64.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/stretchr/objx",
     srcs = [
         "github.com/stretchr/objx/accessors.go",
@@ -6813,6 +7328,20 @@ go_library(
         "github.com/syndtr/gocapability/capability/syscall_linux.go",
     ],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/tonistiigi/fifo",
+    srcs = [
+        "github.com/tonistiigi/fifo/fifo.go",
+        "github.com/tonistiigi/fifo/handle_linux.go",
+        "github.com/tonistiigi/fifo/mkfifo_nosolaris.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/pkg/errors",
+        "//vendor:golang.org/x/net/context",
+    ],
 )
 
 go_library(
@@ -7657,6 +8186,13 @@ go_library(
 )
 
 go_library(
+    name = "golang.org/x/sync/errgroup",
+    srcs = ["golang.org/x/sync/errgroup/errgroup.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/net/context"],
+)
+
+go_library(
     name = "golang.org/x/sys/unix",
     srcs = [
         "golang.org/x/sys/unix/asm.s",
@@ -7679,6 +8215,12 @@ go_library(
         "golang.org/x/sys/unix/zsysnum_linux_amd64.go",
         "golang.org/x/sys/unix/ztypes_linux_amd64.go",
     ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "golang.org/x/sys/windows",
+    srcs = ["golang.org/x/sys/windows/mksyscall.go"],
     tags = ["automanaged"],
 )
 
@@ -7870,6 +8412,13 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = ["//vendor:golang.org/x/text/transform"],
+)
+
+go_library(
+    name = "golang.org/x/time/rate",
+    srcs = ["golang.org/x/time/rate/rate.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/net/context"],
 )
 
 go_library(
@@ -8085,6 +8634,8 @@ go_library(
         "//vendor:google.golang.org/grpc/internal",
         "//vendor:google.golang.org/grpc/metadata",
         "//vendor:google.golang.org/grpc/naming",
+        "//vendor:google.golang.org/grpc/stats",
+        "//vendor:google.golang.org/grpc/tap",
         "//vendor:google.golang.org/grpc/transport",
     ],
 )
@@ -8144,6 +8695,26 @@ go_library(
 )
 
 go_library(
+    name = "google.golang.org/grpc/stats",
+    srcs = [
+        "google.golang.org/grpc/stats/handlers.go",
+        "google.golang.org/grpc/stats/stats.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/net/context",
+        "//vendor:google.golang.org/grpc/grpclog",
+    ],
+)
+
+go_library(
+    name = "google.golang.org/grpc/tap",
+    srcs = ["google.golang.org/grpc/tap/tap.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/net/context"],
+)
+
+go_library(
     name = "google.golang.org/grpc/transport",
     srcs = [
         "google.golang.org/grpc/transport/control.go",
@@ -8159,12 +8730,13 @@ go_library(
         "//vendor:golang.org/x/net/context",
         "//vendor:golang.org/x/net/http2",
         "//vendor:golang.org/x/net/http2/hpack",
-        "//vendor:golang.org/x/net/trace",
         "//vendor:google.golang.org/grpc/codes",
         "//vendor:google.golang.org/grpc/credentials",
         "//vendor:google.golang.org/grpc/grpclog",
         "//vendor:google.golang.org/grpc/metadata",
         "//vendor:google.golang.org/grpc/peer",
+        "//vendor:google.golang.org/grpc/stats",
+        "//vendor:google.golang.org/grpc/tap",
     ],
 )
 

@@ -1,4 +1,6 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
 // http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
@@ -64,14 +66,14 @@ func (p *test) Generate(imports generator.PluginImports, file *generator.FileDes
 			p.In()
 			p.P(`popr := `, randPkg.Use(), `.New(`, randPkg.Use(), `.NewSource(`, timePkg.Use(), `.Now().UnixNano()))`)
 			p.P(`p := NewPopulated`, ccTypeName, `(popr, false)`)
-			p.P(`data, err := `, protoPkg.Use(), `.Marshal(p)`)
+			p.P(`dAtA, err := `, protoPkg.Use(), `.Marshal(p)`)
 			p.P(`if err != nil {`)
 			p.In()
 			p.P(`panic(err)`)
 			p.Out()
 			p.P(`}`)
 			p.P(`msg := &`, ccTypeName, `{}`)
-			p.P(`if err := `, protoPkg.Use(), `.Unmarshal(data, msg); err != nil {`)
+			p.P(`if err := `, protoPkg.Use(), `.Unmarshal(dAtA, msg); err != nil {`)
 			p.In()
 			p.P(`panic(err)`)
 			p.Out()

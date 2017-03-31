@@ -1,0 +1,14 @@
+language: go
+go:
+  - 1.4.3
+  - 1.6.2
+  - tip
+
+# Only test commits to production branch and all pull requests
+branches:
+  only:
+    - master
+
+matrix:
+  allow_failures:
+  - go: tip

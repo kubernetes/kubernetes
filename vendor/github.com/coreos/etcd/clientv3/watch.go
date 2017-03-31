@@ -61,8 +61,8 @@ type WatchResponse struct {
 	// the channel sends a final response that has Canceled set to true with a non-nil Err().
 	Canceled bool
 
-	// created is used to indicate the creation of the watcher.
-	created bool
+	// Created is used to indicate the creation of the watcher.
+	Created bool
 
 	closeErr error
 }
@@ -92,7 +92,7 @@ func (wr *WatchResponse) Err() error {
 
 // IsProgressNotify returns true if the WatchResponse is progress notification.
 func (wr *WatchResponse) IsProgressNotify() bool {
-	return len(wr.Events) == 0 && !wr.Canceled && !wr.created && wr.CompactRevision == 0 && wr.Header.Revision != 0
+	return len(wr.Events) == 0 && !wr.Canceled && !wr.Created && wr.CompactRevision == 0 && wr.Header.Revision != 0
 }
 
 // watcher implements the Watcher interface
@@ -101,6 +101,7 @@ type watcher struct {
 
 	// mu protects the grpc streams map
 	mu sync.RWMutex
+
 	// streams holds all the active grpc streams keyed by ctx value.
 	streams map[string]*watchGrpcStream
 }
@@ -144,8 +145,12 @@ type watchRequest struct {
 	key string
 	end string
 	rev int64
-	// progressNotify is for progress updates.
+	// send created notification event if this field is true
+	createdNotify bool
+	// progressNotify is for progress updates
 	progressNotify bool
+	// filters is the list of events to filter out
+	filters []pb.WatchCreateRequest_FilterType
 	// get the previous key-value pair before the event happens
 	prevKV bool
 	// retc receives a chan WatchResponse once the watcher is established
@@ -173,8 +178,12 @@ type watcherStream struct {
 }
 
 func NewWatcher(c *Client) Watcher {
+	return NewWatchFromWatchClient(pb.NewWatchClient(c.conn))
+}
+
+func NewWatchFromWatchClient(wc pb.WatchClient) Watcher {
 	return &watcher{
-		remote:  pb.NewWatchClient(c.conn),
+		remote:  wc,
 		streams: make(map[string]*watchGrpcStream),
 	}
 }
@@ -215,12 +224,22 @@ func (w *watcher) newWatcherGrpcStream(inctx context.Context) *watchGrpcStream {
 func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) WatchChan {
 	ow := opWatch(key, opts...)
 
+	var filters []pb.WatchCreateRequest_FilterType
+	if ow.filterPut {
+		filters = append(filters, pb.WatchCreateRequest_NOPUT)
+	}
+	if ow.filterDelete {
+		filters = append(filters, pb.WatchCreateRequest_NODELETE)
+	}
+
 	wr := &watchRequest{
 		ctx:            ctx,
+		createdNotify:  ow.createdNotify,
 		key:            string(ow.key),
 		end:            string(ow.end),
 		rev:            ow.rev,
 		progressNotify: ow.progressNotify,
+		filters:        filters,
 		prevKV:         ow.prevKV,
 		retc:           make(chan chan WatchResponse, 1),
 	}
@@ -374,15 +393,17 @@ func (w *watchGrpcStream) run() {
 		for _, ws := range w.substreams {
 			if _, ok := closing[ws]; !ok {
 				close(ws.recvc)
+				closing[ws] = struct{}{}
 			}
 		}
 		for _, ws := range w.resuming {
 			if _, ok := closing[ws]; ws != nil && !ok {
 				close(ws.recvc)
+				closing[ws] = struct{}{}
 			}
 		}
 		w.joinSubstreams()
-		for toClose := len(w.substreams) + len(w.resuming); toClose > 0; toClose-- {
+		for range closing {
 			w.closeSubstream(<-w.closingc)
 		}
 
@@ -458,7 +479,7 @@ func (w *watchGrpcStream) run() {
 			}
 		// watch client failed to recv; spawn another if possible
 		case err := <-w.errc:
-			if toErr(w.ctx, err) == v3rpc.ErrNoLeader {
+			if isHaltErr(w.ctx, err) || toErr(w.ctx, err) == v3rpc.ErrNoLeader {
 				closeErr = err
 				return
 			}
@@ -508,7 +529,7 @@ func (w *watchGrpcStream) dispatchEvent(pbresp *pb.WatchResponse) bool {
 		Header:          *pbresp.Header,
 		Events:          events,
 		CompactRevision: pbresp.CompactRevision,
-		created:         pbresp.Created,
+		Created:         pbresp.Created,
 		Canceled:        pbresp.Canceled,
 	}
 	select {
@@ -562,14 +583,6 @@ func (w *watchGrpcStream) serveSubstream(ws *watcherStream, resumec chan struct{
 		curWr := emptyWr
 		outc := ws.outc
 
-		if len(ws.buf) > 0 && ws.buf[0].created {
-			select {
-			case ws.initReq.retc <- ws.outc:
-			default:
-			}
-			ws.buf = ws.buf[1:]
-		}
-
 		if len(ws.buf) > 0 {
 			curWr = ws.buf[0]
 		} else {
@@ -587,13 +600,35 @@ func (w *watchGrpcStream) serveSubstream(ws *watcherStream, resumec chan struct{
 				// shutdown from closeSubstream
 				return
 			}
-			// TODO pause channel if buffer gets too large
-			ws.buf = append(ws.buf, wr)
+
+			if wr.Created {
+				if ws.initReq.retc != nil {
+					ws.initReq.retc <- ws.outc
+					// to prevent next write from taking the slot in buffered channel
+					// and posting duplicate create events
+					ws.initReq.retc = nil
+
+					// send first creation event only if requested
+					if ws.initReq.createdNotify {
+						ws.outc <- *wr
+					}
+				}
+			}
+
 			nextRev = wr.Header.Revision
 			if len(wr.Events) > 0 {
 				nextRev = wr.Events[len(wr.Events)-1].Kv.ModRevision + 1
 			}
 			ws.initReq.rev = nextRev
+
+			// created event is already sent above,
+			// watcher should not post duplicate events
+			if wr.Created {
+				continue
+			}
+
+			// TODO pause channel if buffer gets too large
+			ws.buf = append(ws.buf, wr)
 		case <-w.ctx.Done():
 			return
 		case <-ws.initReq.ctx.Done():
@@ -719,6 +754,7 @@ func (wr *watchRequest) toPB() *pb.WatchRequest {
 		Key:            []byte(wr.key),
 		RangeEnd:       []byte(wr.end),
 		ProgressNotify: wr.progressNotify,
+		Filters:        wr.filters,
 		PrevKv:         wr.prevKV,
 	}
 	cr := &pb.WatchRequest_CreateRequest{CreateRequest: req}

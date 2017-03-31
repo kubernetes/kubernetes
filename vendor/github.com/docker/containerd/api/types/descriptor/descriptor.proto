@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+import "gogoproto/gogo.proto";
+
+// Descriptor describes a blob in a content store.
+//
+// This descriptor can be used to reference content from an
+// oci descriptor found in a manifest.
+// See https://godoc.org/github.com/opencontainers/image-spec/specs-go/v1#Descriptor
+message Descriptor {
+	string mediaType = 1;
+	string digest = 2 [(gogoproto.customtype) = "github.com/opencontainers/go-digest.Digest", (gogoproto.nullable) = false];
+	int64 size = 3;
+}

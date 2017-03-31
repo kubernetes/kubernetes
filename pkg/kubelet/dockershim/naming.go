@@ -56,7 +56,7 @@ const (
 	DockerPullableImageIDPrefix = dockertools.DockerPullablePrefix
 )
 
-func makeSandboxName(s *runtimeapi.PodSandboxConfig) string {
+func MakeSandboxName(s *runtimeapi.PodSandboxConfig) string {
 	return strings.Join([]string{
 		kubePrefix,                            // 0
 		sandboxContainerName,                  // 1
@@ -67,7 +67,7 @@ func makeSandboxName(s *runtimeapi.PodSandboxConfig) string {
 	}, nameDelimiter)
 }
 
-func makeContainerName(s *runtimeapi.PodSandboxConfig, c *runtimeapi.ContainerConfig) string {
+func MakeContainerName(s *runtimeapi.PodSandboxConfig, c *runtimeapi.ContainerConfig) string {
 	return strings.Join([]string{
 		kubePrefix,                            // 0
 		c.Metadata.Name,                       // 1:
@@ -96,7 +96,7 @@ func parseUint32(s string) (uint32, error) {
 }
 
 // TODO: Evaluate whether we should rely on labels completely.
-func parseSandboxName(name string) (*runtimeapi.PodSandboxMetadata, error) {
+func ParseSandboxName(name string) (*runtimeapi.PodSandboxMetadata, error) {
 	// Docker adds a "/" prefix to names. so trim it.
 	name = strings.TrimPrefix(name, "/")
 
@@ -124,7 +124,7 @@ func parseSandboxName(name string) (*runtimeapi.PodSandboxMetadata, error) {
 }
 
 // TODO: Evaluate whether we should rely on labels completely.
-func parseContainerName(name string) (*runtimeapi.ContainerMetadata, error) {
+func ParseContainerName(name string) (*runtimeapi.ContainerMetadata, error) {
 	// Docker adds a "/" prefix to names. so trim it.
 	name = strings.TrimPrefix(name, "/")
 

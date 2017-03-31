@@ -86,7 +86,7 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeapi.Container, err
 	if len(c.Names) == 0 {
 		return nil, fmt.Errorf("unexpected empty container name: %+v", c)
 	}
-	metadata, err := parseContainerName(c.Names[0])
+	metadata, err := ParseContainerName(c.Names[0])
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func containerToRuntimeAPISandbox(c *dockertypes.Container) (*runtimeapi.PodSand
 	if len(c.Names) == 0 {
 		return nil, fmt.Errorf("unexpected empty sandbox name: %+v", c)
 	}
-	metadata, err := parseSandboxName(c.Names[0])
+	metadata, err := ParseSandboxName(c.Names[0])
 	if err != nil {
 		return nil, err
 	}

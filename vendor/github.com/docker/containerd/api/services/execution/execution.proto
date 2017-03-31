@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package containerd.v1.services;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/any.proto";
+import "gogoproto/gogo.proto";
+import "github.com/docker/containerd/api/types/mount/mount.proto";
+import "github.com/docker/containerd/api/types/container/container.proto";
+
+service ContainerService {
+	rpc Create(CreateRequest) returns (CreateResponse);
+	rpc Start(StartRequest) returns (google.protobuf.Empty);
+	rpc Delete(DeleteRequest) returns (DeleteResponse);
+	rpc Info(InfoRequest) returns (containerd.v1.types.Container);
+	rpc List(ListRequest) returns (ListResponse);
+	rpc Events(EventsRequest) returns (stream containerd.v1.types.Event);
+}
+
+message CreateRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	google.protobuf.Any spec = 2;	
+	repeated containerd.v1.types.Mount rootfs = 3;
+	string runtime = 4;
+	string stdin = 5;
+	string stdout = 6;
+	string stderr = 7;
+	bool terminal = 8;
+}
+
+message CreateResponse {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	uint32 pid = 2;
+}
+
+message StartRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message DeleteRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message DeleteResponse {
+	string id = 1 [(gogoproto.customname) = "ID"];
+	uint32 exit_status = 2;
+}
+
+message InfoRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message ListRequest {
+}
+
+message ListResponse {
+	repeated containerd.v1.types.Container containers = 1;
+}
+
+message EventsRequest {
+}

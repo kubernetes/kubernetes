@@ -35,7 +35,7 @@ import (
 
 func init() {
 	// github.com/coreos/etcd/etcdserver/api package is too spammy, set the log level to NOTICE.
-	capnslog.MustRepoLogger("github.com/coreos/etcd/etcdserver/api").SetRepoLogLevel(capnslog.NOTICE)
+	capnslog.MustRepoLogger("github.com/coreos/etcd").SetLogLevel(map[string]capnslog.LogLevel{"etcdserver/api": capnslog.NOTICE})
 }
 
 // All following configurations are got from etcd source code.
