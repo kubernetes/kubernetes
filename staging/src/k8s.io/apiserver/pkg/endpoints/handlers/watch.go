@@ -177,7 +177,6 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	flusher.Flush()
 
 	var unknown runtime.Unknown
-	internalEvent := &metav1.InternalEvent{}
 	buf := &bytes.Buffer{}
 	ch := s.Watching.ResultChan()
 	for {
@@ -205,9 +204,19 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			unknown.Raw = buf.Bytes()
 			event.Object = &unknown
 
-			// the internal event will be versioned by the encoder
-			*internalEvent = metav1.InternalEvent(event)
-			if err := e.Encode(internalEvent); err != nil {
+			// create the external type directly and encode it.  Clients will only recognize the serialization we provide
+			// so there isn't any benefit to doing separate conversion and encoding.
+			externalEvent := &metav1.WatchEvent{}
+			externalEvent.Type = string(event.Type)
+			switch t := event.Object.(type) {
+			case *runtime.Unknown:
+				// TODO: handle other fields on Unknown and detect type
+				externalEvent.Object.Raw = t.Raw
+			case nil:
+			default:
+				externalEvent.Object.Object = event.Object
+			}
+			if err := e.Encode(externalEvent); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v (%#v)", err, e))
 				// client disconnect.
 				return
