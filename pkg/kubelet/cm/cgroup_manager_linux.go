@@ -349,7 +349,6 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	resourceConfig := cgroupConfig.ResourceParameters
 	resources := m.toResources(resourceConfig)
 
-	glog.Infof("resources to update: %v", resources.CpusetCpus)
 	cgroupPaths := m.buildCgroupPaths(cgroupConfig.Name)
 
 	// we take the location in traditional cgroupfs format.
