@@ -116,13 +116,24 @@ type Request struct {
 
 	backoffMgr BackoffManager
 	throttle   flowcontrol.RateLimiter
+
+	clientMetrics metrics.ClientMetrics
 }
 
+type noopMetrics struct{}
+
+func (*noopMetrics) AddHTTPResult(time.Duration, string, string, url.URL) {}
+func (*noopMetrics) AddTries(int, string, url.URL)                        {}
+
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter) *Request {
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter, clientMetrics metrics.ClientMetrics) *Request {
 	if backoff == nil {
 		glog.V(2).Infof("Not implementing request backoff strategy.")
 		backoff = &NoBackoff{}
+	}
+
+	if clientMetrics == nil {
+		clientMetrics = &noopMetrics{}
 	}
 
 	pathPrefix := "/"
@@ -130,14 +141,15 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 		pathPrefix = path.Join(pathPrefix, baseURL.Path)
 	}
 	r := &Request{
-		client:      client,
-		verb:        verb,
-		baseURL:     baseURL,
-		pathPrefix:  path.Join(pathPrefix, versionedAPIPath),
-		content:     content,
-		serializers: serializers,
-		backoffMgr:  backoff,
-		throttle:    throttle,
+		client:        client,
+		verb:          verb,
+		baseURL:       baseURL,
+		pathPrefix:    path.Join(pathPrefix, versionedAPIPath),
+		content:       content,
+		serializers:   serializers,
+		backoffMgr:    backoff,
+		throttle:      throttle,
+		clientMetrics: clientMetrics,
 	}
 	switch {
 	case len(content.AcceptContentTypes) > 0:
@@ -665,8 +677,10 @@ func (r *Request) Watch() (watch.Interface, error) {
 		client = http.DefaultClient
 	}
 	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	start := time.Now()
 	resp, err := client.Do(req)
-	updateURLMetrics(r, resp, err)
+	duration := time.Since(start)
+	updateURLMetrics(r, resp, duration, err)
 	if r.baseURL != nil {
 		if err != nil {
 			r.backoffMgr.UpdateBackoff(r.baseURL, err, 0)
@@ -696,7 +710,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 
 // updateURLMetrics is a convenience function for pushing metrics.
 // It also handles corner cases for incomplete/invalid request data.
-func updateURLMetrics(req *Request, resp *http.Response, err error) {
+func updateURLMetrics(req *Request, resp *http.Response, duration time.Duration, err error) {
 	url := "none"
 	if req.baseURL != nil {
 		url = req.baseURL.Host
@@ -704,12 +718,16 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 
 	// Errors can be arbitrary strings. Unbound label cardinality is not suitable for a metric
 	// system so we just report them as `<error>`.
+	var code string
 	if err != nil {
-		metrics.RequestResult.Increment("<error>", req.verb, url)
+		code = "<error>"
 	} else {
-		//Metrics for failure codes
-		metrics.RequestResult.Increment(strconv.Itoa(resp.StatusCode), req.verb, url)
+		code = strconv.Itoa(resp.StatusCode)
 	}
+	metrics.RequestResult.Increment(code, req.verb, url)
+
+	// Write back a latency x response code metric.
+	req.clientMetrics.AddHTTPResult(duration, code, req.verb, *req.baseURL)
 }
 
 // Stream formats and executes the request, and offers streaming of the response.
@@ -737,8 +755,10 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		client = http.DefaultClient
 	}
 	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	start := time.Now()
 	resp, err := client.Do(req)
-	updateURLMetrics(r, resp, err)
+	duration := time.Since(start)
+	updateURLMetrics(r, resp, duration, err)
 	if r.baseURL != nil {
 		if err != nil {
 			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
@@ -774,8 +794,10 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	//Metrics for total request latency
 	start := time.Now()
+	retries := 0
 	defer func() {
 		metrics.RequestLatency.Observe(r.verb, r.finalURLTemplate(), time.Since(start))
+		r.clientMetrics.AddTries(retries+1, r.verb, *r.URL())
 	}()
 
 	if r.err != nil {
@@ -799,7 +821,6 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	// Right now we make about ten retry attempts if we get a Retry-After response.
 	// TODO: Change to a timeout based approach.
 	maxRetries := 10
-	retries := 0
 	for {
 		url := r.URL().String()
 		req, err := http.NewRequest(r.verb, url, r.body)
@@ -818,8 +839,10 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			// This request should also be throttled with the client-internal throttler.
 			r.tryThrottle()
 		}
+		start := time.Now()
 		resp, err := client.Do(req)
-		updateURLMetrics(r, resp, err)
+		duration := time.Since(start)
+		updateURLMetrics(r, resp, duration, err)
 		if err != nil {
 			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
 		} else {

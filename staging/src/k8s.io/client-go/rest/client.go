@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
 )
 
@@ -78,6 +79,9 @@ type RESTClient struct {
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
+
+	// ClientMetrics is a callback interface to a metrics provider.
+	ClientMetrics metrics.ClientMetrics
 }
 
 type Serializers struct {
@@ -91,7 +95,7 @@ type Serializers struct {
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server.
-func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
+func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client, clientMetrics metrics.ClientMetrics) (*RESTClient, error) {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -124,6 +128,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 		createBackoffMgr: readExpBackoffConfig,
 		Throttle:         throttle,
 		Client:           client,
+		ClientMetrics:    clientMetrics,
 	}, nil
 }
 
@@ -222,9 +227,9 @@ func (c *RESTClient) Verb(verb string) *Request {
 	backoff := c.createBackoffMgr()
 
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, c.ClientMetrics)
 	}
-	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, c.ClientMetrics)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").

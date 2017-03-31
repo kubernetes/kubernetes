@@ -59,3 +59,11 @@ func (noopLatency) Observe(string, url.URL, time.Duration) {}
 type noopResult struct{}
 
 func (noopResult) Increment(string, string, string) {}
+
+// ClientMetrics is an interface to metric callbacks for the k8s REST client.
+type ClientMetrics interface {
+	// AddHTTPResult adds a {latency x response code x request} sample.
+	AddHTTPResult(latency time.Duration, code string, method string, u url.URL)
+	// AddTries records the number of tries required for a single request.
+	AddTries(tries int, method string, u url.URL)
+}

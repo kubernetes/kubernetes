@@ -224,7 +224,7 @@ func TestStream(t *testing.T) {
 				GroupVersion:         &schema.GroupVersion{Group: "x"},
 				NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			}
-			c, err := restclient.NewRESTClient(url, "", config, -1, -1, nil, nil)
+			c, err := restclient.NewRESTClient(url, "", config, -1, -1, nil, nil, nil)
 			if err != nil {
 				t.Fatalf("failed to create a client: %v", err)
 			}
