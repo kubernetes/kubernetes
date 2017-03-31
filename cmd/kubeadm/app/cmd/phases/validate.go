@@ -14,30 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package phases
 
-const (
-	DummyDeployment = `
-apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  labels:
-    app: dummy
-  name: dummy
-  namespace: kube-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: dummy
-  template:
-    metadata:
-      labels:
-        app: dummy
-    spec:
-      containers:
-      - image: {{ .ImageRepository }}/pause-{{ .Arch }}:3.0
-        name: dummy
-      hostNetwork: true
-`
+import (
+	"os"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/validate"
+
+	"github.com/spf13/cobra"
 )
+
+func NewCmdValidate() *cobra.Command {
+	var kubeconfig string
+
+	cmd := &cobra.Command{
+		Use:   "validate",
+		Short: "Run end to end validation",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			return validate.Validate(kubeconfig)
+		},
+	}
+
+	//TODO: what's the convention for defaulting a kubeconfig?
+	cmd.Flags().StringVar(&kubeconfig, "kubeconfig", os.Getenv("HOME")+"/.kube/config", "path to kubeconfig")
+
+	return cmd
+}
