@@ -17,15 +17,16 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
+	"path/filepath"
 	"strconv"
 	"time"
-
-	"fmt"
 
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	k8stype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -329,6 +330,22 @@ func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths
 func createEmptyFilesOnVSphereVolume(namespace string, podName string, filePaths []string) {
 	for _, filePath := range filePaths {
 		err := framework.CreateEmptyFileOnPod(namespace, podName, filePath)
+		Expect(err).NotTo(HaveOccurred())
+	}
+}
+
+// verify volumes are attached to the node and are accessible in pod
+func verifyVSphereVolumesAccessible(pod *v1.Pod, persistentvolumes []*v1.PersistentVolume, vsp *vsphere.VSphere) {
+	nodeName := pod.Spec.NodeName
+	namespace := pod.Namespace
+	for index, pv := range persistentvolumes {
+		// Verify disks are attached to the node
+		isAttached, err := verifyVSphereDiskAttached(vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(nodeName))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
+		// Verify Volumes are accessible
+		filepath := filepath.Join("/mnt/", fmt.Sprintf("volume%v", index+1), "/emptyFile.txt")
+		_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/touch", filepath}, "", time.Minute)
 		Expect(err).NotTo(HaveOccurred())
 	}
 }
