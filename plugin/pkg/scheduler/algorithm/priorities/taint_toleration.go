@@ -57,6 +57,12 @@ func ComputeTaintTolerationPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
+	// get taints from node info cache.
+	taints, err := nodeInfo.Taints()
+	if err != nil {
+		// fallback to computing taints from node Spec
+		taints = node.Spec.Taints
+	}
 	// To hold all the tolerations with Effect PreferNoSchedule
 	var tolerationsPreferNoSchedule []v1.Toleration
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
@@ -68,7 +74,7 @@ func ComputeTaintTolerationPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, tolerationsPreferNoSchedule),
+		Score: countIntolerableTaintsPreferNoSchedule(taints, tolerationsPreferNoSchedule),
 	}, nil
 }
 

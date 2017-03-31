@@ -49,7 +49,7 @@ type NodeInfo struct {
 	// explicitly as int, to avoid conversions and improve performance.
 	allowedPodNumber int
 
-	// Cached tains of the node for faster lookup.
+	// Cached taints of the node for faster lookup.
 	taints    []v1.Taint
 	taintsErr error
 
