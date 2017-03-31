@@ -22,17 +22,14 @@ message RegisterRequest {
   // For example: localhost:10321
   string socketAddress = 1;
   string name = 2;
-	string token = 3;
 }
 
 message RegisterReply {
   string error = 1;
-	string token = 2;
 }
 
 message UnregisterRequest {
   string name = 1;
-	string token = 2;
 }
 
 message UnregisterReply {
