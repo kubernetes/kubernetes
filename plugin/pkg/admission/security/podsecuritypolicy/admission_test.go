@@ -57,18 +57,18 @@ func NewTestAdmission(lister extensionslisters.PodSecurityPolicyLister) kadmissi
 
 // TestAlwaysAllowedAuthorizer is a testing struct for testing that fulfills the authorizer interface.
 type TestAuthorizer struct {
-	// disallowed contains names of disallowed policies.  Map is keyed by user.Info.GetName()
-	disallowed map[string][]string
+	// usernameToNamespaceToAllowedPSPs contains the map of allowed PSPs.
+	// if nil, all PSPs are allowed.
+	usernameToNamespaceToAllowedPSPs map[string]map[string]map[string]bool
 }
 
 func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
-	disallowedForUser, _ := t.disallowed[a.GetUser().GetName()]
-	for _, name := range disallowedForUser {
-		if a.GetName() == name {
-			return false, "", nil
-		}
+	if t.usernameToNamespaceToAllowedPSPs == nil {
+		return true, "", nil
 	}
-	return true, "", nil
+	allowedInNamespace := t.usernameToNamespaceToAllowedPSPs[a.GetUser().GetName()][a.GetNamespace()][a.GetName()]
+	allowedClusterWide := t.usernameToNamespaceToAllowedPSPs[a.GetUser().GetName()][""][a.GetName()]
+	return (allowedInNamespace || allowedClusterWide), "", nil
 }
 
 var _ authorizer.Authorizer = &TestAuthorizer{}
@@ -1546,17 +1546,21 @@ func TestGetMatchingPolicies(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		user               user.Info
-		sa                 user.Info
-		expectedPolicies   sets.String
-		inPolicies         []*extensions.PodSecurityPolicy
-		disallowedPolicies map[string][]string
+		user             user.Info
+		sa               user.Info
+		ns               string
+		expectedPolicies sets.String
+		inPolicies       []*extensions.PodSecurityPolicy
+		allowed          map[string]map[string]map[string]bool
 	}{
 		"policy allowed by user": {
 			user: &user.DefaultInfo{Name: "user"},
 			sa:   &user.DefaultInfo{Name: "sa"},
-			disallowedPolicies: map[string][]string{
-				"sa": {"policy"},
+			ns:   "test",
+			allowed: map[string]map[string]map[string]bool{
+				"user": {
+					"test": {"policy": true},
+				},
 			},
 			inPolicies:       []*extensions.PodSecurityPolicy{policyWithName("policy")},
 			expectedPolicies: sets.NewString("policy"),
@@ -1564,43 +1568,55 @@ func TestGetMatchingPolicies(t *testing.T) {
 		"policy allowed by sa": {
 			user: &user.DefaultInfo{Name: "user"},
 			sa:   &user.DefaultInfo{Name: "sa"},
-			disallowedPolicies: map[string][]string{
-				"user": {"policy"},
+			ns:   "test",
+			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test": {"policy": true},
+				},
 			},
 			inPolicies:       []*extensions.PodSecurityPolicy{policyWithName("policy")},
 			expectedPolicies: sets.NewString("policy"),
 		},
 		"no policies allowed": {
-			user: &user.DefaultInfo{Name: "user"},
-			sa:   &user.DefaultInfo{Name: "sa"},
-			disallowedPolicies: map[string][]string{
-				"user": {"policy"},
-				"sa":   {"policy"},
-			},
+			user:             &user.DefaultInfo{Name: "user"},
+			sa:               &user.DefaultInfo{Name: "sa"},
+			ns:               "test",
+			allowed:          map[string]map[string]map[string]bool{},
 			inPolicies:       []*extensions.PodSecurityPolicy{policyWithName("policy")},
 			expectedPolicies: sets.NewString(),
 		},
 		"multiple policies allowed": {
 			user: &user.DefaultInfo{Name: "user"},
 			sa:   &user.DefaultInfo{Name: "sa"},
-			disallowedPolicies: map[string][]string{
-				"user": {"policy1", "policy3"},
-				"sa":   {"policy2", "policy3"},
+			ns:   "test",
+			allowed: map[string]map[string]map[string]bool{
+				"sa": {
+					"test":  {"policy1": true},
+					"":      {"policy4": true},
+					"other": {"policy6": true},
+				},
+				"user": {
+					"test":  {"policy2": true},
+					"":      {"policy5": true},
+					"other": {"policy7": true},
+				},
 			},
 			inPolicies: []*extensions.PodSecurityPolicy{
 				policyWithName("policy1"), // allowed by sa
 				policyWithName("policy2"), // allowed by user
 				policyWithName("policy3"), // not allowed
+				policyWithName("policy4"), // allowed by sa at cluster level
+				policyWithName("policy5"), // allowed by user at cluster level
+				policyWithName("policy6"), // not allowed in this namespace
+				policyWithName("policy7"), // not allowed in this namespace
 			},
-			expectedPolicies: sets.NewString("policy1", "policy2"),
+			expectedPolicies: sets.NewString("policy1", "policy2", "policy4", "policy5"),
 		},
 		"policies are allowed for nil user info": {
-			user: nil,
-			sa:   &user.DefaultInfo{Name: "sa"},
-			disallowedPolicies: map[string][]string{
-				"user": {"policy1", "policy3"},
-				"sa":   {"policy2", "policy3"},
-			},
+			user:    nil,
+			sa:      &user.DefaultInfo{Name: "sa"},
+			ns:      "test",
+			allowed: map[string]map[string]map[string]bool{}, // authorizer not consulted
 			inPolicies: []*extensions.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
@@ -1613,9 +1629,11 @@ func TestGetMatchingPolicies(t *testing.T) {
 		"policies are not allowed for nil sa info": {
 			user: &user.DefaultInfo{Name: "user"},
 			sa:   nil,
-			disallowedPolicies: map[string][]string{
-				"user": {"policy1", "policy3"},
-				"sa":   {"policy2", "policy3"},
+			ns:   "test",
+			allowed: map[string]map[string]map[string]bool{
+				"user": {
+					"test": {"policy2": true},
+				},
 			},
 			inPolicies: []*extensions.PodSecurityPolicy{
 				policyWithName("policy1"),
@@ -1634,8 +1652,8 @@ func TestGetMatchingPolicies(t *testing.T) {
 			store.Add(psp)
 		}
 
-		authz := &TestAuthorizer{disallowed: v.disallowedPolicies}
-		allowedPolicies, err := getMatchingPolicies(pspInformer.Lister(), v.user, v.sa, authz)
+		authz := &TestAuthorizer{usernameToNamespaceToAllowedPSPs: v.allowed}
+		allowedPolicies, err := getMatchingPolicies(pspInformer.Lister(), v.user, v.sa, authz, v.ns)
 		if err != nil {
 			t.Errorf("%s got unexpected error %#v", k, err)
 			continue
