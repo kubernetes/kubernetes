@@ -109,8 +109,12 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 
 // modifySandboxNamespaceOptions apply namespace options for sandbox
 func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig, network *knetwork.PluginManager) {
+	hostNetwork := false
+	if nsOpts != nil {
+		hostNetwork = nsOpts.HostNetwork
+	}
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForSandbox(nsOpts.HostNetwork, network, hostConfig)
+	modifyHostNetworkOptionForSandbox(hostNetwork, network, hostConfig)
 }
 
 // modifyContainerNamespaceOptions apply namespace options for container
