@@ -245,7 +245,7 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 			}
 
 			if fsType == extensions.HostPath {
-				err := isValidHostPathDir(v.HostPath.Path, s.psp.Spec.AllowedHostPaths)
+				err := isHostPathAllowed(v.HostPath.Path, s.psp.Spec.AllowedHostPaths)
 				if err != nil {
 					allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "volumes").Index(i), string(fsType), err.Error()))
 				}
@@ -339,9 +339,9 @@ func (s *simpleProvider) GetPSPName() string {
 	return s.psp.Name
 }
 
-// isValidHostPathDir returns no error if the host path is a prefix of any of the
+// isHostPathAllowed returns no error if the host path is a prefix of any of the
 // allowed host paths allowed by the PSP.
-func isValidHostPathDir(hostPath string, allowedPaths []string) error {
+func isHostPathAllowed(hostPath string, allowedPaths []string) error {
 	// If no allowed paths are specified then allow any path
 	if len(allowedPaths) == 0 {
 		return nil
