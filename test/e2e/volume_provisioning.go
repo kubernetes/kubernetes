@@ -114,18 +114,20 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			By("creating a StorageClass")
 			class := newStorageClass("", "internal")
 			class, err := c.StorageV1().StorageClasses().Create(class)
-			defer c.StorageV1().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(class.Name, nil), "Failed to delete SC ", class.Name)
+			}()
 
 			By("creating a claim with a dynamic provisioning annotation")
 			claim := newClaim(ns)
 			claim.Spec.StorageClassName = &class.Name
 
-			defer func() {
-				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
-			}()
 			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.ExpectNoError(c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil), "Failed to delete PVC ", claim.Name)
+			}()
 
 			if framework.ProviderIs("vsphere") {
 				// vsphere provider does not allocate volumes in 1GiB chunks, so setting expected size
@@ -146,8 +148,8 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			By("creating a StorageClass")
 			class := newBetaStorageClass("", "beta")
 			class, err := c.StorageV1beta1().StorageClasses().Create(class)
-			defer deleteStorageClass(c, class.Name)
 			Expect(err).NotTo(HaveOccurred())
+			defer deleteStorageClass(c, class.Name)
 
 			By("creating a claim with a dynamic provisioning annotation")
 			claim := newClaim(ns)
@@ -155,11 +157,11 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 				v1.BetaStorageClassAnnotation: class.Name,
 			}
 
-			defer func() {
-				framework.DeletePersistentVolumeClaim(c, claim.Name, ns)
-			}()
 			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, claim.Name, ns), "Failed to delete PVC ", claim.Name)
+			}()
 
 			testDynamicProvisioning(c, claim, "2Gi")
 		})
@@ -209,7 +211,9 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			pvc.Spec.StorageClassName = &sc.Name
 			pvc, err = c.Core().PersistentVolumeClaims(ns).Create(pvc)
 			Expect(err).NotTo(HaveOccurred())
-			defer framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
+			defer func() {
+				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
+			}()
 
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionTimeout)
@@ -238,17 +242,16 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			claim := newClaim(ns)
 			// To increase chance of detection, attempt multiple iterations
 			for i := 0; i < raceAttempts; i++ {
-				tmpClaim := framework.CreatePVC(c, ns, claim)
-				framework.DeletePersistentVolumeClaim(c, tmpClaim.Name, ns)
+				tmpClaim, err := framework.CreatePVC(c, ns, claim)
+				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, tmpClaim.Name, ns))
 			}
 
 			By(fmt.Sprintf("Checking for residual PersistentVolumes associated with StorageClass %s", class.Name))
 			residualPVs, err = waitForProvisionedVolumesDeleted(c, class.Name)
-			if err != nil {
-				// Cleanup the test resources before breaking
-				deleteProvisionedVolumesAndDisks(c, residualPVs)
-				Expect(err).NotTo(HaveOccurred())
-			}
+			// Cleanup the test resources before breaking
+			defer deleteProvisionedVolumesAndDisks(c, residualPVs)
+			Expect(err).NotTo(HaveOccurred())
 
 			// Report indicators of regression
 			if len(residualPVs) > 0 {
@@ -270,11 +273,11 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			claim := newClaim(ns)
 			claim.Annotations = map[string]string{v1.AlphaStorageClassAnnotation: ""}
 
-			defer func() {
-				framework.DeletePersistentVolumeClaim(c, claim.Name, ns)
-			}()
 			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, claim.Name, ns), "Failed to delete PVC ", claim.Name)
+			}()
 
 			if framework.ProviderIs("vsphere") {
 				testDynamicProvisioning(c, claim, requestedSize)
@@ -315,11 +318,11 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			claim.Annotations = map[string]string{
 				v1.BetaStorageClassAnnotation: className,
 			}
-			defer func() {
-				framework.DeletePersistentVolumeClaim(c, claim.Name, ns)
-			}()
 			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, claim.Name, ns), "Failed to delete PVC ", claim.Name)
+			}()
 
 			// Expected size of the externally provisioned volume depends on the external
 			// provisioner: for nfs-provisioner used here, it's equal to requested
@@ -333,11 +336,11 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 			By("creating a claim with no annotation")
 			claim := newClaim(ns)
-			defer func() {
-				framework.DeletePersistentVolumeClaim(c, claim.Name, ns)
-			}()
 			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, claim.Name, ns), "Failed to delete PVC ", claim.Name)
+			}()
 
 			if framework.ProviderIs("vsphere") {
 				testDynamicProvisioning(c, claim, requestedSize)
@@ -358,11 +361,11 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 			By("creating a claim with default storageclass and expecting it to timeout")
 			claim := newClaim(ns)
-			defer func() {
-				framework.DeletePersistentVolumeClaim(c, claim.Name, ns)
-			}()
 			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, claim.Name, ns), "Failed to delete PVC ", claim.Name)
+			}()
 
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionTimeout)
@@ -385,11 +388,11 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 			By("creating a claim with default storageclass and expecting it to timeout")
 			claim := newClaim(ns)
-			defer func() {
-				framework.DeletePersistentVolumeClaim(c, claim.Name, ns)
-			}()
 			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, claim.Name, ns), "Failed to delete PVC ", claim.Name)
+			}()
 
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionTimeout)
@@ -515,10 +518,8 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 		},
 	}
 	pod, err := c.Core().Pods(ns).Create(pod)
-	defer func() {
-		framework.DeletePodOrFail(c, ns, pod.Name)
-	}()
-	framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Pod Create API error: %v", err))
+	framework.DeletePodOrFail(c, ns, pod.Name)
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
 }
 
@@ -686,7 +687,7 @@ func deleteStorageClass(c clientset.Interface, className string) {
 // deleteProvisionedVolumes [gce||gke only]  iteratively deletes persistent volumes and attached GCE PDs.
 func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.PersistentVolume) {
 	for _, pv := range pvs {
-		framework.DeletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName)
-		framework.DeletePersistentVolume(c, pv.Name)
+		framework.ExpectNoError(framework.DeletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName))
+		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name))
 	}
 }

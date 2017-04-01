@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // PersistentVolumeUpgradeTest test that a pv is available before and after a cluster upgrade.
@@ -51,12 +52,13 @@ func (t *PersistentVolumeUpgradeTest) createGCEVolume() *v1.PersistentVolumeSour
 	}
 }
 func (t *PersistentVolumeUpgradeTest) deleteGCEVolume(pvSource *v1.PersistentVolumeSource) {
-	framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
+	framework.ExpectNoError(framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName))
 }
 
 // Setup creates a pv and then verifies that a pod can consume it.  The pod writes data to the volume.
 func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 
+	var err error
 	// TODO: generalize this to other providers
 	framework.SkipUnlessProviderIs("gce", "gke")
 
@@ -76,8 +78,9 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 	}
 
 	By("Creating the PV and PVC")
-	t.pv, t.pvc = framework.CreatePVPVC(f.ClientSet, pvConfig, pvcConfig, ns, true)
-	framework.WaitOnPVandPVC(f.ClientSet, ns, t.pv, t.pvc)
+	t.pv, t.pvc, err = framework.CreatePVPVC(f.ClientSet, pvConfig, pvcConfig, ns, true)
+	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(framework.WaitOnPVandPVC(f.ClientSet, ns, t.pv, t.pvc))
 
 	By("Consuming the PV before upgrade")
 	t.testPod(f, pvWriteCmd+";"+pvReadCmd)
@@ -93,13 +96,14 @@ func (t *PersistentVolumeUpgradeTest) Test(f *framework.Framework, done <-chan s
 
 // Teardown cleans up any remaining resources.
 func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
-	framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, t.pv, t.pvc)
+	framework.ExpectNoError(framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, t.pv, t.pvc))
 	t.deleteGCEVolume(t.pvSource)
 }
 
 // testPod creates a pod that consumes a pv and prints it out. The output is then verified.
 func (t *PersistentVolumeUpgradeTest) testPod(f *framework.Framework, cmd string) {
-	pod := framework.CreatePod(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{t.pvc}, false, cmd)
+	pod, err := framework.CreatePod(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{t.pvc}, false, cmd)
+	framework.ExpectNoError(err)
 	expectedOutput := []string{pvTestData}
 	f.TestContainerOutput("pod consumes pv", pod, 0, expectedOutput)
 }
