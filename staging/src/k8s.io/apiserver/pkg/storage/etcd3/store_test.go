@@ -263,7 +263,7 @@ func TestGetToList(t *testing.T) {
 
 	tests := []struct {
 		key         string
-		pred        storage.SelectionPredicate
+		pred        storage.SelectionMatcher
 		expectedOut []*example.Pod
 	}{{ // test GetToList on existing key
 		key:         key,
@@ -622,7 +622,7 @@ func TestList(t *testing.T) {
 
 	tests := []struct {
 		prefix      string
-		pred        storage.SelectionPredicate
+		pred        storage.SelectionMatcher
 		expectedOut []*example.Pod
 	}{{ // test List on existing key
 		prefix:      "/one-level/",

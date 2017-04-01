@@ -91,7 +91,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 }
 
 // MatchEndpoints returns a generic matcher for a given label and field selector.
-func MatchEndpoints(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
+func MatchEndpoints(label labels.Selector, field fields.Selector) pkgstorage.SelectionMatcher {
 	return pkgstorage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

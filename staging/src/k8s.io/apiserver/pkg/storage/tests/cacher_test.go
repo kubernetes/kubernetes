@@ -300,7 +300,7 @@ type injectListError struct {
 	storage.Interface
 }
 
-func (self *injectListError) List(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate, listObj runtime.Object) error {
+func (self *injectListError) List(ctx context.Context, key string, resourceVersion string, p storage.SelectionMatcher, listObj runtime.Object) error {
 	if self.errors > 0 {
 		self.errors--
 		return fmt.Errorf("injected error")

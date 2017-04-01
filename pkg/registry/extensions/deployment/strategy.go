@@ -137,7 +137,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 // MatchDeployment is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchDeployment(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
+func MatchDeployment(label labels.Selector, field fields.Selector) apistorage.SelectionMatcher {
 	return apistorage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

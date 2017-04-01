@@ -42,7 +42,7 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 
 // SimpleFilter converts a selection predicate into a FilterFunc.
 // It ignores any error from Matches().
-func SimpleFilter(p SelectionPredicate) FilterFunc {
+func SimpleFilter(p SelectionMatcher) FilterFunc {
 	return func(obj runtime.Object) bool {
 		matches, err := p.Matches(obj)
 		if err != nil {

@@ -111,7 +111,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 }
 
 // MatchPersistentVolume returns a generic matcher for a given label and field selector.
-func MatchPersistentVolumes(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+func MatchPersistentVolumes(label labels.Selector, field fields.Selector) storage.SelectionMatcher {
 	return storage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

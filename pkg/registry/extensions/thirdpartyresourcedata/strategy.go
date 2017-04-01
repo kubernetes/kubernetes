@@ -86,7 +86,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 }
 
 // Matcher returns a generic matcher for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
+func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionMatcher {
 	return apistorage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

@@ -187,8 +187,8 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.
-func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return &PodFastPredicate{
+func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionMatcher {
+	return PodFastPredicate{
 		SelectionPredicate: storage.SelectionPredicate{
 			Label:       label,
 			Field:       field,

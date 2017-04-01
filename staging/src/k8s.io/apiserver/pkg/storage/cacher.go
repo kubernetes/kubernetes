@@ -291,7 +291,7 @@ func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, pre
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate) (watch.Interface, error) {
+func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, pred SelectionMatcher) (watch.Interface, error) {
 	watchRV, err := ParseWatchResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
@@ -348,7 +348,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 }
 
 // Implements storage.Interface.
-func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate) (watch.Interface, error) {
+func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion string, pred SelectionMatcher) (watch.Interface, error) {
 	return c.Watch(ctx, key, resourceVersion, pred)
 }
 
@@ -398,7 +398,7 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 }
 
 // Implements storage.Interface.
-func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate, listObj runtime.Object) error {
+func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion string, pred SelectionMatcher, listObj runtime.Object) error {
 	if resourceVersion == "" {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility).
@@ -454,7 +454,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 }
 
 // Implements storage.Interface.
-func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate, listObj runtime.Object) error {
+func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, pred SelectionMatcher, listObj runtime.Object) error {
 	if resourceVersion == "" {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility).
@@ -646,7 +646,7 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 	}
 }
 
-func filterFunction(key string, p SelectionPredicate) func(string, runtime.Object) bool {
+func filterFunction(key string, p SelectionMatcher) func(string, runtime.Object) bool {
 	f := SimpleFilter(p)
 	filterFunc := func(objKey string, obj runtime.Object) bool {
 		if !hasPathPrefix(objKey, key) {
@@ -657,7 +657,7 @@ func filterFunction(key string, p SelectionPredicate) func(string, runtime.Objec
 	return filterFunc
 }
 
-func watchFilterFunction(key string, p SelectionPredicate) watchFilterFunc {
+func watchFilterFunction(key string, p SelectionMatcher) watchFilterFunc {
 	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false

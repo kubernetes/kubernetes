@@ -56,7 +56,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return labels.Set(cluster.ObjectMeta.Labels), ClusterToSelectableFields(cluster), nil
 }
 
-func MatchCluster(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
+func MatchCluster(label labels.Selector, field fields.Selector) apistorage.SelectionMatcher {
 	return apistorage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

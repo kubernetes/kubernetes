@@ -97,7 +97,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return labels.Set(pt.ObjectMeta.Labels), PodTemplateToSelectableFields(pt), nil
 }
 
-func MatchPodTemplate(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+func MatchPodTemplate(label labels.Selector, field fields.Selector) storage.SelectionMatcher {
 	return storage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

@@ -112,7 +112,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return labels.Set(service.ObjectMeta.Labels), ServiceToSelectableFields(service), nil
 }
 
-func MatchServices(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
+func MatchServices(label labels.Selector, field fields.Selector) apistorage.SelectionMatcher {
 	return apistorage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

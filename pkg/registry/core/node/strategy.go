@@ -157,7 +157,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 }
 
 // MatchNode returns a generic matcher for a given label and field selector.
-func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
+func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.SelectionMatcher {
 	return pkgstorage.SelectionPredicate{
 		Label:       label,
 		Field:       field,

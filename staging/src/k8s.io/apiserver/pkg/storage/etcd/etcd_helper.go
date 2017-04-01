@@ -231,7 +231,7 @@ func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object,
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionMatcher) (watch.Interface, error) {
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
@@ -246,7 +246,7 @@ func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion stri
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionMatcher) (watch.Interface, error) {
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
@@ -330,7 +330,7 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+func (h *etcdHelper) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionMatcher, listObj runtime.Object) error {
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
@@ -420,7 +420,7 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFun
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) List(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+func (h *etcdHelper) List(ctx context.Context, key string, resourceVersion string, pred storage.SelectionMatcher, listObj runtime.Object) error {
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}

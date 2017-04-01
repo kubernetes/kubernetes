@@ -341,7 +341,7 @@ func (s *store) GuaranteedUpdate(
 }
 
 // GetToList implements storage.Interface.GetToList.
-func (s *store) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+func (s *store) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionMatcher, listObj runtime.Object) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -371,7 +371,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 }
 
 // List implements storage.Interface.List.
-func (s *store) List(ctx context.Context, key, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+func (s *store) List(ctx context.Context, key, resourceVersion string, pred storage.SelectionMatcher, listObj runtime.Object) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -409,16 +409,16 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 }
 
 // Watch implements storage.Interface.Watch.
-func (s *store) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+func (s *store) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionMatcher) (watch.Interface, error) {
 	return s.watch(ctx, key, resourceVersion, pred, false)
 }
 
 // WatchList implements storage.Interface.WatchList.
-func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionMatcher) (watch.Interface, error) {
 	return s.watch(ctx, key, resourceVersion, pred, true)
 }
 
-func (s *store) watch(ctx context.Context, key string, rv string, pred storage.SelectionPredicate, recursive bool) (watch.Interface, error) {
+func (s *store) watch(ctx context.Context, key string, rv string, pred storage.SelectionMatcher, recursive bool) (watch.Interface, error) {
 	rev, err := storage.ParseWatchResourceVersion(rv)
 	if err != nil {
 		return nil, err
