@@ -878,6 +878,10 @@ type PodSecurityPolicySpec struct {
 	// will not be forced to.
 	// +optional
 	ReadOnlyRootFilesystem bool
+	// AllowedHostPaths is a white list of allowed host path prefixes. Empty indicates that all
+	// host paths may be used.
+	// +optional
+	AllowedHostPaths []string
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy
