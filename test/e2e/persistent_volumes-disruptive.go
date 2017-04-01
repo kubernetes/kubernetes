@@ -184,7 +184,7 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 
 	By("Restarting the kubelet.")
 	kubeletCommand(kStop, c, clientPod)
-	framework.DeletePodWithWait(f, c, clientPod)
+	framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
 	kubeletCommand(kStart, c, clientPod)
 
 	By("Expecting the volume mount not to be found.")
@@ -195,13 +195,16 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 	framework.Logf("Volume mount detected on pod and written file is readable post-restart.")
 }
 
-// initTestCase initializes spec resources (pv, pvc, and pod) and returns pointers to be consumed by the test
+// initTestCase initializes spec resources (pv, pvc, and pod) and returns pointers to be consumed
+// by the test.
 func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, ns, nodeName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
-	pv, pvc := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+
+	pv, pvc, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+	Expect(err).NotTo(HaveOccurred())
 	pod := framework.MakePod(ns, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating nfs client Pod %s on node %s", pod.Name, nodeName)
-	pod, err := c.CoreV1().Pods(ns).Create(pod)
+	pod, err = c.CoreV1().Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
 	err = framework.WaitForPodRunningInNamespace(c, pod)
 	Expect(err).NotTo(HaveOccurred())
@@ -217,9 +220,9 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 
 // tearDownTestCase destroy resources created by initTestCase.
 func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, pod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
-	framework.DeletePodWithWait(f, c, pod)
-	framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
-	framework.DeletePersistentVolume(c, pv.Name)
+	framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "tearDown: Failed to delete pod ", pod.Name)
+	framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "tearDown: Failed to delete PVC ", pvc.Name)
+	framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "tearDown: Failed to delete PV ", pv.Name)
 }
 
 // kubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod.

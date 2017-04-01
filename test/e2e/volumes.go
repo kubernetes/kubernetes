@@ -517,9 +517,8 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 			By("creating a test gce pd volume")
 			volumeName, err := framework.CreatePDWithRetry()
 			Expect(err).NotTo(HaveOccurred())
-
 			defer func() {
-				framework.DeletePDWithRetry(volumeName)
+				framework.ExpectNoError(framework.DeletePDWithRetry(volumeName))
 			}()
 
 			defer func() {

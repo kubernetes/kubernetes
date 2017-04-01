@@ -521,7 +521,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		framework.SkipUnlessProviderIs("gce")
 
 		By("delete a PD")
-		framework.DeletePDWithRetry("non-exist")
+		framework.ExpectNoError(framework.DeletePDWithRetry("non-exist"))
 	})
 })
 
@@ -697,7 +697,7 @@ func detachAndDeletePDs(diskName string, hosts []types.NodeName) {
 		waitForPDDetach(diskName, host)
 	}
 	By(fmt.Sprintf("Deleting PD %q", diskName))
-	framework.DeletePDWithRetry(diskName)
+	framework.ExpectNoError(framework.DeletePDWithRetry(diskName))
 }
 
 func waitForPDInVolumesInUse(
