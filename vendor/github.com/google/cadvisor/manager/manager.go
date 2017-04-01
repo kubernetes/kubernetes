@@ -388,6 +388,7 @@ func (self *manager) getContainerData(containerName string) (*containerData, err
 	return cont, nil
 }
 
+// continuously collect gpu spec if error occured, or just collect once.
 func (self *manager) tickGpuSpec(quit chan error) {
 	ticker := time.Tick(5 * time.Second)
 	for {
@@ -454,6 +455,7 @@ func (self *manager) collectGpuSpec() bool {
 	return true
 }
 
+// collects gpu stats in every tick time
 func (self *manager) tickGpuStats(duration time.Duration, quit chan error) {
 	ticker := time.Tick(duration)
 	for {

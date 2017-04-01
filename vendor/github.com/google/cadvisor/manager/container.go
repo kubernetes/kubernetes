@@ -561,6 +561,7 @@ func getGpuSpec(container *containerData) *info.GpuSpec {
 				return nil
 			}
 
+			// obtain gpu spec from map using the index of gpu device
 			if _, ok := gpuSpecMap[temp]; ok {
 				gpuNum++
 				gpuSpec.MemoryTotal = append(gpuSpec.MemoryTotal, gpuSpecMap[temp].memoryTotal)
@@ -569,12 +570,14 @@ func getGpuSpec(container *containerData) *info.GpuSpec {
 		}
 	}
 	if gpuNum > 0 {
+		// gpuSpec.Limit represents for the total number of gpus attached with
 		gpuSpec.Limit = uint64(gpuNum)
 	}
 
 	return gpuSpec
 }
 
+// collect gpu stats from gpuStatsMap
 func getGpuStats(container *containerData) *info.GpuStats {
 	client, err := docker.Client()
 	if err != nil {
