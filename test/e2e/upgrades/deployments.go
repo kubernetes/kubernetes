@@ -56,13 +56,13 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 
 	// Wait for it to be updated to revision 1
 	By(fmt.Sprintf("Waiting deployment %q to be updated to revision 1", deploymentName))
-	err = framework.WaitForDeploymentRevisionAndImageV15(c, ns, deploymentName, "1", nginxImage)
+	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", nginxImage)
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentStatusValidV15(c, deployment))
+	framework.ExpectNoError(framework.WaitForDeploymentStatusValid(c, deployment))
 
-	rs, err := deploymentutil.GetNewReplicaSetV15(deployment, c)
+	rs, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	framework.ExpectNoError(err)
 	if rs == nil {
 		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q, found none", deployment.Name))
@@ -84,12 +84,12 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 
 	// Wait for it to be updated to revision 2
 	By(fmt.Sprintf("Waiting deployment %q to be updated to revision 2", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentRevisionAndImageV15(c, ns, deploymentName, "2", nginxImage))
+	framework.ExpectNoError(framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", nginxImage))
 
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentStatusV15(c, deployment))
+	framework.ExpectNoError(framework.WaitForDeploymentStatus(c, deployment))
 
-	rs, err = deploymentutil.GetNewReplicaSetV15(deployment, c)
+	rs, err = deploymentutil.GetNewReplicaSet(deployment, c)
 	framework.ExpectNoError(err)
 	if rs == nil {
 		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q", deployment.Name))
