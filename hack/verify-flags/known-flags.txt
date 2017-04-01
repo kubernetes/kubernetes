@@ -521,6 +521,7 @@ pod-running
 pod-running-timeout
 pods-per-core
 policy-config-file
+policy-configmap
 poll-interval
 portal-net
 prepull-images
@@ -683,6 +684,7 @@ upgrade-image
 upgrade-target
 use-kubernetes-cluster-service
 use-kubernetes-version
+use-legacy-policy-config
 use-service-account-credentials
 user-whitelist
 use-service-account-credentials
