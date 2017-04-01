@@ -74,27 +74,27 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	go serviceConfig.Run(stopCh)
 
 	// Add the first service
-	handler.expected = []api.Service{*service1v1}
+	handler.expected = []*api.Service{service1v1}
 	fakeWatch.Add(service1v1)
 	<-ch
 
 	// Add another service
-	handler.expected = []api.Service{*service1v1, *service2}
+	handler.expected = []*api.Service{service1v1, service2}
 	fakeWatch.Add(service2)
 	<-ch
 
 	// Modify service1
-	handler.expected = []api.Service{*service1v2, *service2}
+	handler.expected = []*api.Service{service1v2, service2}
 	fakeWatch.Modify(service1v2)
 	<-ch
 
 	// Delete service1
-	handler.expected = []api.Service{*service2}
+	handler.expected = []*api.Service{service2}
 	fakeWatch.Delete(service1v2)
 	<-ch
 
 	// Delete service2
-	handler.expected = []api.Service{}
+	handler.expected = []*api.Service{}
 	fakeWatch.Delete(service2)
 	<-ch
 }
@@ -174,15 +174,15 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 
 type svcHandler struct {
 	t        *testing.T
-	expected []api.Service
+	expected []*api.Service
 	done     func()
 }
 
-func newSvcHandler(t *testing.T, svcs []api.Service, done func()) *svcHandler {
+func newSvcHandler(t *testing.T, svcs []*api.Service, done func()) *svcHandler {
 	return &svcHandler{t: t, expected: svcs, done: done}
 }
 
-func (s *svcHandler) OnServiceUpdate(services []api.Service) {
+func (s *svcHandler) OnServiceUpdate(services []*api.Service) {
 	defer s.done()
 	sort.Sort(sortedServices(services))
 	if !reflect.DeepEqual(s.expected, services) {
@@ -242,7 +242,7 @@ func TestInitialSync(t *testing.T) {
 
 	svcConfig := newServiceConfig(svcLW, time.Minute)
 	epsConfig := newEndpointsConfig(epsLW, time.Minute)
-	svcHandler := newSvcHandler(t, []api.Service{*svc2, *svc1}, wg.Done)
+	svcHandler := newSvcHandler(t, []*api.Service{svc2, svc1}, wg.Done)
 	svcConfig.RegisterHandler(svcHandler)
 	epsHandler := newEpsHandler(t, []*api.Endpoints{eps2, eps1}, wg.Done)
 	epsConfig.RegisterHandler(epsHandler)
