@@ -237,6 +237,21 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		},
 	}
 
+	failHostPathDirPod := defaultPod()
+	failHostPathDirPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "bad volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/fail",
+				},
+			},
+		},
+	}
+	failHostPathDirPSP := defaultPSP()
+	failHostPathDirPSP.Spec.Volumes = []extensions.FSType{extensions.HostPath}
+	failHostPathDirPSP.Spec.AllowedHostPaths = []string{"/foo/bar"}
+
 	failOtherSysctlsAllowedPSP := defaultPSP()
 	failOtherSysctlsAllowedPSP.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
 
@@ -306,6 +321,11 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			pod:           failHostDirPod,
 			psp:           defaultPSP(),
 			expectedError: "hostPath volumes are not allowed to be used",
+		},
+		"failHostPathDirPSP": {
+			pod:           failHostPathDirPod,
+			psp:           failHostPathDirPSP,
+			expectedError: "Host path /fail is not allowed to be used. Allowed host paths: [/foo/bar]",
 		},
 		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
 			pod:           failSafeSysctlFooPod,
@@ -705,12 +725,27 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	hostDirPod := defaultPod()
 	hostDirPod.Spec.Volumes = []api.Volume{
 		{
-			Name: "bad volume",
+			Name: "good volume",
 			VolumeSource: api.VolumeSource{
 				HostPath: &api.HostPathVolumeSource{},
 			},
 		},
 	}
+
+	hostPathDirPod := defaultPod()
+	hostPathDirPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "good volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/bar/baz",
+				},
+			},
+		},
+	}
+	hostPathDirPSP := defaultPSP()
+	hostPathDirPSP.Spec.Volumes = []extensions.FSType{extensions.HostPath}
+	hostPathDirPSP.Spec.AllowedHostPaths = []string{"/foo/bar"}
 
 	hostPortPSP := defaultPSP()
 	hostPortPSP.Spec.HostPorts = []extensions.HostPortRange{{Min: 1, Max: 1}}
@@ -771,6 +806,10 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		"pass hostDir validating PSP": {
 			pod: hostDirPod,
 			psp: hostDirPSP,
+		},
+		"pass hostDir allowed directory validating PSP": {
+			pod: hostPathDirPod,
+			psp: hostPathDirPSP,
 		},
 		"pass hostPort validating PSP": {
 			pod: hostPortPod,

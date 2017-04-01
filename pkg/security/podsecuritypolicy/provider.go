@@ -18,6 +18,7 @@ package podsecuritypolicy
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
@@ -240,6 +241,14 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 				allErrs = append(allErrs, field.Invalid(
 					field.NewPath("spec", "volumes").Index(i), string(fsType),
 					fmt.Sprintf("%s volumes are not allowed to be used", string(fsType))))
+				continue
+			}
+
+			if fsType == extensions.HostPath {
+				err := isValidHostPathDir(v.HostPath.Path, s.psp.Spec.AllowedHostPaths)
+				if err != nil {
+					allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "volumes").Index(i), string(fsType), err.Error()))
+				}
 			}
 		}
 	}
@@ -328,4 +337,21 @@ func (s *simpleProvider) isValidHostPort(port int) bool {
 // Get the name of the PSP that this provider was initialized with.
 func (s *simpleProvider) GetPSPName() string {
 	return s.psp.Name
+}
+
+// isValidHostPathDir returns no error if the host path is a prefix of any of the
+// allowed host paths allowed by the PSP.
+func isValidHostPathDir(hostPath string, allowedPaths []string) error {
+	// If no allowed paths are specified then allow any path
+	if len(allowedPaths) == 0 {
+		return nil
+	}
+
+	for _, allowedPath := range allowedPaths {
+		if strings.HasPrefix(hostPath, allowedPath) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("Host path %s is not allowed to be used. Allowed host paths: %v", hostPath, allowedPaths)
 }
