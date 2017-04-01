@@ -15628,6 +15628,20 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"allowedHostPaths": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AllowedHostPaths is a white list of allowed host path prefixes. Empty indicates that all host paths may be used.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
 					},
 					Required: []string{"seLinux", "runAsUser", "supplementalGroups", "fsGroup"},
 				},
