@@ -81,16 +81,17 @@ type ServiceCheck struct {
 }
 
 func (sc ServiceCheck) Check() (warnings, errors []error) {
+	warnings, errors = []error{}, []error{}
+
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		return []error{err}, nil
+		warnings = append(warnings, err)
+		return warnings, errors
 	}
-
-	warnings = []error{}
 
 	if !initSystem.ServiceExists(sc.Service) {
 		warnings = append(warnings, fmt.Errorf("%s service does not exist", sc.Service))
-		return warnings, nil
+		return warnings, errors
 	}
 
 	if !initSystem.ServiceIsEnabled(sc.Service) {
