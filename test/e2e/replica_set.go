@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -307,14 +306,25 @@ func testRSReleaseControlledNotMatching(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	p := pods.Items[0]
-	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
-	patch := []byte("{\"metadata\":{\"labels\":{\"name\":\"not-matching-name\"}}}")
-	_, err = podClient.Patch(p.Name, types.StrategicMergePatchType, patch)
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		pod.Labels = map[string]string{"name": "not-matching-name"}
+		_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Update(pod)
+		if err != nil && errors.IsConflict(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Then the pod is released")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		p2, err := podClient.Get(p.Name, metav1.GetOptions{})
+		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		for _, owner := range p2.OwnerReferences {
 			if *owner.Controller && owner.UID == rs.UID {

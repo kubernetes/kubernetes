@@ -3388,6 +3388,13 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 		status = d.Status
 
 		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
+			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c)
+			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c)
+			if err == nil && nerr == nil {
+				Logf("%+v", d)
+				logReplicaSetsOfDeployment(d, allOldRSs, newRS)
+				logPodsOfDeployment(c, d, append(allOldRSs, newRS), false)
+			}
 			return false, fmt.Errorf("deployment %q is running new pods alongside old pods: %#v", d.Name, status)
 		}
 

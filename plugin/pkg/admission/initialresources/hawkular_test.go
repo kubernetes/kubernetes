@@ -67,9 +67,17 @@ func TestTaqQuery(t *testing.T) {
 	assert.Equal(t, 2, len(tQe))
 	assert.Equal(t, testImageWithReference(), tQre[containerImageTag])
 	assert.Equal(t, "cpu/usage", tQre[descriptorTag])
+
+	kind = api.ResourceMemory
+	tQ = tagQuery(kind, testImageWithReference(), true)
+	assert.Equal(t, "memory/usage", tQ[descriptorTag])
+
+	kind = api.ResourceStorage
+	tQ = tagQuery(kind, testImageWithReference(), true)
+	assert.Equal(t, "", tQ[descriptorTag])
 }
 
-func TestGetUsagePercentile(t *testing.T) {
+func newSource(t *testing.T) (map[string]string, dataSource) {
 	tenant := "16a8884e4c155457ee38a8901df6b536"
 	reqs := make(map[string]string)
 
@@ -89,10 +97,40 @@ func TestGetUsagePercentile(t *testing.T) {
 		}
 	}))
 
-	paramUri := fmt.Sprintf("%s?user=test&pass=yep", s.URL)
+	paramUri := fmt.Sprintf("%s?user=test&pass=yep&tenant=foo&insecure=true", s.URL)
 
 	hSource, err := newHawkularSource(paramUri)
 	assert.NoError(t, err)
+
+	return reqs, hSource
+}
+
+func TestInsecureMustBeBool(t *testing.T) {
+	paramUri := fmt.Sprintf("localhost?user=test&pass=yep&insecure=foo")
+	_, err := newHawkularSource(paramUri)
+	if err == nil {
+		t.Errorf("Expected error from newHawkularSource")
+	}
+}
+
+func TestCAFileMustExist(t *testing.T) {
+	paramUri := fmt.Sprintf("localhost?user=test&pass=yep&caCert=foo")
+	_, err := newHawkularSource(paramUri)
+	if err == nil {
+		t.Errorf("Expected error from newHawkularSource")
+	}
+}
+
+func TestServiceAccountIsMutuallyExclusiveWithAuth(t *testing.T) {
+	paramUri := fmt.Sprintf("localhost?user=test&pass=yep&useServiceAccount=true")
+	_, err := newHawkularSource(paramUri)
+	if err == nil {
+		t.Errorf("Expected error from newHawkularSource")
+	}
+}
+
+func TestGetUsagePercentile(t *testing.T) {
+	reqs, hSource := newSource(t)
 
 	usage, samples, err := hSource.GetUsagePercentile(api.ResourceCPU, 90, testImageWithVersion(), "16a8884e4c155457ee38a8901df6b536", true, time.Now(), time.Now())
 	assert.NoError(t, err)
