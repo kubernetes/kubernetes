@@ -457,7 +457,7 @@ type healthCheckPort struct {
 // Accepts a list of Services and the existing service map.  Returns the new
 // service map, a list of healthcheck ports to add to or remove from the health
 // checking listener service, and a set of stale UDP services.
-func buildServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMap) (proxyServiceMap, []healthCheckPort, []healthCheckPort, sets.String) {
+func buildNewServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMap) (proxyServiceMap, []healthCheckPort, []healthCheckPort, sets.String) {
 	newServiceMap := make(proxyServiceMap)
 	healthCheckAdd := make([]healthCheckPort, 0)
 	healthCheckDel := make([]healthCheckPort, 0)
@@ -537,7 +537,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []*api.Service) {
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedServiceUpdate = true
 
-	newServiceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(allServices, proxier.serviceMap)
+	newServiceMap, hcAdd, hcDel, staleUDPServices := buildNewServiceMap(allServices, proxier.serviceMap)
 	for _, hc := range hcAdd {
 		glog.V(4).Infof("Adding health check for %+v, port %v", hc.namespace, hc.nodeport)
 		// Turn on healthcheck responder to listen on the health check nodePort
@@ -572,7 +572,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []*api.Endpoints) {
 	proxier.allEndpoints = allEndpoints
 
 	// TODO: once service has made this same transform, move this into proxier.syncProxyRules()
-	newMap, staleConnections := updateEndpoints(proxier.allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
+	newMap, staleConnections := buildNewEndpointsMap(proxier.allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
 	if len(newMap) != len(proxier.endpointsMap) || !reflect.DeepEqual(newMap, proxier.endpointsMap) {
 		proxier.endpointsMap = newMap
 		proxier.syncProxyRules()
@@ -584,7 +584,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []*api.Endpoints) {
 }
 
 // Convert a slice of api.Endpoints objects into a map of service-port -> endpoints.
-func updateEndpoints(allEndpoints []*api.Endpoints, curMap proxyEndpointMap, hostname string,
+func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap, hostname string,
 	healthChecker healthChecker) (newMap proxyEndpointMap, staleSet map[endpointServicePair]bool) {
 
 	// return values
@@ -638,7 +638,7 @@ func updateEndpoints(allEndpoints []*api.Endpoints, curMap proxyEndpointMap, hos
 //
 // TODO: this could be simplified:
 // - hostPortInfo and endpointsInfo overlap too much
-// - the test for this is overlapped by the test for updateEndpoints
+// - the test for this is overlapped by the test for buildNewEndpointsMap
 // - naming is poor and responsibilities are muddled
 func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 	curEndpoints proxyEndpointMap,
