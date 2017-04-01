@@ -17,10 +17,13 @@ limitations under the License.
 package upgrades
 
 import (
+	"strings"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // PersistentVolumeUpgradeTest test that a pv is available before and after a cluster upgrade.
@@ -39,6 +42,19 @@ const (
 	pvReadCmd  string = "cat " + pvTestFile
 )
 
+// convert []error to a string.
+func errsToString(errs []error) string {
+	var str string
+	if len(errs) > 0 {
+		errmsgs := []string{}
+		for _, e := range errs {
+			errmsgs = append(errmsgs, e.Error())
+		}
+		str = strings.Join(errmsgs, "; ")
+	}
+	return str
+}
+
 func (t *PersistentVolumeUpgradeTest) createGCEVolume() *v1.PersistentVolumeSource {
 	diskName, err := framework.CreatePDWithRetry()
 	framework.ExpectNoError(err)
@@ -50,13 +66,15 @@ func (t *PersistentVolumeUpgradeTest) createGCEVolume() *v1.PersistentVolumeSour
 		},
 	}
 }
-func (t *PersistentVolumeUpgradeTest) deleteGCEVolume(pvSource *v1.PersistentVolumeSource) {
-	framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
+func (t *PersistentVolumeUpgradeTest) deleteGCEVolume(pvSource *v1.PersistentVolumeSource) error {
+	err := framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
+	return err
 }
 
 // Setup creates a pv and then verifies that a pod can consume it.  The pod writes data to the volume.
 func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 
+	var err error
 	// TODO: generalize this to other providers
 	framework.SkipUnlessProviderIs("gce", "gke")
 
@@ -76,8 +94,9 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 	}
 
 	By("Creating the PV and PVC")
-	t.pv, t.pvc = framework.CreatePVPVC(f.ClientSet, pvConfig, pvcConfig, ns, true)
-	framework.WaitOnPVandPVC(f.ClientSet, ns, t.pv, t.pvc)
+	t.pv, t.pvc, err = framework.CreatePVPVC(f.ClientSet, pvConfig, pvcConfig, ns, true)
+	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(framework.WaitOnPVandPVC(f.ClientSet, ns, t.pv, t.pvc))
 
 	By("Consuming the PV before upgrade")
 	t.testPod(f, pvWriteCmd+";"+pvReadCmd)
@@ -93,8 +112,14 @@ func (t *PersistentVolumeUpgradeTest) Test(f *framework.Framework, done <-chan s
 
 // Teardown cleans up any remaining resources.
 func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
-	framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, t.pv, t.pvc)
-	t.deleteGCEVolume(t.pvSource)
+	errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, t.pv, t.pvc)
+	if err := t.deleteGCEVolume(t.pvSource); err != nil {
+		errs = append(errs, err)
+	}
+	errmsg := errsToString(errs)
+	if len(errmsg) > 0 {
+		framework.Failf("Failed to delete 1 or more PVs/PVCs and/or the GCE volume. Errors: %v", errmsg)
+	}
 }
 
 // testPod creates a pod that consumes a pv and prints it out. The output is then verified.
