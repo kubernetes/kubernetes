@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -90,7 +89,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			permReason2    = "Permanent2"
 			permMessage2   = "permanent error 2"
 		)
-		var source, config, tmpLogFile string
+		var source, config, hostLogFile string
 		var lookback time.Duration
 		var eventListOptions metav1.ListOptions
 
@@ -153,9 +152,6 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			}.AsSelector().String()
 			eventListOptions = metav1.ListOptions{FieldSelector: selector}
 			By("Create the test log file")
-			tmpLogFile = filepath.Join("/tmp", name, path.Base(logFile))
-			os.MkdirAll(path.Dir(tmpLogFile), 755)
-			_, err = os.Create(tmpLogFile)
 			Expect(err).NotTo(HaveOccurred())
 			By("Create config map for the node problem detector")
 			_, err = c.Core().ConfigMaps(ns).Create(&v1.ConfigMap{
@@ -183,7 +179,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 						{
 							Name: logVolume,
 							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{Path: path.Dir(tmpLogFile)},
+								EmptyDir: &v1.EmptyDirVolumeSource{},
 							},
 						},
 						{
@@ -197,7 +193,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 						{
 							Name:    name,
 							Image:   image,
-							Command: []string{"/node-problem-detector", "--logtostderr", "--system-log-monitors=" + configFile, fmt.Sprintf("--apiserver-override=%s?inClusterConfig=false", framework.TestContext.Host)},
+							Command: []string{"sh", "-c", "touch " + logFile + " && /node-problem-detector --logtostderr --system-log-monitors=" + configFile + fmt.Sprintf(" --apiserver-override=%s?inClusterConfig=false", framework.TestContext.Host)},
 							Env: []v1.EnvVar{
 								{
 									Name: "NODE_NAME",
@@ -227,6 +223,11 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 					},
 				},
 			})
+			pod, err := f.PodClient().Get(name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			// TODO: remove hardcoded kubelet volume directory path
+			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
+			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
 		})
 
 		It("should generate node condition and events for corresponding errors", func() {
@@ -318,7 +319,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				By(test.description)
 				if test.messageNum > 0 {
 					By(fmt.Sprintf("Inject %d logs: %q", test.messageNum, test.message))
-					err := injectLog(tmpLogFile, test.timestamp, test.message, test.messageNum)
+					err := injectLog(hostLogFile, test.timestamp, test.message, test.messageNum)
 					Expect(err).NotTo(HaveOccurred())
 				}
 
@@ -360,8 +361,6 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
 			c.Core().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do()
-			By("Clean up the temporary directory")
-			Expect(os.RemoveAll(path.Dir(tmpLogFile))).To(Succeed())
 		})
 	})
 })
