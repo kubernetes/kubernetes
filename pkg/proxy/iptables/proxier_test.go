@@ -926,7 +926,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		}),
 	}
 
-	serviceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(services, make(proxyServiceMap))
+	serviceMap, hcAdd, hcDel, staleUDPServices := buildNewServiceMap(services, make(proxyServiceMap))
 	if len(serviceMap) != 8 {
 		t.Errorf("expected service map length 8, got %v", serviceMap)
 	}
@@ -961,7 +961,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	// Remove some stuff
 	services = []*api.Service{services[0]}
 	services[0].Spec.Ports = []api.ServicePort{services[0].Spec.Ports[1]}
-	serviceMap, hcAdd, hcDel, staleUDPServices = buildServiceMap(services, serviceMap)
+	serviceMap, hcAdd, hcDel, staleUDPServices = buildNewServiceMap(services, serviceMap)
 	if len(serviceMap) != 1 {
 		t.Errorf("expected service map length 1, got %v", serviceMap)
 	}
@@ -1008,7 +1008,7 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	}
 
 	// Headless service should be ignored
-	serviceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(services, make(proxyServiceMap))
+	serviceMap, hcAdd, hcDel, staleUDPServices := buildNewServiceMap(services, make(proxyServiceMap))
 	if len(serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %d", len(serviceMap))
 	}
@@ -1036,7 +1036,7 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 		}),
 	}
 
-	serviceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(services, make(proxyServiceMap))
+	serviceMap, hcAdd, hcDel, staleUDPServices := buildNewServiceMap(services, make(proxyServiceMap))
 	if len(serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %v", serviceMap)
 	}
@@ -1081,7 +1081,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		}),
 	}
 
-	serviceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(first, make(proxyServiceMap))
+	serviceMap, hcAdd, hcDel, staleUDPServices := buildNewServiceMap(first, make(proxyServiceMap))
 	if len(serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", serviceMap)
 	}
@@ -1097,7 +1097,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	}
 
 	// Change service to load-balancer
-	serviceMap, hcAdd, hcDel, staleUDPServices = buildServiceMap(second, serviceMap)
+	serviceMap, hcAdd, hcDel, staleUDPServices = buildNewServiceMap(second, serviceMap)
 	if len(serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", serviceMap)
 	}
@@ -1113,7 +1113,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// No change; make sure the service map stays the same and there are
 	// no health-check changes
-	serviceMap, hcAdd, hcDel, staleUDPServices = buildServiceMap(second, serviceMap)
+	serviceMap, hcAdd, hcDel, staleUDPServices = buildNewServiceMap(second, serviceMap)
 	if len(serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", serviceMap)
 	}
@@ -1128,7 +1128,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	}
 
 	// And back to ClusterIP
-	serviceMap, hcAdd, hcDel, staleUDPServices = buildServiceMap(first, serviceMap)
+	serviceMap, hcAdd, hcDel, staleUDPServices = buildNewServiceMap(first, serviceMap)
 	if len(serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", serviceMap)
 	}
@@ -1396,7 +1396,7 @@ func makeServicePortName(ns, name, port string) proxy.ServicePortName {
 	}
 }
 
-func Test_updateEndpoints(t *testing.T) {
+func Test_buildNewEndpointsMap(t *testing.T) {
 	testCases := []struct {
 		newEndpoints   []*api.Endpoints
 		oldEndpoints   map[proxy.ServicePortName][]*endpointsInfo
@@ -1993,7 +1993,7 @@ func Test_updateEndpoints(t *testing.T) {
 	}}
 
 	for tci, tc := range testCases {
-		newMap, stale := updateEndpoints(tc.newEndpoints, tc.oldEndpoints, "host", fakeHealthChecker{})
+		newMap, stale := buildNewEndpointsMap(tc.newEndpoints, tc.oldEndpoints, "host", fakeHealthChecker{})
 		if len(newMap) != len(tc.expectedResult) {
 			t.Errorf("[%d] expected %d results, got %d: %v", tci, len(tc.expectedResult), len(newMap), newMap)
 		}
