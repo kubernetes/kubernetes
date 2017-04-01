@@ -1984,6 +1984,21 @@ func (m *PodSecurityPolicySpec) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0
 	}
 	i++
+	if len(m.AllowedHostPaths) > 0 {
+		for _, s := range m.AllowedHostPaths {
+			dAtA[i] = 0x7a
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			dAtA[i] = uint8(l)
+			i++
+			i += copy(dAtA[i:], s)
+		}
+	}
 	return i, nil
 }
 
@@ -3232,6 +3247,12 @@ func (m *PodSecurityPolicySpec) Size() (n int) {
 	l = m.FSGroup.Size()
 	n += 1 + l + sovGenerated(uint64(l))
 	n += 2
+	if len(m.AllowedHostPaths) > 0 {
+		for _, s := range m.AllowedHostPaths {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -3963,6 +3984,7 @@ func (this *PodSecurityPolicySpec) String() string {
 		`SupplementalGroups:` + strings.Replace(strings.Replace(this.SupplementalGroups.String(), "SupplementalGroupsStrategyOptions", "SupplementalGroupsStrategyOptions", 1), `&`, ``, 1) + `,`,
 		`FSGroup:` + strings.Replace(strings.Replace(this.FSGroup.String(), "FSGroupStrategyOptions", "FSGroupStrategyOptions", 1), `&`, ``, 1) + `,`,
 		`ReadOnlyRootFilesystem:` + fmt.Sprintf("%v", this.ReadOnlyRootFilesystem) + `,`,
+		`AllowedHostPaths:` + fmt.Sprintf("%v", this.AllowedHostPaths) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -9342,6 +9364,35 @@ func (m *PodSecurityPolicySpec) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.ReadOnlyRootFilesystem = bool(v != 0)
+		case 15:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllowedHostPaths", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.AllowedHostPaths = append(m.AllowedHostPaths, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
