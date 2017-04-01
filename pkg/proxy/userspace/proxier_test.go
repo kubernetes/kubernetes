@@ -350,7 +350,7 @@ func TestMultiPortOnServiceUpdate(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 
-	p.OnServiceUpdate([]api.Service{{
+	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceP.Name, Namespace: serviceP.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
@@ -515,7 +515,7 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 	conn.Close()
 	waitForNumProxyLoops(t, p, 1)
 
-	p.OnServiceUpdate([]api.Service{})
+	p.OnServiceUpdate([]*api.Service{})
 	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -555,7 +555,7 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 	conn.Close()
 	waitForNumProxyLoops(t, p, 1)
 
-	p.OnServiceUpdate([]api.Service{})
+	p.OnServiceUpdate([]*api.Service{})
 	if err := waitForClosedPortUDP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -594,7 +594,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	conn.Close()
 	waitForNumProxyLoops(t, p, 1)
 
-	p.OnServiceUpdate([]api.Service{})
+	p.OnServiceUpdate([]*api.Service{})
 	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -602,7 +602,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 
 	// need to add endpoint here because it got clean up during service delete
 	lb.OnEndpointsUpdate([]*api.Endpoints{endpoint})
-	p.OnServiceUpdate([]api.Service{{
+	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
@@ -650,7 +650,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	conn.Close()
 	waitForNumProxyLoops(t, p, 1)
 
-	p.OnServiceUpdate([]api.Service{})
+	p.OnServiceUpdate([]*api.Service{})
 	if err := waitForClosedPortUDP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -658,7 +658,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 
 	// need to add endpoint here because it got clean up during service delete
 	lb.OnEndpointsUpdate([]*api.Endpoints{endpoint})
-	p.OnServiceUpdate([]api.Service{{
+	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
@@ -703,7 +703,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 	waitForNumProxyLoops(t, p, 1)
 
-	p.OnServiceUpdate([]api.Service{{
+	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
@@ -753,7 +753,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 1)
 
-	p.OnServiceUpdate([]api.Service{{
+	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
@@ -802,7 +802,7 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 	waitForNumProxyLoops(t, p, 1)
 
-	p.OnServiceUpdate([]api.Service{{
+	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{
 			Ports: []api.ServicePort{{
@@ -856,7 +856,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 	waitForNumProxyLoops(t, p, 1)
 
-	p.OnServiceUpdate([]api.Service{{
+	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: "", Ports: []api.ServicePort{{
 			Name:     "p",
@@ -869,7 +869,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 		t.Fatalf("service with empty ClusterIP should not be included in the proxy")
 	}
 
-	p.OnServiceUpdate([]api.Service{{
+	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: "None", Ports: []api.ServicePort{{
 			Name:     "p",
@@ -882,7 +882,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 		t.Fatalf("service with 'None' as ClusterIP should not be included in the proxy")
 	}
 
-	p.OnServiceUpdate([]api.Service{{
+	p.OnServiceUpdate([]*api.Service{{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",

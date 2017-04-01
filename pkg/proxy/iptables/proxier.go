@@ -457,13 +457,12 @@ type healthCheckPort struct {
 // Accepts a list of Services and the existing service map.  Returns the new
 // service map, a list of healthcheck ports to add to or remove from the health
 // checking listener service, and a set of stale UDP services.
-func buildServiceMap(allServices []api.Service, oldServiceMap proxyServiceMap) (proxyServiceMap, []healthCheckPort, []healthCheckPort, sets.String) {
+func buildServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMap) (proxyServiceMap, []healthCheckPort, []healthCheckPort, sets.String) {
 	newServiceMap := make(proxyServiceMap)
 	healthCheckAdd := make([]healthCheckPort, 0)
 	healthCheckDel := make([]healthCheckPort, 0)
 
-	for i := range allServices {
-		service := &allServices[i]
+	for _, service := range allServices {
 		svcName := types.NamespacedName{
 			Namespace: service.Namespace,
 			Name:      service.Name,
@@ -529,7 +528,7 @@ func buildServiceMap(allServices []api.Service, oldServiceMap proxyServiceMap) (
 
 // OnServiceUpdate tracks the active set of service proxies.
 // They will be synchronized using syncProxyRules()
-func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
+func (proxier *Proxier) OnServiceUpdate(allServices []*api.Service) {
 	start := time.Now()
 	defer func() {
 		glog.V(4).Infof("OnServiceUpdate took %v for %d services", time.Since(start), len(allServices))
