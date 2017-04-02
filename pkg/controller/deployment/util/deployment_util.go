@@ -583,7 +583,7 @@ func rsListFromClient(c clientset.Interface) rsListFunc {
 		if err != nil {
 			return nil, err
 		}
-		ret := []*extensions.ReplicaSet{}
+		var ret []*extensions.ReplicaSet
 		for i := range rsList.Items {
 			ret = append(ret, &rsList.Items[i])
 		}
@@ -860,9 +860,12 @@ func WaitForPodsHashPopulated(c extensionslisters.ReplicaSetLister, desiredGener
 }
 
 // LabelPodsWithHash labels all pods in the given podList with the new hash label.
-// The returned bool value can be used to tell if all pods are actually labeled.
 func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister corelisters.PodLister, namespace, name, hash string) error {
 	for _, pod := range podList.Items {
+		// Ignore inactive Pods.
+		if !controller.IsPodActive(&pod) {
+			continue
+		}
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
 			_, err := UpdatePodWithRetries(c.Core().Pods(namespace), podLister, pod.Namespace, pod.Name,

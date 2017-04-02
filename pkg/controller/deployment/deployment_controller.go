@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -541,10 +542,8 @@ func (dc *DeploymentController) getPodMapForDeployment(d *extensions.Deployment,
 		podMap[rs.UID] = &v1.PodList{}
 	}
 	for _, pod := range pods {
-		// Ignore inactive Pods since that's what ReplicaSet does.
-		if !controller.IsPodActive(pod) {
-			continue
-		}
+		// Do not ignore inactive Pods because Recreate Deployments need to verify that no
+		// Pods from older versions are running before spinning up new Pods.
 		controllerRef := controller.GetControllerOf(pod)
 		if controllerRef == nil {
 			continue
@@ -618,6 +617,10 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return err
 	}
 	// List all Pods owned by this Deployment, grouped by their ReplicaSet.
+	// Current uses of the podMap are:
+	//
+	// * check if a Pod is labeled correctly with the pod-template-hash label.
+	// * check that no old Pods are running in the middle of Recreate Deployments.
 	podMap, err := dc.getPodMapForDeployment(d, rsList)
 	if err != nil {
 		return err
