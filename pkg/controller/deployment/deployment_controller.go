@@ -52,7 +52,11 @@ import (
 
 const (
 	// maxRetries is the number of times a deployment will be retried before it is dropped out of the queue.
-	maxRetries = 5
+	// With the current rate-limiter in use (5ms*2^(maxRetries-1)) the following numbers represent the times
+	// a deployment is going to be requeued:
+	//
+	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
+	maxRetries = 15
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
