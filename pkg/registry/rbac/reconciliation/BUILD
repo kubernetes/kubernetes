@@ -32,10 +32,10 @@ go_library(
         "reconcile_rolebindings.go",
         "role_interfaces.go",
         "rolebinding_interfaces.go",
+        "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",

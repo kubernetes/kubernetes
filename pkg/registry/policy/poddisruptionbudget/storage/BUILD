@@ -14,7 +14,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -33,7 +32,6 @@ go_library(
     srcs = ["storage.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/policy/poddisruptionbudget:go_default_library",
