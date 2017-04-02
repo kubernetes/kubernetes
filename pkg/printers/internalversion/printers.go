@@ -20,7 +20,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -223,7 +225,8 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 					}
 					addr := &ss.Addresses[i]
 					if !more {
-						list = append(list, fmt.Sprintf("%s:%d", addr.IP, port.Port))
+						hostPort := net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port)))
+						list = append(list, hostPort)
 					}
 					count++
 				}
