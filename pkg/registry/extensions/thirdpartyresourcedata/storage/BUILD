@@ -31,7 +31,6 @@ go_library(
     srcs = ["storage.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",

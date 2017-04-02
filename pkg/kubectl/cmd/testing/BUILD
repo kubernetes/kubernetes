@@ -9,7 +9,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["fake.go"],
+    srcs = [
+        "fake.go",
+        "zz_generated.deepcopy.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
