@@ -518,8 +518,10 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 		},
 	}
 	pod, err := c.Core().Pods(ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Pod Create API error: %v", err))
-	framework.DeletePodOrFail(c, ns, pod.Name)
+	framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	defer func() {
+		framework.DeletePodOrFail(c, ns, pod.Name)
+	}()
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
 }
 
