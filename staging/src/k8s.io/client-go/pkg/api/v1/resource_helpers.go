@@ -17,10 +17,14 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+	"math"
+	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/api"
 )
 
 // Returns string version of ResourceName.
@@ -254,4 +258,101 @@ func GetResourceRequest(pod *Pod, resource ResourceName) int64 {
 		}
 	}
 	return totalResources
+}
+
+// ExtractResourceValueByContainerName extracts the value of a resource
+// by providing container name
+func ExtractResourceValueByContainerName(fs *ResourceFieldSelector, pod *Pod, containerName string) (string, error) {
+	container, err := findContainerInPod(pod, containerName)
+	if err != nil {
+		return "", err
+	}
+	return ExtractContainerResourceValue(fs, container)
+}
+
+// ExtractResourceValueByContainerNameAndNodeAllocatable extracts the value of a resource
+// by providing container name and node allocatable
+func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *ResourceFieldSelector, pod *Pod, containerName string, nodeAllocatable ResourceList) (string, error) {
+	realContainer, err := findContainerInPod(pod, containerName)
+	if err != nil {
+		return "", err
+	}
+
+	containerCopy, err := api.Scheme.DeepCopy(realContainer)
+	if err != nil {
+		return "", fmt.Errorf("failed to perform a deep copy of container object: %v", err)
+	}
+
+	container, ok := containerCopy.(*Container)
+	if !ok {
+		return "", fmt.Errorf("unexpected type returned from deep copy of container object")
+	}
+
+	MergeContainerResourceLimits(container, nodeAllocatable)
+
+	return ExtractContainerResourceValue(fs, container)
+}
+
+// ExtractContainerResourceValue extracts the value of a resource
+// in an already known container
+func ExtractContainerResourceValue(fs *ResourceFieldSelector, container *Container) (string, error) {
+	divisor := resource.Quantity{}
+	if divisor.Cmp(fs.Divisor) == 0 {
+		divisor = resource.MustParse("1")
+	} else {
+		divisor = fs.Divisor
+	}
+
+	switch fs.Resource {
+	case "limits.cpu":
+		return convertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
+	case "limits.memory":
+		return convertResourceMemoryToString(container.Resources.Limits.Memory(), divisor)
+	case "requests.cpu":
+		return convertResourceCPUToString(container.Resources.Requests.Cpu(), divisor)
+	case "requests.memory":
+		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
+	}
+
+	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
+}
+
+// convertResourceCPUToString converts cpu value to the format of divisor and returns
+// ceiling of the value.
+func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantity) (string, error) {
+	c := int64(math.Ceil(float64(cpu.MilliValue()) / float64(divisor.MilliValue())))
+	return strconv.FormatInt(c, 10), nil
+}
+
+// convertResourceMemoryToString converts memory value to the format of divisor and returns
+// ceiling of the value.
+func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Quantity) (string, error) {
+	m := int64(math.Ceil(float64(memory.Value()) / float64(divisor.Value())))
+	return strconv.FormatInt(m, 10), nil
+}
+
+// findContainerInPod finds a container by its name in the provided pod
+func findContainerInPod(pod *Pod, containerName string) (*Container, error) {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == containerName {
+			return &container, nil
+		}
+	}
+	return nil, fmt.Errorf("container %s not found", containerName)
+}
+
+// MergeContainerResourceLimits checks if a limit is applied for
+// the container, and if not, it sets the limit to the passed resource list.
+func MergeContainerResourceLimits(container *Container,
+	allocatable ResourceList) {
+	if container.Resources.Limits == nil {
+		container.Resources.Limits = make(ResourceList)
+	}
+	for _, resource := range []ResourceName{ResourceCPU, ResourceMemory} {
+		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
+			if cap, exists := allocatable[resource]; exists {
+				container.Resources.Limits[resource] = *cap.Copy()
+			}
+		}
+	}
 }
