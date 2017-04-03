@@ -41,8 +41,7 @@ type EventDispatcher interface {
 
 	// PostStopPod is invoked after all of a pod's containers have permanently
 	// stopped running, but before the pod sandbox is destroyed.
-	PostStopPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error)
-
+	PostStopPod(cgroupPath string) error
 	// Start starts the dispatcher. After the dispatcher is started, isolators
 	// can register themselves to receive lifecycle events.
 	Start(socketAddress string)
@@ -80,21 +79,7 @@ func newEventDispatcher() *eventDispatcher {
 	return dispatcher
 }
 
-func (ed *eventDispatcher) dispatchEvent(pod *v1.Pod, cgroupPath string, kind lifecycle.Event_Kind) (*lifecycle.EventReply, error) {
-	jsonPod, err := json.Marshal(pod)
-	if err != nil {
-		return nil, err
-	}
-	// construct an event
-	ev := &lifecycle.Event{
-		Kind: kind,
-		CgroupInfo: &lifecycle.CgroupInfo{
-			Kind: lifecycle.CgroupInfo_POD,
-			Path: cgroupPath,
-		},
-		Pod: jsonPod,
-	}
-
+func (ed *eventDispatcher) dispatchEvent(ev *lifecycle.Event) (*lifecycle.EventReply, error) {
 	mergedReplies := &lifecycle.EventReply{}
 	var errlist []error
 	// TODO(CD): Re-evaluate nondeterministic delegation order arising
@@ -125,11 +110,32 @@ func (ed *eventDispatcher) dispatchEvent(pod *v1.Pod, cgroupPath string, kind li
 }
 
 func (ed *eventDispatcher) PreStartPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error) {
-	return ed.dispatchEvent(pod, cgroupPath, lifecycle.Event_POD_PRE_START)
+	jsonPod, err := json.Marshal(pod)
+	if err != nil {
+		return nil, err
+	}
+	// construct an event
+	return ed.dispatchEvent(
+		&lifecycle.Event{
+			Kind: lifecycle.Event_POD_PRE_START,
+			CgroupInfo: &lifecycle.CgroupInfo{
+				Kind: lifecycle.CgroupInfo_POD,
+				Path: cgroupPath,
+			},
+			Pod: jsonPod,
+		})
 }
 
-func (ed *eventDispatcher) PostStopPod(pod *v1.Pod, cgroupPath string) (*lifecycle.EventReply, error) {
-	return ed.dispatchEvent(pod, cgroupPath, lifecycle.Event_POD_POST_STOP)
+func (ed *eventDispatcher) PostStopPod(cgroupPath string) error {
+	_, err := ed.dispatchEvent(
+		&lifecycle.Event{
+			Kind: lifecycle.Event_POD_POST_STOP,
+			CgroupInfo: &lifecycle.CgroupInfo{
+				Kind: lifecycle.CgroupInfo_POD,
+				Path: cgroupPath,
+			},
+		})
+	return err
 }
 
 func (ed *eventDispatcher) Start(socketAddress string) {

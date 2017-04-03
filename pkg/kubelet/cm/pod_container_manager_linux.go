@@ -183,11 +183,17 @@ func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
 		Name:               podCgroup,
 		ResourceParameters: &ResourceConfig{},
 	}
-	// TODO(CD): Invoke pod post-stop lifecycle hook.
-	if err := m.cgroupManager.Destroy(containerConfig); err != nil {
-		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
+	var errlist []error
+
+	// Invoke pod post-stop lifecycle hook.
+	if err := m.eventDispatcher.PostStopPod(string(podCgroup)); err != nil {
+		errlist = append(errlist, fmt.Errorf("Failed to execute postStop Hook for %v : %v", podCgroup, err))
 	}
-	return nil
+	// Make sure cgroup is destroyed even if postStop hook failed
+	if err := m.cgroupManager.Destroy(containerConfig); err != nil {
+		errlist = append(errlist, fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err))
+	}
+	return utilerrors.NewAggregate(errlist)
 }
 
 // ReduceCPULimits reduces the CPU CFS values to the minimum amount of shares.
