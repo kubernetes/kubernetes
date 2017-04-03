@@ -251,7 +251,7 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 			if err != nil {
 				// if the PV is not found, log the error
 				// and count the PV towards the PV limit
-				// generate a random volume ID since its required for de-dup
+				// generate a random volume ID since it is required for de-dup
 				utilruntime.HandleError(fmt.Errorf("Unable to look up PV info for %s/%s/%s, assuming PV matches predicate when counting limits: %v", namespace, pvcName, pvName, err))
 				source := rand.NewSource(time.Now().UnixNano())
 				generatedID := "missingPV" + strconv.Itoa(rand.New(source).Intn(1000000))
