@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package autoscaling
 
 import (
 	"bytes"
@@ -36,6 +36,7 @@ import (
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/test/e2e"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -82,7 +83,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		originalSizes = make(map[string]int)
 		sum := 0
 		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
-			size, err := GroupSize(mig)
+			size, err := e2e.GroupSize(mig)
 			framework.ExpectNoError(err)
 			By(fmt.Sprintf("Initial size of %s: %d", mig, size))
 			originalSizes[mig] = size
@@ -190,7 +191,8 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	It("should add node to the particular mig [Feature:ClusterSizeAutoscalingScaleUp]", func() {
-		labels := map[string]string{"cluster-autoscaling-test.special-node": "true"}
+		labelKey := "cluster-autoscaling-test.special-node"
+		labelValue := "true"
 
 		By("Finding the smallest MIG")
 		minMig := ""
@@ -204,25 +206,30 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		removeLabels := func(nodesToClean sets.String) {
 			By("Removing labels from nodes")
-			updateNodeLabels(c, nodesToClean, nil, labels)
+			for node := range nodesToClean {
+				framework.RemoveLabelOffNode(c, node, labelKey)
+			}
 		}
 
-		nodes, err := GetGroupNodes(minMig)
+		nodes, err := e2e.GetGroupNodes(minMig)
 		framework.ExpectNoError(err)
 		nodesSet := sets.NewString(nodes...)
 		defer removeLabels(nodesSet)
 		By(fmt.Sprintf("Annotating nodes of the smallest MIG(%s): %v", minMig, nodes))
-		updateNodeLabels(c, nodesSet, labels, nil)
 
-		CreateNodeSelectorPods(f, "node-selector", minSize+1, labels, false)
+		for node := range nodesSet {
+			framework.AddOrUpdateLabelOnNode(c, node, labelKey, labelValue)
+		}
+
+		CreateNodeSelectorPods(f, "node-selector", minSize+1, map[string]string{labelKey: labelValue}, false)
 
 		By("Waiting for new node to appear and annotating it")
-		WaitForGroupSize(minMig, int32(minSize+1))
+		e2e.WaitForGroupSize(minMig, int32(minSize+1))
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
-		newNodes, err := GetGroupNodes(minMig)
+		newNodes, err := e2e.GetGroupNodes(minMig)
 		framework.ExpectNoError(err)
 		newNodesSet := sets.NewString(newNodes...)
 		newNodesSet.Delete(nodes...)
@@ -264,7 +271,10 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 		}
 		By(fmt.Sprintf("Setting labels for registered new nodes: %v", registeredNodes.List()))
-		updateNodeLabels(c, registeredNodes, labels, nil)
+		for node := range registeredNodes {
+			framework.AddOrUpdateLabelOnNode(c, node, labelKey, labelValue)
+		}
+
 		defer removeLabels(registeredNodes)
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
@@ -645,11 +655,11 @@ func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c clientset.Interf
 
 func setMigSizes(sizes map[string]int) {
 	for mig, desiredSize := range sizes {
-		currentSize, err := GroupSize(mig)
+		currentSize, err := e2e.GroupSize(mig)
 		framework.ExpectNoError(err)
 		if desiredSize != currentSize {
 			By(fmt.Sprintf("Setting size of %s to %d", mig, desiredSize))
-			err = ResizeGroup(mig, int32(desiredSize))
+			err = e2e.ResizeGroup(mig, int32(desiredSize))
 			framework.ExpectNoError(err)
 		}
 	}
