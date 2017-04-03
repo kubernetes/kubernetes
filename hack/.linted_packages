@@ -379,6 +379,7 @@ staging/src/k8s.io/client-go/listers/settings/v1alpha1
 staging/src/k8s.io/client-go/listers/storage/v1
 staging/src/k8s.io/client-go/listers/storage/v1beta1
 staging/src/k8s.io/client-go/plugin/pkg/client/auth
+staging/src/k8s.io/client-go/plugin/pkg/client/auth/azure
 staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp
 staging/src/k8s.io/client-go/rest/watch
 staging/src/k8s.io/client-go/tools/auth
