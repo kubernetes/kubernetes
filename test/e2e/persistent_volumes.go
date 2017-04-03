@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -78,7 +79,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 	}
 
 	// 2. delete each PVC, wait for its bound PV to reach `expectedPhase`
-	By("Deleting PVCs to invoke recycler")
+	By("Deleting PVCs to invoke reclaim policy")
 	if err = framework.DeletePVCandValidatePVGroup(c, ns, pvols, claims, expectPhase); err != nil {
 		return err
 	}
@@ -226,7 +227,14 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume]", func() {
 
 			AfterEach(func() {
 				framework.Logf("AfterEach: deleting %v PVCs and %v PVs...", len(claims), len(pvols))
-				framework.ExpectNoError(framework.PVPVCMapCleanup(c, ns, pvols, claims), "AfterEach: Failed to cleanup PV/PVC")
+				errs := framework.PVPVCMapCleanup(c, ns, pvols, claims)
+				if len(errs) > 0 {
+					errmsg := []string{}
+					for _, e := range errs {
+						errmsg = append(errmsg, e.Error())
+					}
+					framework.Failf("AfterEach: Failed to delete 1 or more PVs/PVCs. Errors: %v", strings.Join(errmsg, "; "))
+				}
 			})
 
 			// Create 2 PVs and 4 PVCs.

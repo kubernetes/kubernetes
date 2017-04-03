@@ -107,26 +107,30 @@ func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc
 	return nil
 }
 
-// Clean up pvs and pvcs in multi-pv-pvc test cases. All entries found in the pv and
-// claims maps are deleted.
-func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMap) error {
+// Clean up pvs and pvcs in multi-pv-pvc test cases. Entries found in the pv and claim maps are
+// deleted as long as the Delete api call succeeds.
+// Note: delete errors are appended to []error so that as many pvcs and pvs as possible are deleted.
+func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMap) []error {
 
+	var errs []error
 	var err error
 
 	for pvcKey := range claims {
 		if err = DeletePersistentVolumeClaim(c, pvcKey.Name, ns); err != nil {
-			return fmt.Errorf("Failed to delete PVC %q. Error: %v", pvcKey.Name, err)
+			errs = append(errs, fmt.Errorf("Failed to delete PVC %q. Error: %v", pvcKey.Name, err))
+		} else {
+			delete(claims, pvcKey)
 		}
-		delete(claims, pvcKey)
 	}
 
 	for pvKey := range pvols {
 		if err = DeletePersistentVolume(c, pvKey); err != nil {
-			return fmt.Errorf("Failed to delete PV %q: %v", pvKey, err)
+			errs = append(errs, fmt.Errorf("Failed to delete PV %q: %v", pvKey, err))
+		} else {
+			delete(pvols, pvKey)
 		}
-		delete(pvols, pvKey)
 	}
-	return nil
+	return errs
 }
 
 // Delete the PV.
@@ -197,8 +201,8 @@ func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 // Wraps deletePVCandValidatePV() by calling the function in a loop over the PV map. Only bound PVs
 // are deleted. Validates that the claim was deleted and the PV is in the expected Phase (Released,
 // Available, Bound).
-// Note: if there are more claims than pvs then some of the remaining claims will bind to the
-//   just-made-available pvs.
+// Note: if there are more claims than pvs then some of the remaining claims may bind to just made
+//   available pvs.
 func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, claims PVCMap, expectPVPhase v1.PersistentVolumePhase) error {
 
 	var boundPVs, deletedPVCs int
@@ -218,13 +222,17 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, 
 			if _, found := claims[pvcKey]; !found {
 				return fmt.Errorf("internal: claims map is missing pvc %q", pvcKey)
 			}
+			// get the pvc for the delete call below
 			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(cr.Name, metav1.GetOptions{})
-			if err != nil && !apierrs.IsNotFound(err) {
+			if err == nil {
+				if err = DeletePVCandValidatePV(c, ns, pvc, pv, expectPVPhase); err != nil {
+					return err
+				}
+			} else if !apierrs.IsNotFound(err) {
 				return fmt.Errorf("PVC Get API error: %v", err)
 			}
-			if err = DeletePVCandValidatePV(c, ns, pvc, pv, expectPVPhase); err != nil {
-				return err
-			}
+			// delete pvckey from map even if apierrs.IsNotFound above is true and thus the
+			// claim was not actually deleted here
 			delete(claims, pvcKey)
 			deletedPVCs++
 		}
@@ -392,7 +400,6 @@ func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, p
 	if pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{}); err != nil {
 		return fmt.Errorf("PV Get API error: %v", err)
 	}
-	// Re-get the pvc and
 	if pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{}); err != nil {
 		return fmt.Errorf("PVC Get API error: %v", err)
 	}
