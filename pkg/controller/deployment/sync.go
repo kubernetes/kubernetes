@@ -557,7 +557,7 @@ func calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaS
 	totalReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 	unavailableReplicas := totalReplicas - availableReplicas
 	// If unavailableReplicas is negative, then that means the Deployment has more available replicas running than
-	// desired, e.g. whenever it scales down. In such a case we should simply default unavailableReplicas to zero.
+	// desired, eg. whenever it scales down. In such a case we should simply default unavailableReplicas to zero.
 	if unavailableReplicas < 0 {
 		unavailableReplicas = 0
 	}
