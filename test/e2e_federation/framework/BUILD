@@ -18,6 +18,7 @@ go_library(
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
+        "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
@@ -32,7 +33,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
-        "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )
 

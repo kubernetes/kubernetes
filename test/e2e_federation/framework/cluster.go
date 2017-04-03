@@ -18,31 +18,18 @@ package framework
 
 import (
 	"fmt"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-)
-
-const (
-	KubeAPIQPS   float32 = 20.0
-	KubeAPIBurst         = 30
-
-	userAgentName = "federation-e2e"
-
-	federatedNamespaceTimeout    = 5 * time.Minute
-	federatedClustersWaitTimeout = 1 * time.Minute
 )
 
 // ClusterMap is a map of Cluster instances keyed by cluster name
@@ -57,74 +44,62 @@ type Cluster struct {
 	BackendPod       *v1.Pod // The backend pod, if one's been created.
 }
 
-// can not be moved to util, as By and Expect must be put in Ginkgo test unit
 func getRegisteredClusters(f *Framework) (ClusterMap, string) {
-	clusters := make(ClusterMap)
-	contexts := f.GetUnderlyingFederatedContexts()
-
-	By("Obtaining a list of all the clusters")
-	clusterList := waitForAllRegisteredClusters(f, len(contexts))
-
-	framework.Logf("Checking that %d clusters are Ready", len(contexts))
-	for _, context := range contexts {
-		ClusterIsReadyOrFail(f, &context)
+	By("Obtaining a list of registered clusters")
+	clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
+	framework.ExpectNoError(err, fmt.Sprintf("Error retrieving list of federated clusters: %+v", err))
+	if len(clusterList.Items) == 0 {
+		framework.Failf("No registered clusters found")
 	}
-	framework.Logf("%d clusters are Ready", len(contexts))
 
+	// TODO return a slice instead of a map so that the first cluster is implicit
 	primaryClusterName := clusterList.Items[0].Name
 	By(fmt.Sprintf("Labeling %q as the first cluster", primaryClusterName))
-	for i, c := range clusterList.Items {
-		framework.Logf("Creating a clientset for the cluster %s", c.Name)
-		Expect(framework.TestContext.KubeConfig).ToNot(Equal(""), "KubeConfig must be specified to load clusters' client config")
-		clusters[c.Name] = &Cluster{c.Name, createClientsetForCluster(c, i, userAgentName), false, nil}
+
+	clusters := make(ClusterMap)
+	for _, c := range clusterList.Items {
+		clusterName := c.Name
+		ClusterIsReadyOrFail(f, clusterName)
+		clientset := clientsetForClusterOrFail(f, clusterName)
+		clusters[clusterName] = &Cluster{
+			Name:      clusterName,
+			Clientset: clientset,
+		}
 	}
-	waitForNamespaceInFederatedClusters(clusters, f.FederationNamespace.Name, federatedNamespaceTimeout)
+
+	waitForNamespaceInFederatedClusters(clusters, f.FederationNamespace.Name)
+
 	return clusters, primaryClusterName
 }
 
-// waitForAllRegisteredClusters waits for all clusters defined in e2e context to be created
-// return ClusterList until the listed cluster items equals clusterCount
-func waitForAllRegisteredClusters(f *Framework, clusterCount int) *federationapi.ClusterList {
-	var clusterList *federationapi.ClusterList
-	if err := wait.PollImmediate(framework.Poll, federatedClustersWaitTimeout, func() (bool, error) {
-		var err error
-		clusterList, err = f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		framework.Logf("%d clusters registered, waiting for %d", len(clusterList.Items), clusterCount)
-		if len(clusterList.Items) == clusterCount {
-			return true, nil
-		}
-		return false, nil
-	}); err != nil {
-		framework.Failf("Failed to list registered clusters: %+v", err)
+func clientsetForClusterOrFail(f *Framework, clusterName string) *kubeclientset.Clientset {
+	By(fmt.Sprintf("Loading configuration for cluster %q", clusterName))
+
+	// TODO The system namespace should be configurable since it can vary across deployments
+	secret, err := f.Framework.ClientSet.Core().Secrets("federation-system").Get(clusterName, metav1.GetOptions{})
+	framework.ExpectNoError(err, fmt.Sprintf("Error loading config secret for cluster %q: %+v", clusterName, err))
+
+	data, ok := secret.Data[util.KubeconfigSecretDataKey]
+	if !ok || len(data) == 0 {
+		framework.Failf("Secret for cluster %q has no value for key %q", clusterName, util.KubeconfigSecretDataKey)
 	}
-	return clusterList
-}
 
-func createClientsetForCluster(c federationapi.Cluster, i int, userAgentName string) *kubeclientset.Clientset {
-	kubecfg, err := clientcmd.LoadFromFile(framework.TestContext.KubeConfig)
-	framework.ExpectNoError(err, "error loading KubeConfig: %v", err)
+	cfg, err := clientcmd.Load(data)
+	framework.ExpectNoError(err, fmt.Sprintf("Error loading configuration for cluster %q: %+v", clusterName, err))
 
-	cfgOverride := &clientcmd.ConfigOverrides{
-		ClusterInfo: clientcmdapi.Cluster{
-			Server: c.Spec.ServerAddressByClientCIDRs[0].ServerAddress,
-		},
-	}
-	ccfg := clientcmd.NewNonInteractiveClientConfig(*kubecfg, c.Name, cfgOverride, clientcmd.NewDefaultClientConfigLoadingRules())
-	cfg, err := ccfg.ClientConfig()
-	framework.ExpectNoError(err, "Error creating client config in cluster #%d (%q)", i, c.Name)
+	restConfig, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
+	framework.ExpectNoError(err, fmt.Sprintf("Error creating client for cluster %q: %+v", clusterName, err))
 
-	cfg.QPS = KubeAPIQPS
-	cfg.Burst = KubeAPIBurst
-	return kubeclientset.NewForConfigOrDie(restclient.AddUserAgent(cfg, userAgentName))
+	restConfig.QPS = f.Framework.Options.ClientQPS
+	restConfig.Burst = f.Framework.Options.ClientBurst
+
+	return kubeclientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "federation-e2e"))
 }
 
 // waitForNamespaceInFederatedClusters waits for the federated namespace to be created in federated clusters
-func waitForNamespaceInFederatedClusters(clusters ClusterMap, nsName string, timeout time.Duration) {
+func waitForNamespaceInFederatedClusters(clusters ClusterMap, nsName string) {
 	for name, c := range clusters {
-		err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		err := wait.PollImmediate(framework.Poll, FederatedDefaultTestTimeout, func() (bool, error) {
 			_, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{})
 			if err != nil {
 				By(fmt.Sprintf("Waiting for namespace %q to be created in cluster %q, err: %v", nsName, name, err))
@@ -137,22 +112,11 @@ func waitForNamespaceInFederatedClusters(clusters ClusterMap, nsName string, tim
 	}
 }
 
-// ClusterIsReadyOrFail checks whether the federated cluster of the provided context is ready
-func ClusterIsReadyOrFail(f *Framework, context *E2EContext) {
-	c, err := f.FederationClientset.Federation().Clusters().Get(context.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("get cluster: %+v", err))
-	if c.ObjectMeta.Name != context.Name {
-		framework.Failf("cluster name does not match input context: actual=%+v, expected=%+v", c, context)
-	}
-	err = isReady(context.Name, f.FederationClientset)
-	framework.ExpectNoError(err, fmt.Sprintf("unexpected error in verifying if cluster %s is ready: %+v", context.Name, err))
-	framework.Logf("Cluster %s is Ready", context.Name)
-}
-
-// Verify that the cluster is marked ready.
-func isReady(clusterName string, clientset *fedclientset.Clientset) error {
-	return wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
-		c, err := clientset.Federation().Clusters().Get(clusterName, metav1.GetOptions{})
+// ClusterIsReadyOrFail checks whether the named cluster is ready
+func ClusterIsReadyOrFail(f *Framework, clusterName string) {
+	By(fmt.Sprintf("Checking readiness of cluster %q", clusterName))
+	err := wait.PollImmediate(framework.Poll, FederatedDefaultTestTimeout, func() (bool, error) {
+		c, err := f.FederationClientset.Federation().Clusters().Get(clusterName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -163,4 +127,6 @@ func isReady(clusterName string, clientset *fedclientset.Clientset) error {
 		}
 		return false, nil
 	})
+	framework.ExpectNoError(err, fmt.Sprintf("Unexpected error in verifying if cluster %q is ready: %+v", clusterName, err))
+	framework.Logf("Cluster %s is Ready", clusterName)
 }
