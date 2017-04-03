@@ -69,10 +69,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 		Long:    create_cluster_long,
 		Example: create_cluster_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if !options.complete(cmd) {
-				return
-			}
-
+			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
 			fmt.Fprintf(out, "Cluster %q set.\n", options.name)
 		},
@@ -155,15 +152,15 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 	return modifiedCluster
 }
 
-func (o *createClusterOptions) complete(cmd *cobra.Command) bool {
+func (o *createClusterOptions) complete(cmd *cobra.Command) error {
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
 		cmd.Help()
-		return false
+		return fmt.Errorf("Unexpected args: %v", args)
 	}
 
 	o.name = args[0]
-	return true
+	return nil
 }
 
 func (o createClusterOptions) validate() error {
