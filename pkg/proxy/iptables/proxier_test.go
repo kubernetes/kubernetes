@@ -2010,8 +2010,7 @@ func Test_updateEndpoints(t *testing.T) {
 	}}
 
 	for tci, tc := range testCases {
-		hc := newFakeHealthChecker()
-		newMap, stale := updateEndpoints(tc.newEndpoints, tc.oldEndpoints, nodeName, hc)
+		newMap, hcEndpoints, stale := updateEndpoints(tc.newEndpoints, tc.oldEndpoints, nodeName)
 		if len(newMap) != len(tc.expectedResult) {
 			t.Errorf("[%d] expected %d results, got %d: %v", tci, len(tc.expectedResult), len(newMap), newMap)
 		}
@@ -2034,8 +2033,8 @@ func Test_updateEndpoints(t *testing.T) {
 				t.Errorf("[%d] expected stale[%v], but didn't find it: %v", tci, x, stale)
 			}
 		}
-		if !reflect.DeepEqual(hc.endpoints, tc.expectedHealthchecks) {
-			t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, hc.endpoints)
+		if !reflect.DeepEqual(hcEndpoints, tc.expectedHealthchecks) {
+			t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, hcEndpoints)
 		}
 	}
 }
