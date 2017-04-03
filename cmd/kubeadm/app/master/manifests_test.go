@@ -29,6 +29,7 @@ import (
 	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const testCertsDir = "/var/lib/certs"
@@ -522,8 +523,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--experimental-bootstrap-token-auth=true",
-				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
-				"--proxy-client-key-file=/var/lib/certs/front-proxy-client.key",
 				"--requestheader-username-headers=X-Remote-User",
 				"--requestheader-group-headers=X-Remote-Group",
 				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
@@ -539,7 +538,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getAPIServerCommand(rt.cfg, false)
+		actual := getAPIServerCommand(rt.cfg, false, version.MustParseSemantic("v1.6"))
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
