@@ -546,7 +546,13 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []*api.Endpoints) {
 	proxier.allEndpoints = allEndpoints
 
 	// TODO: once service has made this same transform, move this into proxier.syncProxyRules()
-	newMap, staleConnections := buildNewEndpointsMap(proxier.allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
+	newMap, hcEndpoints, staleConnections := buildNewEndpointsMap(proxier.allEndpoints, proxier.endpointsMap, proxier.hostname)
+
+	// update healthcheck endpoints
+	if err := proxier.healthChecker.SyncEndpoints(hcEndpoints); err != nil {
+		glog.Errorf("Error syncing healthcheck endoints: %v", err)
+	}
+
 	if len(newMap) != len(proxier.endpointsMap) || !reflect.DeepEqual(newMap, proxier.endpointsMap) {
 		proxier.endpointsMap = newMap
 		proxier.syncProxyRules()
@@ -558,11 +564,11 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []*api.Endpoints) {
 }
 
 // Convert a slice of api.Endpoints objects into a map of service-port -> endpoints.
-func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap, hostname string,
-	healthChecker healthcheck.Server) (newMap proxyEndpointMap, staleSet map[endpointServicePair]bool) {
+func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap, hostname string) (newMap proxyEndpointMap, hcEndpoints map[types.NamespacedName]int, staleSet map[endpointServicePair]bool) {
 
 	// return values
 	newMap = make(proxyEndpointMap)
+	hcEndpoints = make(map[types.NamespacedName]int)
 	staleSet = make(map[endpointServicePair]bool)
 
 	// Update endpoints for services.
@@ -607,16 +613,11 @@ func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap
 		}
 	}
 	// produce a count per service
-	localEndpointCounts := map[types.NamespacedName]int{}
 	for nsn, ips := range localIPs {
-		localEndpointCounts[nsn] = len(ips)
-	}
-	// update healthcheck endpoints
-	if err := healthChecker.SyncEndpoints(localEndpointCounts); err != nil {
-		glog.Errorf("Error syncing healthcheck endoints: %v", err)
+		hcEndpoints[nsn] = len(ips)
 	}
 
-	return newMap, staleSet
+	return newMap, hcEndpoints, staleSet
 }
 
 // Gather information about all the endpoint state for a given api.Endpoints.
