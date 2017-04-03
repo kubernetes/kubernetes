@@ -36,7 +36,6 @@ import (
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/test/e2e"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -83,7 +82,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		originalSizes = make(map[string]int)
 		sum := 0
 		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
-			size, err := e2e.GroupSize(mig)
+			size, err := framework.GroupSize(mig)
 			framework.ExpectNoError(err)
 			By(fmt.Sprintf("Initial size of %s: %d", mig, size))
 			originalSizes[mig] = size
@@ -211,7 +210,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 		}
 
-		nodes, err := e2e.GetGroupNodes(minMig)
+		nodes, err := framework.GetGroupNodes(minMig)
 		framework.ExpectNoError(err)
 		nodesSet := sets.NewString(nodes...)
 		defer removeLabels(nodesSet)
@@ -224,12 +223,12 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		CreateNodeSelectorPods(f, "node-selector", minSize+1, map[string]string{labelKey: labelValue}, false)
 
 		By("Waiting for new node to appear and annotating it")
-		e2e.WaitForGroupSize(minMig, int32(minSize+1))
+		framework.WaitForGroupSize(minMig, int32(minSize+1))
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
-		newNodes, err := e2e.GetGroupNodes(minMig)
+		newNodes, err := framework.GetGroupNodes(minMig)
 		framework.ExpectNoError(err)
 		newNodesSet := sets.NewString(newNodes...)
 		newNodesSet.Delete(nodes...)
@@ -655,11 +654,11 @@ func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c clientset.Interf
 
 func setMigSizes(sizes map[string]int) {
 	for mig, desiredSize := range sizes {
-		currentSize, err := e2e.GroupSize(mig)
+		currentSize, err := framework.GroupSize(mig)
 		framework.ExpectNoError(err)
 		if desiredSize != currentSize {
 			By(fmt.Sprintf("Setting size of %s to %d", mig, desiredSize))
-			err = e2e.ResizeGroup(mig, int32(desiredSize))
+			err = framework.ResizeGroup(mig, int32(desiredSize))
 			framework.ExpectNoError(err)
 		}
 	}
