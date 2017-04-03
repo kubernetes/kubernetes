@@ -115,7 +115,7 @@ func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMa
 
 	for pvcKey := range claims {
 		if err = DeletePersistentVolumeClaim(c, pvcKey.Name, ns); err != nil {
-			return fmt.Errorf("Failed to delete PVC %q: %v", pvcKey.Name, err)
+			return fmt.Errorf("Failed to delete PVC %q. Error: %v", pvcKey.Name, err)
 		}
 		delete(claims, pvcKey)
 	}
@@ -472,7 +472,7 @@ func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
 
 	By("Pod should terminate with exitcode 0 (success)")
 	if err := WaitForPodSuccessInNamespace(c, pod.Name, ns); err != nil {
-		fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
+		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
 	}
 	Logf("Pod %v succeeded ", pod.Name)
 	return nil
