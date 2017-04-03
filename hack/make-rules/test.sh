@@ -185,8 +185,8 @@ junitFilenamePrefix() {
   # exceeding 255 character filename limit. KUBE_TEST_API
   # barely fits there and in coverage mode test names are
   # appended to generated file names, easily exceeding
-  # 255 chars in length. So let's just sha1sum it.
-  local KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"|sha1sum|awk '{print $1}')"
+  # 255 chars in length. So let's just use a sha1 hash of it.
+  local KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"|shasum -a 1|awk '{print $1}')"
   echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_HASH}_$(kube::util::sortable_date)"
 }
 
@@ -236,7 +236,8 @@ runTests() {
   fi
 
   # Create coverage report directories.
-  cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API}/$(kube::util::sortable_date)"
+  KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"|shasum -a 1|awk '{print $1}')"
+  cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API_HASH}/$(kube::util::sortable_date)"
   cover_profile="coverage.out"  # Name for each individual coverage profile
   kube::log::status "Saving coverage output in '${cover_report_dir}'"
   mkdir -p "${@+${@/#/${cover_report_dir}/}}"
