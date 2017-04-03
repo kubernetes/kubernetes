@@ -98,7 +98,7 @@ func waitTillNPodsRunningOnNodes(c clientset.Interface, nodeNames sets.String, p
 // In case a given label already exists, it overwrites it. If label to remove doesn't exist
 // it silently ignores it.
 // TODO: migrate to use framework.AddOrUpdateLabelOnNode/framework.RemoveLabelOffNode
-func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRemove map[string]string) {
+func UpdateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRemove map[string]string) {
 	const maxRetries = 5
 	for nodeName := range nodeNames {
 		var node *v1.Node
@@ -310,7 +310,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			for i := 0; i < numNodes; i++ {
 				nodeNames.Insert(nodes.Items[i].Name)
 			}
-			updateNodeLabels(c, nodeNames, nodeLabels, nil)
+			UpdateNodeLabels(c, nodeNames, nodeLabels, nil)
 
 			// Start resourceMonitor only in small clusters.
 			if len(nodes.Items) <= maxNodesToCheck {
@@ -324,7 +324,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				resourceMonitor.Stop()
 			}
 			// If we added labels to nodes in this test, remove them now.
-			updateNodeLabels(c, nodeNames, nil, nodeLabels)
+			UpdateNodeLabels(c, nodeNames, nil, nodeLabels)
 		})
 
 		for _, itArg := range deleteTests {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package autoscaling
 
 import (
 	"bytes"
@@ -36,6 +36,7 @@ import (
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	. "k8s.io/kubernetes/test/e2e"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -204,7 +205,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		removeLabels := func(nodesToClean sets.String) {
 			By("Removing labels from nodes")
-			updateNodeLabels(c, nodesToClean, nil, labels)
+			UpdateNodeLabels(c, nodesToClean, nil, labels)
 		}
 
 		nodes, err := GetGroupNodes(minMig)
@@ -212,7 +213,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		nodesSet := sets.NewString(nodes...)
 		defer removeLabels(nodesSet)
 		By(fmt.Sprintf("Annotating nodes of the smallest MIG(%s): %v", minMig, nodes))
-		updateNodeLabels(c, nodesSet, labels, nil)
+		UpdateNodeLabels(c, nodesSet, labels, nil)
 
 		CreateNodeSelectorPods(f, "node-selector", minSize+1, labels, false)
 
@@ -264,7 +265,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 		}
 		By(fmt.Sprintf("Setting labels for registered new nodes: %v", registeredNodes.List()))
-		updateNodeLabels(c, registeredNodes, labels, nil)
+		UpdateNodeLabels(c, registeredNodes, labels, nil)
 		defer removeLabels(registeredNodes)
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
