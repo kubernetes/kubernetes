@@ -30,6 +30,7 @@ if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
     source "${KUBE_ROOT}/cluster/env.sh"
 fi
 
+source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 
