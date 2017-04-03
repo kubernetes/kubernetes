@@ -125,17 +125,17 @@ const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 // a volume for this PVC.
 const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
-// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
+// CloudVolumeCreatedForClaimNamespaceTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 // with namespace of a persistent volume claim used to create this volume.
-const cloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
+const CloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
 
-// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
+// CloudVolumeCreatedForClaimNameTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 // with name of a persistent volume claim used to create this volume.
-const cloudVolumeCreatedForClaimNameTag = "kubernetes.io/created-for/pvc/name"
+const CloudVolumeCreatedForClaimNameTag = "kubernetes.io/created-for/pvc/name"
 
-// Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
+// CloudVolumeCreatedForVolumeNameTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 // with name of appropriate Kubernetes persistent volume .
-const cloudVolumeCreatedForVolumeNameTag = "kubernetes.io/created-for/pv/name"
+const CloudVolumeCreatedForVolumeNameTag = "kubernetes.io/created-for/pv/name"
 
 // Number of retries when we create a PV object for a provisioned volume.
 const createProvisionedPVRetryCount = 5
@@ -1283,9 +1283,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 
 	// Gather provisioning options
 	tags := make(map[string]string)
-	tags[cloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
-	tags[cloudVolumeCreatedForClaimNameTag] = claim.Name
-	tags[cloudVolumeCreatedForVolumeNameTag] = pvName
+	tags[CloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
+	tags[CloudVolumeCreatedForClaimNameTag] = claim.Name
+	tags[CloudVolumeCreatedForVolumeNameTag] = pvName
 
 	options := vol.VolumeOptions{
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
