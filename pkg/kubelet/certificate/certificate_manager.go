@@ -155,10 +155,7 @@ func (m *manager) shouldRotate() bool {
 	// jitter, if a number of nodes are added to a cluster at approximately the
 	// same time (such as cluster creation time), they won't all try to rotate
 	// certificates at the same time for the rest of the life of the cluster.
-	//
-	// For the parameters of the Jitter function:
-	//    [total*0.7, total+total*0.7*0.28] ~ [total*0.7, total*0.9]
-	jitteryDuration := wait.Jitter(time.Duration(totalDuration*0.7), 0.28)
+	jitteryDuration := wait.Jitter(time.Duration(totalDuration*0.2), 1.0) + time.Duration(totalDuration*0.5)
 	rotationThreshold := m.cert.Leaf.NotBefore.Add(jitteryDuration)
 	return time.Now().After(rotationThreshold)
 }
