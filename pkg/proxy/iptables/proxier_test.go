@@ -365,16 +365,16 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
 	return &Proxier{
-		exec:                      &exec.FakeExec{},
-		serviceMap:                make(map[proxy.ServicePortName]*serviceInfo),
-		iptables:                  ipt,
-		clusterCIDR:               "10.0.0.0/24",
-		allEndpoints:              []*api.Endpoints{},
-		haveReceivedServiceUpdate: true,
-		hostname:                  testHostname,
-		portsMap:                  make(map[localPort]closeable),
-		portMapper:                &fakePortOpener{[]*localPort{}},
-		healthChecker:             fakeHealthChecker{},
+		exec:          &exec.FakeExec{},
+		serviceMap:    make(map[proxy.ServicePortName]*serviceInfo),
+		iptables:      ipt,
+		clusterCIDR:   "10.0.0.0/24",
+		allEndpoints:  []*api.Endpoints{},
+		allServices:   []*api.Service{},
+		hostname:      testHostname,
+		portsMap:      make(map[localPort]closeable),
+		portMapper:    &fakePortOpener{[]*localPort{}},
+		healthChecker: fakeHealthChecker{},
 	}
 }
 
