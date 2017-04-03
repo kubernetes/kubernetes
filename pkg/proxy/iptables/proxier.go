@@ -435,7 +435,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 func (proxier *Proxier) Sync() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-	proxier.syncProxyRules()
+	proxier.syncProxyRules(syncReasonForce)
 }
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
@@ -554,7 +554,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []*api.Service) {
 
 	if len(newServiceMap) != len(proxier.serviceMap) || !reflect.DeepEqual(newServiceMap, proxier.serviceMap) {
 		proxier.serviceMap = newServiceMap
-		proxier.syncProxyRules()
+		proxier.syncProxyRules(syncReasonServices)
 	} else {
 		glog.V(4).Infof("Skipping proxy iptables rule sync on service update because nothing changed")
 	}
@@ -575,7 +575,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []*api.Endpoints) {
 	newMap, staleConnections := updateEndpoints(proxier.allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
 	if len(newMap) != len(proxier.endpointsMap) || !reflect.DeepEqual(newMap, proxier.endpointsMap) {
 		proxier.endpointsMap = newMap
-		proxier.syncProxyRules()
+		proxier.syncProxyRules(syncReasonEndpoints)
 	} else {
 		glog.V(4).Infof("Skipping proxy iptables rule sync on endpoint update because nothing changed")
 	}
@@ -757,16 +757,22 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServ
 	}
 }
 
+type syncReason string
+
+const syncReasonServices syncReason = "ServicesUpdate"
+const syncReasonEndpoints syncReason = "EndpointsUpdate"
+const syncReasonForce syncReason = "Force"
+
 // This is where all of the iptables-save/restore calls happen.
 // The only other iptables rules are those that are setup in iptablesInit()
 // assumes proxier.mu is held
-func (proxier *Proxier) syncProxyRules() {
+func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	if proxier.throttle != nil {
 		proxier.throttle.Accept()
 	}
 	start := time.Now()
 	defer func() {
-		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
+		glog.V(4).Infof("syncProxyRules(%s) took %v", reason, time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
 	if proxier.allEndpoints == nil || !proxier.haveReceivedServiceUpdate {
