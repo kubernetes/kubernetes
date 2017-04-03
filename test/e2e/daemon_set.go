@@ -94,7 +94,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 	f = framework.NewDefaultFramework("daemonsets")
 
 	image := "gcr.io/google_containers/serve_hostname:v1.4"
-	redisImage := "gcr.io/google_containers/redis:e2e"
+	redisImage := "gcr.io/k8s-testimages/redis:e2e"
 	dsName := "daemon-set"
 
 	var ns string
@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, complexLabel))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
 
-		By("Change label of node, check that daemon pod is launched.")
+		By("Change node label to blue, check that daemon pod is launched.")
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
@@ -155,11 +155,24 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		err = checkDaemonStatus(f, dsName)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("remove the node selector and wait for daemons to be unscheduled")
-		_, err = setDaemonSetNodeLabels(c, nodeList.Items[0].Name, map[string]string{})
+		By("Update the node label to green, and wait for daemons to be unscheduled")
+		nodeSelector[daemonsetColorLabel] = "green"
+		greenNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
 		Expect(err).NotTo(HaveOccurred(), "error removing labels on node")
 		Expect(wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, complexLabel))).
 			NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
+
+		By("Update DaemonSet node selector to green, and change its update strategy to RollingUpdate")
+		patch := fmt.Sprintf(`{"spec":{"template":{"spec":{"nodeSelector":{"%s":"%s"}}},"updateStrategy":{"type":"RollingUpdate"}}}`,
+			daemonsetColorLabel, greenNode.Labels[daemonsetColorLabel])
+		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
+		Expect(err).NotTo(HaveOccurred(), "error patching daemon set")
+		daemonSetLabels, _ = separateDaemonSetNodeLabels(greenNode.Labels)
+		Expect(len(daemonSetLabels)).To(Equal(1))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonPodOnNodes(f, complexLabel, []string{greenNode.Name}))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
+		err = checkDaemonStatus(f, dsName)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should run and stop complex daemon with node affinity", func() {
@@ -191,7 +204,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, complexLabel))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
 
-		By("Change label of node, check that daemon pod is launched.")
+		By("Change node label to blue, check that daemon pod is launched.")
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
@@ -203,7 +216,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		err = checkDaemonStatus(f, dsName)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("remove the node selector and wait for daemons to be unscheduled")
+		By("Remove the node label and wait for daemons to be unscheduled")
 		_, err = setDaemonSetNodeLabels(c, nodeList.Items[0].Name, map[string]string{})
 		Expect(err).NotTo(HaveOccurred(), "error removing labels on node")
 		Expect(wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, complexLabel))).
@@ -251,9 +264,8 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Update daemon pods image.")
-		ds, err = c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
-		ds.Spec.Template.Spec.Containers[0].Image = redisImage
-		ds, err = c.Extensions().DaemonSets(ns).Update(ds)
+		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, redisImage)
+		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ds.Spec.TemplateGeneration).To(Equal(int64(2)))
 
@@ -277,6 +289,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		framework.Logf("Creating simple daemon set %s with templateGeneration %d", dsName, templateGeneration)
 		ds := newDaemonSet(dsName, image, label)
 		ds.Spec.TemplateGeneration = templateGeneration
+		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
 		ds, err := c.Extensions().DaemonSets(ns).Create(ds)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration))
@@ -290,11 +303,8 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Update daemon pods image.")
-		ds, err = c.Extensions().DaemonSets(ns).Get(dsName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		ds.Spec.Template.Spec.Containers[0].Image = redisImage
-		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
-		ds, err = c.Extensions().DaemonSets(ns).Update(ds)
+		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, redisImage)
+		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration + 1))
 
@@ -390,6 +400,11 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
+
+// getDaemonSetImagePatch generates a patch for updating a DaemonSet's container image
+func getDaemonSetImagePatch(containerName, containerImage string) string {
+	return fmt.Sprintf(`{"spec":{"template":{"spec":{"containers":[{"name":"%s","image":"%s"}]}}}}`, containerName, containerImage)
+}
 
 func orphanDaemonSetPods(c clientset.Interface, ds *extensions.DaemonSet) error {
 	trueVar := true

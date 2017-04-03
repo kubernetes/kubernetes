@@ -19,9 +19,11 @@ limitations under the License.
 package replication
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -38,6 +40,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -211,17 +214,21 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 }
 
 func TestSyncReplicationControllerDeletes(t *testing.T) {
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	controllerSpec := newReplicationController(1)
+
+	c := fake.NewSimpleClientset(controllerSpec)
 	fakePodControl := controller.FakePodControl{}
 	manager, podInformer, rcInformer := newReplicationManagerFromClient(c, BurstReplicas)
 	manager.podControl = &fakePodControl
 
 	// 2 running pods and a controller with 1 replica, one pod delete expected
-	controllerSpec := newReplicationController(1)
 	rcInformer.Informer().GetIndexer().Add(controllerSpec)
 	newPodList(podInformer.Informer().GetIndexer(), 2, v1.PodRunning, controllerSpec, "pod")
 
-	manager.syncReplicationController(getKey(controllerSpec, t))
+	err := manager.syncReplicationController(getKey(controllerSpec, t))
+	if err != nil {
+		t.Fatalf("syncReplicationController() error: %v", err)
+	}
 	validateSyncReplication(t, &fakePodControl, 0, 1, 0)
 }
 
@@ -258,12 +265,12 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 }
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	rc := newReplicationController(2)
+	c := fake.NewSimpleClientset(rc)
 	manager, podInformer, rcInformer := newReplicationManagerFromClient(c, BurstReplicas)
 
 	// A controller with 2 replicas and no active pods in the store.
 	// Inactive pods should be ignored. 2 creates expected.
-	rc := newReplicationController(2)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	failedPod := newPod("failed-pod", rc, v1.PodFailed, nil, true)
 	deletedPod := newPod("deleted-pod", rc, v1.PodRunning, nil, true)
@@ -282,6 +289,13 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: "",
+		SkipRequestFn: func(verb string, url url.URL) bool {
+			if verb == "GET" {
+				// Ignore refetch to check DeletionTimestamp.
+				return true
+			}
+			return false
+		},
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
@@ -361,20 +375,12 @@ func TestControllerUpdateReplicas(t *testing.T) {
 }
 
 func TestSyncReplicationControllerDormancy(t *testing.T) {
-	// Setup a test server so we can lie about the current state of pods
-	fakeHandler := utiltesting.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: "{}",
-		T:            t,
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	controllerSpec := newReplicationController(2)
+	c := fake.NewSimpleClientset(controllerSpec)
 	fakePodControl := controller.FakePodControl{}
 	manager, podInformer, rcInformer := newReplicationManagerFromClient(c, BurstReplicas)
 	manager.podControl = &fakePodControl
 
-	controllerSpec := newReplicationController(2)
 	rcInformer.Informer().GetIndexer().Add(controllerSpec)
 	newPodList(podInformer.Informer().GetIndexer(), 1, v1.PodRunning, controllerSpec, "pod")
 
@@ -416,10 +422,6 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 	fakePodControl.Err = nil
 	manager.syncReplicationController(getKey(controllerSpec, t))
 	validateSyncReplication(t, &fakePodControl, 1, 0, 0)
-
-	// 2 PUT for the rc status during dormancy window.
-	// Note that the pod creates go through pod control so they're not recorded.
-	fakeHandler.ValidateRequestCount(t, 2)
 }
 
 func TestPodControllerLookup(t *testing.T) {
@@ -699,17 +701,17 @@ func TestUpdatePods(t *testing.T) {
 
 func TestControllerUpdateRequeue(t *testing.T) {
 	// This server should force a requeue of the controller because it fails to update status.Replicas.
-	fakeHandler := utiltesting.FakeHandler{
-		StatusCode:   500,
-		ResponseBody: "",
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
-
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	rc := newReplicationController(1)
+	c := fake.NewSimpleClientset(rc)
+	c.PrependReactor("update", "replicationcontrollers",
+		func(action core.Action) (bool, runtime.Object, error) {
+			if action.GetSubresource() != "status" {
+				return false, nil, nil
+			}
+			return true, nil, errors.New("failed to update status")
+		})
 	manager, podInformer, rcInformer := newReplicationManagerFromClient(c, BurstReplicas)
 
-	rc := newReplicationController(1)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	rc.Status = v1.ReplicationControllerStatus{Replicas: 2}
 	newPodList(podInformer.Informer().GetIndexer(), 1, v1.PodRunning, rc, "pod")
@@ -717,13 +719,14 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 
-	// an error from the sync function will be requeued, check to make sure we returned an error
-	if err := manager.syncReplicationController(getKey(rc, t)); err == nil {
-		t.Errorf("missing error for requeue")
+	// Enqueue once. Then process it. Disable rate-limiting for this.
+	manager.queue = workqueue.NewRateLimitingQueue(workqueue.NewMaxOfRateLimiter())
+	manager.enqueueController(rc)
+	manager.processNextWorkItem()
+	// It should have been requeued.
+	if got, want := manager.queue.Len(), 1; got != want {
+		t.Errorf("queue.Len() = %v, want %v", got, want)
 	}
-
-	// 1 Update and 1 GET, both of which fail
-	fakeHandler.ValidateRequestCount(t, 2)
 }
 
 func TestControllerUpdateStatusWithFailure(t *testing.T) {
@@ -775,12 +778,12 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 
 // TODO: This test is too hairy for a unittest. It should be moved to an E2E suite.
 func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int) {
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	controllerSpec := newReplicationController(numReplicas)
+	c := fake.NewSimpleClientset(controllerSpec)
 	fakePodControl := controller.FakePodControl{}
 	manager, podInformer, rcInformer := newReplicationManagerFromClient(c, burstReplicas)
 	manager.podControl = &fakePodControl
 
-	controllerSpec := newReplicationController(numReplicas)
 	rcInformer.Informer().GetIndexer().Add(controllerSpec)
 
 	expectedPods := 0
@@ -956,10 +959,10 @@ func TestRCSyncExpectations(t *testing.T) {
 }
 
 func TestDeleteControllerAndExpectations(t *testing.T) {
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	rc := newReplicationController(1)
+	c := fake.NewSimpleClientset(rc)
 	manager, podInformer, rcInformer := newReplicationManagerFromClient(c, 10)
 
-	rc := newReplicationController(1)
 	rcInformer.Informer().GetIndexer().Add(rc)
 
 	fakePodControl := controller.FakePodControl{}
@@ -1236,8 +1239,8 @@ func setupManagerWithGCEnabled(objs ...runtime.Object) (manager *ReplicationMana
 }
 
 func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled()
 	rc := newReplicationController(2)
+	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled(rc)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	var trueVar = true
 	otherControllerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "v1", Kind: "ReplicationController", Name: "AnotherRC", Controller: &trueVar}
@@ -1335,8 +1338,8 @@ func TestPatchExtraPodsThenDelete(t *testing.T) {
 }
 
 func TestUpdateLabelsRemoveControllerRef(t *testing.T) {
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled()
 	rc := newReplicationController(2)
+	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled(rc)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	// put one pod in the podLister
 	pod := newPod("pod", rc, v1.PodRunning, nil, false)
@@ -1373,8 +1376,8 @@ func TestUpdateLabelsRemoveControllerRef(t *testing.T) {
 }
 
 func TestUpdateSelectorControllerRef(t *testing.T) {
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled()
 	rc := newReplicationController(2)
+	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled(rc)
 	// put 2 pods in the podLister
 	newPodList(podInformer.Informer().GetIndexer(), 2, v1.PodRunning, rc, "pod")
 	// update the RC so that its selector no longer matches the pods
@@ -1406,10 +1409,10 @@ func TestUpdateSelectorControllerRef(t *testing.T) {
 // RC manager shouldn't adopt or create more pods if the rc is about to be
 // deleted.
 func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
-	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled()
 	rc := newReplicationController(2)
 	now := metav1.Now()
 	rc.DeletionTimestamp = &now
+	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled(rc)
 	rcInformer.Informer().GetIndexer().Add(rc)
 	pod1 := newPod("pod1", rc, v1.PodRunning, nil, false)
 	podInformer.Informer().GetIndexer().Add(pod1)
@@ -1419,6 +1422,30 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	validateSyncReplication(t, fakePodControl, 0, 0, 0)
+}
+
+func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
+	// Bare client says it IS deleted.
+	rc := newReplicationController(2)
+	now := metav1.Now()
+	rc.DeletionTimestamp = &now
+	manager, fakePodControl, podInformer, rcInformer := setupManagerWithGCEnabled(rc)
+	// Lister (cache) says it's NOT deleted.
+	rc2 := *rc
+	rc2.DeletionTimestamp = nil
+	rcInformer.Informer().GetIndexer().Add(&rc2)
+
+	// Recheck occurs if a matching orphan is present.
+	pod1 := newPod("pod1", rc, v1.PodRunning, nil, false)
+	podInformer.Informer().GetIndexer().Add(pod1)
+
+	// sync should abort.
+	err := manager.syncReplicationController(getKey(rc, t))
+	if err == nil {
+		t.Error("syncReplicationController() err = nil, expected non-nil")
+	}
+	// no patch, no create.
 	validateSyncReplication(t, fakePodControl, 0, 0, 0)
 }
 

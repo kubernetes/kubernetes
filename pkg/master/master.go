@@ -216,7 +216,7 @@ func (c completedConfig) New() (*Master, error) {
 	}
 
 	if c.EnableUISupport {
-		routes.UIRedirect{}.Install(s.HandlerContainer)
+		routes.UIRedirect{}.Install(s.FallThroughHandler)
 	}
 	if c.EnableLogsSupport {
 		routes.Logs{}.Install(s.HandlerContainer)
@@ -240,8 +240,10 @@ func (c completedConfig) New() (*Master, error) {
 		m.InstallLegacyAPI(c.Config, c.Config.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
 
+	// The order here is preserved in discovery.
+	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
+	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
 	restStorageProviders := []RESTStorageProvider{
-		appsrest.RESTStorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
 		autoscalingrest.RESTStorageProvider{},
@@ -250,8 +252,11 @@ func (c completedConfig) New() (*Master, error) {
 		extensionsrest.RESTStorageProvider{ResourceInterface: thirdparty.NewThirdPartyResourceServer(s, c.StorageFactory)},
 		policyrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
-		storagerest.RESTStorageProvider{},
 		settingsrest.RESTStorageProvider{},
+		storagerest.RESTStorageProvider{},
+		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
+		// See https://github.com/kubernetes/kubernetes/issues/42392
+		appsrest.RESTStorageProvider{},
 	}
 	m.InstallAPIs(c.Config.APIResourceConfigSource, c.Config.GenericConfig.RESTOptionsGetter, restStorageProviders...)
 

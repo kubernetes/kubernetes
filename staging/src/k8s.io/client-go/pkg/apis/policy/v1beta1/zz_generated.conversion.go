@@ -111,7 +111,11 @@ func Convert_v1beta1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(i
 
 func autoConvert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(in *policy.PodDisruptionBudgetList, out *PodDisruptionBudgetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]PodDisruptionBudget)(unsafe.Pointer(&in.Items))
+	if in.Items == nil {
+		out.Items = make([]PodDisruptionBudget, 0)
+	} else {
+		out.Items = *(*[]PodDisruptionBudget)(unsafe.Pointer(&in.Items))
+	}
 	return nil
 }
 

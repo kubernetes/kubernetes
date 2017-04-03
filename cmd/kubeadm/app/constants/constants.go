@@ -57,7 +57,7 @@ const (
 	SchedulerKubeConfigFileName         = "scheduler.conf"
 
 	// Important: a "v"-prefix shouldn't exist here; semver doesn't allow that
-	MinimumControlPlaneVersion = "1.6.0-beta.1"
+	MinimumControlPlaneVersion = "1.6.0-beta.3"
 
 	// Some well-known users and groups in the core Kubernetes authorization system
 

@@ -138,6 +138,13 @@ func (i *Instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error)
 	return addrs, nil
 }
 
+// NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (i *Instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	return []v1.NodeAddress{}, errors.New("unimplemented")
+}
+
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (i *Instances) ExternalID(name types.NodeName) (string, error) {
 	srv, err := getServerByName(i.compute, name)
@@ -164,6 +171,13 @@ func (i *Instances) InstanceID(name types.NodeName) (string, error) {
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<instanceid>
 	return "/" + srv.ID, nil
+}
+
+// InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (i *Instances) InstanceTypeByProviderID(providerID string) (string, error) {
+	return "", errors.New("unimplemented")
 }
 
 // InstanceType returns the type of the specified instance.

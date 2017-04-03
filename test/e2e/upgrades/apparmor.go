@@ -34,9 +34,22 @@ type AppArmorUpgradeTest struct {
 
 func (AppArmorUpgradeTest) Name() string { return "apparmor-upgrade" }
 
+func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+	supportedImages := make(map[string]bool)
+	for _, d := range common.AppArmorDistros {
+		supportedImages[d] = true
+	}
+
+	for _, vCtx := range upgCtx.Versions {
+		if !supportedImages[vCtx.NodeImage] {
+			return true
+		}
+	}
+	return false
+}
+
 // Setup creates a secret and then verifies that a pod can consume it.
 func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
-	common.SkipIfAppArmorNotSupported()
 	By("Loading AppArmor profiles to nodes")
 	common.LoadAppArmorProfiles(f)
 

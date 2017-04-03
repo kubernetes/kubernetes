@@ -50,7 +50,7 @@ var (
 		To start using your cluster, you need to run (as a regular user):
 
 		  sudo cp {{.KubeConfigPath}} $HOME/
-		  sudo chmod $(id -u):$(id -g) $HOME/{{.KubeConfigName}}
+		  sudo chown $(id -u):$(id -g) $HOME/{{.KubeConfigName}}
 		  export KUBECONFIG=$HOME/{{.KubeConfigName}}
 
 		You should now deploy a pod network to the cluster.
@@ -200,9 +200,6 @@ func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
 
-	// TODO this is not great, but there is only one address we can use here
-	// so we'll pick the first one, there is much of chance to have an empty
-	// slice by the time this gets called
 	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
 	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, i.cfg.CertificatesDir, kubeadmapi.GlobalEnvParams.KubernetesDir)
 	if err != nil {

@@ -33,6 +33,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
+        "//pkg/util/version:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor:github.com/onsi/ginkgo",

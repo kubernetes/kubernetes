@@ -90,7 +90,7 @@ func (o *ViewLastAppliedOptions) Complete(f cmdutil.Factory, args []string) erro
 		return err
 	}
 
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(enforceNamespace, args...).
@@ -132,16 +132,19 @@ func (o *ViewLastAppliedOptions) Validate(cmd *cobra.Command) error {
 
 func (o *ViewLastAppliedOptions) RunApplyViewLastApplied() error {
 	for _, str := range o.LastAppliedConfigurationList {
-		yamlOutput, err := yaml.JSONToYAML([]byte(str))
 		switch o.OutputFormat {
 		case "json":
 			jsonBuffer := &bytes.Buffer{}
-			err = json.Indent(jsonBuffer, []byte(str), "", "  ")
+			err := json.Indent(jsonBuffer, []byte(str), "", "  ")
 			if err != nil {
 				return err
 			}
 			fmt.Fprintf(o.Out, string(jsonBuffer.Bytes()))
 		case "yaml":
+			yamlOutput, err := yaml.JSONToYAML([]byte(str))
+			if err != nil {
+				return err
+			}
 			fmt.Fprintf(o.Out, string(yamlOutput))
 		}
 	}

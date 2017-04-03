@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -62,6 +61,7 @@ import (
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
+	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -96,6 +96,9 @@ const (
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 	redisControllerFilename  = "redis-master-controller.json"
 	redisServiceFilename     = "redis-master-service.json"
+	nginxDeployment1Filename = "nginx-deployment1.yaml"
+	nginxDeployment2Filename = "nginx-deployment2.yaml"
+	nginxDeployment3Filename = "nginx-deployment3.yaml"
 )
 
 var (
@@ -682,6 +685,49 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("checking the result")
 			if originalNodePort != currentNodePort {
 				framework.Failf("port should keep the same")
+			}
+		})
+
+		It("apply set/view last-applied", func() {
+			deployment1Yaml := readTestFileOrDie(nginxDeployment1Filename)
+			deployment2Yaml := readTestFileOrDie(nginxDeployment2Filename)
+			deployment3Yaml := readTestFileOrDie(nginxDeployment3Filename)
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("deployment replicas number is 2")
+			framework.RunKubectlOrDieInput(string(deployment1Yaml[:]), "apply", "-f", "-", nsFlag)
+
+			By("check the last-applied matches expectations annotations")
+			output := framework.RunKubectlOrDieInput(string(deployment1Yaml[:]), "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
+			requiredString := "\"replicas\": 2"
+			if !strings.Contains(output, requiredString) {
+				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
+			}
+
+			By("apply file doesn't have replicas")
+			framework.RunKubectlOrDieInput(string(deployment2Yaml[:]), "apply", "set-last-applied", "-f", "-", nsFlag)
+
+			By("check last-applied has been updated, annotations doesn't replicas")
+			output = framework.RunKubectlOrDieInput(string(deployment1Yaml[:]), "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
+			requiredString = "\"replicas\": 2"
+			if strings.Contains(output, requiredString) {
+				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
+			}
+
+			By("scale set replicas to 3")
+			nginxDeploy := "nginx-deployment"
+			framework.RunKubectlOrDie("scale", "deployment", nginxDeploy, "--replicas=3", nsFlag)
+
+			By("apply file doesn't have replicas but image changed")
+			framework.RunKubectlOrDieInput(string(deployment3Yaml[:]), "apply", "-f", "-", nsFlag)
+
+			By("verify replicas still is 3 and image has been updated")
+			output = framework.RunKubectlOrDieInput(string(deployment3Yaml[:]), "get", "-f", "-", nsFlag, "-o", "json")
+			requiredItems := []string{"\"replicas\": 3", "nginx-slim:0.7"}
+			for _, item := range requiredItems {
+				if !strings.Contains(output, item) {
+					framework.Failf("Missing %s in kubectl apply", item)
+				}
 			}
 		})
 	})
@@ -1416,7 +1462,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				Effect: v1.TaintEffectNoSchedule,
 			}
 
-			nodeName := getNodeThatCanRunPod(f)
+			nodeName := scheduling.GetNodeThatCanRunPod(f)
 
 			By("adding the taint " + testTaint.ToString() + " to a node")
 			runKubectlRetryOrDie("taint", "nodes", nodeName, testTaint.ToString())
@@ -1447,7 +1493,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				Effect: v1.TaintEffectNoSchedule,
 			}
 
-			nodeName := getNodeThatCanRunPod(f)
+			nodeName := scheduling.GetNodeThatCanRunPod(f)
 
 			By("adding the taint " + testTaint.ToString() + " to a node")
 			runKubectlRetryOrDie("taint", "nodes", nodeName, testTaint.ToString())
@@ -1847,7 +1893,7 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 		if strings.Contains(data.Image, jpgExpected) {
 			return nil
 		} else {
-			return errors.New(fmt.Sprintf("data served up in container is inaccurate, %s didn't contain %s", data, jpgExpected))
+			return fmt.Errorf("data served up in container is inaccurate, %s didn't contain %s", data, jpgExpected)
 		}
 	}
 }

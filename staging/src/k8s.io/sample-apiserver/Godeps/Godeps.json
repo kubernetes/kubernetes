@@ -1,14 +1,14 @@
 {
 	"ImportPath": "k8s.io/sample-apiserver",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v74",
+	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
 	],
 	"Deps": [
 		{
 			"ImportPath": "bitbucket.org/ww/goautoneg",
-			"Rev": "'75cd24fc2f2c2a2088577d12123ddee5f54e0675'"
+			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
 		},
 		{
 			"ImportPath": "github.com/PuerkitoBio/purell",
@@ -68,11 +68,11 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/daemon",
-			"Rev": "4484981625c1a6a2ecb40a390fcb6a9bcfee76e3"
+			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/journal",
-			"Rev": "4484981625c1a6a2ecb40a390fcb6a9bcfee76e3"
+			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
 		},
 		{
 			"ImportPath": "github.com/coreos/pkg/capnslog",
@@ -108,7 +108,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "465937c80b3c07a7c7ad20cc934898646a91c1de"
+			"Rev": "ba18e35c5c1b36ef6334cad706eb681153d2d379"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",

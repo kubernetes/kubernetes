@@ -122,7 +122,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
-		"skip preflight checks normally run before modifying the system",
+		"Skip preflight checks normally run before modifying the system",
 	)
 
 	return cmd

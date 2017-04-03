@@ -192,10 +192,9 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				metav1.LabelHostname:       kl.hostname,
-				metav1.LabelOS:             goruntime.GOOS,
-				metav1.LabelArch:           goruntime.GOARCH,
-				metav1.LabelFluentdDsReady: "true",
+				metav1.LabelHostname: kl.hostname,
+				metav1.LabelOS:       goruntime.GOOS,
+				metav1.LabelArch:     goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{

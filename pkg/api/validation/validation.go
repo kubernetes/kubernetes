@@ -105,6 +105,14 @@ func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList
 func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	if annotations[api.AffinityAnnotationKey] != "" {
+		allErrs = append(allErrs, ValidateAffinityInPodAnnotations(annotations, fldPath)...)
+	}
+
+	if annotations[api.TolerationsAnnotationKey] != "" {
+		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
+	}
+
 	// TODO: remove these after we EOL the annotations.
 	if hostname, exists := annotations[utilpod.PodHostnameAnnotation]; exists {
 		allErrs = append(allErrs, ValidateDNS1123Label(hostname, fldPath.Key(utilpod.PodHostnameAnnotation))...)
@@ -133,6 +141,40 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.Pod
 		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.UnsafeSysctlsPodAnnotationKey), strings.Join(inBoth, ", "), "can not be safe and unsafe"))
 	}
 
+	return allErrs
+}
+
+// ValidateTolerationsInPodAnnotations tests that the serialized tolerations in Pod.Annotations has valid data
+func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	tolerations, err := api.GetTolerationsFromPodAnnotations(annotations)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, api.TolerationsAnnotationKey, err.Error()))
+		return allErrs
+	}
+
+	if len(tolerations) > 0 {
+		allErrs = append(allErrs, validateTolerations(tolerations, fldPath.Child(api.TolerationsAnnotationKey))...)
+	}
+
+	return allErrs
+}
+
+// ValidateAffinityInPodAnnotations tests that the serialized Affinity in Pod.Annotations has valid data
+func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	affinity, err := api.GetAffinityFromPodAnnotations(annotations)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, api.AffinityAnnotationKey, err.Error()))
+		return allErrs
+	}
+	if affinity == nil {
+		return allErrs
+	}
+
+	allErrs = append(allErrs, validateAffinity(affinity, fldPath.Child("affinity"))...)
 	return allErrs
 }
 
@@ -1522,6 +1564,10 @@ func validateConfigMapEnvSource(configMapSource *api.ConfigMapEnvSource, fldPath
 	allErrs := field.ErrorList{}
 	if len(configMapSource.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		for _, msg := range ValidateConfigMapName(configMapSource.Name, true) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), configMapSource.Name, msg))
+		}
 	}
 	return allErrs
 }
@@ -1530,6 +1576,10 @@ func validateSecretEnvSource(secretSource *api.SecretEnvSource, fldPath *field.P
 	allErrs := field.ErrorList{}
 	if len(secretSource.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		for _, msg := range ValidateSecretName(secretSource.Name, true) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), secretSource.Name, msg))
+		}
 	}
 	return allErrs
 }
@@ -2908,6 +2958,9 @@ func ValidatePodTemplateSpecForRC(template *api.PodTemplateSpec, selectorMap map
 		if template.Spec.RestartPolicy != api.RestartPolicyAlways {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "restartPolicy"), template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
 		}
+		if template.Spec.ActiveDeadlineSeconds != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "activeDeadlineSeconds"), template.Spec.ActiveDeadlineSeconds, "must not be specified"))
+		}
 	}
 	return allErrs
 }
@@ -2947,6 +3000,23 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume, fldPath *field.Path) 
 	return allErrs
 }
 
+// ValidateTaintsInNodeAnnotations tests that the serialized taints in Node.Annotations has valid data
+func ValidateTaintsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, api.TaintsAnnotationKey, err.Error()))
+		return allErrs
+	}
+
+	if len(taints) > 0 {
+		allErrs = append(allErrs, validateNodeTaints(taints, fldPath.Child(api.TaintsAnnotationKey))...)
+	}
+
+	return allErrs
+}
+
 // validateNodeTaints tests if given taints have valid data.
 func validateNodeTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -2983,6 +3053,11 @@ func validateNodeTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList
 
 func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	if annotations[api.TaintsAnnotationKey] != "" {
+		allErrs = append(allErrs, ValidateTaintsInNodeAnnotations(annotations, fldPath)...)
+	}
+
 	if annotations[api.PreferAvoidPodsAnnotationKey] != "" {
 		allErrs = append(allErrs, ValidateAvoidPodsInNodeAnnotations(annotations, fldPath)...)
 	}

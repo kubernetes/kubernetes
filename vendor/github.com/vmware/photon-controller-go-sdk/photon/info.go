@@ -17,11 +17,11 @@ type InfoAPI struct {
 	client *Client
 }
 
-var infoUrl = "/info"
+var infoUrl = rootUrl + "/info"
 
 // Get info
 func (api *InfoAPI) Get() (info *Info, err error) {
-	res, err := api.client.restClient.Get(api.client.Endpoint+infoUrl, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Get(api.client.Endpoint+infoUrl, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}

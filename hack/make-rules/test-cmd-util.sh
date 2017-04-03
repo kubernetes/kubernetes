@@ -223,6 +223,48 @@ setup() {
   kube::log::status "Setup complete"
 }
 
+########################################################
+# Kubectl version (--short, --client, --output) #
+########################################################
+run_kubectl_version_tests() {
+  kube::log::status "Testing kubectl version"
+  TEMP="${KUBE_TEMP}"
+
+  # create version files, one for the client, one for the server.
+  # these are the files we will use to ensure that the remainder output is correct
+  kube::test::version::object_to_file "Client" "" "${TEMP}/client_version_test"
+  kube::test::version::object_to_file "Server" "" "${TEMP}/server_version_test"
+
+  kube::log::status "Testing kubectl version: check client only output matches expected output"
+  kube::test::version::object_to_file "Client" "--client" "${TEMP}/client_only_version_test"
+  kube::test::version::object_to_file "Client" "--client" "${TEMP}/server_client_only_version_test"
+  kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_only_version_test" "the flag '--client' shows correct client info"
+  kube::test::version::diff_assert "${TEMP}/server_version_test" "ne" "${TEMP}/server_client_only_version_test" "the flag '--client' correctly has no server version info"
+  
+  kube::log::status "Testing kubectl version: verify json output"
+  kube::test::version::json_client_server_object_to_file "" "clientVersion" "${TEMP}/client_json_version_test"
+  kube::test::version::json_client_server_object_to_file "" "serverVersion" "${TEMP}/server_json_version_test"
+  kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_json_version_test" "--output json has correct client info"
+  kube::test::version::diff_assert "${TEMP}/server_version_test" "eq" "${TEMP}/server_json_version_test" "--output json has correct server info"
+
+  kube::log::status "Testing kubectl version: verify json output using additional --client flag does not contain serverVersion"
+  kube::test::version::json_client_server_object_to_file "--client" "clientVersion" "${TEMP}/client_only_json_version_test"
+  kube::test::version::json_client_server_object_to_file "--client" "serverVersion" "${TEMP}/server_client_only_json_version_test"
+  kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_only_json_version_test" "--client --output json has correct client info"
+  kube::test::version::diff_assert "${TEMP}/server_version_test" "ne" "${TEMP}/server_client_only_json_version_test" "--client --output json has no server info"
+  
+  kube::log::status "Testing kubectl version: compare json output using additional --short flag"
+  kube::test::version::json_client_server_object_to_file "--short" "clientVersion" "${TEMP}/client_short_json_version_test"
+  kube::test::version::json_client_server_object_to_file "--short" "serverVersion" "${TEMP}/server_short_json_version_test"
+  kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_short_json_version_test" "--short --output client json info is equal to non short result"
+  kube::test::version::diff_assert "${TEMP}/server_version_test" "eq" "${TEMP}/server_short_json_version_test" "--short --output server json info is equal to non short result"
+
+  kube::log::status "Testing kubectl version: compare json output with yaml output"
+  kube::test::version::json_object_to_file "" "${TEMP}/client_server_json_version_test"
+  kube::test::version::yaml_object_to_file "" "${TEMP}/client_server_yaml_version_test"
+  kube::test::version::diff_assert "${TEMP}/client_server_json_version_test" "eq" "${TEMP}/client_server_yaml_version_test" "--output json/yaml has identical information"
+}
+
 # Runs all pod related tests.
 run_pod_tests() {
   kube::log::status "Testing kubectl(v1:pods)"
@@ -672,10 +714,12 @@ __EOF__
   "apiVersion": "v1",
   "metadata": {
     "name": "node-v1-test",
-    "annotations": {"a":"b"}
+    "annotations": {"a":"b"},
+    "resourceVersion": "0"
   }
 }
 __EOF__
+
   # Post-condition: the node command succeeds
   kube::test::get_object_assert "node node-v1-test" "{{.metadata.annotations.a}}" 'b'
   kubectl delete node node-v1-test "${kube_flags[@]}"
@@ -1149,7 +1193,7 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" "/apis/apps/v1beta1/namespaces/default/statefulsets 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/autoscaling/v1/namespaces/default/horizontalpodautoscalers 200"
   kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/apps/v1beta1/namespaces/default/deployments 200 OK"
+  kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"
 
   ### Test --allow-missing-template-keys
@@ -2817,6 +2861,11 @@ runTests() {
     kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
+  #########################
+  # Kubectl version #
+  #########################
+  run_kubectl_version_tests
+
   # Passing no arguments to create is an error
   ! kubectl create
 
@@ -2956,7 +3005,7 @@ runTests() {
   output_message=$(kubectl get --raw=/api/v1)
 
   ## test if a short name is exported during discovery
-  kube::test::if_has_string "${output_message}" '{"name":"configmaps","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
+  kube::test::if_has_string "${output_message}" '{"name":"configmaps","singularName":"","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\]}'
 
   ###########################
   # POD creation / deletion #

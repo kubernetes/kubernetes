@@ -265,7 +265,7 @@ func (dsc *DaemonSetsController) getPodDaemonSets(pod *v1.Pod) []*extensions.Dae
 		return nil
 	}
 	if len(sets) > 1 {
-		// ControllerRef will ensure we don't do anythign crazy, but more than one
+		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
 		utilruntime.HandleError(fmt.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels))
 	}
@@ -346,7 +346,9 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 		dsc.enqueueDaemonSet(ds)
 		// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
 		if changedToReady && ds.Spec.MinReadySeconds > 0 {
-			dsc.enqueueDaemonSetAfter(ds, time.Duration(ds.Spec.MinReadySeconds)*time.Second)
+			// Add a second to avoid milliseconds skew in AddAfter.
+			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
+			dsc.enqueueDaemonSetAfter(ds, (time.Duration(ds.Spec.MinReadySeconds)*time.Second)+time.Second)
 		}
 		return
 	}
@@ -468,8 +470,20 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 	if err != nil {
 		return nil, err
 	}
+	// If any adoptions are attempted, we should first recheck for deletion with
+	// an uncached quorum read sometime after listing Pods (see #42639).
+	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+		fresh, err := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		if fresh.UID != ds.UID {
+			return nil, fmt.Errorf("original DaemonSet %v/%v is gone: got uid %v, wanted %v", ds.Namespace, ds.Name, fresh.UID, ds.UID)
+		}
+		return fresh, nil
+	})
 	// Use ControllerRefManager to adopt/orphan as needed.
-	cm := controller.NewPodControllerRefManager(dsc.podControl, ds, selector, controllerKind)
+	cm := controller.NewPodControllerRefManager(dsc.podControl, ds, selector, controllerKind, canAdoptFunc)
 	claimedPods, err := cm.ClaimPods(pods)
 	if err != nil {
 		return nil, err

@@ -22,9 +22,8 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -35,8 +34,8 @@ import (
 func alwaysReady() bool { return true }
 
 func TestStatefulSetControllerCreates(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
+	ssc, spc := newFakeStatefulSetController(set)
 	if err := scaleUpStatefulSetController(set, ssc, spc); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -51,8 +50,8 @@ func TestStatefulSetControllerCreates(t *testing.T) {
 }
 
 func TestStatefulSetControllerDeletes(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
+	ssc, spc := newFakeStatefulSetController(set)
 	if err := scaleUpStatefulSetController(set, ssc, spc); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -79,8 +78,8 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 }
 
 func TestStatefulSetControllerRespectsTermination(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
+	ssc, spc := newFakeStatefulSetController(set)
 	if err := scaleUpStatefulSetController(set, ssc, spc); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -130,8 +129,8 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 }
 
 func TestStatefulSetControllerBlocksScaling(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
+	ssc, spc := newFakeStatefulSetController(set)
 	if err := scaleUpStatefulSetController(set, ssc, spc); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
@@ -173,6 +172,63 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 	}
 	if len(pods) != 3 {
 		t.Error("StatefulSet does not resume when terminated Pod is removed")
+	}
+}
+
+func TestStatefulSetControllerDeletionTimestamp(t *testing.T) {
+	set := newStatefulSet(3)
+	set.DeletionTimestamp = new(metav1.Time)
+	ssc, spc := newFakeStatefulSetController(set)
+
+	spc.setsIndexer.Add(set)
+
+	// Force a sync. It should not try to create any Pods.
+	ssc.enqueueStatefulSet(set)
+	fakeWorker(ssc)
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(pods), 0; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+}
+
+func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
+	set := newStatefulSet(3)
+	// The bare client says it IS deleted.
+	set.DeletionTimestamp = new(metav1.Time)
+	ssc, spc := newFakeStatefulSetController(set)
+
+	// The lister (cache) says it's NOT deleted.
+	set2 := *set
+	set2.DeletionTimestamp = nil
+	spc.setsIndexer.Add(&set2)
+
+	// The recheck occurs in the presence of a matching orphan.
+	pod := newStatefulSetPod(set, 1)
+	pod.OwnerReferences = nil
+	spc.podsIndexer.Add(pod)
+
+	// Force a sync. It should not try to create any Pods.
+	ssc.enqueueStatefulSet(set)
+	fakeWorker(ssc)
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(pods), 1; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
 	}
 }
 
@@ -437,8 +493,8 @@ func TestStatefulSetControllerGetStatefulSetsForPod(t *testing.T) {
 }
 
 func TestGetPodsForStatefulSetAdopt(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(5)
+	ssc, spc := newFakeStatefulSetController(set)
 	pod1 := newStatefulSetPod(set, 1)
 	// pod2 is an orphan with matching labels and name.
 	pod2 := newStatefulSetPod(set, 2)
@@ -479,8 +535,8 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 }
 
 func TestGetPodsForStatefulSetRelease(t *testing.T) {
-	ssc, spc := newFakeStatefulSetController()
 	set := newStatefulSet(3)
+	ssc, spc := newFakeStatefulSetController(set)
 	pod1 := newStatefulSetPod(set, 1)
 	// pod2 is owned but has wrong name.
 	pod2 := newStatefulSetPod(set, 2)
@@ -518,8 +574,8 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 	}
 }
 
-func newFakeStatefulSetController() (*StatefulSetController, *fakeStatefulPodControl) {
-	client := fake.NewSimpleClientset()
+func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSetController, *fakeStatefulPodControl) {
+	client := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewStatefulSetController(

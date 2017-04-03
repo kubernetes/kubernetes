@@ -68,19 +68,13 @@ func TestListVolumesForPod(t *testing.T) {
 	podName := volumehelper.GetUniquePodName(pod)
 
 	volumesToReturn, volumeExsit := kubelet.ListVolumesForPod(types.UID(podName))
-	if !volumeExsit {
-		t.Errorf("Expected to find volumes for pod %q, but ListVolumesForPod find no volume", podName)
-	}
+	assert.True(t, volumeExsit, "expected to find volumes for pod %q", podName)
 
 	outerVolumeSpecName1 := "vol1"
-	if volumesToReturn[outerVolumeSpecName1] == nil {
-		t.Errorf("Value of map volumesToReturn is not expected to be nil, which key is : %s", outerVolumeSpecName1)
-	}
+	assert.NotNil(t, volumesToReturn[outerVolumeSpecName1], "key %s", outerVolumeSpecName1)
 
 	outerVolumeSpecName2 := "vol2"
-	if volumesToReturn[outerVolumeSpecName2] == nil {
-		t.Errorf("Value of map volumesToReturn is not expected to be nil, which key is : %s", outerVolumeSpecName2)
-	}
+	assert.NotNil(t, volumesToReturn[outerVolumeSpecName2], "key %s", outerVolumeSpecName2)
 
 }
 
@@ -154,18 +148,12 @@ func TestPodVolumesExist(t *testing.T) {
 	kubelet.podManager.SetPods(pods)
 	for _, pod := range pods {
 		err := kubelet.volumeManager.WaitForAttachAndMount(pod)
-		if err != nil {
-			t.Errorf("Expected success: %v", err)
-		}
+		assert.NoError(t, err)
 	}
 
 	for _, pod := range pods {
 		podVolumesExist := kubelet.podVolumesExist(pod.UID)
-		if !podVolumesExist {
-			t.Errorf(
-				"Expected to find volumes for pod %q, but podVolumesExist returned false",
-				pod.UID)
-		}
+		assert.True(t, podVolumesExist, "pod %q", pod.UID)
 	}
 }
 

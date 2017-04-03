@@ -2416,6 +2416,16 @@ func TestValidateEnvFrom(t *testing.T) {
 			expectedError: "field[0].configMapRef.name: Required value",
 		},
 		{
+			name: "invalid name",
+			envs: []api.EnvFromSource{
+				{
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "$"}},
+				},
+			},
+			expectedError: "field[0].configMapRef.name: Invalid value",
+		},
+		{
 			name: "invalid prefix",
 			envs: []api.EnvFromSource{
 				{
@@ -2435,6 +2445,16 @@ func TestValidateEnvFrom(t *testing.T) {
 				},
 			},
 			expectedError: "field[0].secretRef.name: Required value",
+		},
+		{
+			name: "invalid name",
+			envs: []api.EnvFromSource{
+				{
+					SecretRef: &api.SecretEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "&"}},
+				},
+			},
+			expectedError: "field[0].secretRef.name: Invalid value",
 		},
 		{
 			name: "invalid prefix",

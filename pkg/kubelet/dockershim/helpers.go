@@ -149,10 +149,10 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]stru
 		// Some of this port stuff is under-documented voodoo.
 		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
 		var protocol string
-		switch strings.ToUpper(string(port.Protocol)) {
-		case "UDP":
+		switch port.Protocol {
+		case runtimeapi.Protocol_UDP:
 			protocol = "/udp"
-		case "TCP":
+		case runtimeapi.Protocol_TCP:
 			protocol = "/tcp"
 		default:
 			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)

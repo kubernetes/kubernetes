@@ -33,6 +33,7 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
+	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -128,11 +129,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		t.Fatalf("Pod not found in Pod Informer cache : %v", err)
 	}
 
-	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
-
-	if len(podsToAdd) == 0 {
-		t.Fatalf("Pod not added to desired state of world")
-	}
+	waitForPodsInDSWP(t, ctrl.GetDesiredStateOfWorld())
 
 	// let's stop pod events from getting triggered
 	close(podStopCh)
@@ -144,7 +141,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	waitToObservePods(t, podInformer, 0)
 	// the populator loop turns every 1 minute
 	time.Sleep(80 * time.Second)
-	podsToAdd = ctrl.GetDesiredStateOfWorld().GetPodToAdd()
+	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
 	if len(podsToAdd) != 0 {
 		t.Fatalf("All pods should have been removed")
 	}
@@ -165,6 +162,19 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 		}
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// wait for pods to be observed in desired state of world
+func waitForPodsInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld) {
+	if err := wait.Poll(time.Millisecond*500, wait.ForeverTestTimeout, func() (bool, error) {
+		pods := dswp.GetPodToAdd()
+		if len(pods) > 0 {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Pod not added to desired state of world : %v", err)
 	}
 }
 

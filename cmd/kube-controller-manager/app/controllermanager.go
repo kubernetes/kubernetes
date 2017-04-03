@@ -331,6 +331,13 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 			return false, nil
 		}
 
+		healthStatus := 0
+		client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		if healthStatus != http.StatusOK {
+			glog.Errorf("Server isn't healthy yet.  Waiting a little while.")
+			return false, nil
+		}
+
 		discoveryClient = client.Discovery()
 		return true, nil
 	})

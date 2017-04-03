@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -64,6 +65,24 @@ func NewFileStore(path string) (CheckpointStore, error) {
 	return &FileStore{path: path}, nil
 }
 
+// writeFileAndSync is copied from ioutil.WriteFile, with the extra File.Sync
+// at the end to ensure file is written on the disk.
+func writeFileAndSync(filename string, data []byte, perm os.FileMode) error {
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	n, err := f.Write(data)
+	if err == nil && n < len(data) {
+		err = io.ErrShortWrite
+	}
+	f.Sync()
+	if err1 := f.Close(); err == nil {
+		err = err1
+	}
+	return err
+}
+
 func (fstore *FileStore) Write(key string, data []byte) error {
 	if err := validateKey(key); err != nil {
 		return err
@@ -72,7 +91,7 @@ func (fstore *FileStore) Write(key string, data []byte) error {
 		return err
 	}
 	tmpfile := filepath.Join(fstore.path, fmt.Sprintf("%s%s%s", tmpPrefix, key, tmpSuffix))
-	if err := ioutil.WriteFile(tmpfile, data, 0644); err != nil {
+	if err := writeFileAndSync(tmpfile, data, 0644); err != nil {
 		return err
 	}
 	return os.Rename(tmpfile, fstore.getCheckpointPath(key))

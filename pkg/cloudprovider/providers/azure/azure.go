@@ -17,14 +17,17 @@ limitations under the License.
 package azure
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
 	"time"
@@ -125,38 +128,54 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az.SubnetsClient = network.NewSubnetsClient(az.SubscriptionID)
 	az.SubnetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.SubnetsClient.Authorizer = servicePrincipalToken
+	az.SubnetsClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&az.SubnetsClient.Client)
 
 	az.RouteTablesClient = network.NewRouteTablesClient(az.SubscriptionID)
 	az.RouteTablesClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.RouteTablesClient.Authorizer = servicePrincipalToken
+	az.RouteTablesClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&az.RouteTablesClient.Client)
 
 	az.RoutesClient = network.NewRoutesClient(az.SubscriptionID)
 	az.RoutesClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.RoutesClient.Authorizer = servicePrincipalToken
+	az.RoutesClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&az.RoutesClient.Client)
 
 	az.InterfacesClient = network.NewInterfacesClient(az.SubscriptionID)
 	az.InterfacesClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.InterfacesClient.Authorizer = servicePrincipalToken
+	az.InterfacesClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&az.InterfacesClient.Client)
 
 	az.LoadBalancerClient = network.NewLoadBalancersClient(az.SubscriptionID)
 	az.LoadBalancerClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.LoadBalancerClient.Authorizer = servicePrincipalToken
+	az.LoadBalancerClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&az.LoadBalancerClient.Client)
 
 	az.VirtualMachinesClient = compute.NewVirtualMachinesClient(az.SubscriptionID)
 	az.VirtualMachinesClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.VirtualMachinesClient.Authorizer = servicePrincipalToken
 	az.VirtualMachinesClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&az.VirtualMachinesClient.Client)
 
 	az.PublicIPAddressesClient = network.NewPublicIPAddressesClient(az.SubscriptionID)
 	az.PublicIPAddressesClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.PublicIPAddressesClient.Authorizer = servicePrincipalToken
+	az.PublicIPAddressesClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&az.PublicIPAddressesClient.Client)
 
 	az.SecurityGroupsClient = network.NewSecurityGroupsClient(az.SubscriptionID)
 	az.SecurityGroupsClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.SecurityGroupsClient.Authorizer = servicePrincipalToken
+	az.SecurityGroupsClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&az.SecurityGroupsClient.Client)
 
 	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
 	az.StorageAccountClient.Authorizer = servicePrincipalToken
+
 	return &az, nil
 }
 
@@ -193,4 +212,9 @@ func (az *Cloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []stri
 // ProviderName returns the cloud provider ID.
 func (az *Cloud) ProviderName() string {
 	return CloudProviderName
+}
+
+func configureUserAgent(client *autorest.Client) {
+	k8sVersion := version.Get().GitVersion
+	client.UserAgent = fmt.Sprintf("%s; %s", client.UserAgent, k8sVersion)
 }

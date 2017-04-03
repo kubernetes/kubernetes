@@ -18,14 +18,16 @@ package nvidia
 
 import "k8s.io/apimachinery/pkg/util/sets"
 
+type containerToGPU map[string]sets.String
+
 // podGPUs represents a list of pod to GPU mappings.
 type podGPUs struct {
-	podGPUMapping map[string]sets.String
+	podGPUMapping map[string]containerToGPU
 }
 
 func newPodGPUs() *podGPUs {
 	return &podGPUs{
-		podGPUMapping: map[string]sets.String{},
+		podGPUMapping: make(map[string]containerToGPU),
 	}
 }
 func (pgpu *podGPUs) pods() sets.String {
@@ -36,12 +38,26 @@ func (pgpu *podGPUs) pods() sets.String {
 	return ret
 }
 
-func (pgpu *podGPUs) insert(podUID string, device string) {
+func (pgpu *podGPUs) insert(podUID, contName string, device string) {
 	if _, exists := pgpu.podGPUMapping[podUID]; !exists {
-		pgpu.podGPUMapping[podUID] = sets.NewString(device)
-	} else {
-		pgpu.podGPUMapping[podUID].Insert(device)
+		pgpu.podGPUMapping[podUID] = make(containerToGPU)
 	}
+	if _, exists := pgpu.podGPUMapping[podUID][contName]; !exists {
+		pgpu.podGPUMapping[podUID][contName] = sets.NewString()
+	}
+	pgpu.podGPUMapping[podUID][contName].Insert(device)
+}
+
+func (pgpu *podGPUs) getGPUs(podUID, contName string) sets.String {
+	containers, exists := pgpu.podGPUMapping[podUID]
+	if !exists {
+		return nil
+	}
+	devices, exists := containers[contName]
+	if !exists {
+		return nil
+	}
+	return devices
 }
 
 func (pgpu *podGPUs) delete(pods []string) {
@@ -52,8 +68,10 @@ func (pgpu *podGPUs) delete(pods []string) {
 
 func (pgpu *podGPUs) devices() sets.String {
 	ret := sets.NewString()
-	for _, devices := range pgpu.podGPUMapping {
-		ret = ret.Union(devices)
+	for _, containerToGPU := range pgpu.podGPUMapping {
+		for _, deviceSet := range containerToGPU {
+			ret = ret.Union(deviceSet)
+		}
 	}
 	return ret
 }

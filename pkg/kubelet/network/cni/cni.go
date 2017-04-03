@@ -21,12 +21,10 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -147,13 +145,9 @@ func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentcon
 	if err != nil {
 		return err
 	}
-
 	plugin.host = host
 
-	// sync network config from pluginDir periodically to detect network config updates
-	go wait.Forever(func() {
-		plugin.syncNetworkConfig()
-	}, 10*time.Second)
+	plugin.syncNetworkConfig()
 	return nil
 }
 
@@ -187,6 +181,14 @@ func (plugin *cniNetworkPlugin) checkInitialized() error {
 
 func (plugin *cniNetworkPlugin) Name() string {
 	return CNIPluginName
+}
+
+func (plugin *cniNetworkPlugin) Status() error {
+	// sync network config from pluginDir periodically to detect network config updates
+	plugin.syncNetworkConfig()
+
+	// Can't set up pods if we don't have any CNI network configs yet
+	return plugin.checkInitialized()
 }
 
 func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
@@ -244,7 +246,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
 	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
-		glog.Errorf("Error adding network: %v", err)
+		glog.Errorf("Error adding network when buliding cni runtime conf: %v", err)
 		return nil, err
 	}
 
@@ -262,7 +264,7 @@ func (network *cniNetwork) addToNetwork(podName string, podNamespace string, pod
 func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) error {
 	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
-		glog.Errorf("Error deleting network: %v", err)
+		glog.Errorf("Error deleting network when buliding cni runtime conf: %v", err)
 		return err
 	}
 

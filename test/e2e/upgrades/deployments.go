@@ -56,13 +56,13 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 
 	// Wait for it to be updated to revision 1
 	By(fmt.Sprintf("Waiting deployment %q to be updated to revision 1", deploymentName))
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", nginxImage)
+	err = framework.WaitForDeploymentRevisionAndImageV15(c, ns, deploymentName, "1", nginxImage)
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentStatusValid(c, deployment))
+	framework.ExpectNoError(framework.WaitForDeploymentStatusValidV15(c, deployment))
 
-	rs, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	rs, err := deploymentutil.GetNewReplicaSetV15(deployment, c)
 	framework.ExpectNoError(err)
 	if rs == nil {
 		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q, found none", deployment.Name))
@@ -84,12 +84,12 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 
 	// Wait for it to be updated to revision 2
 	By(fmt.Sprintf("Waiting deployment %q to be updated to revision 2", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", nginxImage))
+	framework.ExpectNoError(framework.WaitForDeploymentRevisionAndImageV15(c, ns, deploymentName, "2", nginxImage))
 
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentStatus(c, deployment))
+	framework.ExpectNoError(framework.WaitForDeploymentStatusV15(c, deployment))
 
-	rs, err = deploymentutil.GetNewReplicaSet(deployment, c)
+	rs, err = deploymentutil.GetNewReplicaSetV15(deployment, c)
 	framework.ExpectNoError(err)
 	if rs == nil {
 		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q", deployment.Name))
@@ -117,6 +117,9 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	deployment, err := c.Extensions().Deployments(t.oldD.Namespace).Get(t.oldD.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	t.updatedD = deployment
+
+	By(fmt.Sprintf("Waiting for deployment %q to complete adoption", deployment.Name))
+	framework.ExpectNoError(framework.WaitForDeploymentStatus(c, deployment))
 
 	By(fmt.Sprintf("Checking that replica sets for deployment %q are the same as prior to the upgrade", t.updatedD.Name))
 	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(t.updatedD, c)

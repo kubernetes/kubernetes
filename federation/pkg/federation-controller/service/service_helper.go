@@ -131,9 +131,13 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 	if isDeletion {
 		// cachedService is not reliable here as
 		// deleting cache is the last step of federation service deletion
-		_, err := fedClient.Core().Services(cachedService.lastState.Namespace).Get(cachedService.lastState.Name, metav1.GetOptions{})
+		service, err := fedClient.Core().Services(cachedService.lastState.Namespace).Get(cachedService.lastState.Name, metav1.GetOptions{})
 		// rebuild service if federation service still exists
 		if err == nil || !errors.IsNotFound(err) {
+			if err == nil && service.DeletionTimestamp != nil {
+				glog.V(4).Infof("Skipping sync of service %v in underlying clusters as it has already been marked for deletion", name)
+				return nil
+			}
 			return sc.ensureClusterService(cachedService, clusterName, cachedService.appliedState, clusterCache.clientset)
 		}
 	}

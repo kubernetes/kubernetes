@@ -76,8 +76,8 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	return pods, nil
 }
 
-// getActivePods returns non-terminal pods
-func (kl *Kubelet) getActivePods() []*v1.Pod {
+// GetActivePods returns non-terminal pods
+func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	allPods := kl.podManager.GetPods()
 	activePods := kl.filterOutTerminatedPods(allPods)
 	return activePods
@@ -135,7 +135,28 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			return nil, err
 		}
 		if mount.SubPath != "" {
+			fileinfo, err := os.Lstat(hostPath)
+			if err != nil {
+				return nil, err
+			}
+			perm := fileinfo.Mode()
+
 			hostPath = filepath.Join(hostPath, mount.SubPath)
+
+			// Create the sub path now because if it's auto-created later when referenced, it may have an
+			// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
+			// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
+			// later auto-create it with the incorrect mode 0750
+			if err := os.MkdirAll(hostPath, perm); err != nil {
+				glog.Errorf("failed to mkdir:%s", hostPath)
+				return nil, err
+			}
+
+			// chmod the sub path because umask may have prevented us from making the sub path with the same
+			// permissions as the mounter path
+			if err := os.Chmod(hostPath, perm); err != nil {
+				return nil, err
+			}
 		}
 
 		// Docker Volume Mounts fail on Windows if it is not of the form C:/
@@ -672,7 +693,7 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets.
-func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) ([]v1.Secret, error) {
+func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 	pullSecrets := []v1.Secret{}
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
@@ -685,7 +706,7 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) ([]v1.Secret, error) {
 		pullSecrets = append(pullSecrets, *secret)
 	}
 
-	return pullSecrets, nil
+	return pullSecrets
 }
 
 // Returns true if pod is in the terminated state ("Failed" or "Succeeded").

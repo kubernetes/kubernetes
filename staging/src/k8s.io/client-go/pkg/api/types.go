@@ -1401,6 +1401,9 @@ type TCPSocketAction struct {
 	// Required: Port to connect to.
 	// +optional
 	Port intstr.IntOrString
+	// Optional: Host name to connect to, defaults to the pod IP.
+	// +optional
+	Host string
 }
 
 // ExecAction describes a "run in container" action.
@@ -1896,9 +1899,7 @@ type PodAffinityTerm struct {
 	// +optional
 	LabelSelector *metav1.LabelSelector
 	// namespaces specifies which namespaces the labelSelector applies to (matches against);
-	// nil list means "this pod's namespace," empty list means "all namespaces"
-	// The json tag here is not "omitempty" since we need to distinguish nil and empty.
-	// See https://golang.org/pkg/encoding/json/#Marshal for more details.
+	// null or empty list means "this pod's namespace"
 	Namespaces []string
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
@@ -3100,8 +3101,9 @@ type DeleteOptions struct {
 	OrphanDependents *bool
 
 	// Whether and how garbage collection will be performed.
-	// Defaults to Default.
 	// Either this field or OrphanDependents may be set, but not both.
+	// The default policy is decided by the existing finalizer set in the
+	// metadata.finalizers and the resource-specific default policy.
 	// +optional
 	PropagationPolicy *DeletionPropagation
 }

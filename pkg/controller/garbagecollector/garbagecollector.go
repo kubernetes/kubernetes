@@ -125,6 +125,10 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Garbage Collector: Shutting down")
 }
 
+func (gc *GarbageCollector) HasSynced() bool {
+	return gc.dependencyGraphBuilder.HasSynced()
+}
+
 func (gc *GarbageCollector) runAttemptToDeleteWorker() {
 	for gc.attemptToDeleteWorker() {
 	}

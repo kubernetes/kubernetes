@@ -28,7 +28,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -67,6 +66,10 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
+	// OverlapAnnotation marks deployments with overlapping selector with other deployments
+	// TODO: Delete this annotation when we no longer need to support a client
+	//       talking to a server older than v1.6.
+	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
 
 	// Reasons for deployment conditions
 	//
@@ -287,6 +290,7 @@ var annotationsToSkip = map[string]bool{
 	RevisionHistoryAnnotation:               true,
 	DesiredReplicasAnnotation:               true,
 	MaxReplicasAnnotation:                   true,
+	OverlapAnnotation:                       true,
 }
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
@@ -494,15 +498,30 @@ func getReplicaSetFraction(rs extensions.ReplicaSet, d extensions.Deployment) in
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 // The third returned value is the new replica set, and it may be nil if it doesn't exist yet.
 func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
-	rsList, err := listReplicaSets(deployment, c)
+	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	podList, err := listPods(deployment, rsList, c)
+	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList, podList)
+	newRS, err := FindNewReplicaSet(deployment, rsList)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return oldRSes, allOldRSes, newRS, nil
+}
+
+// GetAllReplicaSetsV15 is a compatibility function that emulates the behavior
+// from v1.5.x (list matching objects by selector) except that it leaves out
+// objects that are explicitly marked as being controlled by something else.
+func GetAllReplicaSetsV15(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
+	rsList, err := ListReplicaSetsV15(deployment, rsListFromClient(c))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -516,49 +535,54 @@ func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 // GetOldReplicaSets returns the old replica sets targeted by the given Deployment; get PodList and ReplicaSetList from client interface.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	rsList, err := listReplicaSets(deployment, c)
+	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
 	if err != nil {
 		return nil, nil, err
 	}
-	podList, err := listPods(deployment, rsList, c)
-	if err != nil {
-		return nil, nil, err
-	}
-	return FindOldReplicaSets(deployment, rsList, podList)
+	return FindOldReplicaSets(deployment, rsList)
 }
 
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
 // Returns nil if the new replica set doesn't exist yet.
 func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
-	rsList, err := listReplicaSets(deployment, c)
+	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
 	if err != nil {
 		return nil, err
 	}
 	return FindNewReplicaSet(deployment, rsList)
 }
 
-// listReplicaSets lists all RSes the given deployment targets with the given client interface.
-func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, error) {
-	return ListReplicaSets(deployment,
-		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
-			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
-			if err != nil {
-				return nil, err
-			}
-			ret := []*extensions.ReplicaSet{}
-			for i := range rsList.Items {
-				ret = append(ret, &rsList.Items[i])
-			}
-			return ret, err
-		})
+// GetNewReplicaSetV15 is a compatibility function that emulates the behavior
+// from v1.5.x (list matching objects by selector) except that it leaves out
+// objects that are explicitly marked as being controlled by something else.
+func GetNewReplicaSetV15(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
+	rsList, err := ListReplicaSetsV15(deployment, rsListFromClient(c))
+	if err != nil {
+		return nil, err
+	}
+	return FindNewReplicaSet(deployment, rsList)
 }
 
-// listReplicaSets lists all Pods the given deployment targets with the given client interface.
-func listPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, c clientset.Interface) (*v1.PodList, error) {
-	return ListPods(deployment, rsList,
-		func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-			return c.Core().Pods(namespace).List(options)
-		})
+// rsListFromClient returns an rsListFunc that wraps the given client.
+func rsListFromClient(c clientset.Interface) rsListFunc {
+	return func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
+		rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
+		if err != nil {
+			return nil, err
+		}
+		ret := []*extensions.ReplicaSet{}
+		for i := range rsList.Items {
+			ret = append(ret, &rsList.Items[i])
+		}
+		return ret, err
+	}
+}
+
+// podListFromClient returns a podListFunc that wraps the given client.
+func podListFromClient(c clientset.Interface) podListFunc {
+	return func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
+		return c.Core().Pods(namespace).List(options)
+	}
 }
 
 // TODO: switch this to full namespacers
@@ -593,14 +617,10 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([
 	return owned, nil
 }
 
-// ListReplicaSets returns a slice of RSes the given deployment targets.
-// Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),
-// because only the controller itself should do that.
-// However, it does filter out anything whose ControllerRef doesn't match.
-// TODO: Remove the duplicate.
-func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSList func(string, metav1.ListOptions) ([]*internalextensions.ReplicaSet, error)) ([]*internalextensions.ReplicaSet, error) {
-	// TODO: Right now we list replica sets by their labels. We should list them by selector, i.e. the replica set's selector
-	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830.
+// ListReplicaSetsV15 is a compatibility function that emulates the behavior
+// from v1.5.x (list matching objects by selector) except that it leaves out
+// objects that are explicitly marked as being controlled by something else.
+func ListReplicaSetsV15(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
 	namespace := deployment.Namespace
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
@@ -609,17 +629,49 @@ func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSLis
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	all, err := getRSList(namespace, options)
 	if err != nil {
-		return all, err
+		return nil, err
 	}
-	// Only include those whose ControllerRef matches the Deployment.
-	owned := make([]*internalextensions.ReplicaSet, 0, len(all))
+	// Since this function maintains compatibility with v1.5, the objects we want
+	// do not necessarily have ControllerRefs pointing to us.
+	// However, we can at least avoid interfering with other controllers that do
+	// use ControllerRef.
+	filtered := make([]*extensions.ReplicaSet, 0, len(all))
 	for _, rs := range all {
 		controllerRef := controller.GetControllerOf(rs)
-		if controllerRef != nil && controllerRef.UID == deployment.UID {
-			owned = append(owned, rs)
+		if controllerRef != nil && controllerRef.UID != deployment.UID {
+			continue
 		}
+		filtered = append(filtered, rs)
 	}
-	return owned, nil
+	return filtered, nil
+}
+
+// ListReplicaSetsInternalV15 is ListReplicaSetsV15 for internalextensions.
+// TODO: Remove the duplicate when call sites are updated to ListReplicaSetsV15.
+func ListReplicaSetsInternalV15(deployment *internalextensions.Deployment, getRSList func(string, metav1.ListOptions) ([]*internalextensions.ReplicaSet, error)) ([]*internalextensions.ReplicaSet, error) {
+	namespace := deployment.Namespace
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	all, err := getRSList(namespace, options)
+	if err != nil {
+		return nil, err
+	}
+	// Since this function maintains compatibility with v1.5, the objects we want
+	// do not necessarily have ControllerRefs pointing to us.
+	// However, we can at least avoid interfering with other controllers that do
+	// use ControllerRef.
+	filtered := make([]*internalextensions.ReplicaSet, 0, len(all))
+	for _, rs := range all {
+		controllerRef := controller.GetControllerOf(rs)
+		if controllerRef != nil && controllerRef.UID != deployment.UID {
+			continue
+		}
+		filtered = append(filtered, rs)
+	}
+	return filtered, nil
 }
 
 // ListPods returns a list of pods the given deployment targets.
@@ -654,6 +706,41 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 		}
 	}
 	return owned, nil
+}
+
+// ListPodsV15 is a compatibility function that emulates the behavior
+// from v1.5.x (list matching objects by selector) except that it leaves out
+// objects that are explicitly marked as being controlled by something else.
+func ListPodsV15(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, getPodList podListFunc) (*v1.PodList, error) {
+	namespace := deployment.Namespace
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	podList, err := getPodList(namespace, options)
+	if err != nil {
+		return nil, err
+	}
+	// Since this function maintains compatibility with v1.5, the objects we want
+	// do not necessarily have ControllerRefs pointing to one of our ReplicaSets.
+	// However, we can at least avoid interfering with other controllers that do
+	// use ControllerRef.
+	rsMap := make(map[types.UID]bool, len(rsList))
+	for _, rs := range rsList {
+		rsMap[rs.UID] = true
+	}
+	filtered := make([]v1.Pod, 0, len(podList.Items))
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		controllerRef := controller.GetControllerOf(pod)
+		if controllerRef != nil && !rsMap[controllerRef.UID] {
+			continue
+		}
+		filtered = append(filtered, *pod)
+	}
+	podList.Items = filtered
+	return podList, nil
 }
 
 // EqualIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
@@ -694,44 +781,24 @@ func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.R
 	return nil, nil
 }
 
-// FindOldReplicaSets returns the old replica sets targeted by the given Deployment, with the given PodList and slice of RSes.
+// FindOldReplicaSets returns the old replica sets targeted by the given Deployment, with the given slice of RSes.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, podList *v1.PodList) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	// Find all pods whose labels match deployment.Spec.Selector, and corresponding replica sets for pods in podList.
-	// All pods and replica sets are labeled with pod-template-hash to prevent overlapping
-	oldRSs := map[string]*extensions.ReplicaSet{}
-	allOldRSs := map[string]*extensions.ReplicaSet{}
-	requiredRSs := []*extensions.ReplicaSet{}
-	allRSs := []*extensions.ReplicaSet{}
+func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+	var requiredRSs []*extensions.ReplicaSet
+	var allRSs []*extensions.ReplicaSet
 	newRS, err := FindNewReplicaSet(deployment, rsList)
 	if err != nil {
-		return requiredRSs, allRSs, err
+		return nil, nil, err
 	}
-	for _, pod := range podList.Items {
-		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
-		for _, rs := range rsList {
-			rsLabelsSelector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
-			if err != nil {
-				return nil, nil, fmt.Errorf("invalid label selector: %v", err)
-			}
-			// Filter out new replica set
-			if newRS != nil && rs.UID == newRS.UID {
-				continue
-			}
-			// TODO: If there are no pods for a deployment, we will never return old replica sets....!
-			allOldRSs[rs.ObjectMeta.Name] = rs
-			if rsLabelsSelector.Matches(podLabelsSelector) {
-				oldRSs[rs.ObjectMeta.Name] = rs
-			}
+	for _, rs := range rsList {
+		// Filter out new replica set
+		if newRS != nil && rs.UID == newRS.UID {
+			continue
 		}
-	}
-	for key := range oldRSs {
-		value := oldRSs[key]
-		requiredRSs = append(requiredRSs, value)
-	}
-	for key := range allOldRSs {
-		value := allOldRSs[key]
-		allRSs = append(allRSs, value)
+		allRSs = append(allRSs, rs)
+		if *(rs.Spec.Replicas) != 0 {
+			requiredRSs = append(requiredRSs, rs)
+		}
 	}
 	return requiredRSs, allRSs, nil
 }

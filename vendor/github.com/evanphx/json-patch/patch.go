@@ -257,10 +257,14 @@ Loop:
 	return false
 }
 
-func findObject(pd *partialDoc, path string) (container, string) {
-	doc := container(pd)
+func findObject(pd *container, path string) (container, string) {
+	doc := *pd
 
 	split := strings.Split(path, "/")
+
+	if len(split) < 2 {
+		return nil, ""
+	}
 
 	parts := split[1 : len(split)-1]
 
@@ -311,7 +315,7 @@ func (d *partialDoc) get(key string) (*lazyNode, error) {
 func (d *partialDoc) remove(key string) error {
 	_, ok := (*d)[key]
 	if !ok {
-		return fmt.Errorf("Unable to remove nonexistant key: %s", key)
+		return fmt.Errorf("Unable to remove nonexistent key: %s", key)
 	}
 
 	delete(*d, key)
@@ -341,7 +345,7 @@ func (d *partialArray) set(key string, val *lazyNode) error {
 	copy(ary, cur)
 
 	if idx >= len(ary) {
-		fmt.Printf("huh?: %#v[%d] %s, %s\n", ary, idx)
+		return fmt.Errorf("Unable to access invalid index: %d", idx)
 	}
 
 	ary[idx] = val
@@ -409,7 +413,7 @@ func (d *partialArray) remove(key string) error {
 
 }
 
-func (p Patch) add(doc *partialDoc, op operation) error {
+func (p Patch) add(doc *container, op operation) error {
 	path := op.path()
 
 	con, key := findObject(doc, path)
@@ -421,7 +425,7 @@ func (p Patch) add(doc *partialDoc, op operation) error {
 	return con.add(key, op.value())
 }
 
-func (p Patch) remove(doc *partialDoc, op operation) error {
+func (p Patch) remove(doc *container, op operation) error {
 	path := op.path()
 
 	con, key := findObject(doc, path)
@@ -433,7 +437,7 @@ func (p Patch) remove(doc *partialDoc, op operation) error {
 	return con.remove(key)
 }
 
-func (p Patch) replace(doc *partialDoc, op operation) error {
+func (p Patch) replace(doc *container, op operation) error {
 	path := op.path()
 
 	con, key := findObject(doc, path)
@@ -445,7 +449,7 @@ func (p Patch) replace(doc *partialDoc, op operation) error {
 	return con.set(key, op.value())
 }
 
-func (p Patch) move(doc *partialDoc, op operation) error {
+func (p Patch) move(doc *container, op operation) error {
 	from := op.from()
 
 	con, key := findObject(doc, from)
@@ -475,7 +479,7 @@ func (p Patch) move(doc *partialDoc, op operation) error {
 	return con.set(key, val)
 }
 
-func (p Patch) test(doc *partialDoc, op operation) error {
+func (p Patch) test(doc *container, op operation) error {
 	path := op.path()
 
 	con, key := findObject(doc, path)
@@ -493,9 +497,8 @@ func (p Patch) test(doc *partialDoc, op operation) error {
 	if val == nil {
 		if op.value().raw == nil {
 			return nil
-		} else {
-			return fmt.Errorf("Testing value %s failed", path)
 		}
+		return fmt.Errorf("Testing value %s failed", path)
 	}
 
 	if val.equal(op.value()) {
@@ -540,7 +543,12 @@ func (p Patch) Apply(doc []byte) ([]byte, error) {
 // ApplyIndent mutates a JSON document according to the patch, and returns the new
 // document indented.
 func (p Patch) ApplyIndent(doc []byte, indent string) ([]byte, error) {
-	pd := &partialDoc{}
+	var pd container
+	if doc[0] == '[' {
+		pd = &partialArray{}
+	} else {
+		pd = &partialDoc{}
+	}
 
 	err := json.Unmarshal(doc, pd)
 
@@ -553,15 +561,15 @@ func (p Patch) ApplyIndent(doc []byte, indent string) ([]byte, error) {
 	for _, op := range p {
 		switch op.kind() {
 		case "add":
-			err = p.add(pd, op)
+			err = p.add(&pd, op)
 		case "remove":
-			err = p.remove(pd, op)
+			err = p.remove(&pd, op)
 		case "replace":
-			err = p.replace(pd, op)
+			err = p.replace(&pd, op)
 		case "move":
-			err = p.move(pd, op)
+			err = p.move(&pd, op)
 		case "test":
-			err = p.test(pd, op)
+			err = p.test(&pd, op)
 		default:
 			err = fmt.Errorf("Unexpected kind: %s", op.kind())
 		}

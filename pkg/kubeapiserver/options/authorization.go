@@ -75,14 +75,17 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 
 }
 
-func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory informers.SharedInformerFactory) authorizer.AuthorizationConfig {
+func (s *BuiltInAuthorizationOptions) Modes() []string {
 	modes := []string{}
 	if len(s.Mode) > 0 {
 		modes = strings.Split(s.Mode, ",")
 	}
+	return modes
+}
 
+func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory informers.SharedInformerFactory) authorizer.AuthorizationConfig {
 	return authorizer.AuthorizationConfig{
-		AuthorizationModes:          modes,
+		AuthorizationModes:          s.Modes(),
 		PolicyFile:                  s.PolicyFile,
 		WebhookConfigFile:           s.WebhookConfigFile,
 		WebhookCacheAuthorizedTTL:   s.WebhookCacheAuthorizedTTL,

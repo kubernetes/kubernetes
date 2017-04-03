@@ -41,7 +41,7 @@ func getRunOptions() *options.ServerRunOptions {
 	// Use a unique prefix to ensure isolation from other tests using the same etcd instance
 	r.Etcd.StorageConfig.Prefix = uuid.New()
 	// Disable secure serving
-	r.SecureServing.ServingOptions.BindPort = 0
+	r.SecureServing.BindPort = 0
 	return r
 }
 

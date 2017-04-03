@@ -62,8 +62,17 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 }
 
 func masterUpgradeGCE(rawV string) error {
+	env := os.Environ()
+	// TODO: Remove these variables when they're no longer needed for downgrades.
+	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
+		env = append(env,
+			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
+			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
+			"TEST_ETCD_IMAGE=3.0.17")
+	}
+
 	v := "v" + rawV
-	_, _, err := RunCmd(gceUpgradeScript(), "-M", v)
+	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-M", v)
 	return err
 }
 
@@ -78,7 +87,13 @@ func masterUpgradeGKE(v string) error {
 		"--master",
 		fmt.Sprintf("--cluster-version=%s", v),
 		"--quiet")
-	return err
+	if err != nil {
+		return err
+	}
+
+	waitForSSHTunnels()
+
+	return nil
 }
 
 func NodeUpgrade(f *Framework, v string, img string) error {
@@ -157,7 +172,14 @@ func nodeUpgradeGKE(v string, img string) error {
 		args = append(args, fmt.Sprintf("--image-type=%s", img))
 	}
 	_, _, err := RunCmd("gcloud", args...)
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	waitForSSHTunnels()
+
+	return nil
 }
 
 // CheckNodesReady waits up to nt for expect nodes accessed by c to be ready,
@@ -260,4 +282,20 @@ func gceUpgradeScript() string {
 		return path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh")
 	}
 	return TestContext.GCEUpgradeScript
+}
+
+func waitForSSHTunnels() {
+	Logf("Waiting for SSH tunnels to establish")
+	RunKubectl("run", "ssh-tunnel-test",
+		"--image=gcr.io/google_containers/busybox:1.24",
+		"--restart=Never",
+		"--command", "--",
+		"echo", "Hello")
+	defer RunKubectl("delete", "pod", "ssh-tunnel-test")
+
+	// allow up to a minute for new ssh tunnels to establish
+	wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
+		_, err := RunKubectl("logs", "ssh-tunnel-test")
+		return err == nil, nil
+	})
 }

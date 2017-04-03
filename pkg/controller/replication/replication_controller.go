@@ -176,6 +176,27 @@ func (rm *ReplicationManager) getPodControllers(pod *v1.Pod) []*v1.ReplicationCo
 	return rcs
 }
 
+// resolveControllerRef returns the controller referenced by a ControllerRef,
+// or nil if the ControllerRef could not be resolved to a matching controller
+// of the corrrect Kind.
+func (rm *ReplicationManager) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *v1.ReplicationController {
+	// We can't look up by UID, so look up by Name and then verify UID.
+	// Don't even try to look up by Name if it's the wrong Kind.
+	if controllerRef.Kind != controllerKind.Kind {
+		return nil
+	}
+	rc, err := rm.rcLister.ReplicationControllers(namespace).Get(controllerRef.Name)
+	if err != nil {
+		return nil
+	}
+	if rc.UID != controllerRef.UID {
+		// The controller we found with this Name is not the same one that the
+		// ControllerRef points to.
+		return nil
+	}
+	return rc
+}
+
 // callback when RC is updated
 func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 	oldRC := old.(*v1.ReplicationController)
@@ -216,19 +237,15 @@ func (rm *ReplicationManager) addPod(obj interface{}) {
 
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
-		if controllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
-			return
-		}
-		glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
-		rc, err := rm.rcLister.ReplicationControllers(pod.Namespace).Get(controllerRef.Name)
-		if err != nil {
+		rc := rm.resolveControllerRef(pod.Namespace, controllerRef)
+		if rc == nil {
 			return
 		}
 		rsKey, err := controller.KeyFunc(rc)
 		if err != nil {
 			return
 		}
+		glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
 		rm.expectations.CreationObserved(rsKey)
 		rm.enqueueController(rc)
 		return
@@ -278,26 +295,20 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 	curControllerRef := controller.GetControllerOf(curPod)
 	oldControllerRef := controller.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
-	if controllerRefChanged &&
-		oldControllerRef != nil && oldControllerRef.Kind == controllerKind.Kind {
+	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
-		rc, err := rm.rcLister.ReplicationControllers(oldPod.Namespace).Get(oldControllerRef.Name)
-		if err == nil {
+		if rc := rm.resolveControllerRef(oldPod.Namespace, oldControllerRef); rc != nil {
 			rm.enqueueController(rc)
 		}
 	}
 
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
-		if curControllerRef.Kind != controllerKind.Kind {
-			// It's controlled by a different type of controller.
+		rc := rm.resolveControllerRef(curPod.Namespace, curControllerRef)
+		if rc == nil {
 			return
 		}
 		glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
-		rc, err := rm.rcLister.ReplicationControllers(curPod.Namespace).Get(curControllerRef.Name)
-		if err != nil {
-			return
-		}
 		rm.enqueueController(rc)
 		// TODO: MinReadySeconds in the Pod will generate an Available condition to be added in
 		// the Pod status which in turn will trigger a requeue of the owning ReplicationController thus
@@ -308,7 +319,9 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 		// "closer" to kubelet (from the deployment to the ReplicationController controller).
 		if !v1.IsPodReady(oldPod) && v1.IsPodReady(curPod) && rc.Spec.MinReadySeconds > 0 {
 			glog.V(2).Infof("ReplicationController %q will be enqueued after %ds for availability check", rc.Name, rc.Spec.MinReadySeconds)
-			rm.enqueueControllerAfter(rc, time.Duration(rc.Spec.MinReadySeconds)*time.Second)
+			// Add a second to avoid milliseconds skew in AddAfter.
+			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
+			rm.enqueueControllerAfter(rc, (time.Duration(rc.Spec.MinReadySeconds)*time.Second)+time.Second)
 		}
 		return
 	}
@@ -354,20 +367,15 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 		// No controller should care about orphans being deleted.
 		return
 	}
-	if controllerRef.Kind != controllerKind.Kind {
-		// It's controlled by a different type of controller.
-		return
-	}
-	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
-
-	rc, err := rm.rcLister.ReplicationControllers(pod.Namespace).Get(controllerRef.Name)
-	if err != nil {
+	rc := rm.resolveControllerRef(pod.Namespace, controllerRef)
+	if rc == nil {
 		return
 	}
 	rsKey, err := controller.KeyFunc(rc)
 	if err != nil {
 		return
 	}
+	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
 	rm.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
 	rm.enqueueController(rc)
 }
@@ -582,7 +590,19 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 			filteredPods = append(filteredPods, pod)
 		}
 	}
-	cm := controller.NewPodControllerRefManager(rm.podControl, rc, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), controllerKind)
+	// If any adoptions are attempted, we should first recheck for deletion with
+	// an uncached quorum read sometime after listing Pods (see #42639).
+	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+		fresh, err := rm.kubeClient.CoreV1().ReplicationControllers(rc.Namespace).Get(rc.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		if fresh.UID != rc.UID {
+			return nil, fmt.Errorf("original ReplicationController %v/%v is gone: got uid %v, wanted %v", rc.Namespace, rc.Name, fresh.UID, rc.UID)
+		}
+		return fresh, nil
+	})
+	cm := controller.NewPodControllerRefManager(rm.podControl, rc, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), controllerKind, canAdoptFunc)
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
 	filteredPods, err = cm.ClaimPods(filteredPods)

@@ -30,29 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/retry"
 )
 
-type restMappingError struct {
-	kind    string
-	version string
-}
-
-func (r *restMappingError) Error() string {
-	versionKind := fmt.Sprintf("%s/%s", r.version, r.kind)
-	return fmt.Sprintf("unable to get REST mapping for %s.", versionKind)
-}
-
-// Message prints more details
-func (r *restMappingError) Message() string {
-	versionKind := fmt.Sprintf("%s/%s", r.version, r.kind)
-	errMsg := fmt.Sprintf("unable to get REST mapping for %s.", versionKind)
-	errMsg += fmt.Sprintf(" If %s is a thirdparty resource (tpr), please note that the garbage collector doesn't support tpr yet. Once tpr is supported, object with ownerReferences referring non-existing tpr objects will be deleted by the garbage collector.", versionKind)
-	errMsg += fmt.Sprintf(" If %s is not a tpr, then you should remove ownerReferences that refer %s objects manually.", versionKind, versionKind)
-	return errMsg
-}
-
-func newRESTMappingError(kind, version string) *restMappingError {
-	return &restMappingError{kind: kind, version: version}
-}
-
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
 // namespace> tuple to a unversioned.APIResource struct.
 func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool) (*metav1.APIResource, error) {

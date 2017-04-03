@@ -37,6 +37,7 @@ import (
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -355,7 +356,16 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	}
 
 	errList := []error{}
-	for _, pod := range podList.Items {
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		// Since the client must maintain compatibility with a v1.5 server,
+		// we can't assume the Pods will have ControllerRefs pointing to 'ss'.
+		// However, we can at least avoid interfering with other controllers
+		// that do use ControllerRef.
+		controllerRef := controller.GetControllerOf(pod)
+		if controllerRef != nil && controllerRef.UID != ss.UID {
+			continue
+		}
 		if err := pods.Delete(pod.Name, gracePeriod); err != nil {
 			if !errors.IsNotFound(err) {
 				errList = append(errList, err)
@@ -440,8 +450,15 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 		return err
 	}
 
+	// Do not cascade deletion for overlapping deployments.
+	// A Deployment with this annotation will not create or manage anything,
+	// so we can assume any matching ReplicaSets belong to another Deployment.
+	if len(deployment.Annotations[deploymentutil.OverlapAnnotation]) > 0 {
+		return deployments.Delete(name, nil)
+	}
+
 	// Stop all replica sets belonging to this Deployment.
-	rss, err := deploymentutil.ListReplicaSetsInternal(deployment,
+	rss, err := deploymentutil.ListReplicaSetsInternalV15(deployment,
 		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
 			rsList, err := reaper.rsClient.ReplicaSets(namespace).List(options)
 			if err != nil {

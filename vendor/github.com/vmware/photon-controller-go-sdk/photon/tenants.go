@@ -12,6 +12,7 @@ package photon
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 )
 
 // Contains functionality for tenants API.
@@ -29,12 +30,12 @@ type ProjectGetOptions struct {
 	Name string `urlParam:"name"`
 }
 
-var tenantUrl string = "/tenants"
+var tenantUrl string = rootUrl + "/tenants"
 
 // Returns all tenants on an photon instance.
 func (api *TenantsAPI) GetAll() (result *Tenants, err error) {
 	uri := api.client.Endpoint + tenantUrl
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -54,7 +55,7 @@ func (api *TenantsAPI) Create(tenantSpec *TenantCreateSpec) (task *Task, err err
 		api.client.Endpoint+tenantUrl,
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -65,7 +66,7 @@ func (api *TenantsAPI) Create(tenantSpec *TenantCreateSpec) (task *Task, err err
 
 // Deletes the tenant with specified ID. Any projects, VMs, disks, etc., owned by the tenant must be deleted first.
 func (api *TenantsAPI) Delete(id string) (task *Task, err error) {
-	res, err := api.client.restClient.Delete(api.client.Endpoint+tenantUrl+"/"+id, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.Delete(api.client.Endpoint+tenantUrl+"/"+id, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -84,7 +85,7 @@ func (api *TenantsAPI) CreateResourceTicket(tenantId string, spec *ResourceTicke
 		api.client.Endpoint+tenantUrl+"/"+tenantId+"/resource-tickets",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -100,7 +101,7 @@ func (api *TenantsAPI) GetResourceTickets(tenantId string, options *ResourceTick
 	if options != nil {
 		uri += getQueryString(options)
 	}
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -120,7 +121,7 @@ func (api *TenantsAPI) CreateProject(tenantId string, spec *ProjectCreateSpec) (
 		api.client.Endpoint+tenantUrl+"/"+tenantId+"/projects",
 		"application/json",
 		bytes.NewReader(body),
-		api.client.options.TokenOptions.AccessToken)
+		api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -136,7 +137,7 @@ func (api *TenantsAPI) GetProjects(tenantId string, options *ProjectGetOptions) 
 	if options != nil {
 		uri += getQueryString(options)
 	}
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -153,7 +154,7 @@ func (api *TenantsAPI) GetTasks(id string, options *TaskGetOptions) (result *Tas
 	if options != nil {
 		uri += getQueryString(options)
 	}
-	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions.AccessToken)
+	res, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
@@ -163,19 +164,42 @@ func (api *TenantsAPI) GetTasks(id string, options *TaskGetOptions) (result *Tas
 	return
 }
 
-// Gets a tenant with the specified ID.
-func (api *TenantsAPI) Get(id string) (tenant *Tenant, err error) {
-	res, err := api.client.restClient.Get(api.getEntityUrl(id), api.client.options.TokenOptions.AccessToken)
+// Gets a tenant with the specified ID or name
+func (api *TenantsAPI) Get(identity string) (tenant *Tenant, err error) {
+	res, err := api.client.restClient.Get(api.getEntityUrl(identity), api.client.options.TokenOptions)
 	if err != nil {
 		return
 	}
 	defer res.Body.Close()
 	res, err = getError(res)
+	tenant = &Tenant{}
+	if res != nil {
+		err = json.NewDecoder(res.Body).Decode(tenant)
+		// ID corresponds to the tenant ID found, return tenant
+		if err == nil {
+			return
+		}
+	}
+	// Find by Name
+	uri := api.client.Endpoint + tenantUrl + "?name=" + identity
+	res2, err := api.client.restClient.GetList(api.client.Endpoint, uri, api.client.options.TokenOptions)
+
 	if err != nil {
 		return
 	}
-	tenant = &Tenant{}
-	err = json.NewDecoder(res.Body).Decode(tenant)
+
+	tenants := &Tenants{}
+	err = json.Unmarshal(res2, tenants)
+	if err != nil {
+		return
+	}
+
+	if len(tenants.Items) < 1 {
+		err = fmt.Errorf("Cannot find a tenant with id or name match %s", identity)
+		return
+	}
+
+	tenant = &(tenants.Items[0])
 	return
 }
 

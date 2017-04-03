@@ -96,7 +96,10 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	// Now only the old pod or the new pod run. Watch it until it finishes
 	// and send all events on the pod to the PV
 	for {
-		event := <-podCh
+		event, ok := <-podCh
+		if !ok {
+			return fmt.Errorf("recycler pod %q watch channel had been closed", pod.Name)
+		}
 		switch event.Object.(type) {
 		case *v1.Pod:
 			// POD changed
@@ -198,13 +201,14 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 		return nil, err
 	}
 
-	eventCh := make(chan watch.Event, 0)
+	eventCh := make(chan watch.Event, 30)
 
 	go func() {
 		defer eventWatch.Stop()
 		defer podWatch.Stop()
 		defer close(eventCh)
-
+		var podWatchChannelClosed bool
+		var eventWatchChannelClosed bool
 		for {
 			select {
 			case _ = <-stopChannel:
@@ -212,15 +216,19 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 
 			case podEvent, ok := <-podWatch.ResultChan():
 				if !ok {
-					return
+					podWatchChannelClosed = true
+				} else {
+					eventCh <- podEvent
 				}
-				eventCh <- podEvent
-
 			case eventEvent, ok := <-eventWatch.ResultChan():
 				if !ok {
-					return
+					eventWatchChannelClosed = true
+				} else {
+					eventCh <- eventEvent
 				}
-				eventCh <- eventEvent
+			}
+			if podWatchChannelClosed && eventWatchChannelClosed {
+				break
 			}
 		}
 	}()

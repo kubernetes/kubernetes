@@ -111,11 +111,11 @@ func (dc *DeploymentController) checkPausedConditions(d *extensions.Deployment) 
 // This may lead to stale reads of replica sets, thus incorrect deployment status.
 func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(d *extensions.Deployment, rsList []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList, createIfNotExisted bool) (*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
 	// List the deployment's RSes & Pods and apply pod-template-hash info to deployment's adopted RSes/Pods
-	rsList, podList, err := dc.rsAndPodsWithHashKeySynced(d, rsList, podMap)
+	rsList, err := dc.rsAndPodsWithHashKeySynced(d, rsList, podMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error labeling replica sets and pods with pod-template-hash: %v", err)
 	}
-	_, allOldRSs, err := deploymentutil.FindOldReplicaSets(d, rsList, podList)
+	_, allOldRSs, err := deploymentutil.FindOldReplicaSets(d, rsList)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -134,7 +134,7 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(d *extensions.D
 //
 // rsList should come from getReplicaSetsForDeployment(d).
 // podMap should come from getPodMapForDeployment(d, rsList).
-func (dc *DeploymentController) rsAndPodsWithHashKeySynced(d *extensions.Deployment, rsList []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList) ([]*extensions.ReplicaSet, *v1.PodList, error) {
+func (dc *DeploymentController) rsAndPodsWithHashKeySynced(d *extensions.Deployment, rsList []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList) ([]*extensions.ReplicaSet, error) {
 	syncedRSList := []*extensions.ReplicaSet{}
 	for _, rs := range rsList {
 		// Add pod-template-hash information if it's not in the RS.
@@ -142,16 +142,11 @@ func (dc *DeploymentController) rsAndPodsWithHashKeySynced(d *extensions.Deploym
 		// that aren't constrained by the pod-template-hash.
 		syncedRS, err := dc.addHashKeyToRSAndPods(rs, podMap[rs.UID])
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		syncedRSList = append(syncedRSList, syncedRS)
 	}
-	// Put all Pods from podMap into one list.
-	syncedPodList := &v1.PodList{}
-	for _, podList := range podMap {
-		syncedPodList.Items = append(syncedPodList.Items, podList.Items...)
-	}
-	return syncedRSList, syncedPodList, nil
+	return syncedRSList, nil
 }
 
 // addHashKeyToRSAndPods adds pod-template-hash information to the given rs, if it's not already there, with the following steps:
@@ -259,7 +254,8 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 			return dc.client.Extensions().ReplicaSets(rsCopy.ObjectMeta.Namespace).Update(rsCopy)
 		}
 
-		updateConditions := deploymentutil.SetDeploymentRevision(deployment, newRevision)
+		// Should use the revision in existingNewRS's annotation, since it set by before
+		updateConditions := deploymentutil.SetDeploymentRevision(deployment, rsCopy.Annotations[deploymentutil.RevisionAnnotation])
 		// If no other Progressing condition has been recorded and we need to estimate the progress
 		// of this deployment then it is likely that old users started caring about progress. In that
 		// case we need to take into account the first time we noticed their new replica set.

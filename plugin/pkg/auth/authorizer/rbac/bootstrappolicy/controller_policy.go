@@ -260,7 +260,7 @@ func init() {
 			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch").Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
 			rbac.NewRule("update").Groups(appsGroup).Resources("statefulsets/status").RuleOrDie(),
-			rbac.NewRule("get", "create", "delete", "update").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			rbac.NewRule("get", "create", "delete", "update", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("get", "create").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 			eventsRule(),
 		},

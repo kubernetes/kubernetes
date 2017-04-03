@@ -329,6 +329,8 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 		}
 
+		options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[:], ":"))
+
 		// Avoid mount storm, pick a host randomly.
 		// Iterate all hosts until mount succeeds.
 		for _, ip := range addrlist {

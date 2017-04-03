@@ -48,7 +48,7 @@ const (
 
 type activePodsLister interface {
 	// Returns a list of active pods on the node.
-	GetRunningPods() ([]*v1.Pod, error)
+	GetActivePods() []*v1.Pod
 }
 
 // nvidiaGPUManager manages nvidia gpu devices.
@@ -102,10 +102,7 @@ func (ngm *nvidiaGPUManager) Start() error {
 		return err
 	}
 	// It's possible that the runtime isn't available now.
-	allocatedGPUs, err := ngm.gpusInUse()
-	if err == nil {
-		ngm.allocated = allocatedGPUs
-	}
+	ngm.allocated = ngm.gpusInUse()
 	// We ignore errors when identifying allocated GPUs because it is possible that the runtime interfaces may be not be logically up.
 	return nil
 }
@@ -141,16 +138,16 @@ func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) (
 	defer ngm.Unlock()
 	if ngm.allocated == nil {
 		// Initialization is not complete. Try now. Failures can no longer be tolerated.
-		allocated, err := ngm.gpusInUse()
-		if err != nil {
-			return nil, fmt.Errorf("Failed to allocate GPUs because of issues identifying GPUs in use: %v", err)
-		}
-		ngm.allocated = allocated
+		ngm.allocated = ngm.gpusInUse()
 	} else {
 		// update internal list of GPUs in use prior to allocating new GPUs.
-		if err := ngm.updateAllocatedGPUs(); err != nil {
-			return nil, fmt.Errorf("Failed to allocate GPUs because of issues with updating GPUs in use: %v", err)
-		}
+		ngm.updateAllocatedGPUs()
+	}
+	// Check if GPUs have already been allocated. If so return them right away.
+	// This can happen if a container restarts for example.
+	if devices := ngm.allocated.getGPUs(string(pod.UID), container.Name); devices != nil {
+		glog.V(2).Infof("Found pre-allocated GPUs for container %q in Pod %q: %v", container.Name, pod.UID, devices.List())
+		return append(devices.List(), ngm.defaultDevices...), nil
 	}
 	// Get GPU devices in use.
 	devicesInUse := ngm.allocated.devices()
@@ -164,7 +161,7 @@ func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) (
 	ret := available.UnsortedList()[:gpusNeeded]
 	for _, device := range ret {
 		// Update internal allocated GPU cache.
-		ngm.allocated.insert(string(pod.UID), device)
+		ngm.allocated.insert(string(pod.UID), container.Name, device)
 	}
 	// Add standard devices files that needs to be exposed.
 	ret = append(ret, ngm.defaultDevices...)
@@ -173,13 +170,10 @@ func (ngm *nvidiaGPUManager) AllocateGPU(pod *v1.Pod, container *v1.Container) (
 }
 
 // updateAllocatedGPUs updates the list of GPUs in use.
-// It gets a list of running pods and then frees any GPUs that are bound to terminated pods.
+// It gets a list of active pods and then frees any GPUs that are bound to terminated pods.
 // Returns error on failure.
-func (ngm *nvidiaGPUManager) updateAllocatedGPUs() error {
-	activePods, err := ngm.activePodsLister.GetRunningPods()
-	if err != nil {
-		return fmt.Errorf("Failed to list active pods: %v", err)
-	}
+func (ngm *nvidiaGPUManager) updateAllocatedGPUs() {
+	activePods := ngm.activePodsLister.GetActivePods()
 	activePodUids := sets.NewString()
 	for _, pod := range activePods {
 		activePodUids.Insert(string(pod.UID))
@@ -188,7 +182,6 @@ func (ngm *nvidiaGPUManager) updateAllocatedGPUs() error {
 	podsToBeRemoved := allocatedPodUids.Difference(activePodUids)
 	glog.V(5).Infof("pods to be removed: %v", podsToBeRemoved.List())
 	ngm.allocated.delete(podsToBeRemoved.List())
-	return nil
 }
 
 // discoverGPUs identifies allGPUs NVIDIA GPU devices available on the local node by walking `/dev` directory.
@@ -217,14 +210,15 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 }
 
 // gpusInUse returns a list of GPUs in use along with the respective pods that are using it.
-func (ngm *nvidiaGPUManager) gpusInUse() (*podGPUs, error) {
-	pods, err := ngm.activePodsLister.GetRunningPods()
-	if err != nil {
-		return nil, err
+func (ngm *nvidiaGPUManager) gpusInUse() *podGPUs {
+	pods := ngm.activePodsLister.GetActivePods()
+	type containerIdentifier struct {
+		id   string
+		name string
 	}
 	type podContainers struct {
-		uid          string
-		containerIDs sets.String
+		uid        string
+		containers []containerIdentifier
 	}
 	// List of containers to inspect.
 	podContainersToInspect := []podContainers{}
@@ -240,21 +234,23 @@ func (ngm *nvidiaGPUManager) gpusInUse() (*podGPUs, error) {
 		if containers.Len() == 0 {
 			continue
 		}
-		containerIDs := sets.NewString()
+		// TODO: If kubelet restarts right after allocating a GPU to a pod, the container might not have started yet and so container status might not be available yet.
+		// Use an internal checkpoint instead or try using the CRI if its checkpoint is reliable.
+		var containersToInspect []containerIdentifier
 		for _, container := range pod.Status.ContainerStatuses {
 			if containers.Has(container.Name) {
-				containerIDs.Insert(container.ContainerID)
+				containersToInspect = append(containersToInspect, containerIdentifier{container.ContainerID, container.Name})
 			}
 		}
 		// add the pod and its containers that need to be inspected.
-		podContainersToInspect = append(podContainersToInspect, podContainers{string(pod.UID), containerIDs})
+		podContainersToInspect = append(podContainersToInspect, podContainers{string(pod.UID), containersToInspect})
 	}
 	ret := newPodGPUs()
 	for _, podContainer := range podContainersToInspect {
-		for _, containerId := range podContainer.containerIDs.List() {
-			containerJSON, err := ngm.dockerClient.InspectContainer(containerId)
+		for _, containerIdentifier := range podContainer.containers {
+			containerJSON, err := ngm.dockerClient.InspectContainer(containerIdentifier.id)
 			if err != nil {
-				glog.V(3).Infof("Failed to inspect container %q in pod %q while attempting to reconcile nvidia gpus in use", containerId, podContainer.uid)
+				glog.V(3).Infof("Failed to inspect container %q in pod %q while attempting to reconcile nvidia gpus in use", containerIdentifier.id, podContainer.uid)
 				continue
 			}
 
@@ -266,12 +262,12 @@ func (ngm *nvidiaGPUManager) gpusInUse() (*podGPUs, error) {
 			for _, device := range devices {
 				if isValidPath(device.PathOnHost) {
 					glog.V(4).Infof("Nvidia GPU %q is in use by Docker Container: %q", device.PathOnHost, containerJSON.ID)
-					ret.insert(podContainer.uid, device.PathOnHost)
+					ret.insert(podContainer.uid, containerIdentifier.name, device.PathOnHost)
 				}
 			}
 		}
 	}
-	return ret, nil
+	return ret
 }
 
 func isValidPath(path string) bool {

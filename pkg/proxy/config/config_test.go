@@ -24,18 +24,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 )
-
-const TomcatPort int = 8080
-const TomcatName = "tomcat"
-
-var TomcatEndpoints = map[string]string{"c0": "1.1.1.1:18080", "c1": "2.2.2.2:18081"}
-
-const MysqlPort int = 3306
-const MysqlName = "mysql"
-
-var MysqlEndpoints = map[string]string{"c0": "1.1.1.1:13306", "c3": "2.2.2.2:13306"}
 
 type sortedServices []api.Service
 
@@ -83,7 +74,7 @@ func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []a
 	}
 }
 
-type sortedEndpoints []api.Endpoints
+type sortedEndpoints []*api.Endpoints
 
 func (s sortedEndpoints) Len() int {
 	return len(s)
@@ -96,24 +87,24 @@ func (s sortedEndpoints) Less(i, j int) bool {
 }
 
 type EndpointsHandlerMock struct {
-	updated chan []api.Endpoints
+	updated chan []*api.Endpoints
 	waits   int
 }
 
 func NewEndpointsHandlerMock() *EndpointsHandlerMock {
-	return &EndpointsHandlerMock{updated: make(chan []api.Endpoints, 5)}
+	return &EndpointsHandlerMock{updated: make(chan []*api.Endpoints, 5)}
 }
 
-func (h *EndpointsHandlerMock) OnEndpointsUpdate(endpoints []api.Endpoints) {
+func (h *EndpointsHandlerMock) OnEndpointsUpdate(endpoints []*api.Endpoints) {
 	sort.Sort(sortedEndpoints(endpoints))
 	h.updated <- endpoints
 }
 
-func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints []api.Endpoints) {
+func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints []*api.Endpoints) {
 	// We might get 1 or more updates for N endpoint updates, because we
 	// over write older snapshots of endpoints from the producer go-routine
 	// if the consumer falls behind. Unittests will hard timeout in 5m.
-	var endpoints []api.Endpoints
+	var endpoints []*api.Endpoints
 	for {
 		select {
 		case endpoints = <-h.updated:
@@ -129,197 +120,198 @@ func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints
 	}
 }
 
-func CreateServiceUpdate(op Operation, service *api.Service) ServiceUpdate {
-	return ServiceUpdate{Op: op, Service: service}
-}
-
-func CreateEndpointsUpdate(op Operation, endpoints *api.Endpoints) EndpointsUpdate {
-	return EndpointsUpdate{Op: op, Endpoints: endpoints}
-}
-
 func TestNewServiceAddedAndNotified(t *testing.T) {
-	config := NewServiceConfig()
-	config.store.synced = true
-	channel := config.Channel("one")
+	fakeWatch := watch.NewFake()
+	lw := fakeLW{
+		listResp:  &api.ServiceList{Items: []api.Service{}},
+		watchResp: fakeWatch,
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	config := newServiceConfig(lw, time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate := CreateServiceUpdate(ADD, &api.Service{
+	go config.Run(stopCh)
+
+	service := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
-	})
-	channel <- serviceUpdate
-	handler.ValidateServices(t, []api.Service{*serviceUpdate.Service})
+	}
+	fakeWatch.Add(service)
+	handler.ValidateServices(t, []api.Service{*service})
 }
 
 func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
-	config := NewServiceConfig()
-	config.store.synced = true
-	channel := config.Channel("one")
-	handler := NewServiceHandlerMock()
-	config.RegisterHandler(handler)
-	serviceUpdate := CreateServiceUpdate(ADD, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
-	})
-	channel <- serviceUpdate
-	handler.ValidateServices(t, []api.Service{*serviceUpdate.Service})
-
-	serviceUpdate2 := CreateServiceUpdate(ADD, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
-	})
-	channel <- serviceUpdate2
-	services := []api.Service{*serviceUpdate2.Service, *serviceUpdate.Service}
-	handler.ValidateServices(t, services)
-
-	serviceUpdate3 := CreateServiceUpdate(REMOVE, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-	})
-	channel <- serviceUpdate3
-	services = []api.Service{*serviceUpdate2.Service}
-	handler.ValidateServices(t, services)
-}
-
-func TestNewMultipleSourcesServicesAddedAndNotified(t *testing.T) {
-	config := NewServiceConfig()
-	config.store.synced = true
-	channelOne := config.Channel("one")
-	channelTwo := config.Channel("two")
-	if channelOne == channelTwo {
-		t.Error("Same channel handed back for one and two")
+	fakeWatch := watch.NewFake()
+	lw := fakeLW{
+		listResp:  &api.ServiceList{Items: []api.Service{}},
+		watchResp: fakeWatch,
 	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	config := newServiceConfig(lw, time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate1 := CreateServiceUpdate(ADD, &api.Service{
+	go config.Run(stopCh)
+
+	service1 := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
-	})
-	serviceUpdate2 := CreateServiceUpdate(ADD, &api.Service{
+	}
+	fakeWatch.Add(service1)
+	handler.ValidateServices(t, []api.Service{*service1})
+
+	service2 := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
-	})
-	channelOne <- serviceUpdate1
-	channelTwo <- serviceUpdate2
-	services := []api.Service{*serviceUpdate2.Service, *serviceUpdate1.Service}
+	}
+	fakeWatch.Add(service2)
+	services := []api.Service{*service2, *service1}
+	handler.ValidateServices(t, services)
+
+	fakeWatch.Delete(service1)
+	services = []api.Service{*service2}
 	handler.ValidateServices(t, services)
 }
 
-func TestNewMultipleSourcesServicesMultipleHandlersAddedAndNotified(t *testing.T) {
-	config := NewServiceConfig()
-	config.store.synced = true
-	channelOne := config.Channel("one")
-	channelTwo := config.Channel("two")
+func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
+	fakeWatch := watch.NewFake()
+	lw := fakeLW{
+		listResp:  &api.ServiceList{Items: []api.Service{}},
+		watchResp: fakeWatch,
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	config := newServiceConfig(lw, time.Minute)
 	handler := NewServiceHandlerMock()
 	handler2 := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	serviceUpdate1 := CreateServiceUpdate(ADD, &api.Service{
+	go config.Run(stopCh)
+
+	service1 := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
-	})
-	serviceUpdate2 := CreateServiceUpdate(ADD, &api.Service{
+	}
+	service2 := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
-	})
-	channelOne <- serviceUpdate1
-	channelTwo <- serviceUpdate2
-	services := []api.Service{*serviceUpdate2.Service, *serviceUpdate1.Service}
+	}
+	fakeWatch.Add(service1)
+	fakeWatch.Add(service2)
+
+	services := []api.Service{*service2, *service1}
 	handler.ValidateServices(t, services)
 	handler2.ValidateServices(t, services)
 }
 
-func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
-	config := NewEndpointsConfig()
-	config.store.synced = true
-	channelOne := config.Channel("one")
-	channelTwo := config.Channel("two")
+func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
+	fakeWatch := watch.NewFake()
+	lw := fakeLW{
+		listResp:  &api.EndpointsList{Items: []api.Endpoints{}},
+		watchResp: fakeWatch,
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	config := newEndpointsConfig(lw, time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	endpointsUpdate1 := CreateEndpointsUpdate(ADD, &api.Endpoints{
+	go config.Run(stopCh)
+
+	endpoints1 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	endpointsUpdate2 := CreateEndpointsUpdate(ADD, &api.Endpoints{
+	}
+	endpoints2 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	channelOne <- endpointsUpdate1
-	channelTwo <- endpointsUpdate2
+	}
+	fakeWatch.Add(endpoints1)
+	fakeWatch.Add(endpoints2)
 
-	endpoints := []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints}
+	endpoints := []*api.Endpoints{endpoints2, endpoints1}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 }
 
-func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
-	config := NewEndpointsConfig()
-	config.store.synced = true
-	channelOne := config.Channel("one")
-	channelTwo := config.Channel("two")
+func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
+	fakeWatch := watch.NewFake()
+	lw := fakeLW{
+		listResp:  &api.EndpointsList{Items: []api.Endpoints{}},
+		watchResp: fakeWatch,
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	config := newEndpointsConfig(lw, time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	endpointsUpdate1 := CreateEndpointsUpdate(ADD, &api.Endpoints{
+	go config.Run(stopCh)
+
+	endpoints1 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	endpointsUpdate2 := CreateEndpointsUpdate(ADD, &api.Endpoints{
+	}
+	endpoints2 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	channelOne <- endpointsUpdate1
-	channelTwo <- endpointsUpdate2
+	}
+	fakeWatch.Add(endpoints1)
+	fakeWatch.Add(endpoints2)
 
-	endpoints := []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints}
+	endpoints := []*api.Endpoints{endpoints2, endpoints1}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Add one more
-	endpointsUpdate3 := CreateEndpointsUpdate(ADD, &api.Endpoints{
+	endpoints3 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "5.5.5.5"}, {IP: "6.6.6.6"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	channelTwo <- endpointsUpdate3
-	endpoints = []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints, *endpointsUpdate3.Endpoints}
+	}
+	fakeWatch.Add(endpoints3)
+	endpoints = []*api.Endpoints{endpoints2, endpoints1, endpoints3}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Update the "foo" service with new endpoints
-	endpointsUpdate1 = CreateEndpointsUpdate(ADD, &api.Endpoints{
+	endpoints1v2 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "7.7.7.7"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
-	})
-	channelOne <- endpointsUpdate1
-	endpoints = []api.Endpoints{*endpointsUpdate2.Endpoints, *endpointsUpdate1.Endpoints, *endpointsUpdate3.Endpoints}
+	}
+	fakeWatch.Modify(endpoints1v2)
+	endpoints = []*api.Endpoints{endpoints2, endpoints1v2, endpoints3}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 
-	// Remove "bar" service
-	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, &api.Endpoints{ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"}})
-	channelTwo <- endpointsUpdate2
-
-	endpoints = []api.Endpoints{*endpointsUpdate1.Endpoints, *endpointsUpdate3.Endpoints}
+	// Remove "bar" endpoints
+	fakeWatch.Delete(endpoints2)
+	endpoints = []*api.Endpoints{endpoints1v2, endpoints3}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
 }

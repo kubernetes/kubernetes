@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"os"
+
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
 
@@ -36,7 +38,7 @@ func NewAuditLogOptions() *AuditLogOptions {
 
 func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.Path, "audit-log-path", o.Path,
-		"If set, all requests coming to the apiserver will be logged to this file.")
+		"If set, all requests coming to the apiserver will be logged to this file.  '-' means standard out.")
 	fs.IntVar(&o.MaxAge, "audit-log-maxage", o.MaxBackups,
 		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename.")
 	fs.IntVar(&o.MaxBackups, "audit-log-maxbackup", o.MaxBackups,
@@ -47,6 +49,11 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 
 func (o *AuditLogOptions) ApplyTo(c *server.Config) error {
 	if len(o.Path) == 0 {
+		return nil
+	}
+
+	if o.Path == "-" {
+		c.AuditWriter = os.Stdout
 		return nil
 	}
 

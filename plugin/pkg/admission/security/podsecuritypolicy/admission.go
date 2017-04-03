@@ -52,7 +52,7 @@ func init() {
 }
 
 // PSPMatchFn allows plugging in how PSPs are matched against user information.
-type PSPMatchFn func(lister extensionslisters.PodSecurityPolicyLister, user user.Info, sa user.Info, authz authorizer.Authorizer) ([]*extensions.PodSecurityPolicy, error)
+type PSPMatchFn func(lister extensionslisters.PodSecurityPolicyLister, user user.Info, sa user.Info, authz authorizer.Authorizer, namespace string) ([]*extensions.PodSecurityPolicy, error)
 
 // podSecurityPolicyPlugin holds state for and implements the admission plugin.
 type podSecurityPolicyPlugin struct {
@@ -130,7 +130,7 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 		saInfo = serviceaccount.UserInfo(a.GetNamespace(), pod.Spec.ServiceAccountName, "")
 	}
 
-	matchedPolicies, err := c.pspMatcher(c.lister, a.GetUserInfo(), saInfo, c.authz)
+	matchedPolicies, err := c.pspMatcher(c.lister, a.GetUserInfo(), saInfo, c.authz, a.GetNamespace())
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -279,7 +279,7 @@ func (c *podSecurityPolicyPlugin) createProvidersFromPolicies(psps []*extensions
 // TODO: this will likely need optimization since the initial implementation will
 // always query for authorization.  Needs scale testing and possibly checking against
 // a cache.
-func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user user.Info, sa user.Info, authz authorizer.Authorizer) ([]*extensions.PodSecurityPolicy, error) {
+func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user user.Info, sa user.Info, authz authorizer.Authorizer, namespace string) ([]*extensions.PodSecurityPolicy, error) {
 	matchedPolicies := make([]*extensions.PodSecurityPolicy, 0)
 
 	list, err := lister.List(labels.Everything())
@@ -288,7 +288,8 @@ func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user 
 	}
 
 	for _, constraint := range list {
-		if authorizedForPolicy(user, constraint, authz) || authorizedForPolicy(sa, constraint, authz) {
+		// if no user info exists then the API is being hit via the unsecured port. In this case authorize the request.
+		if user == nil || authorizedForPolicy(user, namespace, constraint, authz) || authorizedForPolicy(sa, namespace, constraint, authz) {
 			matchedPolicies = append(matchedPolicies, constraint)
 		}
 	}
@@ -296,28 +297,26 @@ func getMatchingPolicies(lister extensionslisters.PodSecurityPolicyLister, user 
 	return matchedPolicies, nil
 }
 
-// authorizedForPolicy returns true if info is authorized to perform a "get" on policy.
-func authorizedForPolicy(info user.Info, policy *extensions.PodSecurityPolicy, authz authorizer.Authorizer) bool {
-	// if no info exists then the API is being hit via the unsecured port.  In this case
-	// authorize the request.
+// authorizedForPolicy returns true if info is authorized to perform the "use" verb on the policy resource.
+func authorizedForPolicy(info user.Info, namespace string, policy *extensions.PodSecurityPolicy, authz authorizer.Authorizer) bool {
 	if info == nil {
-		return true
+		return false
 	}
-	attr := buildAttributes(info, policy)
+	attr := buildAttributes(info, namespace, policy)
 	allowed, reason, err := authz.Authorize(attr)
 	if err != nil {
-		glog.V(5).Infof("cannot authorized for policy: %v,%v", reason, err)
+		glog.V(5).Infof("cannot authorize for policy: %v,%v", reason, err)
 	}
 	return allowed
 }
 
 // buildAttributes builds an attributes record for a SAR based on the user info and policy.
-func buildAttributes(info user.Info, policy *extensions.PodSecurityPolicy) authorizer.Attributes {
-	// TODO consider checking against the namespace that the pod is being
-	// created in to allow per-namespace PSP definitions.
+func buildAttributes(info user.Info, namespace string, policy *extensions.PodSecurityPolicy) authorizer.Attributes {
+	// check against the namespace that the pod is being created in to allow per-namespace PSP grants.
 	attr := authorizer.AttributesRecord{
 		User:            info,
 		Verb:            "use",
+		Namespace:       namespace,
 		Name:            policy.Name,
 		APIGroup:        extensions.GroupName,
 		Resource:        "podsecuritypolicies",

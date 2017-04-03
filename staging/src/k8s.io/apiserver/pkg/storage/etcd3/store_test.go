@@ -692,6 +692,7 @@ func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *ex
 func TestPrefix(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
+	defer cluster.Terminate(t)
 	transformer := prefixTransformer{prefix: []byte("test!")}
 	testcases := map[string]string{
 		"custom/prefix":     "/custom/prefix",

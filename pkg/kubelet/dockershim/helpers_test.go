@@ -22,6 +22,7 @@ import (
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/engine-api/types"
+	dockernat "github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -299,5 +300,89 @@ func TestEnsureSandboxImageExists(t *testing.T) {
 		err := ensureSandboxImageExists(fakeDocker, sandboxImage)
 		assert.NoError(t, fakeDocker.AssertCalls(test.calls))
 		assert.Equal(t, test.err, err != nil)
+	}
+}
+
+func TestMakePortsAndBindings(t *testing.T) {
+	for desc, test := range map[string]struct {
+		pm           []*runtimeapi.PortMapping
+		exposedPorts map[dockernat.Port]struct{}
+		portmappings map[dockernat.Port][]dockernat.PortBinding
+	}{
+		"no port mapping": {
+			pm:           nil,
+			exposedPorts: map[dockernat.Port]struct{}{},
+			portmappings: map[dockernat.Port][]dockernat.PortBinding{},
+		},
+		"tcp port mapping": {
+			pm: []*runtimeapi.PortMapping{
+				{
+					Protocol:      runtimeapi.Protocol_TCP,
+					ContainerPort: 80,
+					HostPort:      80,
+				},
+			},
+			exposedPorts: map[dockernat.Port]struct{}{
+				"80/tcp": {},
+			},
+			portmappings: map[dockernat.Port][]dockernat.PortBinding{
+				"80/tcp": {
+					{
+						HostPort: "80",
+					},
+				},
+			},
+		},
+		"udp port mapping": {
+			pm: []*runtimeapi.PortMapping{
+				{
+					Protocol:      runtimeapi.Protocol_UDP,
+					ContainerPort: 80,
+					HostPort:      80,
+				},
+			},
+			exposedPorts: map[dockernat.Port]struct{}{
+				"80/udp": {},
+			},
+			portmappings: map[dockernat.Port][]dockernat.PortBinding{
+				"80/udp": {
+					{
+						HostPort: "80",
+					},
+				},
+			},
+		},
+		"multipe port mappings": {
+			pm: []*runtimeapi.PortMapping{
+				{
+					Protocol:      runtimeapi.Protocol_TCP,
+					ContainerPort: 80,
+					HostPort:      80,
+				},
+				{
+					Protocol:      runtimeapi.Protocol_TCP,
+					ContainerPort: 80,
+					HostPort:      81,
+				},
+			},
+			exposedPorts: map[dockernat.Port]struct{}{
+				"80/tcp": {},
+			},
+			portmappings: map[dockernat.Port][]dockernat.PortBinding{
+				"80/tcp": {
+					{
+						HostPort: "80",
+					},
+					{
+						HostPort: "81",
+					},
+				},
+			},
+		},
+	} {
+		t.Logf("TestCase: %s", desc)
+		actualExposedPorts, actualPortMappings := makePortsAndBindings(test.pm)
+		assert.Equal(t, test.exposedPorts, actualExposedPorts)
+		assert.Equal(t, test.portmappings, actualPortMappings)
 	}
 }

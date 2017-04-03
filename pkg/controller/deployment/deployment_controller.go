@@ -501,7 +501,19 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(d *extensions.Deploy
 	if err != nil {
 		return nil, fmt.Errorf("deployment %s/%s has invalid label selector: %v", d.Namespace, d.Name, err)
 	}
-	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, d, deploymentSelector, controllerKind)
+	// If any adoptions are attempted, we should first recheck for deletion with
+	// an uncached quorum read sometime after listing ReplicaSets (see #42639).
+	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+		fresh, err := dc.client.ExtensionsV1beta1().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		if fresh.UID != d.UID {
+			return nil, fmt.Errorf("original Deployment %v/%v is gone: got uid %v, wanted %v", d.Namespace, d.Name, fresh.UID, d.UID)
+		}
+		return fresh, nil
+	})
+	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, d, deploymentSelector, controllerKind, canAdoptFunc)
 	return cm.ClaimReplicaSets(rsList)
 }
 
@@ -581,6 +593,20 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 
+	// This is the point at which we used to add/remove the overlap annotation.
+	// Now we always remove it if it exists, because it is obsolete as of 1.6.
+	// Although the server no longer adds or looks at the annotation,
+	// it's important to remove it from controllers created before the upgrade,
+	// so that old clients (e.g. kubectl reaper) know they can no longer assume
+	// the controller is blocked due to selector overlap and has no dependents.
+	if _, ok := d.Annotations[util.OverlapAnnotation]; ok {
+		delete(d.Annotations, util.OverlapAnnotation)
+		d, err = dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d)
+		if err != nil {
+			return fmt.Errorf("couldn't remove obsolete overlap annotation from deployment %v: %v", key, err)
+		}
+	}
+
 	// List ReplicaSets owned by this Deployment, while reconciling ControllerRef
 	// through adoption/orphaning.
 	rsList, err := dc.getReplicaSetsForDeployment(d)
@@ -611,7 +637,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 			return err
 		}
 		// So far the cleanup policy was executed once a deployment was paused, scaled up/down, or it
-		// succesfully completed deploying a replica set. Decouple it from the strategies and have it
+		// successfully completed deploying a replica set. Decouple it from the strategies and have it
 		// run almost unconditionally - cleanupDeployment is safe by default.
 		dc.cleanupDeployment(oldRSs, d)
 	}

@@ -47,6 +47,18 @@ addon-dir-create:
     - file_mode: 644
 {% endif %}
 
+{% if pillar.get('enable_cluster_monitoring', '').lower() == 'stackdriver' %}
+/etc/kubernetes/addons/cluster-monitoring/stackdriver:
+  file.recurse:
+    - source: salt://kube-addons/cluster-monitoring/stackdriver
+    - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - template: jinja
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - file_mode: 644
+{% endif %}
+
 {% if pillar.get('enable_cluster_monitoring', '').lower() == 'standalone' %}
 /etc/kubernetes/addons/cluster-monitoring/standalone:
   file.recurse:
@@ -87,6 +99,22 @@ addon-dir-create:
     - template: jinja
     - group: root
     - dir_mode: 755
+    - makedirs: True
+
+/etc/kubernetes/addons/dns/kubedns-sa.yaml:
+  file.managed:
+    - source: salt://kube-addons/dns/kubedns-sa.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
+    - makedirs: True
+
+/etc/kubernetes/addons/dns/kubedns-cm.yaml:
+  file.managed:
+    - source: salt://kube-addons/dns/kubedns-cm.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
     - makedirs: True
 {% endif %}
 

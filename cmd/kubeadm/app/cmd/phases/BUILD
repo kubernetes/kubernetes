@@ -13,6 +13,7 @@ go_library(
         "certs.go",
         "kubeconfig.go",
         "phase.go",
+        "validate.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -21,6 +22,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/phases/validate:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//vendor:github.com/spf13/cobra",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
