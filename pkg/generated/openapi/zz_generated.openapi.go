@@ -3355,7 +3355,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 					Properties: map[string]spec.Schema{
 						"fieldRef": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.podIP.",
+								Description: "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.",
 								Ref:         ref("k8s.io/kubernetes/pkg/api/v1.ObjectFieldSelector"),
 							},
 						},
@@ -12958,6 +12958,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 		"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeletConfiguration": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
+					Description: "A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true: - its value will never, or cannot safely be changed during the lifetime of a node - its value cannot be safely shared between nodes at the same time (e.g. a hostname)\n  KubeletConfiguration is intended to be shared between nodes\nIn general, please try to avoid adding flags or configuration fields, we already have a confusingly large amount of them.",
 					Properties: map[string]spec.Schema{
 						"kind": {
 							SchemaProps: spec.SchemaProps{
@@ -13071,13 +13072,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							SchemaProps: spec.SchemaProps{
 								Description: "authorization specifies how requests to the Kubelet's server are authorized",
 								Ref:         ref("k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1.KubeletAuthorization"),
-							},
-						},
-						"hostnameOverride": {
-							SchemaProps: spec.SchemaProps{
-								Description: "hostnameOverride is the hostname used to identify the kubelet instead of the actual hostname.",
-								Type:        []string{"string"},
-								Format:      "",
 							},
 						},
 						"podInfraContainerImage": {
@@ -13617,13 +13611,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 							},
 						},
-						"nodeIP": {
-							SchemaProps: spec.SchemaProps{
-								Description: "nodeIP is IP address of the node. If set, kubelet will use this IP address for the node.",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
 						"nodeLabels": {
 							SchemaProps: spec.SchemaProps{
 								Description: "nodeLabels to add when registering the node in the cluster.",
@@ -13869,7 +13856,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							},
 						},
 					},
-					Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "enableContentionProfiling", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "experimentalQOSReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "systemReserved", "kubeReserved"},
+					Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "enableContentionProfiling", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "experimentalQOSReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "systemReserved", "kubeReserved"},
 				},
 			},
 			Dependencies: []string{

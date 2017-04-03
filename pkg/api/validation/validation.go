@@ -1416,7 +1416,7 @@ func ValidateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "spec.nodeName", "spec.serviceAccountName", "status.podIP")
+var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP")
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "requests.cpu", "requests.memory")
 
 func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList {
@@ -1524,6 +1524,10 @@ func validateConfigMapEnvSource(configMapSource *api.ConfigMapEnvSource, fldPath
 	allErrs := field.ErrorList{}
 	if len(configMapSource.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		for _, msg := range ValidateConfigMapName(configMapSource.Name, true) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), configMapSource.Name, msg))
+		}
 	}
 	return allErrs
 }
@@ -1532,6 +1536,10 @@ func validateSecretEnvSource(secretSource *api.SecretEnvSource, fldPath *field.P
 	allErrs := field.ErrorList{}
 	if len(secretSource.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		for _, msg := range ValidateSecretName(secretSource.Name, true) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), secretSource.Name, msg))
+		}
 	}
 	return allErrs
 }

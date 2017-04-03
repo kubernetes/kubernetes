@@ -126,7 +126,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error) {
 
 	// Initialize the TLS Options
-	tlsOptions, err := InitializeTLS(&s.KubeletConfiguration)
+	tlsOptions, err := InitializeTLS(&s.KubeletFlags, &s.KubeletConfiguration)
 	if err != nil {
 		return nil, err
 	}
@@ -574,7 +574,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(&s.KubeletConfiguration, kubeDeps, s.RunOnce, standaloneMode); err != nil {
+	if err := RunKubelet(&s.KubeletFlags, &s.KubeletConfiguration, kubeDeps, s.RunOnce, standaloneMode); err != nil {
 		return err
 	}
 
@@ -620,7 +620,7 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
-func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions, error) {
+func InitializeTLS(kf *options.KubeletFlags, kc *componentconfig.KubeletConfiguration) (*server.TLSOptions, error) {
 	if kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
 		kc.TLSCertFile = path.Join(kc.CertDirectory, "kubelet.crt")
 		kc.TLSPrivateKeyFile = path.Join(kc.CertDirectory, "kubelet.key")
@@ -630,7 +630,7 @@ func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions
 			return nil, err
 		}
 		if !canReadCertAndKey {
-			cert, key, err := certutil.GenerateSelfSignedCertKey(nodeutil.GetHostname(kc.HostnameOverride), nil, nil)
+			cert, key, err := certutil.GenerateSelfSignedCertKey(nodeutil.GetHostname(kf.HostnameOverride), nil, nil)
 			if err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
@@ -761,8 +761,8 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, runOnce bool, standaloneMode bool) error {
-	hostname := nodeutil.GetHostname(kubeCfg.HostnameOverride)
+func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, runOnce bool, standaloneMode bool) error {
+	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
 	if err != nil {
@@ -808,7 +808,7 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
-	k, err := builder(kubeCfg, kubeDeps, standaloneMode)
+	k, err := builder(kubeCfg, kubeDeps, standaloneMode, kubeFlags.HostnameOverride, kubeFlags.NodeIP)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -888,11 +888,11 @@ func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg 
 	}
 }
 
-func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool) (k kubelet.KubeletBootstrap, err error) {
+func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, standaloneMode bool, hostnameOverride string, nodeIP string) (k kubelet.KubeletBootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, standaloneMode)
+	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, standaloneMode, hostnameOverride, nodeIP)
 	if err != nil {
 		return nil, err
 	}

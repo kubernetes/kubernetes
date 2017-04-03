@@ -267,7 +267,8 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
 	}
 	if obj.ImageGCHighThresholdPercent == nil {
-		temp := int32(90)
+		// default is below docker's default dm.min_free_space of 90%
+		temp := int32(85)
 		obj.ImageGCHighThresholdPercent = &temp
 	}
 	if obj.ImageGCLowThresholdPercent == nil {

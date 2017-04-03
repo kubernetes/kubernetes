@@ -638,6 +638,12 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod 
 		return pod.Spec.NodeName, nil
 	case "spec.serviceAccountName":
 		return pod.Spec.ServiceAccountName, nil
+	case "status.hostIP":
+		hostIP, err := kl.getHostIPAnyWay()
+		if err != nil {
+			return "", err
+		}
+		return hostIP.String(), nil
 	case "status.podIP":
 		return podIP, nil
 	}
