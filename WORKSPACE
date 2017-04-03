@@ -1,6 +1,6 @@
 git_repository(
     name = "io_bazel_rules_go",
-    commit = "7828452850597b52b49ec603b23f8ad2bcb22aed",
+    commit = "cfdcbdc1d17e6dc3c48bbda4fce760949e58e381",
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
@@ -18,7 +18,9 @@ git_repository(
 
 load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
 
-go_repositories()
+go_repositories(
+    go_version = "1.7.5",
+)
 
 # for building docker base images
 debs = (
