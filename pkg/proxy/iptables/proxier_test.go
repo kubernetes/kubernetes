@@ -546,7 +546,7 @@ func TestClusterIPReject(t *testing.T) {
 
 	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "p80"}
 	fp.serviceMap[svc] = newFakeServiceInfo(svc, svcIP, 80, api.ProtocolTCP, false)
-	fp.syncProxyRules()
+	fp.syncProxyRules(syncReasonForce)
 
 	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
 	svcRules := ipt.GetRules(svcChain)
@@ -638,7 +638,7 @@ func TestLoadBalancer(t *testing.T) {
 		}),
 	}
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(syncReasonForce)
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
 	fwChain := string(serviceFirewallChainName(svc, proto))
@@ -683,7 +683,7 @@ func TestNodePort(t *testing.T) {
 		}),
 	}
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(syncReasonForce)
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
 	svcChain := string(servicePortChainName(svc, strings.ToLower(proto)))
@@ -705,7 +705,7 @@ func TestNodePortReject(t *testing.T) {
 	svcInfo.nodePort = 3001
 	fp.serviceMap[svc] = svcInfo
 
-	fp.syncProxyRules()
+	fp.syncProxyRules(syncReasonForce)
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
 	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP.String(), 3001) {
