@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/golang/glog"
 
@@ -42,6 +43,10 @@ const (
 	azureAuthority  = "https://login.microsoftonline.com"
 	uuidFormat      = "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}"
 	azureTokenKey   = "azureTokenKey"
+
+	cfgClientID = "client-id"
+	cfgTenantID = "tenant-id"
+	cfgAudience = "audience"
 )
 
 func init() {
@@ -50,17 +55,49 @@ func init() {
 	}
 }
 
+var cache = newAzureTokenCache()
+
+type azureTokenCache struct {
+	lock  sync.Mutex
+	cache map[string]*azureToken
+}
+
+func newAzureTokenCache() *azureTokenCache {
+	return &azureTokenCache{cache: make(map[string]*azureToken)}
+}
+
+func (c *azureTokenCache) getToken(tokenKey string) *azureToken {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.cache[tokenKey]
+}
+
+func (c *azureTokenCache) setToken(tokenKey string, token *azureToken) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.cache[tokenKey] = token
+}
+
 func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
-	azFilename, err := azureTokensFile()
-	if err != nil {
-		return nil, err
-	}
-	fileSource, err := newAzureTokenSourceFromFile(azFilename)
-	if err != nil {
-		return nil, err
+	var ts tokenSource
+
+	clientID := cfg[cfgClientID]
+	tenantID := cfg[cfgTenantID]
+	audience := cfg[cfgAudience]
+	if clientID != "" && tenantID != "" && audience != "" {
+		ts = newAzureTokenSourceDeviceCode(clientID, tenantID, audience)
+	} else {
+		azFilename, err := azureTokensFile()
+		if err != nil {
+			return nil, err
+		}
+		ts, err = newAzureTokenSourceFromFile(azFilename)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	cacheSource := newAzureTokenSourceFromCache(fileSource)
+	cacheSource := newAzureTokenSourceFromCache(ts, cache)
 
 	return &azureAuthProvider{
 		tokenSource: cacheSource,
@@ -120,15 +157,14 @@ type tokenSource interface {
 }
 
 type azureTokenSourceFromCache struct {
-	lock   sync.Mutex
 	source tokenSource
-	cache  map[string]*azureToken
+	cache  *azureTokenCache
 }
 
-func newAzureTokenSourceFromCache(source tokenSource) tokenSource {
+func newAzureTokenSourceFromCache(source tokenSource, cache *azureTokenCache) tokenSource {
 	return &azureTokenSourceFromCache{
 		source: source,
-		cache:  make(map[string]*azureToken),
+		cache:  cache,
 	}
 }
 
@@ -136,14 +172,14 @@ func newAzureTokenSourceFromCache(source tokenSource) tokenSource {
 // the configured source. Automatically refreshes the token if expired.
 func (ts *azureTokenSourceFromCache) Token() (*azureToken, error) {
 	var err error
-	token := ts.cachedToken()
+	token := ts.cache.getToken(azureTokenKey)
 	if token == nil {
 		token, err = ts.source.Token()
 		if err != nil {
 			return nil, err
 		}
 		if !token.token.IsExpired() {
-			ts.cacheToken(token)
+			ts.cache.setToken(azureTokenKey, token)
 		}
 	}
 	if token.token.IsExpired() {
@@ -151,21 +187,9 @@ func (ts *azureTokenSourceFromCache) Token() (*azureToken, error) {
 		if err != nil {
 			return nil, err
 		}
-		ts.cacheToken(token)
+		ts.cache.setToken(azureTokenKey, token)
 	}
 	return token, nil
-}
-
-func (ts *azureTokenSourceFromCache) cachedToken() *azureToken {
-	ts.lock.Lock()
-	defer ts.lock.Unlock()
-	return ts.cache[azureTokenKey]
-}
-
-func (ts *azureTokenSourceFromCache) cacheToken(token *azureToken) {
-	ts.lock.Lock()
-	defer ts.lock.Unlock()
-	ts.cache[azureTokenKey] = token
 }
 
 func (ts *azureTokenSourceFromCache) refreshToken(token *azureToken) (*azureToken, error) {
@@ -300,4 +324,43 @@ func (t *azureTime) UnmarshalJSON(b []byte) error {
 	}
 	t.Time = time
 	return nil
+}
+
+type azureTokenSourceDeviceCode struct {
+	clinetID string
+	tenantID string
+	audience string
+}
+
+func newAzureTokenSourceDeviceCode(clientID string, tenantID string, audience string) tokenSource {
+	return &azureTokenSourceDeviceCode{
+		clinetID: clientID,
+		tenantID: tenantID,
+		audience: audience,
+	}
+}
+
+func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
+	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(ts.tenantID)
+	if err != nil {
+		return nil, err
+	}
+	client := &autorest.Client{}
+	deviceCode, err := azure.InitiateDeviceAuth(client, *oauthConfig, ts.clinetID, ts.audience)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(*deviceCode.Message)
+
+	token, err := azure.WaitForUserCompletion(client, deviceCode)
+	if err != nil {
+		return nil, err
+	}
+
+	return &azureToken{
+		token:    *token,
+		clientID: ts.clinetID,
+		tenantID: ts.tenantID,
+	}, nil
 }

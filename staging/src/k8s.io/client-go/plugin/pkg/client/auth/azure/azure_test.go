@@ -82,25 +82,24 @@ func TestAzureTokenSourceFromCache(t *testing.T) {
 		accessToken: fakeAccessToken,
 		expiresOn:   strconv.FormatInt(time.Now().Add(3600*time.Second).Unix(), 10),
 	}
-
-	cache := newAzureTokenSourceFromCache(&fakeSource)
-	token, err := cache.Token()
+	tokenCache := newAzureTokenCache()
+	cacheSource := newAzureTokenSourceFromCache(&fakeSource, tokenCache)
+	token, err := cacheSource.Token()
 	if err != nil {
 		t.Errorf("failed to retrieve the token form cache: %v", err)
 	}
 
-	cacheSource := cache.(*azureTokenSourceFromCache)
 	wantCacheLen := 1
-	if len(cacheSource.cache) != wantCacheLen {
-		t.Errorf("Token() cache length error: got %v, want %v", len(cacheSource.cache), wantCacheLen)
+	if len(tokenCache.cache) != wantCacheLen {
+		t.Errorf("Token() cache length error: got %v, want %v", len(tokenCache.cache), wantCacheLen)
 	}
 
-	if token != cacheSource.cache[azureTokenKey] {
+	if token != tokenCache.cache[azureTokenKey] {
 		t.Error("Token() returned token != cached token")
 	}
 
 	fakeSource.accessToken = "fake token 2"
-	token, err = cache.Token()
+	token, err = cacheSource.Token()
 	if err != nil {
 		t.Errorf("failed to retrieve the cached token: %v", err)
 	}
