@@ -22,7 +22,6 @@ import (
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
@@ -45,11 +44,7 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	// Validate version argument
 	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
 	if err != nil {
-		if cfg.KubernetesVersion != kubeadmapiext.DefaultKubernetesVersion {
-			return err
-		} else {
-			ver = kubeadmapiext.DefaultKubernetesFallbackVersion
-		}
+		return err
 	}
 	cfg.KubernetesVersion = ver
 
