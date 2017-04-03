@@ -642,6 +642,15 @@ Anyway, the cluster should get back to the proper size after 10 min.
          the new CRI + CNI code path.
       * If you are using plugins other than `bridge`, make sure you have
         updated custom plugins to the latest version that is compatible.
+* **CNI plugins now affect node readiness**
+  * Kubelet will now block node readiness until a CNI configuration file is
+    present in `/etc/cni/net.d` or a given custom CNI configuration path.
+    [This change](https://github.com/kubernetes/kubernetes/pull/43474) ensures
+    kubelet does not start pods that require networking before
+    [networking is ready](https://github.com/kubernetes/kubernetes/issues/43014).
+    This change may require changes to clients that gate pod creation and/or
+    scheduling on the node condition `type` `Ready` `status` being `True` for pods
+    that need to run prior to the network being ready.
 * **Enhance Kubelet QoS**:
   * Pods are placed under a new cgroup hierarchy by default. This feature requires
     draining and restarting the node as part of upgrades. To opt-out set
