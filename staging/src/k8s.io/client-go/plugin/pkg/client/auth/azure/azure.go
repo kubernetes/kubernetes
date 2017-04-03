@@ -44,9 +44,14 @@ const (
 	uuidFormat      = "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}"
 	azureTokenKey   = "azureTokenKey"
 
-	cfgClientID = "client-id"
-	cfgTenantID = "tenant-id"
-	cfgAudience = "audience"
+	cfgClientID     = "client-id"
+	cfgTenantID     = "tenant-id"
+	cfgAudience     = "audience"
+	cfgAccessToken  = "access-token"
+	cfgRefreshToken = "refresh-token"
+	cfgTokenType    = "token-type"
+	cfgExpiresIn    = "expires-in"
+	cfgExpiresOn    = "expires-on"
 )
 
 func init() {
@@ -97,17 +102,15 @@ func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.
 		}
 	}
 
-	cacheSource := newAzureTokenSourceFromCache(ts, cache)
+	cacheSource := newAzureTokenSourceFromCache(ts, cache, cfg, persister)
 
 	return &azureAuthProvider{
 		tokenSource: cacheSource,
-		persister:   persister,
 	}, nil
 }
 
 type azureAuthProvider struct {
 	tokenSource tokenSource
-	persister   restclient.AuthProviderConfigPersister
 }
 
 func (p *azureAuthProvider) Login() error {
@@ -157,29 +160,41 @@ type tokenSource interface {
 }
 
 type azureTokenSourceFromCache struct {
-	source tokenSource
-	cache  *azureTokenCache
+	source    tokenSource
+	cache     *azureTokenCache
+	cfg       map[string]string
+	persister restclient.AuthProviderConfigPersister
 }
 
-func newAzureTokenSourceFromCache(source tokenSource, cache *azureTokenCache) tokenSource {
+func newAzureTokenSourceFromCache(source tokenSource, cache *azureTokenCache, cfg map[string]string, persister restclient.AuthProviderConfigPersister) tokenSource {
 	return &azureTokenSourceFromCache{
-		source: source,
-		cache:  cache,
+		source:    source,
+		cache:     cache,
+		cfg:       cfg,
+		persister: persister,
 	}
 }
 
-// Token fetches a token from the cache if present otherwise acquires a new token from
-// the configured source. Automatically refreshes the token if expired.
+// Token fetches a token from the cache of configuration if present otherwise
+// acquires a new token from the configured source. Automatically refreshes
+// the token if expired.
 func (ts *azureTokenSourceFromCache) Token() (*azureToken, error) {
 	var err error
 	token := ts.cache.getToken(azureTokenKey)
 	if token == nil {
-		token, err = ts.source.Token()
+		token, err = ts.retrieveTokenFromCfg()
 		if err != nil {
-			return nil, err
+			token, err = ts.source.Token()
+			if err != nil {
+				return nil, err
+			}
 		}
 		if !token.token.IsExpired() {
 			ts.cache.setToken(azureTokenKey, token)
+			err = ts.storeTokenInCfg(token)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	if token.token.IsExpired() {
@@ -188,8 +203,80 @@ func (ts *azureTokenSourceFromCache) Token() (*azureToken, error) {
 			return nil, err
 		}
 		ts.cache.setToken(azureTokenKey, token)
+		err = ts.storeTokenInCfg(token)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return token, nil
+}
+
+func (ts *azureTokenSourceFromCache) retrieveTokenFromCfg() (*azureToken, error) {
+	accessToken := ts.cfg[cfgAccessToken]
+	if accessToken == "" {
+		return nil, fmt.Errorf("no access token in cfg: %s", cfgAccessToken)
+	}
+	refreshToken := ts.cfg[cfgRefreshToken]
+	if refreshToken == "" {
+		return nil, fmt.Errorf("no refresh token in cfg: %s", cfgRefreshToken)
+	}
+	tokenType := ts.cfg[cfgTokenType]
+	if tokenType == "" {
+		tokenType = "Bearer"
+	}
+	clientID := ts.cfg[cfgClientID]
+	if clientID == "" {
+		return nil, fmt.Errorf("no client ID in cfg: %s", cfgClientID)
+	}
+	tenantID := ts.cfg[cfgTenantID]
+	if tenantID == "" {
+		return nil, fmt.Errorf("no tenant ID in cfg: %s", cfgTenantID)
+	}
+	audiance := ts.cfg[cfgAudience]
+	if audiance == "" {
+		return nil, fmt.Errorf("no audience in cfg: %s", cfgAudience)
+	}
+	expiresIn := ts.cfg[cfgExpiresIn]
+	if expiresIn == "" {
+		return nil, fmt.Errorf("no expiresIn in cfg: %s", cfgExpiresIn)
+	}
+	expiresOn := ts.cfg[cfgExpiresOn]
+	if expiresOn == "" {
+		return nil, fmt.Errorf("no expiresOn in cfg: %s", cfgExpiresOn)
+	}
+
+	return &azureToken{
+		token: azure.Token{
+			AccessToken:  accessToken,
+			RefreshToken: refreshToken,
+			ExpiresIn:    expiresIn,
+			ExpiresOn:    expiresOn,
+			NotBefore:    expiresOn,
+			Resource:     audiance,
+			Type:         tokenType,
+		},
+		clientID: clientID,
+		tenantID: tenantID,
+	}, nil
+}
+
+func (ts *azureTokenSourceFromCache) storeTokenInCfg(token *azureToken) error {
+	newCfg := make(map[string]string)
+	newCfg[cfgAccessToken] = token.token.AccessToken
+	newCfg[cfgRefreshToken] = token.token.RefreshToken
+	newCfg[cfgTokenType] = token.token.Type
+	newCfg[cfgClientID] = token.clientID
+	newCfg[cfgTenantID] = token.tenantID
+	newCfg[cfgAudience] = token.token.Resource
+	newCfg[cfgExpiresIn] = token.token.ExpiresIn
+	newCfg[cfgExpiresOn] = token.token.ExpiresOn
+
+	err := ts.persister.Persist(newCfg)
+	if err != nil {
+		return err
+	}
+	ts.cfg = newCfg
+	return nil
 }
 
 func (ts *azureTokenSourceFromCache) refreshToken(token *azureToken) (*azureToken, error) {

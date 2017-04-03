@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -82,8 +83,10 @@ func TestAzureTokenSourceFromCache(t *testing.T) {
 		accessToken: fakeAccessToken,
 		expiresOn:   strconv.FormatInt(time.Now().Add(3600*time.Second).Unix(), 10),
 	}
+	cfg := make(map[string]string)
+	persiter := &fakePersister{cache: make(map[string]string)}
 	tokenCache := newAzureTokenCache()
-	cacheSource := newAzureTokenSourceFromCache(&fakeSource, tokenCache)
+	cacheSource := newAzureTokenSourceFromCache(&fakeSource, tokenCache, cfg, persiter)
 	token, err := cacheSource.Token()
 	if err != nil {
 		t.Errorf("failed to retrieve the token form cache: %v", err)
@@ -98,6 +101,14 @@ func TestAzureTokenSourceFromCache(t *testing.T) {
 		t.Error("Token() returned token != cached token")
 	}
 
+	wantCfg := token2Cfg(token)
+	persistedCfg := persiter.Cache()
+	for k, v := range persistedCfg {
+		if strings.Compare(v, wantCfg[k]) != 0 {
+			t.Errorf("Token() persisted cfg %s: got %v, want %v", k, v, wantCfg[k])
+		}
+	}
+
 	fakeSource.accessToken = "fake token 2"
 	token, err = cacheSource.Token()
 	if err != nil {
@@ -107,6 +118,31 @@ func TestAzureTokenSourceFromCache(t *testing.T) {
 	if token.token.AccessToken != fakeAccessToken {
 		t.Errorf("Token() didn't return the cached token")
 	}
+}
+
+type fakePersister struct {
+	lock  sync.Mutex
+	cache map[string]string
+}
+
+func (p *fakePersister) Persist(cache map[string]string) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.cache = map[string]string{}
+	for k, v := range cache {
+		p.cache[k] = v
+	}
+	return nil
+}
+
+func (p *fakePersister) Cache() map[string]string {
+	ret := map[string]string{}
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	for k, v := range p.cache {
+		ret[k] = v
+	}
+	return ret
 }
 
 type fakeTokenSource struct {
@@ -120,6 +156,19 @@ func (ts *fakeTokenSource) Token() (*azureToken, error) {
 		clientID: "fake",
 		tenantID: "fake",
 	}, nil
+}
+
+func token2Cfg(token *azureToken) map[string]string {
+	cfg := make(map[string]string)
+	cfg[cfgAccessToken] = token.token.AccessToken
+	cfg[cfgRefreshToken] = token.token.RefreshToken
+	cfg[cfgTokenType] = token.token.Type
+	cfg[cfgClientID] = token.clientID
+	cfg[cfgTenantID] = token.tenantID
+	cfg[cfgAudience] = token.token.Resource
+	cfg[cfgExpiresIn] = token.token.ExpiresIn
+	cfg[cfgExpiresOn] = token.token.ExpiresOn
+	return cfg
 }
 
 func newFackeAzureToken(accessToken string, expiresOn string) azure.Token {
