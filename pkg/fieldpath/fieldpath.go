@@ -41,11 +41,6 @@ func FormatMap(m map[string]string) (fmtStr string) {
 // ExtractFieldPathAsString extracts the field from the given object
 // and returns it as a string.  The object must be a pointer to an
 // API type.
-//
-// Currently, this API is limited to supporting the fieldpaths:
-//
-// 1.  metadata.name - The name of an API object
-// 2.  metadata.namespace - The namespace of an API object
 func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
