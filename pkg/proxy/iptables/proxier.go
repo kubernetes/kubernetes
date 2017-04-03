@@ -340,6 +340,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		table utiliptables.Table
 		chain utiliptables.Chain
 	}{
+		{utiliptables.TableFilter, utiliptables.ChainInput},
 		{utiliptables.TableFilter, utiliptables.ChainOutput},
 		{utiliptables.TableNAT, utiliptables.ChainOutput},
 		{utiliptables.TableNAT, utiliptables.ChainPrerouting},
@@ -757,6 +758,7 @@ func (proxier *Proxier) syncProxyRules() {
 			table utiliptables.Table
 			chain utiliptables.Chain
 		}{
+			{utiliptables.TableFilter, utiliptables.ChainInput},
 			{utiliptables.TableFilter, utiliptables.ChainOutput},
 			{utiliptables.TableNAT, utiliptables.ChainOutput},
 			{utiliptables.TableNAT, utiliptables.ChainPrerouting},
