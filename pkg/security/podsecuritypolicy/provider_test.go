@@ -325,7 +325,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		"failHostPathDirPSP": {
 			pod:           failHostPathDirPod,
 			psp:           failHostPathDirPSP,
-			expectedError: "Host path /fail is not allowed to be used. Allowed host paths: [/foo/bar]",
+			expectedError: "host path /fail is not allowed to be used. allowed host paths: [/foo/bar]",
 		},
 		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
 			pod:           failSafeSysctlFooPod,

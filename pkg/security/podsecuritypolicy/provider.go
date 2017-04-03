@@ -353,5 +353,5 @@ func isHostPathAllowed(hostPath string, allowedPaths []string) error {
 		}
 	}
 
-	return fmt.Errorf("Host path %s is not allowed to be used. Allowed host paths: %v", hostPath, allowedPaths)
+	return fmt.Errorf("host path %s is not allowed to be used. allowed host paths: %v", hostPath, allowedPaths)
 }
