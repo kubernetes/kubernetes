@@ -359,7 +359,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			defer updateDefaultStorageClass(c, scName, "true")
 			updateDefaultStorageClass(c, scName, "false")
 
-			By("creating a claim with default storageclass and expecting it to timeout")
+			By("creating a claim with no storageclass and expecting it to timeout")
 			claim := newClaim(ns)
 			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
@@ -386,7 +386,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			defer updateDefaultStorageClass(c, scName, "true")
 			updateDefaultStorageClass(c, scName, "")
 
-			By("creating a claim with default storageclass and expecting it to timeout")
+			By("creating a claim with no storageclass and expecting it to timeout")
 			claim := newClaim(ns)
 			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
