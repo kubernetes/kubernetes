@@ -412,6 +412,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EnableCRI == nil {
 		obj.EnableCRI = boolVar(true)
 	}
+	if obj.ExperimentalCpuConversionFactor <= 0 {
+		obj.ExperimentalCpuConversionFactor = 1.0
+	}
 }
 
 func boolVar(b bool) *bool {
