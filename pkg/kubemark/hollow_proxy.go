@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/util"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -56,6 +57,7 @@ func NewHollowProxyOrDie(
 	eventClient v1core.EventsGetter,
 	endpointsConfig *proxyconfig.EndpointsConfig,
 	serviceConfig *proxyconfig.ServiceConfig,
+	informerFactory informers.SharedInformerFactory,
 	iptInterface utiliptables.Interface,
 	broadcaster record.EventBroadcaster,
 	recorder record.EventRecorder,
@@ -73,6 +75,7 @@ func NewHollowProxyOrDie(
 
 	go endpointsConfig.Run(wait.NeverStop)
 	go serviceConfig.Run(wait.NeverStop)
+	go informerFactory.Start(wait.NeverStop)
 
 	hollowProxy, err := proxyapp.NewProxyServer(client, eventClient, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake")
 	if err != nil {

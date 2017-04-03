@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -136,10 +137,11 @@ func main() {
 
 		iptInterface := fakeiptables.NewFake()
 
-		serviceConfig := proxyconfig.NewServiceConfig(internalClientset.Core().RESTClient(), 15*time.Minute)
+		informerFactory := informers.NewSharedInformerFactory(internalClientset, 15*time.Minute)
+		serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().InternalVersion().Services(), 15*time.Minute)
 		serviceConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
-		endpointsConfig := proxyconfig.NewEndpointsConfig(internalClientset.Core().RESTClient(), 15*time.Minute)
+		endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), 15*time.Minute)
 		endpointsConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
 		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
@@ -153,6 +155,7 @@ func main() {
 			eventClient,
 			endpointsConfig,
 			serviceConfig,
+			informerFactory,
 			iptInterface,
 			eventBroadcaster,
 			recorder,
