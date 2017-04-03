@@ -520,17 +520,13 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		}
 	}
 
-	// TODO: These need to become arguments to a standalone docker shim.
-	binDir := kubeCfg.CNIBinDir
-	if binDir == "" {
-		binDir = kubeCfg.NetworkPluginDir
-	}
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       klet.hairpinMode,
 		NonMasqueradeCIDR: klet.nonMasqueradeCIDR,
 		PluginName:        kubeCfg.NetworkPluginName,
+		PluginDir:         kubeCfg.NetworkPluginDir,
 		PluginConfDir:     kubeCfg.CNIConfDir,
-		PluginBinDir:      binDir,
+		PluginBinDir:      kubeCfg.CNIBinDir,
 		MTU:               int(kubeCfg.NetworkPluginMTU),
 	}
 

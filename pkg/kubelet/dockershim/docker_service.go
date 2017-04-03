@@ -98,6 +98,9 @@ type NetworkPluginSettings struct {
 	NonMasqueradeCIDR string
 	// PluginName is the name of the plugin, runtime shim probes for
 	PluginName string
+	// PluginDir is the full path of the directory in which to search
+	// for network plugins.
+	PluginDir string
 	// PluginBinDir is the directory in which the binaries for the plugin with
 	// PluginName is kept. The admin is responsible for provisioning these
 	// binaries before-hand.
@@ -184,7 +187,7 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	}
 	// dockershim currently only supports CNI plugins.
 	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginBinDir)
-	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDir))
+	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginDir))
 	netHost := &dockerNetworkHost{
 		pluginSettings.LegacyRuntimeHost,
 		&namespaceGetter{ds},
