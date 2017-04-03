@@ -642,6 +642,8 @@ Also, please note:
 * Kubernetes now supports up to 5,000 nodes via etcd v3, which is enabled by default.
 * [Role-based access control (RBAC)](https://kubernetes.io//docs/admin/authorization/rbac) has graduated to beta, and defines secure default roles for control plane, node, and controller components.
 * The [`kubeadm` cluster bootstrap tool](https://kubernetes.io/docs/getting-started-guides/kubeadm/) has graduated to beta. Some highlights:
+  * **WARNING:** A [known issue](https://github.com/kubernetes/kubernetes/issues/43815)
+    in v1.6.0 causes `kubeadm init` to hang. Please use v1.6.1, which fixes the issue.
   * All communication is now over TLS
   * Authorization plugins can be installed by kubeadm, including the new default of RBAC
   * The bootstrap token system now allows token management and expiration
