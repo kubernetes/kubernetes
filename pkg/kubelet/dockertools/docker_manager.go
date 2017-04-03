@@ -75,6 +75,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/tail"
 	"k8s.io/kubernetes/pkg/util/term"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
+	"github.com/docker/engine-api/types/blkiodev"
 )
 
 const (
@@ -663,6 +664,8 @@ func (dm *DockerManager) runContainer(
 	memoryLimit := container.Resources.Limits.Memory().Value()
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
+	storageReadIOpsLimit := container.Resources.Limits.StorageReadIOps().Value()
+	storageWriteIOpsLimit := container.Resources.Limits.StorageWriteIOps().Value()
 	var cpuShares int64
 	// If request is not specified, but limit is, we want request to default to limit.
 	// API server does this for new containers, but we repeat this logic in Kubelet
@@ -673,6 +676,13 @@ func (dm *DockerManager) runContainer(
 		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
 		// of CPU shares.
 		cpuShares = cm.MilliCPUToShares(cpuRequest.MilliValue())
+	}
+
+	blkioDeviceReadIOps := []*blkiodev.ThrottleDevice{
+		{Path: opts.BlkioDevicePath, Rate: uint64(storageReadIOpsLimit)},
+	}
+	blkioDeviceWriteIOps := []*blkiodev.ThrottleDevice{
+		{Path: opts.BlkioDevicePath, Rate: uint64(storageWriteIOpsLimit)},
 	}
 
 	// Set devices for container.
@@ -740,6 +750,8 @@ func (dm *DockerManager) runContainer(
 			MemorySwap: -1,
 			CPUShares:  cpuShares,
 			Devices:    devices,
+			BlkioDeviceReadIOps: blkioDeviceReadIOps,
+			BlkioDeviceWriteIOps: blkioDeviceWriteIOps,
 		},
 		SecurityOpt: fmtSecurityOpts,
 	}
