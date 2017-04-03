@@ -25,7 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	ktesting "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 )
 
 type sortedServices []*api.Service
@@ -121,17 +124,19 @@ func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints
 }
 
 func TestNewServiceAddedAndNotified(t *testing.T) {
+	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	lw := fakeLW{
-		listResp:  &api.ServiceList{Items: []api.Service{}},
-		watchResp: fakeWatch,
-	}
+	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	config := newServiceConfig(lw, time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
+
+	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
+	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	service := &api.Service{
@@ -143,17 +148,19 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 }
 
 func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
+	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	lw := fakeLW{
-		listResp:  &api.ServiceList{Items: []api.Service{}},
-		watchResp: fakeWatch,
-	}
+	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	config := newServiceConfig(lw, time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
+
+	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
+	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	service1 := &api.Service{
@@ -177,19 +184,21 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 }
 
 func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
+	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	lw := fakeLW{
-		listResp:  &api.ServiceList{Items: []api.Service{}},
-		watchResp: fakeWatch,
-	}
+	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	config := newServiceConfig(lw, time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
+
+	config := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	handler2 := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
+	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	service1 := &api.Service{
@@ -209,19 +218,21 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 }
 
 func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
+	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	lw := fakeLW{
-		listResp:  &api.EndpointsList{Items: []api.Endpoints{}},
-		watchResp: fakeWatch,
-	}
+	client.PrependWatchReactor("endpoints", ktesting.DefaultWatchReactor(fakeWatch, nil))
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	config := newEndpointsConfig(lw, time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
+
+	config := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
+	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	endpoints1 := &api.Endpoints{
@@ -247,19 +258,21 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 }
 
 func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
+	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	lw := fakeLW{
-		listResp:  &api.EndpointsList{Items: []api.Endpoints{}},
-		watchResp: fakeWatch,
-	}
+	client.PrependWatchReactor("endpoints", ktesting.DefaultWatchReactor(fakeWatch, nil))
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	config := newEndpointsConfig(lw, time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
+
+	config := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
 	handler := NewEndpointsHandlerMock()
 	handler2 := NewEndpointsHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
+	go sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	endpoints1 := &api.Endpoints{
