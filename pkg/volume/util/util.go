@@ -152,10 +152,9 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 	if kubeClient == nil {
 		return nil, fmt.Errorf("Cannot get kube client")
 	}
-	// TODO: replace with a real attribute after beta
-	className, found := pv.Annotations["volume.beta.kubernetes.io/storage-class"]
-	if !found {
-		return nil, fmt.Errorf("Volume has no class annotation")
+	className := v1.GetPersistentVolumeClass(pv)
+	if className == "" {
+		return nil, fmt.Errorf("Volume has no storage class")
 	}
 
 	class, err := kubeClient.StorageV1beta1().StorageClasses().Get(className, metav1.GetOptions{})
