@@ -7267,6 +7267,10 @@
      "readOnly": {
       "type": "boolean",
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "backendType": {
+      "type": "string",
+      "description": "RBD client type you want to use for mapping the Image to a block device. Defaults to \"krbd\". Tip: Ensure that the backend is supported by the host operating system. Examples: \"krbd\", \"rbd-nbd\". Implicitly inferred to be \"krbd\" if unspecified. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      }
     }
    },

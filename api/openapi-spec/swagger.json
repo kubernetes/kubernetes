@@ -40339,6 +40339,10 @@
      "image"
     ],
     "properties": {
+     "backendType": {
+      "description": "RBD client type you want to use for mapping the Image to a block device. Defaults to \"krbd\". Tip: Ensure that the backend is supported by the host operating system. Examples: \"krbd\", \"rbd-nbd\". Implicitly inferred to be \"krbd\" if unspecified. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "type": "string"
+     },
      "fsType": {
       "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#rbd",
       "type": "string"
