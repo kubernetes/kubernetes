@@ -123,7 +123,7 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 	cmd.Flags().Var(&options.username, clientcmd.FlagUsername, clientcmd.FlagUsername+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.authProvider, flagAuthProvider, "auth provider for the user entry in kubeconfig")
-	cmd.Flags().StringSlice(flagAuthProviderArg, nil, "'key=value' arugments for the auth provider")
+	cmd.Flags().StringSlice(flagAuthProviderArg, nil, "'key=value' arguments for the auth provider")
 	f := cmd.Flags().VarPF(&options.embedCertData, clientcmd.FlagEmbedCerts, "", "embed client cert/key for the user entry in kubeconfig")
 	f.NoOptDefVal = "true"
 
