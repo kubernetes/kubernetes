@@ -447,15 +447,8 @@ type nodeGetter interface {
 }
 
 func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
-	if proxyMode == proxyModeUserspace {
-		return proxyModeUserspace
-	} else if proxyMode == proxyModeIPTables {
-		return tryIPTablesProxy(iptver, kcompat)
-	} else if proxyMode != "" {
-		glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
-		return tryIPTablesProxy(iptver, kcompat)
-	}
-	return tryIPTablesProxy(iptver, kcompat)
+	// FIXME: Remove before merging.
+	return proxyModeUserspace
 }
 
 func tryIPTablesProxy(iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {

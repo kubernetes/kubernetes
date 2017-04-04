@@ -81,7 +81,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 
 		By("checking kube-proxy URLs")
 		config.GetSelfURL("/healthz", "ok")
-		config.GetSelfURL("/proxyMode", "iptables") // the default
+		config.GetSelfURL("/proxyMode", "userspace") // the default
 	})
 
 	// TODO: Remove [Slow] when this has had enough bake time to prove presubmit worthiness.
