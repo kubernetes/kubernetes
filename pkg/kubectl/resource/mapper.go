@@ -53,7 +53,6 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode %q: %v", source, err)
 	}
-
 	obj, versioned := versions.Last(), versions.First()
 	mapping, err := m.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
