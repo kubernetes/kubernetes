@@ -40,8 +40,7 @@ type ClusterMap map[string]*Cluster
 type Cluster struct {
 	Name string
 	*kubeclientset.Clientset
-	NamespaceCreated bool    // Did we need to create a new namespace in this cluster?  If so, we should delete it.
-	BackendPod       *v1.Pod // The backend pod, if one's been created.
+	BackendPod *v1.Pod // The backend pod, if one's been created.
 }
 
 func getRegisteredClusters(f *Framework) (ClusterMap, string) {

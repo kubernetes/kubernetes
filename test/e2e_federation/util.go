@@ -79,53 +79,6 @@ func createClusterObjectOrFail(f *fedframework.Framework, context *fedframework.
 	framework.Logf("Successfully created cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 }
 
-// Creates the federation namespace in all underlying clusters.
-func createNamespaceInClusters(clusters fedframework.ClusterMap, f *fedframework.Framework) {
-	nsName := f.FederationNamespace.Name
-	for name, c := range clusters {
-		// The e2e Framework created the required namespace in federation control plane, but we need to create it in all the others, if it doesn't yet exist.
-		// TODO(nikhiljindal): remove this once we have the namespace controller working as expected.
-		if _, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{}); errors.IsNotFound(err) {
-			ns := &v1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: nsName,
-				},
-			}
-			_, err := c.Clientset.Core().Namespaces().Create(ns)
-			if err == nil {
-				c.NamespaceCreated = true
-			}
-			framework.ExpectNoError(err, "Couldn't create the namespace %s in cluster %q", nsName, name)
-			framework.Logf("Namespace %s created in cluster %q", nsName, name)
-		} else if err != nil {
-			framework.Logf("Couldn't create the namespace %s in cluster %q: %v", nsName, name, err)
-		}
-	}
-}
-
-// Unregisters the given clusters from federation control plane.
-// Also deletes the federation namespace from each cluster.
-func unregisterClusters(clusters fedframework.ClusterMap, f *fedframework.Framework) {
-	nsName := f.FederationNamespace.Name
-	for name, c := range clusters {
-		if c.NamespaceCreated {
-			if _, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{}); !errors.IsNotFound(err) {
-				err := c.Clientset.Core().Namespaces().Delete(nsName, &metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "Couldn't delete the namespace %s in cluster %q: %v", nsName, name, err)
-			}
-			framework.Logf("Namespace %s deleted in cluster %q", nsName, name)
-		}
-	}
-
-	// Delete the registered clusters in the federation API server.
-	clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
-	framework.ExpectNoError(err, "Error listing clusters")
-	for _, cluster := range clusterList.Items {
-		err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "Error deleting cluster %q", cluster.Name)
-	}
-}
-
 // waitForServiceOrFail waits until a service is either present or absent in the cluster specified by clientset.
 // If the condition is not met within timout, it fails the calling test.
 func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, service *v1.Service, present bool, timeout time.Duration) {
