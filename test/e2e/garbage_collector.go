@@ -106,16 +106,24 @@ func newOwnerRC(f *framework.Framework, name string, replicas int32) *v1.Replica
 	}
 }
 
-// verifyRemainingDeploymentsAndReplicaSets verifies if the number
-// of the remaining deployment and rs are deploymentNum and rsNum.
+// verifyDeploymentRSPods verifies if the number
+// of the remaining deployment, rs and pods are deploymentNum, rsNum and podNum.
 // It returns error if the communication with the API server fails.
-func verifyRemainingDeploymentsAndReplicaSets(
+func verifyDeploymentRSPods(
 	f *framework.Framework,
 	clientSet clientset.Interface,
 	deployment *v1beta1.Deployment,
-	deploymentNum, rsNum int,
+	deploymentNum, rsNum int, podNum int,
 ) (bool, error) {
 	var ret = true
+	pods, err := clientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("Failed to list pods: %v", err)
+	}
+	if len(pods.Items) != podNum {
+		ret = false
+		By(fmt.Sprintf("expected %d pods, got %d pods", podNum, len(pods.Items)))
+	}
 	rs, err := clientSet.Extensions().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list rs: %v", err)
@@ -397,7 +405,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		By("wait for all rs to be garbage collected")
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
-			return verifyRemainingDeploymentsAndReplicaSets(f, clientSet, deployment, 0, 0)
+			return verifyDeploymentRSPods(f, clientSet, deployment, 0, 0, 0)
 		})
 		if err == wait.ErrWaitTimeout {
 			err = fmt.Errorf("Failed to wait for all rs to be garbage collected: %v", err)
@@ -407,7 +415,6 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 			} else {
 				framework.Failf("remaining rs are: %#v", remainingRSs)
 			}
-
 		}
 
 		gatherMetrics(f)
@@ -446,7 +453,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		By("wait for 2 Minute to see if the garbage collector mistakenly deletes the rs")
 		err = wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
-			return verifyRemainingDeploymentsAndReplicaSets(f, clientSet, deployment, 0, 1)
+			return verifyDeploymentRSPods(f, clientSet, deployment, 0, 1, 2)
 		})
 		if err != nil {
 			err = fmt.Errorf("Failed to wait to see if the garbage collecter mistakenly deletes the rs: %v", err)

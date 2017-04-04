@@ -347,7 +347,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 				break
 			}
 		}
-		glog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted with Foreground", item.identity)
+		glog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted in Foreground", item.identity)
 		// the deletion event will be observed by the graphBuilder, so the item
 		// will be processed again in processDeletingDependentsItem. If it
 		// doesn't have dependents, the function will remove the
@@ -358,9 +358,10 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	default:
 		// item doesn't have any solid owner, so it needs to be garbage
 		// collected. Also, none of item's owners is waiting for the deletion of
-		// the dependents, so GC deletes item with Default.
-		glog.V(2).Infof("delete object %s with Default", item.identity)
-		return gc.deleteObject(item.identity, nil)
+		// the dependents, so GC deletes item in Background.
+		glog.V(2).Infof("delete object %s in Background", item.identity)
+		policy := metav1.DeletePropagationBackground
+		return gc.deleteObject(item.identity, &policy)
 	}
 }
 
