@@ -225,6 +225,25 @@ func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClai
 	}
 }
 
+//checkVolumeSatisfyClaim checks if the volume requested by the claim satisfies the requirements of the claim
+func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) error {
+	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	requestedSize := requestedQty.Value()
+
+	volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
+	volumeSize := volumeQty.Value()
+	if volumeSize < requestedSize {
+		return fmt.Errorf("Storage capacity of volume[%s] requested by claim[%v] is not enough", volume.Name, claimToClaimKey(claim))
+	}
+
+	requestedClass := v1.GetPersistentVolumeClaimClass(claim)
+	if v1.GetPersistentVolumeClass(volume) != requestedClass {
+		return fmt.Errorf("Class of volume[%s] is not the same as claim[%v]", volume.Name, claimToClaimKey(claim))
+	}
+
+	return nil
+}
+
 // syncUnboundClaim is the main controller method to decide what to do with an
 // unbound claim.
 func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVolumeClaim) error {
@@ -295,7 +314,15 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				// User asked for a PV that is not claimed
 				// OBSERVATION: pvc is "Pending", pv is "Available"
 				glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume is unbound, binding", claimToClaimKey(claim))
-				if err = ctrl.bind(volume, claim); err != nil {
+				if err = checkVolumeSatisfyClaim(volume, claim); err != nil {
+					glog.V(4).Infof("Can't bind the claim to volume %q: %v", volume.Name, err)
+					//send a event
+					ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeMismatch", "Volume's size is smaller than requested or volume's class does not match with claim")
+					//volume does not satisfy the requirements of the claim
+					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
+						return err
+					}
+				} else if err = ctrl.bind(volume, claim); err != nil {
 					// On any error saving the volume or the claim, subsequent
 					// syncClaim will finish the binding.
 					return err
