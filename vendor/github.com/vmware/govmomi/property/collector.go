@@ -17,6 +17,7 @@ limitations under the License.
 package property
 
 import (
+	"context"
 	"errors"
 
 	"github.com/vmware/govmomi/vim25"
@@ -24,7 +25,6 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 // Collector models the PropertyCollector managed object.

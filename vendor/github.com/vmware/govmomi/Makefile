@@ -18,3 +18,6 @@ test:
 
 install:
 	go install github.com/vmware/govmomi/govc
+
+doc: install
+	./govc/usage.sh > ./govc/USAGE.md

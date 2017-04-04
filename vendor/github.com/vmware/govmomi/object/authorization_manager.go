@@ -17,11 +17,12 @@ limitations under the License.
 package object
 
 import (
+	"context"
+
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 type AuthorizationManager struct {
@@ -104,5 +105,70 @@ func (m AuthorizationManager) SetEntityPermissions(ctx context.Context, entity t
 	}
 
 	_, err := methods.SetEntityPermissions(ctx, m.Client(), &req)
+	return err
+}
+
+func (m AuthorizationManager) RetrieveRolePermissions(ctx context.Context, id int32) ([]types.Permission, error) {
+	req := types.RetrieveRolePermissions{
+		This:   m.Reference(),
+		RoleId: id,
+	}
+
+	res, err := methods.RetrieveRolePermissions(ctx, m.Client(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Returnval, nil
+}
+
+func (m AuthorizationManager) RetrieveAllPermissions(ctx context.Context) ([]types.Permission, error) {
+	req := types.RetrieveAllPermissions{
+		This: m.Reference(),
+	}
+
+	res, err := methods.RetrieveAllPermissions(ctx, m.Client(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Returnval, nil
+}
+
+func (m AuthorizationManager) AddRole(ctx context.Context, name string, ids []string) (int32, error) {
+	req := types.AddAuthorizationRole{
+		This:    m.Reference(),
+		Name:    name,
+		PrivIds: ids,
+	}
+
+	res, err := methods.AddAuthorizationRole(ctx, m.Client(), &req)
+	if err != nil {
+		return -1, err
+	}
+
+	return res.Returnval, nil
+}
+
+func (m AuthorizationManager) RemoveRole(ctx context.Context, id int32, failIfUsed bool) error {
+	req := types.RemoveAuthorizationRole{
+		This:       m.Reference(),
+		RoleId:     id,
+		FailIfUsed: failIfUsed,
+	}
+
+	_, err := methods.RemoveAuthorizationRole(ctx, m.Client(), &req)
+	return err
+}
+
+func (m AuthorizationManager) UpdateRole(ctx context.Context, id int32, name string, ids []string) error {
+	req := types.UpdateAuthorizationRole{
+		This:    m.Reference(),
+		RoleId:  id,
+		NewName: name,
+		PrivIds: ids,
+	}
+
+	_, err := methods.UpdateAuthorizationRole(ctx, m.Client(), &req)
 	return err
 }
