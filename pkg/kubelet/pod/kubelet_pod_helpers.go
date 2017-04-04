@@ -35,15 +35,8 @@ func (p *Pod) IsCritical() bool {
 	return kubelettypes.IsCriticalPod(p.apiPod)
 }
 
-// notRunning returns true if every status is terminated or waiting, or the status list
-// is empty.
-func notRunning(statuses []v1.ContainerStatus) bool {
-	for _, status := range statuses {
-		if status.State.Terminated == nil && status.State.Waiting == nil {
-			return false
-		}
-	}
-	return true
+func (p *Pod) GetPodSource() (string, error) {
+	return kubelettypes.GetPodSource(p.GetAPIPod())
 }
 
 // IsMirrorPodOf returns true if mirrorPod is a correct representation of

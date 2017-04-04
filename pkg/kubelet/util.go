@@ -20,56 +20,53 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // Check whether we have the capabilities to run the specified pod.
-func canRunPod(kpod *kubepod.Pod) error {
-	pod := kpod.GetAPIPod()
+func canRunPod(pod *kubepod.Pod) error {
 	if !capabilities.Get().AllowPrivileged {
-		for _, container := range pod.Spec.Containers {
+		for _, container := range pod.GetSpec().Containers {
 			if securitycontext.HasPrivilegedRequest(&container) {
-				return fmt.Errorf("pod with UID %q specified privileged container, but is disallowed", pod.UID)
+				return fmt.Errorf("pod with UID %q specified privileged container, but is disallowed", pod.UID())
 			}
 		}
-		for _, container := range pod.Spec.InitContainers {
+		for _, container := range pod.GetSpec().InitContainers {
 			if securitycontext.HasPrivilegedRequest(&container) {
-				return fmt.Errorf("pod with UID %q specified privileged init container, but is disallowed", pod.UID)
+				return fmt.Errorf("pod with UID %q specified privileged init container, but is disallowed", pod.UID())
 			}
 		}
 	}
 
-	if pod.Spec.HostNetwork {
+	if pod.GetSpec().HostNetwork {
 		allowed, err := allowHostNetwork(pod)
 		if err != nil {
 			return err
 		}
 		if !allowed {
-			return fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
+			return fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID())
 		}
 	}
 
-	if pod.Spec.HostPID {
+	if pod.GetSpec().HostPID {
 		allowed, err := allowHostPID(pod)
 		if err != nil {
 			return err
 		}
 		if !allowed {
-			return fmt.Errorf("pod with UID %q specified host PID, but is disallowed", pod.UID)
+			return fmt.Errorf("pod with UID %q specified host PID, but is disallowed", pod.UID())
 		}
 	}
 
-	if pod.Spec.HostIPC {
+	if pod.GetSpec().HostIPC {
 		allowed, err := allowHostIPC(pod)
 		if err != nil {
 			return err
 		}
 		if !allowed {
-			return fmt.Errorf("pod with UID %q specified host ipc, but is disallowed", pod.UID)
+			return fmt.Errorf("pod with UID %q specified host ipc, but is disallowed", pod.UID())
 		}
 	}
 
@@ -77,8 +74,8 @@ func canRunPod(kpod *kubepod.Pod) error {
 }
 
 // Determined whether the specified pod is allowed to use host networking
-func allowHostNetwork(pod *v1.Pod) (bool, error) {
-	podSource, err := kubetypes.GetPodSource(pod)
+func allowHostNetwork(pod *kubepod.Pod) (bool, error) {
+	podSource, err := pod.GetPodSource()
 	if err != nil {
 		return false, err
 	}
@@ -91,8 +88,8 @@ func allowHostNetwork(pod *v1.Pod) (bool, error) {
 }
 
 // Determined whether the specified pod is allowed to use host networking
-func allowHostPID(pod *v1.Pod) (bool, error) {
-	podSource, err := kubetypes.GetPodSource(pod)
+func allowHostPID(pod *kubepod.Pod) (bool, error) {
+	podSource, err := pod.GetPodSource()
 	if err != nil {
 		return false, err
 	}
@@ -105,8 +102,8 @@ func allowHostPID(pod *v1.Pod) (bool, error) {
 }
 
 // Determined whether the specified pod is allowed to use host ipc
-func allowHostIPC(pod *v1.Pod) (bool, error) {
-	podSource, err := kubetypes.GetPodSource(pod)
+func allowHostIPC(pod *kubepod.Pod) (bool, error) {
+	podSource, err := pod.GetPodSource()
 	if err != nil {
 		return false, err
 	}
