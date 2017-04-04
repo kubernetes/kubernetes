@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/validate"
 )
 
 const apiCallRetryInterval = 500 * time.Millisecond
@@ -49,6 +50,8 @@ func findMyself(client *clientset.Clientset) (*v1.Node, error) {
 }
 
 func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
+	validate.WaitForNode(client)
+
 	n, err := findMyself(client)
 	if err != nil {
 		return err

@@ -34,11 +34,22 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
+// Validate verifies control plane readiness
 func Validate(kubeconfigPath string) error {
 	client, err := kubeconfigutil.ClientSetFromFile(kubeconfigPath)
 	if err != nil {
 		return err
 	}
+	WaitForNode(client)
+
+	if err := createAndWaitForADummyDeployment(client); err != nil {
+		return err
+	}
+	return nil
+}
+
+// WaitForNode waits for at least one node to register and become ready
+func WaitForNode(client *clientset.Clientset) {
 	fmt.Println("[validate] Waiting for at least one node to register and become ready")
 	start := time.Now()
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
@@ -59,11 +70,6 @@ func Validate(kubeconfigPath string) error {
 		fmt.Printf("[validate] First node is ready after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
-
-	if err := createAndWaitForADummyDeployment(client); err != nil {
-		return err
-	}
-	return nil
 }
 
 func createAndWaitForADummyDeployment(client *clientset.Clientset) error {
