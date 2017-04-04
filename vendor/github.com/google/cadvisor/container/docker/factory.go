@@ -33,6 +33,7 @@ import (
 	"github.com/google/cadvisor/machine"
 	"github.com/google/cadvisor/manager/watcher"
 	dockerutil "github.com/google/cadvisor/utils/docker"
+	"github.com/google/cadvisor/zfs"
 
 	docker "github.com/docker/engine-api/client"
 	"github.com/golang/glog"
@@ -102,9 +103,13 @@ type dockerFactory struct {
 
 	dockerVersion []int
 
+	dockerAPIVersion []int
+
 	ignoreMetrics container.MetricSet
 
 	thinPoolWatcher *devicemapper.ThinPoolWatcher
+
+	zfsWatcher *zfs.ZfsWatcher
 }
 
 func (self *dockerFactory) String() string {
@@ -132,6 +137,7 @@ func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool
 		self.dockerVersion,
 		self.ignoreMetrics,
 		self.thinPoolWatcher,
+		self.zfsWatcher,
 	)
 	return
 }
@@ -181,8 +187,10 @@ func (self *dockerFactory) DebugInfo() map[string][]string {
 }
 
 var (
-	version_regexp_string = `(\d+)\.(\d+)\.(\d+)`
-	version_re            = regexp.MustCompile(version_regexp_string)
+	version_regexp_string    = `(\d+)\.(\d+)\.(\d+)`
+	version_re               = regexp.MustCompile(version_regexp_string)
+	apiversion_regexp_string = `(\d+)\.(\d+)`
+	apiversion_re            = regexp.MustCompile(apiversion_regexp_string)
 )
 
 func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolWatcher, error) {
@@ -216,6 +224,21 @@ func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolW
 
 	go thinPoolWatcher.Start()
 	return thinPoolWatcher, nil
+}
+
+func startZfsWatcher(dockerInfo *dockertypes.Info) (*zfs.ZfsWatcher, error) {
+	filesystem, err := dockerutil.DockerZfsFilesystem(*dockerInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	zfsWatcher, err := zfs.NewZfsWatcher(filesystem)
+	if err != nil {
+		return nil, err
+	}
+
+	go zfsWatcher.Start()
+	return zfsWatcher, nil
 }
 
 func ensureThinLsKernelVersion(kernelVersion string) error {
@@ -291,7 +314,9 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 	}
 
 	// Version already validated above, assume no error here.
-	dockerVersion, _ := parseDockerVersion(dockerInfo.ServerVersion)
+	dockerVersion, _ := parseVersion(dockerInfo.ServerVersion, version_re, 3)
+
+	dockerAPIVersion, _ := APIVersion()
 
 	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
 	if err != nil {
@@ -306,17 +331,27 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 		}
 	}
 
+	var zfsWatcher *zfs.ZfsWatcher
+	if storageDriver(dockerInfo.Driver) == zfsStorageDriver {
+		zfsWatcher, err = startZfsWatcher(dockerInfo)
+		if err != nil {
+			glog.Errorf("zfs filesystem stats will not be reported: %v", err)
+		}
+	}
+
 	glog.Infof("Registering Docker factory")
 	f := &dockerFactory{
 		cgroupSubsystems:   cgroupSubsystems,
 		client:             client,
 		dockerVersion:      dockerVersion,
+		dockerAPIVersion:   dockerAPIVersion,
 		fsInfo:             fsInfo,
 		machineInfoFactory: factory,
 		storageDriver:      storageDriver(dockerInfo.Driver),
 		storageDir:         RootDir(),
 		ignoreMetrics:      ignoreMetrics,
 		thinPoolWatcher:    thinPoolWatcher,
+		zfsWatcher:         zfsWatcher,
 	}
 
 	container.RegisterContainerHandlerFactory(f, []watcher.ContainerWatchSource{watcher.Raw})

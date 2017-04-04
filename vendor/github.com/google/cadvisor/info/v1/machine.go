@@ -196,6 +196,9 @@ type VersionInfo struct {
 	// Docker version.
 	DockerVersion string `json:"docker_version"`
 
+	// Docker API Version
+	DockerAPIVersion string `json:"docker_api_version"`
+
 	// cAdvisor version.
 	CadvisorVersion string `json:"cadvisor_version"`
 	// cAdvisor git revision.
