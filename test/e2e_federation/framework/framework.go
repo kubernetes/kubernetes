@@ -232,6 +232,6 @@ func (f *Framework) GetUnderlyingFederatedContexts() []E2EContext {
 	return e2eContexts
 }
 
-func (f *Framework) GetRegisteredClusters() (ClusterMap, string) {
+func (f *Framework) GetRegisteredClusters() ClusterSlice {
 	return getRegisteredClusters(f)
 }
