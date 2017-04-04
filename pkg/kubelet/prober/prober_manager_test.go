@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -256,9 +257,10 @@ func TestUpdatePodStatus(t *testing.T) {
 		probeKey{testPodUID, probedUnready.Name, readiness}: {},
 		probeKey{testPodUID, terminated.Name, readiness}:    {},
 	}
-	m.readinessManager.Set(kubecontainer.ParseContainerID(probedReady.ContainerID), results.Success, &v1.Pod{})
-	m.readinessManager.Set(kubecontainer.ParseContainerID(probedUnready.ContainerID), results.Failure, &v1.Pod{})
-	m.readinessManager.Set(kubecontainer.ParseContainerID(terminated.ContainerID), results.Success, &v1.Pod{})
+	uid := uuid.NewUUID()
+	m.readinessManager.Set(kubecontainer.ParseContainerID(probedReady.ContainerID), results.Success, uid)
+	m.readinessManager.Set(kubecontainer.ParseContainerID(probedUnready.ContainerID), results.Failure, uid)
+	m.readinessManager.Set(kubecontainer.ParseContainerID(terminated.ContainerID), results.Success, uid)
 
 	m.UpdatePodStatus(testPodUID, &podStatus)
 
@@ -293,7 +295,7 @@ func TestUpdateReadiness(t *testing.T) {
 	defer func() {
 		close(stopCh)
 		// Send an update to exit updateReadiness()
-		m.readinessManager.Set(kubecontainer.ContainerID{}, results.Success, &v1.Pod{})
+		m.readinessManager.Set(kubecontainer.ContainerID{}, results.Success, testPod.UID())
 	}()
 
 	exec := syncExecProber{}
