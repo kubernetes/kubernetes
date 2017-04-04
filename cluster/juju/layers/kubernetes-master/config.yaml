@@ -11,3 +11,8 @@ options:
     type: string
     default: 10.152.183.0/24
     description: CIDR to user for Kubernetes services. Cannot be changed after deployment.
+  channel:
+    type: string
+    default: "stable"
+    description: |
+      Snap channel to install Kubernetes master services from

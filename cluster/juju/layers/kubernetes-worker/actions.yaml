@@ -15,3 +15,5 @@ microbot:
         type: boolean
         default: False
         description: Removes a microbots deployment, service, and ingress if True.
+upgrade:
+    description: Upgrade the kubernetes snaps
