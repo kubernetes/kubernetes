@@ -1212,13 +1212,11 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 func Test_accumulateEndpointsMap(t *testing.T) {
 	testCases := []struct {
 		newEndpoints *api.Endpoints
-		oldEndpoints map[proxy.ServicePortName][]*endpointsInfo
-		expectedNew  map[proxy.ServicePortName][]*endpointsInfo
+		expected     map[proxy.ServicePortName][]*endpointsInfo
 	}{{
 		// Case[0]: nothing
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{},
-		expectedNew:  map[proxy.ServicePortName][]*endpointsInfo{},
+		expected:     map[proxy.ServicePortName][]*endpointsInfo{},
 	}, {
 		// Case[1]: no changes, unnamed port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
@@ -1234,12 +1232,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				},
 			}
 		}),
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", ""): {
-				{"1.1.1.1:11", false},
-			},
-		},
-		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+		expected: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", ""): {
 				{"1.1.1.1:11", false},
 			},
@@ -1259,12 +1252,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				},
 			}
 		}),
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", "port"): {
-				{"1.1.1.1:11", false},
-			},
-		},
-		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+		expected: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "port"): {
 				{"1.1.1.1:11", false},
 			},
@@ -1283,10 +1271,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				},
 			}
 		}),
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", ""): {},
-		},
-		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+		expected: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", ""): {
 				{"1.1.1.1:11", false},
 			},
@@ -1294,12 +1279,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 	}, {
 		// Case[4]: remove port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", ""): {
-				{"1.1.1.1:11", false},
-			},
-		},
-		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{},
+		expected:     map[proxy.ServicePortName][]*endpointsInfo{},
 	}, {
 		// Case[5]: new IP and port
 		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
@@ -1320,12 +1300,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				},
 			}
 		}),
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", "p1"): {
-				{"1.1.1.1:11", false},
-			},
-		},
-		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+		expected: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p1"): {
 				{"1.1.1.1:11", false},
 				{"2.2.2.2:11", false},
@@ -1350,17 +1325,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				},
 			}
 		}),
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", "p1"): {
-				{"1.1.1.1:11", false},
-				{"2.2.2.2:11", false},
-			},
-			makeServicePortName("ns1", "ep1", "p2"): {
-				{"1.1.1.1:22", false},
-				{"2.2.2.2:22", false},
-			},
-		},
-		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+		expected: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p1"): {
 				{"1.1.1.1:11", false},
 			},
@@ -1380,12 +1345,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				},
 			}
 		}),
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", "p1"): {
-				{"1.1.1.1:11", false},
-			},
-		},
-		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+		expected: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p2"): {
 				{"1.1.1.1:11", false},
 			},
@@ -1405,12 +1365,7 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 				},
 			}
 		}),
-		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
-			makeServicePortName("ns1", "ep1", "p1"): {
-				{"1.1.1.1:11", false},
-			},
-		},
-		expectedNew: map[proxy.ServicePortName][]*endpointsInfo{
+		expected: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p1"): {
 				{"1.1.1.1:22", false},
 			},
@@ -1420,18 +1375,18 @@ func Test_accumulateEndpointsMap(t *testing.T) {
 	for tci, tc := range testCases {
 		// outputs
 		newEndpoints := make(proxyEndpointMap)
-		accumulateEndpointsMap(tc.newEndpoints, "host", tc.oldEndpoints, &newEndpoints)
+		accumulateEndpointsMap(tc.newEndpoints, "host", &newEndpoints)
 
-		if len(newEndpoints) != len(tc.expectedNew) {
-			t.Errorf("[%d] expected %d new, got %d: %v", tci, len(tc.expectedNew), len(newEndpoints), spew.Sdump(newEndpoints))
+		if len(newEndpoints) != len(tc.expected) {
+			t.Errorf("[%d] expected %d new, got %d: %v", tci, len(tc.expected), len(newEndpoints), spew.Sdump(newEndpoints))
 		}
-		for x := range tc.expectedNew {
-			if len(newEndpoints[x]) != len(tc.expectedNew[x]) {
-				t.Errorf("[%d] expected %d endpoints for %v, got %d", tci, len(tc.expectedNew[x]), x, len(newEndpoints[x]))
+		for x := range tc.expected {
+			if len(newEndpoints[x]) != len(tc.expected[x]) {
+				t.Errorf("[%d] expected %d endpoints for %v, got %d", tci, len(tc.expected[x]), x, len(newEndpoints[x]))
 			} else {
 				for i := range newEndpoints[x] {
-					if *(newEndpoints[x][i]) != *(tc.expectedNew[x][i]) {
-						t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, tc.expectedNew[x][i], *(newEndpoints[x][i]))
+					if *(newEndpoints[x][i]) != *(tc.expected[x][i]) {
+						t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, tc.expected[x][i], *(newEndpoints[x][i]))
 					}
 				}
 			}
