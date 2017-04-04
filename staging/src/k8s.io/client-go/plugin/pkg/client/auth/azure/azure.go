@@ -414,14 +414,14 @@ func (t *azureTime) UnmarshalJSON(b []byte) error {
 }
 
 type azureTokenSourceDeviceCode struct {
-	clinetID string
+	clientID string
 	tenantID string
 	audience string
 }
 
 func newAzureTokenSourceDeviceCode(clientID string, tenantID string, audience string) tokenSource {
 	return &azureTokenSourceDeviceCode{
-		clinetID: clientID,
+		clientID: clientID,
 		tenantID: tenantID,
 		audience: audience,
 	}
@@ -433,7 +433,7 @@ func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
 		return nil, err
 	}
 	client := &autorest.Client{}
-	deviceCode, err := azure.InitiateDeviceAuth(client, *oauthConfig, ts.clinetID, ts.audience)
+	deviceCode, err := azure.InitiateDeviceAuth(client, *oauthConfig, ts.clientID, ts.audience)
 	if err != nil {
 		return nil, err
 	}
@@ -447,7 +447,7 @@ func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
 
 	return &azureToken{
 		token:    *token,
-		clientID: ts.clinetID,
+		clientID: ts.clientID,
 		tenantID: ts.tenantID,
 	}, nil
 }

@@ -52,7 +52,7 @@ This plugin provides an integration with [Azure CLI](https://github.com/Azure/az
    kubectl config set-credentials "USER_NAME" --auth-provider=azure \
      --auth-provider-arg=client-id=APPLICATION_ID \
      --auth-provider-arg=tenant-id=TENANT_ID \
-     --auth-provider-arg=audiance=https://management.core.windows.net/
+     --auth-provider-arg=audience=https://management.core.windows.net/
    ```
 
    * Replace `USER_NAME`, `APPLICATION_ID` and `TENANT_ID` with the values of the registered application.
