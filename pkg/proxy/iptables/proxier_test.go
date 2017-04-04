@@ -858,8 +858,8 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	}
 }
 
-func makeTestService(namespace, name string, svcFunc func(*api.Service)) api.Service {
-	svc := api.Service{
+func makeTestService(namespace, name string, svcFunc func(*api.Service)) *api.Service {
+	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -867,7 +867,7 @@ func makeTestService(namespace, name string, svcFunc func(*api.Service)) api.Ser
 		Spec:   api.ServiceSpec{},
 		Status: api.ServiceStatus{},
 	}
-	svcFunc(&svc)
+	svcFunc(svc)
 	return svc
 }
 
@@ -883,7 +883,7 @@ func addTestPort(array []api.ServicePort, name string, protocol api.Protocol, po
 }
 
 func TestBuildServiceMapAddRemove(t *testing.T) {
-	services := []api.Service{
+	services := []*api.Service{
 		makeTestService("somewhere-else", "cluster-ip", func(svc *api.Service) {
 			svc.Spec.Type = api.ServiceTypeClusterIP
 			svc.Spec.ClusterIP = "172.16.55.4"
@@ -959,7 +959,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	}
 
 	// Remove some stuff
-	services = []api.Service{services[0]}
+	services = []*api.Service{services[0]}
 	services[0].Spec.Ports = []api.ServicePort{services[0].Spec.Ports[1]}
 	serviceMap, hcAdd, hcDel, staleUDPServices = buildServiceMap(services, serviceMap)
 	if len(serviceMap) != 1 {
@@ -999,7 +999,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceHeadless(t *testing.T) {
-	services := []api.Service{
+	services := []*api.Service{
 		makeTestService("somewhere-else", "headless", func(svc *api.Service) {
 			svc.Spec.Type = api.ServiceTypeClusterIP
 			svc.Spec.ClusterIP = api.ClusterIPNone
@@ -1027,7 +1027,7 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
-	services := []api.Service{
+	services := []*api.Service{
 		makeTestService("somewhere-else", "external-name", func(svc *api.Service) {
 			svc.Spec.Type = api.ServiceTypeExternalName
 			svc.Spec.ClusterIP = "172.16.55.4" // Should be ignored
@@ -1053,7 +1053,7 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
-	first := []api.Service{
+	first := []*api.Service{
 		makeTestService("somewhere", "some-service", func(svc *api.Service) {
 			svc.Spec.Type = api.ServiceTypeClusterIP
 			svc.Spec.ClusterIP = "172.16.55.4"
@@ -1062,7 +1062,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		}),
 	}
 
-	second := []api.Service{
+	second := []*api.Service{
 		makeTestService("somewhere", "some-service", func(svc *api.Service) {
 			svc.ObjectMeta.Annotations = map[string]string{
 				service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
