@@ -34,12 +34,27 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
+// Validate verifies control plane readiness
 func Validate(kubeconfigPath string) error {
 	client, err := kubeconfigutil.ClientSetFromFile(kubeconfigPath)
 	if err != nil {
 		return err
 	}
-	fmt.Println("[validate] Waiting for at least one node to register and become ready")
+	WaitForNode(client, true)
+
+	if err := createAndWaitForADummyDeployment(client); err != nil {
+		return err
+	}
+	return nil
+}
+
+// WaitForNode waits for at least one node to register and optionally to become ready
+func WaitForNode(client *clientset.Clientset, waitForReadiness bool) {
+	message := "[validate] Waiting for at least one node to register"
+	if waitForReadiness {
+		message = message + " and become ready"
+	}
+	fmt.Println(message)
 	start := time.Now()
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		nodeList, err := client.Nodes().List(metav1.ListOptions{})
@@ -50,20 +65,17 @@ func Validate(kubeconfigPath string) error {
 		if len(nodeList.Items) < 1 {
 			return false, nil
 		}
-		n := &nodeList.Items[0]
-		if !v1.IsNodeReady(n) {
-			fmt.Println("[validate] First node has registered, but is not ready yet")
-			return false, nil
+		if waitForReadiness {
+			n := &nodeList.Items[0]
+			if !v1.IsNodeReady(n) {
+				fmt.Println("[validate] First node has registered, but is not ready yet")
+				return false, nil
+			}
 		}
 
-		fmt.Printf("[validate] First node is ready after %f seconds\n", time.Since(start).Seconds())
+		fmt.Printf("[validate] First node is registered after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
-
-	if err := createAndWaitForADummyDeployment(client); err != nil {
-		return err
-	}
-	return nil
 }
 
 func createAndWaitForADummyDeployment(client *clientset.Clientset) error {
