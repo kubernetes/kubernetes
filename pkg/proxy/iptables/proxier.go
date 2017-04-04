@@ -154,9 +154,18 @@ type endpointsInfo struct {
 	isLocal  bool
 }
 
+func (e *endpointsInfo) String() string {
+	return fmt.Sprintf("%v", *e)
+}
+
 // returns a new serviceInfo struct
 func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, service *api.Service) *serviceInfo {
-	onlyNodeLocalEndpoints := apiservice.NeedsHealthCheck(service) && utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) && (service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
+	onlyNodeLocalEndpoints := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) &&
+		(service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort) &&
+		apiservice.NeedsHealthCheck(service) {
+		onlyNodeLocalEndpoints = true
+	}
 	info := &serviceInfo{
 		clusterIP: net.ParseIP(service.Spec.ClusterIP),
 		port:      int(port.Port),
@@ -543,7 +552,7 @@ func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap
 
 	// Update endpoints for services.
 	for i := range allEndpoints {
-		accumulateEndpointsMap(allEndpoints[i], hostname, curMap, &newMap)
+		accumulateEndpointsMap(allEndpoints[i], hostname, &newMap)
 	}
 	// Check stale connections against endpoints missing from the update.
 	// TODO: we should really only mark a connection stale if the proto was UDP
@@ -601,10 +610,7 @@ func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap
 // - hostPortInfo and endpointsInfo overlap too much
 // - the test for this is overlapped by the test for buildNewEndpointsMap
 // - naming is poor and responsibilities are muddled
-func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
-	curEndpoints proxyEndpointMap,
-	newEndpoints *proxyEndpointMap) {
-
+func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string, newEndpoints *proxyEndpointMap) {
 	// We need to build a map of portname -> all ip:ports for that
 	// portname.  Explode Endpoints.Subsets[*] into this structure.
 	for i := range endpoints.Subsets {
@@ -1306,7 +1312,9 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	}
 	proxier.portsMap = replacementPortsMap
 
-	// Update healthchecks.
+	// Update healthchecks.  The endpoints list might include services that are
+	// not "OnlyLocal", but the services list will not, and the healthChecker
+	// will just drop those endpoints.
 	if err := proxier.healthChecker.SyncServices(hcServices); err != nil {
 		glog.Errorf("Error syncing healtcheck services: %v", err)
 	}
