@@ -24,7 +24,7 @@
 		},
 		{
 			"ImportPath": "github.com/boltdb/bolt",
-			"Rev": "dfb21201d9270c1082d5fb0f07f500311ff72f18"
+			"Rev": "583e8937c61f1af6513608ccc75c97b6abdf4ff9"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/alarm",
