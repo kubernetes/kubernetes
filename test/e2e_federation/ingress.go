@@ -221,10 +221,12 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 		var _ = Describe("Ingress connectivity and DNS", func() {
 
+			var backendPods BackendPodMap
+
 			BeforeEach(func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
 				// create backend pod
-				createBackendPodsOrFail(clusters, ns, FederatedIngressServicePodName)
+				backendPods = createBackendPodsOrFail(clusters, ns, FederatedIngressServicePodName)
 				// create ingress object
 				jig.ing = createIngressOrFail(f.FederationClientset, ns, service.Name, FederatedIngressTLSSecretName)
 				// wait for ingress objects sync
@@ -233,7 +235,9 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			})
 
 			AfterEach(func() {
-				deleteBackendPodsOrFail(clusters, ns)
+				deleteBackendPodsOrFail(clusters, backendPods)
+				backendPods = nil
+
 				if jig.ing != nil {
 					By(fmt.Sprintf("Deleting ingress %v on all clusters", jig.ing.Name))
 					orphanDependents := false

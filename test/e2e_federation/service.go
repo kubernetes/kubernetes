@@ -146,6 +146,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 			var (
 				service      *v1.Service
 				serviceShard *v1.Service
+				backendPods  BackendPodMap
 			)
 
 			BeforeEach(func() {
@@ -153,7 +154,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 				nsName := f.FederationNamespace.Name
 
-				createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
+				backendPods = createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 
 				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
 				obj, err := api.Scheme.DeepCopy(service)
@@ -191,7 +192,8 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				fedframework.SkipUnlessFederated(f.ClientSet)
 
 				nsName := f.FederationNamespace.Name
-				deleteBackendPodsOrFail(clusters, nsName)
+				deleteBackendPodsOrFail(clusters, backendPods)
+				backendPods = nil
 
 				if service != nil {
 					deleteServiceOrFail(f.FederationClientset, nsName, service.Name, nil)
@@ -245,7 +247,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 					fedframework.SkipUnlessFederated(f.ClientSet)
 
 					// Delete all the backend pods from the shard which is local to the discovery pod.
-					deleteOneBackendPodOrFail(clusters[primaryClusterName])
+					deleteOneBackendPodOrFail(clusters[primaryClusterName], backendPods[primaryClusterName])
 
 				})
 

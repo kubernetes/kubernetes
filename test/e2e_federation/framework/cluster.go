@@ -40,7 +40,6 @@ type ClusterMap map[string]*Cluster
 type Cluster struct {
 	Name string
 	*kubeclientset.Clientset
-	BackendPod *v1.Pod // The backend pod, if one's been created.
 }
 
 func getRegisteredClusters(f *Framework) (ClusterMap, string) {
