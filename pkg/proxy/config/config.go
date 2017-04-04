@@ -33,9 +33,17 @@ import (
 
 // ServiceConfigHandler is an abstract interface of objects which receive update notifications for the set of services.
 type ServiceConfigHandler interface {
-	// OnServiceUpdate gets called when a configuration has been changed by one of the sources.
-	// This is the union of all the configuration sources.
-	OnServiceUpdate(services []api.Service)
+	// OnServiceUpdate gets called when a service is created, removed or changed
+	// on any of the configuration sources. An example is when a new service
+	// comes up.
+	//
+	// NOTE: For efficiency, services are being passed by reference, thus,
+	// OnServiceUpdate should NOT modify pointers of a given slice.
+	// Those service objects are shared with other layers of the system and
+	// are guaranteed to be immutable with the assumption that are also
+	// not mutated by those handlers. Make a deep copy if you need to modify
+	// them in your code.
+	OnServiceUpdate(services []*api.Service)
 }
 
 // EndpointsConfigHandler is an abstract interface of objects which receive update notifications for the set of endpoints.
@@ -208,24 +216,23 @@ func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 		return
 	}
 
-	// We hanve synced informers. Now we can start delivering updates
+	// We have synced informers. Now we can start delivering updates
 	// to the registered handler.
 	go func() {
 		for range c.updates {
 			services, err := c.lister.List(labels.Everything())
 			if err != nil {
 				glog.Errorf("Error while listing services from cache: %v", err)
-				// This will cause a retry (if there isnt' any other trigger in-flight).
+				// This will cause a retry (if there isn't any other trigger in-flight).
 				c.dispatchUpdate()
 				continue
 			}
-			svcs := make([]api.Service, 0, len(services))
-			for i := range services {
-				svcs = append(svcs, *services[i])
+			if services == nil {
+				services = []*api.Service{}
 			}
 			for i := range c.handlers {
 				glog.V(3).Infof("Calling handler.OnServiceUpdate()")
-				c.handlers[i].OnServiceUpdate(svcs)
+				c.handlers[i].OnServiceUpdate(services)
 			}
 		}
 	}()

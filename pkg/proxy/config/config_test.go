@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-type sortedServices []api.Service
+type sortedServices []*api.Service
 
 func (s sortedServices) Len() int {
 	return len(s)
@@ -41,24 +41,24 @@ func (s sortedServices) Less(i, j int) bool {
 }
 
 type ServiceHandlerMock struct {
-	updated chan []api.Service
+	updated chan []*api.Service
 	waits   int
 }
 
 func NewServiceHandlerMock() *ServiceHandlerMock {
-	return &ServiceHandlerMock{updated: make(chan []api.Service, 5)}
+	return &ServiceHandlerMock{updated: make(chan []*api.Service, 5)}
 }
 
-func (h *ServiceHandlerMock) OnServiceUpdate(services []api.Service) {
+func (h *ServiceHandlerMock) OnServiceUpdate(services []*api.Service) {
 	sort.Sort(sortedServices(services))
 	h.updated <- services
 }
 
-func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []api.Service) {
+func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []*api.Service) {
 	// We might get 1 or more updates for N service updates, because we
 	// over write older snapshots of services from the producer go-routine
 	// if the consumer falls behind.
-	var services []api.Service
+	var services []*api.Service
 	for {
 		select {
 		case services = <-h.updated:
@@ -139,7 +139,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
 	}
 	fakeWatch.Add(service)
-	handler.ValidateServices(t, []api.Service{*service})
+	handler.ValidateServices(t, []*api.Service{service})
 }
 
 func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
@@ -161,18 +161,18 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
 	}
 	fakeWatch.Add(service1)
-	handler.ValidateServices(t, []api.Service{*service1})
+	handler.ValidateServices(t, []*api.Service{service1})
 
 	service2 := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
 	}
 	fakeWatch.Add(service2)
-	services := []api.Service{*service2, *service1}
+	services := []*api.Service{service2, service1}
 	handler.ValidateServices(t, services)
 
 	fakeWatch.Delete(service1)
-	services = []api.Service{*service2}
+	services = []*api.Service{service2}
 	handler.ValidateServices(t, services)
 }
 
@@ -203,7 +203,7 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 	fakeWatch.Add(service1)
 	fakeWatch.Add(service2)
 
-	services := []api.Service{*service2, *service1}
+	services := []*api.Service{service2, service1}
 	handler.ValidateServices(t, services)
 	handler2.ValidateServices(t, services)
 }
