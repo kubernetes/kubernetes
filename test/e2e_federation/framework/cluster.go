@@ -45,19 +45,16 @@ const (
 	federatedClustersWaitTimeout = 1 * time.Minute
 )
 
-// ClusterMap is a map of Cluster instances keyed by cluster name
-type ClusterMap map[string]*Cluster
+// ClusterSlice is a slice of clusters
+type ClusterSlice []*Cluster
 
-// Cluster keeps track of the assorted objects and state related to each cluster
-// in the federation
+// Cluster keeps track of the name and client of a cluster in the federation
 type Cluster struct {
 	Name string
 	*kubeclientset.Clientset
 }
 
-// can not be moved to util, as By and Expect must be put in Ginkgo test unit
-func getRegisteredClusters(f *Framework) (ClusterMap, string) {
-	clusters := make(ClusterMap)
+func getRegisteredClusters(f *Framework) ClusterSlice {
 	contexts := f.GetUnderlyingFederatedContexts()
 
 	By("Obtaining a list of all the clusters")
@@ -69,15 +66,17 @@ func getRegisteredClusters(f *Framework) (ClusterMap, string) {
 	}
 	framework.Logf("%d clusters are Ready", len(contexts))
 
-	primaryClusterName := clusterList.Items[0].Name
-	By(fmt.Sprintf("Labeling %q as the first cluster", primaryClusterName))
+	clusters := ClusterSlice{}
 	for i, c := range clusterList.Items {
 		framework.Logf("Creating a clientset for the cluster %s", c.Name)
 		Expect(framework.TestContext.KubeConfig).ToNot(Equal(""), "KubeConfig must be specified to load clusters' client config")
-		clusters[c.Name] = &Cluster{c.Name, createClientsetForCluster(c, i, userAgentName), false, nil}
+		clusters = append(clusters, &Cluster{
+			Name:      c.Name,
+			Clientset: createClientsetForCluster(c, i, userAgentName),
+		})
 	}
 	waitForNamespaceInFederatedClusters(clusters, f.FederationNamespace.Name, federatedNamespaceTimeout)
-	return clusters, primaryClusterName
+	return clusters
 }
 
 // waitForAllRegisteredClusters waits for all clusters defined in e2e context to be created
@@ -120,8 +119,9 @@ func createClientsetForCluster(c federationapi.Cluster, i int, userAgentName str
 }
 
 // waitForNamespaceInFederatedClusters waits for the federated namespace to be created in federated clusters
-func waitForNamespaceInFederatedClusters(clusters ClusterMap, nsName string, timeout time.Duration) {
-	for name, c := range clusters {
+func waitForNamespaceInFederatedClusters(clusters ClusterSlice, nsName string, timeout time.Duration) {
+	for _, c := range clusters {
+		name := c.Name
 		err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 			_, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{})
 			if err != nil {

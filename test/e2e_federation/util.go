@@ -103,7 +103,7 @@ func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, 
 }
 
 // waitForServiceShardsOrFail waits for the service to appear in all clusters
-func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters fedframework.ClusterMap) {
+func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters fedframework.ClusterSlice) {
 	framework.Logf("Waiting for service %q in %d clusters", service.Name, len(clusters))
 	for _, c := range clusters {
 		waitForServiceOrFail(c.Clientset, namespace, service, true, fedframework.FederatedDefaultTestTimeout)
@@ -174,9 +174,10 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 	}
 }
 
-func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Service, clusters fedframework.ClusterMap) {
+func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Service, clusters fedframework.ClusterSlice) {
 	framework.Logf("Deleting service %q in %d clusters", service.Name, len(clusters))
-	for name, c := range clusters {
+	for _, c := range clusters {
+		name := c.Name
 		var cSvc *v1.Service
 
 		err := wait.PollImmediate(framework.Poll, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
@@ -342,7 +343,7 @@ type BackendPodMap map[string]*v1.Pod
 
 // createBackendPodsOrFail creates one pod in each cluster, and returns the created pods.  If creation of any pod fails,
 // the test fails (possibly with a partially created set of pods). No retries are attempted.
-func createBackendPodsOrFail(clusters fedframework.ClusterMap, namespace string, name string) BackendPodMap {
+func createBackendPodsOrFail(clusters fedframework.ClusterSlice, namespace string, name string) BackendPodMap {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -360,7 +361,8 @@ func createBackendPodsOrFail(clusters fedframework.ClusterMap, namespace string,
 		},
 	}
 	podMap := make(BackendPodMap)
-	for name, c := range clusters {
+	for _, c := range clusters {
+		name := c.Name
 		By(fmt.Sprintf("Creating pod %q in namespace %q in cluster %q", pod.Name, namespace, name))
 		createdPod, err := c.Clientset.Core().Pods(namespace).Create(pod)
 		framework.ExpectNoError(err, "Creating pod %q in namespace %q in cluster %q", name, namespace, name)
@@ -386,15 +388,15 @@ func deleteOneBackendPodOrFail(c *fedframework.Cluster, pod *v1.Pod) {
 
 // deleteBackendPodsOrFail deletes one pod from each cluster that has one.
 // If deletion of any pod fails, the test fails (possibly with a partially deleted set of pods). No retries are attempted.
-func deleteBackendPodsOrFail(clusters fedframework.ClusterMap, backendPods BackendPodMap) {
+func deleteBackendPodsOrFail(clusters fedframework.ClusterSlice, backendPods BackendPodMap) {
 	if backendPods == nil {
 		return
 	}
-	for name, c := range clusters {
-		if pod, ok := backendPods[name]; ok {
+	for _, c := range clusters {
+		if pod, ok := backendPods[c.Name]; ok {
 			deleteOneBackendPodOrFail(c, pod)
 		} else {
-			By(fmt.Sprintf("No backend pod to delete for cluster %q", name))
+			By(fmt.Sprintf("No backend pod to delete for cluster %q", c.Name))
 		}
 	}
 }
