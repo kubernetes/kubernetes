@@ -1405,7 +1405,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	// Latency measurements for the main workflow are relative to the
 	// first time the pod was seen by the API server.
 	var firstSeenTime time.Time
-	if firstSeenTimeStr, ok := pod.ObjectMeta().Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; ok {
+	if firstSeenTimeStr, ok := pod.Annotations()[kubetypes.ConfigFirstSeenAnnotationKey]; ok {
 		firstSeenTime = kubetypes.ConvertToTimestamp(firstSeenTimeStr).Get()
 	}
 
@@ -1575,7 +1575,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Update the traffic shaping for the pod's ingress and egress limits
-	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.ObjectMeta().Annotations)
+	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations())
 	if err != nil {
 		return err
 	}

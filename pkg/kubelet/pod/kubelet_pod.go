@@ -60,24 +60,28 @@ func (p *Pod) String() string {
 	return format.Pod(p.GetAPIPod())
 }
 
-func (p *Pod) ObjectMeta() metav1.ObjectMeta {
+func (p *Pod) objectMeta() metav1.ObjectMeta {
 	return p.apiPod.ObjectMeta
 }
 
 func (p *Pod) DeletionTimestampIsSet() bool {
-	return p.ObjectMeta().DeletionTimestamp != nil
+	return p.objectMeta().DeletionTimestamp != nil
+}
+
+func (p *Pod) Annotations() map[string]string {
+	return p.objectMeta().Annotations
 }
 
 func (p *Pod) UID() types.UID {
-	return p.ObjectMeta().UID
+	return p.objectMeta().UID
 }
 
 func (p *Pod) Namespace() string {
-	return p.ObjectMeta().Namespace
+	return p.objectMeta().Namespace
 }
 
 func (p *Pod) Name() string {
-	return p.ObjectMeta().Name
+	return p.objectMeta().Name
 }
 
 func ToAPIPods(pods []*Pod) []*v1.Pod {

@@ -258,7 +258,7 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*kubepod.Pod) error {
 	possibleCIDRs := sets.String{}
 	for ix := range allPods {
 		pod := allPods[ix]
-		ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.ObjectMeta().Annotations)
+		ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations())
 		if err != nil {
 			return err
 		}
