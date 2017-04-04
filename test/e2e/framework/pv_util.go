@@ -421,25 +421,6 @@ func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) {
 	Logf("Pod %q successfully deleted", pod.Name)
 }
 
-// Create the test pod, wait for success, and then delete the pod.
-func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, claimName string) {
-
-	Logf("Creating nfs test pod")
-
-	// Make pod spec
-	pod := MakeWritePod(ns, claimName)
-
-	// Instantiate pod (Create)
-	runPod, err := c.CoreV1().Pods(ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(runPod).NotTo(BeNil())
-
-	defer DeletePodWithWait(f, c, runPod)
-
-	// Wait for the test pod to complete its lifecycle
-	testPodSuccessOrFail(c, ns, runPod)
-}
-
 // Sanity check for GCE testing.  Verify the persistent disk attached to the node.
 func VerifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 	gceCloud, err := GetGCECloud()
@@ -634,17 +615,13 @@ func deletePD(pdName string) error {
 	}
 }
 
-// Create the test pod, wait for (hopefully) success, and then delete the pod.
+// Create the test pod, wait for success, and then delete the pod.
 func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) {
 	Logf("Creating nfs test pod")
-	// Make pod spec
 	pod := MakeWritePod(ns, pvc)
-
-	// Instantiate pod (Create)
 	runPod, err := c.CoreV1().Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(runPod).NotTo(BeNil())
-
 	defer DeletePodWithWait(f, c, runPod)
 
 	// Wait for the test pod to complete its lifecycle
