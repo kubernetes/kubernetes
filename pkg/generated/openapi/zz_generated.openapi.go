@@ -426,13 +426,6 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
-						"kind": {
-							SchemaProps: spec.SchemaProps{
-								Description: "Defaults to shared shared: mulitple blob disks per storage account dedicated: single blob disk per storage account managed: azure managed data disk (only in managed availability set)",
-								Type:        []string{"string"},
-								Format:      "",
-							},
-						},
 					},
 					Required: []string{"export", "exact"},
 				},
@@ -1930,6 +1923,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 							SchemaProps: spec.SchemaProps{
 								Description: "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
 								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Expected values Shared: mulitple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared",
+								Type:        []string{"string"},
 								Format:      "",
 							},
 						},

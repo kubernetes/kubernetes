@@ -3370,7 +3370,7 @@
      },
      "kind": {
       "$ref": "v1.AzureDataDiskKind",
-      "description": "Defaults to shared shared: mulitple blob disks per storage account dedicated: single blob disk per storage account managed: azure managed data disk (only in managed availability set)"
+      "description": "Expected values Shared: mulitple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared"
      }
     }
    },
