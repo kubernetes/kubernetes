@@ -154,6 +154,10 @@ function save-logs() {
     else
         files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
     fi
+
+    echo "Changing logfiles to be world-readable for download"
+    log-dump-ssh "${node_name}" "sudo chmod -R a+r /var/log" || true
+
     echo "Copying '${files}' from ${node_name}"
     copy-logs-from-node "${node_name}" "${dir}" "${files}"
 }
