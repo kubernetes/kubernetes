@@ -64,6 +64,8 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	var c clientset.Interface
 
 	BeforeEach(func() {
+		framework.SkipUnlessNodeOSDistroIs("gci")
+
 		namespace = f.Namespace
 		c = f.ClientSet
 	})
@@ -152,8 +154,6 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 
 	framework.KubeDescribe("GlusterFS", func() {
 		It("should be mountable [Volume]", func() {
-			framework.SkipUnlessNodeOSDistroIs("gci")
-
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
 				Prefix:      "gluster",
