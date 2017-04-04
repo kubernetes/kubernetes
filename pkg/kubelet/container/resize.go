@@ -18,13 +18,13 @@ package container
 
 import (
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/term"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 )
 
 // handleResizing spawns a goroutine that processes the resize channel, calling resizeFunc for each
-// term.Size received from the channel. The resize channel must be closed elsewhere to stop the
+// remotecommand.Size received from the channel. The resize channel must be closed elsewhere to stop the
 // goroutine.
-func HandleResizing(resize <-chan term.Size, resizeFunc func(size term.Size)) {
+func HandleResizing(resize <-chan remotecommand.Size, resizeFunc func(size remotecommand.Size)) {
 	if resize == nil {
 		return
 	}

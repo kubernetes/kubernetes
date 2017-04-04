@@ -11,7 +11,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "attach.go",
-        "constants.go",
         "doc.go",
         "exec.go",
         "httpstream.go",
@@ -28,6 +27,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/httpstream",
         "//vendor:k8s.io/apimachinery/pkg/util/httpstream/spdy",
+        "//vendor:k8s.io/apimachinery/pkg/util/remotecommand",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apiserver/pkg/server/httplog",
         "//vendor:k8s.io/apiserver/pkg/util/wsstream",

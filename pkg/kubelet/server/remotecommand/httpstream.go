@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	consts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/api"
@@ -148,16 +149,16 @@ func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 
 	var handler protocolHandler
 	switch protocol {
-	case StreamProtocolV4Name:
+	case consts.StreamProtocolV4Name:
 		handler = &v4ProtocolHandler{}
-	case StreamProtocolV3Name:
+	case consts.StreamProtocolV3Name:
 		handler = &v3ProtocolHandler{}
-	case StreamProtocolV2Name:
+	case consts.StreamProtocolV2Name:
 		handler = &v2ProtocolHandler{}
 	case "":
-		glog.V(4).Infof("Client did not request protocol negotiaion. Falling back to %q", StreamProtocolV1Name)
+		glog.V(4).Infof("Client did not request protocol negotiaion. Falling back to %q", consts.StreamProtocolV1Name)
 		fallthrough
-	case StreamProtocolV1Name:
+	case consts.StreamProtocolV1Name:
 		handler = &v1ProtocolHandler{}
 	}
 
