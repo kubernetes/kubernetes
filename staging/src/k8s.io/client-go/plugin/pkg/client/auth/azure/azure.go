@@ -365,7 +365,7 @@ func (ts *azureTokenSourceFromFile) Token() (*azureToken, error) {
 	// a token without a tenant (e.g common token).
 	var tenantToken *azToken
 	for _, token := range tokens {
-		if ts.isTeantAuthroity(token.Authority) {
+		if ts.isTenantAuthroity(token.Authority) {
 			tenantToken = &token
 			break
 		}
@@ -390,7 +390,7 @@ func (ts *azureTokenSourceFromFile) Token() (*azureToken, error) {
 	}, nil
 }
 
-func (ts *azureTokenSourceFromFile) isTeantAuthroity(authority string) bool {
+func (ts *azureTokenSourceFromFile) isTenantAuthroity(authority string) bool {
 	r := regexp.MustCompile(fmt.Sprintf("^%s/%s$", azureAuthority, uuidFormat))
 	return r.MatchString(authority)
 }
