@@ -61,9 +61,11 @@ metadata:
 provisioner: kubernetes.io/vsphere-volume
 parameters:
   diskformat: eagerzeroedthick
+  fstype:     ext3
 ```
 
 * `diskformat`: `thin`, `zeroedthick` and `eagerzeroedthick`. See vSphere docs for details. Default: `"thin"`.
+* `fstype`: fstype that are supported by kubernetes. Default: `"ext4"`.
 
 #### Portworx Volume
 
