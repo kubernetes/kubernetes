@@ -117,6 +117,24 @@ func doMount(mountCmd string, source string, target string, fstype string, optio
 		glog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n", err, mountCmd, source, target, fstype, options, string(output))
 		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n",
 			err, mountCmd, source, target, fstype, options, string(output))
+	} else {
+		//Grow XFS file system to use increased disk space if any.
+		if fstype == "xfs" {
+        		growFSCmd := "xfs_growfs"
+			growFSArgs := []string{}
+			growFSArgs = append(growFSArgs, target)
+        		command = exec.Command(growFSCmd, growFSArgs...)
+        		output, err = command.CombinedOutput()
+        		if err != nil {
+                		switch {
+                		case err == utilExec.ErrExecutableNotFound:
+                        		glog.Warningf("'xfs_growfs' not found on system; continuing mount without running 'xfs_growfs'.")
+                        		return nil
+                		}
+                		glog.Errorf("Growfs failed: %v\nGrowFS command: %s\nGrowFS arguments: %s\nOutput: %s\n", err, growFSCmd, target, string(output))
+                		return fmt.Errorf("Growfs failed: %v\nGrowFS command: %s\nGrowFS arguments: %s\nOutput: %s\n", err, growFSCmd, target, string(output))
+        		}
+        	}
 	}
 	return err
 }
