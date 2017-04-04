@@ -1365,7 +1365,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *kubepod.Pod, podStatus *ku
 	// Sort the container statuses since clients of this interface expect the list
 	// of containers in a pod has a deterministic order.
 	if isInitContainer {
-		kubetypes.SortInitContainerStatuses(pod.GetAPIPod(), containerStatuses)
+		kubetypes.SortInitContainerStatuses(pod.GetSpec(), containerStatuses)
 	} else {
 		sort.Sort(kubetypes.SortedContainerStatuses(containerStatuses))
 	}

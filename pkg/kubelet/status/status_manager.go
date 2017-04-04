@@ -577,7 +577,7 @@ func normalizeStatus(pod *kubepod.Pod, status *v1.PodStatus) *v1.PodStatus {
 		normalizeContainerState(&cstatus.LastTerminationState)
 	}
 	// Sort the container statuses, so that the order won't affect the result of comparison
-	kubetypes.SortInitContainerStatuses(pod.GetAPIPod(), status.InitContainerStatuses)
+	kubetypes.SortInitContainerStatuses(pod.GetSpec(), status.InitContainerStatuses)
 	return status
 }
 

@@ -188,7 +188,7 @@ type admissionRequirementList []*admissionRequirement
 func (a admissionRequirementList) distance(pod *kubepod.Pod) float64 {
 	dist := float64(0)
 	for _, req := range a {
-		remainingRequest := float64(req.quantity - v1.GetResourceRequest(pod.GetAPIPod(), req.resourceName))
+		remainingRequest := float64(req.quantity - v1.GetResourceRequest(pod.GetSpec(), req.resourceName))
 		if remainingRequest < 0 {
 			remainingRequest = 0
 		}
@@ -204,7 +204,7 @@ func (a admissionRequirementList) subtract(pods ...*kubepod.Pod) admissionRequir
 	for _, req := range a {
 		newQuantity := req.quantity
 		for _, pod := range pods {
-			newQuantity -= v1.GetResourceRequest(pod.GetAPIPod(), req.resourceName)
+			newQuantity -= v1.GetResourceRequest(pod.GetSpec(), req.resourceName)
 		}
 		if newQuantity > 0 {
 			newList = append(newList, &admissionRequirement{
@@ -250,8 +250,8 @@ func smallerResourceRequest(pod1 *kubepod.Pod, pod2 *kubepod.Pod) bool {
 		v1.ResourceCPU,
 	}
 	for _, res := range priorityList {
-		req1 := v1.GetResourceRequest(pod1.GetAPIPod(), res)
-		req2 := v1.GetResourceRequest(pod2.GetAPIPod(), res)
+		req1 := v1.GetResourceRequest(pod1.GetSpec(), res)
+		req2 := v1.GetResourceRequest(pod2.GetSpec(), res)
 		if req1 < req2 {
 			return true
 		} else if req1 > req2 {
