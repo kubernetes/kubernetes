@@ -413,7 +413,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 	It("should be able to detach from a node which was deleted [Slow] [Disruptive] [Volume]", func() {
 		framework.SkipUnlessProviderIs("gce")
 
-		initialGroupSize, err := GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
+		initialGroupSize, err := framework.GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
 		framework.ExpectNoError(err, "Error getting group size")
 
 		By("Creating a pd")
@@ -461,13 +461,13 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		// The disk should be detached from host0 on it's deletion
 		By("Waiting for pd to detach from host0")
 		waitForPDDetach(diskName, host0Name)
-		framework.ExpectNoError(WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get back the cluster to inital size")
+		framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get back the cluster to inital size")
 		return
 	})
 
 	It("should be able to detach from a node whose api object was deleted [Slow] [Disruptive] [Volume]", func() {
 		framework.SkipUnlessProviderIs("gce")
-		initialGroupSize, err := GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
+		initialGroupSize, err := framework.GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
 		framework.ExpectNoError(err, "Error getting group size")
 		By("Creating a pd")
 		diskName, err := framework.CreatePDWithRetry()
@@ -484,7 +484,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			// need to set the resource version or else the Create() fails
 			_, err := nodeClient.Create(nodeToDelete)
 			framework.ExpectNoError(err, "Unable to re-create the deleted node")
-			framework.ExpectNoError(WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get the node group back to the original size")
+			framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get the node group back to the original size")
 			framework.WaitForNodeToBeReady(f.ClientSet, nodeToDelete.Name, nodeStatusTimeout)
 			if len(nodes.Items) != originalCount {
 				return fmt.Errorf("The node count is not back to original count")
