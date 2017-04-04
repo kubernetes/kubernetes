@@ -26,7 +26,7 @@ import (
 )
 
 type DaemonSetFixture struct {
-	adapter  typeadapters.FederatedTypeAdapter
+	adapter  *typeadapters.DaemonSetAdapter
 	stopChan chan struct{}
 }
 

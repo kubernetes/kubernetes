@@ -19,6 +19,7 @@ package framework
 import (
 	"fmt"
 	"net/http/httptest"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -26,6 +27,9 @@ import (
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	controller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -79,6 +83,12 @@ func (f *FederationFixture) startClusters() {
 		fmt.Printf("Federated cluster %d serving on %s", i, host)
 
 		clusterClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
+
+		informerFactory := informers.NewSharedInformerFactory(clusterClient, controller.NoResyncPeriodFunc())
+		informerFactory.Start(f.stopChan)
+
+		go daemon.NewDaemonSetsController(informerFactory.Extensions().V1beta1().DaemonSets(), informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Nodes(), clusterClient).Run(goruntime.NumCPU(), f.stopChan)
+
 		f.Clusters = append(f.Clusters, &MemberCluster{
 			Server: server,
 			Config: config,
