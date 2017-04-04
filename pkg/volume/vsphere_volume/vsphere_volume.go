@@ -344,6 +344,17 @@ func (plugin *vsphereVolumePlugin) newProvisionerInternal(options volume.VolumeO
 }
 
 func (v *vsphereVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+	var fsType string = "ext4"
+
+	for k, val := range v.options.Parameters {
+		switch strings.ToLower(k) {
+		case volume.VolumeParameterFSType:
+			fsType = val
+		default:
+			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, v.plugin.GetPluginName())
+		}
+	}
+
 	vmDiskPath, sizeKB, err := v.manager.CreateVolume(v)
 	if err != nil {
 		return nil, err
@@ -366,7 +377,7 @@ func (v *vsphereVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
 					VolumePath: vmDiskPath,
-					FSType:     "ext4",
+					FSType:     fsType,
 				},
 			},
 		},
