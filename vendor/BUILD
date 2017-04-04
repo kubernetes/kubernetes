@@ -2,6 +2,8 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
+load("@io_bazel_rules_go//go:def.bzl")
+
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -213,6 +215,7 @@ filegroup(
         "//vendor/github.com/google/cadvisor/utils:all-srcs",
         "//vendor/github.com/google/cadvisor/validate:all-srcs",
         "//vendor/github.com/google/cadvisor/version:all-srcs",
+        "//vendor/github.com/google/cadvisor/zfs:all-srcs",
         "//vendor/github.com/google/certificate-transparency/go:all-srcs",
         "//vendor/github.com/google/gofuzz:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud:all-srcs",
