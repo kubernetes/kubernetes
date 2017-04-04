@@ -20,6 +20,7 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",
+        "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",

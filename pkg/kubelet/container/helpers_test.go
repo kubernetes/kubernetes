@@ -249,7 +249,7 @@ func TestHasPrivilegedContainer(t *testing.T) {
 				},
 			},
 		}
-		actual := HasPrivilegedContainer(pod)
+		actual := HasPrivilegedContainer(&pod.Spec)
 		if actual != v.expected {
 			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
 		}

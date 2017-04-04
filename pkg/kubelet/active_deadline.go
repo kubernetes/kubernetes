@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -61,30 +62,30 @@ func newActiveDeadlineHandler(
 }
 
 // ShouldSync returns true if the pod is past its active deadline.
-func (m *activeDeadlineHandler) ShouldSync(pod *v1.Pod) bool {
+func (m *activeDeadlineHandler) ShouldSync(pod *kubepod.Pod) bool {
 	return m.pastActiveDeadline(pod)
 }
 
 // ShouldEvict returns true if the pod is past its active deadline.
 // It dispatches an event that the pod should be evicted if it is past its deadline.
-func (m *activeDeadlineHandler) ShouldEvict(pod *v1.Pod) lifecycle.ShouldEvictResponse {
+func (m *activeDeadlineHandler) ShouldEvict(pod *kubepod.Pod) lifecycle.ShouldEvictResponse {
 	if !m.pastActiveDeadline(pod) {
 		return lifecycle.ShouldEvictResponse{Evict: false}
 	}
-	m.recorder.Eventf(pod, v1.EventTypeNormal, reason, message)
+	m.recorder.Eventf(pod.GetAPIPod(), v1.EventTypeNormal, reason, message)
 	return lifecycle.ShouldEvictResponse{Evict: true, Reason: reason, Message: message}
 }
 
 // pastActiveDeadline returns true if the pod has been active for more than its ActiveDeadlineSeconds
-func (m *activeDeadlineHandler) pastActiveDeadline(pod *v1.Pod) bool {
+func (m *activeDeadlineHandler) pastActiveDeadline(pod *kubepod.Pod) bool {
 	// no active deadline was specified
-	if pod.Spec.ActiveDeadlineSeconds == nil {
+	if pod.GetSpec().ActiveDeadlineSeconds == nil {
 		return false
 	}
 	// get the latest status to determine if it was started
-	podStatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
+	podStatus, ok := m.podStatusProvider.GetPodStatus(pod.UID())
 	if !ok {
-		podStatus = pod.Status
+		podStatus = *pod.GetStatus()
 	}
 	// we have no start time so just return
 	if podStatus.StartTime.IsZero() {
@@ -93,6 +94,6 @@ func (m *activeDeadlineHandler) pastActiveDeadline(pod *v1.Pod) bool {
 	// determine if the deadline was exceeded
 	start := podStatus.StartTime.Time
 	duration := m.clock.Since(start)
-	allowedDuration := time.Duration(*pod.Spec.ActiveDeadlineSeconds) * time.Second
+	allowedDuration := time.Duration(*pod.GetSpec().ActiveDeadlineSeconds) * time.Second
 	return duration >= allowedDuration
 }

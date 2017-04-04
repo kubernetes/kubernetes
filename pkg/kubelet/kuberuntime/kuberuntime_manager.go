@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
@@ -66,7 +67,7 @@ var (
 
 // A subset of the pod.Manager interface extracted for garbage collection purposes.
 type podGetter interface {
-	GetPodByUID(kubetypes.UID) (*v1.Pod, bool)
+	GetPodByUID(kubetypes.UID) (*kubepod.Pod, bool)
 }
 
 type kubeGenericRuntimeManager struct {

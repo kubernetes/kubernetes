@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
@@ -246,7 +247,7 @@ func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, sear
 
 // cleanupBandwidthLimits updates the status of bandwidth-limited containers
 // and ensures that only the appropriate CIDRs are active on the node.
-func (kl *Kubelet) cleanupBandwidthLimits(allPods []*v1.Pod) error {
+func (kl *Kubelet) cleanupBandwidthLimits(allPods []*kubepod.Pod) error {
 	if kl.shaper == nil {
 		return nil
 	}
@@ -257,7 +258,7 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*v1.Pod) error {
 	possibleCIDRs := sets.String{}
 	for ix := range allPods {
 		pod := allPods[ix]
-		ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
+		ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.ObjectMeta().Annotations)
 		if err != nil {
 			return err
 		}
@@ -265,10 +266,10 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*v1.Pod) error {
 			glog.V(8).Infof("Not a bandwidth limited container...")
 			continue
 		}
-		status, found := kl.statusManager.GetPodStatus(pod.UID)
+		status, found := kl.statusManager.GetPodStatus(pod.UID())
 		if !found {
 			// TODO(random-liu): Cleanup status get functions. (issue #20477)
-			s, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+			s, err := kl.containerRuntime.GetPodStatus(pod.UID(), pod.Name(), pod.Namespace())
 			if err != nil {
 				return err
 			}

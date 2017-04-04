@@ -19,8 +19,10 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/dockertools:go_default_library",
         "//pkg/kubelet/gpu:go_default_library",
+        "//pkg/kubelet/pod:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
@@ -45,6 +47,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/kubelet/pod:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",

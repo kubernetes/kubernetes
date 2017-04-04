@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 // worker handles the periodic probing of its assigned container. Each worker has a go-routine
@@ -37,7 +37,7 @@ type worker struct {
 	stopCh chan struct{}
 
 	// The pod containing this probe (read-only)
-	pod *v1.Pod
+	pod *kubepod.Pod
 
 	// The container to probe (read-only)
 	container v1.Container
@@ -70,7 +70,7 @@ type worker struct {
 func newWorker(
 	m *manager,
 	probeType probeType,
-	pod *v1.Pod,
+	pod *kubepod.Pod,
 	container v1.Container) *worker {
 
 	w := &worker{
@@ -107,7 +107,7 @@ func (w *worker) run() {
 			w.resultsManager.Remove(w.containerID)
 		}
 
-		w.probeManager.removeWorker(w.pod.UID, w.container.Name, w.probeType)
+		w.probeManager.removeWorker(w.pod.UID(), w.container.Name, w.probeType)
 	}()
 
 	// If kubelet restarted the probes could be started in rapid succession.
@@ -141,17 +141,17 @@ func (w *worker) doProbe() (keepGoing bool) {
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrash(func(_ interface{}) { keepGoing = true })
 
-	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
+	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID())
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.
-		glog.V(3).Infof("No status for pod: %v", format.Pod(w.pod))
+		glog.V(3).Infof("No status for pod: %v", w.pod.String())
 		return true
 	}
 
 	// Worker should terminate if pod is terminated.
 	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
 		glog.V(3).Infof("Pod %v %v, exiting probe worker",
-			format.Pod(w.pod), status.Phase)
+			w.pod.String(), status.Phase)
 		return false
 	}
 
@@ -159,7 +159,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	if !ok || len(c.ContainerID) == 0 {
 		// Either the container has not been created yet, or it was deleted.
 		glog.V(3).Infof("Probe target container not found: %v - %v",
-			format.Pod(w.pod), w.container.Name)
+			w.pod.String(), w.container.Name)
 		return true // Wait for more information.
 	}
 
@@ -168,7 +168,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 			w.resultsManager.Remove(w.containerID)
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
-		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		w.resultsManager.Set(w.containerID, w.initialValue, w.pod.GetAPIPod())
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
@@ -180,13 +180,13 @@ func (w *worker) doProbe() (keepGoing bool) {
 
 	if c.State.Running == nil {
 		glog.V(3).Infof("Non-running container probed: %v - %v",
-			format.Pod(w.pod), w.container.Name)
+			w.pod.String(), w.container.Name)
 		if !w.containerID.IsEmpty() {
-			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
+			w.resultsManager.Set(w.containerID, results.Failure, w.pod.GetAPIPod())
 		}
 		// Abort if the container will not be restarted.
 		return c.State.Terminated == nil ||
-			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
+			w.pod.GetSpec().RestartPolicy != v1.RestartPolicyNever
 	}
 
 	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
@@ -196,7 +196,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	// TODO: in order for exec probes to correctly handle downward API env, we must be able to reconstruct
 	// the full container environment here, OR we must make a call to the CRI in order to get those environment
 	// values from the running container.
-	result, err := w.probeManager.prober.probe(w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(w.probeType, w.pod.GetAPIPod(), status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
@@ -215,7 +215,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 		return true
 	}
 
-	w.resultsManager.Set(w.containerID, result, w.pod)
+	w.resultsManager.Set(w.containerID, result, w.pod.GetAPIPod())
 
 	if w.probeType == liveness && result == results.Failure {
 		// The container fails a liveness check, it will need to be restarted.

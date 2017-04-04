@@ -31,18 +31,19 @@ import (
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // mockPodKiller is used to testing which pod is killed
 type mockPodKiller struct {
-	pod                 *v1.Pod
+	pod                 *kubepod.Pod
 	status              v1.PodStatus
 	gracePeriodOverride *int64
 }
 
 // killPodNow records the pod that was killed
-func (m *mockPodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+func (m *mockPodKiller) killPodNow(pod *kubepod.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
 	m.pod = pod
 	m.status = status
 	m.gracePeriodOverride = gracePeriodOverride
@@ -90,7 +91,7 @@ func (m *mockImageGC) DeleteUnusedImages() (int64, error) {
 	return m.freed, m.err
 }
 
-func makePodWithMemoryStats(name string, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*v1.Pod, statsapi.PodStats) {
+func makePodWithMemoryStats(name string, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*kubepod.Pod, statsapi.PodStats) {
 	pod := newPod(name, []v1.Container{
 		newContainer(name, requests, limits),
 	}, nil)
@@ -98,7 +99,7 @@ func makePodWithMemoryStats(name string, requests v1.ResourceList, limits v1.Res
 	return pod, podStats
 }
 
-func makePodWithDiskStats(name string, requests v1.ResourceList, limits v1.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*v1.Pod, statsapi.PodStats) {
+func makePodWithDiskStats(name string, requests v1.ResourceList, limits v1.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*kubepod.Pod, statsapi.PodStats) {
 	pod := newPod(name, []v1.Container{
 		newContainer(name, requests, limits),
 	}, nil)
@@ -106,7 +107,7 @@ func makePodWithDiskStats(name string, requests v1.ResourceList, limits v1.Resou
 	return pod, podStats
 }
 
-func makeMemoryStats(nodeAvailableBytes string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
+func makeMemoryStats(nodeAvailableBytes string, podStats map[string]statsapi.PodStats) *statsapi.Summary {
 	val := resource.MustParse(nodeAvailableBytes)
 	availableBytes := uint64(val.Value())
 	WorkingSetBytes := uint64(val.Value())
@@ -125,7 +126,7 @@ func makeMemoryStats(nodeAvailableBytes string, podStats map[*v1.Pod]statsapi.Po
 	return result
 }
 
-func makeDiskStats(rootFsAvailableBytes, imageFsAvailableBytes string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
+func makeDiskStats(rootFsAvailableBytes, imageFsAvailableBytes string, podStats map[string]statsapi.PodStats) *statsapi.Summary {
 	rootFsVal := resource.MustParse(rootFsAvailableBytes)
 	rootFsBytes := uint64(rootFsVal.Value())
 	rootFsCapacityBytes := uint64(rootFsVal.Value() * 2)
@@ -178,15 +179,15 @@ func TestMemoryPressure(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "500Mi"},
 	}
-	pods := []*v1.Pod{}
-	podStats := map[*v1.Pod]statsapi.PodStats{}
+	pods := []*kubepod.Pod{}
+	podStats := map[string]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
 		pods = append(pods, pod)
-		podStats[pod] = podStat
+		podStats[pod.Name()] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*v1.Pod {
+	activePodsFunc := func() []*kubepod.Pod {
 		return pods
 	}
 
@@ -245,7 +246,7 @@ func TestMemoryPressure(t *testing.T) {
 
 	// try to admit our pods (they should succeed)
 	expected := []bool{true, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*kubepod.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -263,7 +264,7 @@ func TestMemoryPressure(t *testing.T) {
 
 	// verify no pod was yet killed because there has not yet been enough time passed.
 	if podKiller.pod != nil {
-		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name)
+		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name())
 	}
 
 	// step forward in time pass the grace period
@@ -278,7 +279,7 @@ func TestMemoryPressure(t *testing.T) {
 
 	// verify the right pod was killed with the right grace period.
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 	if podKiller.gracePeriodOverride == nil {
 		t.Errorf("Manager chose to kill pod but should have had a grace period override.")
@@ -313,7 +314,7 @@ func TestMemoryPressure(t *testing.T) {
 
 	// check the right pod was killed
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 	observedGracePeriod = *podKiller.gracePeriodOverride
 	if observedGracePeriod != int64(0) {
@@ -322,7 +323,7 @@ func TestMemoryPressure(t *testing.T) {
 
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*kubepod.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -341,12 +342,12 @@ func TestMemoryPressure(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*kubepod.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -365,12 +366,12 @@ func TestMemoryPressure(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 
 	// all pods should admit now
 	expected = []bool{true, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*kubepod.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -396,15 +397,15 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), perLocalVolumeUsed: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "500Mi"},
 	}
-	pods := []*v1.Pod{}
-	podStats := map[*v1.Pod]statsapi.PodStats{}
+	pods := []*kubepod.Pod{}
+	podStats := map[string]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
 		pods = append(pods, pod)
-		podStats[pod] = podStat
+		podStats[pod.Name()] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*v1.Pod {
+	activePodsFunc := func() []*kubepod.Pod {
 		return pods
 	}
 
@@ -477,7 +478,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 	// verify no pod was yet killed because there has not yet been enough time passed.
 	if podKiller.pod != nil {
-		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name)
+		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name())
 	}
 
 	// step forward in time pass the grace period
@@ -492,7 +493,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 	// verify the right pod was killed with the right grace period.
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 	if podKiller.gracePeriodOverride == nil {
 		t.Errorf("Manager chose to kill pod but should have had a grace period override.")
@@ -527,7 +528,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 	// check the right pod was killed
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 	observedGracePeriod = *podKiller.gracePeriodOverride
 	if observedGracePeriod != int64(0) {
@@ -552,7 +553,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 
 	// try to admit our pod (should fail)
@@ -573,7 +574,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 
 	// try to admit our pod (should succeed)
@@ -594,15 +595,15 @@ func TestMinReclaim(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "500Mi"},
 	}
-	pods := []*v1.Pod{}
-	podStats := map[*v1.Pod]statsapi.PodStats{}
+	pods := []*kubepod.Pod{}
+	podStats := map[string]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
 		pods = append(pods, pod)
-		podStats[pod] = podStat
+		podStats[pod.Name()] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*v1.Pod {
+	activePodsFunc := func() []*kubepod.Pod {
 		return pods
 	}
 
@@ -662,7 +663,7 @@ func TestMinReclaim(t *testing.T) {
 
 	// check the right pod was killed
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 	observedGracePeriod := *podKiller.gracePeriodOverride
 	if observedGracePeriod != int64(0) {
@@ -682,7 +683,7 @@ func TestMinReclaim(t *testing.T) {
 
 	// check the right pod was killed
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 	observedGracePeriod = *podKiller.gracePeriodOverride
 	if observedGracePeriod != int64(0) {
@@ -702,7 +703,7 @@ func TestMinReclaim(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 
 	// move the clock past transition period to ensure that we stop reporting pressure
@@ -718,7 +719,7 @@ func TestMinReclaim(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 }
 
@@ -733,15 +734,15 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "500Mi"},
 	}
-	pods := []*v1.Pod{}
-	podStats := map[*v1.Pod]statsapi.PodStats{}
+	pods := []*kubepod.Pod{}
+	podStats := map[string]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
 		pods = append(pods, pod)
-		podStats[pod] = podStat
+		podStats[pod.Name()] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*v1.Pod {
+	activePodsFunc := func() []*kubepod.Pod {
 		return pods
 	}
 
@@ -807,7 +808,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	// verify no pod was killed because image gc was sufficient
 	if podKiller.pod != nil {
-		t.Errorf("Manager should not have killed a pod, but killed: %v", podKiller.pod.Name)
+		t.Errorf("Manager should not have killed a pod, but killed: %v", podKiller.pod.Name())
 	}
 
 	// reset state
@@ -840,7 +841,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	// check the right pod was killed
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 	observedGracePeriod := *podKiller.gracePeriodOverride
 	if observedGracePeriod != int64(0) {
@@ -866,7 +867,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 
 	// move the clock past transition period to ensure that we stop reporting pressure
@@ -888,19 +889,19 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 }
 
 func TestInodePressureNodeFsInodes(t *testing.T) {
-	podMaker := func(name string, requests v1.ResourceList, limits v1.ResourceList, rootInodes, logInodes, volumeInodes string) (*v1.Pod, statsapi.PodStats) {
+	podMaker := func(name string, requests v1.ResourceList, limits v1.ResourceList, rootInodes, logInodes, volumeInodes string) (*kubepod.Pod, statsapi.PodStats) {
 		pod := newPod(name, []v1.Container{
 			newContainer(name, requests, limits),
 		}, nil)
 		podStats := newPodInodeStats(pod, parseQuantity(rootInodes), parseQuantity(logInodes), parseQuantity(volumeInodes))
 		return pod, podStats
 	}
-	summaryStatsMaker := func(rootFsInodesFree, rootFsInodes string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
+	summaryStatsMaker := func(rootFsInodesFree, rootFsInodes string, podStats map[string]statsapi.PodStats) *statsapi.Summary {
 		rootFsInodesFreeVal := resource.MustParse(rootFsInodesFree)
 		internalRootFsInodesFree := uint64(rootFsInodesFreeVal.Value())
 		rootFsInodesVal := resource.MustParse(rootFsInodes)
@@ -927,15 +928,15 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsInodesUsed: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsInodesUsed: "800Mi"},
 	}
-	pods := []*v1.Pod{}
-	podStats := map[*v1.Pod]statsapi.PodStats{}
+	pods := []*kubepod.Pod{}
+	podStats := map[string]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsInodesUsed, podToMake.logsFsInodesUsed, podToMake.perLocalVolumeInodesUsed)
 		pods = append(pods, pod)
-		podStats[pod] = podStat
+		podStats[pod.Name()] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*v1.Pod {
+	activePodsFunc := func() []*kubepod.Pod {
 		return pods
 	}
 
@@ -1008,7 +1009,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 
 	// verify no pod was yet killed because there has not yet been enough time passed.
 	if podKiller.pod != nil {
-		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name)
+		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name())
 	}
 
 	// step forward in time pass the grace period
@@ -1023,7 +1024,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 
 	// verify the right pod was killed with the right grace period.
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 	if podKiller.gracePeriodOverride == nil {
 		t.Errorf("Manager chose to kill pod but should have had a grace period override.")
@@ -1058,7 +1059,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 
 	// check the right pod was killed
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 	observedGracePeriod = *podKiller.gracePeriodOverride
 	if observedGracePeriod != int64(0) {
@@ -1083,7 +1084,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 
 	// try to admit our pod (should fail)
@@ -1104,7 +1105,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 
 	// try to admit our pod (should succeed)
@@ -1120,23 +1121,24 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	podsToMake := []podToMake{
 		{name: "critical", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "800Mi"},
 	}
-	pods := []*v1.Pod{}
-	podStats := map[*v1.Pod]statsapi.PodStats{}
+	apiPods := []*v1.Pod{}
+	podStats := map[string]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
-		pods = append(pods, pod)
-		podStats[pod] = podStat
+		apiPods = append(apiPods, pod.GetAPIPod())
+		podStats[pod.Name()] = podStat
 	}
 
 	// Mark the pod as critical
-	pods[0].Annotations = map[string]string{
+	apiPods[0].Annotations = map[string]string{
 		kubelettypes.CriticalPodAnnotationKey:  "",
 		kubelettypes.ConfigSourceAnnotationKey: kubelettypes.FileSource,
 	}
-	pods[0].Namespace = kubeapi.NamespaceSystem
+	apiPods[0].Namespace = kubeapi.NamespaceSystem
+	pods := kubepod.FromAPIPods(apiPods)
 
 	podToEvict := pods[0]
-	activePodsFunc := func() []*v1.Pod {
+	activePodsFunc := func() []*kubepod.Pod {
 		return pods
 	}
 
@@ -1197,7 +1199,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 
 	// verify no pod was yet killed because there has not yet been enough time passed.
 	if podKiller.pod != nil {
-		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name)
+		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name())
 	}
 
 	// step forward in time pass the grace period
@@ -1212,7 +1214,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 
 	// verify the right pod was killed with the right grace period.
 	if podKiller.pod == podToEvict {
-		t.Errorf("Manager chose to kill critical pod: %v, but should have ignored it", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill critical pod: %v, but should have ignored it", podKiller.pod.Name())
 	}
 	// reset state
 	podKiller.pod = nil
@@ -1243,7 +1245,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 
 	// check the right pod was killed
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 }
 
@@ -1260,15 +1262,15 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "100Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "200Mi"},
 	}
-	pods := []*v1.Pod{}
-	podStats := map[*v1.Pod]statsapi.PodStats{}
+	pods := []*kubepod.Pod{}
+	podStats := map[string]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
 		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
 		pods = append(pods, pod)
-		podStats[pod] = podStat
+		podStats[pod.Name()] = podStat
 	}
 	podToEvict := pods[5]
-	activePodsFunc := func() []*v1.Pod {
+	activePodsFunc := func() []*kubepod.Pod {
 		return pods
 	}
 
@@ -1319,7 +1321,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 
 	// try to admit our pods (they should succeed)
 	expected := []bool{true, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*kubepod.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -1328,7 +1330,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	pod, podStat := podMaker("guaranteed-high-2", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi"), "1Gi")
-	podStats[pod] = podStat
+	podStats[pod.Name()] = podStat
 	summaryProvider.result = summaryStatsMaker(constantCapacity, podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
 
@@ -1339,7 +1341,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 
 	// check the right pod was killed
 	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name(), podToEvict.Name())
 	}
 	observedGracePeriod := *podKiller.gracePeriodOverride
 	if observedGracePeriod != int64(0) {
@@ -1351,7 +1353,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*kubepod.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -1359,9 +1361,9 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 
 	// reduce memory pressure
 	fakeClock.Step(1 * time.Minute)
-	for pod := range podStats {
-		if pod.Name == "guaranteed-high-2" {
-			delete(podStats, pod)
+	for podName := range podStats {
+		if podName == "guaranteed-high-2" {
+			delete(podStats, podName)
 		}
 	}
 	summaryProvider.result = summaryStatsMaker(constantCapacity, podStats)
@@ -1375,12 +1377,12 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*kubepod.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -1399,12 +1401,12 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 
 	// no pod should have been killed
 	if podKiller.pod != nil {
-		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name())
 	}
 
 	// all pods should admit now
 	expected = []bool{true, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	for i, pod := range []*kubepod.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}

@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -200,7 +201,7 @@ type DockerManager struct {
 
 // A subset of the pod.Manager interface extracted for testing purposes.
 type podGetter interface {
-	GetPodByUID(kubetypes.UID) (*v1.Pod, bool)
+	GetPodByUID(kubetypes.UID) (*kubepod.Pod, bool)
 }
 
 func PodInfraContainerEnv(env map[string]string) kubecontainer.Option {
@@ -1867,7 +1868,7 @@ func (dm *DockerManager) calculateOomScoreAdj(pod *v1.Pod, container *v1.Contain
 	if container.Name == PodInfraContainerName {
 		oomScoreAdj = qos.PodInfraOOMAdj
 	} else {
-		oomScoreAdj = qos.GetContainerOOMScoreAdjust(pod, container, int64(dm.machineInfo.MemoryCapacity))
+		oomScoreAdj = qos.GetContainerOOMScoreAdjust(&pod.Spec, container, int64(dm.machineInfo.MemoryCapacity))
 
 	}
 

@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 // getResourceList returns a ResourceList with the
@@ -127,7 +128,7 @@ func TestResourceConfigForPod(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := ResourceConfigForPod(testCase.pod)
+		actual := ResourceConfigForPod(kubepod.NewPod(testCase.pod))
 		if !reflect.DeepEqual(actual.CpuPeriod, testCase.expected.CpuPeriod) {
 			t.Errorf("unexpected result, test: %v, cpu period not as expected", testName)
 		}

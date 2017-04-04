@@ -26,17 +26,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 type testActivePodsLister struct {
-	activePods []*v1.Pod
+	activePods []*kubepod.Pod
 }
 
-func (tapl *testActivePodsLister) GetActivePods() []*v1.Pod {
+func (tapl *testActivePodsLister) GetActivePods() []*kubepod.Pod {
 	return tapl.activePods
 }
 
-func makeTestPod(numContainers, gpusPerContainer int) *v1.Pod {
+func makeTestPod(numContainers, gpusPerContainer int) *kubepod.Pod {
 	quantity := resource.NewQuantity(int64(gpusPerContainer), resource.DecimalSI)
 	resources := v1.ResourceRequirements{
 		Limits: v1.ResourceList{
@@ -57,7 +58,7 @@ func makeTestPod(numContainers, gpusPerContainer int) *v1.Pod {
 			Resources: resources,
 		})
 	}
-	return pod
+	return kubepod.NewPod(pod)
 }
 
 func TestMultiContainerPodGPUAllocation(t *testing.T) {
@@ -77,13 +78,15 @@ func TestMultiContainerPodGPUAllocation(t *testing.T) {
 	// Allocated GPUs for a pod with two containers.
 	pod := makeTestPod(2, 1)
 	// Allocate for the first container.
-	devices1, err := testGpuManager.AllocateGPU(pod, &pod.Spec.Containers[0])
+	container := pod.GetSpec().Containers[0]
+	devices1, err := testGpuManager.AllocateGPU(pod.UID(), &container)
 	as.Nil(err)
 	as.Equal(len(devices1), 1)
 
 	podLister.activePods = append(podLister.activePods, pod)
 	// Allocate for the second container.
-	devices2, err := testGpuManager.AllocateGPU(pod, &pod.Spec.Containers[1])
+	container = pod.GetSpec().Containers[1]
+	devices2, err := testGpuManager.AllocateGPU(pod.UID(), &container)
 	as.Nil(err)
 	as.Equal(len(devices2), 1)
 
@@ -91,19 +94,22 @@ func TestMultiContainerPodGPUAllocation(t *testing.T) {
 
 	// further allocations should fail.
 	newPod := makeTestPod(2, 1)
-	devices1, err = testGpuManager.AllocateGPU(newPod, &newPod.Spec.Containers[0])
+	container = newPod.GetSpec().Containers[0]
+	devices1, err = testGpuManager.AllocateGPU(newPod.UID(), &container)
 	as.NotNil(err, "expected gpu allocation to fail. got: %v", devices1)
 
 	// Now terminate the original pod and observe that GPU allocation for new pod succeeds.
 	podLister.activePods = podLister.activePods[:0]
 
-	devices1, err = testGpuManager.AllocateGPU(newPod, &newPod.Spec.Containers[0])
+	container = newPod.GetSpec().Containers[0]
+	devices1, err = testGpuManager.AllocateGPU(newPod.UID(), &container)
 	as.Nil(err)
 	as.Equal(len(devices1), 1)
 
 	podLister.activePods = append(podLister.activePods, newPod)
 
-	devices2, err = testGpuManager.AllocateGPU(newPod, &newPod.Spec.Containers[1])
+	container = newPod.GetSpec().Containers[1]
+	devices2, err = testGpuManager.AllocateGPU(newPod.UID(), &container)
 	as.Nil(err)
 	as.Equal(len(devices2), 1)
 
@@ -127,7 +133,8 @@ func TestMultiPodGPUAllocation(t *testing.T) {
 	// Allocated GPUs for a pod with two containers.
 	podA := makeTestPod(1, 1)
 	// Allocate for the first container.
-	devicesA, err := testGpuManager.AllocateGPU(podA, &podA.Spec.Containers[0])
+	container := podA.GetSpec().Containers[0]
+	devicesA, err := testGpuManager.AllocateGPU(podA.UID(), &container)
 	as.Nil(err)
 	as.Equal(len(devicesA), 1)
 
@@ -136,7 +143,8 @@ func TestMultiPodGPUAllocation(t *testing.T) {
 	// further allocations should fail.
 	podB := makeTestPod(1, 1)
 	// Allocate for the first container.
-	devicesB, err := testGpuManager.AllocateGPU(podB, &podB.Spec.Containers[0])
+	container = podB.GetSpec().Containers[0]
+	devicesB, err := testGpuManager.AllocateGPU(podB.UID(), &container)
 	as.Nil(err)
 	as.Equal(len(devicesB), 1)
 	as.NotEqual(devicesA, devicesB, "expected pods to get different devices")
@@ -160,7 +168,8 @@ func TestPodContainerRestart(t *testing.T) {
 	// Make a pod with one containers that requests two GPUs.
 	podA := makeTestPod(1, 2)
 	// Allocate GPUs
-	devicesA, err := testGpuManager.AllocateGPU(podA, &podA.Spec.Containers[0])
+	container := podA.GetSpec().Containers[0]
+	devicesA, err := testGpuManager.AllocateGPU(podA.UID(), &container)
 	as.Nil(err)
 	as.Equal(len(devicesA), 3)
 
@@ -168,12 +177,14 @@ func TestPodContainerRestart(t *testing.T) {
 
 	// further allocations should fail.
 	podB := makeTestPod(1, 1)
-	_, err = testGpuManager.AllocateGPU(podB, &podB.Spec.Containers[0])
+	container = podB.GetSpec().Containers[0]
+	_, err = testGpuManager.AllocateGPU(podB.UID(), &container)
 	as.NotNil(err)
 
 	// Allcate GPU for existing Pod A.
 	// The same gpus must be returned.
-	devicesAretry, err := testGpuManager.AllocateGPU(podA, &podA.Spec.Containers[0])
+	container = podA.GetSpec().Containers[0]
+	devicesAretry, err := testGpuManager.AllocateGPU(podA.UID(), &container)
 	as.Nil(err)
 	as.Equal(len(devicesA), 3)
 	as.True(sets.NewString(devicesA...).Equal(sets.NewString(devicesAretry...)))

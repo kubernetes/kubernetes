@@ -22,13 +22,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-type ActivePodsFunc func() []*v1.Pod
+type ActivePodsFunc func() []*kubepod.Pod
 
 // Manages the containers running on a machine.
 type ContainerManager interface {

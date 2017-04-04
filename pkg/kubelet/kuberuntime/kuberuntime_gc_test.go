@@ -28,6 +28,7 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 func TestSandboxGC(t *testing.T) {
@@ -132,7 +133,7 @@ func TestContainerGC(t *testing.T) {
 		pod := makeTestPod(podName, "test-ns", podName, []v1.Container{container})
 		if podName != "deleted" {
 			// initialize the pod getter, explicitly exclude deleted pod
-			fakePodGetter.pods[pod.UID] = pod
+			fakePodGetter.pods[pod.UID] = kubepod.NewPod(pod)
 		}
 		return containerTemplate{
 			pod:       pod,
@@ -303,8 +304,8 @@ func TestPodLogDirectoryGC(t *testing.T) {
 	fakePodGetter := m.containerGC.podGetter.(*fakePodGetter)
 
 	// pod log directories without corresponding pods should be removed.
-	fakePodGetter.pods["123"] = makeTestPod("foo1", "new", "123", nil)
-	fakePodGetter.pods["456"] = makeTestPod("foo2", "new", "456", nil)
+	fakePodGetter.pods["123"] = kubepod.NewPod(makeTestPod("foo1", "new", "123", nil))
+	fakePodGetter.pods["456"] = kubepod.NewPod(makeTestPod("foo2", "new", "456", nil))
 	files := []string{"123", "456", "789", "012"}
 	removed := []string{filepath.Join(podLogsRootDirectory, "789"), filepath.Join(podLogsRootDirectory, "012")}
 

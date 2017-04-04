@@ -26,9 +26,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
@@ -39,15 +39,15 @@ import (
 type Manager interface {
 	// AddPod creates new probe workers for every container probe. This should be called for every
 	// pod created.
-	AddPod(pod *v1.Pod)
+	AddPod(pod *kubepod.Pod)
 
 	// RemovePod handles cleaning up the removed pod state, including terminating probe workers and
 	// deleting cached results.
-	RemovePod(pod *v1.Pod)
+	RemovePod(pod *kubepod.Pod)
 
 	// CleanupPods handles cleaning up pods which should no longer be running.
 	// It takes a list of "active pods" which should not be cleaned up.
-	CleanupPods(activePods []*v1.Pod)
+	CleanupPods(activePods []*kubepod.Pod)
 
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
@@ -127,19 +127,19 @@ func (t probeType) String() string {
 	}
 }
 
-func (m *manager) AddPod(pod *v1.Pod) {
+func (m *manager) AddPod(pod *kubepod.Pod) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
-	key := probeKey{podUID: pod.UID}
-	for _, c := range pod.Spec.Containers {
+	key := probeKey{podUID: pod.UID()}
+	for _, c := range pod.GetSpec().Containers {
 		key.containerName = c.Name
 
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
 				glog.Errorf("Readiness probe already exists! %v - %v",
-					format.Pod(pod), c.Name)
+					pod.String(), c.Name)
 				return
 			}
 			w := newWorker(m, readiness, pod, c)
@@ -151,7 +151,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
 				glog.Errorf("Liveness probe already exists! %v - %v",
-					format.Pod(pod), c.Name)
+					pod.String(), c.Name)
 				return
 			}
 			w := newWorker(m, liveness, pod, c)
@@ -161,12 +161,12 @@ func (m *manager) AddPod(pod *v1.Pod) {
 	}
 }
 
-func (m *manager) RemovePod(pod *v1.Pod) {
+func (m *manager) RemovePod(pod *kubepod.Pod) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
-	key := probeKey{podUID: pod.UID}
-	for _, c := range pod.Spec.Containers {
+	key := probeKey{podUID: pod.UID()}
+	for _, c := range pod.GetSpec().Containers {
 		key.containerName = c.Name
 		for _, probeType := range [...]probeType{readiness, liveness} {
 			key.probeType = probeType
@@ -177,10 +177,10 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 	}
 }
 
-func (m *manager) CleanupPods(activePods []*v1.Pod) {
+func (m *manager) CleanupPods(activePods []*kubepod.Pod) {
 	desiredPods := make(map[types.UID]sets.Empty)
 	for _, pod := range activePods {
-		desiredPods[pod.UID] = sets.Empty{}
+		desiredPods[pod.UID()] = sets.Empty{}
 	}
 
 	m.workerLock.RLock()

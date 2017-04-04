@@ -22,12 +22,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // Check whether we have the capabilities to run the specified pod.
-func canRunPod(pod *v1.Pod) error {
+func canRunPod(kpod *kubepod.Pod) error {
+	pod := kpod.GetAPIPod()
 	if !capabilities.Get().AllowPrivileged {
 		for _, container := range pod.Spec.Containers {
 			if securitycontext.HasPrivilegedRequest(&container) {

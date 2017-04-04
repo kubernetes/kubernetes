@@ -133,7 +133,7 @@ func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 // are valid according to the whitelist.
 func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
-	a := pod.Annotations[w.annotationKey]
+	a := pod.ObjectMeta().Annotations[w.annotationKey]
 	if a == "" {
 		return lifecycle.PodAdmitResult{
 			Admit: true,
@@ -150,9 +150,9 @@ func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 	}
 
 	var hostNet, hostIPC bool
-	if pod.Spec.SecurityContext != nil {
-		hostNet = pod.Spec.HostNetwork
-		hostIPC = pod.Spec.HostIPC
+	if pod.GetSpec().SecurityContext != nil {
+		hostNet = pod.GetSpec().HostNetwork
+		hostIPC = pod.GetSpec().HostIPC
 	}
 	for _, s := range sysctls {
 		if err := w.validateSysctl(s.Name, hostNet, hostIPC); err != nil {

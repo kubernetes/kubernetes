@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/util/removeall"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -80,10 +81,10 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *v1.Pod, o
 // cleanupOrphanedPodDirs removes the volumes of pods that should not be
 // running and that have no containers running.
 func (kl *Kubelet) cleanupOrphanedPodDirs(
-	pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
+	pods []*kubepod.Pod, runningPods []*kubecontainer.Pod) error {
 	allPods := sets.NewString()
 	for _, pod := range pods {
-		allPods.Insert(string(pod.UID))
+		allPods.Insert(string(pod.UID()))
 	}
 	for _, pod := range runningPods {
 		allPods.Insert(string(pod.ID))

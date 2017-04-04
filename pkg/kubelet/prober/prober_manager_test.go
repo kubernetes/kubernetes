@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 )
@@ -48,7 +49,7 @@ var defaultProbe *v1.Probe = &v1.Probe{
 }
 
 func TestAddRemovePods(t *testing.T) {
-	noProbePod := v1.Pod{
+	noProbePod := kubepod.NewPod(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: "no_probe_pod",
 		},
@@ -59,9 +60,9 @@ func TestAddRemovePods(t *testing.T) {
 				Name: "no_probe2",
 			}},
 		},
-	}
+	})
 
-	probePod := v1.Pod{
+	probePod := kubepod.NewPod(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: "probe_pod",
 		},
@@ -78,7 +79,7 @@ func TestAddRemovePods(t *testing.T) {
 				LivenessProbe: defaultProbe,
 			}},
 		},
-	}
+	})
 
 	m := newTestManager()
 	defer cleanup(t, m)
@@ -87,13 +88,13 @@ func TestAddRemovePods(t *testing.T) {
 	}
 
 	// Adding a pod with no probes should be a no-op.
-	m.AddPod(&noProbePod)
+	m.AddPod(noProbePod)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
 	}
 
 	// Adding a pod with probes.
-	m.AddPod(&probePod)
+	m.AddPod(probePod)
 	probePaths := []probeKey{
 		{"probe_pod", "readiness", readiness},
 		{"probe_pod", "liveness", liveness},
@@ -103,13 +104,13 @@ func TestAddRemovePods(t *testing.T) {
 	}
 
 	// Removing un-probed pod.
-	m.RemovePod(&noProbePod)
+	m.RemovePod(noProbePod)
 	if err := expectProbes(m, probePaths); err != nil {
 		t.Error(err)
 	}
 
 	// Removing probed pod.
-	m.RemovePod(&probePod)
+	m.RemovePod(probePod)
 	if err := waitForWorkerExit(m, probePaths); err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +119,7 @@ func TestAddRemovePods(t *testing.T) {
 	}
 
 	// Removing already removed pods should be a no-op.
-	m.RemovePod(&probePod)
+	m.RemovePod(probePod)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
 	}
@@ -127,7 +128,7 @@ func TestAddRemovePods(t *testing.T) {
 func TestCleanupPods(t *testing.T) {
 	m := newTestManager()
 	defer cleanup(t, m)
-	podToCleanup := v1.Pod{
+	podToCleanup := kubepod.NewPod(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: "pod_cleanup",
 		},
@@ -140,8 +141,8 @@ func TestCleanupPods(t *testing.T) {
 				LivenessProbe: defaultProbe,
 			}},
 		},
-	}
-	podToKeep := v1.Pod{
+	})
+	podToKeep := kubepod.NewPod(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: "pod_keep",
 		},
@@ -154,11 +155,11 @@ func TestCleanupPods(t *testing.T) {
 				LivenessProbe: defaultProbe,
 			}},
 		},
-	}
-	m.AddPod(&podToCleanup)
-	m.AddPod(&podToKeep)
+	})
+	m.AddPod(podToCleanup)
+	m.AddPod(podToKeep)
 
-	m.CleanupPods([]*v1.Pod{&podToKeep})
+	m.CleanupPods([]*kubepod.Pod{podToKeep})
 
 	removedProbes := []probeKey{
 		{"pod_cleanup", "prober1", readiness},
@@ -193,11 +194,11 @@ func TestCleanupRepeated(t *testing.T) {
 	for i := 0; i < numTestPods; i++ {
 		pod := podTemplate
 		pod.UID = types.UID(strconv.Itoa(i))
-		m.AddPod(&pod)
+		m.AddPod(kubepod.NewPod(&pod))
 	}
 
 	for i := 0; i < 10; i++ {
-		m.CleanupPods([]*v1.Pod{})
+		m.CleanupPods([]*kubepod.Pod{})
 	}
 }
 

@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -186,7 +187,7 @@ var _ kubecontainer.DirectStreamingRuntime = &Runtime{}
 
 // TODO(yifan): This duplicates the podGetter in dockertools.
 type podGetter interface {
-	GetPodByUID(kubetypes.UID) (*v1.Pod, bool)
+	GetPodByUID(kubetypes.UID) (*kubepod.Pod, bool)
 }
 
 // cliInterface wrapps the command line calls for testing purpose.

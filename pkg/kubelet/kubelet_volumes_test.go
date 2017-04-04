@@ -35,7 +35,7 @@ func TestListVolumesForPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 
-	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+	apiPod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -61,11 +61,12 @@ func TestListVolumesForPod(t *testing.T) {
 		close(stopCh)
 	}()
 
-	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
+	pods := testKubelet.basicManager.SetPods([]*v1.Pod{apiPod})
+	pod := pods[0]
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	assert.NoError(t, err)
 
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := volumehelper.GetUniquePodName(pod.GetAPIPod())
 
 	volumesToReturn, volumeExsit := kubelet.ListVolumesForPod(types.UID(podName))
 	assert.True(t, volumeExsit, "expected to find volumes for pod %q", podName)
@@ -83,7 +84,7 @@ func TestPodVolumesExist(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	pods := []*v1.Pod{
+	apiPods := []*v1.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod1",
@@ -145,15 +146,15 @@ func TestPodVolumesExist(t *testing.T) {
 		close(stopCh)
 	}()
 
-	testKubelet.basicManager.SetPods(pods)
+	pods := testKubelet.basicManager.SetPods(apiPods)
 	for _, pod := range pods {
 		err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 		assert.NoError(t, err)
 	}
 
 	for _, pod := range pods {
-		podVolumesExist := kubelet.podVolumesExist(pod.UID)
-		assert.True(t, podVolumesExist, "pod %q", pod.UID)
+		podVolumesExist := kubelet.podVolumesExist(pod.UID())
+		assert.True(t, podVolumesExist, "pod %q", pod.UID())
 	}
 }
 
@@ -162,7 +163,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+	apiPod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -180,12 +181,13 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 		close(stopCh)
 	}()
 
-	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
+	pods := testKubelet.basicManager.SetPods([]*v1.Pod{apiPod})
+	pod := pods[0]
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		volumehelper.GetUniquePodName(pod.GetAPIPod()))
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -208,7 +210,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+	apiPod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -227,14 +229,15 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	}()
 
 	// Add pod
-	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
+	pods := testKubelet.basicManager.SetPods([]*v1.Pod{apiPod})
+	pod := pods[0]
 
 	// Verify volumes attached
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		volumehelper.GetUniquePodName(pod.GetAPIPod()))
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -259,7 +262,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		volumehelper.GetUniquePodName(pod.GetAPIPod()))
 
 	assert.Len(t, podVolumes, 0,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
@@ -297,7 +300,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
 
-	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+	apiPod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -315,7 +318,8 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		close(stopCh)
 	}()
 
-	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
+	pods := testKubelet.basicManager.SetPods([]*v1.Pod{apiPod})
+	pod := pods[0]
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
@@ -326,7 +330,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		volumehelper.GetUniquePodName(pod.GetAPIPod()))
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -366,7 +370,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
 
-	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+	apiPod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -385,7 +389,8 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	}()
 
 	// Add pod
-	testKubelet.basicManager.SetPods([]*v1.Pod{pod})
+	pods := testKubelet.basicManager.SetPods([]*v1.Pod{apiPod})
+	pod := pods[0]
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
@@ -397,7 +402,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		volumehelper.GetUniquePodName(pod.GetAPIPod()))
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -421,7 +426,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		volumehelper.GetUniquePodName(pod.GetAPIPod()))
 
 	assert.Len(t, podVolumes, 0,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)

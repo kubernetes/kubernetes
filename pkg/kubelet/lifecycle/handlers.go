@@ -151,11 +151,11 @@ type appArmorAdmitHandler struct {
 
 func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	// If the pod is already running or terminated, no need to recheck AppArmor.
-	if attrs.Pod.Status.Phase != v1.PodPending {
+	if attrs.Pod.GetStatus().Phase != v1.PodPending {
 		return PodAdmitResult{Admit: true}
 	}
 
-	err := a.Validate(attrs.Pod)
+	err := a.Validate(attrs.Pod.GetAPIPod())
 	if err == nil {
 		return PodAdmitResult{Admit: true}
 	}

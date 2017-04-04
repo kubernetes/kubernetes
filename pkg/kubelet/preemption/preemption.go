@@ -28,9 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
@@ -62,8 +60,8 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
-func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(pod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
-	if !kubetypes.IsCriticalPod(pod) || !utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) {
+func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(pod *kubepod.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
+	if !pod.IsCritical() || !utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) {
 		return false, failureReasons, nil
 	}
 	// InsufficientResourceError is not a reason to reject a critical pod.
@@ -105,19 +103,19 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(insufficientResour
 			Reason:  events.PreemptContainer,
 		}
 		// record that we are evicting the pod
-		c.recorder.Eventf(pod, v1.EventTypeWarning, events.PreemptContainer, message)
+		c.recorder.Eventf(pod.GetAPIPod(), v1.EventTypeWarning, events.PreemptContainer, message)
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		err := c.killPodFunc(pod, status, nil)
 		if err != nil {
-			return fmt.Errorf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
+			return fmt.Errorf("preemption: pod %s failed to evict %v", pod.String(), err)
 		}
-		glog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
+		glog.Infof("preemption: pod %s evicted successfully", pod.String())
 	}
 	return nil
 }
 
 // getPodsToPreempt returns a list of pods that could be preempted to free requests >= requirements
-func getPodsToPreempt(pods []*v1.Pod, requirements admissionRequirementList) ([]*v1.Pod, error) {
+func getPodsToPreempt(pods []*kubepod.Pod, requirements admissionRequirementList) ([]*kubepod.Pod, error) {
 	bestEffortPods, burstablePods, guaranteedPods := sortPodsByQOS(pods)
 
 	// make sure that pods exist to reclaim the requirements
@@ -149,8 +147,8 @@ func getPodsToPreempt(pods []*v1.Pod, requirements admissionRequirementList) ([]
 // it chooses the pod that has the "smaller resource request"
 // This method, by repeatedly choosing the pod that fulfills as much of the requirements as possible,
 // attempts to minimize the number of pods returned.
-func getPodsToPreemptByDistance(pods []*v1.Pod, requirements admissionRequirementList) ([]*v1.Pod, error) {
-	podsToEvict := []*v1.Pod{}
+func getPodsToPreemptByDistance(pods []*kubepod.Pod, requirements admissionRequirementList) ([]*kubepod.Pod, error) {
+	podsToEvict := []*kubepod.Pod{}
 	// evict pods by shortest distance from remaining requirements, updating requirements every round.
 	for len(requirements) > 0 {
 		if len(pods) == 0 {
@@ -187,10 +185,10 @@ type admissionRequirementList []*admissionRequirement
 // distance of the pods requests from the admissionRequirements.
 // distance is measured by the fraction of the requirement satisfied by the pod,
 // so that each requirement is weighted equally, regardless of absolute magnitude.
-func (a admissionRequirementList) distance(pod *v1.Pod) float64 {
+func (a admissionRequirementList) distance(pod *kubepod.Pod) float64 {
 	dist := float64(0)
 	for _, req := range a {
-		remainingRequest := float64(req.quantity - v1.GetResourceRequest(pod, req.resourceName))
+		remainingRequest := float64(req.quantity - v1.GetResourceRequest(pod.GetAPIPod(), req.resourceName))
 		if remainingRequest < 0 {
 			remainingRequest = 0
 		}
@@ -201,12 +199,12 @@ func (a admissionRequirementList) distance(pod *v1.Pod) float64 {
 
 // returns a new admissionRequirementList containing remaining requirements if the provided pod
 // were to be preempted
-func (a admissionRequirementList) subtract(pods ...*v1.Pod) admissionRequirementList {
+func (a admissionRequirementList) subtract(pods ...*kubepod.Pod) admissionRequirementList {
 	newList := []*admissionRequirement{}
 	for _, req := range a {
 		newQuantity := req.quantity
 		for _, pod := range pods {
-			newQuantity -= v1.GetResourceRequest(pod, req.resourceName)
+			newQuantity -= v1.GetResourceRequest(pod.GetAPIPod(), req.resourceName)
 		}
 		if newQuantity > 0 {
 			newList = append(newList, &admissionRequirement{
@@ -227,10 +225,10 @@ func (a admissionRequirementList) toString() string {
 }
 
 // returns lists containing non-critical besteffort, burstable, and guaranteed pods
-func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod) {
+func sortPodsByQOS(pods []*kubepod.Pod) (bestEffort, burstable, guaranteed []*kubepod.Pod) {
 	for _, pod := range pods {
-		if !kubetypes.IsCriticalPod(pod) {
-			switch qos.GetPodQOS(pod) {
+		if !pod.IsCritical() {
+			switch pod.GetPodQOS() {
 			case v1.PodQOSBestEffort:
 				bestEffort = append(bestEffort, pod)
 			case v1.PodQOSBurstable:
@@ -245,15 +243,15 @@ func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod)
 }
 
 // returns true if pod1 has a smaller request than pod2
-func smallerResourceRequest(pod1 *v1.Pod, pod2 *v1.Pod) bool {
+func smallerResourceRequest(pod1 *kubepod.Pod, pod2 *kubepod.Pod) bool {
 	priorityList := []v1.ResourceName{
 		v1.ResourceNvidiaGPU,
 		v1.ResourceMemory,
 		v1.ResourceCPU,
 	}
 	for _, res := range priorityList {
-		req1 := v1.GetResourceRequest(pod1, res)
-		req2 := v1.GetResourceRequest(pod2, res)
+		req1 := v1.GetResourceRequest(pod1.GetAPIPod(), res)
+		req2 := v1.GetResourceRequest(pod2.GetAPIPod(), res)
 		if req1 < req2 {
 			return true
 		} else if req1 > req2 {

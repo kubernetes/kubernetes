@@ -131,7 +131,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod, c
 	lc := &runtimeapi.LinuxPodSandboxConfig{
 		CgroupParent: cgroupParent,
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
-			Privileged: kubecontainer.HasPrivilegedContainer(pod),
+			Privileged: kubecontainer.HasPrivilegedContainer(&pod.Spec),
 		},
 	}
 

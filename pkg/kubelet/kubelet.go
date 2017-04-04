@@ -168,7 +168,7 @@ type SyncHandler interface {
 	HandlePodUpdates(pods []*v1.Pod)
 	HandlePodRemoves(pods []*v1.Pod)
 	HandlePodReconcile(pods []*v1.Pod)
-	HandlePodSyncs(pods []*v1.Pod)
+	HandlePodSyncs(pods []*kubepod.Pod)
 	HandlePodCleanups() error
 }
 
@@ -760,7 +760,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
-	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
+	klet.podKillingCh = make(chan *PodPair, podKillingChannelCapacity)
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
 	// setup eviction manager
@@ -1020,7 +1020,7 @@ type Kubelet struct {
 	backOff *flowcontrol.Backoff
 
 	// Channel for sending pods to kill.
-	podKillingCh chan *kubecontainer.PodPair
+	podKillingCh chan *PodPair
 
 	// The configuration file used as the base to generate the container's
 	// DNS resolver configuration file. This can be used in conjunction with
@@ -1405,7 +1405,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	// Latency measurements for the main workflow are relative to the
 	// first time the pod was seen by the API server.
 	var firstSeenTime time.Time
-	if firstSeenTimeStr, ok := pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; ok {
+	if firstSeenTimeStr, ok := pod.ObjectMeta().Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; ok {
 		firstSeenTime = kubetypes.ConvertToTimestamp(firstSeenTimeStr).Get()
 	}
 
@@ -1429,7 +1429,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	podStatus.IP = apiPodStatus.PodIP
 
 	// Record the time it takes for the pod to become running.
-	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
+	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID())
 	if !ok || existingStatus.Phase == v1.PodPending && apiPodStatus.Phase == v1.PodRunning &&
 		!firstSeenTime.IsZero() {
 		metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
@@ -1458,7 +1458,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	// Kill pod if it should not be running
-	if !runnable.Admit || pod.DeletionTimestamp != nil || apiPodStatus.Phase == v1.PodFailed {
+	if !runnable.Admit || pod.DeletionTimestampIsSet() || apiPodStatus.Phase == v1.PodFailed {
 		var syncErr error
 		if err := kl.killPod(pod, nil, podStatus, nil); err != nil {
 			syncErr = fmt.Errorf("error killing pod: %v", err)
@@ -1474,7 +1474,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
-	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !kubecontainer.IsHostNetworkPod(pod) {
+	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !pod.IsHostNetworkPod() {
 		return fmt.Errorf("network is not ready: %v", rs)
 	}
 
@@ -1511,52 +1511,51 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		// expected to run only once and if the kubelet is restarted then
 		// they are not expected to run again.
 		// We don't create and apply updates to cgroup if its a run once pod and was killed above
-		if !(podKilled && pod.Spec.RestartPolicy == v1.RestartPolicyNever) {
+		if !(podKilled && pod.GetSpec().RestartPolicy == v1.RestartPolicyNever) {
 			if !pcm.Exists(pod) {
 				if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
 					glog.V(2).Infof("Failed to update QoS cgroups while syncing pod: %v", err)
 				}
 				if err := pcm.EnsureExists(pod); err != nil {
-					return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+					return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID(), err)
 				}
 			}
 		}
 	}
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
-	if kubepod.IsStaticPod(pod) {
-		podFullName := kubecontainer.GetPodFullName(pod)
+	if pod.IsStatic() {
 		deleted := false
 		if mirrorPod != nil {
-			if mirrorPod.DeletionTimestamp != nil || !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
+			if mirrorPod.DeletionTimestampIsSet() || !mirrorPod.IsMirrorPodOf(pod) {
 				// The mirror pod is semantically different from the static pod. Remove
 				// it. The mirror pod will get recreated later.
-				glog.Warningf("Deleting mirror pod %q because it is outdated", format.Pod(mirrorPod))
-				if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
-					glog.Errorf("Failed deleting mirror pod %q: %v", format.Pod(mirrorPod), err)
+				glog.Warningf("Deleting mirror pod %q because it is outdated", mirrorPod.String())
+				if err := kl.podManager.DeleteMirrorPod(pod.GetPodFullName()); err != nil {
+					glog.Errorf("Failed deleting mirror pod %q: %v", mirrorPod.String(), err)
 				} else {
 					deleted = true
 				}
 			}
 		}
 		if mirrorPod == nil || deleted {
-			glog.V(3).Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
-			if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-				glog.Errorf("Failed creating a mirror pod for %q: %v", format.Pod(pod), err)
+			glog.V(3).Infof("Creating a mirror pod for static pod %q", pod.String())
+			if err := kl.podManager.CreateMirrorPod(pod.GetAPIPod()); err != nil {
+				glog.Errorf("Failed creating a mirror pod for %q: %v", pod.String(), err)
 			}
 		}
 	}
 
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
-		glog.Errorf("Unable to make pod data directories for pod %q: %v", format.Pod(pod), err)
+		glog.Errorf("Unable to make pod data directories for pod %q: %v", pod.String(), err)
 		return err
 	}
 
 	// Wait for volumes to attach/mount
 	if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
-		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
+		kl.recorder.Eventf(pod.GetAPIPod(), v1.EventTypeWarning, events.FailedMountVolume, "Unable to mount volumes for pod %q: %v", pod.String(), err)
+		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", pod.String(), err)
 		return err
 	}
 
@@ -1564,8 +1563,8 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
-	kl.reasonCache.Update(pod.UID, result)
+	result := kl.containerRuntime.SyncPod(pod.GetAPIPod(), apiPodStatus, podStatus, pullSecrets, kl.backOff)
+	kl.reasonCache.Update(pod.UID(), result)
 	if err := result.Error(); err != nil {
 		return err
 	}
@@ -1576,19 +1575,19 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Update the traffic shaping for the pod's ingress and egress limits
-	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
+	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.ObjectMeta().Annotations)
 	if err != nil {
 		return err
 	}
 	if egress != nil || ingress != nil {
-		if kubecontainer.IsHostNetworkPod(pod) {
-			kl.recorder.Event(pod, v1.EventTypeWarning, events.HostNetworkNotSupported, "Bandwidth shaping is not currently supported on the host network")
+		if pod.IsHostNetworkPod() {
+			kl.recorder.Event(pod.GetAPIPod(), v1.EventTypeWarning, events.HostNetworkNotSupported, "Bandwidth shaping is not currently supported on the host network")
 		} else if kl.shaper != nil {
 			if len(apiPodStatus.PodIP) > 0 {
 				err = kl.shaper.ReconcileCIDR(fmt.Sprintf("%s/32", apiPodStatus.PodIP), egress, ingress)
 			}
 		} else {
-			kl.recorder.Event(pod, v1.EventTypeWarning, events.UndefinedShaper, "Pod requests bandwidth shaping, but the shaper is undefined")
+			kl.recorder.Event(pod.GetAPIPod(), v1.EventTypeWarning, events.UndefinedShaper, "Pod requests bandwidth shaping, but the shaper is undefined")
 		}
 	}
 
@@ -1598,16 +1597,16 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 // Get pods which should be resynchronized. Currently, the following pod should be resynchronized:
 //   * pod whose work is ready.
 //   * internal modules that request sync of a pod.
-func (kl *Kubelet) getPodsToSync() []*v1.Pod {
+func (kl *Kubelet) getPodsToSync() []*kubepod.Pod {
 	allPods := kl.podManager.GetPods()
 	podUIDs := kl.workQueue.GetWork()
 	podUIDSet := sets.NewString()
 	for _, podUID := range podUIDs {
 		podUIDSet.Insert(string(podUID))
 	}
-	var podsToSync []*v1.Pod
+	var podsToSync []*kubepod.Pod
 	for _, pod := range allPods {
-		if podUIDSet.Has(string(pod.UID)) {
+		if podUIDSet.Has(string(pod.UID())) {
 			// The work of the pod is ready
 			podsToSync = append(podsToSync, pod)
 			continue
@@ -1628,7 +1627,7 @@ func (kl *Kubelet) getPodsToSync() []*v1.Pod {
 //
 // deletePod returns an error if not all sources are ready or the pod is not
 // found in the runtime cache.
-func (kl *Kubelet) deletePod(pod *v1.Pod) error {
+func (kl *Kubelet) deletePod(pod *kubepod.Pod) error {
 	if pod == nil {
 		return fmt.Errorf("deletePod does not allow nil pod")
 	}
@@ -1637,7 +1636,7 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 		// for sources that haven't reported yet.
 		return fmt.Errorf("skipping delete because sources aren't ready yet")
 	}
-	kl.podWorkers.ForgetWorker(pod.UID)
+	kl.podWorkers.ForgetWorker(pod.UID())
 
 	// Runtime cache may not have been updated to with the pod, but it's okay
 	// because the periodic cleanup routine will attempt to delete again later.
@@ -1645,11 +1644,11 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 	if err != nil {
 		return fmt.Errorf("error listing containers: %v", err)
 	}
-	runningPod := kubecontainer.Pods(runningPods).FindPod("", pod.UID)
+	runningPod := kubecontainer.Pods(runningPods).FindPod("", pod.UID())
 	if runningPod.IsEmpty() {
 		return fmt.Errorf("pod not found")
 	}
-	podPair := kubecontainer.PodPair{APIPod: pod, RunningPod: &runningPod}
+	podPair := PodPair{APIPod: pod, RunningPod: &runningPod}
 
 	kl.podKillingCh <- &podPair
 	// TODO: delete the mirror pod here?
@@ -1681,8 +1680,8 @@ func (kl *Kubelet) isOutOfDisk() bool {
 
 // rejectPod records an event about the pod with the given reason and message,
 // and updates the pod to the failed phase in the status manage.
-func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
-	kl.recorder.Eventf(pod, v1.EventTypeWarning, reason, message)
+func (kl *Kubelet) rejectPod(pod *kubepod.Pod, reason, message string) {
+	kl.recorder.Eventf(pod.GetAPIPod(), v1.EventTypeWarning, reason, message)
 	kl.statusManager.SetPodStatus(pod, v1.PodStatus{
 		Phase:   v1.PodFailed,
 		Reason:  reason,
@@ -1694,7 +1693,7 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 // The function returns a boolean value indicating whether the pod
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
-func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (kl *Kubelet) canAdmitPod(pods []*kubepod.Pod, pod *kubepod.Pod) (bool, string, string) {
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
 	// TODO: move out of disk check into a pod admitter
@@ -1708,14 +1707,14 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	// TODO: When disk space scheduling is implemented (#11976), remove the out-of-disk check here and
 	// add the disk space predicate to predicates.GeneralPredicates.
 	if kl.isOutOfDisk() {
-		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), "predicate fails due to OutOfDisk")
+		glog.Warningf("Failed to admit pod %v - %s", pod.String(), "predicate fails due to OutOfDisk")
 		return false, "OutOfDisk", "cannot be started due to lack of disk space."
 	}
 
 	return true, "", ""
 }
 
-func (kl *Kubelet) canRunPod(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (kl *Kubelet) canRunPod(pod *kubepod.Pod) lifecycle.PodAdmitResult {
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod}
 	// Get "OtherPods". Rejected pods are failed, so only include admitted pods that are alive.
 	attrs.OtherPods = kl.filterOutTerminatedPods(kl.podManager.GetPods())
@@ -1845,8 +1844,8 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		if isSyncPodWorthy(e) {
 			// PLEG event for a pod; sync it.
 			if pod, ok := kl.podManager.GetPodByUID(e.ID); ok {
-				glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
-				handler.HandlePodSyncs([]*v1.Pod{pod})
+				glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", pod.String(), e)
+				handler.HandlePodSyncs([]*kubepod.Pod{pod})
 			} else {
 				// If the pod no longer exists, ignore the event.
 				glog.V(4).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
@@ -1864,7 +1863,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		if len(podsToSync) == 0 {
 			break
 		}
-		glog.V(4).Infof("SyncLoop (SYNC): %d pods; %s", len(podsToSync), format.Pods(podsToSync))
+		glog.V(4).Infof("SyncLoop (SYNC): %d pods; %s", len(podsToSync), kubepod.Format(podsToSync))
 		kl.HandlePodSyncs(podsToSync)
 	case update := <-kl.livenessManager.Updates():
 		if update.Result == proberesults.Failure {
@@ -1878,8 +1877,8 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 				glog.V(4).Infof("SyncLoop (container unhealthy): ignore irrelevant update: %#v", update)
 				break
 			}
-			glog.V(1).Infof("SyncLoop (container unhealthy): %q", format.Pod(pod))
-			handler.HandlePodSyncs([]*v1.Pod{pod})
+			glog.V(1).Infof("SyncLoop (container unhealthy): %q", pod.String())
+			handler.HandlePodSyncs([]*kubepod.Pod{pod})
 		}
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
@@ -1899,9 +1898,9 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 
 // dispatchWork starts the asynchronous sync of the pod in a pod worker.
 // If the pod is terminated, dispatchWork
-func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mirrorPod *v1.Pod, start time.Time) {
+func (kl *Kubelet) dispatchWork(pod *kubepod.Pod, syncType kubetypes.SyncPodType, mirrorPod *kubepod.Pod, start time.Time) {
 	if kl.podIsTerminated(pod) {
-		if pod.DeletionTimestamp != nil {
+		if pod.DeletionTimestampIsSet() {
 			// If the pod is in a terminated state, there is no pod worker to
 			// handle the work item. Check if the DeletionTimestamp has been
 			// set, and force a status update to trigger a pod deletion request
@@ -1923,12 +1922,12 @@ func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mir
 	})
 	// Note the number of containers for new pods.
 	if syncType == kubetypes.SyncPodCreate {
-		metrics.ContainersPerPodCount.Observe(float64(len(pod.Spec.Containers)))
+		metrics.ContainersPerPodCount.Observe(float64(len(pod.GetSpec().Containers)))
 	}
 }
 
 // TODO: handle mirror pods in a separate component (issue #17251)
-func (kl *Kubelet) handleMirrorPod(mirrorPod *v1.Pod, start time.Time) {
+func (kl *Kubelet) handleMirrorPod(mirrorPod *kubepod.Pod, start time.Time) {
 	// Mirror pod ADD/UPDATE/DELETE operations are considered an UPDATE to the
 	// corresponding static pod. Send update to the pod worker if the static
 	// pod exists.
@@ -1942,15 +1941,15 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *v1.Pod, start time.Time) {
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
-	for _, pod := range pods {
+	for _, p := range pods {
 		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does
 		// not exist in the pod manager, it means that it has been deleted in
 		// the apiserver and no action (other than cleanup) is required.
-		kl.podManager.AddPod(pod)
+		pod := kl.podManager.AddPod(p)
 
-		if kubepod.IsMirrorPod(pod) {
+		if pod.IsMirrorPod() {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
@@ -1979,9 +1978,10 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 // being updated from a config source.
 func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	start := kl.clock.Now()
-	for _, pod := range pods {
+	for _, apiPod := range pods {
+		pod := kubepod.NewPod(apiPod)
 		kl.podManager.UpdatePod(pod)
-		if kubepod.IsMirrorPod(pod) {
+		if pod.IsMirrorPod() {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
@@ -1996,16 +1996,17 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 // being removed from a config source.
 func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
-	for _, pod := range pods {
+	for _, apiPod := range pods {
+		pod := kubepod.NewPod(apiPod)
 		kl.podManager.DeletePod(pod)
-		if kubepod.IsMirrorPod(pod) {
+		if pod.IsMirrorPod() {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
 		// Deletion is allowed to fail because the periodic cleanup routine
 		// will trigger deletion again.
 		if err := kl.deletePod(pod); err != nil {
-			glog.V(2).Infof("Failed to delete pod %q, err: %v", format.Pod(pod), err)
+			glog.V(2).Infof("Failed to delete pod %q, err: %v", pod.String(), err)
 		}
 		kl.probeManager.RemovePod(pod)
 	}
@@ -2014,14 +2015,15 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 // HandlePodReconcile is the callback in the SyncHandler interface for pods
 // that should be reconciled.
 func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
-	for _, pod := range pods {
+	for _, apiPod := range pods {
+		pod := kubepod.NewPod(apiPod)
 		// Update the pod in pod manager, status manager will do periodically reconcile according
 		// to the pod manager.
 		kl.podManager.UpdatePod(pod)
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
-		if eviction.PodIsEvicted(pod.Status) {
-			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
+		if eviction.PodIsEvicted(*pod.GetStatus()) {
+			if podStatus, err := kl.podCache.Get(pod.UID()); err == nil {
 				kl.containerDeletor.deleteContainersInPod("", podStatus, true)
 			}
 		}
@@ -2030,7 +2032,7 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 
 // HandlePodSyncs is the callback in the syncHandler interface for pods
 // that should be dispatched to pod workers for sync.
-func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
+func (kl *Kubelet) HandlePodSyncs(pods []*kubepod.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
@@ -2141,7 +2143,7 @@ func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID str
 		removeAll := false
 		if syncedPod, ok := kl.podManager.GetPodByUID(podId); ok {
 			// When an evicted pod has already synced, all containers can be removed.
-			removeAll = eviction.PodIsEvicted(syncedPod.Status)
+			removeAll = eviction.PodIsEvicted(*syncedPod.GetStatus())
 		}
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
 	}

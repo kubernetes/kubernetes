@@ -53,7 +53,7 @@ func getTestRunningStatus() v1.PodStatus {
 	return podStatus
 }
 
-func getTestPod() *v1.Pod {
+func getTestPod() *kubepod.Pod {
 	container := v1.Container{
 		Name: testContainerName,
 	}
@@ -65,10 +65,10 @@ func getTestPod() *v1.Pod {
 	}
 	pod.Name = "testPod"
 	pod.UID = testPodUID
-	return &pod
+	return kubepod.NewPod(&pod)
 }
 
-func setTestProbe(pod *v1.Pod, probeType probeType, probeSpec v1.Probe) {
+func setTestProbe(pod *kubepod.Pod, probeType probeType, probeSpec v1.Probe) {
 	// All tests rely on the fake exec prober.
 	probeSpec.Handler = v1.Handler{
 		Exec: &v1.ExecAction{},
@@ -88,12 +88,14 @@ func setTestProbe(pod *v1.Pod, probeType probeType, probeSpec v1.Probe) {
 		}
 	}
 
+	spec := pod.GetSpec()
 	switch probeType {
 	case readiness:
-		pod.Spec.Containers[0].ReadinessProbe = &probeSpec
+		spec.Containers[0].ReadinessProbe = &probeSpec
 	case liveness:
-		pod.Spec.Containers[0].LivenessProbe = &probeSpec
+		spec.Containers[0].LivenessProbe = &probeSpec
 	}
+	pod.SetSpec(spec)
 }
 
 func newTestManager() *manager {
@@ -101,7 +103,7 @@ func newTestManager() *manager {
 	refManager.SetRef(testContainerID, &v1.ObjectReference{}) // Suppress prober warnings.
 	podManager := kubepod.NewBasicPodManager(nil, nil)
 	// Add test pod to pod manager, so that status manager can get the pod from pod manager if needed.
-	podManager.AddPod(getTestPod())
+	podManager.AddPod(getTestPod().GetAPIPod())
 	m := NewManager(
 		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}),
 		results.NewManager(),
@@ -117,7 +119,7 @@ func newTestManager() *manager {
 func newTestWorker(m *manager, probeType probeType, probeSpec v1.Probe) *worker {
 	pod := getTestPod()
 	setTestProbe(pod, probeType, probeSpec)
-	return newWorker(m, probeType, pod, pod.Spec.Containers[0])
+	return newWorker(m, probeType, pod, pod.GetSpec().Containers[0])
 }
 
 type fakeExecProber struct {

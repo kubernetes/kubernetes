@@ -31,6 +31,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient, *nettest.MockNetworkPlugin) {
@@ -71,13 +72,13 @@ func makeUndefinedContainer(id string, running bool, created time.Time) *FakeCon
 func addPods(podGetter podGetter, podUIDs ...types.UID) {
 	fakePodGetter := podGetter.(*fakePodGetter)
 	for _, uid := range podUIDs {
-		fakePodGetter.pods[uid] = &v1.Pod{
+		fakePodGetter.pods[uid] = kubepod.NewPod(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uid),
 				Namespace: "test",
 				UID:       uid,
 			},
-		}
+		})
 	}
 }
 

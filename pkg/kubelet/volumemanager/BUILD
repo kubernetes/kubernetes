@@ -19,7 +19,6 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/status:go_default_library",
-        "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/kubelet/volumemanager/populator:go_default_library",
         "//pkg/kubelet/volumemanager/reconciler:go_default_library",

@@ -81,7 +81,7 @@ func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, er
 
 // Admit checks whether the runtime supports sysctls.
 func (w *runtimeAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	sysctls, unsafeSysctls, err := v1.SysctlsFromPodAnnotations(attrs.Pod.Annotations)
+	sysctls, unsafeSysctls, err := v1.SysctlsFromPodAnnotations(attrs.Pod.ObjectMeta().Annotations)
 	if err != nil {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
