@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/term"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 
 	"github.com/golang/glog"
 )
@@ -78,7 +78,7 @@ type context struct {
 	stderrStream io.WriteCloser
 	writeStatus  func(status *apierrors.StatusError) error
 	resizeStream io.ReadCloser
-	resizeChan   chan term.Size
+	resizeChan   chan remotecommand.Size
 	tty          bool
 }
 
@@ -114,7 +114,7 @@ func createStreams(req *http.Request, w http.ResponseWriter, opts *Options, supp
 	}
 
 	if ctx.resizeStream != nil {
-		ctx.resizeChan = make(chan term.Size)
+		ctx.resizeChan = make(chan remotecommand.Size)
 		go handleResizeEvents(ctx.resizeStream, ctx.resizeChan)
 	}
 
@@ -409,12 +409,12 @@ WaitForStreams:
 // supportsTerminalResizing returns false because v1ProtocolHandler doesn't support it.
 func (*v1ProtocolHandler) supportsTerminalResizing() bool { return false }
 
-func handleResizeEvents(stream io.Reader, channel chan<- term.Size) {
+func handleResizeEvents(stream io.Reader, channel chan<- remotecommand.Size) {
 	defer runtime.HandleCrash()
 
 	decoder := json.NewDecoder(stream)
 	for {
-		size := term.Size{}
+		size := remotecommand.Size{}
 		if err := decoder.Decode(&size); err != nil {
 			break
 		}

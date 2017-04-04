@@ -14,18 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resize
+package remotecommand
 
 import (
 	"encoding/json"
 	"io"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
+// Size represents the width and height of a terminal.
+type Size struct {
+	Width  uint16
+	Height uint16
+}
+
+// TerminalSizeQueue is capable of returning terminal resize events as they occur.
+type TerminalSizeQueue interface {
+	// Next returns the new terminal size after the terminal has been resized. It returns nil when
+	// monitoring has been stopped.
+	Next() *Size
+}
+
 // GetResizeFunc will return function that handles terminal resize
-func GetResizeFunc(resizeQueue term.TerminalSizeQueue) func(io.Writer) {
+func GetResizeFunc(resizeQueue TerminalSizeQueue) func(io.Writer) {
 	return func(stream io.Writer) {
 		defer runtime.HandleCrash()
 

@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand/resize"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -100,7 +99,7 @@ func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *restc
 	}
 	var resizeFunc func(io.Writer)
 	if terminalSizeQueue != nil {
-		resizeFunc = resize.GetResizeFunc(terminalSizeQueue)
+		resizeFunc = remotecommand.GetResizeFunc(terminalSizeQueue)
 	}
 	return exec.Stream(remotecommand.StreamOptions{
 		SupportedProtocols: remotecommandserver.SupportedStreamingProtocols,

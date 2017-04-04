@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
 const (
@@ -39,7 +39,7 @@ const (
 type Executor interface {
 	// ExecInContainer executes a command in a container in the pod, copying data
 	// between in/out/err and the container's stdin/stdout/stderr.
-	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error
+	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.Size, timeout time.Duration) error
 }
 
 // ServeExec handles requests to execute a command in a container. After
