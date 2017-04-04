@@ -37,6 +37,9 @@ limitations under the License.
  * and checks, that Kubernetes can use it as a volume.
  */
 
+// test/e2e/common/volumes.go duplicates the GlusterFS test from this file.  Any changes made to this
+// test should be made there as well.
+
 package e2e
 
 import (
@@ -76,7 +79,7 @@ func DeleteCinderVolume(name string) error {
 }
 
 // These tests need privileged containers, which are disabled by default.
-var _ = framework.KubeDescribe("Volumes [Volume][Volume]", func() {
+var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	f := framework.NewDefaultFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
@@ -137,6 +140,9 @@ var _ = framework.KubeDescribe("Volumes [Volume][Volume]", func() {
 
 	framework.KubeDescribe("GlusterFS [Feature:Volumes]", func() {
 		It("should be mountable", func() {
+			//TODO (copejon) GFS is not supported on debian image.
+			framework.SkipUnlessNodeOSDistroIs("gci")
+
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
 				Prefix:      "gluster",

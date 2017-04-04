@@ -37,6 +37,9 @@ limitations under the License.
  * and checks, that Kubernetes can use it as a volume.
  */
 
+// GlusterFS test is duplicated from test/e2e/volumes.go.  Any changes made there
+// should be duplicated here
+
 package common
 
 import (
@@ -130,7 +133,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 					Volume: v1.VolumeSource{
 						NFS: &v1.NFSVolumeSource{
 							Server:   serverIP,
-							Path:     "/",
+							Path:     "/exports",
 							ReadOnly: true,
 						},
 					},
@@ -149,6 +152,8 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 
 	framework.KubeDescribe("GlusterFS", func() {
 		It("should be mountable [Volume]", func() {
+			framework.SkipUnlessNodeOSDistroIs("gci")
+
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
 				Prefix:      "gluster",
@@ -161,6 +166,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
+
 			pod := framework.StartVolumeServer(c, config)
 			serverIP := pod.Status.PodIP
 			framework.Logf("Gluster server IP address: %v", serverIP)
