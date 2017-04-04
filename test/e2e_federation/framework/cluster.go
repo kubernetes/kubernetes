@@ -41,19 +41,17 @@ type Cluster struct {
 	*kubeclientset.Clientset
 }
 
-func getRegisteredClusters(f *Framework) ClusterSlice {
-	By("Obtaining a list of registered clusters")
-	clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("Error retrieving list of federated clusters: %+v", err))
-	if len(clusterList.Items) == 0 {
-		framework.Failf("No registered clusters found")
-	}
+// Cache the cluster config to avoid having to retrieve it for each test
+var clusterNames []string
+var clusterConfigMap map[string][]byte
 
+func getRegisteredClusters(f *Framework) ClusterSlice {
+	if clusterNames == nil {
+		clusterNames, clusterConfigMap = getClusterConfig(f)
+	}
 	clusters := ClusterSlice{}
-	for _, c := range clusterList.Items {
-		clusterName := c.Name
-		ClusterIsReadyOrFail(f, clusterName)
-		clientset := clientsetForClusterOrFail(f, clusterName)
+	for _, clusterName := range clusterNames {
+		clientset := clientsetForClusterOrFail(f, clusterName, clusterConfigMap[clusterName])
 		clusters = append(clusters, &Cluster{
 			Name:      clusterName,
 			Clientset: clientset,
@@ -65,7 +63,26 @@ func getRegisteredClusters(f *Framework) ClusterSlice {
 	return clusters
 }
 
-func clientsetForClusterOrFail(f *Framework, clusterName string) *kubeclientset.Clientset {
+func getClusterConfig(f *Framework) ([]string, map[string][]byte) {
+	By("Obtaining a list of registered clusters")
+	clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
+	framework.ExpectNoError(err, fmt.Sprintf("Error retrieving list of federated clusters: %+v", err))
+	if len(clusterList.Items) == 0 {
+		framework.Failf("No registered clusters found")
+	}
+
+	configMap := map[string][]byte{}
+	names := []string{}
+	for _, c := range clusterList.Items {
+		names = append(names, c.Name)
+		ClusterIsReadyOrFail(f, c.Name)
+		configMap[c.Name] = configForClusterOrFail(f, c.Name)
+	}
+
+	return names, configMap
+}
+
+func configForClusterOrFail(f *Framework, clusterName string) []byte {
 	By(fmt.Sprintf("Loading configuration for cluster %q", clusterName))
 
 	// TODO The system namespace should be configurable since it can vary across deployments
@@ -77,6 +94,10 @@ func clientsetForClusterOrFail(f *Framework, clusterName string) *kubeclientset.
 		framework.Failf("Secret for cluster %q has no value for key %q", clusterName, util.KubeconfigSecretDataKey)
 	}
 
+	return data
+}
+
+func clientsetForClusterOrFail(f *Framework, clusterName string, data []byte) *kubeclientset.Clientset {
 	cfg, err := clientcmd.Load(data)
 	framework.ExpectNoError(err, fmt.Sprintf("Error loading configuration for cluster %q: %+v", clusterName, err))
 
