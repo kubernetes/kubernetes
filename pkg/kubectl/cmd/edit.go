@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/cmdtools"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/crlf"
@@ -152,7 +152,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 
 	var (
 		windowsLineEndings = cmdutil.GetFlagBool(cmd, "windows-line-endings")
-		edit               = editor.NewDefaultEditor(f.EditorEnvs())
+		edit               = cmdtools.NewDefaultCmdTool("editor", f.EditorEnvs())
 	)
 
 	// editFn is invoked for each edit session (once with a list for normal edit, once for each individual resource in a edit-on-create invocation)
@@ -212,7 +212,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 
 			// launch the editor
 			editedDiff := edited
-			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), o.ext, buf)
+			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), o.ext, buf, nil)
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
