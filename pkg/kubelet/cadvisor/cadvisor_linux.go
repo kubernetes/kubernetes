@@ -95,10 +95,7 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
 func New(port uint, runtime string, rootPath string) (Interface, error) {
-	sysFs, err := sysfs.NewRealSysFs()
-	if err != nil {
-		return nil, err
-	}
+	sysFs := sysfs.NewRealSysFs()
 
 	// Create and start the cAdvisor container manager.
 	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}}, http.DefaultClient)
