@@ -9,7 +9,7 @@
   - [Downloads for v1.6.0](#downloads-for-v160)
     - [Client Binaries](#client-binaries-1)
     - [Server Binaries](#server-binaries-1)
-  - [WARNING: etcd backup strongly recommended](#warning:-etcd-backup-strongly-recommended)
+  - [WARNING: etcd backup strongly recommended](#warning-etcd-backup-strongly-recommended)
   - [Major updates and release themes](#major-updates-and-release-themes)
   - [Action Required](#action-required)
     - [Certificates API](#certificates-api)
@@ -336,8 +336,8 @@
   - [Known Issues](#known-issues-1)
   - [Notable Changes to Existing Behavior](#notable-changes-to-existing-behavior-1)
     - [Deployments](#deployments)
-    - [kubectl rolling-update: < v1.4.0 client vs >=v1.4.0 cluster](#kubectl-rolling-update:-<-v140-client-vs->=v140-cluster)
-    - [kubectl delete: < v1.4.0 client vs >=v1.4.0 cluster](#kubectl-delete:-<-v140-client-vs->=v140-cluster)
+    - [kubectl rolling-update: < v1.4.0 client vs >=v1.4.0 cluster](#kubectl-rolling-update--v140-client-vs-v140-cluster)
+    - [kubectl delete: < v1.4.0 client vs >=v1.4.0 cluster](#kubectl-delete--v140-client-vs-v140-cluster)
     - [DELETE operation in REST API](#delete-operation-in-rest-api)
   - [Action Required Before Upgrading](#action-required-before-upgrading-1)
 - [optionally, remove the old secret](#optionally-remove-the-old-secret)
@@ -642,6 +642,8 @@ Also, please note:
 * Kubernetes now supports up to 5,000 nodes via etcd v3, which is enabled by default.
 * [Role-based access control (RBAC)](https://kubernetes.io//docs/admin/authorization/rbac) has graduated to beta, and defines secure default roles for control plane, node, and controller components.
 * The [`kubeadm` cluster bootstrap tool](https://kubernetes.io/docs/getting-started-guides/kubeadm/) has graduated to beta. Some highlights:
+  * **WARNING:** A [known issue](https://github.com/kubernetes/kubernetes/issues/43815)
+    in v1.6.0 causes `kubeadm init` to hang. Please use v1.6.1, which fixes the issue.
   * All communication is now over TLS
   * Authorization plugins can be installed by kubeadm, including the new default of RBAC
   * The bootstrap token system now allows token management and expiration
@@ -694,6 +696,15 @@ Anyway, the cluster should get back to the proper size after 10 min.
          the new CRI + CNI code path.
       * If you are using plugins other than `bridge`, make sure you have
         updated custom plugins to the latest version that is compatible.
+* **CNI plugins now affect node readiness**
+  * Kubelet will now block node readiness until a CNI configuration file is
+    present in `/etc/cni/net.d` or a given custom CNI configuration path.
+    [This change](https://github.com/kubernetes/kubernetes/pull/43474) ensures
+    kubelet does not start pods that require networking before
+    [networking is ready](https://github.com/kubernetes/kubernetes/issues/43014).
+    This change may require changes to clients that gate pod creation and/or
+    scheduling on the node condition `type` `Ready` `status` being `True` for pods
+    that need to run prior to the network being ready.
 * **Enhance Kubelet QoS**:
   * Pods are placed under a new cgroup hierarchy by default. This feature requires
     draining and restarting the node as part of upgrades. To opt-out set

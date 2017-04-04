@@ -218,6 +218,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
 
 	var proxier proxy.ProxyProvider
+	var servicesHandler proxyconfig.ServiceConfigHandler
 	var endpointsHandler proxyconfig.EndpointsConfigHandler
 
 	proxyMode := getProxyMode(string(config.Mode), client.Core().Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
@@ -244,22 +245,20 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
 		proxier = proxierIPTables
+		servicesHandler = proxierIPTables
 		endpointsHandler = proxierIPTables
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
 		glog.V(0).Info("Tearing down userspace rules.")
 		userspace.CleanupLeftovers(iptInterface)
 	} else {
 		glog.V(0).Info("Using userspace Proxier.")
-
-		var proxierUserspace proxy.ProxyProvider
-
 		if runtime.GOOS == "windows" {
 			// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
 			// our config.EndpointsConfigHandler.
 			loadBalancer := winuserspace.NewLoadBalancerRR()
 			// set EndpointsConfigHandler to our loadBalancer
 			endpointsHandler = loadBalancer
-			proxierUserspace, err = winuserspace.NewProxier(
+			proxierUserspace, err := winuserspace.NewProxier(
 				loadBalancer,
 				net.ParseIP(config.BindAddress),
 				netshInterface,
@@ -268,13 +267,18 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 				config.IPTablesSyncPeriod.Duration,
 				config.UDPIdleTimeout.Duration,
 			)
+			if err != nil {
+				glog.Fatalf("Unable to create proxier: %v", err)
+			}
+			servicesHandler = proxierUserspace
+			proxier = proxierUserspace
 		} else {
 			// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
 			// our config.EndpointsConfigHandler.
 			loadBalancer := userspace.NewLoadBalancerRR()
 			// set EndpointsConfigHandler to our loadBalancer
 			endpointsHandler = loadBalancer
-			proxierUserspace, err = userspace.NewProxier(
+			proxierUserspace, err := userspace.NewProxier(
 				loadBalancer,
 				net.ParseIP(config.BindAddress),
 				iptInterface,
@@ -284,11 +288,12 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 				config.IPTablesMinSyncPeriod.Duration,
 				config.UDPIdleTimeout.Duration,
 			)
+			if err != nil {
+				glog.Fatalf("Unable to create proxier: %v", err)
+			}
+			servicesHandler = proxierUserspace
+			proxier = proxierUserspace
 		}
-		if err != nil {
-			glog.Fatalf("Unable to create proxier: %v", err)
-		}
-		proxier = proxierUserspace
 		// Remove artifacts from the pure-iptables Proxier, if not on Windows.
 		if runtime.GOOS != "windows" {
 			glog.V(0).Info("Tearing down pure-iptables proxy rules.")
@@ -306,7 +311,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
 	serviceConfig := proxyconfig.NewServiceConfig(client.Core().RESTClient(), config.ConfigSyncPeriod)
-	serviceConfig.RegisterHandler(proxier)
+	serviceConfig.RegisterHandler(servicesHandler)
 	go serviceConfig.Run(wait.NeverStop)
 
 	endpointsConfig := proxyconfig.NewEndpointsConfig(client.Core().RESTClient(), config.ConfigSyncPeriod)

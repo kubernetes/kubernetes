@@ -2564,10 +2564,6 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 		return "", err
 	}
 
-	return describeConfigMap(configMap)
-}
-
-func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", configMap.Name)
@@ -2580,7 +2576,15 @@ func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 			w.Write(LEVEL_0, "%s:\n----\n", k)
 			w.Write(LEVEL_0, "%s\n", string(v))
 		}
-
+		if describerSettings.ShowEvents {
+			events, err := d.Core().Events(namespace).Search(api.Scheme, configMap)
+			if err != nil {
+				return err
+			}
+			if events != nil {
+				DescribeEvents(events, w)
+			}
+		}
 		return nil
 	})
 }

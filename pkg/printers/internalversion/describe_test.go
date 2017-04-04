@@ -1245,6 +1245,14 @@ func TestDescribeEvents(t *testing.T) {
 				},
 			}, events),
 		},
+		"ConfigMap": &ConfigMapDescriber{
+			fake.NewSimpleClientset(&api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
 	}
 
 	for name, d := range m {

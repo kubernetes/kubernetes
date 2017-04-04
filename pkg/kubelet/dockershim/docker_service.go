@@ -420,6 +420,9 @@ func (ds *dockerService) getDockerAPIVersion() (*semver.Version, error) {
 	} else {
 		dv, err = ds.getDockerVersion()
 	}
+	if err != nil {
+		return nil, err
+	}
 
 	apiVersion, err := semver.Parse(dv.APIVersion)
 	if err != nil {

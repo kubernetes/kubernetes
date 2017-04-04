@@ -39,13 +39,13 @@ type HollowProxy struct {
 
 type FakeProxyHandler struct{}
 
-func (*FakeProxyHandler) OnServiceUpdate(services []api.Service)       {}
+func (*FakeProxyHandler) OnServiceUpdate(services []*api.Service)      {}
 func (*FakeProxyHandler) OnEndpointsUpdate(endpoints []*api.Endpoints) {}
 
 type FakeProxier struct{}
 
-func (*FakeProxier) OnServiceUpdate(services []api.Service) {}
-func (*FakeProxier) Sync()                                  {}
+func (*FakeProxier) OnServiceUpdate(services []*api.Service) {}
+func (*FakeProxier) Sync()                                   {}
 func (*FakeProxier) SyncLoop() {
 	select {}
 }

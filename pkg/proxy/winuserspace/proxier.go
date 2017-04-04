@@ -317,12 +317,10 @@ func getListenIPPortMap(service *api.Service, listenPort int, nodePort int) map[
 // OnServiceUpdate manages the active set of service proxies.
 // Active service proxies are reinitialized if found in the update set or
 // shutdown if missing from the update set.
-func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
+func (proxier *Proxier) OnServiceUpdate(services []*api.Service) {
 	glog.V(4).Infof("Received update notice: %+v", services)
 	activeServicePortPortals := make(map[ServicePortPortalName]bool) // use a map as a set
-	for i := range services {
-		service := &services[i]
-
+	for _, service := range services {
 		// if ClusterIP is "None" or empty, skip proxying
 		if !api.IsServiceIPSet(service) {
 			glog.V(3).Infof("Skipping service %s due to clusterIP = %q", types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, service.Spec.ClusterIP)
