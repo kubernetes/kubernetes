@@ -20,7 +20,12 @@ provides:
   kube-api-endpoint:
     interface: http
   cluster-dns:
+    # kube-dns is deprecated. Its functionality has been rolled into the
+    # kube-control interface. The cluster-dns relation will be removed in
+    # a future release.
     interface: kube-dns
+  kube-control:
+    interface: kube-control
   cni:
     interface: kubernetes-cni
     scope: container
