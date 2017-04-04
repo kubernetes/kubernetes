@@ -182,7 +182,6 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 		pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
 		ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
 	}
-
 	return pod
 }
 
