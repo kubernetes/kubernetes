@@ -53,7 +53,6 @@ type ClusterMap map[string]*Cluster
 type Cluster struct {
 	Name string
 	*kubeclientset.Clientset
-	BackendPod *v1.Pod // The backend pod, if one's been created.
 }
 
 // can not be moved to util, as By and Expect must be put in Ginkgo test unit

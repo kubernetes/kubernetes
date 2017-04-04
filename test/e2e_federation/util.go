@@ -337,9 +337,12 @@ func discoverService(f *fedframework.Framework, name string, exists bool, podNam
 	}
 }
 
-// createBackendPodsOrFail creates one pod in each cluster, and returns the created pods (in the same order as clusterClientSets).
-// If creation of any pod fails, the test fails (possibly with a partially created set of pods). No retries are attempted.
-func createBackendPodsOrFail(clusters fedframework.ClusterMap, namespace string, name string) {
+// BackendPodMap maps a cluster name to a backend pod created in that cluster
+type BackendPodMap map[string]*v1.Pod
+
+// createBackendPodsOrFail creates one pod in each cluster, and returns the created pods.  If creation of any pod fails,
+// the test fails (possibly with a partially created set of pods). No retries are attempted.
+func createBackendPodsOrFail(clusters fedframework.ClusterMap, namespace string, name string) BackendPodMap {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -356,19 +359,20 @@ func createBackendPodsOrFail(clusters fedframework.ClusterMap, namespace string,
 			RestartPolicy: v1.RestartPolicyAlways,
 		},
 	}
+	podMap := make(BackendPodMap)
 	for name, c := range clusters {
 		By(fmt.Sprintf("Creating pod %q in namespace %q in cluster %q", pod.Name, namespace, name))
 		createdPod, err := c.Clientset.Core().Pods(namespace).Create(pod)
 		framework.ExpectNoError(err, "Creating pod %q in namespace %q in cluster %q", name, namespace, name)
 		By(fmt.Sprintf("Successfully created pod %q in namespace %q in cluster %q: %v", pod.Name, namespace, name, *createdPod))
-		c.BackendPod = createdPod
+		podMap[name] = createdPod
 	}
+	return podMap
 }
 
 // deleteOneBackendPodOrFail deletes exactly one backend pod which must not be nil
 // The test fails if there are any errors.
-func deleteOneBackendPodOrFail(c *fedframework.Cluster) {
-	pod := c.BackendPod
+func deleteOneBackendPodOrFail(c *fedframework.Cluster, pod *v1.Pod) {
 	Expect(pod).ToNot(BeNil())
 	err := c.Clientset.Core().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 	msgFmt := fmt.Sprintf("Deleting Pod %q in namespace %q in cluster %q %%v", pod.Name, pod.Namespace, c.Name)
@@ -382,11 +386,13 @@ func deleteOneBackendPodOrFail(c *fedframework.Cluster) {
 
 // deleteBackendPodsOrFail deletes one pod from each cluster that has one.
 // If deletion of any pod fails, the test fails (possibly with a partially deleted set of pods). No retries are attempted.
-func deleteBackendPodsOrFail(clusters fedframework.ClusterMap, namespace string) {
+func deleteBackendPodsOrFail(clusters fedframework.ClusterMap, backendPods BackendPodMap) {
+	if backendPods == nil {
+		return
+	}
 	for name, c := range clusters {
-		if c.BackendPod != nil {
-			deleteOneBackendPodOrFail(c)
-			c.BackendPod = nil
+		if pod, ok := backendPods[name]; ok {
+			deleteOneBackendPodOrFail(c, pod)
 		} else {
 			By(fmt.Sprintf("No backend pod to delete for cluster %q", name))
 		}
