@@ -47,9 +47,8 @@ var FederatedServiceLabels = map[string]string{
 
 var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func() {
 	f := fedframework.NewDefaultFederatedFramework("federated-service")
-	var clusters fedframework.ClusterMap // All clusters, keyed by cluster name
+	var clusters fedframework.ClusterSlice
 	var federationName string
-	var primaryClusterName string // The name of the "primary" cluster
 
 	var _ = Describe("Without Clusters [NoCluster]", func() {
 		BeforeEach(func() {
@@ -84,7 +83,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				federationName = DefaultFederationName
 			}
 
-			clusters, primaryClusterName = f.GetRegisteredClusters()
+			clusters = f.GetRegisteredClusters()
 		})
 
 		Describe("Federated Service", func() {
@@ -246,8 +245,10 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				BeforeEach(func() {
 					fedframework.SkipUnlessFederated(f.ClientSet)
 
-					// Delete all the backend pods from the shard which is local to the discovery pod.
-					deleteOneBackendPodOrFail(clusters[primaryClusterName], backendPods[primaryClusterName])
+					// Delete the backend pod from the shard which is local to the discovery pod.
+					primaryCluster := clusters[0]
+					backendPod := backendPods[primaryCluster.Name]
+					deleteOneBackendPodOrFail(primaryCluster, backendPod)
 
 				})
 
@@ -289,7 +290,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 // verifyCascadingDeletionForService verifies that services are deleted from
 // underlying clusters when orphan dependents is false and they are not
 // deleted when orphan dependents is true.
-func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, clusters fedframework.ClusterMap, orphanDependents *bool, nsName string) {
+func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, clusters fedframework.ClusterSlice, orphanDependents *bool, nsName string) {
 	service := createServiceOrFail(clientset, nsName, FederatedServiceName)
 	serviceName := service.Name
 	// Check subclusters if the service was created there.
@@ -315,12 +316,12 @@ func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, cluste
 	errMessages := []string{}
 	// service should be present in underlying clusters unless orphanDependents is false.
 	shouldExist := orphanDependents == nil || *orphanDependents == true
-	for clusterName, clusterClientset := range clusters {
-		_, err := clusterClientset.Core().Services(nsName).Get(serviceName, metav1.GetOptions{})
+	for _, cluster := range clusters {
+		_, err := cluster.Core().Services(nsName).Get(serviceName, metav1.GetOptions{})
 		if shouldExist && errors.IsNotFound(err) {
-			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for service %s in cluster %s, expected service to exist", serviceName, clusterName))
+			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for service %s in cluster %s, expected service to exist", serviceName, cluster.Name))
 		} else if !shouldExist && !errors.IsNotFound(err) {
-			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for service %s in cluster %s, got error: %v", serviceName, clusterName, err))
+			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for service %s in cluster %s, got error: %v", serviceName, cluster.Name, err))
 		}
 	}
 	if len(errMessages) != 0 {

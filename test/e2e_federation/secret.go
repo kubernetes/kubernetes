@@ -42,7 +42,7 @@ const (
 
 // Create/delete secret api objects
 var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func() {
-	var clusters fedframework.ClusterMap // All clusters, keyed by cluster name
+	var clusters fedframework.ClusterSlice
 
 	f := fedframework.NewDefaultFederatedFramework("federated-secret")
 
@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			clusters, _ = f.GetRegisteredClusters()
+			clusters = f.GetRegisteredClusters()
 		})
 
 		AfterEach(func() {
@@ -108,7 +108,7 @@ func deleteAllSecretsOrFail(clientset *fedclientset.Clientset, nsName string) {
 // verifyCascadingDeletionForSecret verifies that secrets are deleted from
 // underlying clusters when orphan dependents is false and they are not
 // deleted when orphan dependents is true.
-func verifyCascadingDeletionForSecret(clientset *fedclientset.Clientset, clusters fedframework.ClusterMap, orphanDependents *bool, nsName string) {
+func verifyCascadingDeletionForSecret(clientset *fedclientset.Clientset, clusters fedframework.ClusterSlice, orphanDependents *bool, nsName string) {
 	secret := createSecretOrFail(clientset, nsName)
 	secretName := secret.Name
 	// Check subclusters if the secret was created there.
@@ -134,12 +134,12 @@ func verifyCascadingDeletionForSecret(clientset *fedclientset.Clientset, cluster
 	errMessages := []string{}
 	// secret should be present in underlying clusters unless orphanDependents is false.
 	shouldExist := orphanDependents == nil || *orphanDependents == true
-	for clusterName, clusterClientset := range clusters {
-		_, err := clusterClientset.Core().Secrets(nsName).Get(secretName, metav1.GetOptions{})
+	for _, cluster := range clusters {
+		_, err := cluster.Core().Secrets(nsName).Get(secretName, metav1.GetOptions{})
 		if shouldExist && errors.IsNotFound(err) {
-			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for secret %s in cluster %s, expected secret to exist", secretName, clusterName))
+			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for secret %s in cluster %s, expected secret to exist", secretName, cluster.Name))
 		} else if !shouldExist && !errors.IsNotFound(err) {
-			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for secret %s in cluster %s, got error: %v", secretName, clusterName, err))
+			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for secret %s in cluster %s, got error: %v", secretName, cluster.Name, err))
 		}
 	}
 	if len(errMessages) != 0 {
@@ -213,7 +213,7 @@ func updateSecretOrFail(clientset *fedclientset.Clientset, nsName string, secret
 	return newSecret
 }
 
-func waitForSecretShardsOrFail(nsName string, secret *v1.Secret, clusters fedframework.ClusterMap) {
+func waitForSecretShardsOrFail(nsName string, secret *v1.Secret, clusters fedframework.ClusterSlice) {
 	framework.Logf("Waiting for secret %q in %d clusters", secret.Name, len(clusters))
 	for _, c := range clusters {
 		waitForSecretOrFail(c.Clientset, nsName, secret, true, FederatedSecretTimeout)
@@ -243,7 +243,7 @@ func waitForSecretOrFail(clientset *kubeclientset.Clientset, nsName string, secr
 	}
 }
 
-func waitForSecretShardsUpdatedOrFail(nsName string, secret *v1.Secret, clusters fedframework.ClusterMap) {
+func waitForSecretShardsUpdatedOrFail(nsName string, secret *v1.Secret, clusters fedframework.ClusterSlice) {
 	framework.Logf("Waiting for secret %q in %d clusters", secret.Name, len(clusters))
 	for _, c := range clusters {
 		waitForSecretUpdateOrFail(c.Clientset, nsName, secret, FederatedSecretTimeout)

@@ -74,12 +74,12 @@ var _ = framework.KubeDescribe("Federated ReplicaSet [Feature:Federation]", func
 	// e2e cases for federated replicaset controller
 	Describe("Features", func() {
 		var (
-			clusters fedframework.ClusterMap
+			clusters fedframework.ClusterSlice
 		)
 
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
-			clusters, _ = f.GetRegisteredClusters()
+			clusters = f.GetRegisteredClusters()
 		})
 
 		// e2e cases for federated replicaset controller
@@ -200,7 +200,7 @@ var _ = framework.KubeDescribe("Federated ReplicaSet [Feature:Federation]", func
 	})
 })
 
-func createAndWaitForReplicasetOrFail(clientset *fedclientset.Clientset, nsName string, clusters fedframework.ClusterMap) *v1beta1.ReplicaSet {
+func createAndWaitForReplicasetOrFail(clientset *fedclientset.Clientset, nsName string, clusters fedframework.ClusterSlice) *v1beta1.ReplicaSet {
 	rs := createReplicaSetOrFail(clientset, newReplicaSet(nsName, FederationReplicaSetPrefix, 5, nil))
 	// Check subclusters if the replicaSet was created there.
 	By(fmt.Sprintf("Waiting for replica sets %s to be created in all underlying clusters", rs.Name))
@@ -220,7 +220,7 @@ func createAndWaitForReplicasetOrFail(clientset *fedclientset.Clientset, nsName 
 	return rs
 }
 
-func createAndUpdateFedRSWithPref(clientset *fedclientset.Clientset, nsName string, clusters fedframework.ClusterMap, pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) *v1beta1.ReplicaSet {
+func createAndUpdateFedRSWithPref(clientset *fedclientset.Clientset, nsName string, clusters fedframework.ClusterSlice, pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) *v1beta1.ReplicaSet {
 	framework.Logf("Replicas: %d, Preference: %#v", replicas, pref)
 	rs := newReplicaSet(nsName, FederationReplicaSetPrefix, replicas, pref)
 	rs = createReplicaSetOrFail(clientset, rs)
@@ -254,18 +254,18 @@ func deleteAllReplicaSetsOrFail(clientset *fedclientset.Clientset, nsName string
 // verifyCascadingDeletionForReplicaSet verifies that replicaSets are deleted
 // from underlying clusters when orphan dependents is false and they are not
 // deleted when orphan dependents is true.
-func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset, clusters fedframework.ClusterMap, orphanDependents *bool, nsName, rsName string) {
+func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset, clusters fedframework.ClusterSlice, orphanDependents *bool, nsName, rsName string) {
 	By(fmt.Sprintf("Deleting replica set %s", rsName))
 	deleteReplicaSetOrFail(clientset, nsName, rsName, orphanDependents)
 
 	By(fmt.Sprintf("Verifying replica sets %s in underlying clusters", rsName))
 	errMessages := []string{}
-	for clusterName, clusterClientset := range clusters {
-		_, err := clusterClientset.Extensions().ReplicaSets(nsName).Get(rsName, metav1.GetOptions{})
+	for _, cluster := range clusters {
+		_, err := cluster.Extensions().ReplicaSets(nsName).Get(rsName, metav1.GetOptions{})
 		if (orphanDependents == nil || *orphanDependents == true) && errors.IsNotFound(err) {
-			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for replica set %s in cluster %s, expected replica set to exist", rsName, clusterName))
+			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for replica set %s in cluster %s, expected replica set to exist", rsName, cluster.Name))
 		} else if (orphanDependents != nil && *orphanDependents == false) && (err == nil || !errors.IsNotFound(err)) {
-			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for replica set %s in cluster %s, got error: %v", rsName, clusterName, err))
+			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for replica set %s in cluster %s, got error: %v", rsName, cluster.Name, err))
 		}
 	}
 	if len(errMessages) != 0 {
@@ -273,7 +273,7 @@ func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset, clu
 	}
 }
 
-func generateFedRSPrefsWithWeight(clusters fedframework.ClusterMap) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
+func generateFedRSPrefsWithWeight(clusters fedframework.ClusterSlice) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
 	By("Generating replicaset preferences with weights")
 	clusterNames := extractClusterNames(clusters)
 	pref = &federation.FederatedReplicaSetPreferences{
@@ -294,7 +294,7 @@ func generateFedRSPrefsWithWeight(clusters fedframework.ClusterMap) (pref *feder
 	return
 }
 
-func generateFedRSPrefsWithMin(clusters fedframework.ClusterMap) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
+func generateFedRSPrefsWithMin(clusters fedframework.ClusterSlice) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
 	By("Generating replicaset preferences with min replicas")
 	clusterNames := extractClusterNames(clusters)
 	pref = &federation.FederatedReplicaSetPreferences{
@@ -321,7 +321,7 @@ func generateFedRSPrefsWithMin(clusters fedframework.ClusterMap) (pref *federati
 	return
 }
 
-func generateFedRSPrefsWithMax(clusters fedframework.ClusterMap) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
+func generateFedRSPrefsWithMax(clusters fedframework.ClusterSlice) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
 	By("Generating replicaset preferences with max replicas")
 	clusterNames := extractClusterNames(clusters)
 	pref = &federation.FederatedReplicaSetPreferences{
@@ -354,7 +354,7 @@ func updateFedRSPrefsRebalance(pref *federation.FederatedReplicaSetPreferences, 
 	return pref
 }
 
-func generateFedRSPrefsForRebalancing(clusters fedframework.ClusterMap) (pref1, pref2 *federation.FederatedReplicaSetPreferences, replicas int32, expect1, expect2 map[string]int32) {
+func generateFedRSPrefsForRebalancing(clusters fedframework.ClusterSlice) (pref1, pref2 *federation.FederatedReplicaSetPreferences, replicas int32, expect1, expect2 map[string]int32) {
 	By("Generating replicaset for rebalancing")
 	clusterNames := extractClusterNames(clusters)
 	replicas = 3
@@ -382,12 +382,12 @@ func generateFedRSPrefsForRebalancing(clusters fedframework.ClusterMap) (pref1, 
 	return
 }
 
-func waitForReplicaSetOrFail(c *fedclientset.Clientset, namespace string, replicaSetName string, clusters fedframework.ClusterMap, expect map[string]int32) {
+func waitForReplicaSetOrFail(c *fedclientset.Clientset, namespace string, replicaSetName string, clusters fedframework.ClusterSlice, expect map[string]int32) {
 	err := waitForReplicaSet(c, namespace, replicaSetName, clusters, expect)
 	framework.ExpectNoError(err, "Failed to verify replica set \"%s/%s\", err: %v", namespace, replicaSetName, err)
 }
 
-func waitForReplicaSet(c *fedclientset.Clientset, namespace string, replicaSetName string, clusters fedframework.ClusterMap, expect map[string]int32) error {
+func waitForReplicaSet(c *fedclientset.Clientset, namespace string, replicaSetName string, clusters fedframework.ClusterSlice, expect map[string]int32) error {
 	framework.Logf("waitForReplicaSet: %s/%s; clusters: %v; expect: %v", namespace, replicaSetName, clusters, expect)
 	err := wait.Poll(10*time.Second, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
 		frs, err := c.ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
@@ -530,10 +530,10 @@ func newReplicaSetWithName(namespace string, name string, replicas int32, pref *
 	return rs
 }
 
-func extractClusterNames(clusters fedframework.ClusterMap) []string {
+func extractClusterNames(clusters fedframework.ClusterSlice) []string {
 	clusterNames := make([]string, 0, len(clusters))
-	for clusterName := range clusters {
-		clusterNames = append(clusterNames, clusterName)
+	for _, cluster := range clusters {
+		clusterNames = append(clusterNames, cluster.Name)
 	}
 	return clusterNames
 }
