@@ -31,6 +31,9 @@ type Attributes struct {
 	// Docker version.
 	DockerVersion string `json:"docker_version"`
 
+	// Docker API version.
+	DockerAPIVersion string `json:"docker_api_version"`
+
 	// cAdvisor version.
 	CadvisorVersion string `json:"cadvisor_version"`
 
@@ -74,6 +77,7 @@ func GetAttributes(mi *v1.MachineInfo, vi *v1.VersionInfo) Attributes {
 		KernelVersion:      vi.KernelVersion,
 		ContainerOsVersion: vi.ContainerOsVersion,
 		DockerVersion:      vi.DockerVersion,
+		DockerAPIVersion:   vi.DockerAPIVersion,
 		CadvisorVersion:    vi.CadvisorVersion,
 		NumCores:           mi.NumCores,
 		CpuFrequency:       mi.CpuFrequency,
