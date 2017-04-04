@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package autoscaling
 
 import (
 	"fmt"
@@ -119,7 +119,7 @@ var _ = framework.KubeDescribe("DNS horizontal autoscaling", func() {
 		originalSizes := make(map[string]int)
 		sum := 0
 		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
-			size, err := GroupSize(mig)
+			size, err := framework.GroupSize(mig)
 			Expect(err).NotTo(HaveOccurred())
 			By(fmt.Sprintf("Initial size of %s: %d", mig, size))
 			originalSizes[mig] = size
