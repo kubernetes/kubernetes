@@ -28,7 +28,6 @@ go_test(
         "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
-        "//pkg/util/term:go_default_library",
         "//vendor:github.com/stretchr/testify/require",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",

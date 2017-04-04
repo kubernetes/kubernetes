@@ -14,6 +14,7 @@ go_library(
         "doc.go",
         "errorstream.go",
         "remotecommand.go",
+        "resize.go",
         "v1.go",
         "v2.go",
         "v3.go",
@@ -58,9 +59,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/client/unversioned/remotecommand/resize:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
