@@ -453,25 +453,13 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			}
 
 			BeforeEach(func() {
-<<<<<<< HEAD
+				framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 				NFSconfig = framework.VolumeTestConfig{
 					Namespace:   ns,
 					Prefix:      "nfs",
 					ServerImage: framework.NfsServerImage,
 					ServerPorts: []int{2049},
 					ServerArgs:  []string{"-G", "777", "/exports"},
-=======
-				framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-				// TODO: delete after pr #33447 is merged
-				framework.SkipIfProviderIs("gke")
-
-				NFSconfig = VolumeTestConfig{
-					namespace:   ns,
-					prefix:      "nfs",
-					serverImage: NfsServerImage,
-					serverPorts: []int{2049},
-					serverArgs:  []string{"-G", "777", "/exports"},
->>>>>>> add disruptive tests to verify host clean up. Issues: #31272, #37657.
 				}
 				nfsServerPod, nfsIP = createNfsServerPod(c, NFSconfig)
 			})
