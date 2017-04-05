@@ -169,7 +169,6 @@ pkg/client/metrics
 pkg/client/metrics/prometheus
 pkg/client/unversioned
 pkg/client/unversioned/remotecommand
-pkg/client/unversioned/remotecommand/resize
 pkg/cloudprovider/providers
 pkg/cloudprovider/providers/azure
 pkg/cloudprovider/providers/cloudstack
