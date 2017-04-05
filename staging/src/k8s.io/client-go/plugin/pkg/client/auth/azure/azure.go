@@ -40,7 +40,6 @@ import (
 
 const (
 	azureTimeFormat = "\"2006-01-02 15:04:05.99999\""
-	azureAuthority  = "https://login.microsoftonline.com"
 	uuidFormat      = "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}"
 	azureTokenKey   = "azureTokenKey"
 
@@ -371,8 +370,7 @@ func (ts *azureTokenSourceFromFile) Token() (*azureToken, error) {
 		}
 	}
 	if tenantToken == nil {
-		return nil, fmt.Errorf("no token issued by authority %s found in ~/.azure/accessTokens.json file",
-			azureAuthority)
+		return nil, errors.New("no tenant token for in ~/.azure/accessTokens.json file")
 	}
 
 	return &azureToken{
@@ -391,7 +389,7 @@ func (ts *azureTokenSourceFromFile) Token() (*azureToken, error) {
 }
 
 func (ts *azureTokenSourceFromFile) isTenantAuthroity(authority string) bool {
-	r := regexp.MustCompile(fmt.Sprintf("^%s/%s$", azureAuthority, uuidFormat))
+	r := regexp.MustCompile(fmt.Sprintf("^https://.*/%s$", uuidFormat))
 	return r.MatchString(authority)
 }
 
