@@ -829,7 +829,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 
 	// If run in 'hostnetwork' mode, then copy the host's /etc/resolv.conf and /etc/hosts,
 	// and add mounts.
-	if kubecontainer.IsHostNetworkPod(pod) {
+	if kubecontainer.IsHostNetworkPod(&pod.Spec) {
 		hostsMount, resolvMount, err := makeHostNetworkMount(opts)
 		if err != nil {
 			return err
@@ -947,14 +947,14 @@ func serviceFilePath(serviceName string) string {
 // The pod does not run in host network. And
 // The pod runs inside a netns created outside of rkt.
 func (r *Runtime) shouldCreateNetns(pod *v1.Pod) bool {
-	return !kubecontainer.IsHostNetworkPod(pod) && r.network.PluginName() != network.DefaultPluginName
+	return !kubecontainer.IsHostNetworkPod(&pod.Spec) && r.network.PluginName() != network.DefaultPluginName
 }
 
 // usesRktHostNetwork returns true if:
 // The pod runs in the host network. Or
 // The pod runs inside a netns created outside of rkt.
 func (r *Runtime) usesRktHostNetwork(pod *v1.Pod) bool {
-	return kubecontainer.IsHostNetworkPod(pod) || r.shouldCreateNetns(pod)
+	return kubecontainer.IsHostNetworkPod(&pod.Spec) || r.shouldCreateNetns(pod)
 }
 
 // generateRunCommand crafts a 'rkt run-prepared' command with necessary parameters.
@@ -1002,7 +1002,7 @@ func (r *Runtime) generateRunCommand(pod *v1.Pod, uuid, netnsName string) (strin
 		runPrepared = append(runPrepared, fmt.Sprintf("--net=%s", defaultNetworkName))
 	}
 
-	if kubecontainer.IsHostNetworkPod(pod) {
+	if kubecontainer.IsHostNetworkPod(&pod.Spec) {
 		// TODO(yifan): Let runtimeHelper.GeneratePodHostNameAndDomain() to handle this.
 		hostname, err = r.os.Hostname()
 		if err != nil {
@@ -1188,7 +1188,7 @@ func (r *Runtime) preparePod(pod *v1.Pod, podIP string, pullSecrets []v1.Secret,
 	// TODO per container finishedAt, not just per pod
 	markPodFinished := podFinishedMarkCommand(r.touchPath, r.runtimeHelper.GetPodDir(pod.UID), uuid)
 
-	hostNetwork := kubecontainer.IsHostNetworkPod(pod)
+	hostNetwork := kubecontainer.IsHostNetworkPod(&pod.Spec)
 	units := []*unit.UnitOption{
 		newUnitOption("Service", "ExecStart", runPrepared),
 		newUnitOption("Service", "ExecStopPost", markPodFinished),
@@ -1767,7 +1767,7 @@ func (r *Runtime) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
+			if kubecontainer.ShouldContainerBeRestarted(&container, &pod.Spec, podStatus) {
 				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				// TODO(yifan): Containers in one pod are fate-sharing at this moment, see:
 				// https://github.com/appc/spec/issues/276.

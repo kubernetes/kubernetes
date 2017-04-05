@@ -1314,7 +1314,7 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) 
 			return nil, nil, false, err
 		}
 	}
-	useClusterFirstPolicy := ((pod.Spec.DNSPolicy == v1.DNSClusterFirst && !kubecontainer.IsHostNetworkPod(pod)) || pod.Spec.DNSPolicy == v1.DNSClusterFirstWithHostNet)
+	useClusterFirstPolicy := ((pod.Spec.DNSPolicy == v1.DNSClusterFirst && !kubecontainer.IsHostNetworkPod(&pod.Spec)) || pod.Spec.DNSPolicy == v1.DNSClusterFirstWithHostNet)
 	if useClusterFirstPolicy && len(kl.clusterDNS) == 0 {
 		// clusterDNS is not known.
 		// pod with ClusterDNSFirst Policy cannot be created
@@ -1474,7 +1474,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
-	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !pod.IsHostNetworkPod() {
+	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !kubecontainer.IsHostNetworkPod(pod.GetSpec()) {
 		return fmt.Errorf("network is not ready: %v", rs)
 	}
 
@@ -1527,11 +1527,11 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	if pod.IsStatic() {
 		deleted := false
 		if mirrorPod != nil {
-			if mirrorPod.DeletionTimestampIsSet() || !mirrorPod.IsMirrorPodOf(pod) {
+			if mirrorPod.DeletionTimestampIsSet() || !kubepod.IsMirrorPodOf(mirrorPod, pod) {
 				// The mirror pod is semantically different from the static pod. Remove
 				// it. The mirror pod will get recreated later.
 				glog.Warningf("Deleting mirror pod %q because it is outdated", mirrorPod.String())
-				if err := kl.podManager.DeleteMirrorPod(pod.GetPodFullName()); err != nil {
+				if err := kl.podManager.DeleteMirrorPod(pod.GetFullName()); err != nil {
 					glog.Errorf("Failed deleting mirror pod %q: %v", mirrorPod.String(), err)
 				} else {
 					deleted = true
@@ -1580,7 +1580,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		return err
 	}
 	if egress != nil || ingress != nil {
-		if pod.IsHostNetworkPod() {
+		if kubecontainer.IsHostNetworkPod(pod.GetSpec()) {
 			kl.recorder.Event(pod.GetAPIPod(), v1.EventTypeWarning, events.HostNetworkNotSupported, "Bandwidth shaping is not currently supported on the host network")
 		} else if kl.shaper != nil {
 			if len(apiPodStatus.PodIP) > 0 {
@@ -1949,7 +1949,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// the apiserver and no action (other than cleanup) is required.
 		pod := kl.podManager.AddPod(p)
 
-		if pod.IsMirrorPod() {
+		if pod.IsMirror() {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
@@ -1981,7 +1981,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	for _, apiPod := range pods {
 		pod := kubepod.NewPod(apiPod)
 		kl.podManager.UpdatePod(pod)
-		if pod.IsMirrorPod() {
+		if pod.IsMirror() {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
@@ -1999,7 +1999,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	for _, apiPod := range pods {
 		pod := kubepod.NewPod(apiPod)
 		kl.podManager.DeletePod(pod)
-		if pod.IsMirrorPod() {
+		if pod.IsMirror() {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}

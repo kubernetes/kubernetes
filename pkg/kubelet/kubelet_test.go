@@ -823,7 +823,7 @@ func TestCreateMirrorPod(t *testing.T) {
 			updateType: updateType,
 		})
 		assert.NoError(t, err)
-		podFullName := pod.GetPodFullName()
+		podFullName := pod.GetFullName()
 		assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
 		assert.Equal(t, 1, manager.NumOfPods(), "Expected only 1 mirror pod %q, got %+v", podFullName, manager.GetPods())
 	}
@@ -864,7 +864,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 		updateType: kubetypes.SyncPodUpdate,
 	})
 	assert.NoError(t, err)
-	name := pods[0].GetPodFullName()
+	name := pods[0].GetFullName()
 	creates, deletes := manager.GetCounts(name)
 	if creates != 1 || deletes != 1 {
 		t.Errorf("expected 1 creation and 1 deletion of %q, got %d, %d", name, creates, deletes)
@@ -911,7 +911,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	kl.HandlePodCleanups()
 	assert.Len(t, manager.GetPods(), 0, "Expected 0 mirror pods")
 	for _, pod := range orphanPods {
-		name := pod.GetPodFullName()
+		name := pod.GetFullName()
 		creates, deletes := manager.GetCounts(name)
 		if creates != 0 || deletes != 1 {
 			t.Errorf("expected 0 creation and one deletion of %q, got %d, %d", name, creates, deletes)

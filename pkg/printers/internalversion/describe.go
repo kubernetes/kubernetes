@@ -2316,7 +2316,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 	}
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
-		req, limit, err := api.PodRequestsAndLimits(&pod)
+		req, limit, err := api.PodRequestsAndLimits(&pod.Spec)
 		if err != nil {
 			return err
 		}
@@ -2364,7 +2364,7 @@ func filterTerminatedPods(pods []*api.Pod) []*api.Pod {
 func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity, err error) {
 	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
 	for _, pod := range podList.Items {
-		podReqs, podLimits, err := api.PodRequestsAndLimits(&pod)
+		podReqs, podLimits, err := api.PodRequestsAndLimits(&pod.Spec)
 		if err != nil {
 			return nil, nil, err
 		}

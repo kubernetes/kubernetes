@@ -107,7 +107,7 @@ func ResourceConfigForPod(pod *kubepod.Pod) *ResourceConfig {
 	cpuQuota, cpuPeriod := MilliCPUToQuota(cpuLimits)
 
 	// determine the qos class
-	qosClass := pod.GetPodQOS()
+	qosClass := pod.GetQOS()
 
 	// build the result
 	result := &ResourceConfig{}

@@ -206,7 +206,7 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 		for i, policy := range policies {
 			pod.Spec.RestartPolicy = policy
 			e := expected[c.Name][i]
-			r := ShouldContainerBeRestarted(&c, pod, podStatus)
+			r := ShouldContainerBeRestarted(&c, &pod.Spec, podStatus)
 			if r != e {
 				t.Errorf("Restart for container %q with restart policy %q expected %t, got %t",
 					c.Name, policy, e, r)
@@ -304,5 +304,28 @@ func TestMakePortMappings(t *testing.T) {
 	for i, tt := range tests {
 		actual := MakePortMappings(tt.container)
 		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
+	}
+}
+
+func TestGetContainerSpec(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "no-history"},
+				{Name: "alive"},
+				{Name: "succeed"},
+				{Name: "failed"},
+				{Name: "unknown"},
+			},
+		},
+	}
+	for i, c := range pod.Spec.Containers {
+		container := GetContainerSpec(&pod.Spec, c.Name)
+		assert.Equal(t, *container, pod.Spec.Containers[i])
 	}
 }

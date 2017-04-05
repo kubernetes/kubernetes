@@ -1198,7 +1198,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *kubepod.Pod, podStatus *kubecontain
 			glog.V(4).Infof("Cannot get host IP: %v", err)
 		} else {
 			s.HostIP = hostIP.String()
-			if pod.IsHostNetworkPod() && s.PodIP == "" {
+			if kubecontainer.IsHostNetworkPod(pod.GetSpec()) && s.PodIP == "" {
 				s.PodIP = hostIP.String()
 			}
 		}
@@ -1214,7 +1214,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *kubepod.Pod, podStatus *kubecon
 	var apiPodStatus v1.PodStatus
 	apiPodStatus.PodIP = podStatus.IP
 	// set status for Pods created on versions of kube older than 1.6
-	apiPodStatus.QOSClass = pod.GetPodQOS()
+	apiPodStatus.QOSClass = pod.GetQOS()
 
 	apiPodStatus.ContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,
@@ -1331,7 +1331,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *kubepod.Pod, podStatus *ku
 			}
 		}
 		// If a container should be restarted in next syncpod, it is *Waiting*.
-		if !pod.ShouldContainerBeRestarted(&container, podStatus) {
+		if !kubecontainer.ShouldContainerBeRestarted(&container, pod.GetSpec(), podStatus) {
 			continue
 		}
 		status := statuses[container.Name]
@@ -1501,7 +1501,7 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 		if !found || (string(podUID) != "" && pod.UID() != podUID) {
 			return nil, fmt.Errorf("pod %s not found", podFullName)
 		}
-		containerSpec := pod.GetContainerSpec(containerName)
+		containerSpec := kubecontainer.GetContainerSpec(pod.GetSpec(), containerName)
 		if containerSpec == nil {
 			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
 		}

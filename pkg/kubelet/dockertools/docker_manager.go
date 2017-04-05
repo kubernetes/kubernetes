@@ -1046,7 +1046,7 @@ func (dm *DockerManager) podInfraContainerChanged(pod *v1.Pod, podInfraContainer
 	var ports []v1.ContainerPort
 
 	// Check network mode.
-	if kubecontainer.IsHostNetworkPod(pod) {
+	if kubecontainer.IsHostNetworkPod(&pod.Spec) {
 		dockerPodInfraContainer, err := dm.client.InspectContainer(podInfraContainerStatus.ID.ID)
 		if err != nil {
 			return false, err
@@ -1763,7 +1763,7 @@ func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container,
 	}
 
 	utsMode := ""
-	if kubecontainer.IsHostNetworkPod(pod) {
+	if kubecontainer.IsHostNetworkPod(&pod.Spec) {
 		utsMode = namespaceModeHost
 	}
 
@@ -1963,7 +1963,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *v1.Pod) (kubecontainer.Doc
 	netNamespace := ""
 	var ports []v1.ContainerPort
 
-	if kubecontainer.IsHostNetworkPod(pod) {
+	if kubecontainer.IsHostNetworkPod(&pod.Spec) {
 		netNamespace = namespaceModeHost
 	} else if dm.pluginDisablesDockerNetworking() {
 		netNamespace = "none"
@@ -2087,7 +2087,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *v1.Pod, podStatus *kube
 
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
+			if kubecontainer.ShouldContainerBeRestarted(&container, &pod.Spec, podStatus) {
 				// If we are here it means that the container is dead and should be restarted, or never existed and should
 				// be created. We may be inserting this ID again if the container has changed and it has
 				// RestartPolicy::Always, but it's not a big deal.
@@ -2286,7 +2286,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 
 		setupNetworkResult := kubecontainer.NewSyncResult(kubecontainer.SetupNetwork, kubecontainer.GetPodFullName(pod))
 		result.AddSyncResult(setupNetworkResult)
-		if !kubecontainer.IsHostNetworkPod(pod) {
+		if !kubecontainer.IsHostNetworkPod(&pod.Spec) {
 			if err := dm.network.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID.ContainerID(), pod.Annotations); err != nil {
 				setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, err.Error())
 				glog.Error(err)

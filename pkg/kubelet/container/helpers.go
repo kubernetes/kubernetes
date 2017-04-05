@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
@@ -63,7 +62,7 @@ type RuntimeHelper interface {
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
+func ShouldContainerBeRestarted(container *v1.Container, podSpec *v1.PodSpec, podStatus *PodStatus) bool {
 	// Get latest container status.
 	status := podStatus.FindContainerStatusByName(container.Name)
 	// If the container was never started before, we should start it.
@@ -80,14 +79,14 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 		return true
 	}
 	// Check RestartPolicy for dead container
-	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
-		glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+	if podSpec.RestartPolicy == v1.RestartPolicyNever {
+		glog.V(4).Infof("Already ran container %q of pod with RestartPolicy: Never, do nothing", container.Name)
 		return false
 	}
-	if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
+	if podSpec.RestartPolicy == v1.RestartPolicyOnFailure {
 		// Check the exit code.
 		if status.ExitCode == 0 {
-			glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+			glog.V(4).Infof("Already successfully ran container %q of pod with RestartPolicy: OnFailure, do nothing", container.Name)
 			return false
 		}
 	}
@@ -212,8 +211,8 @@ func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp
 }
 
 // Pod must not be nil.
-func IsHostNetworkPod(pod *v1.Pod) bool {
-	return pod.Spec.HostNetwork
+func IsHostNetworkPod(podSpec *v1.PodSpec) bool {
+	return podSpec.HostNetwork
 }
 
 // TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
@@ -292,15 +291,15 @@ func (r *containerCommandRunnerWrapper) RunInContainer(id ContainerID, cmd []str
 }
 
 // GetContainerSpec gets the container spec by containerName.
-func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
-	for i, c := range pod.Spec.Containers {
+func GetContainerSpec(podSpec *v1.PodSpec, containerName string) *v1.Container {
+	for i, c := range podSpec.Containers {
 		if containerName == c.Name {
-			return &pod.Spec.Containers[i]
+			return &podSpec.Containers[i]
 		}
 	}
-	for i, c := range pod.Spec.InitContainers {
+	for i, c := range podSpec.InitContainers {
 		if containerName == c.Name {
-			return &pod.Spec.InitContainers[i]
+			return &podSpec.InitContainers[i]
 		}
 	}
 	return nil

@@ -444,7 +444,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully: (%d, %+v)", pod.String(), status.version, status.status)
 			m.apiStatusVersions[pod.UID()] = status.version
-			if pod.IsMirrorPod() {
+			if pod.IsMirror() {
 				// We don't handle graceful deletion of mirror pods.
 				return
 			}
@@ -479,7 +479,7 @@ func (m *manager) canBeDeleted(uid types.UID, status v1.PodStatus) bool {
 	if !ok {
 		return false
 	}
-	return !pod.IsMirrorPod() && m.podDeletionSafety.OkToDeletePod(pod)
+	return !pod.IsMirror() && m.podDeletionSafety.OkToDeletePod(pod)
 }
 
 // needsReconcile compares the given status with the status in the pod manager (which

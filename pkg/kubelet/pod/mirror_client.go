@@ -61,7 +61,7 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 	for k, v := range pod.Annotations {
 		copyPod.Annotations[k] = v
 	}
-	hash := getPodHash(pod)
+	hash := getPodHash(pod.Annotations)
 	copyPod.Annotations[kubetypes.ConfigMirrorAnnotationKey] = hash
 	apiPod, err := mc.apiserverClient.Core().Pods(copyPod.Namespace).Create(&copyPod)
 	if err != nil && errors.IsAlreadyExists(err) {
@@ -90,22 +90,32 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
 	return nil
 }
 
-func IsStaticPod(pod *v1.Pod) bool {
-	source, err := kubetypes.GetPodSource(pod)
-	return err == nil && source != kubetypes.ApiserverSource
-}
-
+// IsMirror returns true if the pod is a mirror pod
 func IsMirrorPod(pod *v1.Pod) bool {
 	_, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return ok
 }
 
-func getHashFromMirrorPod(pod *v1.Pod) (string, bool) {
-	hash, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
+func getHashFromMirrorPod(annotations map[string]string) (string, bool) {
+	hash, ok := annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return hash, ok
 }
 
-func getPodHash(pod *v1.Pod) string {
+func getPodHash(annotations map[string]string) string {
 	// The annotation exists for all static pods.
-	return pod.Annotations[kubetypes.ConfigHashAnnotationKey]
+	return annotations[kubetypes.ConfigHashAnnotationKey]
+}
+
+// IsMirrorPodOf returns true if mirrorPod is a correct representation of
+// pod; false otherwise.
+func IsMirrorPodOf(mirrorPod *Pod, pod *Pod) bool {
+	// Check name and namespace first.
+	if pod.Name() != mirrorPod.Name() || pod.Namespace() != mirrorPod.Namespace() {
+		return false
+	}
+	hash, ok := getHashFromMirrorPod(mirrorPod.Annotations())
+	if !ok {
+		return false
+	}
+	return hash == getPodHash(pod.Annotations())
 }

@@ -75,7 +75,7 @@ func canRunPod(pod *kubepod.Pod) error {
 
 // Determined whether the specified pod is allowed to use host networking
 func allowHostNetwork(pod *kubepod.Pod) (bool, error) {
-	podSource, err := pod.GetPodSource()
+	podSource, err := pod.GetSource()
 	if err != nil {
 		return false, err
 	}
@@ -89,7 +89,7 @@ func allowHostNetwork(pod *kubepod.Pod) (bool, error) {
 
 // Determined whether the specified pod is allowed to use host networking
 func allowHostPID(pod *kubepod.Pod) (bool, error) {
-	podSource, err := pod.GetPodSource()
+	podSource, err := pod.GetSource()
 	if err != nil {
 		return false, err
 	}
@@ -103,7 +103,7 @@ func allowHostPID(pod *kubepod.Pod) (bool, error) {
 
 // Determined whether the specified pod is allowed to use host ipc
 func allowHostIPC(pod *kubepod.Pod) (bool, error) {
-	podSource, err := pod.GetPodSource()
+	podSource, err := pod.GetSource()
 	if err != nil {
 		return false, err
 	}

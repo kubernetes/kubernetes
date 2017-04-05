@@ -23,5 +23,5 @@ import (
 type FakePodDeletionSafetyProvider struct{}
 
 func (f *FakePodDeletionSafetyProvider) OkToDeletePod(pod *kubepod.Pod) bool {
-	return !pod.IsMirrorPod() && pod.DeletionTimestampIsSet()
+	return !pod.IsMirror() && pod.DeletionTimestampIsSet()
 }

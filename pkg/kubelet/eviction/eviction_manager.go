@@ -26,12 +26,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -110,12 +108,12 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 	// Admit Critical pods even under resource pressure since they are required for system stability.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && attrs.Pod.IsCritical() {
+	if attrs.Pod.IsCritical() {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 	// the node has memory pressure, admit if not best-effort
 	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
-		notBestEffort := v1.PodQOSBestEffort != attrs.Pod.GetPodQOS()
+		notBestEffort := v1.PodQOSBestEffort != attrs.Pod.GetQOS()
 		if notBestEffort {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
@@ -334,8 +332,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 		// do not evict such pods. Static pods are not re-admitted after evictions.
 		// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-		if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-			pod.IsCritical() && pod.IsStatic() {
+		if pod.IsCritical() && pod.IsStatic() {
 			continue
 		}
 		status := v1.PodStatus{

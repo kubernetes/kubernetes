@@ -161,8 +161,8 @@ func (pm *BasicManager) updatePodsInternal(pods ...*Pod) {
 			// not register pod, as it doesn't really matter.
 			pm.secretManager.RegisterPod(pod.GetAPIPod())
 		}
-		podFullName := pod.GetPodFullName()
-		if pod.IsMirrorPod() {
+		podFullName := pod.GetFullName()
+		if pod.IsMirror() {
 			pm.mirrorPodByUID[pod.UID()] = pod
 			pm.mirrorPodByFullName[podFullName] = pod
 			if p, ok := pm.podByFullName[podFullName]; ok {
@@ -184,8 +184,8 @@ func (pm *BasicManager) DeletePod(pod *Pod) {
 	if pm.secretManager != nil {
 		pm.secretManager.UnregisterPod(pod.GetAPIPod())
 	}
-	podFullName := pod.GetPodFullName()
-	if pod.IsMirrorPod() {
+	podFullName := pod.GetFullName()
+	if pod.IsMirror() {
 		delete(pm.mirrorPodByUID, pod.UID())
 		delete(pm.mirrorPodByFullName, podFullName)
 		delete(pm.translationByUID, pod.UID())
@@ -295,13 +295,13 @@ func podsMapToPods(UIDMap map[types.UID]*Pod) []*Pod {
 func (pm *BasicManager) GetMirrorPodByPod(pod *Pod) (*Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
-	mirrorPod, ok := pm.mirrorPodByFullName[pod.GetPodFullName()]
+	mirrorPod, ok := pm.mirrorPodByFullName[pod.GetFullName()]
 	return mirrorPod, ok
 }
 
 func (pm *BasicManager) GetPodByMirrorPod(mirrorPod *Pod) (*Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
-	pod, ok := pm.podByFullName[mirrorPod.GetPodFullName()]
+	pod, ok := pm.podByFullName[mirrorPod.GetFullName()]
 	return pod, ok
 }

@@ -22,9 +22,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	kubeapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -383,6 +385,7 @@ func getTestPods() map[string]*kubepod.Pod {
 			},
 		}),
 	}
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.ExperimentalCriticalPodAnnotation))
 	allPods[critical].Namespace = kubeapi.NamespaceSystem
 	allPods[critical].Annotations[kubetypes.CriticalPodAnnotationKey] = ""
 	kubepods := make(map[string]*kubepod.Pod)

@@ -18,9 +18,7 @@ limitations under the License.
 
 package cm
 
-import (
-	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-)
+import kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 
 const (
 	MinShares     = 0
