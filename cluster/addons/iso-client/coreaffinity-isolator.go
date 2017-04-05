@@ -32,7 +32,6 @@ func handleSIGTERM(sigterm chan os.Signal, client *aff.EventDispatcherClient, op
 func shutdownIsolator(client *aff.EventDispatcherClient, opaque *opaq.OpaqueIntegerResourceAdvertiser) {
 	unregisterRequest := &lifecycle.UnregisterRequest{
 		Name:  client.Name,
-		Token: client.Token,
 	}
 
 	glog.Infof("Unregistering custom-isolator: %s", name)

@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/glog"
 	proto "github.com/golang/protobuf/proto"
-	"github.com/pborman/uuid"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -56,8 +55,6 @@ type registeredIsolator struct {
 	name string
 	// location of the isolator service.
 	socketAddress string
-	// token to identify this registration
-	token string
 }
 
 type eventDispatcher struct {
@@ -176,7 +173,6 @@ func (ed *eventDispatcher) Register(ctx context.Context, request *lifecycle.Regi
 	isolator := &registeredIsolator{
 		name:          request.Name,
 		socketAddress: request.SocketAddress,
-		token:         uuid.NewUUID().String(),
 	}
 
 	glog.Infof("attempting to register isolator [%s]", isolator.name)
@@ -184,29 +180,19 @@ func (ed *eventDispatcher) Register(ctx context.Context, request *lifecycle.Regi
 	// Check registered name for uniqueness
 	reg := ed.isolator(isolator.name)
 	if reg != nil {
-		if reg.token != request.Token {
-			msg := fmt.Sprintf("registration failed: an isolator named [%s] is already registered and the supplied registration token does not match.", reg.name)
-			glog.Warning(msg)
-			return &lifecycle.RegisterReply{Error: msg}, nil
-		}
 		glog.Infof("re-registering isolator [%s]", isolator.name)
 	}
 
 	// Save registeredIsolator
 	ed.isolators[isolator.name] = isolator
 
-	return &lifecycle.RegisterReply{Token: isolator.token}, nil
+	return &lifecycle.RegisterReply{}, nil
 }
 
 func (ed *eventDispatcher) Unregister(ctx context.Context, request *lifecycle.UnregisterRequest) (*lifecycle.UnregisterReply, error) {
 	reg := ed.isolator(request.Name)
 	if reg == nil {
 		msg := fmt.Sprintf("unregistration failed: no isolator named [%s] is currently registered.", request.Name)
-		glog.Warning(msg)
-		return &lifecycle.UnregisterReply{Error: msg}, nil
-	}
-	if reg.token != request.Token {
-		msg := fmt.Sprintf("unregistration failed: token mismatch for isolator [%s].", request.Name)
 		glog.Warning(msg)
 		return &lifecycle.UnregisterReply{Error: msg}, nil
 	}

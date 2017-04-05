@@ -2,14 +2,12 @@ package coreaffinity
 
 import (
 	"github.com/golang/glog"
-	"github.com/pborman/uuid"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
 
 type EventDispatcherClient struct {
-	Token   string
 	Name    string
 	Address string
 	Ctx     context.Context
@@ -34,11 +32,9 @@ func NewEventDispatcherClient(name string, serverAddress string, clientAddress s
 
 // Create RegisterRequest and register EventDispatcherClient
 func (edc *EventDispatcherClient) Register() (reply *lifecycle.RegisterReply, err error) {
-	registerToken := string(uuid.NewUUID())
 	registerRequest := &lifecycle.RegisterRequest{
 		SocketAddress: edc.Address,
 		Name:          edc.Name,
-		Token:         registerToken,
 	}
 
 	glog.Infof("Attempting to register EventDispatcherClient. Request: %v", registerRequest)
@@ -46,6 +42,5 @@ func (edc *EventDispatcherClient) Register() (reply *lifecycle.RegisterReply, er
 	if err != nil {
 		return reply, err
 	}
-	edc.Token = reply.Token
 	return reply, nil
 }
