@@ -51,6 +51,7 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 		return nil, fmt.Errorf("unable to generate certificate request: %v", err)
 	}
 	return RequestCertificate(client, csrData, []certificates.KeyUsage{
+		certificates.UsageServerAuth,
 		certificates.UsageDigitalSignature,
 		certificates.UsageKeyEncipherment,
 		certificates.UsageClientAuth,
