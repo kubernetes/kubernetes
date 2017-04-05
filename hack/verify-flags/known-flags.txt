@@ -521,6 +521,7 @@ pod-running-timeout
 pods-per-core
 policy-config-file
 policy-configmap
+policy-configmap-namespace
 poll-interval
 portal-net
 prepull-images
