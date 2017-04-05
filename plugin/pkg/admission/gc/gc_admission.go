@@ -70,23 +70,18 @@ func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err e
 		return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
 	}
 
-	// Further check if the user is setting ownerReference.blockOwnerDeletion.
-	// If so, only allows the change if the user has delete permission of
+	// Further check if the user is setting ownerReference.blockOwnerDeletion to
+	// true. If so, only allows the change if the user has delete permission of
 	// the _OWNER_
-	changedRefs := changingBlockOwnerDeletion(attributes.GetObject(), attributes.GetOldObject())
-	for _, ref := range changedRefs {
+	newBlockingRefs := newBlockingOwnerDeletionRefs(attributes.GetObject(), attributes.GetOldObject())
+	for _, ref := range newBlockingRefs {
 		attribute, err := a.toDeleteAttribute(ref, attributes)
 		if err != nil {
-			// An error occurs if a RESTMapping cannot be found for
-			// ref.APIVersion and ref.Kind.  If it's caused by a non-kubernetes
-			// core API, currently garbage collector doesn't handle such object,
-			// so it's ok to admit changes to such owner refs. Other errors
-			// should be prevented at the validation stage.
-			continue
+			return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion in this case because cannot find RESTMapping for APIVersion %s Kind %s: %v, %v", ref.APIVersion, ref.Kind, reason, err))
 		}
 		allowed, reason, err := a.authorizer.Authorize(attribute)
 		if !allowed {
-			return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion in an ownerReference refers to a resource you can't delete: %v, %v", reason, err))
+			return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't delete: %v, %v", reason, err))
 		}
 	}
 
@@ -131,14 +126,14 @@ func (a *gcPermissionsEnforcement) toDeleteAttribute(ref metav1.OwnerReference, 
 	if err != nil {
 		return authorizer.AttributesRecord{}, err
 	}
-	mapping, err := a.restMapper.RESTMapping(schema.GroupKind{groupVersion.Group, ref.Kind}, groupVersion.Version)
+	mapping, err := a.restMapper.RESTMapping(schema.GroupKind{Group: groupVersion.Group, Kind: ref.Kind}, groupVersion.Version)
 	if err != nil {
 		return authorizer.AttributesRecord{}, err
 	}
 	return authorizer.AttributesRecord{
 		User: attributes.GetUserInfo(),
 		Verb: "delete",
-		// ownerReference can only refer to an object in the same namespace, so attributes.GetnNamespace() equals to the owner's namespace
+		// ownerReference can only refer to an object in the same namespace, so attributes.GetNamespace() equals to the owner's namespace
 		Namespace:       attributes.GetNamespace(),
 		APIGroup:        groupVersion.Group,
 		APIVersion:      groupVersion.Version,
@@ -168,40 +163,40 @@ func indexByUID(refs []metav1.OwnerReference) map[types.UID]metav1.OwnerReferenc
 	return ret
 }
 
-// Returns new blocking ownerReferences, and references whose blockOwnerDeletion field is changed.
-// Changes between nil and false are ignored.
-func changingBlockOwnerDeletion(newObj, oldObj runtime.Object) []metav1.OwnerReference {
+// Returns new blocking ownerReferences, and references whose blockOwnerDeletion
+// field is changed from false to true.
+func newBlockingOwnerDeletionRefs(newObj, oldObj runtime.Object) []metav1.OwnerReference {
 	newMeta, err := meta.Accessor(newObj)
 	if err != nil {
 		// if we don't have objectmeta, we don't have the object reference
 		return nil
 	}
 	newRefs := newMeta.GetOwnerReferences()
+	blockingNewRefs := blockingOwnerRefs(newRefs)
 
 	if oldObj == nil {
-		return blockingOwnerRefs(newRefs)
+		return blockingNewRefs
 	}
 	oldMeta, err := meta.Accessor(oldObj)
 	if err != nil {
 		// if we don't have objectmeta, treat it as if all the ownerReference are newly created
-		return blockingOwnerRefs(newRefs)
+		return blockingNewRefs
 	}
 
-	var changedRefs []metav1.OwnerReference
+	var ret []metav1.OwnerReference
 	indexedOldRefs := indexByUID(oldMeta.GetOwnerReferences())
-	for _, newRef := range newRefs {
-		newBlocking := newRef.BlockOwnerDeletion != nil && *newRef.BlockOwnerDeletion == true
-		if oldRef, ok := indexedOldRefs[newRef.UID]; ok {
-			oldBlocking := oldRef.BlockOwnerDeletion != nil && *oldRef.BlockOwnerDeletion == true
-			if oldBlocking != newBlocking {
-				changedRefs = append(changedRefs, newRef)
+	for _, ref := range blockingNewRefs {
+		if oldRef, ok := indexedOldRefs[ref.UID]; ok {
+			wasNotBlocking := oldRef.BlockOwnerDeletion == nil || *oldRef.BlockOwnerDeletion == false
+			if wasNotBlocking {
+				ret = append(ret, ref)
 			}
-		} else if newBlocking {
-			// if newRef is newly added, and it's blocking, also return it.
-			changedRefs = append(changedRefs, newRef)
+		} else {
+			// if ref is newly added, and it's blocking, also return it.
+			ret = append(ret, ref)
 		}
 	}
-	return changedRefs
+	return ret
 }
 
 func (a *gcPermissionsEnforcement) SetAuthorizer(authorizer authorizer.Authorizer) {
