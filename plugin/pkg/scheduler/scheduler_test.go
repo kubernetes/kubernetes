@@ -97,6 +97,13 @@ func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister) (string, 
 	return es.machine, es.err
 }
 
+func (es mockScheduler) Predicates() map[string]algorithm.FitPredicate {
+	return nil
+}
+func (es mockScheduler) Prioritizers() []algorithm.PriorityConfig {
+	return nil
+}
+
 func TestScheduler(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(t.Logf).Stop()
