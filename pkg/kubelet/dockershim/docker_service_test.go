@@ -46,8 +46,14 @@ func newTestDockerService() (*dockerService, *libdocker.FakeDockerClient, *clock
 	fakeClock := clock.NewFakeClock(time.Time{})
 	c := libdocker.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23")
 	pm := network.NewPluginManager(&network.NoopNetworkPlugin{})
-	return &dockerService{client: c, os: &containertest.FakeOS{}, network: pm,
-		legacyCleanup: legacyCleanupFlag{done: 1}, checkpointHandler: NewTestPersistentCheckpointHandler()}, c, fakeClock
+	return &dockerService{
+		client:            c,
+		os:                &containertest.FakeOS{},
+		network:           pm,
+		legacyCleanup:     legacyCleanupFlag{done: 1},
+		checkpointHandler: NewTestPersistentCheckpointHandler(),
+		networkReady:      make(map[string]bool),
+	}, c, fakeClock
 }
 
 func newTestDockerServiceWithVersionCache() (*dockerService, *libdocker.FakeDockerClient, *clock.FakeClock) {
