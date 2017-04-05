@@ -118,10 +118,10 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	}
 
 	stop := make(chan struct{})
-	informerFactory.Start(stop)
-
-	sched.Run()
 	defer close(stop)
+
+	informerFactory.Start(stop)
+	sched.Run()
 
 	DoTestUnschedulableNodes(t, clientSet, ns, informerFactory.Core().V1().Nodes().Lister())
 }
@@ -160,11 +160,6 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Creation of scheduler didn't fail while the policy ConfigMap didn't exist.")
 	}
-
-	stop := make(chan struct{})
-	informerFactory.Start(stop)
-
-	defer close(stop)
 }
 
 // TestSchedulerCreationInLegacyMode ensures that creation of the scheduler
@@ -205,10 +200,12 @@ func TestSchedulerCreationInLegacyMode(t *testing.T) {
 	}
 
 	stop := make(chan struct{})
+	defer close(stop)
+
 	informerFactory.Start(stop)
 
 	sched.Run()
-	defer close(stop)
+	DoTestUnschedulableNodes(t, clientSet, ns, informerFactory.Core().V1().Nodes().Lister())
 }
 
 func TestUnschedulableNodes(t *testing.T) {
