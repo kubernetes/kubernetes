@@ -28,7 +28,7 @@
 		},
 		{
 			"ImportPath": "github.com/elazarl/goproxy",
-			"Rev": "07b16b6e30fcac0ad8c0435548e743bcf2ca7e92"
+			"Rev": "c4fc26588b6ef8af07a191fcb6476387bdd46711"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
