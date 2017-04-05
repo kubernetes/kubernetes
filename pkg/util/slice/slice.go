@@ -49,6 +49,17 @@ func ShuffleStrings(s []string) []string {
 	return shuffled
 }
 
+// ContainsString returns true if the given string slice contains the given string.
+// Returns false otherwise.
+func ContainsString(arr []string, s string) bool {
+	for i := range arr {
+		if arr[i] == s {
+			return true
+		}
+	}
+	return false
+}
+
 // Int64Slice attaches the methods of Interface to []int64,
 // sorting in increasing order.
 type Int64Slice []int64

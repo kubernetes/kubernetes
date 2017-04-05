@@ -40,6 +40,7 @@ import (
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
+	sliceutils "k8s.io/kubernetes/pkg/util/slice"
 
 	"github.com/golang/glog"
 )
@@ -220,14 +221,14 @@ func (daemonsetcontroller *DaemonSetController) hasFinalizerFunc(obj pkgruntime.
 	return false
 }
 
-// Removes the finalizer from the given objects ObjectMeta.
+// Removes the finalizers from the given objects ObjectMeta.
 // Assumes that the given object is a daemonset.
-func (daemonsetcontroller *DaemonSetController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+func (daemonsetcontroller *DaemonSetController) removeFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
 	daemonset := obj.(*extensionsv1.DaemonSet)
 	newFinalizers := []string{}
 	hasFinalizer := false
 	for i := range daemonset.ObjectMeta.Finalizers {
-		if string(daemonset.ObjectMeta.Finalizers[i]) != finalizer {
+		if !sliceutils.ContainsString(finalizers, daemonset.ObjectMeta.Finalizers[i]) {
 			newFinalizers = append(newFinalizers, daemonset.ObjectMeta.Finalizers[i])
 		} else {
 			hasFinalizer = true
@@ -240,7 +241,7 @@ func (daemonsetcontroller *DaemonSetController) removeFinalizerFunc(obj pkgrunti
 	daemonset.ObjectMeta.Finalizers = newFinalizers
 	daemonset, err := daemonsetcontroller.federatedApiClient.Extensions().DaemonSets(daemonset.Namespace).Update(daemonset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from daemonset %s: %v", finalizer, daemonset.Name, err)
+		return nil, fmt.Errorf("failed to remove finalizers %v from daemonset %s: %v", finalizers, daemonset.Name, err)
 	}
 	return daemonset, nil
 }

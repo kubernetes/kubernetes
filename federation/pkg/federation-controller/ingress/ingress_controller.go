@@ -42,6 +42,7 @@ import (
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
+	sliceutils "k8s.io/kubernetes/pkg/util/slice"
 
 	"github.com/golang/glog"
 )
@@ -316,14 +317,14 @@ func (ic *IngressController) hasFinalizerFunc(obj pkgruntime.Object, finalizer s
 	return false
 }
 
-// Removes the finalizer from the given objects ObjectMeta.
+// Removes the finalizers from the given objects ObjectMeta.
 // Assumes that the given object is a ingress.
-func (ic *IngressController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+func (ic *IngressController) removeFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
 	ingress := obj.(*extensionsv1beta1.Ingress)
 	newFinalizers := []string{}
 	hasFinalizer := false
 	for i := range ingress.ObjectMeta.Finalizers {
-		if string(ingress.ObjectMeta.Finalizers[i]) != finalizer {
+		if !sliceutils.ContainsString(finalizers, ingress.ObjectMeta.Finalizers[i]) {
 			newFinalizers = append(newFinalizers, ingress.ObjectMeta.Finalizers[i])
 		} else {
 			hasFinalizer = true
@@ -336,7 +337,7 @@ func (ic *IngressController) removeFinalizerFunc(obj pkgruntime.Object, finalize
 	ingress.ObjectMeta.Finalizers = newFinalizers
 	ingress, err := ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress)
 	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from ingress %s: %v", finalizer, ingress.Name, err)
+		return nil, fmt.Errorf("failed to remove finalizers %v from ingress %s: %v", finalizers, ingress.Name, err)
 	}
 	return ingress, nil
 }

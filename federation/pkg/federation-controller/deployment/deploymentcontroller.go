@@ -49,6 +49,7 @@ import (
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
+	sliceutils "k8s.io/kubernetes/pkg/util/slice"
 )
 
 const (
@@ -234,14 +235,14 @@ func (fdc *DeploymentController) hasFinalizerFunc(obj runtime.Object, finalizer 
 	return false
 }
 
-// Removes the finalizer from the given objects ObjectMeta.
+// Removes the finalizers from the given objects ObjectMeta.
 // Assumes that the given object is a deployment.
-func (fdc *DeploymentController) removeFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
+func (fdc *DeploymentController) removeFinalizerFunc(obj runtime.Object, finalizers []string) (runtime.Object, error) {
 	deployment := obj.(*extensionsv1.Deployment)
 	newFinalizers := []string{}
 	hasFinalizer := false
 	for i := range deployment.ObjectMeta.Finalizers {
-		if string(deployment.ObjectMeta.Finalizers[i]) != finalizer {
+		if !sliceutils.ContainsString(finalizers, deployment.ObjectMeta.Finalizers[i]) {
 			newFinalizers = append(newFinalizers, deployment.ObjectMeta.Finalizers[i])
 		} else {
 			hasFinalizer = true
@@ -254,7 +255,7 @@ func (fdc *DeploymentController) removeFinalizerFunc(obj runtime.Object, finaliz
 	deployment.ObjectMeta.Finalizers = newFinalizers
 	deployment, err := fdc.fedClient.Extensions().Deployments(deployment.Namespace).Update(deployment)
 	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from deployment %s: %v", finalizer, deployment.Name, err)
+		return nil, fmt.Errorf("failed to remove finalizers %v from deployment %s: %v", finalizers, deployment.Name, err)
 	}
 	return deployment, nil
 }
