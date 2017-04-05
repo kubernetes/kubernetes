@@ -1,36 +1,9 @@
 # Azure Active Directory plugin for client authentication
 
-This plugin provides an integration with [Azure CLI](https://github.com/Azure/azure-cli) and Azure Active Directory device flow.
+This plugin provides an integration with Azure Active Directory device flow. If no tokens are present in the kubectl configuration, it will prompt a device code which can be used to login in a browser. After login it will automatically fetch the tokens and stored them in the kubectl configuration. In addition it will refresh and update the tokens in configuration when expired.
+
 
 ## Usage
-
-### Microsoft Azure CLI 2.0 (non interactive)
-
-1. Configure the `apiserver` to use the Azure Active Directory as an OIDC provider with following options
-
-   ```
-   --oidc-client-id="https://management.core.windows.net/" \
-   --oidc-issuer-url="https://sts.windows.net/TENANT_ID/"
-   --oidc-username-claim="sub"
-   ```
-
-   * Replace `TENANT_ID` with your tenant ID.
-
-2. Login with Azure CLI
-
-  ```
-  az login
-  ```
-
-3. Configure the `kubectl` to use the `azure` authentication provider
-
-   ```
-   kubectl config set-credentials "USER_NAME" --auth-provider=azure
-   ```
-
-   * Replace `USER_NAME` with your user name.
-
-### Device Flow (interactive)
 
 1. Create an Azure native application following these [instructions](https://docs.microsoft.com/en-us/azure/active-directory/active-directory-app-registration)
 
@@ -39,12 +12,12 @@ This plugin provides an integration with [Azure CLI](https://github.com/Azure/az
 2. Configure the `apiserver` to use the Azure Active Directory as an OIDC provider with following options
 
    ```
-   --oidc-client-id="https://management.core.windows.net/" \
+   --oidc-client-id="spn:APPLICATION_ID" \
    --oidc-issuer-url="https://sts.windows.net/TENANT_ID/"
    --oidc-username-claim="sub"
    ```
 
-   * Replace `TENANT_ID` with your tenant ID.
+   * Replace `TENANT_ID` and `APPLICATION_ID` with your tenant ID.
 
 3. Configure the `kubectl` to use the `azure` authentication provider with using the registered application
 
@@ -52,8 +25,7 @@ This plugin provides an integration with [Azure CLI](https://github.com/Azure/az
    kubectl config set-credentials "USER_NAME" --auth-provider=azure \
      --auth-provider-arg=environment=AzurePublicCloud \
      --auth-provider-arg=client-id=APPLICATION_ID \
-     --auth-provider-arg=tenant-id=TENANT_ID \
-     --auth-provider-arg=audience=https://management.core.windows.net/
+     --auth-provider-arg=tenant-id=TENANT_ID 
    ```
 
    * Supported environments: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
@@ -68,3 +40,4 @@ This plugin provides an integration with [Azure CLI](https://github.com/Azure/az
    ```
 
    * After signing in a web browser, the tokens are stored in the configuration, which will be used when executing next commands.
+ 

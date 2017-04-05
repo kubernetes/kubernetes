@@ -17,19 +17,10 @@ limitations under the License.
 package azure
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
-	"os"
-	"os/user"
-	"path/filepath"
-	"regexp"
-	"strconv"
 	"sync"
-	"time"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -45,7 +36,6 @@ const (
 
 	cfgClientID     = "client-id"
 	cfgTenantID     = "tenant-id"
-	cfgAudience     = "audience"
 	cfgAccessToken  = "access-token"
 	cfgRefreshToken = "refresh-token"
 	cfgTokenType    = "token-type"
@@ -86,26 +76,14 @@ func (c *azureTokenCache) setToken(tokenKey string, token *azureToken) {
 func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	var ts tokenSource
 
-	clientID := cfg[cfgClientID]
-	tenantID := cfg[cfgTenantID]
-	audience := cfg[cfgAudience]
-	if clientID != "" && tenantID != "" && audience != "" {
-		environment, err := azure.EnvironmentFromName(cfg[cfgEnvironment])
-		if err != nil {
-			environment = azure.PublicCloud
-		}
-		ts = newAzureTokenSourceDeviceCode(environment, clientID, tenantID, audience)
-	} else {
-		azFilename, err := azureTokensFile()
-		if err != nil {
-			return nil, err
-		}
-		ts, err = newAzureTokenSourceFromFile(azFilename)
-		if err != nil {
-			return nil, err
-		}
+	environment, err := azure.EnvironmentFromName(cfg[cfgEnvironment])
+	if err != nil {
+		environment = azure.PublicCloud
 	}
-
+	ts, err = newAzureTokenSourceDeviceCode(environment, cfg[cfgClientID], cfg[cfgTenantID])
+	if err != nil {
+		return nil, err
+	}
 	cacheSource := newAzureTokenSourceFromCache(ts, cache, cfg, persister)
 
 	return &azureAuthProvider{
@@ -236,10 +214,6 @@ func (ts *azureTokenSourceFromCache) retrieveTokenFromCfg() (*azureToken, error)
 	if tenantID == "" {
 		return nil, fmt.Errorf("no tenant ID in cfg: %s", cfgTenantID)
 	}
-	audiance := ts.cfg[cfgAudience]
-	if audiance == "" {
-		return nil, fmt.Errorf("no audience in cfg: %s", cfgAudience)
-	}
 	expiresIn := ts.cfg[cfgExpiresIn]
 	if expiresIn == "" {
 		return nil, fmt.Errorf("no expiresIn in cfg: %s", cfgExpiresIn)
@@ -256,7 +230,7 @@ func (ts *azureTokenSourceFromCache) retrieveTokenFromCfg() (*azureToken, error)
 			ExpiresIn:    expiresIn,
 			ExpiresOn:    expiresOn,
 			NotBefore:    expiresOn,
-			Resource:     audiance,
+			Resource:     clientID,
 			Type:         tokenType,
 		},
 		clientID: clientID,
@@ -271,7 +245,6 @@ func (ts *azureTokenSourceFromCache) storeTokenInCfg(token *azureToken) error {
 	newCfg[cfgTokenType] = token.token.Type
 	newCfg[cfgClientID] = token.clientID
 	newCfg[cfgTenantID] = token.tenantID
-	newCfg[cfgAudience] = token.token.Resource
 	newCfg[cfgExpiresIn] = token.token.ExpiresIn
 	newCfg[cfgExpiresOn] = token.token.ExpiresOn
 
@@ -314,122 +287,24 @@ func (ts *azureTokenSourceFromCache) refreshToken(token *azureToken) (*azureToke
 	}, nil
 }
 
-// azureTokensFile return the file where Azure CLI 2.0 stores the access tokens
-func azureTokensFile() (string, error) {
-	const tokensFile = "/.azure/accessTokens.json"
-	usr, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(usr.HomeDir, tokensFile), nil
-}
-
-type azureTokenSourceFromFile struct {
-	tokensReader io.Reader
-}
-
-func newAzureTokenSourceFromFile(filename string) (tokenSource, error) {
-	_, err := os.Stat(filename)
-	if err != nil {
-		return nil, err
-	}
-	r, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	return &azureTokenSourceFromFile{
-		tokensReader: r,
-	}, nil
-}
-
-// Token reads a token from Azure CLI tokens file
-func (ts *azureTokenSourceFromFile) Token() (*azureToken, error) {
-	b, err := ioutil.ReadAll(ts.tokensReader)
-	if err != nil {
-		return nil, err
-	}
-
-	type azToken struct {
-		AccessToken  string    `json:"accessToken"`
-		TokenType    string    `json:"tokenType"`
-		RefreshToken string    `json:"refreshToken"`
-		ExpiresOn    azureTime `json:"expiresOn"`
-		ExpiresIn    int64     `json:"expiresIn"`
-		Authority    string    `json:"_authority"`
-		Resource     string    `json:"resource"`
-		ClientID     string    `json:"_clientId"`
-	}
-	tokens := make([]azToken, 0)
-	err = json.Unmarshal(b, &tokens)
-	if err != nil {
-		return nil, err
-	}
-
-	// Choose the token which has a tenant. Typically in this file there is also stored
-	// a token without a tenant (e.g common token).
-	var tenantToken *azToken
-	for _, token := range tokens {
-		if ts.isTenantAuthroity(token.Authority) {
-			tenantToken = &token
-			break
-		}
-	}
-	if tenantToken == nil {
-		return nil, errors.New("no tenant token for in ~/.azure/accessTokens.json file")
-	}
-
-	return &azureToken{
-		token: azure.Token{
-			AccessToken:  tenantToken.AccessToken,
-			RefreshToken: tenantToken.RefreshToken,
-			ExpiresIn:    strconv.FormatInt(tenantToken.ExpiresIn, 10),
-			ExpiresOn:    strconv.FormatInt(tenantToken.ExpiresOn.Time.Unix(), 10),
-			NotBefore:    strconv.FormatInt(tenantToken.ExpiresOn.Time.Unix(), 10),
-			Resource:     tenantToken.Resource,
-			Type:         tenantToken.TokenType,
-		},
-		clientID: tenantToken.ClientID,
-		tenantID: ts.extractTenantID(tenantToken.Authority),
-	}, nil
-}
-
-func (ts *azureTokenSourceFromFile) isTenantAuthroity(authority string) bool {
-	r := regexp.MustCompile(fmt.Sprintf("^https://.*/%s$", uuidFormat))
-	return r.MatchString(authority)
-}
-
-func (ts *azureTokenSourceFromFile) extractTenantID(authority string) string {
-	r := regexp.MustCompile(uuidFormat)
-	return r.FindString(authority)
-}
-
-type azureTime struct {
-	time.Time
-}
-
-func (t *azureTime) UnmarshalJSON(b []byte) error {
-	time, err := time.Parse(azureTimeFormat, string(b))
-	if err != nil {
-		return err
-	}
-	t.Time = time
-	return nil
-}
-
 type azureTokenSourceDeviceCode struct {
 	environment azure.Environment
 	clientID    string
 	tenantID    string
-	audience    string
 }
 
-func newAzureTokenSourceDeviceCode(environment azure.Environment, clientID string, tenantID string, audience string) tokenSource {
+func newAzureTokenSourceDeviceCode(environment azure.Environment, clientID string, tenantID string) (tokenSource, error) {
+	if clientID == "" {
+		return nil, errors.New("client-id is empty")
+	}
+	if tenantID == "" {
+		return nil, errors.New("tenant-id is empty")
+	}
 	return &azureTokenSourceDeviceCode{
 		environment: environment,
 		clientID:    clientID,
 		tenantID:    tenantID,
-		audience:    audience,
-	}
+	}, nil
 }
 
 func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
@@ -438,7 +313,7 @@ func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
 		return nil, err
 	}
 	client := &autorest.Client{}
-	deviceCode, err := azure.InitiateDeviceAuth(client, *oauthConfig, ts.clientID, ts.audience)
+	deviceCode, err := azure.InitiateDeviceAuth(client, *oauthConfig, ts.clientID, ts.clientID)
 	if err != nil {
 		return nil, err
 	}
