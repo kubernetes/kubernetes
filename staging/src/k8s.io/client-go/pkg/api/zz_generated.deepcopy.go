@@ -1226,11 +1226,6 @@ func DeepCopy_api_ISCSIVolumeSource(in interface{}, out interface{}, c *conversi
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
-		if in.SecretRef != nil {
-			in, out := &in.SecretRef, &out.SecretRef
-			*out = new(LocalObjectReference)
-			**out = **in
-		}
 		return nil
 	}
 }

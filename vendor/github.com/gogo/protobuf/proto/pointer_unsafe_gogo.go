@@ -1,5 +1,7 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
-// http://github.com/gogo/protobuf/gogoproto
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -24,7 +26,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// +build !appengine
+// +build !appengine,!js
 
 // This file contains the implementation of the proto field accesses using package unsafe.
 
@@ -70,16 +72,13 @@ func structPointer_Copy(oldptr structPointer, newptr structPointer, size int) {
 
 func appendStructPointer(base structPointer, f field, typ reflect.Type) structPointer {
 	size := typ.Elem().Size()
-	oldHeader := structPointer_GetSliceHeader(base, f)
-	newLen := oldHeader.Len + 1
-	slice := reflect.MakeSlice(typ, newLen, newLen)
-	bas := toStructPointer(slice)
-	for i := 0; i < oldHeader.Len; i++ {
-		newElemptr := uintptr(bas) + uintptr(i)*size
-		oldElemptr := oldHeader.Data + uintptr(i)*size
-		copyUintPtr(oldElemptr, newElemptr, int(size))
-	}
 
+	oldHeader := structPointer_GetSliceHeader(base, f)
+	oldSlice := reflect.NewAt(typ, unsafe.Pointer(oldHeader)).Elem()
+	newLen := oldHeader.Len + 1
+	newSlice := reflect.MakeSlice(typ, newLen, newLen)
+	reflect.Copy(newSlice, oldSlice)
+	bas := toStructPointer(newSlice)
 	oldHeader.Data = uintptr(bas)
 	oldHeader.Len = newLen
 	oldHeader.Cap = newLen
@@ -105,4 +104,25 @@ func structPointer_Add(p structPointer, size field) structPointer {
 
 func structPointer_Len(p structPointer, f field) int {
 	return len(*(*[]interface{})(unsafe.Pointer(structPointer_GetRefStructPointer(p, f))))
+}
+
+func structPointer_StructRefSlice(p structPointer, f field, size uintptr) *structRefSlice {
+	return &structRefSlice{p: p, f: f, size: size}
+}
+
+// A structRefSlice represents a slice of structs (themselves submessages or groups).
+type structRefSlice struct {
+	p    structPointer
+	f    field
+	size uintptr
+}
+
+func (v *structRefSlice) Len() int {
+	return structPointer_Len(v.p, v.f)
+}
+
+func (v *structRefSlice) Index(i int) structPointer {
+	ss := structPointer_GetStructPointer(v.p, v.f)
+	ss1 := structPointer_GetRefStructPointer(ss, 0)
+	return structPointer_Add(ss1, field(uintptr(i)*v.size))
 }

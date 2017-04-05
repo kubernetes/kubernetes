@@ -308,7 +308,7 @@ func GetStats() Stats { return stats }
 // temporary Buffer and are fine for most applications.
 type Buffer struct {
 	buf   []byte // encode/decode byte stream
-	index int    // write point
+	index int    // read point
 
 	// pools of basic types to amortize allocation.
 	bools   []bool
