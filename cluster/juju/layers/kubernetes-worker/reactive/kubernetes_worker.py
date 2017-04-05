@@ -669,6 +669,15 @@ def enable_gpu():
         return
 
     hookenv.log('Enabling gpu mode')
+    try:
+        # Not sure why this is necessary, but if you don't run this, k8s will
+        # think that the node has 0 gpus (as shown by the output of
+        # `kubectl get nodes -o yaml`
+        check_call(['nvidia-smi'])
+    except CalledProcessError as cpe:
+        hookenv.log('Unable to communicate with the NVIDIA driver.')
+        hookenv.log(cpe)
+        return
 
     kubelet_opts = FlagManager('kubelet')
     if get_version('kubelet') < (1, 6):
@@ -681,11 +690,6 @@ def enable_gpu():
     # Apply node labels
     _apply_node_label('gpu=true', overwrite=True)
     _apply_node_label('cuda=true', overwrite=True)
-
-    # Not sure why this is necessary, but if you don't run this, k8s will
-    # think that the node has 0 gpus (as shown by the output of
-    # `kubectl get nodes -o yaml`
-    check_call(['nvidia-smi'])
 
     set_state('kubernetes-worker.gpu.enabled')
     set_state('kubernetes-worker.restart-needed')
