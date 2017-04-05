@@ -46,7 +46,8 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 	if err != nil {
 		return nil, fmt.Errorf("invalid private key for certificate request: %v", err)
 	}
-	csrData, err := certutil.MakeCSR(privateKey, subject, nil, nil)
+	sans := []string{fmt.Sprintf("%s", nodeName)}
+	csrData, err := certutil.MakeCSR(privateKey, subject, sans, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate certificate request: %v", err)
 	}
