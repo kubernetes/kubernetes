@@ -168,8 +168,10 @@ func (kl *Kubelet) GetRunningPods() ([]*v1.Pod, error) {
 // GetPodByName provides the first pod that matches namespace and name, as well
 // as whether the pod was found.
 func (kl *Kubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
-	kpod, found := kl.podManager.GetPodByName(namespace, name)
-	return kpod.GetAPIPod(), found
+	if kpod, found := kl.podManager.GetPodByName(namespace, name); found {
+		return kpod.GetAPIPod(), true
+	}
+	return nil, false
 }
 
 // GetHostname Returns the hostname as the kubelet sees it.
