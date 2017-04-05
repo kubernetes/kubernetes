@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -306,17 +307,23 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		iptInterface.AddReloadFunc(proxier.Sync)
 	}
 
+	informerFactory := informers.NewSharedInformerFactory(client, config.ConfigSyncPeriod)
+
 	// Create configs (i.e. Watches for Services and Endpoints)
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
-	serviceConfig := proxyconfig.NewServiceConfig(client.Core().RESTClient(), config.ConfigSyncPeriod)
+	serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().InternalVersion().Services(), config.ConfigSyncPeriod)
 	serviceConfig.RegisterHandler(servicesHandler)
 	go serviceConfig.Run(wait.NeverStop)
 
-	endpointsConfig := proxyconfig.NewEndpointsConfig(client.Core().RESTClient(), config.ConfigSyncPeriod)
+	endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), config.ConfigSyncPeriod)
 	endpointsConfig.RegisterHandler(endpointsHandler)
 	go endpointsConfig.Run(wait.NeverStop)
+
+	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
+	// functions must configure their shared informer event handlers first.
+	go informerFactory.Start(wait.NeverStop)
 
 	config.NodeRef = &clientv1.ObjectReference{
 		Kind:      "Node",
