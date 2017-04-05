@@ -167,6 +167,8 @@ message DeploymentStatus {
   optional int32 unavailableReplicas = 5;
 
   // Represents the latest available observations of a deployment's current state.
+  // +patch-strategy=merge
+  // +patch-merge-key=type
   repeated DeploymentCondition conditions = 6;
 }
 
