@@ -9,7 +9,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["deletion_helper.go"],
+    srcs = [
+        "deletion_helper.go",
+        "util.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//federation/pkg/federation-controller/util:go_default_library",
