@@ -43,12 +43,14 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
+        "//pkg/client/listers/core/internalversion:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
 
