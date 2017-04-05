@@ -34,7 +34,6 @@ go_library(
         "//vendor:github.com/coreos/etcd/etcdserver/api/v2http",
         "//vendor:github.com/coreos/etcd/pkg/transport",
         "//vendor:github.com/coreos/etcd/pkg/types",
-        "//vendor:github.com/coreos/pkg/capnslog",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/kardianos/osext",
         "//vendor:k8s.io/apiserver/pkg/util/feature",
