@@ -16,7 +16,7 @@ type CreateOptsBuilder interface {
 // see the Volume object.
 type CreateOpts struct {
 	Size         int               `json:"size" required:"true"`
-	Availability string            `json:"availability,omitempty"`
+	Availability string            `json:"availability_zone,omitempty"`
 	Description  string            `json:"display_description,omitempty"`
 	Metadata     map[string]string `json:"metadata,omitempty"`
 	Name         string            `json:"display_name,omitempty"`
