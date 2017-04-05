@@ -25,7 +25,6 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//vendor:github.com/stretchr/testify/require",
@@ -41,6 +40,7 @@ go_test(
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/cache",
         "//vendor:k8s.io/client-go/tools/portforward",
+        "//vendor:k8s.io/client-go/tools/remotecommand",
         "//vendor:k8s.io/client-go/util/testing",
     ],
 )

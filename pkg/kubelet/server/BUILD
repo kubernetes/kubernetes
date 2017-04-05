@@ -20,7 +20,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/validation:go_default_library",
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
@@ -48,6 +47,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
         "//vendor:k8s.io/apiserver/pkg/server/httplog",
         "//vendor:k8s.io/apiserver/pkg/util/flushwriter",
+        "//vendor:k8s.io/client-go/tools/remotecommand",
     ],
 )
 
@@ -63,7 +63,6 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
@@ -84,6 +83,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/tools/remotecommand",
         "//vendor:k8s.io/client-go/util/testing",
     ],
 )

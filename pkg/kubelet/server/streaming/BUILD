@@ -17,7 +17,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
@@ -26,6 +25,7 @@ go_library(
         "//vendor:google.golang.org/grpc/codes",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/remotecommand",
+        "//vendor:k8s.io/client-go/tools/remotecommand",
         "//vendor:k8s.io/client-go/util/clock",
     ],
 )
@@ -39,7 +39,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
@@ -47,6 +46,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/remotecommand",
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/remotecommand",
         "//vendor:k8s.io/client-go/util/clock",
     ],
 )
