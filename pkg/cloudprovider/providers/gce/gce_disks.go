@@ -77,10 +77,11 @@ type Disks interface {
 // GCECloud implements Disks.
 var _ Disks = (*GCECloud)(nil)
 
-type gceDisk struct {
+type GCEDisk struct {
 	Zone string
 	Name string
 	Kind string
+	Type string
 }
 
 func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bool) error {
@@ -259,7 +260,7 @@ func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
 // If zone is specified, the volume will only be found in the specified zone,
 // otherwise all managed zones will be searched.
 func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]string, error) {
-	var disk *gceDisk
+	var disk *GCEDisk
 	var err error
 	if zone == "" {
 		// We would like as far as possible to avoid this case,
@@ -268,7 +269,7 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 		// by name, so we have to continue to support that.
 		// However, wherever possible the zone should be passed (and it is passed
 		// for most cases that we can control, e.g. dynamic volume provisioning)
-		disk, err = gce.getDiskByNameUnknownZone(name)
+		disk, err = gce.GetDiskByNameUnknownZone(name)
 		if err != nil {
 			return nil, err
 		}
@@ -300,16 +301,17 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 	return labels, nil
 }
 
-// Returns a gceDisk for the disk, if it is found in the specified zone.
+// Returns a GCEDisk for the disk, if it is found in the specified zone.
 // If not found, returns (nil, nil)
-func (gce *GCECloud) findDiskByName(diskName string, zone string) (*gceDisk, error) {
+func (gce *GCECloud) findDiskByName(diskName string, zone string) (*GCEDisk, error) {
 	dc := contextWithNamespace(diskName, "gce_list_disk")
 	disk, err := gce.service.Disks.Get(gce.projectID, zone, diskName).Context(dc).Do()
 	if err == nil {
-		d := &gceDisk{
+		d := &GCEDisk{
 			Zone: lastComponent(disk.Zone),
 			Name: disk.Name,
 			Kind: disk.Kind,
+			Type: disk.Type,
 		}
 		return d, nil
 	}
@@ -320,7 +322,7 @@ func (gce *GCECloud) findDiskByName(diskName string, zone string) (*gceDisk, err
 }
 
 // Like findDiskByName, but returns an error if the disk is not found
-func (gce *GCECloud) getDiskByName(diskName string, zone string) (*gceDisk, error) {
+func (gce *GCECloud) getDiskByName(diskName string, zone string) (*GCEDisk, error) {
 	disk, err := gce.findDiskByName(diskName, zone)
 	if disk == nil && err == nil {
 		return nil, fmt.Errorf("GCE persistent disk not found: diskName=%q zone=%q", diskName, zone)
@@ -331,7 +333,7 @@ func (gce *GCECloud) getDiskByName(diskName string, zone string) (*gceDisk, erro
 // Scans all managed zones to return the GCE PD
 // Prefer getDiskByName, if the zone can be established
 // Return cloudprovider.DiskNotFound if the given disk cannot be found in any zone
-func (gce *GCECloud) getDiskByNameUnknownZone(diskName string) (*gceDisk, error) {
+func (gce *GCECloud) GetDiskByNameUnknownZone(diskName string) (*GCEDisk, error) {
 	// Note: this is the gotcha right now with GCE PD support:
 	// disk names are not unique per-region.
 	// (I can create two volumes with name "myvol" in e.g. us-central1-b & us-central1-f)
@@ -342,7 +344,7 @@ func (gce *GCECloud) getDiskByNameUnknownZone(diskName string) (*gceDisk, error)
 	// admission control, but that might be a little weird (values changing
 	// on create)
 
-	var found *gceDisk
+	var found *GCEDisk
 	for _, zone := range gce.managedZones {
 		disk, err := gce.findDiskByName(diskName, zone)
 		if err != nil {
@@ -383,7 +385,7 @@ func (gce *GCECloud) encodeDiskTags(tags map[string]string) (string, error) {
 }
 
 func (gce *GCECloud) doDeleteDisk(diskToDelete string) error {
-	disk, err := gce.getDiskByNameUnknownZone(diskToDelete)
+	disk, err := gce.GetDiskByNameUnknownZone(diskToDelete)
 	if err != nil {
 		return err
 	}
@@ -398,7 +400,7 @@ func (gce *GCECloud) doDeleteDisk(diskToDelete string) error {
 }
 
 // Converts a Disk resource to an AttachedDisk resource.
-func (gce *GCECloud) convertDiskToAttachedDisk(disk *gceDisk, readWrite string) *compute.AttachedDisk {
+func (gce *GCECloud) convertDiskToAttachedDisk(disk *GCEDisk, readWrite string) *compute.AttachedDisk {
 	return &compute.AttachedDisk{
 		DeviceName: disk.Name,
 		Kind:       disk.Kind,
