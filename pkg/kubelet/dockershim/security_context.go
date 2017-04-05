@@ -167,7 +167,6 @@ func modifyHostNetworkOptionForContainer(hostNetwork bool, sandboxID string, hc 
 	hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
 	hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)
 	hc.UTSMode = ""
-	hc.PidMode = ""
 
 	if hostNetwork {
 		hc.UTSMode = namespaceModeHost
