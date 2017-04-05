@@ -4,7 +4,7 @@ This plugin provides an integration with [Azure CLI](https://github.com/Azure/az
 
 ## Usage
 
-### Microsoft Azure CLI 2.0
+### Microsoft Azure CLI 2.0 (non interactive)
 
 1. Configure the `apiserver` to use the Azure Active Directory as an OIDC provider with following options
 
@@ -30,7 +30,7 @@ This plugin provides an integration with [Azure CLI](https://github.com/Azure/az
 
    * Replace `USER_NAME` with your user name.
 
-### Device Flow
+### Device Flow (interactive)
 
 1. Create an Azure native application following these [instructions](https://docs.microsoft.com/en-us/azure/active-directory/active-directory-app-registration)
 
@@ -50,11 +50,13 @@ This plugin provides an integration with [Azure CLI](https://github.com/Azure/az
 
    ```
    kubectl config set-credentials "USER_NAME" --auth-provider=azure \
+     --auth-provider-arg=environment=AzurePublicCloud \
      --auth-provider-arg=client-id=APPLICATION_ID \
      --auth-provider-arg=tenant-id=TENANT_ID \
      --auth-provider-arg=audience=https://management.core.windows.net/
    ```
 
+   * Supported environments: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
    * Replace `USER_NAME`, `APPLICATION_ID` and `TENANT_ID` with the values of the registered application.
 
  4. The access token is acquired when first `kubectl` command is executed
