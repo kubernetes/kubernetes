@@ -287,18 +287,20 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 
 // getServiceAccountTokens returns all ServiceAccountToken secrets for the given ServiceAccount
 func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAccount) ([]*api.Secret, error) {
-	tokens, err := s.secretLister.Secrets(serviceAccount.Namespace).List(labels.Everything())
+	secrets, err := s.secretLister.Secrets(serviceAccount.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	for _, token := range tokens {
-		if token.Type != api.SecretTypeServiceAccountToken {
+	tokens := []*api.Secret{}
+
+	for _, secret := range secrets {
+		if secret.Type != api.SecretTypeServiceAccountToken {
 			continue
 		}
 
-		if serviceaccount.InternalIsServiceAccountToken(token, serviceAccount) {
-			tokens = append(tokens, token)
+		if serviceaccount.InternalIsServiceAccountToken(secret, serviceAccount) {
+			tokens = append(tokens, secret)
 		}
 	}
 	return tokens, nil
