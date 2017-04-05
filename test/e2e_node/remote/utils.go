@@ -24,7 +24,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// utils.go contains functions used accross test suites.
+// utils.go contains functions used across test suites.
 
 const (
 	cniRelease   = "0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff"
