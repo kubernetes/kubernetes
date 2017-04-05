@@ -233,12 +233,12 @@ func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, li
 }
 
 // finds and returns the request for a specific resource.
-func GetResourceRequest(pod *Pod, resource ResourceName) int64 {
+func GetResourceRequest(podSpec *PodSpec, resource ResourceName) int64 {
 	if resource == ResourcePods {
 		return 1
 	}
 	totalResources := int64(0)
-	for _, container := range pod.Spec.Containers {
+	for _, container := range podSpec.Containers {
 		if rQuantity, ok := container.Resources.Requests[resource]; ok {
 			if resource == ResourceCPU {
 				totalResources += rQuantity.MilliValue()
@@ -248,7 +248,7 @@ func GetResourceRequest(pod *Pod, resource ResourceName) int64 {
 		}
 	}
 	// take max_resource(sum_pod, any_init_container)
-	for _, container := range pod.Spec.InitContainers {
+	for _, container := range podSpec.InitContainers {
 		if rQuantity, ok := container.Resources.Requests[resource]; ok {
 			if resource == ResourceCPU && rQuantity.MilliValue() > totalResources {
 				totalResources = rQuantity.MilliValue()
