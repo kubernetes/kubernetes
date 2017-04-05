@@ -183,9 +183,7 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 		})
 
 	s.deletionHelper = deletionhelper.NewDeletionHelper(
-		s.hasFinalizerFunc,
-		s.removeFinalizerFunc,
-		s.addFinalizerFunc,
+		s.updateObject,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			return adapter.ObjectMeta(obj).Name
@@ -207,50 +205,9 @@ func (s *FederationSyncController) minimizeLatency() {
 	s.updateTimeout = 5 * time.Second
 }
 
-// hasFinalizerFunc returns true if the given object has the given finalizer in its ObjectMeta.
-func (s *FederationSyncController) hasFinalizerFunc(obj pkgruntime.Object, finalizer string) bool {
-	meta := s.adapter.ObjectMeta(obj)
-	for i := range meta.Finalizers {
-		if string(meta.Finalizers[i]) == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// Removes the finalizer from the given objects ObjectMeta.
-func (s *FederationSyncController) removeFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
-	meta := s.adapter.ObjectMeta(obj)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range meta.Finalizers {
-		if !deletionhelper.ContainsString(finalizers, meta.Finalizers[i]) {
-			newFinalizers = append(newFinalizers, meta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	meta.Finalizers = newFinalizers
-	secret, err := s.adapter.FedUpdate(obj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizers %v from %s %s: %v", finalizers, s.adapter.Kind(), meta.Name, err)
-	}
-	return secret, nil
-}
-
-// Adds the given finalizers to the given objects ObjectMeta.
-func (s *FederationSyncController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
-	meta := s.adapter.ObjectMeta(obj)
-	meta.Finalizers = append(meta.Finalizers, finalizers...)
-	secret, err := s.adapter.FedUpdate(obj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizers %v to %s %s: %v", finalizers, s.adapter.Kind(), meta.Name, err)
-	}
-	return secret, nil
+// Sends the given updated object to apiserver.
+func (s *FederationSyncController) updateObject(obj pkgruntime.Object) (pkgruntime.Object, error) {
+	return s.adapter.FedUpdate(obj)
 }
 
 func (s *FederationSyncController) Run(stopChan <-chan struct{}) {
