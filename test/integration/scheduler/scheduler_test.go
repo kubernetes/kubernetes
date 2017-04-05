@@ -42,8 +42,11 @@ import (
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -53,6 +56,22 @@ type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.Node
 type nodeStateManager struct {
 	makeSchedulable   nodeMutationFunc
 	makeUnSchedulable nodeMutationFunc
+}
+
+func PredicateOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	return true, nil, nil
+}
+
+func PredicateTwo(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	return true, nil, nil
+}
+
+func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+	return []schedulerapi.HostPriority{}, nil
+}
+
+func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+	return []schedulerapi.HostPriority{}, nil
 }
 
 // TestSchedulerCreationFromConfigMap verifies that scheduler can be created
@@ -65,9 +84,14 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
-	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	// Pre-register some predicate and priority functions
+	factory.RegisterFitPredicate("PredicateOne", PredicateOne)
+	factory.RegisterFitPredicate("PredicateTwo", PredicateTwo)
+	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+	factory.RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
 
 	// Add a ConfigMap object.
 	configPolicyName := "scheduler-custom-policy-config"
@@ -78,22 +102,17 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			"kind" : "Policy",
 			"apiVersion" : "v1",
 			"predicates" : [
-				{"name" : "PodFitsHostPorts"},
-				{"name" : "PodFitsResources"},
-				{"name" : "NoDiskConflict"},
-				{"name" : "NoVolumeZoneConflict"},
-				{"name" : "MatchNodeSelector"},
-				{"name" : "HostName"}
+				{"name" : "PredicateOne"},
+				{"name" : "PredicateTwo"}
 			],
 			"priorities" : [
-				{"name" : "LeastRequestedPriority", "weight" : 1},
-				{"name" : "BalancedResourceAllocation", "weight" : 1},
-				{"name" : "ServiceSpreadingPriority", "weight" : 1},
-				{"name" : "EqualPriority", "weight" : 1}
+				{"name" : "PriorityOne", "weight" : 1},
+				{"name" : "PriorityTwo", "weight" : 5}
 			]
 			}`,
 		},
 	}
+
 	policyConfigMap.APIVersion = api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()
 	clientSet.Core().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
 
@@ -117,13 +136,21 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		t.Fatalf("Error creating scheduler: %v", err)
 	}
 
-	stop := make(chan struct{})
-	informerFactory.Start(stop)
+	// Verify that the config is applied correctly.
+	schedPredicates := sched.Config().Algorithm.Predicates()
+	schedPrioritizers := sched.Config().Algorithm.Prioritizers()
+	if len(schedPredicates) != 2 || len(schedPrioritizers) != 2 {
+		t.Errorf("Unexpected number of predicates or priority functions. Number of predicates: %v, number of prioritizers: %v", len(schedPredicates), len(schedPrioritizers))
+	}
+	// Check a predicate and a priority function.
+	if schedPredicates["PredicateTwo"] == nil {
+		t.Errorf("Expected to have a PodFitsHostPorts predicate.")
+	}
+	if schedPrioritizers[1].Function == nil || schedPrioritizers[1].Weight != 5 {
+		t.Errorf("Unexpected prioritizer: func: %v, weight: %v", schedPrioritizers[1].Function, schedPrioritizers[1].Weight)
+	}
 
-	sched.Run()
-	defer close(stop)
-
-	DoTestUnschedulableNodes(t, clientSet, ns, informerFactory.Core().V1().Nodes().Lister())
+	defer close(sched.Config().StopEverything)
 }
 
 // TestSchedulerCreationFromNonExistentConfigMap ensures that creation of the
@@ -160,11 +187,6 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Creation of scheduler didn't fail while the policy ConfigMap didn't exist.")
 	}
-
-	stop := make(chan struct{})
-	informerFactory.Start(stop)
-
-	defer close(stop)
 }
 
 // TestSchedulerCreationInLegacyMode ensures that creation of the scheduler
@@ -178,7 +200,6 @@ func TestSchedulerCreationInLegacyMode(t *testing.T) {
 
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
-
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -204,11 +225,11 @@ func TestSchedulerCreationInLegacyMode(t *testing.T) {
 		t.Fatalf("Creation of scheduler in legacy mode failed: %v", err)
 	}
 
-	stop := make(chan struct{})
-	informerFactory.Start(stop)
+	informerFactory.Start(sched.Config().StopEverything)
+	defer close(sched.Config().StopEverything)
 
 	sched.Run()
-	defer close(stop)
+	DoTestUnschedulableNodes(t, clientSet, ns, informerFactory.Core().V1().Nodes().Lister())
 }
 
 func TestUnschedulableNodes(t *testing.T) {

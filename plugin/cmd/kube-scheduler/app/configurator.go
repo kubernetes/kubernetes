@@ -104,6 +104,7 @@ func CreateScheduler(
 		s.PolicyConfigFile,
 		s.AlgorithmProvider,
 		s.PolicyConfigMapName,
+		s.PolicyConfigMapNamespace,
 		s.UseLegacyPolicyConfig,
 	}
 
@@ -116,10 +117,11 @@ func CreateScheduler(
 // a scheduler from a user provided config file or ConfigMap object.
 type schedulerConfigurator struct {
 	scheduler.Configurator
-	policyFile            string
-	algorithmProvider     string
-	policyConfigMap       string
-	useLegacyPolicyConfig bool
+	policyFile               string
+	algorithmProvider        string
+	policyConfigMap          string
+	policyConfigMapNamespace string
+	useLegacyPolicyConfig    bool
 }
 
 // getSchedulerPolicyConfig finds and decodes scheduler's policy config. If no
@@ -131,7 +133,8 @@ func (sc schedulerConfigurator) getSchedulerPolicyConfig() (*schedulerapi.Policy
 
 	// If not in legacy mode, try to find policy ConfigMap.
 	if !sc.useLegacyPolicyConfig && len(sc.policyConfigMap) != 0 {
-		policyConfigMap, err := sc.GetClient().CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(sc.policyConfigMap, metav1.GetOptions{})
+		namespace := sc.policyConfigMapNamespace
+		policyConfigMap, err := sc.GetClient().CoreV1().ConfigMaps(namespace).Get(sc.policyConfigMap, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("Error getting scheduler policy ConfigMap: %v.", err)
 		}
@@ -150,8 +153,8 @@ func (sc schedulerConfigurator) getSchedulerPolicyConfig() (*schedulerapi.Policy
 		}
 	}
 
-	// If there we are in legacy mode or ConfigMap name is empty, try to use
-	// policy config file.
+	// If we are in legacy mode or ConfigMap name is empty, try to use policy
+	// config file.
 	if !policyConfigMapFound {
 		if _, err := os.Stat(sc.policyFile); err != nil {
 			// No config file is found.
@@ -171,7 +174,7 @@ func (sc schedulerConfigurator) getSchedulerPolicyConfig() (*schedulerapi.Policy
 }
 
 // Create implements the interface for the Configurator, hence it is exported
-// even through the struct is not.
+// even though the struct is not.
 func (sc schedulerConfigurator) Create() (*scheduler.Config, error) {
 	policy, err := sc.getSchedulerPolicyConfig()
 	if err != nil {
