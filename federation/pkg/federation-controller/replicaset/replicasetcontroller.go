@@ -512,7 +512,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	if frs.DeletionTimestamp != nil {
 		if err := frsc.delete(frs); err != nil {
 			glog.Errorf("Failed to delete %s: %v", frs, err)
-			frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "DeleteFailed",
+			frsc.eventRecorder.Eventf(frs, api.EventTypeWarning, "DeleteFailed",
 				"ReplicaSet delete failed: %v", err)
 			frsc.deliverReplicaSetByKey(key, 0, true)
 			return statusError, err
@@ -627,7 +627,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		return statusAllOk, nil
 	}
 	err = frsc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "FailedUpdateInCluster",
+		frsc.eventRecorder.Eventf(frs, api.EventTypeWarning, "FailedUpdateInCluster",
 			"Replicaset update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {

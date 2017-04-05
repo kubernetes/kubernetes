@@ -365,7 +365,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 	if baseNamespace.DeletionTimestamp != nil {
 		if err := nc.delete(baseNamespace); err != nil {
 			glog.Errorf("Failed to delete %s: %v", namespace, err)
-			nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "DeleteFailed",
+			nc.eventRecorder.Eventf(baseNamespace, api.EventTypeWarning, "DeleteFailed",
 				"Namespace delete failed: %v", err)
 			nc.deliverNamespace(namespace, 0, true)
 		}
@@ -444,7 +444,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 	glog.V(2).Infof("Updating namespace %s in underlying clusters. Operations: %d", baseNamespace.Name, len(operations))
 
 	err = nc.federatedUpdater.UpdateWithOnError(operations, nc.updateTimeout, func(op util.FederatedOperation, operror error) {
-		nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "UpdateInClusterFailed",
+		nc.eventRecorder.Eventf(baseNamespace, api.EventTypeWarning, "UpdateInClusterFailed",
 			"Namespace update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {

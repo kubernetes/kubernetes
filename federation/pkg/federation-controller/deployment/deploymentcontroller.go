@@ -500,7 +500,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 	if fd.DeletionTimestamp != nil {
 		if err := fdc.delete(fd); err != nil {
 			glog.Errorf("Failed to delete %s: %v", fd.Name, err)
-			fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "DeleteFailed",
+			fdc.eventRecorder.Eventf(fd, api.EventTypeWarning, "DeleteFailed",
 				"Deployment delete failed: %v", err)
 			return statusError, err
 		}
@@ -615,7 +615,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		return statusAllOk, nil
 	}
 	err = fdc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "FailedUpdateInCluster",
+		fdc.eventRecorder.Eventf(fd, api.EventTypeWarning, "FailedUpdateInCluster",
 			"Deployment update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {
