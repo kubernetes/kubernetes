@@ -20,8 +20,10 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -46,17 +48,19 @@ import (
 )
 
 const (
-	defaultTimeout   = 3 * time.Minute
-	resizeTimeout    = 5 * time.Minute
-	scaleUpTimeout   = 5 * time.Minute
-	scaleDownTimeout = 15 * time.Minute
-	podTimeout       = 2 * time.Minute
+	defaultTimeout      = 3 * time.Minute
+	resizeTimeout       = 5 * time.Minute
+	scaleUpTimeout      = 5 * time.Minute
+	scaleDownTimeout    = 15 * time.Minute
+	podTimeout          = 2 * time.Minute
+	nodesRecoverTimeout = 5 * time.Minute
 
 	gkeEndpoint      = "https://test-container.sandbox.googleapis.com"
 	gkeUpdateTimeout = 15 * time.Minute
 
 	disabledTaint             = "DisabledForAutoscalingTest"
 	newNodesForScaledownTests = 2
+	unhealthyClusterThreshold = 4
 )
 
 var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
@@ -352,6 +356,48 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 				func(size int) bool { return size < increasedSize }, scaleDownTimeout))
 		})
+	})
+
+	It("Shouldn't perform scale up operation and should list unhealthy status if most of the cluster is broken[Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		clusterSize := nodeCount
+		for clusterSize < unhealthyClusterThreshold+1 {
+			clusterSize = manuallyIncreaseClusterSize(f, originalSizes)
+		}
+
+		By("Block network connectivity to some nodes to simulate unhealthy cluster")
+		nodesToBreakCount := int(math.Floor(math.Max(float64(unhealthyClusterThreshold), 0.5*float64(clusterSize))))
+		nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector().String()})
+		framework.ExpectNoError(err)
+		Expect(nodesToBreakCount <= len(nodes.Items)).To(BeTrue())
+		nodesToBreak := nodes.Items[:nodesToBreakCount]
+
+		// TestUnderTemporaryNetworkFailure only removes connectivity to a single node,
+		// and accepts func() callback. This is expanding the loop to recursive call
+		// to avoid duplicating TestUnderTemporaryNetworkFailure
+		var testFunction func()
+		testFunction = func() {
+			if len(nodesToBreak) > 0 {
+				ntb := &nodesToBreak[0]
+				nodesToBreak = nodesToBreak[1:]
+				framework.TestUnderTemporaryNetworkFailure(c, "default", ntb, testFunction)
+			} else {
+				ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
+				defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
+				time.Sleep(scaleUpTimeout)
+				currentNodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+				framework.Logf("Currently available nodes: %v, nodes available at the start of test: %v, disabled nodes: %v", len(currentNodes.Items), len(nodes.Items), nodesToBreakCount)
+				Expect(len(currentNodes.Items)).Should(Equal(len(nodes.Items) - nodesToBreakCount))
+				status, err := getClusterwideStatus(c)
+				framework.Logf("Clusterwide status: %v", status)
+				framework.ExpectNoError(err)
+				Expect(status).Should(Equal("Unhealthy"))
+			}
+		}
+		testFunction()
+		// Give nodes time to recover from network failure
+		framework.ExpectNoError(framework.WaitForClusterSize(c, len(nodes.Items), nodesRecoverTimeout))
 	})
 
 })
@@ -827,4 +873,26 @@ func manuallyIncreaseClusterSize(f *framework.Framework, originalSizes map[strin
 	framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 		func(size int) bool { return size >= increasedSize }, scaleUpTimeout))
 	return increasedSize
+}
+
+// Try to get clusterwide health from CA status configmap.
+// Status configmap is not parsing-friendly, so evil regexpery follows.
+func getClusterwideStatus(c clientset.Interface) (string, error) {
+	configMap, err := c.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	status, ok := configMap.Data["status"]
+	if !ok {
+		return "", fmt.Errorf("Status information not found in configmap")
+	}
+	matcher, err := regexp.Compile("Cluster-wide:\\s*\n\\s*Health:\\s*([A-Za-z]+)")
+	if err != nil {
+		return "", err
+	}
+	result := matcher.FindStringSubmatch(status)
+	if len(result) < 2 {
+		return "", fmt.Errorf("Failed to parse CA status configmap")
+	}
+	return result[1], nil
 }
