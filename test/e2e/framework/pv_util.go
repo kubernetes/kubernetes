@@ -148,7 +148,7 @@ func DeletePersistentVolume(c clientset.Interface, pvName string) error {
 // Delete the Claim
 func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns string) error {
 	if c != nil && len(pvcName) > 0 {
-		Logf("Deleting PersistentVolumeClaim %v", pvcName)
+		Logf("Deleting PersistentVolumeClaim %q", pvcName)
 		err := c.CoreV1().PersistentVolumeClaims(ns).Delete(pvcName, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
 			return fmt.Errorf("PVC Delete API error: %v", err)
@@ -333,7 +333,8 @@ func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 
 // Create the desired number of PVs and PVCs and return them in separate maps. If the
 // number of PVs != the number of PVCs then the min of those two counts is the number of
-// PVs expected to bind.
+// PVs expected to bind. If a Create error occurs, all created PVs and PVCs are deleted
+// and the error is returned.
 func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig) (PVMap, PVCMap, error) {
 
 	var (
@@ -345,6 +346,21 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 	pvMap := make(PVMap, numpvs)
 	pvcMap := make(PVCMap, numpvcs)
 
+	handle_err := func() { // on error delete created resources, if any
+		for pvcKey := range pvcMap {
+			if len(pvcKey.Name) > 0 {
+				DeletePersistentVolumeClaim(c, pvcKey.Name, pvcKey.Namespace) // ignore error
+				pvcMap[pvcKey] = pvcval{}
+			}
+		}
+		for pvName := range pvMap {
+			if len(pvName) > 0 {
+				DeletePersistentVolume(c, pvName) // ignore error
+				pvMap[pvName] = pvval{}
+			}
+		}
+	}
+
 	extraPVs = numpvs - numpvcs
 	if extraPVs < 0 {
 		extraPVCs = -extraPVs
@@ -355,6 +371,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 	// create pvs and pvcs
 	for i = 0; i < pvsToCreate; i++ {
 		if pv, pvc, err = CreatePVPVC(c, pvConfig, pvcConfig, ns, false); err != nil {
+			handle_err()
 			return pvMap, pvcMap, err
 		}
 		pvMap[pv.Name] = pvval{}
@@ -365,6 +382,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 	for i = 0; i < extraPVs; i++ {
 		pv = MakePersistentVolume(pvConfig)
 		if pv, err = createPV(c, pv); err != nil {
+			handle_err()
 			return pvMap, pvcMap, err
 		}
 		pvMap[pv.Name] = pvval{}
@@ -372,6 +390,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 	for i = 0; i < extraPVCs; i++ {
 		pvc = MakePersistentVolumeClaim(pvcConfig, ns)
 		if pvc, err = CreatePVC(c, ns, pvc); err != nil {
+			handle_err()
 			return pvMap, pvcMap, err
 		}
 		pvcMap[makePvcKey(ns, pvc.Name)] = pvcval{}
