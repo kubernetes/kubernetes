@@ -38,6 +38,8 @@ import (
 	"sync"
 
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/naming"
 )
@@ -50,6 +52,14 @@ type Address struct {
 	// Metadata is the information associated with Addr, which may be used
 	// to make load balancing decision.
 	Metadata interface{}
+}
+
+// BalancerConfig specifies the configurations for Balancer.
+type BalancerConfig struct {
+	// DialCreds is the transport credential the Balancer implementation can
+	// use to dial to a remote load balancer server. The Balancer implementations
+	// can ignore this if it does not need to talk to another party securely.
+	DialCreds credentials.TransportCredentials
 }
 
 // BalancerGetOptions configures a Get call.
@@ -66,11 +76,11 @@ type Balancer interface {
 	// Start does the initialization work to bootstrap a Balancer. For example,
 	// this function may start the name resolution and watch the updates. It will
 	// be called when dialing.
-	Start(target string) error
+	Start(target string, config BalancerConfig) error
 	// Up informs the Balancer that gRPC has a connection to the server at
 	// addr. It returns down which is called once the connection to addr gets
 	// lost or closed.
-	// TODO: It is not clear how to construct and take advantage the meaningful error
+	// TODO: It is not clear how to construct and take advantage of the meaningful error
 	// parameter for down. Need realistic demands to guide.
 	Up(addr Address) (down func(error))
 	// Get gets the address of a server for the RPC corresponding to ctx.
@@ -205,7 +215,12 @@ func (rr *roundRobin) watchAddrUpdates() error {
 	return nil
 }
 
-func (rr *roundRobin) Start(target string) error {
+func (rr *roundRobin) Start(target string, config BalancerConfig) error {
+	rr.mu.Lock()
+	defer rr.mu.Unlock()
+	if rr.done {
+		return ErrClientConnClosing
+	}
 	if rr.r == nil {
 		// If there is no name resolver installed, it is not needed to
 		// do name resolution. In this case, target is added into rr.addrs
@@ -301,7 +316,7 @@ func (rr *roundRobin) Get(ctx context.Context, opts BalancerGetOptions) (addr Ad
 	if !opts.BlockingWait {
 		if len(rr.addrs) == 0 {
 			rr.mu.Unlock()
-			err = fmt.Errorf("there is no address available")
+			err = Errorf(codes.Unavailable, "there is no address available")
 			return
 		}
 		// Returns the next addr on rr.addrs for failfast RPCs.

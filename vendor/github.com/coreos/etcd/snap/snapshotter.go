@@ -21,7 +21,7 @@ import (
 	"hash/crc32"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -84,13 +84,13 @@ func (s *Snapshotter) save(snapshot *raftpb.Snapshot) error {
 		marshallingDurations.Observe(float64(time.Since(start)) / float64(time.Second))
 	}
 
-	err = pioutil.WriteAndSyncFile(path.Join(s.dir, fname), d, 0666)
+	err = pioutil.WriteAndSyncFile(filepath.Join(s.dir, fname), d, 0666)
 	if err == nil {
 		saveDurations.Observe(float64(time.Since(start)) / float64(time.Second))
 	} else {
-		err1 := os.Remove(path.Join(s.dir, fname))
+		err1 := os.Remove(filepath.Join(s.dir, fname))
 		if err1 != nil {
-			plog.Errorf("failed to remove broken snapshot file %s", path.Join(s.dir, fname))
+			plog.Errorf("failed to remove broken snapshot file %s", filepath.Join(s.dir, fname))
 		}
 	}
 	return err
@@ -114,7 +114,7 @@ func (s *Snapshotter) Load() (*raftpb.Snapshot, error) {
 }
 
 func loadSnap(dir, name string) (*raftpb.Snapshot, error) {
-	fpath := path.Join(dir, name)
+	fpath := filepath.Join(dir, name)
 	snap, err := Read(fpath)
 	if err != nil {
 		renameBroken(fpath)

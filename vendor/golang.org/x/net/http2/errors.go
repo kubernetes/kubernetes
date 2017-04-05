@@ -64,9 +64,17 @@ func (e ConnectionError) Error() string { return fmt.Sprintf("connection error: 
 type StreamError struct {
 	StreamID uint32
 	Code     ErrCode
+	Cause    error // optional additional detail
+}
+
+func streamError(id uint32, code ErrCode) StreamError {
+	return StreamError{StreamID: id, Code: code}
 }
 
 func (e StreamError) Error() string {
+	if e.Cause != nil {
+		return fmt.Sprintf("stream error: stream ID %d; %v; %v", e.StreamID, e.Code, e.Cause)
+	}
 	return fmt.Sprintf("stream error: stream ID %d; %v", e.StreamID, e.Code)
 }
 

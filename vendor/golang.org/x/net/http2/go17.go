@@ -39,6 +39,13 @@ type clientTrace httptrace.ClientTrace
 
 func reqContext(r *http.Request) context.Context { return r.Context() }
 
+func (t *Transport) idleConnTimeout() time.Duration {
+	if t.t1 != nil {
+		return t.t1.IdleConnTimeout
+	}
+	return 0
+}
+
 func setResponseUncompressed(res *http.Response) { res.Uncompressed = true }
 
 func traceGotConn(req *http.Request, cc *ClientConn) {
@@ -91,4 +98,9 @@ func traceFirstResponseByte(trace *clientTrace) {
 func requestTrace(req *http.Request) *clientTrace {
 	trace := httptrace.ContextClientTrace(req.Context())
 	return (*clientTrace)(trace)
+}
+
+// Ping sends a PING frame to the server and waits for the ack.
+func (cc *ClientConn) Ping(ctx context.Context) error {
+	return cc.ping(ctx)
 }

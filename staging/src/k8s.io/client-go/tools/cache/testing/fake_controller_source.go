@@ -174,12 +174,12 @@ func (f *FakeControllerSource) List(options metav1.ListOptions) (runtime.Object,
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
-	listAccessor, err := meta.ListAccessor(listObj)
+	objMeta, err := metav1.ListMetaFor(listObj)
 	if err != nil {
 		return nil, err
 	}
 	resourceVersion := len(f.changes)
-	listAccessor.SetResourceVersion(strconv.Itoa(resourceVersion))
+	objMeta.ResourceVersion = strconv.Itoa(resourceVersion)
 	return listObj, nil
 }
 
@@ -195,12 +195,12 @@ func (f *FakePVControllerSource) List(options metav1.ListOptions) (runtime.Objec
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
-	listAccessor, err := meta.ListAccessor(listObj)
+	objMeta, err := metav1.ListMetaFor(listObj)
 	if err != nil {
 		return nil, err
 	}
 	resourceVersion := len(f.changes)
-	listAccessor.SetResourceVersion(strconv.Itoa(resourceVersion))
+	objMeta.ResourceVersion = strconv.Itoa(resourceVersion)
 	return listObj, nil
 }
 
@@ -216,12 +216,12 @@ func (f *FakePVCControllerSource) List(options metav1.ListOptions) (runtime.Obje
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
-	listAccessor, err := meta.ListAccessor(listObj)
+	objMeta, err := metav1.ListMetaFor(listObj)
 	if err != nil {
 		return nil, err
 	}
 	resourceVersion := len(f.changes)
-	listAccessor.SetResourceVersion(strconv.Itoa(resourceVersion))
+	objMeta.ResourceVersion = strconv.Itoa(resourceVersion)
 	return listObj, nil
 }
 
