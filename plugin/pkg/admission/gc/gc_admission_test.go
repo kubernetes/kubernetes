@@ -338,10 +338,10 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
-			name:            "non-rc-deleter, create, all ownerReferences have blockOwnerDeletion=false",
+			name:            "non-rc-deleter, create, all ownerReferences have blockOwnerDeletion=false or nil",
 			username:        "non-rc-deleter",
 			resource:        api.SchemeGroupVersion.WithResource("pods"),
-			newObj:          podWithOwnerRefs(notBlockRC1, notBlockRC2),
+			newObj:          podWithOwnerRefs(notBlockRC1, nilBlockRC2),
 			expectedAllowed: true,
 		},
 		{
@@ -413,7 +413,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			resource:        api.SchemeGroupVersion.WithResource("pods"),
 			oldObj:          podWithOwnerRefs(blockRC1),
 			newObj:          podWithOwnerRefs(notBlockRC1),
-			expectedAllowed: false,
+			expectedAllowed: true,
 		},
 		{
 			name:            "non-rc-deleter, update, some ownerReferences change blockOwnerDeletion, but all such references are to daemonset",
