@@ -45,7 +45,7 @@ const (
 )
 
 type HasFinalizerFunc func(runtime.Object, string) bool
-type RemoveFinalizerFunc func(runtime.Object, string) (runtime.Object, error)
+type RemoveFinalizerFunc func(runtime.Object, []string) (runtime.Object, error)
 type AddFinalizerFunc func(runtime.Object, []string) (runtime.Object, error)
 type ObjNameFunc func(runtime.Object) string
 
@@ -123,11 +123,8 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 		// If the obj has FinalizerOrphan finalizer, then we need to orphan the
 		// corresponding objects in underlying clusters.
 		// Just remove both the finalizers in that case.
-		obj, err := dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
-		if err != nil {
-			return obj, err
-		}
-		return dh.removeFinalizerFunc(obj, metav1.FinalizerOrphanDependents)
+		finalizers := []string{FinalizerDeleteFromUnderlyingClusters, metav1.FinalizerOrphanDependents}
+		return dh.removeFinalizerFunc(obj, finalizers)
 	}
 
 	glog.V(2).Infof("Deleting obj %s from underlying clusters", objName)
@@ -183,5 +180,5 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 	}
 
 	// All done. Just remove the finalizer.
-	return dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
+	return dh.removeFinalizerFunc(obj, []string{FinalizerDeleteFromUnderlyingClusters})
 }
