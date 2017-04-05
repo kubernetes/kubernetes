@@ -201,6 +201,7 @@ go_test(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/rbac:go_default_library",
+        "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",

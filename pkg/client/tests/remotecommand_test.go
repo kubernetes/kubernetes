@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	consts "k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	remoteclient "k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
@@ -150,8 +151,8 @@ func TestStream(t *testing.T) {
 			TestName:        "error",
 			Error:           "bail",
 			Stdout:          "a",
-			ClientProtocols: []string{remotecommand.StreamProtocolV2Name},
-			ServerProtocols: []string{remotecommand.StreamProtocolV2Name},
+			ClientProtocols: []string{consts.StreamProtocolV2Name},
+			ServerProtocols: []string{consts.StreamProtocolV2Name},
 		},
 		{
 			TestName:        "in/out/err",
@@ -159,8 +160,8 @@ func TestStream(t *testing.T) {
 			Stdout:          "b",
 			Stderr:          "c",
 			MessageCount:    100,
-			ClientProtocols: []string{remotecommand.StreamProtocolV2Name},
-			ServerProtocols: []string{remotecommand.StreamProtocolV2Name},
+			ClientProtocols: []string{consts.StreamProtocolV2Name},
+			ServerProtocols: []string{consts.StreamProtocolV2Name},
 		},
 		{
 			TestName:        "in/out/tty",
@@ -168,8 +169,8 @@ func TestStream(t *testing.T) {
 			Stdout:          "b",
 			Tty:             true,
 			MessageCount:    100,
-			ClientProtocols: []string{remotecommand.StreamProtocolV2Name},
-			ServerProtocols: []string{remotecommand.StreamProtocolV2Name},
+			ClientProtocols: []string{consts.StreamProtocolV2Name},
+			ServerProtocols: []string{consts.StreamProtocolV2Name},
 		},
 		{
 			// 1.0 kubectl, 1.0 kubelet
@@ -187,7 +188,7 @@ func TestStream(t *testing.T) {
 			Stderr:          "c",
 			MessageCount:    1,
 			ClientProtocols: []string{},
-			ServerProtocols: []string{remotecommand.StreamProtocolV2Name, remotecommand.StreamProtocolV1Name},
+			ServerProtocols: []string{consts.StreamProtocolV2Name, consts.StreamProtocolV1Name},
 		},
 		{
 			// 1.1+ kubectl, 1.0 kubelet
@@ -195,7 +196,7 @@ func TestStream(t *testing.T) {
 			Stdout:          "b",
 			Stderr:          "c",
 			MessageCount:    1,
-			ClientProtocols: []string{remotecommand.StreamProtocolV2Name, remotecommand.StreamProtocolV1Name},
+			ClientProtocols: []string{consts.StreamProtocolV2Name, consts.StreamProtocolV1Name},
 			ServerProtocols: []string{},
 		},
 	}

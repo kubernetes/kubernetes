@@ -30,12 +30,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	consts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/pkg/api"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubeletportforward "k8s.io/kubernetes/pkg/kubelet/server/portforward"
-	kubeletremotecommand "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
 
 const (
@@ -301,7 +301,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 		require.NoError(t, err)
 
 		opts := remotecommand.StreamOptions{
-			SupportedProtocols: kubeletremotecommand.SupportedStreamingProtocols,
+			SupportedProtocols: consts.SupportedStreamingProtocols,
 			Stdin:              stdinR,
 			Stdout:             stdoutW,
 			Stderr:             stderrW,
