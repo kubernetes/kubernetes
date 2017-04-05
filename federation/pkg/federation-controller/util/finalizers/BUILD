@@ -5,21 +5,17 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
     name = "go_default_library",
-    srcs = ["deletion_helper.go"],
+    srcs = ["finalizers.go"],
     tags = ["automanaged"],
     deps = [
-        "//federation/pkg/federation-controller/util:go_default_library",
-        "//federation/pkg/federation-controller/util/finalizers:go_default_library",
-        "//pkg/api:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/client-go/tools/record",
     ],
 )
 
@@ -34,4 +30,18 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["finalizers_test.go"],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api/v1:go_default_library",
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+    ],
 )
