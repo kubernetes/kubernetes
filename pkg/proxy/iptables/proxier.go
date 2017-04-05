@@ -193,18 +193,19 @@ type proxyEndpointMap map[proxy.ServicePortName][]*endpointsInfo
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
-	mu                        sync.Mutex // protects the following fields
-	serviceMap                proxyServiceMap
-	endpointsMap              proxyEndpointMap
-	portsMap                  map[localPort]closeable
-	haveReceivedServiceUpdate bool // true once we've seen an OnServiceUpdate event
-	// allEndpoints should never be modified by proxier - the pointers
-	// are shared with higher layers of kube-proxy. They are guaranteed
-	// to not be modified in the meantime, but also require to be not
-	// modified by Proxier.
-	// nil until we have seen an OnEndpointsUpdate event.
+	mu           sync.Mutex // protects the following fields
+	serviceMap   proxyServiceMap
+	endpointsMap proxyEndpointMap
+	portsMap     map[localPort]closeable
+	// allServices and allEndpoints should never be modified by proxier - the
+	// pointers are shared with higher layers of kube-proxy. They are guaranteed
+	// to not be modified in the meantime, but also require to be not modified
+	// by Proxier.
+	// nil until we have seen an On*Update event.
+	allServices  []*api.Service
 	allEndpoints []*api.Endpoints
-	throttle     flowcontrol.RateLimiter
+
+	throttle flowcontrol.RateLimiter
 
 	// These are effectively const and do not need the mutex to be held.
 	syncPeriod     time.Duration
@@ -529,13 +530,12 @@ func buildServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMap) 
 // OnServiceUpdate tracks the active set of service proxies.
 // They will be synchronized using syncProxyRules()
 func (proxier *Proxier) OnServiceUpdate(allServices []*api.Service) {
-	start := time.Now()
-	defer func() {
-		glog.V(4).Infof("OnServiceUpdate took %v for %d services", time.Since(start), len(allServices))
-	}()
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-	proxier.haveReceivedServiceUpdate = true
+	if proxier.allServices == nil {
+		glog.V(2).Info("Received first Services update")
+	}
+	proxier.allServices = allServices
 
 	newServiceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(allServices, proxier.serviceMap)
 	for _, hc := range hcAdd {
@@ -769,7 +769,7 @@ func (proxier *Proxier) syncProxyRules() {
 		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
-	if proxier.allEndpoints == nil || !proxier.haveReceivedServiceUpdate {
+	if proxier.allEndpoints == nil || proxier.allServices == nil {
 		glog.V(2).Info("Not syncing iptables until Services and Endpoints have been received from master")
 		return
 	}
