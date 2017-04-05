@@ -19,6 +19,7 @@ go_library(
         "//cmd/kube-proxy/app/options:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/iptables:go_default_library",

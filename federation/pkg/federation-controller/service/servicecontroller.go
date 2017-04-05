@@ -45,7 +45,7 @@ import (
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
@@ -1008,7 +1008,7 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	if service.DeletionTimestamp != nil {
 		if err := s.delete(service); err != nil {
 			glog.Errorf("Failed to delete %s: %v", service, err)
-			s.eventRecorder.Eventf(service, api.EventTypeNormal, "DeleteFailed",
+			s.eventRecorder.Eventf(service, api.EventTypeWarning, "DeleteFailed",
 				"Service delete failed: %v", err)
 			return err, cachedService.nextRetryDelay()
 		}

@@ -20,8 +20,10 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -46,17 +48,23 @@ import (
 )
 
 const (
-	defaultTimeout   = 3 * time.Minute
-	resizeTimeout    = 5 * time.Minute
-	scaleUpTimeout   = 5 * time.Minute
-	scaleDownTimeout = 15 * time.Minute
-	podTimeout       = 2 * time.Minute
+	defaultTimeout        = 3 * time.Minute
+	resizeTimeout         = 5 * time.Minute
+	scaleUpTimeout        = 5 * time.Minute
+	scaleUpTriggerTimeout = 2 * time.Minute
+	scaleDownTimeout      = 15 * time.Minute
+	podTimeout            = 2 * time.Minute
+	nodesRecoverTimeout   = 5 * time.Minute
 
 	gkeEndpoint      = "https://test-container.sandbox.googleapis.com"
 	gkeUpdateTimeout = 15 * time.Minute
 
 	disabledTaint             = "DisabledForAutoscalingTest"
 	newNodesForScaledownTests = 2
+	unhealthyClusterThreshold = 4
+
+	caNoScaleUpStatus      = "NoActivity"
+	caOngoingScaleUpStatus = "InProgress"
 )
 
 var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
@@ -113,7 +121,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 	It("shouldn't increase cluster size if pending pod is too large [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		By("Creating unschedulable pod")
-		ReserveMemory(f, "memory-reservation", 1, int(1.1*float64(memCapacityMb)), false)
+		ReserveMemory(f, "memory-reservation", 1, int(1.1*float64(memCapacityMb)), false, defaultTimeout)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		By("Waiting for scale up hoping it won't happen")
@@ -140,13 +148,38 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	It("should increase cluster size if pending pods are small [Feature:ClusterSizeAutoscalingScaleUp]", func() {
-		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
+		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false, defaultTimeout)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+	})
+
+	It("shouldn't trigger additional scale-ups during processing scale-up [Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		status, err := getScaleUpStatus(c)
+		framework.ExpectNoError(err)
+		unmanagedNodes := nodeCount - status.ready
+
+		By("Schedule more pods than can fit and wait for claster to scale-up")
+		ReserveMemory(f, "memory-reservation", 100, (nodeCount+2)*memCapacityMb, false, 1*time.Second)
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
+
+		status, err = waitForScaleUpStatus(c, caOngoingScaleUpStatus, scaleUpTriggerTimeout)
+		framework.ExpectNoError(err)
+		target := status.target
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+
+		By("Expect no more scale-up to be happening after all pods are scheduled")
+		status, err = getScaleUpStatus(c)
+		framework.ExpectNoError(err)
+		if status.target != target {
+			glog.Warningf("Final number of nodes (%v) does not match initial scale-up target (%v).", status.target, target)
+		}
+		Expect(status.status).Should(Equal(caNoScaleUpStatus))
+		Expect(status.ready).Should(Equal(status.target))
+		Expect(len(framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items)).Should(Equal(status.target + unmanagedNodes))
 	})
 
 	It("should increase cluster size if pending pods are small and there is another node pool that is not autoscaled [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -159,7 +192,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
 		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
 
-		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
+		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false, defaultTimeout)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		// Verify, that cluster size is increased
@@ -291,7 +324,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 
 		By("Creating rc with 2 pods too big to fit default-pool but fitting extra-pool")
-		ReserveMemory(f, "memory-reservation", 2, int(2.1*float64(memCapacityMb)), false)
+		ReserveMemory(f, "memory-reservation", 2, int(2.1*float64(memCapacityMb)), false, defaultTimeout)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		// Apparently GKE master is restarted couple minutes after the node pool is added
@@ -352,6 +385,48 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 				func(size int) bool { return size < increasedSize }, scaleDownTimeout))
 		})
+	})
+
+	It("Shouldn't perform scale up operation and should list unhealthy status if most of the cluster is broken[Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		clusterSize := nodeCount
+		for clusterSize < unhealthyClusterThreshold+1 {
+			clusterSize = manuallyIncreaseClusterSize(f, originalSizes)
+		}
+
+		By("Block network connectivity to some nodes to simulate unhealthy cluster")
+		nodesToBreakCount := int(math.Floor(math.Max(float64(unhealthyClusterThreshold), 0.5*float64(clusterSize))))
+		nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector().String()})
+		framework.ExpectNoError(err)
+		Expect(nodesToBreakCount <= len(nodes.Items)).To(BeTrue())
+		nodesToBreak := nodes.Items[:nodesToBreakCount]
+
+		// TestUnderTemporaryNetworkFailure only removes connectivity to a single node,
+		// and accepts func() callback. This is expanding the loop to recursive call
+		// to avoid duplicating TestUnderTemporaryNetworkFailure
+		var testFunction func()
+		testFunction = func() {
+			if len(nodesToBreak) > 0 {
+				ntb := &nodesToBreak[0]
+				nodesToBreak = nodesToBreak[1:]
+				framework.TestUnderTemporaryNetworkFailure(c, "default", ntb, testFunction)
+			} else {
+				ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false, defaultTimeout)
+				defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
+				time.Sleep(scaleUpTimeout)
+				currentNodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+				framework.Logf("Currently available nodes: %v, nodes available at the start of test: %v, disabled nodes: %v", len(currentNodes.Items), len(nodes.Items), nodesToBreakCount)
+				Expect(len(currentNodes.Items)).Should(Equal(len(nodes.Items) - nodesToBreakCount))
+				status, err := getClusterwideStatus(c)
+				framework.Logf("Clusterwide status: %v", status)
+				framework.ExpectNoError(err)
+				Expect(status).Should(Equal("Unhealthy"))
+			}
+		}
+		testFunction()
+		// Give nodes time to recover from network failure
+		framework.ExpectNoError(framework.WaitForClusterSize(c, len(nodes.Items), nodesRecoverTimeout))
 	})
 
 })
@@ -576,7 +651,7 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 	}
 }
 
-func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool) {
+func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration) {
 	By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	request := int64(1024 * 1024 * megabytes / replicas)
 	config := &testutils.RCConfig{
@@ -584,7 +659,7 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		InternalClient: f.InternalClientset,
 		Name:           id,
 		Namespace:      f.Namespace.Name,
-		Timeout:        defaultTimeout,
+		Timeout:        timeout,
 		Image:          framework.GetPauseImageName(f.ClientSet),
 		Replicas:       replicas,
 		MemRequest:     request,
@@ -827,4 +902,88 @@ func manuallyIncreaseClusterSize(f *framework.Framework, originalSizes map[strin
 	framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 		func(size int) bool { return size >= increasedSize }, scaleUpTimeout))
 	return increasedSize
+}
+
+// Try to get clusterwide health from CA status configmap.
+// Status configmap is not parsing-friendly, so evil regexpery follows.
+func getClusterwideStatus(c clientset.Interface) (string, error) {
+	configMap, err := c.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	status, ok := configMap.Data["status"]
+	if !ok {
+		return "", fmt.Errorf("Status information not found in configmap")
+	}
+	matcher, err := regexp.Compile("Cluster-wide:\\s*\n\\s*Health:\\s*([A-Za-z]+)")
+	if err != nil {
+		return "", err
+	}
+	result := matcher.FindStringSubmatch(status)
+	if len(result) < 2 {
+		return "", fmt.Errorf("Failed to parse CA status configmap")
+	}
+	return result[1], nil
+}
+
+type scaleUpStatus struct {
+	status string
+	ready  int
+	target int
+}
+
+// Try to get scaleup statuses of all node groups.
+// Status configmap is not parsing-friendly, so evil regexpery follows.
+func getScaleUpStatus(c clientset.Interface) (*scaleUpStatus, error) {
+	configMap, err := c.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	status, ok := configMap.Data["status"]
+	if !ok {
+		return nil, fmt.Errorf("Status information not found in configmap")
+	}
+	matcher, err := regexp.Compile("s*ScaleUp:\\s*([A-Za-z]+)\\s*\\(ready=([0-9]+)\\s*cloudProviderTarget=([0-9]+)\\s*\\)")
+	if err != nil {
+		return nil, err
+	}
+	matches := matcher.FindAllStringSubmatch(status, -1)
+	if len(matches) < 1 {
+		return nil, fmt.Errorf("Failed to parse CA status configmap")
+	}
+	result := scaleUpStatus{
+		status: caNoScaleUpStatus,
+		ready:  0,
+		target: 0,
+	}
+	for _, match := range matches {
+		if match[1] == caOngoingScaleUpStatus {
+			result.status = caOngoingScaleUpStatus
+		}
+		newReady, err := strconv.Atoi(match[2])
+		if err != nil {
+			return nil, err
+		}
+		result.ready += newReady
+		newTarget, err := strconv.Atoi(match[3])
+		if err != nil {
+			return nil, err
+		}
+		result.target += newTarget
+	}
+	glog.Infof("Cluster-Autoscaler scale-up status: %v (%v, %v)", result.status, result.ready, result.target)
+	return &result, nil
+}
+
+func waitForScaleUpStatus(c clientset.Interface, expected string, timeout time.Duration) (*scaleUpStatus, error) {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+		status, err := getScaleUpStatus(c)
+		if err != nil {
+			return nil, err
+		}
+		if status.status == expected {
+			return status, nil
+		}
+	}
+	return nil, fmt.Errorf("ScaleUp status did not reach expected value: %v", expected)
 }

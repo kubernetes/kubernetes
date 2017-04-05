@@ -42,9 +42,6 @@ spec:
           readOnly: true
       nodeSelector:
         beta.kubernetes.io/fluentd-ds-ready: "true"
-      tolerations:
-      - key : "node.alpha.kubernetes.io/ismaster"
-        effect: "NoSchedule"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog

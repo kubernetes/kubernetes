@@ -17,10 +17,12 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//pkg/bootstrap/api:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/strategicpatch",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/apis/rbac/v1beta1",
