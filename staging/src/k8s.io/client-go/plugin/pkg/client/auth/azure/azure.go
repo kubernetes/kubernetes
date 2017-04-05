@@ -51,6 +51,7 @@ const (
 	cfgTokenType    = "token-type"
 	cfgExpiresIn    = "expires-in"
 	cfgExpiresOn    = "expires-on"
+	cfgEnvironment  = "environment"
 )
 
 func init() {
@@ -89,7 +90,11 @@ func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.
 	tenantID := cfg[cfgTenantID]
 	audience := cfg[cfgAudience]
 	if clientID != "" && tenantID != "" && audience != "" {
-		ts = newAzureTokenSourceDeviceCode(clientID, tenantID, audience)
+		environment, err := azure.EnvironmentFromName(cfg[cfgEnvironment])
+		if err != nil {
+			environment = azure.PublicCloud
+		}
+		ts = newAzureTokenSourceDeviceCode(environment, clientID, tenantID, audience)
 	} else {
 		azFilename, err := azureTokensFile()
 		if err != nil {
@@ -412,21 +417,23 @@ func (t *azureTime) UnmarshalJSON(b []byte) error {
 }
 
 type azureTokenSourceDeviceCode struct {
-	clientID string
-	tenantID string
-	audience string
+	environment azure.Environment
+	clientID    string
+	tenantID    string
+	audience    string
 }
 
-func newAzureTokenSourceDeviceCode(clientID string, tenantID string, audience string) tokenSource {
+func newAzureTokenSourceDeviceCode(environment azure.Environment, clientID string, tenantID string, audience string) tokenSource {
 	return &azureTokenSourceDeviceCode{
-		clientID: clientID,
-		tenantID: tenantID,
-		audience: audience,
+		environment: environment,
+		clientID:    clientID,
+		tenantID:    tenantID,
+		audience:    audience,
 	}
 }
 
 func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
-	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(ts.tenantID)
+	oauthConfig, err := ts.environment.OAuthConfigForTenant(ts.tenantID)
 	if err != nil {
 		return nil, err
 	}
