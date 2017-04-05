@@ -64,7 +64,8 @@ type Framework struct {
 	StagingClient     *staging.Clientset
 	ClientPool        dynamic.ClientPool
 
-	Namespace                *v1.Namespace   // Every test has at least one namespace
+	SkipNamespaceCreation    bool            // Whether to skip creating a namespace
+	Namespace                *v1.Namespace   // Every test has at least one namespace unless creation is skipped
 	namespacesToDelete       []*v1.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
 
@@ -181,23 +182,26 @@ func (f *Framework) BeforeEach() {
 		f.ClientPool = dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	}
 
-	By("Building a namespace api object")
-	namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
-		"e2e-framework": f.BaseName,
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	f.Namespace = namespace
-
-	if TestContext.VerifyServiceAccount {
-		By("Waiting for a default service account to be provisioned in namespace")
-		err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
+	if !f.SkipNamespaceCreation {
+		By("Building a namespace api object")
+		namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
+			"e2e-framework": f.BaseName,
+		})
 		Expect(err).NotTo(HaveOccurred())
-	} else {
-		Logf("Skipping waiting for service account")
+
+		f.Namespace = namespace
+
+		if TestContext.VerifyServiceAccount {
+			By("Waiting for a default service account to be provisioned in namespace")
+			err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
+			Expect(err).NotTo(HaveOccurred())
+		} else {
+			Logf("Skipping waiting for service account")
+		}
 	}
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" {
+		var err error
 		f.gatherer, err = NewResourceUsageGatherer(f.ClientSet, ResourceGathererOptions{
 			inKubemark: ProviderIs("kubemark"),
 			masterOnly: TestContext.GatherKubeSystemResourceUsageData == "master",
@@ -274,7 +278,9 @@ func (f *Framework) AfterEach() {
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
 		// Pass both unversioned client and and versioned clientset, till we have removed all uses of the unversioned client.
-		DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
+		if !f.SkipNamespaceCreation {
+			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
+		}
 		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
 		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", Logf)
 	}
