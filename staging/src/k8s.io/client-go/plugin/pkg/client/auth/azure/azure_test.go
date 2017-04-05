@@ -1,7 +1,6 @@
 package azure
 
 import (
-	"bytes"
 	"strconv"
 	"strings"
 	"sync"
@@ -10,72 +9,6 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/azure"
 )
-
-func TestAzureTokenSourceFromFile(t *testing.T) {
-	testAzureFile := `
-	[
-	  {
-	    "expiresIn": 3599,
-	    "_authority": "https://login.microsoftonline.com/72f988bf-86f1-41af-91ab-2d7cd011db47",
-	    "refreshToken": "test",
-	    "tokenType": "Bearer",
-	    "expiresOn": "2017-04-03 10:36:27.808196",
-	    "oid": "ceb33d00-c512-4657-84fa-c6d9433291e4",
-	    "userId": "test",
-	    "isMRRT": true,
-	    "_clientId": "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
-	    "resource": "https://management.core.windows.net/",
-	    "accessToken": "test"
-	  },
-	  {
-	    "expiresIn": 3599,
-	    "_authority": "https://login.microsoftonline.com/common",
-	    "oid": "ceb33d00-c512-4657-84fa-c6d9433291e4",
-	    "refreshToken": "test",
-	    "tokenType": "Bearer",
-	    "expiresOn": "2017-04-03 10:36:25.657865",
-	    "userId": "test",
-	    "isMRRT": true,
-	    "_clientId": "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
-	    "resource": "https://management.core.windows.net/",
-	    "accessToken": "test"
-	  }
-	] `
-
-	reader := bytes.NewReader([]byte(testAzureFile))
-	fileSouce := &azureTokenSourceFromFile{
-		tokensReader: reader,
-	}
-
-	token, err := fileSouce.Token()
-	if err != nil {
-		t.Errorf("failed to read the token from azure file: %v", err)
-	}
-
-	wantAccessToken := "test"
-	if strings.Compare(token.token.AccessToken, wantAccessToken) != 0 {
-		t.Errorf("Token() accessToken error: got %v, want %v", token.token.AccessToken, wantAccessToken)
-	}
-	wantRefreshToken := "test"
-	if strings.Compare(token.token.RefreshToken, wantAccessToken) != 0 {
-		t.Errorf("Token() accessToken error: got %v, want %v", token.token.RefreshToken, wantRefreshToken)
-	}
-
-	wantExpirationTime := "1491215787"
-	if strings.Compare(token.token.ExpiresOn, wantExpirationTime) != 0 {
-		t.Errorf("Token() expiresOn error: got %v, want %v", token.token.ExpiresOn, wantExpirationTime)
-	}
-
-	wantClientID := "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
-	if strings.Compare(token.clientID, wantClientID) != 0 {
-		t.Errorf("Token() clientID error: got %v, want %v", token.clientID, wantClientID)
-	}
-
-	wantTenantID := "72f988bf-86f1-41af-91ab-2d7cd011db47"
-	if strings.Compare(token.tenantID, wantTenantID) != 0 {
-		t.Errorf("Token() tenantID error: got %v, want %v", token.tenantID, wantTenantID)
-	}
-}
 
 func TestAzureTokenSourceFromCache(t *testing.T) {
 	fakeAccessToken := "fake token 1"
@@ -165,7 +98,6 @@ func token2Cfg(token *azureToken) map[string]string {
 	cfg[cfgTokenType] = token.token.Type
 	cfg[cfgClientID] = token.clientID
 	cfg[cfgTenantID] = token.tenantID
-	cfg[cfgAudience] = token.token.Resource
 	cfg[cfgExpiresIn] = token.token.ExpiresIn
 	cfg[cfgExpiresOn] = token.token.ExpiresOn
 	return cfg
