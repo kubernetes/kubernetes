@@ -78,7 +78,7 @@ func removeProxyHeaders(ctx *ProxyCtx, r *http.Request) {
 	// and would wrap the response body with the relevant reader.
 	r.Header.Del("Accept-Encoding")
 	// curl can add that, see
-	// http://homepage.ntlworld.com/jonathan.deboynepollard/FGA/web-proxy-connection-header.html
+	// https://jdebp.eu./FGA/web-proxy-connection-header.html
 	r.Header.Del("Proxy-Connection")
 	r.Header.Del("Proxy-Authenticate")
 	r.Header.Del("Proxy-Authorization")
@@ -123,7 +123,7 @@ func (proxy *ProxyHttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		}
 		origBody := resp.Body
 		resp = proxy.filterResponse(resp, ctx)
-
+		defer origBody.Close()
 		ctx.Logf("Copying response to client %v [%d]", resp.Status, resp.StatusCode)
 		// http.ResponseWriter will take care of filling the correct response length
 		// Setting it now, might impose wrong value, contradicting the actual new
