@@ -86,7 +86,7 @@ var (
 	clusterRoleColumns               = []string{"NAME", "AGE"}
 	clusterRoleBindingColumns        = []string{"NAME", "AGE"}
 	clusterRoleBindingWideColumns    = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
-	storageClassColumns              = []string{"NAME", "TYPE"}
+	storageClassColumns              = []string{"NAME", "PROVISIONER"}
 	statusColumns                    = []string{"STATUS", "REASON", "MESSAGE"}
 
 	// TODO: consider having 'KIND' for third party resource data
