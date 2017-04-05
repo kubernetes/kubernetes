@@ -271,7 +271,7 @@ func getUserFromImageUser(imageUser string) (*int64, string) {
 }
 
 // See #33189. If the previous attempt to create a sandbox container name FOO
-// failed due to "device or resource busy", it is possbile that docker did
+// failed due to "device or resource busy", it is possible that docker did
 // not clean up properly and has inconsistent internal state. Docker would
 // not report the existence of FOO, but would complain if user wants to
 // create a new container named FOO. To work around this, we parse the error
@@ -280,7 +280,7 @@ func getUserFromImageUser(imageUser string) (*int64, string) {
 // See #40443. Sometimes even removal may fail with "no such container" error.
 // In that case we have to create the container with a randomized name.
 // TODO(random-liu): Remove this work around after docker 1.11 is deprecated.
-// TODO(#33189): Monitor the tests to see if the fix is sufficent.
+// TODO(#33189): Monitor the tests to see if the fix is sufficient.
 func recoverFromCreationConflictIfNeeded(client dockertools.DockerInterface, createConfig dockertypes.ContainerCreateConfig, err error) (*dockertypes.ContainerCreateResponse, error) {
 	matches := conflictRE.FindStringSubmatch(err.Error())
 	if len(matches) != 2 {
