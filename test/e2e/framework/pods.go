@@ -202,6 +202,23 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	)).To(Succeed(), "wait for pod %q to success", name)
 }
 
+// WaitForFinished waits for pod to be finished with success or failure.
+func (c *PodClient) WaitForFinished(name string, timeout time.Duration) {
+	f := c.f
+	Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+		func(pod *v1.Pod) (bool, error) {
+			switch pod.Status.Phase {
+			case v1.PodFailed:
+				return true, nil
+			case v1.PodSucceeded:
+				return true, nil
+			default:
+				return false, nil
+			}
+		},
+	)).To(Succeed(), "wait for pod %q to success", name)
+}
+
 // WaitForSuccess waits for pod to succeed or an error event for that pod.
 func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
