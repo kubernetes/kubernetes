@@ -43,10 +43,19 @@ const (
 	tagValueTrue       = "true"
 	tagValueFalse      = "false"
 	tagExtensionPrefix = "x-kubernetes-"
+	tagPatchStrategy   = "patch-strategy"
+	tagPatchMergeKey   = "patch-merge-key"
 )
 
 func getOpenAPITagValue(comments []string) []string {
 	return types.ExtractCommentTags("+", comments)[tagName]
+}
+
+func getOpenAPITagAndExtensionTagValue(comments []string) ([]string, map[string][]string) {
+	extensionMap := types.ExtractCommentTags("+", comments)
+	APITags := extensionMap[tagName]
+	delete(extensionMap, tagName)
+	return APITags, extensionMap
 }
 
 func hasOpenAPITagValue(comments []string, value string) bool {
@@ -337,7 +346,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			g.Do("Required: []string{\"$.$\"},\n", strings.Join(required, "\",\""))
 		}
 		g.Do("},\n", nil)
-		if err := g.generateExtensions(t.CommentLines); err != nil {
+		if err := g.generateExtensionsWithoutTags(t.CommentLines); err != nil {
 			return err
 		}
 		g.Do("},\n", nil)
@@ -362,26 +371,83 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 	return nil
 }
 
-func (g openAPITypeWriter) generateExtensions(CommentLines []string) error {
-	tagValues := getOpenAPITagValue(CommentLines)
-	anyExtension := false
+// getTagsMap extract the key-value pairs from openapi tags and struct tags returns a map[string]string
+func getTagsMap(CommentLines []string, tags string) (map[string]string, error) {
+	tagMap := make(map[string]string)
+
+	// Handle openapi tags
+	tagValues, extensionTagValues := getOpenAPITagAndExtensionTagValue(CommentLines)
 	for _, val := range tagValues {
 		if strings.HasPrefix(val, tagExtensionPrefix) {
-			if !anyExtension {
-				g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
-				anyExtension = true
-			}
 			parts := strings.SplitN(val, ":", 2)
 			if len(parts) != 2 {
-				return fmt.Errorf("Invalid extension value: %v", val)
+				return nil, fmt.Errorf("Invalid extension value: %v", val)
 			}
-			g.Do("\"$.$\": ", parts[0])
-			g.Do("\"$.$\",\n", parts[1])
+			tagMap[parts[0]] = parts[1]
 		}
 	}
-	if anyExtension {
-		g.Do("},\n},\n", nil)
+
+	for key, values := range extensionTagValues {
+		if key == tagPatchStrategy || key == tagPatchMergeKey {
+			if len(values) < 1 {
+				return nil, fmt.Errorf("Expected at least one value.")
+			}
+			tagMap[key] = values[0]
+		}
 	}
+
+	// Handle struct tags. Make sure there is a matching k-v pair already added in the map.
+	tagPairs := strings.Fields(tags)
+	for _, tagPair := range tagPairs {
+		parts := strings.SplitN(tagPair, ":", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("Invalid extension value: %v", tagPair)
+		}
+		switch parts[0] {
+		case "patchStrategy":
+			openapiTags, ok := tagMap["patch-strategy"]
+			if !ok || openapiTags != strings.Trim(parts[1], `"`) {
+				return nil, fmt.Errorf("The struct tag %q has no matching the open api tag\n", tagPair)
+			}
+		case "patchMergeKey":
+			openapiTags, ok := tagMap["patch-merge-key"]
+			if !ok || openapiTags != strings.Trim(parts[1], `"`) {
+				return nil, fmt.Errorf("The struct tag %q has no matching the open api tag\n", tagPair)
+			}
+		}
+	}
+
+	return tagMap, nil
+}
+
+func (g openAPITypeWriter) generateExtensionsWithoutTags(CommentLines []string) error {
+	tagsMap, err := getTagsMap(CommentLines, "")
+	if err != nil {
+		return err
+	}
+	return g.generateExtensions(tagsMap)
+}
+
+func (g openAPITypeWriter) generateExtensionsWithTags(CommentLines []string, tags string) error {
+	tagsMap, err := getTagsMap(CommentLines, tags)
+	if err != nil {
+		return err
+	}
+	return g.generateExtensions(tagsMap)
+}
+
+func (g openAPITypeWriter) generateExtensions(tagsMap map[string]string) error {
+	if len(tagsMap) == 0 {
+		return nil
+	}
+
+	g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
+	for key, val := range tagsMap {
+		g.Do("\"$.$\": ", key)
+		g.Do("\"$.$\",\n", val)
+	}
+	g.Do("},\n},\n", nil)
+
 	return nil
 }
 
@@ -434,7 +500,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member) error {
 		return nil
 	}
 	g.Do("\"$.$\": {\n", name)
-	if err := g.generateExtensions(m.CommentLines); err != nil {
+	if err := g.generateExtensionsWithTags(m.CommentLines, m.Tags); err != nil {
 		return err
 	}
 	g.Do("SchemaProps: spec.SchemaProps{\n", nil)
