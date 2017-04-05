@@ -3,8 +3,6 @@ package isolator
 import (
 	"encoding/json"
 	"fmt"
-	"net"
-	"sync"
 
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
@@ -14,29 +12,27 @@ import (
 )
 
 type Isolator interface {
+	// preStart Hook to be implemented by custom isolators
 	PreStart(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.CgroupResource, error)
+	// postStop Hook to be implemented by custom isolators
 	PostStop(cgroupInfo *lifecycle.CgroupInfo) error
 }
 
+// wrapper for custom isolators which implements Isolator protobuf service with Notify method
 type NotifyHandler struct {
 	isolator Isolator
 }
 
-func NewNotifyHandler(i Isolator) *NotifyHandler {
-	return &NotifyHandler{isolator: i}
-}
-
 // extract Pod object from Event
-func getPod(bytePod []byte) (pod *v1.Pod, err error) {
-	pod = &v1.Pod{}
-	err = json.Unmarshal(bytePod, pod)
-	if err != nil {
-		glog.Fatalf("Cannot Unmarshal pod: %v", err)
-		return
+func getPod(bytePod []byte) (*v1.Pod, error) {
+	pod := &v1.Pod{}
+	if err := json.Unmarshal(bytePod, pod); err != nil {
+		return nil, fmt.Errorf("Cannot unamrshall POD: %v", err)
 	}
-	return
+	return pod, nil
 }
 
+// wrapper for preStart method
 func (n NotifyHandler) preStart(event *lifecycle.Event) (*lifecycle.EventReply, error) {
 	pod, err := getPod(event.Pod)
 	if err != nil {
@@ -61,6 +57,7 @@ func (n NotifyHandler) preStart(event *lifecycle.Event) (*lifecycle.EventReply, 
 	}, nil
 }
 
+// wrapper for postStop method
 func (n NotifyHandler) postStop(event *lifecycle.Event) (*lifecycle.EventReply, error) {
 	if err := n.isolator.PostStop(event.CgroupInfo); err != nil {
 		return &lifecycle.EventReply{
@@ -87,19 +84,10 @@ func (n NotifyHandler) Notify(context context.Context, event *lifecycle.Event) (
 	}
 }
 
-func Register(nh *NotifyHandler) *grpc.Server {
+func Register(i Isolator) *grpc.Server {
+	nh := &NotifyHandler{isolator: i}
 	grpcServer := grpc.NewServer()
 	lifecycle.RegisterIsolatorServer(grpcServer, nh)
 	glog.Info("Isolator Server has been registered")
-
 	return grpcServer
-}
-
-func Serve(wg sync.WaitGroup, socket net.Listener, grpcServer *grpc.Server) {
-	defer wg.Done()
-	glog.Info("Starting serving")
-	if err := grpcServer.Serve(socket); err != nil {
-		glog.Fatalf("Isolator server stopped serving : %v", err)
-	}
-	glog.Info("Stopping isolatorServer")
 }

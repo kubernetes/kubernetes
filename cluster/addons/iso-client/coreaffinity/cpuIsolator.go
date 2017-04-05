@@ -1,4 +1,4 @@
-package coreaffinity
+package coreaffinityisolator
 
 import (
 	"fmt"
@@ -12,47 +12,47 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
 
-type cpuIsolator struct {
+type coreAffinityIsolator struct {
 	Name             string
-	CPUTopology      *cputopology.CPUTopology
 	cpuAssignmentMap map[string][]int
+	CPUTopology      *cputopology.CPUTopology
 }
 
 // Constructor for Isolator
-func NewIsolator(name string) (*cpuIsolator, error) {
+func New(name string) (*coreAffinityIsolator, error) {
 	topology, err := discovery.DiscoverTopology()
-	return &cpuIsolator{
+	return &coreAffinityIsolator{
 		Name:             name,
 		CPUTopology:      topology,
 		cpuAssignmentMap: make(map[string][]int),
 	}, err
 }
 
-func (i *cpuIsolator) gatherContainerRequest(container v1.Container) int64 {
-	resource, ok := container.Resources.Requests[v1.OpaqueIntResourceName(i.Name)]
+func (c *coreAffinityIsolator) gatherContainerRequest(container v1.Container) int64 {
+	resource, ok := container.Resources.Requests[v1.OpaqueIntResourceName(c.Name)]
 	if !ok {
 		return 0
 	}
 	return resource.Value()
 }
 
-func (i *cpuIsolator) countCoresFromOIR(pod *v1.Pod) int64 {
+func (c *coreAffinityIsolator) countCoresFromOIR(pod *v1.Pod) int64 {
 	var coresAccu int64
 	for _, container := range pod.Spec.Containers {
-		coresAccu = coresAccu + i.gatherContainerRequest(container)
+		coresAccu = coresAccu + c.gatherContainerRequest(container)
 	}
 	return coresAccu
 }
 
-func (i *cpuIsolator) reserveCPUs(cores int64) ([]int, error) {
-	cpus := i.CPUTopology.GetAvailableCPUs()
+func (c *coreAffinityIsolator) reserveCPUs(cores int64) ([]int, error) {
+	cpus := c.CPUTopology.GetAvailableCPUs()
 	if len(cpus) < int(cores) {
 		return nil, fmt.Errorf("cannot reserved requested number of cores")
 	}
 	var reservedCores []int
 
 	for idx := 0; idx < int(cores); idx++ {
-		if err := i.CPUTopology.Reserve(cpus[idx]); err != nil {
+		if err := c.CPUTopology.Reserve(cpus[idx]); err != nil {
 			return reservedCores, err
 		}
 		reservedCores = append(reservedCores, cpus[idx])
@@ -61,9 +61,9 @@ func (i *cpuIsolator) reserveCPUs(cores int64) ([]int, error) {
 
 }
 
-func (i *cpuIsolator) reclaimCPUs(cores []int) {
+func (c *coreAffinityIsolator) reclaimCPUs(cores []int) {
 	for _, core := range cores {
-		i.CPUTopology.Reclaim(core)
+		c.CPUTopology.Reclaim(core)
 	}
 }
 
@@ -75,8 +75,9 @@ func asCPUList(cores []int) string {
 	return strings.Join(coresStr, ",")
 }
 
-func (i *cpuIsolator) PreStart(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.CgroupResource, error) {
-	oirCores := i.countCoresFromOIR(pod)
+// implementation of preStart method in  isolator Interface
+func (c *coreAffinityIsolator) PreStart(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*lifecycle.CgroupResource, error) {
+	oirCores := c.countCoresFromOIR(pod)
 	glog.Infof("Pod %s requested %d cores", pod.Name, oirCores)
 
 	if oirCores == 0 {
@@ -84,9 +85,9 @@ func (i *cpuIsolator) PreStart(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*
 		return []*lifecycle.CgroupResource{}, nil
 	}
 
-	reservedCores, err := i.reserveCPUs(oirCores)
+	reservedCores, err := c.reserveCPUs(oirCores)
 	if err != nil {
-		i.reclaimCPUs(reservedCores)
+		c.reclaimCPUs(reservedCores)
 		return []*lifecycle.CgroupResource{}, err
 	}
 
@@ -96,13 +97,13 @@ func (i *cpuIsolator) PreStart(pod *v1.Pod, resource *lifecycle.CgroupInfo) ([]*
 			CgroupSubsystem: lifecycle.CgroupResource_CPUSET_CPUS,
 		},
 	}
-	i.cpuAssignmentMap[resource.Path] = reservedCores
+	c.cpuAssignmentMap[resource.Path] = reservedCores
 	return cgroupResource, nil
 }
 
-func (i *cpuIsolator) PostStop(cgroupInfo *lifecycle.CgroupInfo) error {
-	cpus := i.cpuAssignmentMap[cgroupInfo.Path]
-	i.reclaimCPUs(cpus)
-	delete(i.cpuAssignmentMap, cgroupInfo.Path)
+func (c *coreAffinityIsolator) PostStop(cgroupInfo *lifecycle.CgroupInfo) error {
+	cpus := c.cpuAssignmentMap[cgroupInfo.Path]
+	c.reclaimCPUs(cpus)
+	delete(c.cpuAssignmentMap, cgroupInfo.Path)
 	return nil
 }
