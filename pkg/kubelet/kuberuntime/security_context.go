@@ -41,23 +41,23 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	}
 
 	// set namespace options and supplemental groups.
-	podSc := pod.Spec.SecurityContext
-	if podSc == nil {
-		return synthesized
-	}
 	synthesized.NamespaceOptions = &runtimeapi.NamespaceOption{
 		HostNetwork: pod.Spec.HostNetwork,
 		HostIpc:     pod.Spec.HostIPC,
 		HostPid:     pod.Spec.HostPID,
 	}
-	if podSc.FSGroup != nil {
-		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, *podSc.FSGroup)
+	podSc := pod.Spec.SecurityContext
+	if podSc != nil {
+		if podSc.FSGroup != nil {
+			synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, *podSc.FSGroup)
+		}
+
+		if podSc.SupplementalGroups != nil {
+			synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, podSc.SupplementalGroups...)
+		}
 	}
 	if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
 		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, groups...)
-	}
-	if podSc.SupplementalGroups != nil {
-		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, podSc.SupplementalGroups...)
 	}
 
 	return synthesized
