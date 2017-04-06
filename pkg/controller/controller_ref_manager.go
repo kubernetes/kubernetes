@@ -183,6 +183,10 @@ func (m *PodControllerRefManager) ClaimPods(pods []*v1.Pod, filters ...func(*v1.
 
 	match := func(obj metav1.Object) bool {
 		pod := obj.(*v1.Pod)
+		// Skip pods marked for deletion
+		if pod.DeletionTimestamp != nil {
+			return false
+		}
 		// Check selector first so filters only run on potentially matching Pods.
 		if !m.selector.Matches(labels.Set(pod.Labels)) {
 			return false
