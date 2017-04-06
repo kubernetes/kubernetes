@@ -31,9 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 type testObject struct {
 	gvk schema.GroupVersionKind

@@ -40,9 +40,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	// we need the API types for rest mapping lookup
-	_ "k8s.io/client-go/pkg/api/install"
-	_ "k8s.io/client-go/pkg/apis/extensions/install"
+	apiinstall "k8s.io/client-go/pkg/api/install"
+	extensionsinstall "k8s.io/client-go/pkg/apis/extensions/install"
 )
+
+func init() {
+	apiinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	extensionsinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 type restClientTestCase struct {
 	desiredMetricValues PodMetricsInfo

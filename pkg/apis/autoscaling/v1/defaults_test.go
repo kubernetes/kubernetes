@@ -22,10 +22,15 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
+	apiinstall "k8s.io/kubernetes/pkg/api/install"
+	autoscalinginstall "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	. "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 )
+
+func init() {
+	apiinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	autoscalinginstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func TestSetDefaultHPA(t *testing.T) {
 	tests := []struct {

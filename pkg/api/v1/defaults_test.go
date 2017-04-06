@@ -26,8 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	codec := api.Codecs.LegacyCodec(v1.SchemeGroupVersion)

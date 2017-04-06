@@ -26,11 +26,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
+	apiinstall "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	extensionsinstall "k8s.io/kubernetes/pkg/apis/extensions/install"
 	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
+
+func init() {
+	apiinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	extensionsinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func TestSetDefaultDaemonSet(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}

@@ -19,8 +19,13 @@ package tests
 import (
 	"k8s.io/apiserver/pkg/apis/example"
 
-	_ "k8s.io/client-go/pkg/api/install"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/install"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func DeepEqualSafePodSpec() example.PodSpec {
 	grace := int64(30)

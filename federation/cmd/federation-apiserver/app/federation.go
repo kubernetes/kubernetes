@@ -24,7 +24,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/federation/apis/federation"
-	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	fedv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
 	"k8s.io/kubernetes/pkg/api"

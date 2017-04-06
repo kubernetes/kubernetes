@@ -40,8 +40,12 @@ import (
 	"path/filepath"
 	"text/template"
 
-	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
+	"k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 const defaultConfigTmplJSON = `
 {

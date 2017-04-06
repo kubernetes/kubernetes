@@ -24,7 +24,6 @@ import (
 	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	hpastorage "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
 )

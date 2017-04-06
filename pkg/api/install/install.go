@@ -27,12 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-func init() {
-	Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
-}
-
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
+	if _, ok := groupFactoryRegistry[api.GroupName]; ok {
+		return
+	}
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  api.GroupName,
