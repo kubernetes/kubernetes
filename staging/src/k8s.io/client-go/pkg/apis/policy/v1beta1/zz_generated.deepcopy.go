@@ -22,116 +22,153 @@ package v1beta1
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
-}
-
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Eviction, InType: reflect.TypeOf(&Eviction{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PodDisruptionBudget, InType: reflect.TypeOf(&PodDisruptionBudget{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PodDisruptionBudgetList, InType: reflect.TypeOf(&PodDisruptionBudgetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PodDisruptionBudgetSpec, InType: reflect.TypeOf(&PodDisruptionBudgetSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PodDisruptionBudgetStatus, InType: reflect.TypeOf(&PodDisruptionBudgetStatus{})},
-	)
-}
-
-func DeepCopy_v1beta1_Eviction(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Eviction)
-		out := out.(*Eviction)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Eviction) DeepCopyInto(out *Eviction) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.DeleteOptions != nil {
+		in, out := &in.DeleteOptions, &out.DeleteOptions
+		if *in == nil {
+			*out = nil
 		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+			*out = new(v1.DeleteOptions)
+			(*in).DeepCopyInto(*out)
 		}
-		if in.DeleteOptions != nil {
-			in, out := &in.DeleteOptions, &out.DeleteOptions
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
-				*out = newVal.(*v1.DeleteOptions)
-			}
-		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Eviction.
+func (x *Eviction) DeepCopy() *Eviction {
+	if x == nil {
+		return nil
+	}
+	out := new(Eviction)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Eviction) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1beta1_PodDisruptionBudget(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodDisruptionBudget)
-		out := out.(*PodDisruptionBudget)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodDisruptionBudget) DeepCopyInto(out *PodDisruptionBudget) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodDisruptionBudget.
+func (x *PodDisruptionBudget) DeepCopy() *PodDisruptionBudget {
+	if x == nil {
+		return nil
+	}
+	out := new(PodDisruptionBudget)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodDisruptionBudget) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodDisruptionBudgetList) DeepCopyInto(out *PodDisruptionBudgetList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]PodDisruptionBudget, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodDisruptionBudgetList.
+func (x *PodDisruptionBudgetList) DeepCopy() *PodDisruptionBudgetList {
+	if x == nil {
+		return nil
+	}
+	out := new(PodDisruptionBudgetList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodDisruptionBudgetList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodDisruptionBudgetSpec) DeepCopyInto(out *PodDisruptionBudgetSpec) {
+	*out = *in
+	out.MinAvailable = in.MinAvailable
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		if *in == nil {
+			*out = nil
 		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
 		}
-		if err := DeepCopy_v1beta1_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_PodDisruptionBudgetStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
 	}
+	return
 }
 
-func DeepCopy_v1beta1_PodDisruptionBudgetList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodDisruptionBudgetList)
-		out := out.(*PodDisruptionBudgetList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]PodDisruptionBudget, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_PodDisruptionBudget(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
+// DeepCopy will perform a deep copy of the receiver, creating a new PodDisruptionBudgetSpec.
+func (x *PodDisruptionBudgetSpec) DeepCopy() *PodDisruptionBudgetSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(PodDisruptionBudgetSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1beta1_PodDisruptionBudgetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodDisruptionBudgetSpec)
-		out := out.(*PodDisruptionBudgetSpec)
-		*out = *in
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
-				*out = newVal.(*v1.LabelSelector)
-			}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodDisruptionBudgetStatus) DeepCopyInto(out *PodDisruptionBudgetStatus) {
+	*out = *in
+	if in.DisruptedPods != nil {
+		in, out := &in.DisruptedPods, &out.DisruptedPods
+		*out = make(map[string]v1.Time)
+		for key, val := range *in {
+			(*out)[key] = *val.DeepCopy()
 		}
-		return nil
 	}
+	return
 }
 
-func DeepCopy_v1beta1_PodDisruptionBudgetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodDisruptionBudgetStatus)
-		out := out.(*PodDisruptionBudgetStatus)
-		*out = *in
-		if in.DisruptedPods != nil {
-			in, out := &in.DisruptedPods, &out.DisruptedPods
-			*out = make(map[string]v1.Time)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		}
+// DeepCopy will perform a deep copy of the receiver, creating a new PodDisruptionBudgetStatus.
+func (x *PodDisruptionBudgetStatus) DeepCopy() *PodDisruptionBudgetStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(PodDisruptionBudgetStatus)
+	x.DeepCopyInto(out)
+	return out
 }

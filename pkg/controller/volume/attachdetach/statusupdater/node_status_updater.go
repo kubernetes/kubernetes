@@ -25,8 +25,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -63,8 +61,8 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 	// kubernetes/kubernetes/issues/37777
 	nodesToUpdate := nsu.actualStateOfWorld.GetVolumesToReportAttached()
 	for nodeName, attachedVolumes := range nodesToUpdate {
-		nodeObj, err := nsu.nodeLister.Get(string(nodeName))
-		if nodeObj == nil || err != nil {
+		node, err := nsu.nodeLister.Get(string(nodeName))
+		if node == nil || err != nil {
 			// If node does not exist, its status cannot be updated, log error and
 			// reset flag statusUpdateNeeded back to true to indicate this node status
 			// needs to be updated again
@@ -76,20 +74,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 			continue
 		}
 
-		clonedNode, err := api.Scheme.DeepCopy(nodeObj)
-		if err != nil {
-			return fmt.Errorf("error cloning node %q: %v",
-				nodeName,
-				err)
-		}
-
-		node, ok := clonedNode.(*v1.Node)
-		if !ok || node == nil {
-			return fmt.Errorf(
-				"failed to cast %q object %#v to Node",
-				nodeName,
-				clonedNode)
-		}
+		node = node.DeepCopy()
 
 		// TODO: Change to pkg/util/node.UpdateNodeStatus.
 		oldData, err := json.Marshal(node)

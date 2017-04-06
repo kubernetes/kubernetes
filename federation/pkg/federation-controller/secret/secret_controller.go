@@ -323,13 +323,7 @@ func (secretcontroller *SecretController) reconcileSecret(secret types.Namespace
 
 	// Create a copy before modifying the obj to prevent race condition with
 	// other readers of obj from store.
-	baseSecretObj, err := api.Scheme.DeepCopy(baseSecretObjFromStore)
-	baseSecret, ok := baseSecretObj.(*apiv1.Secret)
-	if err != nil || !ok {
-		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
-		secretcontroller.deliverSecret(secret, 0, true)
-		return
-	}
+	baseSecret := baseSecretObjFromStore.(*apiv1.Secret).DeepCopy()
 	if baseSecret.DeletionTimestamp != nil {
 		if err := secretcontroller.delete(baseSecret); err != nil {
 			glog.Errorf("Failed to delete %s: %v", secret, err)

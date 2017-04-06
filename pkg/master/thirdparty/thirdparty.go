@@ -317,7 +317,6 @@ func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralRes
 
 		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
 		Convertor: api.Scheme,
-		Copier:    api.Scheme,
 		Defaulter: api.Scheme,
 		Typer:     api.Scheme,
 

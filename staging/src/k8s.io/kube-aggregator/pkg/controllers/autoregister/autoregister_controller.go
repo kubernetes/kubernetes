@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/conversion"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -39,10 +38,6 @@ import (
 
 const (
 	AutoRegisterManagedLabel = "kube-aggregator.kubernetes.io/automanaged"
-)
-
-var (
-	cloner = conversion.NewCloner()
 )
 
 // AutoAPIServiceRegistration is an interface which callers can re-declare locally and properly cast to for
@@ -205,10 +200,7 @@ func (c *autoRegisterController) checkAPIService(name string) error {
 	}
 
 	// we have an entry and we have a desired, now we deconflict.  Only a few fields matter.
-	apiService := &apiregistration.APIService{}
-	if err := apiregistration.DeepCopy_apiregistration_APIService(curr, apiService, cloner); err != nil {
-		return err
-	}
+	apiService := curr.DeepCopy()
 	apiService.Spec = desired.Spec
 	_, err = c.apiServiceClient.APIServices().Update(apiService)
 	return err
@@ -225,12 +217,7 @@ func (c *autoRegisterController) AddAPIServiceToSync(in *apiregistration.APIServ
 	c.apiServicesToSyncLock.Lock()
 	defer c.apiServicesToSyncLock.Unlock()
 
-	apiService := &apiregistration.APIService{}
-	if err := apiregistration.DeepCopy_apiregistration_APIService(in, apiService, cloner); err != nil {
-		// this shouldn't happen
-		utilruntime.HandleError(err)
-		return
-	}
+	apiService := in.DeepCopy()
 	if apiService.Labels == nil {
 		apiService.Labels = map[string]string{}
 	}

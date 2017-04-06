@@ -65,11 +65,7 @@ func UpdatePodWithRetries(podClient v1core.PodInterface, podLister corelisters.P
 		if err != nil {
 			return err
 		}
-		obj, deepCopyErr := api.Scheme.DeepCopy(pod)
-		if deepCopyErr != nil {
-			return deepCopyErr
-		}
-		pod = obj.(*v1.Pod)
+		pod := pod.DeepCopy()
 		// Apply the update, then attempt to push it to the apiserver.
 		if applyErr := applyUpdate(pod); applyErr != nil {
 			return applyErr

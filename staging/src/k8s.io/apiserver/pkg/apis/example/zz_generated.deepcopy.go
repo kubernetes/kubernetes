@@ -22,129 +22,159 @@ package example
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Pod) DeepCopyInto(out *Pod) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_example_Pod, InType: reflect.TypeOf(&Pod{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_example_PodCondition, InType: reflect.TypeOf(&PodCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_example_PodList, InType: reflect.TypeOf(&PodList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_example_PodSpec, InType: reflect.TypeOf(&PodSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_example_PodStatus, InType: reflect.TypeOf(&PodStatus{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new Pod.
+func (x *Pod) DeepCopy() *Pod {
+	if x == nil {
+		return nil
+	}
+	out := new(Pod)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_example_Pod(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Pod)
-		out := out.(*Pod)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if newVal, err := c.DeepCopy(&in.Spec); err != nil {
-			return err
-		} else {
-			out.Spec = *newVal.(*PodSpec)
-		}
-		if newVal, err := c.DeepCopy(&in.Status); err != nil {
-			return err
-		} else {
-			out.Status = *newVal.(*PodStatus)
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Pod) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_example_PodCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodCondition)
-		out := out.(*PodCondition)
-		*out = *in
-		out.LastProbeTime = in.LastProbeTime.DeepCopy()
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodCondition) DeepCopyInto(out *PodCondition) {
+	*out = *in
+	in.LastProbeTime.DeepCopyInto(&out.LastProbeTime)
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	return
 }
 
-func DeepCopy_example_PodList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodList)
-		out := out.(*PodList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Pod, len(*in))
-			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
-					(*out)[i] = *newVal.(*Pod)
-				}
-			}
+// DeepCopy will perform a deep copy of the receiver, creating a new PodCondition.
+func (x *PodCondition) DeepCopy() *PodCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(PodCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodList) DeepCopyInto(out *PodList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Pod, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodList.
+func (x *PodList) DeepCopy() *PodList {
+	if x == nil {
+		return nil
+	}
+	out := new(PodList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_example_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodSpec)
-		out := out.(*PodSpec)
-		*out = *in
-		if in.TerminationGracePeriodSeconds != nil {
-			in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodSpec) DeepCopyInto(out *PodSpec) {
+	*out = *in
+	if in.TerminationGracePeriodSeconds != nil {
+		in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int64)
 			**out = **in
 		}
-		if in.ActiveDeadlineSeconds != nil {
-			in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int64)
 			**out = **in
 		}
-		if in.NodeSelector != nil {
-			in, out := &in.NodeSelector, &out.NodeSelector
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		return nil
 	}
+	if in.NodeSelector != nil {
+		in, out := &in.NodeSelector, &out.NodeSelector
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	return
 }
 
-func DeepCopy_example_PodStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodStatus)
-		out := out.(*PodStatus)
-		*out = *in
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]PodCondition, len(*in))
-			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
-					(*out)[i] = *newVal.(*PodCondition)
-				}
-			}
+// DeepCopy will perform a deep copy of the receiver, creating a new PodSpec.
+func (x *PodSpec) DeepCopy() *PodSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(PodSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodStatus) DeepCopyInto(out *PodStatus) {
+	*out = *in
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]PodCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.StartTime != nil {
-			in, out := &in.StartTime, &out.StartTime
+	}
+	if in.StartTime != nil {
+		in, out := &in.StartTime, &out.StartTime
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(v1.Time)
-			**out = (*in).DeepCopy()
+			(*in).DeepCopyInto(*out)
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodStatus.
+func (x *PodStatus) DeepCopy() *PodStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(PodStatus)
+	x.DeepCopyInto(out)
+	return out
 }

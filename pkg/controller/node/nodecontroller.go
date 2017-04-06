@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,8 +53,6 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-
-	"github.com/golang/glog"
 )
 
 func init() {
@@ -335,13 +335,7 @@ func NewNodeController(
 
 		nodeEventHandlerFuncs = cache.ResourceEventHandlerFuncs{
 			AddFunc: func(originalObj interface{}) {
-				obj, err := api.Scheme.DeepCopy(originalObj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					return
-				}
-				node := obj.(*v1.Node)
-
+				node := originalObj.(*v1.Node).DeepCopy()
 				if err := nc.cidrAllocator.AllocateOrOccupyCIDR(node); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 				}
@@ -372,13 +366,7 @@ func NewNodeController(
 				// state is correct.
 				// Restart of NC fixes the issue.
 				if node.Spec.PodCIDR == "" {
-					nodeCopy, err := api.Scheme.Copy(node)
-					if err != nil {
-						utilruntime.HandleError(err)
-						return
-					}
-
-					if err := nc.cidrAllocator.AllocateOrOccupyCIDR(nodeCopy.(*v1.Node)); err != nil {
+					if err := nc.cidrAllocator.AllocateOrOccupyCIDR(node.DeepCopy()); err != nil {
 						utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 					}
 				}
@@ -387,18 +375,12 @@ func NewNodeController(
 				}
 			},
 			DeleteFunc: func(originalObj interface{}) {
-				obj, err := api.Scheme.DeepCopy(originalObj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					return
-				}
-
-				node, isNode := obj.(*v1.Node)
+				node, isNode := originalObj.(*v1.Node)
 				// We can get DeletedFinalStateUnknown instead of *v1.Node here and we need to handle that correctly. #34692
 				if !isNode {
-					deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+					deletedState, ok := originalObj.(cache.DeletedFinalStateUnknown)
 					if !ok {
-						glog.Errorf("Received unexpected object: %v", obj)
+						glog.Errorf("Received unexpected object: %v", originalObj)
 						return
 					}
 					node, ok = deletedState.Obj.(*v1.Node)
@@ -410,7 +392,7 @@ func NewNodeController(
 				if nc.taintManager != nil {
 					nc.taintManager.NodeUpdated(node, nil)
 				}
-				if err := nc.cidrAllocator.ReleaseCIDR(node); err != nil {
+				if err := nc.cidrAllocator.ReleaseCIDR(node.DeepCopy()); err != nil {
 					glog.Errorf("Error releasing CIDR: %v", err)
 				}
 			},
@@ -418,12 +400,7 @@ func NewNodeController(
 	} else {
 		nodeEventHandlerFuncs = cache.ResourceEventHandlerFuncs{
 			AddFunc: func(originalObj interface{}) {
-				obj, err := api.Scheme.DeepCopy(originalObj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					return
-				}
-				node := obj.(*v1.Node)
+				node := originalObj.(*v1.Node).DeepCopy()
 				if nc.taintManager != nil {
 					nc.taintManager.NodeUpdated(nil, node)
 				}
@@ -437,18 +414,12 @@ func NewNodeController(
 				}
 			},
 			DeleteFunc: func(originalObj interface{}) {
-				obj, err := api.Scheme.DeepCopy(originalObj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					return
-				}
-
-				node, isNode := obj.(*v1.Node)
+				node, isNode := originalObj.(*v1.Node)
 				// We can get DeletedFinalStateUnknown instead of *v1.Node here and we need to handle that correctly. #34692
 				if !isNode {
-					deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+					deletedState, ok := originalObj.(cache.DeletedFinalStateUnknown)
 					if !ok {
-						glog.Errorf("Received unexpected object: %v", obj)
+						glog.Errorf("Received unexpected object: %v", originalObj)
 						return
 					}
 					node, ok = deletedState.Obj.(*v1.Node)
@@ -458,7 +429,7 @@ func NewNodeController(
 					}
 				}
 				if nc.taintManager != nil {
-					nc.taintManager.NodeUpdated(node, nil)
+					nc.taintManager.NodeUpdated(node.DeepCopy(), nil)
 				}
 			},
 		}
@@ -651,12 +622,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 		var gracePeriod time.Duration
 		var observedReadyCondition v1.NodeCondition
 		var currentReadyCondition *v1.NodeCondition
-		nodeCopy, err := api.Scheme.DeepCopy(nodes[i])
-		if err != nil {
-			utilruntime.HandleError(err)
-			continue
-		}
-		node := nodeCopy.(*v1.Node)
+		node := nodes[i].DeepCopy()
 		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*nodeStatusUpdateRetry, func() (bool, error) {
 			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeStatus(node)
 			if err == nil {

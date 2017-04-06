@@ -52,8 +52,6 @@ type CacherConfig struct {
 	// An underlying storage.Versioner.
 	Versioner Versioner
 
-	Copier runtime.ObjectCopier
-
 	// The Cache will be caching objects of a given Type and assumes that they
 	// are all stored under ResourcePrefix directory in the underlying database.
 	Type           interface{}
@@ -159,8 +157,6 @@ type Cacher struct {
 	// Underlying storage.Interface.
 	storage Interface
 
-	copier runtime.ObjectCopier
-
 	// Expected type of objects in the underlying cache.
 	objectType reflect.Type
 
@@ -209,7 +205,6 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	cacher := &Cacher{
 		ready:       newReady(),
 		storage:     config.Storage,
-		copier:      config.Copier,
 		objectType:  reflect.TypeOf(config.Type),
 		watchCache:  watchCache,
 		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
@@ -340,7 +335,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	c.Lock()
 	defer c.Unlock()
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
-	watcher := newCacheWatcher(c.copier, watchRV, chanSize, initEvents, watchFilterFunction(key, pred), forget)
+	watcher := newCacheWatcher(watchRV, chanSize, initEvents, watchFilterFunction(key, pred), forget)
 
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
@@ -524,11 +519,8 @@ func (c *Cacher) GuaranteedUpdate(
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
 		glog.Errorf("GetByKey returned error: %v", err)
 	} else if exists {
-		currObj, copyErr := c.copier.Copy(elem.(*storeElement).Object)
-		if copyErr == nil {
-			return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
-		}
-		glog.Errorf("couldn't copy object: %v", copyErr)
+		currObj := elem.(*storeElement).Object.DeepCopyObject()
+		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
@@ -751,7 +743,6 @@ func (c *errWatcher) Stop() {
 // cacherWatch implements watch.Interface
 type cacheWatcher struct {
 	sync.Mutex
-	copier  runtime.ObjectCopier
 	input   chan *watchCacheEvent
 	result  chan watch.Event
 	done    chan struct{}
@@ -760,9 +751,8 @@ type cacheWatcher struct {
 	forget  func(bool)
 }
 
-func newCacheWatcher(copier runtime.ObjectCopier, resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool)) *cacheWatcher {
+func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool)) *cacheWatcher {
 	watcher := &cacheWatcher{
-		copier:  copier,
 		input:   make(chan *watchCacheEvent, chanSize),
 		result:  make(chan watch.Event, chanSize),
 		done:    make(chan struct{}),
@@ -850,11 +840,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 		return
 	}
 
-	object, err := c.copier.Copy(event.Object)
-	if err != nil {
-		glog.Errorf("unexpected copy error: %v", err)
-		return
-	}
+	object := event.Object.DeepCopyObject()
 	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:

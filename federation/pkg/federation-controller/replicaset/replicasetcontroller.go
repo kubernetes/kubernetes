@@ -503,13 +503,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	if err != nil {
 		return statusError, err
 	}
-	obj, err := api.Scheme.DeepCopy(objFromStore)
-	frs, ok := obj.(*extensionsv1.ReplicaSet)
-	if err != nil || !ok {
-		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
-		frsc.deliverReplicaSetByKey(key, 0, true)
-		return statusError, err
-	}
+	frs := objFromStore.DeepCopy()
 	if frs.DeletionTimestamp != nil {
 		if err := frsc.delete(frs); err != nil {
 			glog.Errorf("Failed to delete %s: %v", frs, err)
@@ -579,7 +573,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		// The object can be modified.
 		lrs := &extensionsv1.ReplicaSet{
 			ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(frs.ObjectMeta),
-			Spec:       *fedutil.DeepCopyApiTypeOrPanic(&frs.Spec).(*extensionsv1.ReplicaSetSpec),
+			Spec:       *frs.Spec.DeepCopy(),
 		}
 		specReplicas := int32(replicas)
 		lrs.Spec.Replicas = &specReplicas

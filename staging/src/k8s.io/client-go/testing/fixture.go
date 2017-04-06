@@ -60,7 +60,6 @@ type ObjectTracker interface {
 // ObjectScheme abstracts the implementation of common operations on objects.
 type ObjectScheme interface {
 	runtime.ObjectCreater
-	runtime.ObjectCopier
 	runtime.ObjectTyper
 }
 
@@ -195,10 +194,7 @@ func (t *tracker) List(gvk schema.GroupVersionKind, ns string) (runtime.Object, 
 	if err := meta.SetList(list, matchingObjs); err != nil {
 		return nil, err
 	}
-	if list, err = t.scheme.Copy(list); err != nil {
-		return nil, err
-	}
-	return list, nil
+	return list.DeepCopyObject(), nil
 }
 
 func (t *tracker) Get(gvk schema.GroupVersionKind, ns, name string) (runtime.Object, error) {
@@ -230,11 +226,7 @@ func (t *tracker) Get(gvk schema.GroupVersionKind, ns, name string) (runtime.Obj
 	// Only one object should match in the tracker if it works
 	// correctly, as Add/Update methods enforce kind/namespace/name
 	// uniqueness.
-	obj, err := t.scheme.Copy(matchingObjs[0])
-	if err != nil {
-		return nil, err
-	}
-
+	obj := matchingObjs[0].DeepCopyObject()
 	if status, ok := obj.(*metav1.Status); ok {
 		if status.Details != nil {
 			status.Details.Kind = gvk.Kind
@@ -285,10 +277,7 @@ func (t *tracker) add(obj runtime.Object, ns string, replaceExisting bool) error
 		// To avoid the object from being accidentally modified by caller
 		// after it's been added to the tracker, we always store the deep
 		// copy.
-		obj, err = t.scheme.Copy(obj)
-		if err != nil {
-			return err
-		}
+		obj = obj.DeepCopyObject()
 
 		if status, ok := obj.(*metav1.Status); ok && status.Details != nil {
 			gvk.Kind = status.Details.Kind

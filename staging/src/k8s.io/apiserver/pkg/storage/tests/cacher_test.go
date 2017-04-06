@@ -103,7 +103,6 @@ func newTestCacher(s storage.Interface, cap int) *storage.Cacher {
 		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      etcdstorage.APIObjectVersioner{},
-		Copier:         scheme,
 		Type:           &example.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
@@ -123,12 +122,7 @@ func makeTestPod(name string) *example.Pod {
 
 func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *example.Pod {
 	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		newObj, err := scheme.DeepCopy(obj)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			return nil, nil, err
-		}
-		return newObj.(*example.Pod), nil, nil
+		return obj.DeepCopy(), nil, nil
 	}
 	key := "pods/" + obj.Namespace + "/" + obj.Name
 	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn); err != nil {

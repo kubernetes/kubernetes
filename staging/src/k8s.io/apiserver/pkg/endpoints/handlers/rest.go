@@ -85,7 +85,6 @@ type RequestScope struct {
 	Creater         runtime.ObjectCreater
 	Convertor       runtime.ObjectConvertor
 	Defaulter       runtime.ObjectDefaulter
-	Copier          runtime.ObjectCopier
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
 
@@ -526,7 +525,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 
 		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS,
-			scope.Namer, scope.Copier, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec)
+			scope.Namer, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec)
 		if err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
@@ -555,7 +554,6 @@ func patchResource(
 	patchType types.PatchType,
 	patchJS []byte,
 	namer ScopeNamer,
-	copier runtime.ObjectCopier,
 	creater runtime.ObjectCreater,
 	defaulter runtime.ObjectDefaulter,
 	unsafeConvertor runtime.ObjectConvertor,
@@ -738,7 +736,7 @@ func patchResource(
 		return patchedObject, admit(patchedObject, currentObject)
 	}
 
-	updatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, copier, applyPatch, applyAdmission)
+	updatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, applyPatch, applyAdmission)
 
 	return finishRequest(timeout, func() (runtime.Object, error) {
 		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo)
@@ -813,7 +811,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		trace.Step("About to store object in database")
 		wasCreated := false
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			obj, created, err := r.Update(ctx, name, rest.DefaultUpdatedObjectInfo(obj, scope.Copier, transformers...))
+			obj, created, err := r.Update(ctx, name, rest.DefaultUpdatedObjectInfo(obj, transformers...))
 			wasCreated = created
 			return obj, err
 		})

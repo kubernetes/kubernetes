@@ -165,30 +165,21 @@ func addGrouplessTypes() {
 }
 
 func addTestTypes() {
-	type ListOptions struct {
-		Object          runtime.Object
-		metav1.TypeMeta `json:",inline"`
-		LabelSelector   string `json:"labelSelector,omitempty"`
-		FieldSelector   string `json:"fieldSelector,omitempty"`
-		Watch           bool   `json:"watch,omitempty"`
-		ResourceVersion string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	scheme.AddKnownTypes(testGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
-		&SimpleXGSubresource{})
+		&genericapitesting.SimpleXGSubresource{})
 	scheme.AddKnownTypes(testGroupVersion, &examplev1.Pod{})
 	scheme.AddKnownTypes(testInternalGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
-		&SimpleXGSubresource{})
+		&genericapitesting.SimpleXGSubresource{})
 	scheme.AddKnownTypes(testInternalGroupVersion, &example.Pod{})
 	// Register SimpleXGSubresource in both testGroupVersion and testGroup2Version, and also their
 	// their corresponding internal versions, to verify that the desired group version object is
 	// served in the tests.
-	scheme.AddKnownTypes(testGroup2Version, &SimpleXGSubresource{}, &metav1.ExportOptions{})
-	scheme.AddKnownTypes(testInternalGroup2Version, &SimpleXGSubresource{}, &metav1.ExportOptions{})
+	scheme.AddKnownTypes(testGroup2Version, &genericapitesting.SimpleXGSubresource{}, &metav1.ExportOptions{})
+	scheme.AddKnownTypes(testInternalGroup2Version, &genericapitesting.SimpleXGSubresource{}, &metav1.ExportOptions{})
 	metav1.AddToGroupVersion(scheme, testGroupVersion)
 }
 
@@ -283,7 +274,6 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 		Creater:   scheme,
 		Convertor: scheme,
-		Copier:    scheme,
 		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
@@ -447,6 +437,9 @@ func (s *SimpleStream) Close() error {
 }
 
 func (obj *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *SimpleStream) DeepCopyObject() runtime.Object {
+	panic("SimpleStream does not support DeepCopy")
+}
 
 func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, bool, string, error) {
 	s.version = version
@@ -467,11 +460,7 @@ func (storage *SimpleRESTStorage) Get(ctx request.Context, id string, options *m
 	if id == "binary" {
 		return storage.stream, storage.errors["get"]
 	}
-	copied, err := scheme.Copy(&storage.item)
-	if err != nil {
-		panic(err)
-	}
-	return copied, storage.errors["get"]
+	return storage.item.DeepCopy(), storage.errors["get"]
 }
 
 func (storage *SimpleRESTStorage) checkContext(ctx request.Context) {
@@ -702,11 +691,7 @@ func (storage *SimpleTypedStorage) New() runtime.Object {
 
 func (storage *SimpleTypedStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
-	copied, err := scheme.Copy(storage.item)
-	if err != nil {
-		panic(err)
-	}
-	return copied, storage.errors["get"]
+	return storage.item.DeepCopyObject(), storage.errors["get"]
 }
 
 func (storage *SimpleTypedStorage) checkContext(ctx request.Context) {
@@ -1084,10 +1069,10 @@ func TestList(t *testing.T) {
 			t.Errorf("%d: unexpected resource namespace: %s", i, simpleStorage.actualNamespace)
 		}
 		if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
-			t.Errorf("%d: unexpected label selector: %v", i, simpleStorage.requestedLabelSelector)
+			t.Errorf("%d: unexpected label selector: expected=%v got=%v", i, testCase.label, simpleStorage.requestedLabelSelector)
 		}
 		if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
-			t.Errorf("%d: unexpected field selector: %v", i, simpleStorage.requestedFieldSelector)
+			t.Errorf("%d: unexpected field selector: expected=%v got=%v", i, testCase.field, simpleStorage.requestedFieldSelector)
 		}
 	}
 }
@@ -2579,7 +2564,6 @@ func TestUpdateREST(t *testing.T) {
 			Root:      "/" + prefix,
 			Creater:   scheme,
 			Convertor: scheme,
-			Copier:    scheme,
 			Defaulter: scheme,
 			Typer:     scheme,
 			Linker:    selfLinker,
@@ -2664,7 +2648,6 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Root:      "/" + prefix,
 		Creater:   scheme,
 		Convertor: scheme,
-		Copier:    scheme,
 		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
@@ -2696,7 +2679,6 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Root:      "/" + prefix,
 		Creater:   scheme,
 		Convertor: scheme,
-		Copier:    scheme,
 		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
@@ -3097,6 +3079,13 @@ type UnregisteredAPIObject struct {
 func (obj *UnregisteredAPIObject) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
 }
+func (obj *UnregisteredAPIObject) DeepCopyObject() runtime.Object {
+	if obj == nil {
+		return nil
+	}
+	clone := *obj
+	return &clone
+}
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -3262,31 +3251,16 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	}
 }
 
-// SimpleXGSubresource is a cross group subresource, i.e. the subresource does not belong to the
-// same group as its parent resource.
-type SimpleXGSubresource struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
-	SubresourceInfo   string            `json:"subresourceInfo,omitempty"`
-	Labels            map[string]string `json:"labels,omitempty"`
-}
-
-func (obj *SimpleXGSubresource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-
 type SimpleXGSubresourceRESTStorage struct {
-	item SimpleXGSubresource
+	item genericapitesting.SimpleXGSubresource
 }
 
 func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
-	return &SimpleXGSubresource{}
+	return &genericapitesting.SimpleXGSubresource{}
 }
 
 func (storage *SimpleXGSubresourceRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
-	copied, err := scheme.Copy(&storage.item)
-	if err != nil {
-		panic(err)
-	}
-	return copied, nil
+	return storage.item.DeepCopyObject(), nil
 }
 
 func TestXGSubresource(t *testing.T) {
@@ -3296,7 +3270,7 @@ func TestXGSubresource(t *testing.T) {
 
 	itemID := "theID"
 	subresourceStorage := &SimpleXGSubresourceRESTStorage{
-		item: SimpleXGSubresource{
+		item: genericapitesting.SimpleXGSubresource{
 			SubresourceInfo: "foo",
 		},
 	}
@@ -3310,7 +3284,6 @@ func TestXGSubresource(t *testing.T) {
 
 		Creater:   scheme,
 		Convertor: scheme,
-		Copier:    scheme,
 		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
@@ -3345,7 +3318,7 @@ func TestXGSubresource(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
-	var itemOut SimpleXGSubresource
+	var itemOut genericapitesting.SimpleXGSubresource
 	body, err := extractBody(resp, &itemOut)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3357,7 +3330,7 @@ func TestXGSubresource(t *testing.T) {
 	// conversion type list in API scheme and hence cannot be converted from input type object
 	// to output type object. So it's values don't appear in the decoded output object.
 	decoder := json.NewDecoder(strings.NewReader(body))
-	var itemFromBody SimpleXGSubresource
+	var itemFromBody genericapitesting.SimpleXGSubresource
 	err = decoder.Decode(&itemFromBody)
 	if err != nil {
 		t.Errorf("unexpected JSON decoding error: %v", err)

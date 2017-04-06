@@ -92,6 +92,7 @@ message RawExtension {
 // +k8s:deepcopy-gen=true
 // +protobuf=true
 // +k8s:openapi-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message TypeMeta {
   // +optional
   optional string apiVersion = 1;

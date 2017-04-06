@@ -578,10 +578,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	// Deep-copy otherwise we are mutating our cache.
 	// TODO: Deep-copy only when needed.
-	d, err := util.DeploymentDeepCopy(deployment)
-	if err != nil {
-		return err
-	}
+	d := deployment.DeepCopy()
 
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(d.Spec.Selector, &everything) {

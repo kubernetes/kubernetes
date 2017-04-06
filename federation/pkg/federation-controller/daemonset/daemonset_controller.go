@@ -357,13 +357,7 @@ func (daemonsetcontroller *DaemonSetController) reconcileDaemonSet(namespace str
 		// Not federated daemonset, ignoring.
 		return
 	}
-	baseDaemonSetObj, err := api.Scheme.DeepCopy(baseDaemonSetObjFromStore)
-	baseDaemonSet, ok := baseDaemonSetObj.(*extensionsv1.DaemonSet)
-	if err != nil || !ok {
-		glog.Errorf("Error in retrieving obj %s from store: %v, %v", daemonsetName, ok, err)
-		daemonsetcontroller.deliverDaemonSet(namespace, daemonsetName, 0, true)
-		return
-	}
+	baseDaemonSet := baseDaemonSetObjFromStore.(*extensionsv1.DaemonSet).DeepCopy()
 	if baseDaemonSet.DeletionTimestamp != nil {
 		if err := daemonsetcontroller.delete(baseDaemonSet); err != nil {
 			glog.Errorf("Failed to delete %s: %v", daemonsetName, err)
@@ -407,7 +401,7 @@ func (daemonsetcontroller *DaemonSetController) reconcileDaemonSet(namespace str
 		// Do not modify. Otherwise make a deep copy.
 		desiredDaemonSet := &extensionsv1.DaemonSet{
 			ObjectMeta: util.DeepCopyRelevantObjectMeta(baseDaemonSet.ObjectMeta),
-			Spec:       *(util.DeepCopyApiTypeOrPanic(&baseDaemonSet.Spec).(*extensionsv1.DaemonSetSpec)),
+			Spec:       *baseDaemonSet.Spec.DeepCopy(),
 		}
 
 		if !found {

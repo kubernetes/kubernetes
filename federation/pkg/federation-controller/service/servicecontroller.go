@@ -26,7 +26,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -509,7 +508,7 @@ func (s *ServiceController) updateFederationService(key string, cachedService *c
 	// Clone federation service, and create them in underlying k8s cluster
 	desiredService := &v1.Service{
 		ObjectMeta: util.DeepCopyRelevantObjectMeta(cachedService.lastState.ObjectMeta),
-		Spec:       *(util.DeepCopyApiTypeOrPanic(&cachedService.lastState.Spec).(*v1.ServiceSpec)),
+		Spec:       *cachedService.lastState.Spec.DeepCopy(),
 	}
 
 	// handle available clusters one by one
@@ -978,13 +977,8 @@ func (s *ServiceController) syncService(key string) error {
 	default:
 		// Create a copy before modifying the obj to prevent race condition with
 		// other readers of obj from store.
-		copy, err := conversion.NewCloner().DeepCopy(service)
-		if err != nil {
-			glog.Errorf("Error in deep copying service %v retrieved from store: %v", key, err)
-			s.queue.Add(key)
-			return err
-		}
-		service := copy.(*v1.Service)
+		// TODO(deepcopy): service was shaddowed in old code. Is this correct?
+		service := service.DeepCopy()
 		cachedService = s.serviceCache.getOrCreate(key)
 		err, retryDelay = s.processServiceUpdate(cachedService, service, key)
 	}

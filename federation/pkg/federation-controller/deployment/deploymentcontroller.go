@@ -491,13 +491,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		// don't delete local deployments for now. Do not reconcile it anymore.
 		return statusAllOk, nil
 	}
-	obj, err := api.Scheme.DeepCopy(objFromStore)
-	fd, ok := obj.(*extensionsv1.Deployment)
-	if err != nil || !ok {
-		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
-		return statusError, err
-	}
-
+	fd := objFromStore.(*extensionsv1.Deployment).DeepCopy()
 	if fd.DeletionTimestamp != nil {
 		if err := fdc.delete(fd); err != nil {
 			glog.Errorf("Failed to delete %s: %v", fd.Name, err)

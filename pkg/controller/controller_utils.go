@@ -534,11 +534,7 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	if controllerRef != nil {
 		pod.OwnerReferences = append(pod.OwnerReferences, *controllerRef)
 	}
-	clone, err := api.Scheme.DeepCopy(&template.Spec)
-	if err != nil {
-		return nil, err
-	}
-	pod.Spec = *clone.(*v1.PodSpec)
+	pod.Spec = *template.Spec.DeepCopy()
 	return pod, nil
 }
 
@@ -939,14 +935,7 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 	}
 
 	newTaints := newNode.Spec.Taints
-	objCopy, err := api.Scheme.DeepCopy(oldNode)
-	if err != nil {
-		return fmt.Errorf("failed to copy node object %#v: %v", oldNode, err)
-	}
-	newNode, ok := (objCopy).(*v1.Node)
-	if !ok {
-		return fmt.Errorf("failed to cast copy onto node object %#v: %v", newNode, err)
-	}
+	oldNode.DeepCopyInto(newNode)
 	newNode.Spec.Taints = newTaints
 	newData, err := json.Marshal(newNode)
 	if err != nil {

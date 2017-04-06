@@ -21,75 +21,100 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Flunder) DeepCopyInto(out *Flunder) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = in.Spec
+	out.Status = in.Status
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_Flunder, InType: reflect.TypeOf(&Flunder{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_FlunderList, InType: reflect.TypeOf(&FlunderList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_FlunderSpec, InType: reflect.TypeOf(&FlunderSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_FlunderStatus, InType: reflect.TypeOf(&FlunderStatus{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new Flunder.
+func (x *Flunder) DeepCopy() *Flunder {
+	if x == nil {
+		return nil
+	}
+	out := new(Flunder)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1alpha1_Flunder(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Flunder)
-		out := out.(*Flunder)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Flunder) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *FlunderList) DeepCopyInto(out *FlunderList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Flunder, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new FlunderList.
+func (x *FlunderList) DeepCopy() *FlunderList {
+	if x == nil {
+		return nil
+	}
+	out := new(FlunderList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *FlunderList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_FlunderList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*FlunderList)
-		out := out.(*FlunderList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Flunder, len(*in))
-			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
-					(*out)[i] = *newVal.(*Flunder)
-				}
-			}
-		}
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *FlunderSpec) DeepCopyInto(out *FlunderSpec) {
+	*out = *in
+	return
 }
 
-func DeepCopy_v1alpha1_FlunderSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*FlunderSpec)
-		out := out.(*FlunderSpec)
-		*out = *in
+// DeepCopy will perform a deep copy of the receiver, creating a new FlunderSpec.
+func (x *FlunderSpec) DeepCopy() *FlunderSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(FlunderSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1alpha1_FlunderStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*FlunderStatus)
-		out := out.(*FlunderStatus)
-		*out = *in
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *FlunderStatus) DeepCopyInto(out *FlunderStatus) {
+	*out = *in
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new FlunderStatus.
+func (x *FlunderStatus) DeepCopy() *FlunderStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(FlunderStatus)
+	x.DeepCopyInto(out)
+	return out
 }

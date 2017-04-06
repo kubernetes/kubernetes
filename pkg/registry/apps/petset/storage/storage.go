@@ -23,7 +23,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	appsapi "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/registry/apps/petset"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -37,7 +36,6 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against replication controllers.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
 		NewFunc:     func() runtime.Object { return &appsapi.StatefulSet{} },
 		NewListFunc: func() runtime.Object { return &appsapi.StatefulSetList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {

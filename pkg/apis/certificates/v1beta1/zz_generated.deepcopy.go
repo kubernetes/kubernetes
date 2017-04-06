@@ -21,130 +21,152 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *CertificateSigningRequest) DeepCopyInto(out *CertificateSigningRequest) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_CertificateSigningRequest, InType: reflect.TypeOf(&CertificateSigningRequest{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_CertificateSigningRequestCondition, InType: reflect.TypeOf(&CertificateSigningRequestCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_CertificateSigningRequestList, InType: reflect.TypeOf(&CertificateSigningRequestList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_CertificateSigningRequestSpec, InType: reflect.TypeOf(&CertificateSigningRequestSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_CertificateSigningRequestStatus, InType: reflect.TypeOf(&CertificateSigningRequestStatus{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new CertificateSigningRequest.
+func (x *CertificateSigningRequest) DeepCopy() *CertificateSigningRequest {
+	if x == nil {
+		return nil
+	}
+	out := new(CertificateSigningRequest)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1beta1_CertificateSigningRequest(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CertificateSigningRequest)
-		out := out.(*CertificateSigningRequest)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_v1beta1_CertificateSigningRequestSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_CertificateSigningRequestStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *CertificateSigningRequest) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1beta1_CertificateSigningRequestCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CertificateSigningRequestCondition)
-		out := out.(*CertificateSigningRequestCondition)
-		*out = *in
-		out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *CertificateSigningRequestCondition) DeepCopyInto(out *CertificateSigningRequestCondition) {
+	*out = *in
+	in.LastUpdateTime.DeepCopyInto(&out.LastUpdateTime)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new CertificateSigningRequestCondition.
+func (x *CertificateSigningRequestCondition) DeepCopy() *CertificateSigningRequestCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(CertificateSigningRequestCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *CertificateSigningRequestList) DeepCopyInto(out *CertificateSigningRequestList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]CertificateSigningRequest, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new CertificateSigningRequestList.
+func (x *CertificateSigningRequestList) DeepCopy() *CertificateSigningRequestList {
+	if x == nil {
+		return nil
+	}
+	out := new(CertificateSigningRequestList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *CertificateSigningRequestList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1beta1_CertificateSigningRequestList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CertificateSigningRequestList)
-		out := out.(*CertificateSigningRequestList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]CertificateSigningRequest, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_CertificateSigningRequest(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *CertificateSigningRequestSpec) DeepCopyInto(out *CertificateSigningRequestSpec) {
+	*out = *in
+	if in.Request != nil {
+		in, out := &in.Request, &out.Request
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
 	}
+	if in.Usages != nil {
+		in, out := &in.Usages, &out.Usages
+		*out = make([]KeyUsage, len(*in))
+		copy(*out, *in)
+	}
+	if in.Groups != nil {
+		in, out := &in.Groups, &out.Groups
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.Extra != nil {
+		in, out := &in.Extra, &out.Extra
+		*out = make(map[string]ExtraValue)
+		for key, val := range *in {
+			(*out)[key] = make(ExtraValue, len(val))
+			copy((*out)[key], val)
+		}
+	}
+	return
 }
 
-func DeepCopy_v1beta1_CertificateSigningRequestSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CertificateSigningRequestSpec)
-		out := out.(*CertificateSigningRequestSpec)
-		*out = *in
-		if in.Request != nil {
-			in, out := &in.Request, &out.Request
-			*out = make([]byte, len(*in))
-			copy(*out, *in)
-		}
-		if in.Usages != nil {
-			in, out := &in.Usages, &out.Usages
-			*out = make([]KeyUsage, len(*in))
-			copy(*out, *in)
-		}
-		if in.Groups != nil {
-			in, out := &in.Groups, &out.Groups
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.Extra != nil {
-			in, out := &in.Extra, &out.Extra
-			*out = make(map[string]ExtraValue)
-			for key, val := range *in {
-				if newVal, err := c.DeepCopy(&val); err != nil {
-					return err
-				} else {
-					(*out)[key] = *newVal.(*ExtraValue)
-				}
-			}
-		}
+// DeepCopy will perform a deep copy of the receiver, creating a new CertificateSigningRequestSpec.
+func (x *CertificateSigningRequestSpec) DeepCopy() *CertificateSigningRequestSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(CertificateSigningRequestSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1beta1_CertificateSigningRequestStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CertificateSigningRequestStatus)
-		out := out.(*CertificateSigningRequestStatus)
-		*out = *in
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]CertificateSigningRequestCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_CertificateSigningRequestCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *CertificateSigningRequestStatus) DeepCopyInto(out *CertificateSigningRequestStatus) {
+	*out = *in
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]CertificateSigningRequestCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.Certificate != nil {
-			in, out := &in.Certificate, &out.Certificate
-			*out = make([]byte, len(*in))
-			copy(*out, *in)
-		}
+	}
+	if in.Certificate != nil {
+		in, out := &in.Certificate, &out.Certificate
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new CertificateSigningRequestStatus.
+func (x *CertificateSigningRequestStatus) DeepCopy() *CertificateSigningRequestStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(CertificateSigningRequestStatus)
+	x.DeepCopyInto(out)
+	return out
 }

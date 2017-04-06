@@ -23,7 +23,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -127,11 +126,7 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 
 		if updated, err := spc.podLister.Pods(set.Namespace).Get(pod.Name); err == nil {
 			// make a copy so we don't mutate the shared cache
-			if copy, err := api.Scheme.DeepCopy(updated); err == nil {
-				pod = copy.(*v1.Pod)
-			} else {
-				utilruntime.HandleError(fmt.Errorf("error copying updated Pod: %v", err))
-			}
+			pod = updated.DeepCopy()
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error getting updated Pod %s/%s from lister: %v", set.Namespace, pod.Name, err))
 		}
@@ -163,11 +158,7 @@ func (spc *realStatefulPodControl) UpdateStatefulSetStatus(set *apps.StatefulSet
 
 		if updated, err := spc.setLister.StatefulSets(set.Namespace).Get(set.Name); err == nil {
 			// make a copy so we don't mutate the shared cache
-			if copy, err := api.Scheme.DeepCopy(updated); err == nil {
-				set = copy.(*apps.StatefulSet)
-			} else {
-				utilruntime.HandleError(fmt.Errorf("error copying updated StatefulSet: %v", err))
-			}
+			set = updated.DeepCopy()
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error getting updated StatefulSet %s/%s from lister: %v", set.Namespace, set.Name, err))
 		}

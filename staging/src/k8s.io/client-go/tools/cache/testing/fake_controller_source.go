@@ -153,11 +153,7 @@ func (f *FakeControllerSource) getListItemsLocked() ([]runtime.Object, error) {
 		// Otherwise, if they make a change and write it back, they
 		// will inadvertently change our canonical copy (in
 		// addition to racing with other clients).
-		objCopy, err := api.Scheme.DeepCopy(obj)
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, objCopy.(runtime.Object))
+		list = append(list, obj.DeepCopyObject())
 	}
 	return list, nil
 }
@@ -242,11 +238,7 @@ func (f *FakeControllerSource) Watch(options metav1.ListOptions) (watch.Interfac
 			// it back, they will inadvertently change the our
 			// canonical copy (in addition to racing with other
 			// clients).
-			objCopy, err := api.Scheme.DeepCopy(c.Object)
-			if err != nil {
-				return nil, err
-			}
-			changes = append(changes, watch.Event{Type: c.Type, Object: objCopy.(runtime.Object)})
+			changes = append(changes, watch.Event{Type: c.Type, Object: c.Object.DeepCopyObject()})
 		}
 		return f.Broadcaster.WatchWithPrefix(changes), nil
 	} else if rc > len(f.changes) {

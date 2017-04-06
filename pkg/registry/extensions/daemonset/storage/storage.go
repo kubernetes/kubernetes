@@ -23,7 +23,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/daemonset"
@@ -37,7 +36,6 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against DaemonSets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
 		NewFunc:     func() runtime.Object { return &extensions.DaemonSet{} },
 		NewListFunc: func() runtime.Object { return &extensions.DaemonSetList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {

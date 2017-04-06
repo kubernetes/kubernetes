@@ -324,12 +324,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 		glog.V(8).Infof("Skipping not federated config map: %s", key)
 		return
 	}
-	obj, err := api.Scheme.DeepCopy(baseConfigMapObj)
-	configMap, ok := obj.(*apiv1.ConfigMap)
-	if err != nil || !ok {
-		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
-		return
-	}
+	configMap := baseConfigMapObj.(*apiv1.ConfigMap).DeepCopy()
 
 	// Check if deletion has been requested.
 	if configMap.DeletionTimestamp != nil {

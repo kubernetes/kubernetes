@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -73,7 +72,7 @@ func (s *storage) CreateThirdPartyResourceData(ctx genericapirequest.Context, Th
 }
 
 func (s *storage) UpdateThirdPartyResourceData(ctx genericapirequest.Context, ThirdPartyResourceData *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error) {
-	obj, _, err := s.Update(ctx, ThirdPartyResourceData.Name, rest.DefaultUpdatedObjectInfo(ThirdPartyResourceData, api.Scheme))
+	obj, _, err := s.Update(ctx, ThirdPartyResourceData.Name, rest.DefaultUpdatedObjectInfo(ThirdPartyResourceData))
 	return obj.(*extensions.ThirdPartyResourceData), err
 }
 

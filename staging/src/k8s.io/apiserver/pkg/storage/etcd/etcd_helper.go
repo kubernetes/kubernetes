@@ -63,13 +63,12 @@ var IdentityTransformer ValueTransformer = identityTransformer{}
 
 // Creates a new storage interface from the client
 // TODO: deprecate in favor of storage.Config abstraction over time
-func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool, cacheSize int, copier runtime.ObjectCopier, transformer ValueTransformer) storage.Interface {
+func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool, cacheSize int, transformer ValueTransformer) storage.Interface {
 	return &etcdHelper{
 		etcdMembersAPI: etcd.NewMembersAPI(client),
 		etcdKeysAPI:    etcd.NewKeysAPI(client),
 		codec:          codec,
 		versioner:      APIObjectVersioner{},
-		copier:         copier,
 		transformer:    transformer,
 		pathPrefix:     path.Join("/", prefix),
 		quorum:         quorum,
@@ -82,7 +81,6 @@ type etcdHelper struct {
 	etcdMembersAPI etcd.MembersAPI
 	etcdKeysAPI    etcd.KeysAPI
 	codec          runtime.Codec
-	copier         runtime.ObjectCopier
 	transformer    ValueTransformer
 	// Note that versioner is required for etcdHelper to work correctly.
 	// The public constructors (NewStorage & NewEtcdStorage) are setting it
@@ -610,12 +608,7 @@ func (h *etcdHelper) getFromCache(index uint64, filter storage.FilterFunc) (runt
 		}
 		// We should not return the object itself to avoid polluting the cache if someone
 		// modifies returned values.
-		objCopy, err := h.copier.Copy(obj.(runtime.Object))
-		if err != nil {
-			glog.Errorf("Error during DeepCopy of cached object: %q", err)
-			// We can't return a copy, thus we report the object as not found.
-			return nil, false
-		}
+		objCopy := obj.(runtime.Object).DeepCopyObject()
 		metrics.ObserveCacheHit()
 		return objCopy.(runtime.Object), true
 	}
@@ -628,11 +621,7 @@ func (h *etcdHelper) addToCache(index uint64, obj runtime.Object) {
 	defer func() {
 		metrics.ObserveAddCache(startTime)
 	}()
-	objCopy, err := h.copier.Copy(obj)
-	if err != nil {
-		glog.Errorf("Error during DeepCopy of cached object: %q", err)
-		return
-	}
+	objCopy := obj.DeepCopyObject()
 	isOverwrite := h.cache.Add(index, objCopy)
 	if !isOverwrite {
 		metrics.ObserveNewEntry()

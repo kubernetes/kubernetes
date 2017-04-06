@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -74,7 +73,7 @@ func (s *storage) CreateDeployment(ctx genericapirequest.Context, deployment *ex
 }
 
 func (s *storage) UpdateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	obj, _, err := s.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment, api.Scheme))
+	obj, _, err := s.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment))
 	if err != nil {
 		return nil, err
 	}

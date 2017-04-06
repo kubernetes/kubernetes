@@ -14,6 +14,7 @@ go_library(
         "doc.go",
         "register.go",
         "types.go",
+        "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
     tags = ["automanaged"],

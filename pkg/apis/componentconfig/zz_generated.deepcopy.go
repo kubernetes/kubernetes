@@ -21,261 +21,440 @@ limitations under the License.
 package componentconfig
 
 import (
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
-}
-
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_IPVar, InType: reflect.TypeOf(&IPVar{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeControllerManagerConfiguration, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAnonymousAuthentication, InType: reflect.TypeOf(&KubeletAnonymousAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAuthentication, InType: reflect.TypeOf(&KubeletAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAuthorization, InType: reflect.TypeOf(&KubeletAuthorization{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletConfiguration, InType: reflect.TypeOf(&KubeletConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletWebhookAuthentication, InType: reflect.TypeOf(&KubeletWebhookAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletWebhookAuthorization, InType: reflect.TypeOf(&KubeletWebhookAuthorization{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletX509Authentication, InType: reflect.TypeOf(&KubeletX509Authentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration, InType: reflect.TypeOf(&PersistentVolumeRecyclerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(&PortRangeVar{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_VolumeConfiguration, InType: reflect.TypeOf(&VolumeConfiguration{})},
-	)
-}
-
-func DeepCopy_componentconfig_IPVar(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IPVar)
-		out := out.(*IPVar)
-		*out = *in
-		if in.Val != nil {
-			in, out := &in.Val, &out.Val
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *IPVar) DeepCopyInto(out *IPVar) {
+	*out = *in
+	if in.Val != nil {
+		in, out := &in.Val, &out.Val
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(string)
 			**out = **in
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new IPVar.
+func (x *IPVar) DeepCopy() *IPVar {
+	if x == nil {
+		return nil
+	}
+	out := new(IPVar)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerManagerConfiguration) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.Controllers != nil {
+		in, out := &in.Controllers, &out.Controllers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	out.ServiceSyncPeriod = in.ServiceSyncPeriod
+	out.NodeSyncPeriod = in.NodeSyncPeriod
+	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
+	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
+	out.NamespaceSyncPeriod = in.NamespaceSyncPeriod
+	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
+	out.MinResyncPeriod = in.MinResyncPeriod
+	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
+	out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
+	out.PodEvictionTimeout = in.PodEvictionTimeout
+	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
+	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
+	out.NodeMonitorPeriod = in.NodeMonitorPeriod
+	out.LeaderElection = in.LeaderElection
+	out.VolumeConfiguration = in.VolumeConfiguration
+	out.ControllerStartInterval = in.ControllerStartInterval
+	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeControllerManagerConfiguration.
+func (x *KubeControllerManagerConfiguration) DeepCopy() *KubeControllerManagerConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeControllerManagerConfiguration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *KubeControllerManagerConfiguration) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeControllerManagerConfiguration)
-		out := out.(*KubeControllerManagerConfiguration)
-		*out = *in
-		if in.Controllers != nil {
-			in, out := &in.Controllers, &out.Controllers
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		return nil
-	}
-}
-
-func DeepCopy_componentconfig_KubeProxyConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeProxyConfiguration)
-		out := out.(*KubeProxyConfiguration)
-		*out = *in
-		if in.IPTablesMasqueradeBit != nil {
-			in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.IPTablesMasqueradeBit != nil {
+		in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
-		if in.OOMScoreAdj != nil {
-			in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
+	}
+	out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
+	out.IPTablesMinSyncPeriod = in.IPTablesMinSyncPeriod
+	if in.OOMScoreAdj != nil {
+		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
+	}
+	out.UDPIdleTimeout = in.UDPIdleTimeout
+	out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
+	out.ConntrackTCPCloseWaitTimeout = in.ConntrackTCPCloseWaitTimeout
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeProxyConfiguration.
+func (x *KubeProxyConfiguration) DeepCopy() *KubeProxyConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeProxyConfiguration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *KubeProxyConfiguration) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_componentconfig_KubeSchedulerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeSchedulerConfiguration)
-		out := out.(*KubeSchedulerConfiguration)
-		*out = *in
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfiguration) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.LeaderElection = in.LeaderElection
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeSchedulerConfiguration.
+func (x *KubeSchedulerConfiguration) DeepCopy() *KubeSchedulerConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeSchedulerConfiguration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *KubeSchedulerConfiguration) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_componentconfig_KubeletAnonymousAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletAnonymousAuthentication)
-		out := out.(*KubeletAnonymousAuthentication)
-		*out = *in
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletAnonymousAuthentication) DeepCopyInto(out *KubeletAnonymousAuthentication) {
+	*out = *in
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletAnonymousAuthentication.
+func (x *KubeletAnonymousAuthentication) DeepCopy() *KubeletAnonymousAuthentication {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeletAnonymousAuthentication)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletAuthentication) DeepCopyInto(out *KubeletAuthentication) {
+	*out = *in
+	out.X509 = in.X509
+	out.Webhook = in.Webhook
+	out.Anonymous = in.Anonymous
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletAuthentication.
+func (x *KubeletAuthentication) DeepCopy() *KubeletAuthentication {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeletAuthentication)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletAuthorization) DeepCopyInto(out *KubeletAuthorization) {
+	*out = *in
+	out.Webhook = in.Webhook
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletAuthorization.
+func (x *KubeletAuthorization) DeepCopy() *KubeletAuthorization {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeletAuthorization)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.SyncFrequency = in.SyncFrequency
+	out.FileCheckFrequency = in.FileCheckFrequency
+	out.HTTPCheckFrequency = in.HTTPCheckFrequency
+	out.Authentication = in.Authentication
+	out.Authorization = in.Authorization
+	if in.HostNetworkSources != nil {
+		in, out := &in.HostNetworkSources, &out.HostNetworkSources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.HostPIDSources != nil {
+		in, out := &in.HostPIDSources, &out.HostPIDSources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.HostIPCSources != nil {
+		in, out := &in.HostIPCSources, &out.HostIPCSources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	out.MinimumGCAge = in.MinimumGCAge
+	if in.ClusterDNS != nil {
+		in, out := &in.ClusterDNS, &out.ClusterDNS
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
+	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
+	out.ImageMinimumGCAge = in.ImageMinimumGCAge
+	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
+	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	out.ImagePullProgressDeadline = in.ImagePullProgressDeadline
+	if in.RegisterWithTaints != nil {
+		in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
+		*out = make([]api.Taint, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
+	if in.NodeLabels != nil {
+		in, out := &in.NodeLabels, &out.NodeLabels
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
+	if in.ExperimentalQOSReserved != nil {
+		in, out := &in.ExperimentalQOSReserved, &out.ExperimentalQOSReserved
+		*out = make(ConfigurationMap)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.AllowedUnsafeSysctls != nil {
+		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.SystemReserved != nil {
+		in, out := &in.SystemReserved, &out.SystemReserved
+		*out = make(ConfigurationMap)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.KubeReserved != nil {
+		in, out := &in.KubeReserved, &out.KubeReserved
+		*out = make(ConfigurationMap)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.EnforceNodeAllocatable != nil {
+		in, out := &in.EnforceNodeAllocatable, &out.EnforceNodeAllocatable
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletConfiguration.
+func (x *KubeletConfiguration) DeepCopy() *KubeletConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeletConfiguration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *KubeletConfiguration) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_componentconfig_KubeletAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletAuthentication)
-		out := out.(*KubeletAuthentication)
-		*out = *in
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletWebhookAuthentication) DeepCopyInto(out *KubeletWebhookAuthentication) {
+	*out = *in
+	out.CacheTTL = in.CacheTTL
+	return
 }
 
-func DeepCopy_componentconfig_KubeletAuthorization(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletAuthorization)
-		out := out.(*KubeletAuthorization)
-		*out = *in
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletWebhookAuthentication.
+func (x *KubeletWebhookAuthentication) DeepCopy() *KubeletWebhookAuthentication {
+	if x == nil {
 		return nil
 	}
+	out := new(KubeletWebhookAuthentication)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletConfiguration)
-		out := out.(*KubeletConfiguration)
-		*out = *in
-		if in.HostNetworkSources != nil {
-			in, out := &in.HostNetworkSources, &out.HostNetworkSources
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.HostPIDSources != nil {
-			in, out := &in.HostPIDSources, &out.HostPIDSources
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.HostIPCSources != nil {
-			in, out := &in.HostIPCSources, &out.HostIPCSources
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.ClusterDNS != nil {
-			in, out := &in.ClusterDNS, &out.ClusterDNS
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.RegisterWithTaints != nil {
-			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
-			*out = make([]api.Taint, len(*in))
-			for i := range *in {
-				if err := api.DeepCopy_api_Taint(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		if in.NodeLabels != nil {
-			in, out := &in.NodeLabels, &out.NodeLabels
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.ExperimentalQOSReserved != nil {
-			in, out := &in.ExperimentalQOSReserved, &out.ExperimentalQOSReserved
-			*out = make(ConfigurationMap)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.AllowedUnsafeSysctls != nil {
-			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.SystemReserved != nil {
-			in, out := &in.SystemReserved, &out.SystemReserved
-			*out = make(ConfigurationMap)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.KubeReserved != nil {
-			in, out := &in.KubeReserved, &out.KubeReserved
-			*out = make(ConfigurationMap)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.EnforceNodeAllocatable != nil {
-			in, out := &in.EnforceNodeAllocatable, &out.EnforceNodeAllocatable
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletWebhookAuthorization) DeepCopyInto(out *KubeletWebhookAuthorization) {
+	*out = *in
+	out.CacheAuthorizedTTL = in.CacheAuthorizedTTL
+	out.CacheUnauthorizedTTL = in.CacheUnauthorizedTTL
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletWebhookAuthorization.
+func (x *KubeletWebhookAuthorization) DeepCopy() *KubeletWebhookAuthorization {
+	if x == nil {
 		return nil
 	}
+	out := new(KubeletWebhookAuthorization)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_KubeletWebhookAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletWebhookAuthentication)
-		out := out.(*KubeletWebhookAuthentication)
-		*out = *in
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletX509Authentication) DeepCopyInto(out *KubeletX509Authentication) {
+	*out = *in
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletX509Authentication.
+func (x *KubeletX509Authentication) DeepCopy() *KubeletX509Authentication {
+	if x == nil {
 		return nil
 	}
+	out := new(KubeletX509Authentication)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_KubeletWebhookAuthorization(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletWebhookAuthorization)
-		out := out.(*KubeletWebhookAuthorization)
-		*out = *in
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LeaderElectionConfiguration) DeepCopyInto(out *LeaderElectionConfiguration) {
+	*out = *in
+	out.LeaseDuration = in.LeaseDuration
+	out.RenewDeadline = in.RenewDeadline
+	out.RetryPeriod = in.RetryPeriod
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new LeaderElectionConfiguration.
+func (x *LeaderElectionConfiguration) DeepCopy() *LeaderElectionConfiguration {
+	if x == nil {
 		return nil
 	}
+	out := new(LeaderElectionConfiguration)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_KubeletX509Authentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletX509Authentication)
-		out := out.(*KubeletX509Authentication)
-		*out = *in
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeRecyclerConfiguration) DeepCopyInto(out *PersistentVolumeRecyclerConfiguration) {
+	*out = *in
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeRecyclerConfiguration.
+func (x *PersistentVolumeRecyclerConfiguration) DeepCopy() *PersistentVolumeRecyclerConfiguration {
+	if x == nil {
 		return nil
 	}
+	out := new(PersistentVolumeRecyclerConfiguration)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_LeaderElectionConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LeaderElectionConfiguration)
-		out := out.(*LeaderElectionConfiguration)
-		*out = *in
-		return nil
-	}
-}
-
-func DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeRecyclerConfiguration)
-		out := out.(*PersistentVolumeRecyclerConfiguration)
-		*out = *in
-		return nil
-	}
-}
-
-func DeepCopy_componentconfig_PortRangeVar(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PortRangeVar)
-		out := out.(*PortRangeVar)
-		*out = *in
-		if in.Val != nil {
-			in, out := &in.Val, &out.Val
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PortRangeVar) DeepCopyInto(out *PortRangeVar) {
+	*out = *in
+	if in.Val != nil {
+		in, out := &in.Val, &out.Val
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(string)
 			**out = **in
 		}
-		return nil
 	}
+	return
 }
 
-func DeepCopy_componentconfig_VolumeConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*VolumeConfiguration)
-		out := out.(*VolumeConfiguration)
-		*out = *in
+// DeepCopy will perform a deep copy of the receiver, creating a new PortRangeVar.
+func (x *PortRangeVar) DeepCopy() *PortRangeVar {
+	if x == nil {
 		return nil
 	}
+	out := new(PortRangeVar)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *VolumeConfiguration) DeepCopyInto(out *VolumeConfiguration) {
+	*out = *in
+	out.PersistentVolumeRecyclerConfiguration = in.PersistentVolumeRecyclerConfiguration
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new VolumeConfiguration.
+func (x *VolumeConfiguration) DeepCopy() *VolumeConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(VolumeConfiguration)
+	x.DeepCopyInto(out)
+	return out
 }

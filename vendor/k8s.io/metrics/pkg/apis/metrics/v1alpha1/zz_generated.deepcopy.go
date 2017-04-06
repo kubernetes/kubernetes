@@ -21,123 +21,169 @@ limitations under the License.
 package v1alpha1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/client-go/pkg/api/v1"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
-}
-
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ContainerMetrics, InType: reflect.TypeOf(&ContainerMetrics{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_NodeMetrics, InType: reflect.TypeOf(&NodeMetrics{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_NodeMetricsList, InType: reflect.TypeOf(&NodeMetricsList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodMetrics, InType: reflect.TypeOf(&PodMetrics{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodMetricsList, InType: reflect.TypeOf(&PodMetricsList{})},
-	)
-}
-
-func DeepCopy_v1alpha1_ContainerMetrics(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ContainerMetrics)
-		out := out.(*ContainerMetrics)
-		*out = *in
-		if in.Usage != nil {
-			in, out := &in.Usage, &out.Usage
-			*out = make(v1.ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ContainerMetrics) DeepCopyInto(out *ContainerMetrics) {
+	*out = *in
+	if in.Usage != nil {
+		in, out := &in.Usage, &out.Usage
+		*out = make(v1.ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ContainerMetrics.
+func (x *ContainerMetrics) DeepCopy() *ContainerMetrics {
+	if x == nil {
+		return nil
+	}
+	out := new(ContainerMetrics)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeMetrics) DeepCopyInto(out *NodeMetrics) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Timestamp.DeepCopyInto(&out.Timestamp)
+	out.Window = in.Window
+	if in.Usage != nil {
+		in, out := &in.Usage, &out.Usage
+		*out = make(v1.ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeMetrics.
+func (x *NodeMetrics) DeepCopy() *NodeMetrics {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeMetrics)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *NodeMetrics) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_NodeMetrics(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeMetrics)
-		out := out.(*NodeMetrics)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*meta_v1.ObjectMeta)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeMetricsList) DeepCopyInto(out *NodeMetricsList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]NodeMetrics, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		out.Timestamp = in.Timestamp.DeepCopy()
-		if in.Usage != nil {
-			in, out := &in.Usage, &out.Usage
-			*out = make(v1.ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeMetricsList.
+func (x *NodeMetricsList) DeepCopy() *NodeMetricsList {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeMetricsList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *NodeMetricsList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_NodeMetricsList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeMetricsList)
-		out := out.(*NodeMetricsList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]NodeMetrics, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1alpha1_NodeMetrics(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodMetrics) DeepCopyInto(out *PodMetrics) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Timestamp.DeepCopyInto(&out.Timestamp)
+	out.Window = in.Window
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]ContainerMetrics, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodMetrics.
+func (x *PodMetrics) DeepCopy() *PodMetrics {
+	if x == nil {
+		return nil
+	}
+	out := new(PodMetrics)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodMetrics) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_PodMetrics(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodMetrics)
-		out := out.(*PodMetrics)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*meta_v1.ObjectMeta)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodMetricsList) DeepCopyInto(out *PodMetricsList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]PodMetrics, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		out.Timestamp = in.Timestamp.DeepCopy()
-		if in.Containers != nil {
-			in, out := &in.Containers, &out.Containers
-			*out = make([]ContainerMetrics, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1alpha1_ContainerMetrics(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
 	}
+	return
 }
 
-func DeepCopy_v1alpha1_PodMetricsList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodMetricsList)
-		out := out.(*PodMetricsList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]PodMetrics, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1alpha1_PodMetrics(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
+// DeepCopy will perform a deep copy of the receiver, creating a new PodMetricsList.
+func (x *PodMetricsList) DeepCopy() *PodMetricsList {
+	if x == nil {
+		return nil
+	}
+	out := new(PodMetricsList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodMetricsList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
