@@ -392,6 +392,7 @@ type provisionerConfig struct {
 	gidMin          int
 	gidMax          int
 	volumeType      gapi.VolumeDurabilityInfo
+	volumeOptions   []string
 }
 
 type glusterfsVolumeProvisioner struct {
@@ -750,7 +751,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		glog.V(4).Infof("glusterfs: provided clusterids: %v", clusterIds)
 	}
 	gid64 := int64(gid)
-	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Clusters: clusterIds, Gid: gid64, Durability: p.volumeType}
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Clusters: clusterIds, Gid: gid64, Durability: p.volumeType, VolOptions: p.volumeOptions}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		glog.Errorf("glusterfs: error creating volume %v ", err)
@@ -886,6 +887,8 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 
 	authEnabled := true
 	parseVolumeType := ""
+	parseVolumeOptions := ""
+
 	for k, v := range params {
 		switch dstrings.ToLower(k) {
 		case "resturl":
@@ -898,6 +901,11 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			cfg.secretName = v
 		case "secretnamespace":
 			cfg.secretNamespace = v
+		case "volumeoptions":
+			if len(v) != 0 {
+				parseVolumeOptions = v
+			}
+
 		case "clusterid":
 			if len(v) != 0 {
 				cfg.clusterId = v
@@ -1002,5 +1010,18 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		return nil, fmt.Errorf("StorageClass for provisioner %q must have gidMax value >= gidMin", glusterfsPluginName)
 	}
 
+	if len(parseVolumeOptions) != 0 {
+		volOptions := dstrings.Split(parseVolumeOptions, ",")
+		for _, v := range volOptions {
+			switch v {
+			case "encryption":
+				cfg.volumeOptions = append(cfg.volumeOptions, v)
+			default:
+				return nil, fmt.Errorf("StorageClass for provisioner %q must have valid ( for eg, 'encrypption') volume option", glusterfsPluginName)
+			}
+		}
+
+		return nil, fmt.Errorf("StorageClass for provisioner %q must have a valid ( for eg. 'encryption') value", glusterfsPluginName)
+	}
 	return &cfg, nil
 }
