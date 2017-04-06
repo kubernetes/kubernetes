@@ -328,14 +328,14 @@ func (s *ServiceController) hasFinalizerFunc(obj pkgruntime.Object, finalizer st
 	return false
 }
 
-// Removes the finalizer from the given objects ObjectMeta.
+// Removes the finalizers from the given objects ObjectMeta.
 // Assumes that the given object is a service.
-func (s *ServiceController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+func (s *ServiceController) removeFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
 	service := obj.(*v1.Service)
 	newFinalizers := []string{}
 	hasFinalizer := false
 	for i := range service.ObjectMeta.Finalizers {
-		if string(service.ObjectMeta.Finalizers[i]) != finalizer {
+		if !deletionhelper.ContainsString(finalizers, service.ObjectMeta.Finalizers[i]) {
 			newFinalizers = append(newFinalizers, service.ObjectMeta.Finalizers[i])
 		} else {
 			hasFinalizer = true
@@ -348,7 +348,7 @@ func (s *ServiceController) removeFinalizerFunc(obj pkgruntime.Object, finalizer
 	service.ObjectMeta.Finalizers = newFinalizers
 	service, err := s.federationClient.Core().Services(service.Namespace).Update(service)
 	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from service %s: %v", finalizer, service.Name, err)
+		return nil, fmt.Errorf("failed to remove finalizers %v from service %s: %v", finalizers, service.Name, err)
 	}
 	return service, nil
 }
