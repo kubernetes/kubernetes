@@ -11,14 +11,6 @@ import (
 	"k8s.io/client-go/transport"
 )
 
-// struct which keeps all information necessary for advertising opaque resources
-type OpaqueIntegerResourceAdvertiser struct {
-	Node   string
-	Name   string
-	Value  string
-	Config *restclient.Config
-}
-
 // body for opaque resource request
 type patchOperation struct {
 	Operation string `json:"op"`
@@ -26,31 +18,13 @@ type patchOperation struct {
 	Value     string `json:"value"`
 }
 
-// constructor for OpaqueIntegerResourceAdvertiser
-func NewOpaqueIntegerResourceAdvertiser(name string, value string) (*OpaqueIntegerResourceAdvertiser, error) {
-	node, err := getNode()
-	if err != nil {
-		return nil, err
-	}
-	config, err := getClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	return &OpaqueIntegerResourceAdvertiser{
-		Node:   node,
-		Config: config,
-		Name:   name,
-		Value:  value,
-	}, nil
-}
-
-func (opaque *OpaqueIntegerResourceAdvertiser) toRequestBody(operation string) ([]byte, error) {
+func toRequestBody(operation string, name string, value string) ([]byte, error) {
 	// body is in form of [{"op": "add", "path": "somepath","value": "somevalue"}]
 	return json.Marshal([]patchOperation{
 		patchOperation{
 			Operation: operation,
-			Path:      opaque.generateOpaqueResourcePath(),
-			Value:     opaque.Value,
+			Path:      generateOpaqueResourcePath(name),
+			Value:     value,
 		},
 	})
 }
@@ -61,18 +35,34 @@ func getNode() (string, error) {
 }
 
 // path for opaque resources
-func (opaque *OpaqueIntegerResourceAdvertiser) generateOpaqueResourcePath() string {
-	return fmt.Sprintf("/status/capacity/pod.alpha.kubernetes.io~1opaque-int-resource-%s", opaque.Name)
+func generateOpaqueResourcePath(name string) string {
+	return fmt.Sprintf("/status/capacity/pod.alpha.kubernetes.io~1opaque-int-resource-%s", name)
 }
 
 // generate url for adding or removing opaque resources
-func (opaque *OpaqueIntegerResourceAdvertiser) generateOpaqueResourceUrl() string {
-	return fmt.Sprintf("%s/api/v1/nodes/%s/status", opaque.Config.Host, opaque.Node)
+func generateOpaqueResourceUrl() (string, error) {
+	host, err := getApiServer()
+	if err != nil {
+		return host, err
+	}
+	node, err := getNode()
+	if err != nil {
+		return node, err
+	}
+	return fmt.Sprintf("%s/api/v1/nodes/%s/status", host, node), nil
 }
 
 // Getting config for accesing apiserver, assuming pod ir run within the cluster
 func getClientConfig() (*restclient.Config, error) {
 	return restclient.InClusterConfig()
+}
+
+func getApiServer() (string, error) {
+	config, err := getClientConfig()
+	if err != nil {
+		return "", err
+	}
+	return config.Host, nil
 }
 
 // prepare PATCH request for adding/removing opaque resources
@@ -85,9 +75,13 @@ func setPatchHeader(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json-patch+json")
 }
 
-func (opaque *OpaqueIntegerResourceAdvertiser) createHttpClient() (*http.Client, error) {
+func createHttpClient() (*http.Client, error) {
 	// TODO: test it against insecure apiserver
-	transportConfig, err := opaque.Config.TransportConfig()
+	config, err := getClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	transportConfig, err := config.TransportConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -98,28 +92,33 @@ func (opaque *OpaqueIntegerResourceAdvertiser) createHttpClient() (*http.Client,
 	return &http.Client{Transport: transport}, nil
 }
 
-func (opaque *OpaqueIntegerResourceAdvertiser) AdvertiseOpaqueResource() error {
-	return opaque.makeRequest("add")
+func AdvertiseOpaqueResource(name string, value string) error {
+	return makeRequest("add", name, value)
 }
 
-func (opaque *OpaqueIntegerResourceAdvertiser) RemoveOpaqueResource() error {
-	return opaque.makeRequest("remove")
+func RemoveOpaqueResource(name string) error {
+	return makeRequest("remove", name, "1")
 }
 
-func (opaque *OpaqueIntegerResourceAdvertiser) makeRequest(operation string) error {
-	body, err := opaque.toRequestBody(operation)
+func makeRequest(operation string, name string, value string) error {
+	body, err := toRequestBody(operation, name, value)
 	if err != nil {
 		return err
 	}
 
-	req, err := prepareRequest(body, opaque.generateOpaqueResourceUrl())
+	url, err := generateOpaqueResourceUrl()
+	if err != nil {
+		return err
+	}
+
+	req, err := prepareRequest(body, url)
 	if err != nil {
 		return err
 	}
 	// Setting proper header for PATCH request
 	setPatchHeader(req)
 
-	client, err := opaque.createHttpClient()
+	client, err := createHttpClient()
 	if err != nil {
 		return err
 	}
@@ -132,7 +131,7 @@ func (opaque *OpaqueIntegerResourceAdvertiser) makeRequest(operation string) err
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("Cannot set  opaque %s", opaque.Name)
+		return fmt.Errorf("Cannot set  opaque %s", name)
 	}
 
 	return nil

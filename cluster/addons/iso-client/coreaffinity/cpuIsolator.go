@@ -101,6 +101,7 @@ func (c *coreAffinityIsolator) PreStart(pod *v1.Pod, resource *lifecycle.CgroupI
 	return cgroupResource, nil
 }
 
+// implementation of postStop method in isolator Interface
 func (c *coreAffinityIsolator) PostStop(cgroupInfo *lifecycle.CgroupInfo) error {
 	cpus := c.cpuAssignmentMap[cgroupInfo.Path]
 	c.reclaimCPUs(cpus)
