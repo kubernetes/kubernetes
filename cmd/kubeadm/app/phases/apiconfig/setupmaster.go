@@ -43,9 +43,12 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		var err error
 		if n, err = client.Nodes().Get(node.GetHostname(""), metav1.GetOptions{}); err != nil {
-			return true, nil
+			return false, nil
 		}
-		return false, nil
+		// The node may appear to have no labels at first,
+		// so we wait for it to get hostname label.
+		_, found := n.ObjectMeta.Labels[metav1.LabelHostname]
+		return found, nil
 	})
 
 	oldData, err := json.Marshal(n)
