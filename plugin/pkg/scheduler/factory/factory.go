@@ -338,6 +338,11 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 			}
 		}
 	}
+	// issue: https://github.com/kubernetes/kubernetes/issues/43845
+	// for backward compatibility if user set the value in policy file, then we use it
+	if policy.HardPodAffinitySymmetricWeight != 0 {
+		f.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
+	}
 	return f.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
 
