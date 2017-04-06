@@ -110,6 +110,8 @@ type JobStatus struct {
 	// Conditions represent the latest available observations of an object's current state.
 	// More info: http://kubernetes.io/docs/user-guide/jobs
 	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	Conditions []JobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// StartTime represents time when the job was acknowledged by the Job Manager.
