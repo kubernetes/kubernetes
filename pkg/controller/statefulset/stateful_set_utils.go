@@ -56,8 +56,8 @@ func (o overlappingStatefulSets) Less(i, j int) bool {
 var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
 // getParentNameAndOrdinal gets the name of pod's parent StatefulSet and pod's ordinal as extracted from its Name. If
-// the Pod was not created by a StatefulSet, its parent is considered to be nil, and its ordinal is considered to be
-// -1.
+// the Pod was not created by a StatefulSet, its parent is considered to be empty string, and its ordinal is considered
+// to be -1.
 func getParentNameAndOrdinal(pod *v1.Pod) (string, int) {
 	parent := ""
 	ordinal := -1
