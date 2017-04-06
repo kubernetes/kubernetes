@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 // rolloutRecreate implements the logic for recreating a replica set.
@@ -43,18 +44,12 @@ func (dc *DeploymentController) rolloutRecreate(d *extensions.Deployment, rsList
 		return dc.syncRolloutStatus(allRSs, newRS, d)
 	}
 
-	newStatus := calculateStatus(allRSs, newRS, d)
 	// Do not process a deployment when it has old pods running.
-	if newStatus.UpdatedReplicas == 0 {
-		for _, podList := range podMap {
-			if len(podList.Items) > 0 {
-				return dc.syncRolloutStatus(allRSs, newRS, d)
-			}
-		}
+	if oldPodsRunning(newRS, oldRSs, podMap) {
+		return dc.syncRolloutStatus(allRSs, newRS, d)
 	}
 
 	// If we need to create a new RS, create it now.
-	// TODO: Create a new RS without re-listing all RSs.
 	if newRS == nil {
 		newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, true)
 		if err != nil {
@@ -64,13 +59,8 @@ func (dc *DeploymentController) rolloutRecreate(d *extensions.Deployment, rsList
 	}
 
 	// scale up new replica set.
-	scaledUp, err := dc.scaleUpNewReplicaSetForRecreate(newRS, d)
-	if err != nil {
+	if _, err := dc.scaleUpNewReplicaSetForRecreate(newRS, d); err != nil {
 		return err
-	}
-	if scaledUp {
-		// Update DeploymentStatus.
-		return dc.syncRolloutStatus(allRSs, newRS, d)
 	}
 
 	// Sync deployment status.
@@ -96,6 +86,23 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*ext
 		}
 	}
 	return scaled, nil
+}
+
+// oldPodsRunning returns whether there are old pods running or any of the old ReplicaSets thinks that it runs pods.
+func oldPodsRunning(newRS *extensions.ReplicaSet, oldRSs []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList) bool {
+	if oldPods := util.GetActualReplicaCountForReplicaSets(oldRSs); oldPods > 0 {
+		return true
+	}
+	for rsUID, podList := range podMap {
+		// If the pods belong to the new ReplicaSet, ignore.
+		if newRS != nil && newRS.UID == rsUID {
+			continue
+		}
+		if len(podList.Items) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // scaleUpNewReplicaSetForRecreate scales up new replica set when deployment strategy is "Recreate".
