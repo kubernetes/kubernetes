@@ -671,7 +671,13 @@ func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 				}
 				(*newEndpoints)[svcPort] = append((*newEndpoints)[svcPort], epInfo)
 			}
-			glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, (*newEndpoints)[svcPort])
+			if glog.V(3) {
+				newEPList := []string{}
+				for _, ep := range (*newEndpoints)[svcPort] {
+					newEPList = append(newEPList, ep.endpoint)
+				}
+				glog.Infof("Setting endpoints for %q to %+v", svcPort, newEPList)
+			}
 		}
 	}
 }
