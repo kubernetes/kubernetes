@@ -107,12 +107,9 @@ var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
 			framework.DeletePodWithWait(f, c, clientPod)
 			framework.PVPVCCleanup(c, ns, pv, pvc)
 			clientPod, pv, pvc, node = nil, nil, nil, ""
-		}
-	})
-
-	AddCleanupAction(func() {
-		if len(diskName) > 0 {
-			framework.DeletePDWithRetry(diskName)
+			if diskName != "" {
+				framework.DeletePDWithRetry(diskName)
+			}
 		}
 	})
 
