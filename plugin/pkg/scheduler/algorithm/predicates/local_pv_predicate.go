@@ -35,6 +35,7 @@ type VolumeNodeChecker struct {
 	pvInfo  PersistentVolumeInfo
 	pvcInfo PersistentVolumeClaimInfo
 	client  clientset.Interface
+	podInfo algorithm.PodLister
 }
 
 // annBoundByController annotation applies to PVs and PVCs.  It indicates that
@@ -49,21 +50,42 @@ const annBoundByController = "pv.kubernetes.io/bound-by-controller"
 // annotation does not matter.
 const annBindCompleted = "pv.kubernetes.io/bind-completed"
 
+type ClaimVolumeBinding struct {
+	Claim  *v1.PersistentVolumeClaim
+	Volume *v1.PersistentVolume
+}
+
 // VolumeNodeChecker evaluates if a pod can fit due to the volumes it requests, given
 // that some volumes have node scheduling constraints, particularly when using LocalStorage PVs.
 // The requirement is that any pod that uses a PVC that is bound to a LocalStorage PV must be scheduled to the
 // LocalStorage PV's node
-func NewVolumeNodePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, client clientset.Interface) algorithm.FitPredicate {
+func NewVolumeNodePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, client clientset.Interface, podInfo algorithm.PodLister) algorithm.FitPredicate {
 	c := &VolumeNodeChecker{
 		pvInfo:  pvInfo,
 		pvcInfo: pvcInfo,
 		client:  client,
+		podInfo: podInfo,
 	}
 	return c.predicate
 }
 
-func (c *VolumeNodeChecker) getAllLocalVolumes(node *v1.Node) ([]*v1.PersistentVolume, error) {
-	volumes, err := c.pvInfo.ListVolumes(labels.Everything())
+func getAllPodsOnNode(node *v1.Node, podInfo algorithm.PodLister) ([]*v1.Pod, error) {
+	filtered := []*v1.Pod{}
+	allPods, err := podInfo.List(labels.Everything())
+	if err != nil {
+		return filtered, err
+	}
+	for _, pod := range allPods {
+		if pod.Spec.NodeName == node.Name {
+			filtered = append(filtered, pod)
+		}
+	}
+	return filtered, nil
+
+}
+
+func getAllLocalVolumes(node *v1.Node, pvInfo PersistentVolumeInfo) ([]*v1.PersistentVolume, error) {
+	volumes, err := pvInfo.ListVolumes(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("volume node predicate cannot get a list of persistent volumes: %v", err)
 	}
@@ -78,6 +100,23 @@ func (c *VolumeNodeChecker) getAllLocalVolumes(node *v1.Node) ([]*v1.PersistentV
 	return ret, nil
 }
 
+func (c *VolumeNodeChecker) checkNodeHasPendingVolumeBindings(node *v1.Node) (bool, error) {
+	pods, err := getAllPodsOnNode(node, c.podInfo)
+	if err != nil {
+		return true, err
+	}
+	for _, pod := range pods {
+		unboundClaims, err := GetUnboundClaims(pod, c.pvcInfo)
+		if err != nil {
+			return true, fmt.Errorf("Failed to get list of unbound Persistent Volume Claims: %v", err)
+		}
+		if len(unboundClaims) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (c *VolumeNodeChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
@@ -90,10 +129,23 @@ func (c *VolumeNodeChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 		return false, nil, fmt.Errorf("node not found")
 	}
 
-	if err := c.handleUnboundClaims(pod, node); err != nil {
+	exists, err := c.checkNodeHasPendingVolumeBindings(node)
+	if err != nil {
 		return false, nil, err
 	}
+	if exists {
+		return false, []algorithm.PredicateFailureReason{ErrPendingLocalPVBinding}, nil
+	}
 
+	unboundClaims, err := GetUnboundClaims(pod, c.pvcInfo)
+	if err != nil {
+		return false, nil, fmt.Errorf("Failed to get list of unbound Persistent Volume Claims: %v", err)
+	}
+
+	_, err = GetVolumesForUnboundClaims(unboundClaims, node, c.pvInfo)
+	if err != nil {
+		return false, nil, err
+	}
 	namespace := pod.Namespace
 	manifest := &(pod.Spec)
 	for i := range manifest.Volumes {
@@ -115,7 +167,8 @@ func (c *VolumeNodeChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 		}
 		pvName := pvc.Spec.VolumeName
 		if pvName == "" {
-			return false, nil, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
+			// Ignore unbound persistent Volumes.
+			continue
 		}
 
 		pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
@@ -137,12 +190,12 @@ func (c *VolumeNodeChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 				return false, []algorithm.PredicateFailureReason{ErrVolumeNodeConflict}, nil
 			}
 		}
-
 	}
+
 	return true, nil, nil
 }
 
-func (c *VolumeNodeChecker) handleUnboundClaims(pod *v1.Pod, node *v1.Node) error {
+func GetUnboundClaims(pod *v1.Pod, pvcInfo PersistentVolumeClaimInfo) ([]*v1.PersistentVolumeClaim, error) {
 	var unboundClaims []*v1.PersistentVolumeClaim
 
 	namespace := pod.Namespace
@@ -154,53 +207,54 @@ func (c *VolumeNodeChecker) handleUnboundClaims(pod *v1.Pod, node *v1.Node) erro
 		}
 		pvcName := volume.PersistentVolumeClaim.ClaimName
 		if pvcName == "" {
-			return fmt.Errorf("PersistentVolumeClaim had no name")
+			return nil, fmt.Errorf("PersistentVolumeClaim had no name")
 		}
-		pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
+		pvc, err := pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if pvc == nil {
-			return fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
+			return nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
 		}
 		// Handle binding for local PVs here.
 		if pvc.Spec.VolumeType != nil && *pvc.Spec.VolumeType == v1.SemiPersistentLocalStorage {
 			unboundClaims = append(unboundClaims, pvc)
 		}
 	}
-	if len(unboundClaims) == 0 {
-		return nil
-	}
-	availableVolumes, err := c.getAllLocalVolumes(node)
+	return unboundClaims, nil
+}
+
+func GetVolumesForUnboundClaims(unboundClaims []*v1.PersistentVolumeClaim, node *v1.Node, pvInfo PersistentVolumeInfo) ([]ClaimVolumeBinding, error) {
+	var boundClaims []ClaimVolumeBinding
+	availableVolumes, err := getAllLocalVolumes(node, pvInfo)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	type claimToVolume struct {
-		claim  *v1.PersistentVolumeClaim
-		volume *v1.PersistentVolume
-	}
-	var boundClaims []claimToVolume
 	for _, claim := range unboundClaims {
-		allocatedVolume, err := c.findBestVolumeForClaim(claim, availableVolumes)
+		allocatedVolume, err := findBestVolumeForClaim(claim, availableVolumes)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if allocatedVolume == nil {
-			return fmt.Errorf("failed to find %d local persistent volumes on node %q", len(unboundClaims), node.Name)
+			return nil, fmt.Errorf("failed to find %d local persistent volumes on node %q", len(unboundClaims), node.Name)
 		}
-		boundClaims = append(boundClaims, claimToVolume{claim, allocatedVolume})
+		boundClaims = append(boundClaims, ClaimVolumeBinding{claim, allocatedVolume})
 		for idx, vol := range availableVolumes {
 			if vol.Name == allocatedVolume.Name {
 				availableVolumes = append(availableVolumes[:idx], availableVolumes[idx+1:]...)
 			}
 		}
 	}
-	for _, boundClaim := range boundClaims {
-		err := c.bind(boundClaim.volume, boundClaim.claim)
+	return boundClaims, nil
+}
+
+func BindVolumesToClaims(client clientset.Interface, claimVolumeBinding []ClaimVolumeBinding) error {
+	for _, boundClaim := range claimVolumeBinding {
+		err := bind(boundClaim.Volume, boundClaim.Claim, client)
 		if err != nil {
-			glog.Fatalf("<vishh> Handle this error!")
+			return err
 		}
 	}
 	return nil
@@ -222,7 +276,7 @@ func isVolumeBoundToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolum
 	return true
 }
 
-func (c *VolumeNodeChecker) findBestVolumeForClaim(claim *v1.PersistentVolumeClaim, volumes []*v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func findBestVolumeForClaim(claim *v1.PersistentVolumeClaim, volumes []*v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	var smallestVolume *v1.PersistentVolume
 	var smallestVolumeSize int64
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -297,7 +351,7 @@ func (c *VolumeNodeChecker) findBestVolumeForClaim(claim *v1.PersistentVolumeCla
 
 // bindVolumeToClaim modifes given volume to be bound to a claim and saves it to
 // API server. The claim is not modified in this method!
-func (c *VolumeNodeChecker) bindVolumeToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
+func bindVolumeToClaim(client clientset.Interface, volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	glog.V(4).Infof("updating PersistentVolume[%s]: binding to %q", volume.Name, claimToClaimKey(claim))
 
 	dirty := false
@@ -342,7 +396,7 @@ func (c *VolumeNodeChecker) bindVolumeToClaim(volume *v1.PersistentVolume, claim
 	// Save the volume only if something was changed
 	if dirty {
 		glog.V(2).Infof("claim %q bound to volume %q", claimToClaimKey(claim), volume.Name)
-		newVol, err := c.client.Core().PersistentVolumes().Update(volumeClone)
+		newVol, err := client.Core().PersistentVolumes().Update(volumeClone)
 		if err != nil {
 			glog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", volume.Name, claimToClaimKey(claim), err)
 			return newVol, err
@@ -357,7 +411,7 @@ func (c *VolumeNodeChecker) bindVolumeToClaim(volume *v1.PersistentVolume, claim
 
 // bindClaimToVolume modifies the given claim to be bound to a volume and
 // saves it to API server. The volume is not modified in this method!
-func (c *VolumeNodeChecker) bindClaimToVolume(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) (*v1.PersistentVolumeClaim, error) {
+func bindClaimToVolume(client clientset.Interface, claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) (*v1.PersistentVolumeClaim, error) {
 	glog.V(4).Infof("updating PersistentVolumeClaim[%s]: binding to %q", claimToClaimKey(claim), volume.Name)
 
 	dirty := false
@@ -399,7 +453,7 @@ func (c *VolumeNodeChecker) bindClaimToVolume(claim *v1.PersistentVolumeClaim, v
 
 	if dirty {
 		glog.V(2).Infof("volume %q bound to claim %q", volume.Name, claimToClaimKey(claim))
-		newClaim, err := c.client.Core().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
+		newClaim, err := client.Core().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
 		if err != nil {
 			glog.V(4).Infof("updating PersistentVolumeClaim[%s]: binding to %q failed: %v", claimToClaimKey(claim), volume.Name, err)
 			return newClaim, err
@@ -413,7 +467,7 @@ func (c *VolumeNodeChecker) bindClaimToVolume(claim *v1.PersistentVolumeClaim, v
 }
 
 // updateVolumePhase saves new volume phase to API server.
-func (c *VolumeNodeChecker) updateVolumePhase(volume *v1.PersistentVolume, phase v1.PersistentVolumePhase, message string) (*v1.PersistentVolume, error) {
+func updateVolumePhase(client clientset.Interface, volume *v1.PersistentVolume, phase v1.PersistentVolumePhase, message string) (*v1.PersistentVolume, error) {
 	glog.V(4).Infof("updating PersistentVolume[%s]: set phase %s", volume.Name, phase)
 	if volume.Status.Phase == phase {
 		// Nothing to do.
@@ -433,7 +487,7 @@ func (c *VolumeNodeChecker) updateVolumePhase(volume *v1.PersistentVolume, phase
 	volumeClone.Status.Phase = phase
 	volumeClone.Status.Message = message
 
-	newVol, err := c.client.Core().PersistentVolumes().UpdateStatus(volumeClone)
+	newVol, err := client.Core().PersistentVolumes().UpdateStatus(volumeClone)
 	if err != nil {
 		glog.V(4).Infof("updating PersistentVolume[%s]: set phase %s failed: %v", volume.Name, phase, err)
 		return newVol, err
@@ -447,7 +501,7 @@ func (c *VolumeNodeChecker) updateVolumePhase(volume *v1.PersistentVolume, phase
 //  claim - claim to update
 //  phasephase - phase to set
 //  volume - volume which Capacity is set into claim.Status.Capacity
-func (c *VolumeNodeChecker) updateClaimStatus(claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume) (*v1.PersistentVolumeClaim, error) {
+func updateClaimStatus(client clientset.Interface, claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume) (*v1.PersistentVolumeClaim, error) {
 	glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: set phase %s", claimToClaimKey(claim), phase)
 
 	dirty := false
@@ -500,7 +554,7 @@ func (c *VolumeNodeChecker) updateClaimStatus(claim *v1.PersistentVolumeClaim, p
 		return claim, nil
 	}
 
-	newClaim, err := c.client.Core().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
+	newClaim, err := client.Core().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
 	if err != nil {
 		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: set phase %s failed: %v", claimToClaimKey(claim), phase, err)
 		return newClaim, err
@@ -521,7 +575,7 @@ func claimrefToClaimKey(claimref *v1.ObjectReference) string {
 // both objects as Bound. Volume is saved first.
 // It returns on first error, it's up to the caller to implement some retry
 // mechanism.
-func (c *VolumeNodeChecker) bind(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) error {
+func bind(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim, client clientset.Interface) error {
 	var err error
 	// use updateClaim/updatedVolume to keep the original claim/volume for
 	// logging in error cases.
@@ -530,25 +584,25 @@ func (c *VolumeNodeChecker) bind(volume *v1.PersistentVolume, claim *v1.Persiste
 
 	glog.V(4).Infof("binding volume %q to claim %q", volume.Name, claimToClaimKey(claim))
 
-	if updatedVolume, err = c.bindVolumeToClaim(volume, claim); err != nil {
+	if updatedVolume, err = bindVolumeToClaim(client, volume, claim); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the volume: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
 	volume = updatedVolume
 
-	if updatedVolume, err = c.updateVolumePhase(volume, v1.VolumeBound, ""); err != nil {
+	if updatedVolume, err = updateVolumePhase(client, volume, v1.VolumeBound, ""); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the volume status: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
 	volume = updatedVolume
 
-	if updatedClaim, err = c.bindClaimToVolume(claim, volume); err != nil {
+	if updatedClaim, err = bindClaimToVolume(client, claim, volume); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the claim: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
 	claim = updatedClaim
 
-	if updatedClaim, err = c.updateClaimStatus(claim, v1.ClaimBound, volume); err != nil {
+	if updatedClaim, err = updateClaimStatus(client, claim, v1.ClaimBound, volume); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the claim status: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}

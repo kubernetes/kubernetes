@@ -38,6 +38,7 @@ var (
 	ErrNodeUnderMemoryPressure   = newPredicateFailureError("NodeUnderMemoryPressure")
 	ErrNodeUnderDiskPressure     = newPredicateFailureError("NodeUnderDiskPressure")
 	ErrVolumeNodeConflict        = newPredicateFailureError("NoVolumeNodeConflict")
+	ErrPendingLocalPVBinding     = newPredicateFailureError("PendingLocalPVBinding")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
 	// as ErrFakePredicate.
 	ErrFakePredicate = newPredicateFailureError("FakePredicateError")

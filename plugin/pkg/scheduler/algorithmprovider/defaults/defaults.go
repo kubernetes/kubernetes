@@ -174,9 +174,9 @@ func defaultPredicates() sets.String {
 
 		// Fit is determiend by local volume node constraints.
 		factory.RegisterFitPredicateFactory(
-			"NoVolumeNodeConflict",
+			"LocalPVFit",
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewVolumeNodePredicate(args.PVInfo, args.PVCInfo, args.Client)
+				return predicates.NewVolumeNodePredicate(args.PVInfo, args.PVCInfo, args.Client, args.PodLister)
 			},
 		),
 	)
@@ -221,6 +221,15 @@ func defaultPriorities() sets.String {
 
 		// TODO: explain what it does.
 		factory.RegisterPriorityFunction2("TaintTolerationPriority", priorities.ComputeTaintTolerationPriorityMap, priorities.ComputeTaintTolerationPriorityReduce, 1),
+		factory.RegisterPriorityConfigFactory(
+			"LocalPVBestFit",
+			factory.PriorityConfigFactory{
+				MapReduceFunction: func(args factory.PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+					return priorities.NewInterPodAffinityPriority(args.PVInfo, args.PVCInfo, args.Client)
+				},
+				Weight: 1,
+			},
+		),
 	)
 }
 
