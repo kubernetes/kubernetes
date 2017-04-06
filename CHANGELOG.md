@@ -15,7 +15,7 @@
   - [Downloads for v1.6.0](#downloads-for-v160)
     - [Client Binaries](#client-binaries-2)
     - [Server Binaries](#server-binaries-2)
-  - [WARNING: etcd backup strongly recommended](#warning:-etcd-backup-strongly-recommended)
+  - [WARNING: etcd backup strongly recommended](#warning-etcd-backup-strongly-recommended)
   - [Major updates and release themes](#major-updates-and-release-themes)
   - [Action Required](#action-required)
     - [Certificates API](#certificates-api)
@@ -880,7 +880,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
 * Cluster Autoscaler respects Pod Disruption Budgets when removing a node.
 
 ### DaemonSet
-* **[beta]** Introduce the rolling update feature for DaemonSet. See [Performing a Rolling Update on a DaemonSet](https://deploy-preview-2878--kubernetes-io-master-staging.netlify.com/docs/tasks/manage-daemon/update-daemon-set/).
+* **[beta]** Introduce the rolling update feature for DaemonSet. See [Performing a Rolling Update on a DaemonSet](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/).
 
 ### Deployment
 * **[beta]** Deployments that cannot make progress in rolling out the newest version will now indicate via the API they are blocked ([docs](https://kubernetes.io/docs/user-guide/deployments/#deployment-status))
