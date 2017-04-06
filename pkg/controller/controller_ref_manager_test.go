@@ -155,6 +155,26 @@ func TestClaimPods(t *testing.T) {
 				claimed: []*v1.Pod{newPod("pod1", productionLabel, &controller)},
 			}
 		}(),
+		func() test {
+			controller := v1.ReplicationController{}
+			controller.UID = types.UID(controllerUID)
+			podToDelete1 := newPod("pod1", productionLabel, &controller)
+			podToDelete2 := newPod("pod2", productionLabel, nil)
+			now := metav1.Now()
+			podToDelete1.DeletionTimestamp = &now
+			podToDelete2.DeletionTimestamp = &now
+
+			return test{
+				name: "Controller does not claim orphaned pods marked for deletion",
+				manager: NewPodControllerRefManager(&FakePodControl{},
+					&controller,
+					productionLabelSelector,
+					controllerKind,
+					func() error { return nil }),
+				pods:    []*v1.Pod{podToDelete1, podToDelete2},
+				claimed: []*v1.Pod{podToDelete1},
+			}
+		}(),
 	}
 	for _, test := range tests {
 		claimed, err := test.manager.ClaimPods(test.pods)
