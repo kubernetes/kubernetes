@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "deployment_controller.go",
+        "migrate.go",
         "progress.go",
         "recreate.go",
         "rollback.go",
@@ -33,6 +34,7 @@ go_library(
         "//pkg/util/labels:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",

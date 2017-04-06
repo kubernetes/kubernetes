@@ -70,6 +70,11 @@ const (
 	// TODO: Delete this annotation when we no longer need to support a client
 	//       talking to a server older than v1.6.
 	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
+	// MigratedFromAnnotation is added in a replica set that was created by the deployment controller
+	// by using the new hashing algorithm (fnv). This annotation will be added and is useful only
+	// during the migration step that should be performed by admins.
+	// TODO: Once added this annotation should never be removed?
+	MigratedFromAnnotation = "deployment.kubernetes.io/migrated-from"
 
 	// Reasons for deployment conditions
 	//

@@ -811,6 +811,10 @@ type KubeControllerManagerConfiguration struct {
 	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
 	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
 	UnhealthyZoneThreshold float32
+	// deploymentHashingAlgorithm is the hashing algorithm used for hashing pod templates for Deployments.
+	// adler is used by default, migrate-to-fnv needs to run as a migration step, and fnv is the new
+	// hashing algorithm that should be used (adler breaks quite fast when brute-forced).
+	DeploymentHashingAlgorithm string
 	// Reconciler runs a periodic loop to reconcile the desired state of the with
 	// the actual state of the world by triggering attach detach operations.
 	// This flag enables or disables reconcile.  Is false by default, and thus enabled.
