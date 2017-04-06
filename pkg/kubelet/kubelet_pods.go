@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -250,23 +249,15 @@ func truncatePodHostnameIfNeeded(podName, hostname string) (string, error) {
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
 	// TODO(vmarmol): Handle better.
 	clusterDomain := kl.clusterDomain
-	podAnnotations := pod.Annotations
-	if podAnnotations == nil {
-		podAnnotations = make(map[string]string)
-	}
+
 	hostname := pod.Name
 	if len(pod.Spec.Hostname) > 0 {
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Hostname); len(msgs) != 0 {
 			return "", "", fmt.Errorf("Pod Hostname %q is not a valid DNS label: %s", pod.Spec.Hostname, strings.Join(msgs, ";"))
 		}
 		hostname = pod.Spec.Hostname
-	} else {
-		hostnameCandidate := podAnnotations[utilpod.PodHostnameAnnotation]
-		if len(utilvalidation.IsDNS1123Label(hostnameCandidate)) == 0 {
-			// use hostname annotation, if specified.
-			hostname = hostnameCandidate
-		}
 	}
+
 	hostname, err := truncatePodHostnameIfNeeded(pod.Name, hostname)
 	if err != nil {
 		return "", "", err
@@ -278,12 +269,8 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 			return "", "", fmt.Errorf("Pod Subdomain %q is not a valid DNS label: %s", pod.Spec.Subdomain, strings.Join(msgs, ";"))
 		}
 		hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
-	} else {
-		subdomainCandidate := pod.Annotations[utilpod.PodSubdomainAnnotation]
-		if len(utilvalidation.IsDNS1123Label(subdomainCandidate)) == 0 {
-			hostDomain = fmt.Sprintf("%s.%s.svc.%s", subdomainCandidate, pod.Namespace, clusterDomain)
-		}
 	}
+
 	return hostname, hostDomain, nil
 }
 
