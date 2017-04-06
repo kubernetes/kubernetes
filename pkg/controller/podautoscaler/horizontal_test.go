@@ -48,9 +48,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	autoscalinginstall "k8s.io/kubernetes/pkg/apis/autoscaling/install"
+	extensionsinstall "k8s.io/kubernetes/pkg/apis/extensions/install"
 )
+
+func init() {
+	autoscalinginstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	extensionsinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func alwaysReady() bool { return true }
 

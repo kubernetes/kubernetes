@@ -30,13 +30,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/install"
+	"k8s.io/client-go/pkg/api/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/flowcontrol"
 
 	"github.com/stretchr/testify/assert"
-	_ "k8s.io/client-go/pkg/api/install"
-	"k8s.io/client-go/pkg/api/v1"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func TestIsConfigTransportTLS(t *testing.T) {
 	testCases := []struct {
