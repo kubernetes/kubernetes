@@ -3,8 +3,8 @@ package isolator
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -84,10 +84,11 @@ func (n NotifyHandler) Notify(context context.Context, event *lifecycle.Event) (
 	}
 }
 
-func Register(i Isolator) *grpc.Server {
+func InitializeIsolatorServer(i Isolator, socket net.Listener) *grpc.Server {
+	// create wrapper
 	nh := &NotifyHandler{isolator: i}
 	grpcServer := grpc.NewServer()
+	// register grpc server implementing Notify() method
 	lifecycle.RegisterIsolatorServer(grpcServer, nh)
-	glog.Info("Isolator Server has been registered")
 	return grpcServer
 }

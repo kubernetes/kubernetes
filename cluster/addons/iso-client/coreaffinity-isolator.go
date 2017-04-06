@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
 	"google.golang.org/grpc"
@@ -15,7 +14,6 @@ import (
 	coreaffiso "k8s.io/kubernetes/cluster/addons/iso-client/coreaffinity"
 	"k8s.io/kubernetes/cluster/addons/iso-client/isolator"
 	opaq "k8s.io/kubernetes/cluster/addons/iso-client/opaque"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/lifecycle"
 )
 
 const (
@@ -27,20 +25,17 @@ const (
 	name = "coreaffinity-isolator"
 )
 
-func handleSIGTERM(sigterm chan os.Signal, client *isolator.EventDispatcherClient, opaque *opaq.OpaqueIntegerResourceAdvertiser) {
+func handleSIGTERM(sigterm chan os.Signal, client *isolator.EventDispatcherClient, opaque *opaq.OpaqueIntegerResourceAdvertiser, server *grpc.Server) {
 	<-sigterm
-	shutdownIsolator(client, opaque)
+	glog.Info("Received SIGTERM")
+	shutdownIsolator(client, opaque, server)
 }
 
-func shutdownIsolator(client *isolator.EventDispatcherClient, opaque *opaq.OpaqueIntegerResourceAdvertiser) {
-	unregisterRequest := &lifecycle.UnregisterRequest{
-		Name:  client.Name,
-	}
-
+func shutdownIsolator(client *isolator.EventDispatcherClient, opaque *opaq.OpaqueIntegerResourceAdvertiser, server *grpc.Server) {
 	glog.Infof("Unregistering custom-isolator: %s", name)
-	if _, err := client.Unregister(client.Ctx, unregisterRequest); err != nil {
+	if err := client.UnregisterIsolator(); err != nil {
 		opaque.RemoveOpaqueResource()
-		glog.Fatalf("Failed to unregister handler: %v")
+		glog.Errorf("Failed to unregister handler: %v")
 	}
 
 	glog.Infof("Removing opque integer resources %q from node %s", opaque.Name, opaque.Node)
@@ -49,17 +44,8 @@ func shutdownIsolator(client *isolator.EventDispatcherClient, opaque *opaq.Opaqu
 	}
 
 	glog.Infof("%s has been unregistered", name)
-	os.Exit(0)
-
-}
-
-func Serve(wg sync.WaitGroup, socket net.Listener, server *grpc.Server) {
-	defer wg.Done()
-	glog.Info("Starting serving")
-	if err := server.Serve(socket); err != nil {
-		glog.Fatalf("Coreaffinity isolator has stopped serving: %v", err)
-	}
-	glog.Info("Stopping coreaffinity isolator")
+	// send stop signal to grpc Server and exit isolator
+	server.Stop()
 }
 
 func advertiseOpaqueCpus(cpus int) (*opaq.OpaqueIntegerResourceAdvertiser, error) {
@@ -71,21 +57,6 @@ func advertiseOpaqueCpus(cpus int) (*opaq.OpaqueIntegerResourceAdvertiser, error
 		return nil, err
 	}
 	return opaque, nil
-}
-
-func registerEventDispatcherClient(name string, eventDispatcherAddress string, isolatorLocalAddress string) (*isolator.EventDispatcherClient, error) {
-	client, err := isolator.NewEventDispatcherClient(name, eventDispatcherAddress, isolatorLocalAddress)
-	if err != nil {
-		return nil, fmt.Errorf("Cannot create eventDispatcherClient: %v", err)
-	}
-
-	// Registering to eventDispatcher server in kubelet
-	reply, err := client.Register()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to register isolator: %v . Reply: %v", err, reply)
-	}
-
-	return client, nil
 }
 
 // TODO: split it to smaller functions
@@ -102,10 +73,6 @@ func main() {
 		glog.Fatalf("Cannot advertise opaque resources: %v", err)
 	}
 
-	var wg sync.WaitGroup
-
-	// create isolator Wrapper
-	server := isolator.Register(coreaffinityIsolator)
 	// bind to socket
 	socket, err := net.Listen("tcp", isolatorLocalAddress)
 	if err != nil {
@@ -113,13 +80,23 @@ func main() {
 		glog.Fatalf("Cannot create tcp socket: %v", err)
 	}
 
-	wg.Add(1)
+	finish := make(chan int)
 	// Starting grpc server to handle isolation requests
-	go Serve(wg, socket, server)
+	server := isolator.InitializeIsolatorServer(coreaffinityIsolator, socket)
 
-	client, err := registerEventDispatcherClient(name, eventDispatcherAddress, isolatorLocalAddress)
+	// Starting Isolator server in separeate goroutine
+	go func(finish chan int) {
+		defer func() { finish <- 1 }()
+		if err := server.Serve(socket); err != nil {
+			glog.Infof("Stopping isolator server: %v", err)
+		}
+	}(finish)
+
+	glog.Info("Custom isolator server has been started")
+	client, err := isolator.RegisterIsolator(name, eventDispatcherAddress, isolatorLocalAddress)
 	if err != nil {
 		opaque.RemoveOpaqueResource()
+		server.Stop()
 		glog.Fatalf("Failed to register eventDispatcher client: %v", err)
 	}
 	glog.Info("Coreaffinity isolator has been registered.")
@@ -127,7 +104,6 @@ func main() {
 	// Handling SigTerm
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go handleSIGTERM(c, client, opaque)
-
-	wg.Wait()
+	go handleSIGTERM(c, client, opaque, server)
+	<-finish
 }
