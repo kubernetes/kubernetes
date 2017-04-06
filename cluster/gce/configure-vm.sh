@@ -796,7 +796,7 @@ function run-salt() {
   echo "== Calling Salt =="
   local rc=0
   for i in {0..6}; do
-    salt-call --local state.highstate && rc=0 || rc=$?
+    salt-call --retcode-passthrough --local state.highstate && rc=0 || rc=$?
     if [[ "${rc}" == 0 ]]; then
       return 0
     fi
