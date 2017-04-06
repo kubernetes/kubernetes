@@ -53,9 +53,10 @@ func TestGetContainerSecurityOpts(t *testing.T) {
 	}
 
 	tests := []struct {
-		msg          string
-		config       *runtimeapi.PodSandboxConfig
-		expectedOpts []string
+		msg             string
+		apparmorProfile string
+		config          *runtimeapi.PodSandboxConfig
+		expectedOpts    []string
 	}{{
 		msg:          "No security annotations",
 		config:       makeConfig(nil),
@@ -79,28 +80,24 @@ func TestGetContainerSecurityOpts(t *testing.T) {
 		}),
 		expectedOpts: nil,
 	}, {
-		msg: "AppArmor runtime/default",
-		config: makeConfig(map[string]string{
-			apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileRuntimeDefault,
-		}),
-		expectedOpts: []string{"seccomp=unconfined"},
+		msg:             "AppArmor runtime/default",
+		apparmorProfile: apparmor.ProfileRuntimeDefault,
+		expectedOpts:    []string{"seccomp=unconfined"},
 	}, {
-		msg: "AppArmor local profile",
-		config: makeConfig(map[string]string{
-			apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileNamePrefix + "foo",
-		}),
-		expectedOpts: []string{"seccomp=unconfined", "apparmor=foo"},
+		msg:             "AppArmor local profile",
+		apparmorProfile: apparmor.ProfileNamePrefix + "foo",
+		expectedOpts:    []string{"seccomp=unconfined", "apparmor=foo"},
 	}, {
-		msg: "AppArmor and seccomp profile",
+		msg:             "AppArmor and seccomp profile",
+		apparmorProfile: apparmor.ProfileNamePrefix + "foo",
 		config: makeConfig(map[string]string{
 			v1.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
-			apparmor.ContainerAnnotationKeyPrefix + containerName:  apparmor.ProfileNamePrefix + "foo",
 		}),
 		expectedOpts: []string{"apparmor=foo"},
 	}}
 
 	for i, test := range tests {
-		opts, err := getContainerSecurityOpts(containerName, test.config, "test/seccomp/profile/root", '=')
+		opts, err := getContainerSecurityOpts(containerName, test.config, "test/seccomp/profile/root", test.apparmorProfile, '=')
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
