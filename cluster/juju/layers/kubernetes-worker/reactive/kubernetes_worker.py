@@ -152,7 +152,8 @@ def shutdown():
         - stop the kube-proxy service
         - remove the 'kubernetes-worker.cni-plugins.installed' state
     '''
-    kubectl('delete', 'node', gethostname())
+    if os.path.isfile(kubeconfig_path):
+        kubectl('delete', 'node', gethostname())
     service_stop('kubelet')
     service_stop('kube-proxy')
     remove_state('kubernetes-worker.cni-plugins.installed')
