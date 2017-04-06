@@ -40,7 +40,7 @@ type StreamOptions struct {
 	Stdout             io.Writer
 	Stderr             io.Writer
 	Tty                bool
-	ResizeFunc         func(io.Writer)
+	TerminalSizeQueue  TerminalSizeQueue
 }
 
 // Executor is an interface for transporting shell-style streams.

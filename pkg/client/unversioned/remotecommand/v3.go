@@ -17,10 +17,12 @@ limitations under the License.
 package remotecommand
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -61,10 +63,23 @@ func (p *streamProtocolV3) createStreams(conn streamCreator) error {
 }
 
 func (p *streamProtocolV3) handleResizes() {
-	if p.resizeStream == nil || p.ResizeFunc == nil {
+	if p.resizeStream == nil || p.TerminalSizeQueue == nil {
 		return
 	}
-	go p.ResizeFunc(p.resizeStream)
+	go func() {
+		defer runtime.HandleCrash()
+
+		encoder := json.NewEncoder(p.resizeStream)
+		for {
+			size := p.TerminalSizeQueue.Next()
+			if size == nil {
+				return
+			}
+			if err := encoder.Encode(&size); err != nil {
+				runtime.HandleError(err)
+			}
+		}
+	}()
 }
 
 func (p *streamProtocolV3) stream(conn streamCreator) error {

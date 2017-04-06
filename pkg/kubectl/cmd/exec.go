@@ -97,17 +97,13 @@ func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *restc
 	if err != nil {
 		return err
 	}
-	var resizeFunc func(io.Writer)
-	if terminalSizeQueue != nil {
-		resizeFunc = remotecommand.GetResizeFunc(terminalSizeQueue)
-	}
 	return exec.Stream(remotecommand.StreamOptions{
 		SupportedProtocols: consts.SupportedStreamingProtocols,
 		Stdin:              stdin,
 		Stdout:             stdout,
 		Stderr:             stderr,
 		Tty:                tty,
-		ResizeFunc:         resizeFunc,
+		TerminalSizeQueue:  terminalSizeQueue,
 	})
 }
 

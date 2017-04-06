@@ -16,13 +16,6 @@ limitations under the License.
 
 package remotecommand
 
-import (
-	"encoding/json"
-	"io"
-
-	"k8s.io/apimachinery/pkg/util/runtime"
-)
-
 // Size represents the width and height of a terminal.
 type Size struct {
 	Width  uint16
@@ -34,22 +27,4 @@ type TerminalSizeQueue interface {
 	// Next returns the new terminal size after the terminal has been resized. It returns nil when
 	// monitoring has been stopped.
 	Next() *Size
-}
-
-// GetResizeFunc will return function that handles terminal resize
-func GetResizeFunc(resizeQueue TerminalSizeQueue) func(io.Writer) {
-	return func(stream io.Writer) {
-		defer runtime.HandleCrash()
-
-		encoder := json.NewEncoder(stream)
-		for {
-			size := resizeQueue.Next()
-			if size == nil {
-				return
-			}
-			if err := encoder.Encode(&size); err != nil {
-				runtime.HandleError(err)
-			}
-		}
-	}
 }
