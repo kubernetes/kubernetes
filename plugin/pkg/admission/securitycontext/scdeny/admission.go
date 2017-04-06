@@ -26,10 +26,10 @@ import (
 )
 
 const (
-	SUPPLEMENTAL_GROUPS = "SupplementalGroups"
-	SE_LINUX_OPTION     = "SELinuxOption"
-	RUN_AS_USER         = "RunAsUser"
-	FS_GROUP            = "FSGroup"
+	supplementalGroups = "SupplementalGroups"
+	seLinuxOption      = "SELinuxOption"
+	runAsUser          = "RunAsUser"
+	fsGroup            = "FSGroup"
 )
 
 func init() {
@@ -82,17 +82,17 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 func checkPodSecurityContext(podContext *api.PodSecurityContext) error {
 	var (
 		kind string
-		err error
+		err  error
 	)
 	if podContext != nil {
 		if podContext.SupplementalGroups != nil {
-			kind = SUPPLEMENTAL_GROUPS
+			kind = supplementalGroups
 		} else if podContext.SELinuxOptions != nil {
-			kind = SE_LINUX_OPTION
+			kind = seLinuxOption
 		} else if podContext.RunAsUser != nil {
-			kind = RUN_AS_USER
+			kind = runAsUser
 		} else if podContext.FSGroup != nil {
-			kind = FS_GROUP
+			kind = fsGroup
 		}
 
 		if kind != "" {
@@ -106,13 +106,13 @@ func checkPodSecurityContext(podContext *api.PodSecurityContext) error {
 func checkSecurityContext(context *api.SecurityContext) error {
 	var (
 		kind string
-		err error
+		err  error
 	)
 	if context != nil {
 		if context.SELinuxOptions != nil {
-			kind = SE_LINUX_OPTION
+			kind = seLinuxOption
 		} else if context.RunAsUser != nil {
-			kind = RUN_AS_USER
+			kind = runAsUser
 		}
 
 		if kind != "" {
