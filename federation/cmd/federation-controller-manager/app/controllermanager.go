@@ -156,9 +156,8 @@ func Run(s *options.CMServer) error {
 }
 
 func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) error {
-	glog.Infof("Loading client config for cluster controller %q", "cluster-controller")
-	ccClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
-	glog.Infof("Running cluster controller")
+	stopChan := wait.NeverStop
+	minimizeLatency := false
 
 	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(restClientCfg)
 	serverResources, err := discoveryClient.ServerResources()
@@ -166,7 +165,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		glog.Fatalf("Could not find resources from API Server: %v", err)
 	}
 
-	go clustercontroller.NewclusterController(ccClientset, s.ClusterMonitorPeriod.Duration).Run()
+	clustercontroller.StartClusterController(restClientCfg, stopChan, s.ClusterMonitorPeriod.Duration)
 
 	if controllerEnabled(s.Controllers, serverResources, servicecontroller.ControllerName, servicecontroller.RequiredResources, true) {
 		dns, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.DnsConfigFile)
@@ -191,9 +190,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, secretcontroller.ControllerName, secretcontroller.RequiredResources, true) {
-		secretcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "secret-controller"))
-		secretcontroller := secretcontroller.NewSecretController(secretcontrollerClientset)
-		secretcontroller.Run(wait.NeverStop)
+		secretcontroller.StartSecretController(restClientCfg, stopChan, minimizeLatency)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, configmapcontroller.ControllerName, configmapcontroller.RequiredResources, true) {
