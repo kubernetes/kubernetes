@@ -30,9 +30,7 @@ import (
 )
 
 const (
-	azureTimeFormat = "\"2006-01-02 15:04:05.99999\""
-	uuidFormat      = "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}"
-	azureTokenKey   = "azureTokenKey"
+	azureTokenKey = "azureTokenKey"
 
 	cfgClientID     = "client-id"
 	cfgTenantID     = "tenant-id"
