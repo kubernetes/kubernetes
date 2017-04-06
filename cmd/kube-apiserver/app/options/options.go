@@ -138,7 +138,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"Amount of time to retain events.")
 
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged,
-		"If true, allow privileged containers.")
+		"If true, allow privileged containers. [default=false]")
 
 	fs.StringVar(&s.SSHUser, "ssh-user", s.SSHUser,
 		"If non-empty, use secure SSH proxy to the nodes, using this user name")
