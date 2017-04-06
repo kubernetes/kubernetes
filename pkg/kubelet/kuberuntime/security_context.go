@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -31,6 +32,9 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	if synthesized == nil {
 		synthesized = &runtimeapi.LinuxContainerSecurityContext{}
 	}
+
+	// set ApparmorProfile.
+	synthesized.ApparmorProfile = apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
 
 	// set RunAsUser.
 	if synthesized.RunAsUser == nil {
