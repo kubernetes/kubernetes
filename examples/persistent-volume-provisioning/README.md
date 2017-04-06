@@ -109,6 +109,7 @@ parameters:
   gidMin: "40000"
   gidMax: "50000"
   volumetype: "replicate:3"
+  volumeoptions: "encryption"
 ```
 
 * `resturl` : Gluster REST service/Heketi service url which provision gluster volumes on demand. The general format should be `IPaddress:Port` and this is a mandatory parameter for GlusterFS dynamic provisioner. If Heketi service is exposed as a routable service in openshift/kubernetes setup, this can have a format similar to
@@ -133,6 +134,8 @@ For example:
     `volumetype: disperse:4:2` where '4' is data and '2' is the redundancy count.
   'Distribute volume':
     `volumetype: none`
+
+* `volumeoptions` : This option allows you to specify the gluster volume option which has to be set on the provisioned volume. The value string is an abstraction of the real options set on the volume. At present the only available value which can be set by this attribute is `encryption`, if this value has been set, all the required volume options ( for eg. `client.ssl, server.ssl`) for enabling encryption on the volume will be performed by Heketi.
 
 For available volume types and it's administration options refer: ([Administration Guide](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3.1/html/Administration_Guide/part-Overview.html))
 
