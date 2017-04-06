@@ -36,6 +36,8 @@ type ClusterSpec struct {
 	// This is to help clients reach servers in the most network-efficient way possible.
 	// Clients can use the appropriate server address as per the CIDR that they match.
 	// In case of multiple matches, clients should use the longest matching CIDR.
+	// +patchMergeKey=clientCIDR
+	// +patchStrategy=merge
 	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" patchStrategy:"merge" patchMergeKey:"clientCIDR" protobuf:"bytes,1,rep,name=serverAddressByClientCIDRs"`
 	// Name of the secret containing kubeconfig to access this cluster.
 	// The secret is read from the kubernetes cluster that is hosting federation control plane.
