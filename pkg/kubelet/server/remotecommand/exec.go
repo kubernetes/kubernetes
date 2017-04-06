@@ -25,14 +25,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	consts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-)
-
-const (
-	NonZeroExitCodeReason = metav1.StatusReason("NonZeroExitCode")
-	ExitCodeCauseType     = metav1.CauseType("ExitCode")
 )
 
 // Executor knows how to execute a command in a container in a pod.
@@ -59,11 +55,11 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 			rc := exitErr.ExitStatus()
 			ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
 				Status: metav1.StatusFailure,
-				Reason: NonZeroExitCodeReason,
+				Reason: consts.NonZeroExitCodeReason,
 				Details: &metav1.StatusDetails{
 					Causes: []metav1.StatusCause{
 						{
-							Type:    ExitCodeCauseType,
+							Type:    consts.ExitCodeCauseType,
 							Message: fmt.Sprintf("%d", rc),
 						},
 					},
