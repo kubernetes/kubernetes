@@ -49,7 +49,7 @@ func NewSecurityContextDeny() admission.Interface {
 	}
 }
 
-// Admit will deny any pod that defines SELinuxOptions or RunAsUser or SupplementalGroups or FSGroup
+// Admit will deny any pod that defines SELinuxOptions, RunAsUser, SupplementalGroups, FSGroup.
 func (p *plugin) Admit(a admission.Attributes) (err error) {
 	if a.GetSubresource() != "" || a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
@@ -60,29 +60,38 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
-	err = checkPodSecurityContext(pod.Spec.SecurityContext)
-	if err == nil {
-		err = checkSecurityContext(pod.Spec.InitContainers, pod.Spec.Containers)
+	if err = checkPodSecurityContext(pod.Spec.SecurityContext); err != nil {
+		return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, err)
 	}
 
-	if err != nil {
-		err = apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, err)
+	for _, container := range pod.Spec.InitContainers {
+		if err = checkSecurityContext(container.SecurityContext); err != nil {
+			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, err)
+		}
+	}
+
+	for _, container := range pod.Spec.Containers {
+		if err = checkSecurityContext(container.SecurityContext); err != nil {
+			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, err)
+		}
 	}
 
 	return
 }
 
-func checkPodSecurityContext(p *api.PodSecurityContext) error {
-	var err error
-	if p != nil {
-		var kind string
-		if p.SupplementalGroups != nil {
+func checkPodSecurityContext(podContext *api.PodSecurityContext) error {
+	var (
+		kind string
+		err error
+	)
+	if podContext != nil {
+		if podContext.SupplementalGroups != nil {
 			kind = SUPPLEMENTAL_GROUPS
-		} else if p.SELinuxOptions != nil {
+		} else if podContext.SELinuxOptions != nil {
 			kind = SE_LINUX_OPTION
-		} else if p.RunAsUser != nil {
+		} else if podContext.RunAsUser != nil {
 			kind = RUN_AS_USER
-		} else if p.FSGroup != nil {
+		} else if podContext.FSGroup != nil {
 			kind = FS_GROUP
 		}
 
@@ -94,23 +103,22 @@ func checkPodSecurityContext(p *api.PodSecurityContext) error {
 	return err
 }
 
-func checkSecurityContext(containers ...[]api.Container) error {
-	for _, c := range containers {
-		for _, v := range c {
-			if v.SecurityContext != nil {
-				var kind string
-				if v.SecurityContext.SELinuxOptions != nil {
-					kind = SE_LINUX_OPTION
-				} else if v.SecurityContext.RunAsUser != nil {
-					kind = RUN_AS_USER
-				}
+func checkSecurityContext(context *api.SecurityContext) error {
+	var (
+		kind string
+		err error
+	)
+	if context != nil {
+		if context.SELinuxOptions != nil {
+			kind = SE_LINUX_OPTION
+		} else if context.RunAsUser != nil {
+			kind = RUN_AS_USER
+		}
 
-				if kind != "" {
-					return fmt.Errorf("SecurityContext.%s is forbidden", kind)
-				}
-			}
+		if kind != "" {
+			err = fmt.Errorf("SecurityContext.%s is forbidden", kind)
 		}
 	}
 
-	return nil
+	return err
 }
