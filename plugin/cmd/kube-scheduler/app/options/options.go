@@ -28,10 +28,14 @@ import (
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 	// install the componentconfig api so we get its defaulting and conversion functions
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
+	componentconfiginstall "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 
 	"github.com/spf13/pflag"
 )
+
+func init() {
+	componentconfiginstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 // SchedulerServer has all the context and params needed to run a Scheduler
 type SchedulerServer struct {

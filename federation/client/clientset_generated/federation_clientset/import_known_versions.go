@@ -18,8 +18,10 @@ package federation_clientset
 
 // These imports are the API groups the client will support.
 import (
-	_ "k8s.io/kubernetes/federation/apis/federation/install"
+	federation "k8s.io/kubernetes/federation/apis/federation/install"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func init() {
+	federation.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
 }

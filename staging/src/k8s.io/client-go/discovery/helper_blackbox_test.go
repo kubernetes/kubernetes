@@ -36,8 +36,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 
-	_ "k8s.io/client-go/pkg/api/install"
+	"k8s.io/client-go/pkg/api/install"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func objBody(object interface{}) io.ReadCloser {
 	output, err := json.MarshalIndent(object, "", "")

@@ -48,21 +48,21 @@ import (
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/storage"
 
-	_ "k8s.io/kubernetes/federation/apis/federation/install"
-	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
-	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
-	_ "k8s.io/kubernetes/pkg/apis/policy/install"
-	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
-	_ "k8s.io/kubernetes/pkg/apis/settings/install"
-	_ "k8s.io/kubernetes/pkg/apis/storage/install"
+	federationinstall "k8s.io/kubernetes/federation/apis/federation/install"
+	coreinstall "k8s.io/kubernetes/pkg/api/install"
+	appsinstall "k8s.io/kubernetes/pkg/apis/apps/install"
+	authenticationinstall "k8s.io/kubernetes/pkg/apis/authentication/install"
+	authorizationinstall "k8s.io/kubernetes/pkg/apis/authorization/install"
+	autoscalinginstall "k8s.io/kubernetes/pkg/apis/autoscaling/install"
+	batchinstall "k8s.io/kubernetes/pkg/apis/batch/install"
+	certificatesinstall "k8s.io/kubernetes/pkg/apis/certificates/install"
+	componentconfiginstall "k8s.io/kubernetes/pkg/apis/componentconfig/install"
+	extensionsinstall "k8s.io/kubernetes/pkg/apis/extensions/install"
+	imagepolicyinstall "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
+	policyinstall "k8s.io/kubernetes/pkg/apis/policy/install"
+	rbacinstall "k8s.io/kubernetes/pkg/apis/rbac/install"
+	settingsinstall "k8s.io/kubernetes/pkg/apis/settings/install"
+	storageinstall "k8s.io/kubernetes/pkg/apis/storage/install"
 )
 
 var (
@@ -92,7 +92,27 @@ type TestGroup struct {
 	externalTypes        map[string]reflect.Type
 }
 
+func install() {
+	coreinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	federationinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	appsinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	authenticationinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	authorizationinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	autoscalinginstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	batchinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	certificatesinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	componentconfiginstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	extensionsinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	imagepolicyinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	policyinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	rbacinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	settingsinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	storageinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
+
 func init() {
+	install()
+
 	if apiMediaType := os.Getenv("KUBE_TEST_API_TYPE"); len(apiMediaType) > 0 {
 		var ok bool
 		mediaType, _, err := mime.ParseMediaType(apiMediaType)

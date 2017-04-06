@@ -37,8 +37,12 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	utiltesting "k8s.io/client-go/util/testing"
 
-	_ "k8s.io/client-go/pkg/api/install"
+	"k8s.io/client-go/pkg/api/install"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 type TestParam struct {
 	actualError           error

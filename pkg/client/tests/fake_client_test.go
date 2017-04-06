@@ -23,9 +23,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 
-	_ "k8s.io/client-go/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/api/install"
+	clientgoinstall "k8s.io/client-go/pkg/api/install"
+	kubernetesinstall "k8s.io/kubernetes/pkg/api/install"
 )
+
+func init() {
+	clientgoinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	kubernetesinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func TestFakeClientSetFiltering(t *testing.T) {
 	tc := clientsetfake.NewSimpleClientset(

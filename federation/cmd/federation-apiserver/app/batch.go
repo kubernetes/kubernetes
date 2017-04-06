@@ -23,7 +23,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	jobstorage "k8s.io/kubernetes/pkg/registry/batch/job/storage"
 )
 
