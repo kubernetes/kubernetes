@@ -73,3 +73,10 @@ func DeepCopyDeployment(a *extensions_v1.Deployment) *extensions_v1.Deployment {
 		Spec:       *(DeepCopyApiTypeOrPanic(&a.Spec).(*extensions_v1.DeploymentSpec)),
 	}
 }
+
+// SetDeploymentDefaults sets defaults for a deployment retrieved from
+// a member cluster to allow backwards-compatible comparison.
+func SetDeploymentDefaults(deployment *extensions_v1.Deployment) {
+	extensions_v1.SetDefaults_Deployment(deployment)
+	setPodSpecDefaults(&deployment.Spec.Template.Spec)
+}
