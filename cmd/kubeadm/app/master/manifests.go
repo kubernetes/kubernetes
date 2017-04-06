@@ -330,7 +330,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 
 	command = getComponentBaseCommand(apiServer)
 	command = append(command, getExtraParameters(cfg.APIServerExtraArgs, defaultArguments)...)
-	command = append(command, getAuthzParameters(cfg.AuthorizationMode)...)
+	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
 
 	if selfHosted {
 		command = append(command, "--advertise-address=$(POD_IP)")
@@ -460,22 +460,23 @@ func getSelfHostedAPIServerEnv() []api.EnvVar {
 	return append(getProxyEnvVars(), podIPEnvVar)
 }
 
-func getAuthzParameters(authzMode string) []string {
+func getAuthzParameters(modes []string) []string {
 	command := []string{}
 	// RBAC is always on. If the user specified
 	authzModes := []string{authzmodes.ModeRBAC}
-	if len(authzMode) != 0 && authzMode != authzmodes.ModeRBAC {
-		authzModes = append(authzModes, authzMode)
+	for _, authzMode := range modes {
+		if len(authzMode) != 0 && authzMode != authzmodes.ModeRBAC {
+			authzModes = append(authzModes, authzMode)
+		}
+		switch authzMode {
+		case authzmodes.ModeABAC:
+			command = append(command, "--authorization-policy-file="+kubeadmconstants.AuthorizationPolicyPath)
+		case authzmodes.ModeWebhook:
+			command = append(command, "--authorization-webhook-config-file="+kubeadmconstants.AuthorizationWebhookConfigPath)
+		}
 	}
 
 	command = append(command, "--authorization-mode="+strings.Join(authzModes, ","))
-
-	switch authzMode {
-	case authzmodes.ModeABAC:
-		command = append(command, "--authorization-policy-file="+kubeadmconstants.AuthorizationPolicyPath)
-	case authzmodes.ModeWebhook:
-		command = append(command, "--authorization-webhook-config-file="+kubeadmconstants.AuthorizationWebhookConfigPath)
-	}
 	return command
 }
 

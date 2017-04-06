@@ -652,44 +652,53 @@ func TestGetSchedulerCommand(t *testing.T) {
 
 func TestGetAuthzParameters(t *testing.T) {
 	var tests = []struct {
-		authMode string
+		authMode []string
 		expected []string
 	}{
 		{
-			authMode: "",
+			authMode: []string{},
 			expected: []string{
 				"--authorization-mode=RBAC",
 			},
 		},
 		{
-			authMode: "RBAC",
+			authMode: []string{"RBAC"},
 			expected: []string{
 				"--authorization-mode=RBAC",
 			},
 		},
 		{
-			authMode: "AlwaysAllow",
+			authMode: []string{"AlwaysAllow"},
 			expected: []string{
 				"--authorization-mode=RBAC,AlwaysAllow",
 			},
 		},
 		{
-			authMode: "AlwaysDeny",
+			authMode: []string{"AlwaysDeny"},
 			expected: []string{
 				"--authorization-mode=RBAC,AlwaysDeny",
 			},
 		},
 		{
-			authMode: "ABAC",
+			authMode: []string{"ABAC"},
 			expected: []string{
 				"--authorization-mode=RBAC,ABAC",
 				"--authorization-policy-file=/etc/kubernetes/abac_policy.json",
 			},
 		},
 		{
-			authMode: "Webhook",
+			authMode: []string{"ABAC", "Webhook"},
 			expected: []string{
-				"--authorization-mode=RBAC,Webhook",
+				"--authorization-mode=RBAC,ABAC,Webhook",
+				"--authorization-policy-file=/etc/kubernetes/abac_policy.json",
+				"--authorization-webhook-config-file=/etc/kubernetes/webhook_authz.conf",
+			},
+		},
+		{
+			authMode: []string{"ABAC", "RBAC", "Webhook"},
+			expected: []string{
+				"--authorization-mode=RBAC,ABAC,Webhook",
+				"--authorization-policy-file=/etc/kubernetes/abac_policy.json",
 				"--authorization-webhook-config-file=/etc/kubernetes/webhook_authz.conf",
 			},
 		},
@@ -697,14 +706,10 @@ func TestGetAuthzParameters(t *testing.T) {
 
 	for _, rt := range tests {
 		actual := getAuthzParameters(rt.authMode)
-		for i := range actual {
-			if actual[i] != rt.expected[i] {
-				t.Errorf(
-					"failed getAuthzParameters:\n\texpected: %s\n\t  actual: %s",
-					rt.expected[i],
-					actual[i],
-				)
-			}
+		sort.Strings(actual)
+		sort.Strings(rt.expected)
+		if !reflect.DeepEqual(actual, rt.expected) {
+			t.Errorf("failed getAuthzParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 		}
 	}
 }
