@@ -407,6 +407,7 @@ func waitForReplicaSet(c *fedclientset.Clientset, namespace string, replicaSetNa
 					return false, nil
 				}
 			} else {
+				fedutil.SetReplicaSetDefaults(rs)
 				if !equivalentReplicaSet(frs, rs) {
 					framework.Logf("Replicaset meta or spec does not match for cluster %q:\n    federation: %v\n    cluster: %v", cluster.name, frs, rs)
 					return false, nil

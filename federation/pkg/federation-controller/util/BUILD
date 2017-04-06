@@ -21,6 +21,7 @@ go_library(
         "federated_updater.go",
         "handlers.go",
         "meta.go",
+        "replicaset.go",
         "secret.go",
     ],
     tags = ["automanaged"],
