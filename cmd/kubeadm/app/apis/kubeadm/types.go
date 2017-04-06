@@ -33,12 +33,12 @@ type EnvParams struct {
 type MasterConfiguration struct {
 	metav1.TypeMeta
 
-	API               API
-	Etcd              Etcd
-	Networking        Networking
-	KubernetesVersion string
-	CloudProvider     string
-	AuthorizationMode string
+	API                API
+	Etcd               Etcd
+	Networking         Networking
+	KubernetesVersion  string
+	CloudProvider      string
+	AuthorizationModes []string
 
 	Token    string
 	TokenTTL time.Duration

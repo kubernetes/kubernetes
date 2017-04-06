@@ -59,8 +59,8 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.Networking.DNSDomain = DefaultServiceDNSDomain
 	}
 
-	if obj.AuthorizationMode == "" {
-		obj.AuthorizationMode = DefaultAuthorizationMode
+	if len(obj.AuthorizationModes) == 0 {
+		obj.AuthorizationModes = []string{DefaultAuthorizationMode}
 	}
 
 	if obj.CertificatesDir == "" {

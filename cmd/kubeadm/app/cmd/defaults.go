@@ -58,7 +58,7 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 
 	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
-	fmt.Printf("[init] Using Authorization mode: %s\n", cfg.AuthorizationMode)
+	fmt.Printf("[init] Using Authorization mode: %v\n", cfg.AuthorizationModes)
 
 	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {
