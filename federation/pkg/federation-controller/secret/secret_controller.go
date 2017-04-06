@@ -174,9 +174,7 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 		})
 
 	secretcontroller.deletionHelper = deletionhelper.NewDeletionHelper(
-		secretcontroller.hasFinalizerFunc,
-		secretcontroller.removeFinalizerFunc,
-		secretcontroller.addFinalizerFunc,
+		secretcontroller.updateSecret,
 		// objNameFunc
 		func(obj pkgruntime.Object) string {
 			secret := obj.(*apiv1.Secret)
@@ -191,52 +189,11 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 	return secretcontroller
 }
 
-// Returns true if the given object has the given finalizer in its ObjectMeta.
-func (secretcontroller *SecretController) hasFinalizerFunc(obj pkgruntime.Object, finalizer string) bool {
-	secret := obj.(*apiv1.Secret)
-	for i := range secret.ObjectMeta.Finalizers {
-		if string(secret.ObjectMeta.Finalizers[i]) == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// Removes the finalizers from the given objects ObjectMeta.
+// Sends the given updated object to apiserver.
 // Assumes that the given object is a secret.
-func (secretcontroller *SecretController) removeFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
+func (secretcontroller *SecretController) updateSecret(obj pkgruntime.Object) (pkgruntime.Object, error) {
 	secret := obj.(*apiv1.Secret)
-	newFinalizers := []string{}
-	hasFinalizer := false
-	for i := range secret.ObjectMeta.Finalizers {
-		if !deletionhelper.ContainsString(finalizers, secret.ObjectMeta.Finalizers[i]) {
-			newFinalizers = append(newFinalizers, secret.ObjectMeta.Finalizers[i])
-		} else {
-			hasFinalizer = true
-		}
-	}
-	if !hasFinalizer {
-		// Nothing to do.
-		return obj, nil
-	}
-	secret.ObjectMeta.Finalizers = newFinalizers
-	secret, err := secretcontroller.federatedApiClient.Core().Secrets(secret.Namespace).Update(secret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizers %v from secret %s: %v", finalizers, secret.Name, err)
-	}
-	return secret, nil
-}
-
-// Adds the given finalizers to the given objects ObjectMeta.
-// Assumes that the given object is a secret.
-func (secretcontroller *SecretController) addFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
-	secret := obj.(*apiv1.Secret)
-	secret.ObjectMeta.Finalizers = append(secret.ObjectMeta.Finalizers, finalizers...)
-	secret, err := secretcontroller.federatedApiClient.Core().Secrets(secret.Namespace).Update(secret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add finalizers %v to secret %s: %v", finalizers, secret.Name, err)
-	}
-	return secret, nil
+	return secretcontroller.federatedApiClient.Core().Secrets(secret.Namespace).Update(secret)
 }
 
 func (secretcontroller *SecretController) Run(stopChan <-chan struct{}) {

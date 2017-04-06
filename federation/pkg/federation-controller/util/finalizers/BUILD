@@ -9,16 +9,12 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["deletion_helper.go"],
+    srcs = ["finalizers.go"],
     tags = ["automanaged"],
     deps = [
-        "//federation/pkg/federation-controller/util:go_default_library",
-        "//federation/pkg/federation-controller/util/finalizers:go_default_library",
-        "//pkg/api:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//federation/pkg/federation-controller/util/slice:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/client-go/tools/record",
     ],
 )
 
