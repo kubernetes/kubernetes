@@ -43,10 +43,23 @@ const (
 	tagValueTrue       = "true"
 	tagValueFalse      = "false"
 	tagExtensionPrefix = "x-kubernetes-"
+	tagPatchStrategy   = "patchStrategy"
+	tagPatchMergeKey   = "patchMergeKey"
 )
 
 func getOpenAPITagValue(comments []string) []string {
 	return types.ExtractCommentTags("+", comments)[tagName]
+}
+
+func getSingleTagsValue(comments []string, tag string) (string, error) {
+	tags, ok := types.ExtractCommentTags("+", comments)[tag]
+	if !ok || len(tags) == 0 {
+		return "", nil
+	}
+	if len(tags) > 1 {
+		return "", fmt.Errorf("Multiple values is not allowed for tag %s", tag)
+	}
+	return tags[0], nil
 }
 
 func hasOpenAPITagValue(comments []string, value string) bool {
@@ -235,6 +248,10 @@ func getJsonTags(m *types.Member) []string {
 	return strings.Split(jsonTag, ",")
 }
 
+func getPatchTags(m *types.Member) (string, string) {
+	return reflect.StructTag(m.Tags).Get(tagPatchMergeKey), reflect.StructTag(m.Tags).Get(tagPatchStrategy)
+}
+
 func getReferableName(m *types.Member) string {
 	jsonTags := getJsonTags(m)
 	if len(jsonTags) > 0 {
@@ -364,23 +381,62 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 
 func (g openAPITypeWriter) generateExtensions(CommentLines []string) error {
 	tagValues := getOpenAPITagValue(CommentLines)
-	anyExtension := false
+	type NameValue struct {
+		Name, Value string
+	}
+	extensions := []NameValue{}
 	for _, val := range tagValues {
 		if strings.HasPrefix(val, tagExtensionPrefix) {
-			if !anyExtension {
-				g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
-				anyExtension = true
-			}
 			parts := strings.SplitN(val, ":", 2)
 			if len(parts) != 2 {
 				return fmt.Errorf("Invalid extension value: %v", val)
 			}
-			g.Do("\"$.$\": ", parts[0])
-			g.Do("\"$.$\",\n", parts[1])
+			extensions = append(extensions, NameValue{parts[0], parts[1]})
 		}
 	}
-	if anyExtension {
-		g.Do("},\n},\n", nil)
+	patchMergeKeyTag, err := getSingleTagsValue(CommentLines, tagPatchMergeKey)
+	if err != nil {
+		return err
+	}
+	if len(patchMergeKeyTag) > 0 {
+		extensions = append(extensions, NameValue{tagExtensionPrefix + tagPatchMergeKey, patchMergeKeyTag})
+	}
+	patchStrategyTag, err := getSingleTagsValue(CommentLines, tagPatchStrategy)
+	if err != nil {
+		return err
+	}
+	if len(patchStrategyTag) > 0 {
+		extensions = append(extensions, NameValue{tagExtensionPrefix + tagPatchStrategy, patchStrategyTag})
+	}
+	if len(extensions) == 0 {
+		return nil
+	}
+	g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
+	for _, extenstion := range extensions {
+		g.Do("\"$.$\": ", extenstion.Name)
+		g.Do("\"$.$\",\n", extenstion.Value)
+	}
+	g.Do("},\n},\n", nil)
+	return nil
+}
+
+func (g openAPITypeWriter) validatePatchTags(m *types.Member) error {
+	patchMergeKeyStructTag, patchStrategyStructTag := getPatchTags(m)
+	patchMergeKeyCommentTag, err := getSingleTagsValue(m.CommentLines, tagPatchMergeKey)
+	if err != nil {
+		return err
+	}
+	patchStrategyCommentTag, err := getSingleTagsValue(m.CommentLines, tagPatchStrategy)
+	if err != nil {
+		return err
+	}
+	if patchMergeKeyStructTag != patchMergeKeyCommentTag {
+		return fmt.Errorf("patchMergeKey in struct tags (%s) is not equal to patchMergeKey comment tag (%s).",
+			patchMergeKeyStructTag, patchMergeKeyCommentTag)
+	}
+	if patchStrategyStructTag != patchStrategyCommentTag {
+		return fmt.Errorf("patchStrategy in struct tags (%s) is not equal to patchStrategy comment tag (%s).",
+			patchMergeKeyStructTag, patchMergeKeyCommentTag)
 	}
 	return nil
 }
@@ -432,6 +488,9 @@ func (g openAPITypeWriter) generateProperty(m *types.Member) error {
 	name := getReferableName(m)
 	if name == "" {
 		return nil
+	}
+	if err := g.validatePatchTags(m); err != nil {
+		return err
 	}
 	g.Do("\"$.$\": {\n", name)
 	if err := g.generateExtensions(m.CommentLines); err != nil {
