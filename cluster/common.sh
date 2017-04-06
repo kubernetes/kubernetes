@@ -871,11 +871,6 @@ EOF
 FEDERATION: $(yaml-quote ${FEDERATION})
 EOF
   fi
-  if [ -n "${FEDERATIONS_DOMAIN_MAP:-}" ]; then
-    cat >>$file <<EOF
-FEDERATIONS_DOMAIN_MAP: $(yaml-quote ${FEDERATIONS_DOMAIN_MAP})
-EOF
-  fi
   if [ -n "${FEDERATION_NAME:-}" ]; then
     cat >>$file <<EOF
 FEDERATION_NAME: $(yaml-quote ${FEDERATION_NAME})

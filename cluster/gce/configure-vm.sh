@@ -582,25 +582,6 @@ enable_cluster_autoscaler: '$(echo "${ENABLE_CLUSTER_AUTOSCALER}" | sed -e "s/'/
 autoscaler_mig_config: '$(echo "${AUTOSCALER_MIG_CONFIG}" | sed -e "s/'/''/g")'
 EOF
     fi
-    if [[ "${FEDERATION:-}" == "true" ]]; then
-      local federations_domain_map="${FEDERATIONS_DOMAIN_MAP:-}"
-      if [[ -z "${federations_domain_map}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
-        federations_domain_map="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
-      fi
-      if [[ -n "${federations_domain_map}" ]]; then
-        cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-federations_domain_map: '$(echo "- --federations=${federations_domain_map}" | sed -e "s/'/''/g")'
-EOF
-      else
-        cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-federations_domain_map: ''
-EOF
-      fi
-    else
-      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-federations_domain_map: ''
-EOF
-    fi
     if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 scheduling_algorithm_provider: '$(echo "${SCHEDULING_ALGORITHM_PROVIDER}" | sed -e "s/'/''/g")'
