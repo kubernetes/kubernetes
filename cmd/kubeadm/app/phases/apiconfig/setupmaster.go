@@ -45,7 +45,13 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 		if n, err = client.Nodes().Get(node.GetHostname(""), metav1.GetOptions{}); err != nil {
 			return true, nil
 		}
-		return false, nil
+		if n.ObjectMeta.Labels == nil {
+			return false, nil
+		}
+		// The node may appear to have no labels at first,
+		// so we wait for it to get hostname label.
+		_, found := n.ObjectMeta.Labels[metav1.LabelHostname]
+		return found, nil
 	})
 
 	oldData, err := json.Marshal(n)
@@ -54,7 +60,11 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 	}
 
 	// The master node is tainted and labelled accordingly
-	n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleMaster] = ""
+	if n.ObjectMeta.Labels == nil {
+		n.ObjectMeta.Labels = map[string]string{kubeadmconstants.LabelNodeRoleMaster: ""}
+	} else {
+		n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleMaster] = ""
+	}
 	n.Spec.Taints = []v1.Taint{{Key: kubeadmconstants.LabelNodeRoleMaster, Value: "", Effect: "NoSchedule"}}
 
 	newData, err := json.Marshal(n)
