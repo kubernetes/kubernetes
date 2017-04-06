@@ -219,9 +219,6 @@ func (sched *Scheduler) scheduleOne() {
 		// If binding succeeded then PodScheduled condition will be updated in apiserver so that
 		// it's atomic with setting host.
 		err := sched.config.Binder.Bind(b)
-		if err := sched.config.SchedulerCache.FinishBinding(&assumed); err != nil {
-			glog.Errorf("scheduler cache FinishBinding failed: %v", err)
-		}
 		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %v/%v", pod.Namespace, pod.Name)
 			if err := sched.config.SchedulerCache.ForgetPod(&assumed); err != nil {
@@ -235,6 +232,9 @@ func (sched *Scheduler) scheduleOne() {
 				Reason: "BindingRejected",
 			})
 			return
+		}
+		if err := sched.config.SchedulerCache.FinishBinding(&assumed); err != nil {
+			glog.Errorf("scheduler cache FinishBinding failed: %v", err)
 		}
 		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 		sched.config.Recorder.Eventf(pod, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
