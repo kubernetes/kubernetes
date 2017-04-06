@@ -12,7 +12,6 @@ go_library(
     srcs = ["install.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/batch/v2alpha1:go_default_library",

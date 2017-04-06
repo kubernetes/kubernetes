@@ -23,11 +23,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
+	apiinstall "k8s.io/kubernetes/pkg/api/install"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	extensionsinstall "k8s.io/kubernetes/pkg/apis/extensions/install"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
+
+func init() {
+	apiinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	extensionsinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func TestParseRuntimeConfig(t *testing.T) {
 	extensionsGroupVersion := extensionsapiv1beta1.SchemeGroupVersion

@@ -27,12 +27,16 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	// Need to make sure the componentconfig api is installed so defaulting funcs work
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
+	"k8s.io/kubernetes/pkg/apis/componentconfig/install"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 
 	"github.com/spf13/pflag"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 const (
 	DefaultKubeletPodsDirName       = "pods"

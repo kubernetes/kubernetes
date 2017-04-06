@@ -22,10 +22,15 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
+	apiinstall "k8s.io/kubernetes/pkg/api/install"
+	batchinstall "k8s.io/kubernetes/pkg/apis/batch/install"
 	. "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
+
+func init() {
+	apiinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	batchinstall.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 func TestSetDefaultCronJob(t *testing.T) {
 	tests := map[string]struct {

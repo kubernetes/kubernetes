@@ -40,8 +40,12 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 
 	// need to register pods
-	_ "k8s.io/client-go/pkg/api/install"
+	"k8s.io/client-go/pkg/api/install"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 type testPatchType struct {
 	metav1.TypeMeta `json:",inline"`

@@ -46,8 +46,13 @@ import (
 	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	_ "k8s.io/client-go/pkg/api/install"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/install"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 var (
 	scheme = runtime.NewScheme()

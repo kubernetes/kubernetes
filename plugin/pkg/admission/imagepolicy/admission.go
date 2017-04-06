@@ -41,8 +41,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
 
 	// install the clientgo image policy API for use with api registry
-	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
+	"k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 )
+
+func init() {
+	install.Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+}
 
 var (
 	groupVersions = []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
