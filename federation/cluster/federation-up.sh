@@ -36,7 +36,6 @@ source "${KUBE_ROOT}/federation/cluster/common.sh"
 
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
 DNS_PROVIDER="${FEDERATION_DNS_PROVIDER:-google-clouddns}"
-FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
 
 # get_version returns the version in KUBERNETES_RELEASE or defaults to the
 # value in the federation `versions` file.
