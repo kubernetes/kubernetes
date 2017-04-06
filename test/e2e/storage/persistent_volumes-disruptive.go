@@ -125,7 +125,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 
 		AfterEach(func() {
 			framework.Logf("Tearing down test spec")
-			tearDownTestCase(c, f, ns, clientPod, pvc, pv)
+			tearDownTestCase(c, f, ns, clientPod, nfsServerPod, pvc, pv)
 			pv, pvc, clientPod = nil, nil, nil
 		})
 
@@ -159,15 +159,17 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", 
 func testKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
 	By("Writing to the volume.")
 	file := "/mnt/_SUCCESS"
-	_, err := podExec(clientPod, fmt.Sprintf("touch %s", file))
+	out, err := podExec(clientPod, "touch "+file)
+	framework.Logf(out)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Restarting kubelet")
 	kubeletCommand(kRestart, c, clientPod)
 
 	By("Testing that written file is accessible.")
-	_, err = podExec(clientPod, fmt.Sprintf("cat %s", file))
+	out, err = podExec(clientPod, "cat "+file)
 	Expect(err).NotTo(HaveOccurred())
+	framework.Logf(out)
 	framework.Logf("Volume mount detected on pod %s and written file %s is readable post-restart.", clientPod.Name, file)
 }
 
@@ -218,10 +220,12 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 }
 
 // tearDownTestCase destroy resources created by initTestCase.
-func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, pod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
-	framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "tearDown: Failed to delete pod ", pod.Name)
-	framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "tearDown: Failed to delete PVC ", pvc.Name)
-	framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "tearDown: Failed to delete PV ", pv.Name)
+
+func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, client, server *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
+	framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
+	framework.DeletePersistentVolume(c, pv.Name)
+	framework.DeletePodWithWait(f, c, client)
+	framework.DeletePodWithWait(f, c, server)
 }
 
 // kubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod.
@@ -230,9 +234,19 @@ func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
-	sshResult, err := framework.SSH("sudo /etc/init.d/kubelet "+string(kOp), nodeIP, framework.TestContext.Provider)
-	Expect(err).NotTo(HaveOccurred())
+	sshResult, err := framework.SSH(fmt.Sprintf("sudo systemctl %s kubelet", string(kOp)), nodeIP, framework.TestContext.Provider)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error occured attempting to SSH to node %q", pod.Spec.NodeName))
 	framework.LogSSHResult(sshResult)
+	if sshResult.Code != 0 {
+		framework.Logf("Restarting kubelet service via `systemctl` failed.  Attempting restart via `service`.")
+		sshResult, err = framework.SSH(fmt.Sprintf("sudo service kubelet %s", string(kOp)), nodeIP, framework.TestContext.Provider)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error occured attempting to SSH to node %q", pod.Spec.NodeName))
+		framework.LogSSHResult(sshResult)
+		if sshResult.Code != 0 {
+			framework.Logf("Restarting kubelet service via `service` failed.")
+			Expect(sshResult.Code).To(BeZero(), "Failed to run %q via ssh", string(kOp))
+		}
+	}
 
 	// On restart, waiting for node NotReady prevents a race condition where the node takes a few moments to leave the
 	// Ready state which in turn short circuits WaitForNodeToBeReady()
