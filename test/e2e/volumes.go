@@ -806,7 +806,8 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("PD", func() {
-		It("should be mountable", func() {
+		// Flaky issue: #43977
+		It("should be mountable [Flaky]", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
