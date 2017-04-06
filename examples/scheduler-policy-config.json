@@ -14,5 +14,6 @@
 	{"name" : "BalancedResourceAllocation", "weight" : 1},
 	{"name" : "ServiceSpreadingPriority", "weight" : 1},
 	{"name" : "EqualPriority", "weight" : 1}
-	]
+	],
+"hardPodAffinitySymmetricWeight" : 10
 }

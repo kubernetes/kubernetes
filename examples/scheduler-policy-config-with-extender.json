@@ -14,7 +14,7 @@
 	{"name" : "ServiceSpreadingPriority", "weight" : 1},
 	{"name" : "EqualPriority", "weight" : 1}
 	],
-"extenders":[ 
+"extenders":[
 	{
         "urlPrefix": "http://127.0.0.1:12346/scheduler",
         "apiVersion": "v1beta1",
@@ -24,5 +24,6 @@
         "enableHttps": false,
         "nodeCacheCapable": false
 	}
-    ]
+    ],
+"hardPodAffinitySymmetricWeight" : 10
 }
