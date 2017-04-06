@@ -104,14 +104,14 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		etcdPod := componentPod(api.Container{
 			Name:          etcd,
 			Command:       getEtcdCommand(cfg),
-			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
+			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(cfg.Etcd.DataDir), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
 
 		etcdPod.Spec.SecurityContext = &api.PodSecurityContext{
 			SELinuxOptions: &api.SELinuxOptions{
-				// Unconfine the etcd container so it can write to /var/lib/etcd with SELinux enforcing:
+				// Unconfine the etcd container so it can write to the data dir with SELinux enforcing:
 				Type: "spc_t",
 			},
 		}
@@ -146,10 +146,10 @@ func etcdVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	}
 }
 
-func etcdVolumeMount() api.VolumeMount {
+func etcdVolumeMount(dataDir string) api.VolumeMount {
 	return api.VolumeMount{
 		Name:      "etcd",
-		MountPath: "/var/lib/etcd",
+		MountPath: dataDir,
 	}
 }
 
@@ -368,9 +368,10 @@ func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	defaultArguments := map[string]string{
 		"listen-client-urls":    "http://127.0.0.1:2379",
 		"advertise-client-urls": "http://127.0.0.1:2379",
+		"data-dir":              cfg.Etcd.DataDir,
 	}
 
-	command = append(command, "etcd", "--data-dir=/var/lib/etcd")
+	command = append(command, "etcd")
 	command = append(command, getExtraParameters(cfg.Etcd.ExtraArgs, defaultArguments)...)
 
 	return command

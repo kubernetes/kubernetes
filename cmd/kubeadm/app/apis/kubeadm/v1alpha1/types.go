@@ -74,6 +74,7 @@ type Etcd struct {
 	CAFile    string            `json:"caFile"`
 	CertFile  string            `json:"certFile"`
 	KeyFile   string            `json:"keyFile"`
+	DataDir   string            `json:"dataDir"`
 	ExtraArgs map[string]string `json:"extraArgs"`
 }
 

@@ -82,6 +82,7 @@ type Etcd struct {
 	CAFile    string
 	CertFile  string
 	KeyFile   string
+	DataDir   string
 	ExtraArgs map[string]string
 }
 

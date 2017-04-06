@@ -152,19 +152,21 @@ func TestEtcdVolume(t *testing.T) {
 }
 
 func TestEtcdVolumeMount(t *testing.T) {
+	etcdDataDir := "/var/lib/etcd"
+
 	var tests = []struct {
 		expected api.VolumeMount
 	}{
 		{
 			expected: api.VolumeMount{
 				Name:      "etcd",
-				MountPath: "/var/lib/etcd",
+				MountPath: etcdDataDir,
 			},
 		},
 	}
 
 	for _, rt := range tests {
-		actual := etcdVolumeMount()
+		actual := etcdVolumeMount(etcdDataDir)
 		if actual.Name != rt.expected.Name {
 			t.Errorf(
 				"failed etcdVolumeMount:\n\texpected: %s\n\t  actual: %s",
@@ -630,7 +632,9 @@ func TestGetEtcdCommand(t *testing.T) {
 		expected []string
 	}{
 		{
-			cfg: &kubeadmapi.MasterConfiguration{},
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{DataDir: "/var/lib/etcd"},
+			},
 			expected: []string{
 				"etcd",
 				"--listen-client-urls=http://127.0.0.1:2379",
@@ -639,12 +643,31 @@ func TestGetEtcdCommand(t *testing.T) {
 			},
 		},
 		{
-			cfg: &kubeadmapi.MasterConfiguration{Etcd: kubeadmapi.Etcd{ListenURL: "http://10.0.1.10:2379", AdvertiseURL: "http://10.0.1.10:2379"}},
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					DataDir: "/var/lib/etcd",
+					ExtraArgs: map[string]string{
+						"listen-client-urls":    "http://10.0.1.10:2379",
+						"advertise-client-urls": "http://10.0.1.10:2379",
+					},
+				},
+			},
 			expected: []string{
 				"etcd",
-				"--listen-client-urls=http://127.0.0.1:2379,http://10.0.1.10:2379",
-				"--advertise-client-urls=http://127.0.0.1:2379,http://10.0.1.10:2379",
+				"--listen-client-urls=http://10.0.1.10:2379",
+				"--advertise-client-urls=http://10.0.1.10:2379",
 				"--data-dir=/var/lib/etcd",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{DataDir: "/etc/foo"},
+			},
+			expected: []string{
+				"etcd",
+				"--listen-client-urls=http://127.0.0.1:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379",
+				"--data-dir=/etc/foo",
 			},
 		},
 	}
@@ -654,7 +677,7 @@ func TestGetEtcdCommand(t *testing.T) {
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
-			t.Errorf("failed getControllerManagerCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+			t.Errorf("failed getEtcdCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 		}
 	}
 }

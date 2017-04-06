@@ -21,6 +21,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 )
 
 var GlobalEnvParams = SetEnvParams()
@@ -31,7 +33,7 @@ func SetEnvParams() *EnvParams {
 
 	envParams := map[string]string{
 		"kubernetes_dir":  "/etc/kubernetes",
-		"host_etcd_path":  "/var/lib/etcd",
+		"host_etcd_path":  v1alpha1.DefaultEtcdDataDir,
 		"hyperkube_image": "",
 		"repo_prefix":     "gcr.io/google_containers",
 		"etcd_image":      "",
