@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +53,11 @@ import (
 
 const (
 	// maxRetries is the number of times a deployment will be retried before it is dropped out of the queue.
-	maxRetries = 5
+	// With the current rate-limiter in use (5ms*2^(maxRetries-1)) the following numbers represent the times
+	// a deployment is going to be requeued:
+	//
+	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
+	maxRetries = 15
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
@@ -537,10 +542,8 @@ func (dc *DeploymentController) getPodMapForDeployment(d *extensions.Deployment,
 		podMap[rs.UID] = &v1.PodList{}
 	}
 	for _, pod := range pods {
-		// Ignore inactive Pods since that's what ReplicaSet does.
-		if !controller.IsPodActive(pod) {
-			continue
-		}
+		// Do not ignore inactive Pods because Recreate Deployments need to verify that no
+		// Pods from older versions are running before spinning up new Pods.
 		controllerRef := controller.GetControllerOf(pod)
 		if controllerRef == nil {
 			continue
@@ -614,6 +617,10 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return err
 	}
 	// List all Pods owned by this Deployment, grouped by their ReplicaSet.
+	// Current uses of the podMap are:
+	//
+	// * check if a Pod is labeled correctly with the pod-template-hash label.
+	// * check that no old Pods are running in the middle of Recreate Deployments.
 	podMap, err := dc.getPodMapForDeployment(d, rsList)
 	if err != nil {
 		return err

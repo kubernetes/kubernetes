@@ -525,11 +525,13 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 
 	// Check the config for authorization mode
-	switch cfg.AuthorizationMode {
-	case authzmodes.ModeABAC:
-		checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationPolicyPath})
-	case authzmodes.ModeWebhook:
-		checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationWebhookConfigPath})
+	for _, authzMode := range cfg.AuthorizationModes {
+		switch authzMode {
+		case authzmodes.ModeABAC:
+			checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationPolicyPath})
+		case authzmodes.ModeWebhook:
+			checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationWebhookConfigPath})
+		}
 	}
 
 	return RunChecks(checks, os.Stderr)

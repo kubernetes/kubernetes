@@ -702,5 +702,7 @@ windows-line-endings
 www-prefix
 zone-id
 zone-name
+lock-object-name
+lock-object-namespace
 
 horizontal-pod-autoscaler-use-rest-clients

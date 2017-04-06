@@ -570,7 +570,7 @@ func patchResource(
 		originalObjJS           []byte
 		originalPatchedObjJS    []byte
 		originalObjMap          map[string]interface{}
-		originalPatchMap        map[string]interface{}
+		getOriginalPatchMap     func() (map[string]interface{}, error)
 		lastConflictErr         error
 		originalResourceVersion string
 	)
@@ -610,6 +610,26 @@ func patchResource(
 					return nil, err
 				}
 				originalObjJS, originalPatchedObjJS = originalJS, patchedJS
+
+				// Make a getter that can return a fresh strategic patch map if needed for conflict retries
+				// We have to rebuild it each time we need it, because the map gets mutated when being applied
+				var originalPatchBytes []byte
+				getOriginalPatchMap = func() (map[string]interface{}, error) {
+					if originalPatchBytes == nil {
+						// Compute once
+						originalPatchBytes, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
+						if err != nil {
+							return nil, err
+						}
+					}
+					// Return a fresh map every time
+					originalPatchMap := make(map[string]interface{})
+					if err := json.Unmarshal(originalPatchBytes, &originalPatchMap); err != nil {
+						return nil, err
+					}
+					return originalPatchMap, nil
+				}
+
 			case types.StrategicMergePatchType:
 				// Since the patch is applied on versioned objects, we need to convert the
 				// current object to versioned representation first.
@@ -621,8 +641,12 @@ func patchResource(
 				if err != nil {
 					return nil, err
 				}
-				originalMap, patchMap, err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
-				if err != nil {
+				// Capture the original object map and patch for possible retries.
+				originalMap := make(map[string]interface{})
+				if err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject, &originalMap); err != nil {
+					return nil, err
+				}
+				if err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj); err != nil {
 					return nil, err
 				}
 				// Convert the object back to unversioned.
@@ -632,8 +656,17 @@ func patchResource(
 					return nil, err
 				}
 				objToUpdate = unversionedObjToUpdate
-				// Store unstructured representations for possible retries.
-				originalObjMap, originalPatchMap = originalMap, patchMap
+				// Store unstructured representation for possible retries.
+				originalObjMap = originalMap
+				// Make a getter that can return a fresh strategic patch map if needed for conflict retries
+				// We have to rebuild it each time we need it, because the map gets mutated when being applied
+				getOriginalPatchMap = func() (map[string]interface{}, error) {
+					patchMap := make(map[string]interface{})
+					if err := json.Unmarshal(patchJS, &patchMap); err != nil {
+						return nil, err
+					}
+					return patchMap, nil
+				}
 			}
 			if err := checkName(objToUpdate, name, namespace, namer); err != nil {
 				return nil, err
@@ -669,17 +702,6 @@ func patchResource(
 					return nil, err
 				}
 			} else {
-				if originalPatchMap == nil {
-					// Compute original patch, if we already didn't do this in previous retries.
-					originalPatch, err := strategicpatch.CreateTwoWayMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
-					if err != nil {
-						return nil, err
-					}
-					originalPatchMap = make(map[string]interface{})
-					if err := json.Unmarshal(originalPatch, &originalPatchMap); err != nil {
-						return nil, err
-					}
-				}
 				// Compute current patch.
 				currentObjJS, err := runtime.Encode(codec, currentObject)
 				if err != nil {
@@ -693,6 +715,12 @@ func patchResource(
 				if err := json.Unmarshal(currentPatch, &currentPatchMap); err != nil {
 					return nil, err
 				}
+			}
+
+			// Get a fresh copy of the original strategic patch each time through, since applying it mutates the map
+			originalPatchMap, err := getOriginalPatchMap()
+			if err != nil {
+				return nil, err
 			}
 
 			hasConflicts, err := mergepatch.HasConflicts(originalPatchMap, currentPatchMap)

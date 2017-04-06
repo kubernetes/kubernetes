@@ -478,6 +478,74 @@ func NewNodeController(
 	return nc, nil
 }
 
+func (nc *NodeController) doEvictionPass() {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+	for k := range nc.zonePodEvictor {
+		// Function should return 'false' and a time after which it should be retried, or 'true' if it shouldn't (it succeeded).
+		nc.zonePodEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
+			node, err := nc.nodeLister.Get(value.Value)
+			if apierrors.IsNotFound(err) {
+				glog.Warningf("Node %v no longer present in nodeLister!", value.Value)
+			} else if err != nil {
+				glog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
+			} else {
+				zone := utilnode.GetZoneKey(node)
+				EvictionsNumber.WithLabelValues(zone).Inc()
+			}
+			nodeUid, _ := value.UID.(string)
+			remaining, err := deletePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, nc.daemonSetStore)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
+				return false, 0
+			}
+			if remaining {
+				glog.Infof("Pods awaiting deletion due to NodeController eviction")
+			}
+			return true, 0
+		})
+	}
+}
+
+func (nc *NodeController) doTaintingPass() {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+	for k := range nc.zoneNotReadyOrUnreachableTainer {
+		// Function should return 'false' and a time after which it should be retried, or 'true' if it shouldn't (it succeeded).
+		nc.zoneNotReadyOrUnreachableTainer[k].Try(func(value TimedValue) (bool, time.Duration) {
+			node, err := nc.nodeLister.Get(value.Value)
+			if apierrors.IsNotFound(err) {
+				glog.Warningf("Node %v no longer present in nodeLister!", value.Value)
+				return true, 0
+			} else if err != nil {
+				glog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
+				// retry in 50 millisecond
+				return false, 50 * time.Millisecond
+			} else {
+				zone := utilnode.GetZoneKey(node)
+				EvictionsNumber.WithLabelValues(zone).Inc()
+			}
+			_, condition := v1.GetNodeCondition(&node.Status, v1.NodeReady)
+			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
+			taintToAdd := v1.Taint{}
+			oppositeTaint := v1.Taint{}
+			if condition.Status == v1.ConditionFalse {
+				taintToAdd = *NotReadyTaintTemplate
+				oppositeTaint = *UnreachableTaintTemplate
+			} else if condition.Status == v1.ConditionUnknown {
+				taintToAdd = *UnreachableTaintTemplate
+				oppositeTaint = *NotReadyTaintTemplate
+			} else {
+				// It seems that the Node is ready again, so there's no need to taint it.
+				glog.V(4).Infof("Node %v was in a taint queue, but it's ready now. Ignoring taint request.", value.Value)
+				return true, 0
+			}
+
+			return swapNodeControllerTaint(nc.kubeClient, &taintToAdd, &oppositeTaint, node), 0
+		})
+	}
+}
+
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run() {
 	go func() {
@@ -502,101 +570,12 @@ func (nc *NodeController) Run() {
 		if nc.useTaintBasedEvictions {
 			// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
 			// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
-			go wait.Until(func() {
-				nc.evictorLock.Lock()
-				defer nc.evictorLock.Unlock()
-				for k := range nc.zoneNotReadyOrUnreachableTainer {
-					// Function should return 'false' and a time after which it should be retried, or 'true' if it shouldn't (it succeeded).
-					nc.zoneNotReadyOrUnreachableTainer[k].Try(func(value TimedValue) (bool, time.Duration) {
-						node, err := nc.nodeLister.Get(value.Value)
-						if apierrors.IsNotFound(err) {
-							glog.Warningf("Node %v no longer present in nodeLister!", value.Value)
-							return true, 0
-						} else if err != nil {
-							glog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
-							// retry in 50 millisecond
-							return false, 50 * time.Millisecond
-						} else {
-							zone := utilnode.GetZoneKey(node)
-							EvictionsNumber.WithLabelValues(zone).Inc()
-						}
-						_, condition := v1.GetNodeCondition(&node.Status, v1.NodeReady)
-						// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
-						taintToAdd := v1.Taint{}
-						oppositeTaint := v1.Taint{}
-						if condition.Status == v1.ConditionFalse {
-							taintToAdd = *NotReadyTaintTemplate
-							oppositeTaint = *UnreachableTaintTemplate
-						} else if condition.Status == v1.ConditionUnknown {
-							taintToAdd = *UnreachableTaintTemplate
-							oppositeTaint = *NotReadyTaintTemplate
-						} else {
-							// It seems that the Node is ready again, so there's no need to taint it.
-							glog.V(4).Infof("Node %v was in a taint queue, but it's ready now. Ignoring taint request.", value.Value)
-							return true, 0
-						}
-
-						taintToAdd.TimeAdded = metav1.Now()
-						err = controller.AddOrUpdateTaintOnNode(nc.kubeClient, value.Value, &taintToAdd)
-						if err != nil {
-							utilruntime.HandleError(
-								fmt.Errorf(
-									"unable to taint %v unresponsive Node %q: %v",
-									taintToAdd.Key,
-									value.Value,
-									err))
-							return false, 0
-						} else {
-							glog.V(4).Info("Added %v Taint to Node %v", taintToAdd, value.Value)
-						}
-						err = controller.RemoveTaintOffNode(nc.kubeClient, value.Value, &oppositeTaint, node)
-						if err != nil {
-							utilruntime.HandleError(
-								fmt.Errorf(
-									"unable to remove %v unneeded taint from unresponsive Node %q: %v",
-									oppositeTaint.Key,
-									value.Value,
-									err))
-							return false, 0
-						} else {
-							glog.V(4).Info("Made sure that Node %v has no %v Taint", value.Value, oppositeTaint)
-						}
-						return true, 0
-					})
-				}
-			}, nodeEvictionPeriod, wait.NeverStop)
+			go wait.Until(nc.doTaintingPass, nodeEvictionPeriod, wait.NeverStop)
 		} else {
 			// Managing eviction of nodes:
 			// When we delete pods off a node, if the node was not empty at the time we then
 			// queue an eviction watcher. If we hit an error, retry deletion.
-			go wait.Until(func() {
-				nc.evictorLock.Lock()
-				defer nc.evictorLock.Unlock()
-				for k := range nc.zonePodEvictor {
-					// Function should return 'false' and a time after which it should be retried, or 'true' if it shouldn't (it succeeded).
-					nc.zonePodEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-						node, err := nc.nodeLister.Get(value.Value)
-						if apierrors.IsNotFound(err) {
-							glog.Warningf("Node %v no longer present in nodeLister!", value.Value)
-						} else if err != nil {
-							glog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
-						} else {
-							zone := utilnode.GetZoneKey(node)
-							EvictionsNumber.WithLabelValues(zone).Inc()
-						}
-						nodeUid, _ := value.UID.(string)
-						remaining, err := deletePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, nc.daemonSetStore)
-						if err != nil {
-							utilruntime.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
-							return false, 0
-						}
-						if remaining {
-							glog.Infof("Pods awaiting deletion due to NodeController eviction")
-						}
-						return true, 0
-					})
-				}
-			}, nodeEvictionPeriod, wait.NeverStop)
+			go wait.Until(nc.doEvictionPass, nodeEvictionPeriod, wait.NeverStop)
 		}
 	}()
 }
@@ -685,7 +664,13 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Check eviction timeout against decisionTimestamp
 			if observedReadyCondition.Status == v1.ConditionFalse {
 				if nc.useTaintBasedEvictions {
-					if nc.markNodeForTainting(node) {
+					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
+					if v1.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
+						taintToAdd := *NotReadyTaintTemplate
+						if !swapNodeControllerTaint(nc.kubeClient, &taintToAdd, UnreachableTaintTemplate, node) {
+							glog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
+						}
+					} else if nc.markNodeForTainting(node) {
 						glog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
@@ -706,7 +691,13 @@ func (nc *NodeController) monitorNodeStatus() error {
 			}
 			if observedReadyCondition.Status == v1.ConditionUnknown {
 				if nc.useTaintBasedEvictions {
-					if nc.markNodeForTainting(node) {
+					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
+					if v1.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
+						taintToAdd := *UnreachableTaintTemplate
+						if !swapNodeControllerTaint(nc.kubeClient, &taintToAdd, NotReadyTaintTemplate, node) {
+							glog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
+						}
+					} else if nc.markNodeForTainting(node) {
 						glog.V(2).Infof("Node %v is unresponsive as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,

@@ -163,7 +163,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		unmanagedNodes := nodeCount - status.ready
 
 		By("Schedule more pods than can fit and wait for claster to scale-up")
-		ReserveMemory(f, "memory-reservation", 100, (nodeCount+2)*memCapacityMb, false, 1*time.Second)
+		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false, 1*time.Second)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		status, err = waitForScaleUpStatus(c, caOngoingScaleUpStatus, scaleUpTriggerTimeout)

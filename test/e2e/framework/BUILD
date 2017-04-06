@@ -35,6 +35,7 @@ go_library(
         "test_context.go",
         "upgrade_util.go",
         "util.go",
+        "volume_util.go",
     ],
     tags = ["automanaged"],
     deps = [

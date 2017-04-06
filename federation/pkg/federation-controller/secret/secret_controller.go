@@ -168,7 +168,8 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			secret := obj.(*apiv1.Secret)
-			err := client.Core().Secrets(secret.Namespace).Delete(secret.Name, &metav1.DeleteOptions{})
+			orphanDependents := false
+			err := client.Core().Secrets(secret.Namespace).Delete(secret.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 			return err
 		})
 
@@ -201,14 +202,14 @@ func (secretcontroller *SecretController) hasFinalizerFunc(obj pkgruntime.Object
 	return false
 }
 
-// Removes the finalizer from the given objects ObjectMeta.
+// Removes the finalizers from the given objects ObjectMeta.
 // Assumes that the given object is a secret.
-func (secretcontroller *SecretController) removeFinalizerFunc(obj pkgruntime.Object, finalizer string) (pkgruntime.Object, error) {
+func (secretcontroller *SecretController) removeFinalizerFunc(obj pkgruntime.Object, finalizers []string) (pkgruntime.Object, error) {
 	secret := obj.(*apiv1.Secret)
 	newFinalizers := []string{}
 	hasFinalizer := false
 	for i := range secret.ObjectMeta.Finalizers {
-		if string(secret.ObjectMeta.Finalizers[i]) != finalizer {
+		if !deletionhelper.ContainsString(finalizers, secret.ObjectMeta.Finalizers[i]) {
 			newFinalizers = append(newFinalizers, secret.ObjectMeta.Finalizers[i])
 		} else {
 			hasFinalizer = true
@@ -221,7 +222,7 @@ func (secretcontroller *SecretController) removeFinalizerFunc(obj pkgruntime.Obj
 	secret.ObjectMeta.Finalizers = newFinalizers
 	secret, err := secretcontroller.federatedApiClient.Core().Secrets(secret.Namespace).Update(secret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to remove finalizer %s from secret %s: %v", finalizer, secret.Name, err)
+		return nil, fmt.Errorf("failed to remove finalizers %v from secret %s: %v", finalizers, secret.Name, err)
 	}
 	return secret, nil
 }

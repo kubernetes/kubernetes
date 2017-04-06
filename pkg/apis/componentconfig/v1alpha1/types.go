@@ -130,6 +130,10 @@ type KubeSchedulerConfiguration struct {
 	FailureDomains string `json:"failureDomains"`
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection LeaderElectionConfiguration `json:"leaderElection"`
+	// LockObjectNamespace defines the namespace of the lock object
+	LockObjectNamespace string `json:"lockObjectNamespace"`
+	// LockObjectName defines the lock object name
+	LockObjectName string `json:"lockObjectName"`
 }
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -600,3 +604,11 @@ type KubeletAnonymousAuthentication struct {
 	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
 	Enabled *bool `json:"enabled"`
 }
+
+const (
+	// "kube-system" is the default scheduler lock object namespace
+	SchedulerDefaultLockObjectNamespace string = "kube-system"
+
+	// "kube-scheduler" is the default scheduler lock object name
+	SchedulerDefaultLockObjectName = "kube-scheduler"
+)
