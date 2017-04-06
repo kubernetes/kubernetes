@@ -201,6 +201,11 @@ func (n *node) write(p *page) {
 	}
 	p.count = uint16(len(n.inodes))
 
+	// Stop here if there are no items to write.
+	if p.count == 0 {
+		return
+	}
+
 	// Loop over each item and write it to the page.
 	b := (*[maxAllocSize]byte)(unsafe.Pointer(&p.ptr))[n.pageElementSize()*len(n.inodes):]
 	for i, item := range n.inodes {

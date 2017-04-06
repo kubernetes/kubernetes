@@ -5,3 +5,4 @@ metadata:
 provisioner: kubernetes.io/vsphere-volume
 parameters:
     diskformat: zeroedthick
+    fstype:     ext3

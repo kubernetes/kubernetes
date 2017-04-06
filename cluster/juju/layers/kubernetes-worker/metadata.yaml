@@ -18,7 +18,12 @@ requires:
   kube-api-endpoint:
     interface: http
   kube-dns:
+    # kube-dns is deprecated. Its functionality has been rolled into the
+    # kube-control interface. The kube-dns relation will be removed in
+    # a future release.
     interface: kube-dns
+  kube-control:
+    interface: kube-control
 provides:
   cni:
     interface: kubernetes-cni

@@ -1012,7 +1012,7 @@ func TestServiceRegistryExternalTrafficBetaAnnotationHealthCheckNodePortUserAllo
 	}
 	created_svc, err := storage.Create(ctx, svc)
 	if created_svc == nil || err != nil {
-		t.Errorf("Unexpected failure creating service %v", err)
+		t.Fatalf("Unexpected failure creating service: %v", err)
 	}
 	created_service := created_svc.(*api.Service)
 	if !service.NeedsHealthCheck(created_service) {

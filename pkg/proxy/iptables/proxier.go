@@ -193,18 +193,19 @@ type proxyEndpointMap map[proxy.ServicePortName][]*endpointsInfo
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
-	mu                        sync.Mutex // protects the following fields
-	serviceMap                proxyServiceMap
-	endpointsMap              proxyEndpointMap
-	portsMap                  map[localPort]closeable
-	haveReceivedServiceUpdate bool // true once we've seen an OnServiceUpdate event
-	// allEndpoints should never be modified by proxier - the pointers
-	// are shared with higher layers of kube-proxy. They are guaranteed
-	// to not be modified in the meantime, but also require to be not
-	// modified by Proxier.
-	// nil until we have seen an OnEndpointsUpdate event.
+	mu           sync.Mutex // protects the following fields
+	serviceMap   proxyServiceMap
+	endpointsMap proxyEndpointMap
+	portsMap     map[localPort]closeable
+	// allServices and allEndpoints should never be modified by proxier - the
+	// pointers are shared with higher layers of kube-proxy. They are guaranteed
+	// to not be modified in the meantime, but also require to be not modified
+	// by Proxier.
+	// nil until we have seen an On*Update event.
+	allServices  []*api.Service
 	allEndpoints []*api.Endpoints
-	throttle     flowcontrol.RateLimiter
+
+	throttle flowcontrol.RateLimiter
 
 	// These are effectively const and do not need the mutex to be held.
 	syncPeriod     time.Duration
@@ -435,7 +436,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 func (proxier *Proxier) Sync() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-	proxier.syncProxyRules()
+	proxier.syncProxyRules(syncReasonForce)
 }
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
@@ -457,7 +458,7 @@ type healthCheckPort struct {
 // Accepts a list of Services and the existing service map.  Returns the new
 // service map, a list of healthcheck ports to add to or remove from the health
 // checking listener service, and a set of stale UDP services.
-func buildServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMap) (proxyServiceMap, []healthCheckPort, []healthCheckPort, sets.String) {
+func buildNewServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMap) (proxyServiceMap, []healthCheckPort, []healthCheckPort, sets.String) {
 	newServiceMap := make(proxyServiceMap)
 	healthCheckAdd := make([]healthCheckPort, 0)
 	healthCheckDel := make([]healthCheckPort, 0)
@@ -529,15 +530,14 @@ func buildServiceMap(allServices []*api.Service, oldServiceMap proxyServiceMap) 
 // OnServiceUpdate tracks the active set of service proxies.
 // They will be synchronized using syncProxyRules()
 func (proxier *Proxier) OnServiceUpdate(allServices []*api.Service) {
-	start := time.Now()
-	defer func() {
-		glog.V(4).Infof("OnServiceUpdate took %v for %d services", time.Since(start), len(allServices))
-	}()
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-	proxier.haveReceivedServiceUpdate = true
+	if proxier.allServices == nil {
+		glog.V(2).Info("Received first Services update")
+	}
+	proxier.allServices = allServices
 
-	newServiceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(allServices, proxier.serviceMap)
+	newServiceMap, hcAdd, hcDel, staleUDPServices := buildNewServiceMap(allServices, proxier.serviceMap)
 	for _, hc := range hcAdd {
 		glog.V(4).Infof("Adding health check for %+v, port %v", hc.namespace, hc.nodeport)
 		// Turn on healthcheck responder to listen on the health check nodePort
@@ -554,7 +554,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []*api.Service) {
 
 	if len(newServiceMap) != len(proxier.serviceMap) || !reflect.DeepEqual(newServiceMap, proxier.serviceMap) {
 		proxier.serviceMap = newServiceMap
-		proxier.syncProxyRules()
+		proxier.syncProxyRules(syncReasonServices)
 	} else {
 		glog.V(4).Infof("Skipping proxy iptables rule sync on service update because nothing changed")
 	}
@@ -572,10 +572,10 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []*api.Endpoints) {
 	proxier.allEndpoints = allEndpoints
 
 	// TODO: once service has made this same transform, move this into proxier.syncProxyRules()
-	newMap, staleConnections := updateEndpoints(proxier.allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
+	newMap, staleConnections := buildNewEndpointsMap(proxier.allEndpoints, proxier.endpointsMap, proxier.hostname, proxier.healthChecker)
 	if len(newMap) != len(proxier.endpointsMap) || !reflect.DeepEqual(newMap, proxier.endpointsMap) {
 		proxier.endpointsMap = newMap
-		proxier.syncProxyRules()
+		proxier.syncProxyRules(syncReasonEndpoints)
 	} else {
 		glog.V(4).Infof("Skipping proxy iptables rule sync on endpoint update because nothing changed")
 	}
@@ -584,7 +584,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []*api.Endpoints) {
 }
 
 // Convert a slice of api.Endpoints objects into a map of service-port -> endpoints.
-func updateEndpoints(allEndpoints []*api.Endpoints, curMap proxyEndpointMap, hostname string,
+func buildNewEndpointsMap(allEndpoints []*api.Endpoints, curMap proxyEndpointMap, hostname string,
 	healthChecker healthChecker) (newMap proxyEndpointMap, staleSet map[endpointServicePair]bool) {
 
 	// return values
@@ -638,7 +638,7 @@ func updateEndpoints(allEndpoints []*api.Endpoints, curMap proxyEndpointMap, hos
 //
 // TODO: this could be simplified:
 // - hostPortInfo and endpointsInfo overlap too much
-// - the test for this is overlapped by the test for updateEndpoints
+// - the test for this is overlapped by the test for buildNewEndpointsMap
 // - naming is poor and responsibilities are muddled
 func accumulateEndpointsMap(endpoints *api.Endpoints, hostname string,
 	curEndpoints proxyEndpointMap,
@@ -757,19 +757,25 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServ
 	}
 }
 
+type syncReason string
+
+const syncReasonServices syncReason = "ServicesUpdate"
+const syncReasonEndpoints syncReason = "EndpointsUpdate"
+const syncReasonForce syncReason = "Force"
+
 // This is where all of the iptables-save/restore calls happen.
 // The only other iptables rules are those that are setup in iptablesInit()
 // assumes proxier.mu is held
-func (proxier *Proxier) syncProxyRules() {
+func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	if proxier.throttle != nil {
 		proxier.throttle.Accept()
 	}
 	start := time.Now()
 	defer func() {
-		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
+		glog.V(4).Infof("syncProxyRules(%s) took %v", reason, time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
-	if proxier.allEndpoints == nil || !proxier.haveReceivedServiceUpdate {
+	if proxier.allEndpoints == nil || proxier.allServices == nil {
 		glog.V(2).Info("Not syncing iptables until Services and Endpoints have been received from master")
 		return
 	}
